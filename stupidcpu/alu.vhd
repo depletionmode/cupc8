@@ -12,7 +12,7 @@ entity alu is
          );
 end alu;
 
-architecture behavioral of alu is
+architecture behavioural of alu is
 signal ra, rb: unsigned(7 downto 0);
 signal rres: unsigned(7 downto 0);
 signal c, z: bit;
