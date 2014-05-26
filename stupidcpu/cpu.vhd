@@ -11,8 +11,15 @@ entity cpu is
 		);
 end entity;
 
+-- instructions
+-- 1 bit - alu  indicator
+-- 4 bit - instruction
+-- 1 bit - immediate indicator
+-- 1 bit - src register
+-- 1 bit - dst register
+
 architecture behavioural of cpu is
-signal r0, r1, r2, r3:	unsigned(7 downto 0);
+signal r0, r1:	unsigned(7 downto 0);
 signal pc:	unsigned(15 downto 0);
 signal ins: unsigned(7 downto 0);
 begin
@@ -22,8 +29,9 @@ begin
 -- todo reset vector
 if(rising_edge(clk)) then
 -- fetch
-ins <= get mem from pc
+-- -- ins <= get from sram @ pc
 -- decode
+
 -- execute
 -- write back
 end if;

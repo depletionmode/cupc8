@@ -20,26 +20,25 @@ begin
 
 ra <= a;
 rb <= b;
-r <= rres(7 downto 0);
+r <= rres(;
 zf <= z;
 cf <= c;
 
 --- OPERATIONS
 -- 0000 EQ
--- 0001 AND
--- 0010 OR
--- 0011 NOT
--- 0100 XOR
--- 0101 NOR
---
--- 1001 ADD
--- 1010 SUB
--- 1011 MOD
--- 1100 DIV
--- 1101 MUL
--- 1110 INC
--- 1111 DEC
----
+-- 0001 GT
+-- 0010 LT
+-- 0011 AND
+-- 0100 OR
+-- 0101 NOT
+-- 0110 XOR
+-- 0111 NOR
+-- 1000 ADD
+-- 1001 SUB
+-- 1010 INC
+-- 1011 DEC
+-- 1100 SHL
+-- 1101 SHR
 
 process(clk)
 begin
@@ -54,29 +53,39 @@ begin
 					z <= '0';
 				end if;
 			when "0001" =>
-				rres <= ra and rb;
+				if (ra > rb) then
+					z <= '1';
+				else
+					z <= '0';
+				end if;
 			when "0010" =>
-				rres <= ra or rb;
+				if (ra < rb) then
+					z <= '1';
+				else
+					z <= '0';
+				end if;
 			when "0011" =>
-				rres <= not ra;
+				rres <= ra and rb;
 			when "0100" =>
-				rres <= ra xor rb;
+				rres <= ra or rb;
 			when "0101" =>
+				rres <= not ra;
+			when "0110" =>
+				rres <= ra xor rb;
+			when "0111" =>
 				rres <= ra nor rb;
-			when "1001" =>
+			when "1000" =>
 				rres <= ra + rb;
-			when "1010" =>
+			when "1001" =>
 				rres <= ra - rb;
-			when "1011" => -- BORKED!!
-				rres <= ra mod rb;
-			when "1100" =>
-				rres <= ra / rb;
-			--when "1101" => -- todo
-				--rres <= ra * rb;
-			when "1110" =>
+			when "1010" =>
 				rres <= ra + 1;
-			when "1111" =>
+			when "1011" =>
 				rres <= ra - 1;
+			when "1100" =>
+				rres <= ra sll rb;
+			when "1101" =>
+				rres <= ra srl rb;
 			when others => NULL;
 		end case;
 	end if;
