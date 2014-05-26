@@ -17,7 +17,7 @@ BEGIN
 
     -- Instantiate the Unit Under Test (UUT)
    uut: entity work.alu PORT MAP (
-          clk => clk,
+          n_en => clk,
           a => a,
           b => b,
           op => op,

@@ -5,21 +5,8 @@ use ieee.numeric_std.all;
 entity cpu is
 	port(
 			clk: 			in std_logic;
-			srst:			in std_logic;
-			halt:			out std_logic; -- high on catastrophic failure
-			
-			-- mmu
-			mem_addr:	out std_logic_vector(15 downto 0);
-			mem_data:	inout std_logic_vector(7 downto 0);
-			mem_wr:		out std_logic;
-			mem_rd:		out std_logic;
-			
-			-- alu
-			alu_en:		out std_logic;
-			alu_ra:		out unsigned(7 downto 0);
-			alu_rb:		out unsigned(7 downto 0);
-			alu_res:		in unsigned(7 downto 0);
-			zf:			in bit
+			n_srst:		in std_logic;
+			halt:			out std_logic -- high on catastrophic failure		
 		);
 end entity;
 
@@ -30,86 +17,140 @@ end entity;
 -- 1 bit - register 1
 -- 1 bit - register 2 (ignored if imm)
 
+-- 10000 NOP
+-- 10001 MOV
+
 architecture behavioural of cpu is
 signal r0, r1:	unsigned(7 downto 0);
-signal pc:	unsigned(15 downto 0);
+signal pc:	unsigned(15 downto 0) := x"0000";
 signal ins: unsigned(7 downto 0);
-variable imm_fetched: bit;
 signal imm_value: unsigned(7 downto 0);
 type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr1, fetch_addr2);
-signal stage: stages <= 'reset';
+signal stage, stage_nxt: stages;-- <= 'reset';
+signal data: unsigned(7 downto 0) := x"ff";
+-- alu
+signal			alu_en:		std_logic;
+signal			alu_ra:		unsigned(7 downto 0);
+signal			alu_rb:		unsigned(7 downto 0);
+signal			alu_res:		unsigned(7 downto 0);
+signal			alu_zf:		bit;
+component alu
+   port(
+			n_en:		in std_logic;
+			op:		in std_logic_vector(3 downto 0);
+			a, b:		in unsigned(7 downto 0);
+			r:			out unsigned(7 downto 0);
+			zf:		out bit
+		);
+end component;
+
+-- mmu
+signal 			mem_addr:	std_logic_vector(15 downto 0);
+signal 			mem_data:	std_logic_vector(7 downto 0);
+signal 			mem_en:		std_logic;
+signal 			mem_wr:		std_logic;
+component mmu
+	port(
+			addr:		in std_logic_vector(15 downto 0);
+			data:		inout std_logic_vector(7 downto 0);
+			n_en:		in std_logic;
+			n_wr:		in std_logic	
+		);
+end component;	
 begin
+alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
+mmu1: mmu port map(mem_addr, mem_data, mem_en, mem_wr);
 
-mem_addr <= to_stdlogicvector(unsigned(pc));
+mem_addr <= std_logic_vector(pc);
+data <= unsigned(mem_data);
 
-process(clk)
+process(stage)
+variable imm_fetched: bit;
+variable rtmp: unsigned(7 downto 0);
+variable ra, rb: unsigned(7 downto 0);
 begin
 case stage is
 	when fetch =>
-		ins <= mem_data;
-		mem_rd <= '0';
-		stage <= decode;
+		ins <= data;
+		mem_wr <= '1';
+		mem_en <= '0';
+		stage_nxt <= decode;
 	when fetch_imm =>
-		imm_value <= mem_data;
-		mem_rd <= '0';
-		imm_fetched <= '1';
-		stage <= decode;
+		imm_value <= data;
+		mem_en <= '0';
+		imm_fetched := '1';
+		stage_nxt <= decode;
 	when decode =>
 		pc <= pc + 1;
-		mem_rd <= '1';
-		if(ins(5) = '1' and imm_fetched = '0') then
+		mem_en <= '1';
+		
+		-- fetch imm
+		if(ins(2) = '1' and imm_fetched = '0') then
 			-- fetch imm
-			stage <= fetch_imm;
+			stage_nxt <= fetch_imm;
 		else
-			case ins(7) is
-				when '0' =>
-					-- alu op
-					if(ins(0) = '0') then
-						ra <= r0;
-					else
-						ra <= r1;
-					end if;
-					if(ins(5) = '1') then
-						rb <= imm_value;
-					else
-						--rb <= r0 when ins(1) = '0' else r1;
-						if(ins(1) = '0') then
-							rb <= r0;
-						else
-							rb <= r1;
-						end if;
-					end if;
-				when others => NULL;
-			end case;
-			stage <= execute;
+			-- register decode
+			if(ins(0) = '0') then ra := r0; else ra := r1; end if;
+			if(ins(1) = '0') then rb := r0; else ra := r1; end if;
+			--ra := r0 when ins(0)='0' else r1;
+			
+			-- alu setup
+			if(ins(7) = '0') then
+				alu_ra <= ra;
+				if(imm_fetched = '1') then alu_rb <= imm_value; else alu_rb <= rb; end if;
+			end if;
+			stage_nxt <= execute;
 		end if;
 	when execute =>
-		case ins(7) is
-			when '0' =>
-				alu_ra <= ra;
-				alu_rb <= rb;
-				alu_en <= '0';
+		-- exec alu
+		if(ins(7) = '0') then alu_en <= '0'; end if;
+		
+		case ins(6 downto 3) is
+			when "0001" => -- MOV
+				if(imm_fetched = '1') then
+					rtmp := imm_value;
+				else
+					rtmp := rb;
+				end if;
 			when others => NULL;
 		end case;
-		stage <= writeback;
+		
+		stage_nxt <= writeback;
 	when writeback =>
-		case ins(7) is
-			when '0' =>
+		-- get result from alu
+		if(ins(7)='0') then
 				alu_en <= '1';
-				r0 <= alu_res;
-			when others => NULL;
-		end case;
-		stage <= fetch;
+				rtmp := alu_res;
+		end if;
+		
+		-- write back into register
+		if(ins(0) = '0') then
+			r0 <= rtmp;
+		else
+			r1 <= rtmp;
+		end if;
+		
+		-- clear up
+		imm_fetched := '0';
+		
+		stage_nxt <= fetch;
 	when reset =>
-		pc <= x"100";
+		r0 <= x"00";
+		r1 <= x"00";
+		pc <= x"0100";
+		stage_nxt <= fetch;
 	when others =>
-		stage <= reset;
+		stage_nxt <= reset;
 	end case;
 end process;
 
-process( srst)
+process(clk)
 begin
-	stage <= reset;
+	if(n_srst = '0') then
+		stage <= reset;
+	else
+		stage <= stage_nxt;
+	end if;
 end process;
 
 end architecture;

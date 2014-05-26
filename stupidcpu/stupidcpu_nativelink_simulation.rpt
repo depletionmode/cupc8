@@ -19,5 +19,5 @@ Sim dir               :  simulation/modelsim
 
 Info: Starting NativeLink simulation with ModelSim-Altera software
 Sourced NativeLink script /home/depmod/fpga/altera/13.1/quartus/common/tcl/internal/nativelink/modelsim.tcl
-Warning: File stupidcpu_run_msim_rtl_vhdl.do already exists - backing up current file as stupidcpu_run_msim_rtl_vhdl.do.bak7
+Warning: File stupidcpu_run_msim_rtl_vhdl.do already exists - backing up current file as stupidcpu_run_msim_rtl_vhdl.do.bak11
 Info: Spawning ModelSim-Altera Simulation software 
