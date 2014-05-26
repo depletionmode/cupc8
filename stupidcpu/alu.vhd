@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity alu is
     port(
-            clk:		in std_logic;
+            n_en:		in std_logic;
 				op:		in std_logic_vector(3 downto 0);
 				a, b:		in unsigned(7 downto 0);
 				r:			out unsigned(7 downto 0);
@@ -40,11 +40,25 @@ cf <= c;
 -- 1100 SHL
 -- 1101 SHR
 
-process(clk)
+process(n_en)
 begin
-	if(rising_edge(clk)) then
-		z <= '0';
+	if(n_en = '0') then
 		c <= '0';
+		
+		--z <= 	'1' when op = ("0000" and ra = rb) or (op = "0001" and ra > rb) or (op = "0010" and ra > rb) else
+		--		(others=>'0');
+				
+		--rres <= 	(ra and rb) when op = "0011" else
+		--			(ra or rb) when op = "0100" else
+		--			(ra not rb) when op = "0101" else
+		--			(ra xor rb) when op = "0110" else
+		--			(ra nor rb) when op = "0111" else
+		--			(ra + rb) when op = "1000" else
+		--			(ra - rb) when op = "1001" else
+		--			(ra + 1) when op = "1010" else
+		--			(ra - 1) when op = "1011" else
+		--			(others=>rres);
+		
 		case op is
 			when "0000" =>
 				if (ra = rb) then
@@ -83,9 +97,9 @@ begin
 			when "1011" =>
 				rres <= ra - 1;
 			when "1100" =>
-				rres <= to_bitvector(to_stdlogicvector(ra)) sla to_integer(rb); --shift_left(ra, rb);
+				rres <= shift_left(ra, to_integer(rb));
 			when "1101" =>
-				rres <= to_bitvector(to_stdlogicvector(ra)) sra to_integer(rb);
+				rres <= shift_right(ra, to_integer(rb));
 			when others => NULL;
 		end case;
 	end if;
