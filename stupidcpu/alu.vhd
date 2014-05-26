@@ -20,7 +20,7 @@ begin
 
 ra <= a;
 rb <= b;
-r <= rres(;
+r <= rres;
 zf <= z;
 cf <= c;
 
