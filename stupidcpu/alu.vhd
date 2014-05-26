@@ -8,21 +8,20 @@ entity alu is
 				op:		in std_logic_vector(3 downto 0);
 				a, b:		in unsigned(7 downto 0);
 				r:			out unsigned(7 downto 0);
-				zf, cf:	out bit
+				zf:	out unsigned(0 downto 0)
          );
 end alu;
 
 architecture behavioural of alu is
 signal ra, rb: unsigned(7 downto 0);
 signal rres: unsigned(7 downto 0);
-signal c, z: bit;
+signal z: unsigned(0 downto 0);
 begin
 
 ra <= a;
 rb <= b;
 r <= rres;
 zf <= z;
-cf <= c;
 
 --- OPERATIONS
 -- 0000 EQ
@@ -43,7 +42,6 @@ cf <= c;
 process(n_en)
 begin
 	if(n_en = '0') then
-		c <= '0';
 		
 		--z <= 	'1' when op = ("0000" and ra = rb) or (op = "0001" and ra > rb) or (op = "0010" and ra > rb) else
 		--		(others=>'0');
@@ -62,21 +60,21 @@ begin
 		case op is
 			when "0000" =>
 				if (ra = rb) then
-					z <= '1';
+					z <= "1";
 				else
-					z <= '0';
+					z <= "0";
 				end if;
 			when "0001" =>
 				if (ra > rb) then
-					z <= '1';
+					z <= "1";
 				else
-					z <= '0';
+					z <= "0";
 				end if;
 			when "0010" =>
 				if (ra < rb) then
-					z <= '1';
+					z <= "1";
 				else
-					z <= '0';
+					z <= "0";
 				end if;
 			when "0011" =>
 				rres <= ra and rb;

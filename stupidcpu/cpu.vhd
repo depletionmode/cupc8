@@ -22,7 +22,8 @@ end entity;
 
 architecture behavioural of cpu is
 signal r0, r1:	unsigned(7 downto 0);
-signal pc:	unsigned(15 downto 0) := x"0000";
+signal pc, sp:	unsigned(15 downto 0) := x"0000";
+signal f: unsigned(3 downto 0) := x"0";
 signal ins: unsigned(7 downto 0);
 signal imm_value: unsigned(7 downto 0);
 type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr1, fetch_addr2);
@@ -33,14 +34,14 @@ signal			alu_en:		std_logic;
 signal			alu_ra:		unsigned(7 downto 0);
 signal			alu_rb:		unsigned(7 downto 0);
 signal			alu_res:		unsigned(7 downto 0);
-signal			alu_zf:		bit;
+signal			alu_zf:		unsigned(0 downto 0);
 component alu
    port(
 			n_en:		in std_logic;
 			op:		in std_logic_vector(3 downto 0);
 			a, b:		in unsigned(7 downto 0);
 			r:			out unsigned(7 downto 0);
-			zf:		out bit
+			zf:		out unsigned(0 downto 0)
 		);
 end component;
 
@@ -63,6 +64,7 @@ mmu1: mmu port map(mem_addr, mem_data, mem_en, mem_wr);
 
 mem_addr <= std_logic_vector(pc);
 data <= unsigned(mem_data);
+f <= "000" & alu_zf;
 
 process(stage)
 variable imm_fetched: bit;
@@ -137,7 +139,8 @@ case stage is
 	when reset =>
 		r0 <= x"00";
 		r1 <= x"00";
-		pc <= x"0100";
+		sp <= x"0100";
+		pc <= x"1000";
 		stage_nxt <= fetch;
 	when others =>
 		stage_nxt <= reset;

@@ -10,7 +10,7 @@ ARCHITECTURE behavior OF tb IS
    signal clk: std_logic := '0';
    signal a,b,r: unsigned(7 downto 0) := (others => '0');
    signal op: std_logic_vector(3 downto 0) := (others => '0');
-	signal zf: bit := '0';
+	signal zf: unsigned := "0";
    constant clk_period : time := 10 ns;
 
 BEGIN
