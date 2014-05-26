@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 
 entity alu is
     port(
-            n_en:		in std_logic;
+            clk:		in std_logic;
 				op:		in std_logic_vector(3 downto 0);
 				a, b:		in unsigned(7 downto 0);
 				r:			out unsigned(7 downto 0);
@@ -40,9 +40,9 @@ cf <= c;
 -- 1100 SHL
 -- 1101 SHR
 
-process(n_en)
+process(clk)
 begin
-	if(n_en = '0') then
+	if(rising_edge(clk)) then
 		c <= '0';
 		
 		--z <= 	'1' when op = ("0000" and ra = rb) or (op = "0001" and ra > rb) or (op = "0010" and ra > rb) else
