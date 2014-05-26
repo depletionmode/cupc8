@@ -83,9 +83,9 @@ begin
 			when "1011" =>
 				rres <= ra - 1;
 			when "1100" =>
-				rres <= ra sll rb;
+				rres <= to_bitvector(to_stdlogicvector(ra)) sla to_integer(rb); --shift_left(ra, rb);
 			when "1101" =>
-				rres <= ra srl rb;
+				rres <= to_bitvector(to_stdlogicvector(ra)) sra to_integer(rb);
 			when others => NULL;
 		end case;
 	end if;
