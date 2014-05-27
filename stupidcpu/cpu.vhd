@@ -6,7 +6,17 @@ entity cpu is
 	port(
 			clk: 			in std_logic;
 			n_srst:		in std_logic;
-			halt:			out std_logic -- high on catastrophic failure		
+			n_hrst:		in std_logic;
+			halt:			out std_logic; -- high on catastrophic failure
+			
+			-- bus
+			spi_cs0,
+			spi_cs1,
+			spi_cs2,
+			spi_cs3:		out std_logic;
+			spi_clk:		out std_logic;
+			spi_mosi:	out std_logic;
+			spi_miso:	in std_logic;
 		);
 end entity;
 
@@ -149,7 +159,7 @@ end process;
 
 process(clk)
 begin
-	if(n_srst = '0') then
+	if(n_hrst = '0') then
 		stage <= reset;
 	else
 		stage <= stage_nxt;
