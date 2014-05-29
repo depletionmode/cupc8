@@ -199,7 +199,7 @@ case stage is
 				mem_wr <= '0';
 				mem_en <= '0';
 				rwb := rtmp;
-				--mem_data <= std_logic_vector(rwb);
+				mem_data <= std_logic_vector(rwb);
 			when others => NULL;
 		end case;
 		

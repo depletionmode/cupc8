@@ -68,6 +68,8 @@ component mux4x10
 		);
 end component;
 
+signal			data_out: std_logic_vector(7 downto 0);
+
 -- spi
 type int_array is array(0 to 3) of integer;
 --signal			spi_clk:			std_logic;
@@ -79,6 +81,7 @@ signal			spi_tx_data:	std_logic_vector(7 downto 0);
 --signal			spi_rx_data:	std_logic_vector(7 downto 0);
 --signal			spi_rdy:			std_logic;
 signal			spi_transfer:	std_logic_vector(3 downto 0);
+shared variable spi_device: integer;
 component spi
 	port(
 			ss:		out std_logic;
@@ -106,46 +109,50 @@ spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3)
 
 spi_sck <= mux_out(9);
 
-process(n_en)
-variable spi_device: integer;
-begin
-	if(n_en = '0') then
-		if n_wr = '1' then -- read
-				case addr(15 downto 12) is
-					when x"1" => -- fake stuff!!!
-						case addr(11 downto 0) is
-							when x"001" => data <= "10001100"; -- MOV R0, #1
-							when x"002" => data <= "00000001";
-							when x"003" => data <= "10001101"; -- MOV R1, #3
-							when x"004" => data <= "00000011";
-							when x"005" => data <= "01000100"; -- ADD R0, #1
-							when x"006" => data <= "00000001";
-							when x"007" => data <= "01000101"; -- ADD R1, #1
-							when x"008" => data <= "00000001";
-							when x"009" => data <= "01000001"; -- ADD R1, R0
-							when x"00a" => data <= "01000010"; -- ADD R0, R1
-							when others =>	data <= "10000000";
-						end case;
-					
-					when x"f" => -- i/o
-						case addr(11 downto 8) is
-							when x"1" => -- spi
-								spi_device := to_integer(unsigned(addr(7 downto 4)));
-								case addr(3 downto 0) is
-									when x"1" =>
-										data <= mux_out(7 downto 0);
-										spi_transfer(spi_device) <= '1';
-									when x"3" =>
-										data <= "0000000" & not mux_out(8); -- '1' when done
-									when x"f" => NULL; -- todo implement config read
-									when others => NULL;
-								end case;
+data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
+
+read : process(n_en, n_wr) begin
+	if n_wr = '1' and n_en='0' then
+		case addr(15 downto 12) is
+			when x"1" => -- fake stuff!!!
+				case addr(11 downto 0) is
+					when x"001" => data_out <= "10001100"; -- MOV R0, #1
+					when x"002" => data_out <= "00000001";
+					when x"003" => data_out <= "10001101"; -- MOV R1, #3
+					when x"004" => data_out <= "00000011";
+					when x"005" => data_out <= "01000100"; -- ADD R0, #1
+					when x"006" => data_out <= "00000001";
+					when x"007" => data_out <= "01000101"; -- ADD R1, #1
+					when x"008" => data_out <= "00000001";
+					when x"009" => data_out <= "01000001"; -- ADD R1, R0
+					when x"00a" => data_out <= "01000010"; -- ADD R0, R1
+					when others =>	data_out <= "10000000";
+				end case;
+			
+			when x"f" => -- i/o
+				case addr(11 downto 8) is
+					when x"1" => -- spi
+						spi_device := to_integer(unsigned(addr(7 downto 4)));
+						case addr(3 downto 0) is
+							when x"1" =>
+								data_out <= mux_out(7 downto 0);
+								spi_transfer(spi_device) <= '1';
+							when x"3" =>
+								data_out <= "0000000" & not mux_out(8); -- '1' when done
+							when x"f" => NULL; -- todo implement config read
 							when others => NULL;
 						end case;
 					when others => NULL;
 				end case;
-		else -- write
-			case addr(15 downto 12) is
+			when others => NULL;
+		end case;
+	end if;
+end process;
+
+
+write : process(n_en, n_wr) begin
+	if n_wr = '1' and n_en='1' then
+		case addr(15 downto 12) is
 				when x"f" => -- i/o
 					case addr(11 downto 8) is
 						when x"1" => -- spi
@@ -153,10 +160,10 @@ begin
 							case addr(3 downto 0) is
 								when x"0" =>
 									--spi_tx_data <= data;
-									spi_transfer(spi_device) <= '1';
+									--spi_transfer(spi_device) <= '1';
 								when x"2" =>
 									mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
-									spi_transfer(spi_device) <= '0'; -- active low
+									--spi_transfer(spi_device) <= '0'; -- active low
 								when x"f" =>
 									--spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
 									--spi_cont(spi_device) <= data(0);
@@ -168,12 +175,9 @@ begin
 					end case;
 				when others => NULL;
 			end case;
-		end if;
-	else
-		--data <= data;
-		data <= "ZZZZZZZZ";
 	end if;
 end process;
+
 end architecture;
 
 --
