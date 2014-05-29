@@ -145,32 +145,33 @@ begin
 					when others => NULL;
 				end case;
 		else -- write
-				case addr(15 downto 12) is
-					when x"f" => -- i/o
-						case addr(11 downto 8) is
-							when x"1" => -- spi
-								spi_device := to_integer(unsigned(addr(7 downto 4)));
-								case addr(3 downto 0) is
-									when x"0" =>
-										spi_tx_data <= data;
-										spi_transfer(spi_device) <= '1';
-									when x"2" =>
-										mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
-										spi_transfer(spi_device) <= '0'; -- active low
-									when x"f" =>
-										spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
-										spi_cont(spi_device) <= data(0);
-										spi_cpol(spi_device) <= data(1);
-										spi_cpha(spi_device) <= data(2);
-									when others => NULL;
-								end case;
-							when others => NULL;
-						end case;
-					when others => NULL;
-				end case;
+			case addr(15 downto 12) is
+				when x"f" => -- i/o
+					case addr(11 downto 8) is
+						when x"1" => -- spi
+							spi_device := to_integer(unsigned(addr(7 downto 4)));
+							case addr(3 downto 0) is
+								when x"0" =>
+									--spi_tx_data <= data;
+									spi_transfer(spi_device) <= '1';
+								when x"2" =>
+									mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
+									spi_transfer(spi_device) <= '0'; -- active low
+								when x"f" =>
+									--spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
+									--spi_cont(spi_device) <= data(0);
+									--spi_cpol(spi_device) <= data(1);
+									--spi_cpha(spi_device) <= data(2);
+								when others => NULL;
+							end case;
+						when others => NULL;
+					end case;
+				when others => NULL;
+			end case;
 		end if;
 	else
-		data <= data;
+		--data <= data;
+		data <= "ZZZZZZZZ";
 	end if;
 end process;
 end architecture;

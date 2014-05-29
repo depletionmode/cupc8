@@ -82,7 +82,6 @@ alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, al
 mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso);
 
 f <= "000" & alu_zf;
-data <= unsigned(mem_data);
 
 process(stage)
 variable imm_fetched: bit;
@@ -95,18 +94,21 @@ begin
 
 case stage is
 	when fetch =>
+		--data <= unsigned(mem_data);
 		mem_addr <= std_logic_vector(pc);
 		ins <= data;
 		mem_wr <= '1';
 		mem_en <= '0';
 		stage_nxt <= decode;
 	when fetch_imm =>
+		--data <= unsigned(mem_data);
 		mem_addr <= std_logic_vector(pc);
 		imm_value <= data;
 		mem_en <= '0';
 		imm_fetched := '1';
 		stage_nxt <= decode;
 	when fetch_addr =>
+		--data <= unsigned(mem_data);
 		mem_addr <= std_logic_vector(pc);
 		mem_en <= '0';
 		if addr1_fetched = '0' then
@@ -119,7 +121,8 @@ case stage is
 			addr2_fetched := '1';
 			stage_nxt <= decode;
 		end if;
-	when decode =>
+	when decode =>	
+		data <= unsigned(mem_data);
 		pc <= pc + 1;
 		mem_en <= '1';
 		
