@@ -18,27 +18,25 @@ entity spi is
 			cont:			in std_logic := '1'; -- 1 - continue, 0 - last
 			cpol:			in std_logic := '1';
 			cpha:			in std_logic := '1';
-			data:			inout std_logic_vector(7 downto 0);
+			tx_data:		in std_logic_vector(7 downto 0);
+			rx_data:		out std_logic_vector(7 downto 0);
 			n_rdy:		out std_logic := '1';
 			n_transfer:	in std_logic := '1'
 		);
 end entity;
 
-
 architecture behavioural of spi is
-variable bit_current: integer range 0 to 32 := 0;
-variable n_done: std_logic := '1';
-variable clk_counter: integer := 0;
 signal buffer_tx, buffer_rx:	std_logic_vector(7 downto 0);
 signal clk_internal: std_logic;
 begin
 
-process(clk)
+process(clk, clk_internal)
 begin
 sck <= clk_internal;
 end process;
 
-process(clk_internal)
+process(clk, clk_internal)
+variable clk_counter: integer := 0;
 begin
 if rising_edge(clk) then
 	if clk_div = 0 then
@@ -56,39 +54,54 @@ if rising_edge(clk) then
 end if;
 end process;
 
-process(clk_internal)
+process(clk)
+variable bit_current: integer range 0 to 8 := 0;
+variable n_done: std_logic := '1';
+variable detect_transfer: std_ulogic_vector (1 downto 0) := "00";
+variable detect_clk: std_ulogic_vector (1 downto 0) := "00";
 begin
-if n_transfer = '0' then
-	n_done := '1';
-	n_rdy <= '1';
-	ss <= '0';
-	buffer_tx <= data;
+if rising_edge(clk) then
+	detect_transfer(1) := detect_transfer(0);
+	detect_transfer(0) := n_transfer;
+	
+	if detect_transfer = "10" then -- falling edge
+		n_done := '1';
+		n_rdy <= '1';
+		ss <= '0';
+		buffer_tx <= tx_data;
+	end if;
 end if;
 
-if n_done = '1' then
-	if bit_current <= 31 then
-		if cpol = '1' then
-			if falling_edge(clk_internal) then
-				mosi <= buffer_tx(bit_current);
-				buffer_rx(bit_current) <= miso;
+
+if rising_edge(clk) then
+	detect_clk(1) := detect_clk(0);
+	detect_clk(0) := clk_internal;
+	
+	if n_done = '1' then
+		if bit_current <= 7 then
+			if cpol = '1' then
+				if detect_clk = "10" then -- falling edge
+					mosi <= buffer_tx(bit_current);
+					buffer_rx(bit_current) <= miso;
+				end if;
+			else
+				if detect_clk = "01" then -- rising edge
+					mosi <= buffer_tx(bit_current);
+					buffer_rx(bit_current) <= miso;
+				end if;
 			end if;
+			bit_current := bit_current + 1;
 		else
-			if rising_edge(clk_internal) then
-				mosi <= buffer_tx(bit_current);
-				buffer_rx(bit_current) <= miso;
+			n_done := '0';
+			n_rdy <= '0';
+			if cont = '0' then
+				ss <= '1';
+			rx_data <= buffer_rx;
 			end if;
 		end if;
-		bit_current := bit_current + 1;
 	else
-		n_done := '0';
-		n_rdy <= '0';
-		if cont = '0' then
-			ss <= '1';
-		data <= buffer_rx;
-		end if;
+		mosi <= 'Z';
 	end if;
-else
-	mosi <= 'Z';
 end if;
 end process;
 end architecture;

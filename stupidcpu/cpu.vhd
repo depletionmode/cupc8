@@ -10,8 +10,8 @@ entity cpu is
 			halt:			out std_logic; -- high on catastrophic failure
 			
 			-- bus
-			spi_cs:		out std_logic_vector(3 downto 0);
-			spi_clk:		out std_logic;
+			spi_ss:		out std_logic_vector(3 downto 0);
+			spi_sck:		out std_logic;
 			spi_mosi:	out std_logic;
 			spi_miso:	in std_logic
 		);
@@ -64,27 +64,40 @@ signal 			mem_en:		std_logic;
 signal 			mem_wr:		std_logic;
 component mmu
 	port(
+			clk:		in std_logic;
+			
 			addr:		in std_logic_vector(15 downto 0);
 			data:		inout std_logic_vector(7 downto 0);
 			n_en:		in std_logic;
-			n_wr:		in std_logic	
+			n_wr:		in std_logic;	
+			
+			spi_ss:			out std_logic_vector(3 downto 0);
+			spi_sck:			out std_logic;
+			spi_mosi:		out std_logic;
+			spi_miso:		in std_logic
 		);
 end component;	
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
-mmu1: mmu port map(mem_addr, mem_data, mem_en, mem_wr);
+mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso);
 
-data <= unsigned(mem_data);
 f <= "000" & alu_zf;
 
-process(stage)
+process(clk,stage)
 variable imm_fetched: bit;
 variable addr1_fetched: bit;
 variable addr2_fetched: bit;
-variable rtmp: unsigned(7 downto 0);
+variable rtmp, rwb: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
 begin
+--data <= unsigned(mem_data);
+
+if rising_edge(clk) then
+	--data <= unsigned(mem_data);
+	mem_data <= std_logic_vector(rwb);
+end if;
+	
 case stage is
 	when fetch =>
 		mem_addr <= std_logic_vector(pc);
@@ -179,7 +192,8 @@ case stage is
 				-- write back into memory
 				mem_wr <= '0';
 				mem_en <= '0';
-				mem_data <= std_logic_vector(rtmp);
+				rwb := rtmp;
+				--mem_data <= std_logic_vector(rtmp);
 			when others => NULL;
 		end case;
 		

@@ -11,13 +11,18 @@ ARCHITECTURE behavior OF cpu_tb IS
    constant clk_period : time := 10 ns;
 	
 	signal n_srst: std_logic := '1';
+	signal n_hrst: std_logic := '1';
+	
+	signal spi_miso: std_logic := 'Z';
 
 BEGIN
 
     -- Instantiate the Unit Under Test (UUT)
    uut: entity work.cpu PORT MAP (
 			n_srst => n_srst,
-         clk => clk
+			n_hrst => n_hrst,
+         clk => clk,
+			spi_miso => spi_miso
         );
 
    -- Clock process definitions
