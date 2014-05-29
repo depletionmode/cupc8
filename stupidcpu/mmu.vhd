@@ -111,7 +111,7 @@ spi_sck <= mux_out(9);
 
 data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
 
-read : process(n_en, n_wr) begin
+read : process(n_en) begin
 	if n_wr = '1' and n_en='0' then
 		case addr(15 downto 12) is
 			when x"1" => -- fake stuff!!!
@@ -150,8 +150,8 @@ read : process(n_en, n_wr) begin
 end process;
 
 
-write : process(n_en, n_wr) begin
-	if n_wr = '1' and n_en='1' then
+write : process(n_en) begin
+	if n_wr = '0' and n_en='0' then
 		case addr(15 downto 12) is
 				when x"f" => -- i/o
 					case addr(11 downto 8) is
