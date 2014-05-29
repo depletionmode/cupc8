@@ -49,7 +49,6 @@ entity mmu is
 			spi_miso:		in std_logic
 		);
 end entity;
-
 architecture behavioural of mmu is
 -- spi output mux
 signal	mux_x0:		std_logic_vector(9 downto 0);
@@ -171,7 +170,47 @@ begin
 				end case;
 		end if;
 	else
-		data <= "ZZZZZZZZ";
+		data <= data;
 	end if;
 end process;
 end architecture;
+
+--
+--entity mmu is
+--	port(
+--			addr:		in std_logic_vector(15 downto 0);
+--			data:		inout std_logic_vector(7 downto 0);
+--			n_en:		in std_logic;
+--			n_wr:		in std_logic
+--		);
+--end entity;
+--
+--
+--architecture behavioural of mmu is
+--begin
+--process(n_en)
+--begin
+--	if(n_en = '0') then
+--		case n_wr is
+--			when '1' => -- read
+--				-- fake stuff!!!
+--				case addr is
+--					when x"1001" => data <= "10001100"; -- MOV R0, #1
+--					when x"1002" => data <= "00000001";
+--					when x"1003" => data <= "10001101"; -- MOV R1, #3
+--					when x"1004" => data <= "00000011";
+--					when x"1005" => data <= "01000100"; -- ADD R0, #1
+--					when x"1006" => data <= "00000001";
+--					when x"1007" => data <= "01000101"; -- ADD R1, #1
+--					when x"1008" => data <= "00000001";
+--					when x"1009" => data <= "01000001"; -- ADD R1, R0
+--					when x"100a" => data <= "01000010"; -- ADD R0, R1
+--					when others =>	data <= "10000000"; -- NOP
+--				end case; -- end fake stuff!!!
+--			when '0' => -- write
+--				NULL;
+--			when others => NULL;
+--		end case;
+--	end if;
+--end process;
+--end architecture;

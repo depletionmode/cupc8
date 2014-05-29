@@ -38,8 +38,8 @@ BEGIN
    stim_proc: process
    begin        
       wait for clk_period/4;
-			n_srst <= '0'; wait for clk_period;
-			n_srst <= '1';
+			n_hrst <= '0'; wait for clk_period;
+			n_hrst <= '1';
       wait;
    end process;
 
