@@ -85,6 +85,7 @@ mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi
 
 f <= "000" & alu_zf;
 
+-- mmu tristate handling
 data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
 mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
 

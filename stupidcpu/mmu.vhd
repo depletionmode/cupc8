@@ -136,7 +136,7 @@ read : process(n_en, n_wr, addr) begin
 						case addr(3 downto 0) is
 							when x"1" =>
 								data_out <= mux_out(7 downto 0);
-								spi_transfer(spi_device) <= '1';
+								--spi_transfer(spi_device) <= '1';
 							when x"3" =>
 								data_out <= "0000000" & not mux_out(8); -- '1' when done
 							when x"f" => NULL; -- todo implement config read
@@ -150,7 +150,7 @@ read : process(n_en, n_wr, addr) begin
 end process;
 
 
-write : process(n_en, n_wr, addr) begin
+write : process(n_en, n_wr, addr, data) begin
 	if n_wr = '0' and n_en='0' then
 		case addr(15 downto 12) is
 				when x"f" => -- i/o
@@ -159,16 +159,16 @@ write : process(n_en, n_wr, addr) begin
 							spi_device := to_integer(unsigned(addr(7 downto 4)));
 							case addr(3 downto 0) is
 								when x"0" =>
-									--spi_tx_data <= data;
-									--spi_transfer(spi_device) <= '1';
+									spi_tx_data <= data;
+									spi_transfer(spi_device) <= '1';
 								when x"2" =>
 									mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
-									--spi_transfer(spi_device) <= '0'; -- active low
+									spi_transfer(spi_device) <= '0'; -- active low
 								when x"f" =>
-									--spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
-									--spi_cont(spi_device) <= data(0);
-									--spi_cpol(spi_device) <= data(1);
-									--spi_cpha(spi_device) <= data(2);
+									spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
+									spi_cont(spi_device) <= data(0);
+									spi_cpol(spi_device) <= data(1);
+									spi_cpha(spi_device) <= data(2);
 								when others => NULL;
 							end case;
 						when others => NULL;
