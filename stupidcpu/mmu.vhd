@@ -101,7 +101,7 @@ component spi
 		);
 end component;	
 begin
-mux0: mux4x10 port map(mux_x0, mux_x1, mux_x2, mux_x3, mux_out, mux_s);
+--mux0: mux4x10 port map(mux_x0, mux_x1, mux_x2, mux_x3, mux_out, mux_s);
 spi0: spi port map(spi_ss(0), mux_x0(9), spi_mosi, spi_miso, clk, spi_clk_div(0), spi_cont(0), spi_cpol(0), spi_cpha(0), spi_tx_data, mux_x0(7 downto 0), mux_x0(8), spi_transfer(0));
 spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1), spi_cont(1), spi_cpol(1), spi_cpha(1), spi_tx_data, mux_x1(7 downto 0), mux_x1(8), spi_transfer(1));
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
@@ -111,7 +111,7 @@ spi_sck <= mux_out(9);
 
 data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
 
-read : process(n_en) begin
+read : process(n_en, n_wr, addr) begin
 	if n_wr = '1' and n_en='0' then
 		case addr(15 downto 12) is
 			when x"1" => -- fake stuff!!!
@@ -142,15 +142,15 @@ read : process(n_en) begin
 							when x"f" => NULL; -- todo implement config read
 							when others => NULL;
 						end case;
-					when others => NULL;
+					when others => data_out <= "00000000";
 				end case;
-			when others => NULL;
+			when others => data_out <= "00000000";
 		end case;
 	end if;
 end process;
 
 
-write : process(n_en) begin
+write : process(n_en, n_wr, addr) begin
 	if n_wr = '0' and n_en='0' then
 		case addr(15 downto 12) is
 				when x"f" => -- i/o

@@ -77,38 +77,40 @@ component mmu
 			spi_miso:		in std_logic
 		);
 end component;	
+
+shared variable rwb: unsigned(7 downto 0);
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
 mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso);
 
 f <= "000" & alu_zf;
 
+data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
+mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
+
 process(stage)
 variable imm_fetched: bit;
 variable addr1_fetched: bit;
 variable addr2_fetched: bit;
-variable rtmp, rwb: unsigned(7 downto 0);
+variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
 begin
 
 case stage is
 	when fetch =>
-		--data <= unsigned(mem_data);
 		mem_addr <= std_logic_vector(pc);
 		ins <= data;
 		mem_wr <= '1';
 		mem_en <= '0';
 		stage_nxt <= decode;
 	when fetch_imm =>
-		--data <= unsigned(mem_data);
 		mem_addr <= std_logic_vector(pc);
 		imm_value <= data;
 		mem_en <= '0';
 		imm_fetched := '1';
 		stage_nxt <= decode;
 	when fetch_addr =>
-		--data <= unsigned(mem_data);
 		mem_addr <= std_logic_vector(pc);
 		mem_en <= '0';
 		if addr1_fetched = '0' then
@@ -122,7 +124,6 @@ case stage is
 			stage_nxt <= decode;
 		end if;
 	when decode =>	
-		data <= unsigned(mem_data);
 		pc <= pc + 1;
 		mem_en <= '1';
 		
@@ -199,7 +200,6 @@ case stage is
 				mem_wr <= '0';
 				mem_en <= '0';
 				rwb := rtmp;
-				mem_data <= std_logic_vector(rwb);
 			when others => NULL;
 		end case;
 		
@@ -221,7 +221,6 @@ case stage is
 		stage_nxt <= fetch;
 		mem_en <= '1';
 		mem_wr <= '1';
-		--mem_data <= "10000000";
 		mem_addr <= x"ffff";
 	when others =>
 		stage_nxt <= reset;
