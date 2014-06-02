@@ -4,9 +4,8 @@ use ieee.numeric_std.all;
 
 -- spi
 -- clk devided by clk_div * 2
--- todo: pll, support for cpha = 1 (currently defaults to cpha = 0)
+-- todo: pll, support for cpha =0 (currently defaults to cpha = 1)
 -- bug: clk_div = 0 is borked
--- bug: cpol = 0 is borked
 
 entity spi is
 	port(
