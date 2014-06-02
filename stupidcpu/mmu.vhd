@@ -54,15 +54,13 @@ architecture behavioural of mmu is
 signal	ram_en:			std_logic;
 signal	ram_we:			std_logic;
 signal 	ram_addr:		std_logic_vector(15 downto 0);
-signal	ram_datain:		std_logic_vector(7 downto 0);
-signal	ram_dataout:	std_logic_vector(7 downto 0);	
+signal	ram_data:		std_logic_vector(7 downto 0);
 component simpleram is
   port (
     en   	: in  std_logic;
     we      : in  std_logic;
     address : in  std_logic_vector;
-    datain  : in  std_logic_vector;
-    dataout : out std_logic_vector
+    data  : inout  std_logic_vector
   );
 end component;
 
@@ -123,23 +121,22 @@ spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1)
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
 spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3), spi_cont(3), spi_cpol(3), spi_cpha(3), spi_tx_data, mux_x3(7 downto 0), mux_x3(8), spi_transfer(3));
 
-ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_datain, ram_dataout);
+ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
 
 spi_sck <= mux_out(9);
 
 data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
---ram_en <= not n_en;
-ram_addr <= addr;
 
-ram_en <= '1' when (n_en = '0' and n_wr = '0') else '0';
+ram_en <= not n_en;
+ram_addr <= addr;
 ram_we <= '1' when (n_en = '0' and n_wr = '0') else '0';
 
 read : process(n_en, n_wr, addr) begin
 	if n_wr = '1' and n_en='0' then
 		case addr(15 downto 12) is
 			when x"0" => -- on chip RAM (for now)
-				--data_out <= ram_dataout;
-				data_out <= "11000011";
+				data_out <= ram_data;
+				--data_out <= "11000011";
 			when x"1" => -- fake stuff!!!
 				case addr(11 downto 0) is
 					when x"001" => data_out <= "10001100"; -- MOV R0, #1
@@ -188,7 +185,7 @@ write : process(n_en, n_wr, addr, data) begin
 	if n_wr = '0' and n_en='0' then
 		case addr(15 downto 12) is
 			when x"0" => -- on chip RAM (for now)
-				ram_datain <= data;
+				ram_data <= data;
 			when x"f" => -- i/o
 				case addr(11 downto 8) is
 					when x"1" => -- spi
