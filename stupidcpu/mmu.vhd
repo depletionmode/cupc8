@@ -50,6 +50,22 @@ entity mmu is
 		);
 end entity;
 architecture behavioural of mmu is
+-- simple internal ram for testing/stack?
+signal	ram_en:			std_logic;
+signal	ram_we:			std_logic;
+signal 	ram_addr:		std_logic_vector(15 downto 0);
+signal	ram_datain:		std_logic_vector(7 downto 0);
+signal	ram_dataout:	std_logic_vector(7 downto 0);	
+component simpleram is
+  port (
+    en   	: in  std_logic;
+    we      : in  std_logic;
+    address : in  std_logic_vector;
+    datain  : in  std_logic_vector;
+    dataout : out std_logic_vector
+  );
+end component;
+
 -- spi output mux
 signal	mux_x0:		std_logic_vector(9 downto 0);
 signal	mux_x1:		std_logic_vector(9 downto 0);
@@ -107,13 +123,23 @@ spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1)
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
 spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3), spi_cont(3), spi_cpol(3), spi_cpha(3), spi_tx_data, mux_x3(7 downto 0), mux_x3(8), spi_transfer(3));
 
+ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_datain, ram_dataout);
+
 spi_sck <= mux_out(9);
 
 data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
+--ram_en <= not n_en;
+ram_addr <= addr;
+
+ram_en <= '1' when (n_en = '0' and n_wr = '0') else '0';
+ram_we <= '1' when (n_en = '0' and n_wr = '0') else '0';
 
 read : process(n_en, n_wr, addr) begin
 	if n_wr = '1' and n_en='0' then
 		case addr(15 downto 12) is
+			when x"0" => -- on chip RAM (for now)
+				--data_out <= ram_dataout;
+				data_out <= "11000011";
 			when x"1" => -- fake stuff!!!
 				case addr(11 downto 0) is
 					when x"001" => data_out <= "10001100"; -- MOV R0, #1
@@ -126,6 +152,14 @@ read : process(n_en, n_wr, addr) begin
 					when x"008" => data_out <= "00000001";
 					when x"009" => data_out <= "01000001"; -- ADD R1, R0
 					when x"00a" => data_out <= "01000010"; -- ADD R0, R1
+					when x"00b" => data_out <= "10010000"; -- PUSH R0
+					when x"00c" => data_out <= "10010001"; -- PUSH R1
+					when x"00d" => data_out <= "10010100"; -- PUSH #0xff
+					when x"00e" => data_out <= "11111111"; --
+					when x"00f" => data_out <= "10011000"; -- POP R0
+					when x"010" => data_out <= "10011000"; -- POP R0
+					when x"011" => data_out <= "10011001"; -- POP R1
+					
 					when others =>	data_out <= "10000000";
 				end case;
 			
@@ -153,28 +187,30 @@ end process;
 write : process(n_en, n_wr, addr, data) begin
 	if n_wr = '0' and n_en='0' then
 		case addr(15 downto 12) is
-				when x"f" => -- i/o
-					case addr(11 downto 8) is
-						when x"1" => -- spi
-							spi_device := to_integer(unsigned(addr(7 downto 4)));
-							case addr(3 downto 0) is
-								when x"0" =>
-									spi_tx_data <= data;
-									spi_transfer(spi_device) <= '1';
-								when x"2" =>
-									mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
-									spi_transfer(spi_device) <= '0'; -- active low
-								when x"f" =>
-									spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
-									spi_cont(spi_device) <= data(0);
-									spi_cpol(spi_device) <= data(1);
-									spi_cpha(spi_device) <= data(2);
-								when others => NULL;
-							end case;
-						when others => NULL;
-					end case;
-				when others => NULL;
-			end case;
+			when x"0" => -- on chip RAM (for now)
+				ram_datain <= data;
+			when x"f" => -- i/o
+				case addr(11 downto 8) is
+					when x"1" => -- spi
+						spi_device := to_integer(unsigned(addr(7 downto 4)));
+						case addr(3 downto 0) is
+							when x"0" =>
+								spi_tx_data <= data;
+								spi_transfer(spi_device) <= '1';
+							when x"2" =>
+								mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
+								spi_transfer(spi_device) <= '0'; -- active low
+							when x"f" =>
+								spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
+								spi_cont(spi_device) <= data(0);
+								spi_cpol(spi_device) <= data(1);
+								spi_cpha(spi_device) <= data(2);
+							when others => NULL;
+						end case;
+					when others => NULL;
+				end case;
+			when others => NULL;
+		end case;
 	end if;
 end process;
 
