@@ -26,10 +26,12 @@ end entity;
 
 -- 10000 NOP
 -- 10001 MOV
--- 10010 PUSH
--- 10011 POP
--- 10100 LD
--- 10101 ST
+-- 10010 PUSH -- not storing?
+-- 10011 POP -- not loading?
+-- 10100 LD -- untested
+-- 10101 ST -- untested
+-- 10110 B
+-- 10111 BNE
 
 architecture behavioural of cpu is
 signal r0, r1:	unsigned(7 downto 0);
@@ -38,7 +40,7 @@ signal f: unsigned(3 downto 0) := x"0";
 signal ins: unsigned(7 downto 0);
 signal imm_value: unsigned(7 downto 0);
 signal addr_value: unsigned(15 downto 0);
-type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch2);
+type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2);
 signal stage, stage_nxt: stages;-- <= 'reset';
 signal data: unsigned(7 downto 0) := "10000000";
 -- alu
@@ -96,9 +98,9 @@ mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'
 		
 		
 process(stage)
-variable imm_fetched: bit;
-variable addr1_fetched: bit;
-variable addr2_fetched: bit;
+variable imm_fetched: bit := '0';
+variable addr1_fetched: bit := '0';
+variable addr2_fetched: bit := '0';
 variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
@@ -123,16 +125,14 @@ case stage is
 	when fetch_addr =>
 		mem_addr <= std_logic_vector(pc);
 		mem_en <= '0';
-		if addr1_fetched = '0' then
-			addr_value <= data & x"00";
-			addr1_fetched := '1';
-			pc <= pc + 1;
-			stage_nxt <= fetch_addr;
-		else
-			addr_value <= addr_value(15 downto 8) & data;
-			addr2_fetched := '1';
-			stage_nxt <= decode;
-		end if;
+		pc <= pc + 1;
+		stage_nxt <= fetch_addr2;
+	when fetch_addr2 =>
+		mem_addr <= std_logic_vector(pc);
+		mem_en <= '0';
+		addr_value <= x"00" & data;
+		addr2_fetched := '1';
+		stage_nxt <= decode;
 	when decode =>	
 		pc <= pc + 1;
 		mem_en <= '1';
@@ -146,15 +146,6 @@ case stage is
 			-- fetch imm
 			stage_nxt <= fetch_imm;
 		else
-			-- handle addressed instructions			
-			case ins(6 downto 3) is
-				when "0101" => -- ST
-					if(addr2_fetched = '0') then
-						stage_nxt <= fetch_addr;
-					end if;
-				when others => NULL;
-			end case;
-		
 			-- register decode
 			if(ins(0) = '0') then ra := r0; else ra := r1; end if;
 			if(ins(1) = '0') then rb := r0; else ra := r1; end if;
@@ -165,7 +156,18 @@ case stage is
 				alu_ra <= ra;
 				if(imm_fetched = '1') then alu_rb <= data; else alu_rb <= rb; end if;
 			end if;
-			stage_nxt <= execute;
+			
+			-- handle addressed instructions			
+			case ins(6 downto 3) is
+				when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
+					if(addr2_fetched = '0') then
+						stage_nxt <= fetch_addr;
+					else
+						addr_value <= data & addr_value(7 downto 0);
+						stage_nxt <= execute;
+					end if;
+				when others => stage_nxt <= execute;
+			end case;
 		end if;
 	when execute =>
 		-- exec alu
@@ -186,12 +188,15 @@ case stage is
 				mem_addr <= std_logic_vector(sp);
 				sp_next := sp - 1;
 				mem_en <= '0';
-			when "0100" => -- LD
+			when "0100"|"0101" => -- LD|ST
 				mem_addr <= std_logic_vector(addr_value);
 				mem_en <= '0';
-			when "0101" => -- ST
-				mem_addr <= std_logic_vector(addr_value);
-				mem_en <= '0';
+			when "0110" => -- B
+				pc <= addr_value;
+			when "0111" => -- BNE
+				if f(0) = '1' then
+					pc <= addr_value;
+				end if;
 			when others => NULL;
 		end case;
 		

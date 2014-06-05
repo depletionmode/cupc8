@@ -8,14 +8,14 @@ entity alu is
 				op:		in std_logic_vector(3 downto 0);
 				a, b:		in unsigned(7 downto 0);
 				r:			out unsigned(7 downto 0);
-				zf:	out unsigned(0 downto 0)
+				zf:		out unsigned(0 downto 0)
          );
 end alu;
 
 architecture behavioural of alu is
 signal ra, rb: unsigned(7 downto 0);
 signal rres: unsigned(7 downto 0);
-signal z: unsigned(0 downto 0);
+signal z: unsigned(0 downto 0) := "0";
 begin
 
 ra <= a;

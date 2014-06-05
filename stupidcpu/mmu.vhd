@@ -139,23 +139,39 @@ read : process(n_en, n_wr, addr) begin
 				--data_out <= "11000011";
 			when x"1" => -- fake stuff!!!
 				case addr(11 downto 0) is
-					when x"001" => data_out <= "10001100"; -- MOV R0, #1
-					when x"002" => data_out <= "00000001";
-					when x"003" => data_out <= "10001101"; -- MOV R1, #3
-					when x"004" => data_out <= "00000011";
-					when x"005" => data_out <= "01000100"; -- ADD R0, #1
-					when x"006" => data_out <= "00000001";
-					when x"007" => data_out <= "01000101"; -- ADD R1, #1
-					when x"008" => data_out <= "00000001";
-					when x"009" => data_out <= "01000001"; -- ADD R1, R0
-					when x"00a" => data_out <= "01000010"; -- ADD R0, R1
-					when x"00b" => data_out <= "10010000"; -- PUSH R0
-					when x"00c" => data_out <= "10010001"; -- PUSH R1
-					when x"00d" => data_out <= "10010100"; -- PUSH #0xff
-					when x"00e" => data_out <= "11111111"; --
-					when x"00f" => data_out <= "10011000"; -- POP R0
-					when x"010" => data_out <= "10011000"; -- POP R0
-					when x"011" => data_out <= "10011001"; -- POP R1
+					
+					-- branch tight loop
+--					when x"000" => data_out <= x"b0"; -- B $0x1000
+--					when x"001" => data_out <= x"00";
+--					when x"002" => data_out <= x"10";
+					
+					-- branch not equal loop
+					when x"000" => data_out <= x"8c"; -- MOV R0, #3
+					when x"001" => data_out <= x"03";
+					when x"002" => data_out <= x"8d"; -- MOV R1, #3
+					when x"003" => data_out <= x"03";
+					when x"004" => data_out <= x"00"; -- EQ R0, R1
+					when x"005" => data_out <= x"b8"; -- BNE $0x1000
+					when x"006" => data_out <= x"00";
+					when x"007" => data_out <= x"10";					
+					
+--					when x"001" => data_out <= "10001100"; -- MOV R0, #1
+--					when x"002" => data_out <= "00000001";
+--					when x"003" => data_out <= "10001101"; -- MOV R1, #3
+--					when x"004" => data_out <= "00000011";
+--					when x"005" => data_out <= "01000100"; -- ADD R0, #1
+--					when x"006" => data_out <= "00000001";
+--					when x"007" => data_out <= "01000101"; -- ADD R1, #1
+--					when x"008" => data_out <= "00000001";
+--					when x"009" => data_out <= "01000001"; -- ADD R1, R0
+--					when x"00a" => data_out <= "01000010"; -- ADD R0, R1
+--					when x"00b" => data_out <= "10010000"; -- PUSH R0
+--					when x"00c" => data_out <= "10010001"; -- PUSH R1
+--					when x"00d" => data_out <= "10010100"; -- PUSH #0xff
+--					when x"00e" => data_out <= "11111111"; --
+--					when x"00f" => data_out <= "10011000"; -- POP R0
+--					when x"010" => data_out <= "10011000"; -- POP R0
+--					when x"011" => data_out <= "10011001"; -- POP R1
 					
 					when others =>	data_out <= "10000000";
 				end case;
