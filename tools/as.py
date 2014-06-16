@@ -12,6 +12,8 @@ registers = [ 'r0', 'r1' ]
 functions = {}
 first_pass = True
 
+base = 0x1000
+
 def __get_reg_value(reg):
     if reg == 'r0': return 0
     elif reg == 'r1': return 1
@@ -30,7 +32,7 @@ def __convert_assembly_ins(ins):
     addr = None
 
     mach_code = bytearray(1)
-   
+
     tokens = ins.split(' ', 1)
     ins = tokens[0]
 
@@ -40,7 +42,7 @@ def __convert_assembly_ins(ins):
     if len(tokens) > 1:
         operands = tokens[1].split(',')
         op1 = operands[0].strip()
-        
+
         # op1 - reg/addr/fcn
         if op1[0] == '$':
             addr = int(op1[1:], 16)
@@ -53,16 +55,16 @@ def __convert_assembly_ins(ins):
             if not op1[1:] in functions:
                 raise Exception('Function {} not found'.format(op1[1:]))
 
-            addr = functions[op1[1:]][0]
+            addr = functions[op1[1:]][0] + base
 
             mach_code.append(addr & 0xff);
             mach_code.append(addr >> 8);
         else:
             ins |= __get_reg_value(op1)
-        
+
         if len(operands) > 1:
             op2 = operands[1].strip()
-        
+
             # 0p2 - reg/imm/addr
             if op2[0] == '#':
                 ins |= 1 << 2;
@@ -87,7 +89,7 @@ def __convert_assembly_ins(ins):
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
-    
+
     if len(args) < 2:
         raise Exception('Invalid input/output files')
 
@@ -133,8 +135,8 @@ if __name__ == "__main__":
             struct.pack_into(str(len(v[1])) + 's', vw, v[0], v[1])
 
         mach_code[0] = 0xb0
-        mach_code[1] = functions[entry_point][0] & 0xff
-        mach_code[2] = functions[entry_point][0] >> 8
+        mach_code[1] = (functions[entry_point][0] + base) & 0xff
+        mach_code[2] = (functions[entry_point][0] + base) >> 8
 
         f.write(mach_code)
 

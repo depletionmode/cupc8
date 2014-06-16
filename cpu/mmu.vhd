@@ -144,16 +144,29 @@ read : process(n_en, n_wr, addr) begin
 --					when x"000" => data_out <= x"b0"; -- B $0x1000
 --					when x"001" => data_out <= x"00";
 --					when x"002" => data_out <= x"10";
+
+					-- stack test (switch r0, r1)
+					when x"000" => data_out <= x"b0";
+					when x"001" => data_out <= x"03";
+					when x"002" => data_out <= x"10";
+					when x"003" => data_out <= x"8c";
+					when x"004" => data_out <= x"02";
+					when x"005" => data_out <= x"8d";
+					when x"006" => data_out <= x"03";
+					when x"007" => data_out <= x"90";
+					when x"008" => data_out <= x"91";
+					when x"009" => data_out <= x"98";
+					when x"010" => data_out <= x"99";
 					
 					-- branch not equal loop
-					when x"000" => data_out <= x"8c"; -- MOV R0, #3
-					when x"001" => data_out <= x"03";
-					when x"002" => data_out <= x"8d"; -- MOV R1, #3
-					when x"003" => data_out <= x"03";
-					when x"004" => data_out <= x"00"; -- EQ R0, R1
-					when x"005" => data_out <= x"b8"; -- BNE $0x1000
-					when x"006" => data_out <= x"00";
-					when x"007" => data_out <= x"10";					
+--					when x"000" => data_out <= x"8c"; -- MOV R0, #3
+--					when x"001" => data_out <= x"03";
+--					when x"002" => data_out <= x"8d"; -- MOV R1, #3
+--					when x"003" => data_out <= x"03";
+--					when x"004" => data_out <= x"00"; -- EQ R0, R1
+--					when x"005" => data_out <= x"b8"; -- BNE $0x1000
+--					when x"006" => data_out <= x"00";
+--					when x"007" => data_out <= x"10";					
 					
 --					when x"001" => data_out <= "10001100"; -- MOV R0, #1
 --					when x"002" => data_out <= "00000001";

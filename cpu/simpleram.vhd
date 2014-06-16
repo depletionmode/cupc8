@@ -13,8 +13,8 @@ entity simpleram is
 end entity simpleram;
 
 architecture RTL of simpleram is
-   --type ram_type is array (integer range <>) of std_logic_vector(7 downto 0);
-   --signal ram : ram_type(0 to 2**16);
+   type ram_type is array (integer range <>) of std_logic_vector(7 downto 0);
+   signal ram : ram_type(0 to 2**16);
 	signal dataout : std_logic_vector(7 downto 0);
 begin
 
@@ -22,13 +22,13 @@ data <= dataout when (en='1' and we='0') else (others=>'Z');
 
 mem_write: process(address, data, en, we) begin
 	if (en='1' and we='1') then
-		--ram(conv_integer(address))  <= data;
+		ram(conv_integer(address))  <= data;
 	end if;
 end process;
 
 mem_read: process(address, en, we) begin
 	if (en='1' and we='0') then
-		--dataout <= ram(conv_integer(address));
+		dataout <= ram(conv_integer(address));
 	end if;
 end process;
 
