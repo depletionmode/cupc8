@@ -9,6 +9,9 @@ opcodes = {
 
 registers = [ 'r0', 'r1' ]
 
+functions = {}
+first_pass = True
+
 def __get_reg_value(reg):
     if reg == 'r0': return 0
     elif reg == 'r1': return 1
@@ -38,12 +41,20 @@ def __convert_assembly_ins(ins):
         operands = tokens[1].split(',')
         op1 = operands[0].strip()
         
-        # op1 - reg/addr
+        # op1 - reg/addr/fcn
         if op1[0] == '$':
             addr = int(op1[1:], 16)
             if addr > 0xffff:
                 raise Exception('Addr out of range')
             # little endian
+            mach_code.append(addr & 0xff);
+            mach_code.append(addr >> 8);
+        elif op1[0] == '.':
+            if not op1[1:] in functions:
+                raise Exception('Function {} not found'.format(op1[1:]))
+
+            addr = functions[op1[1:]][0]
+
             mach_code.append(addr & 0xff);
             mach_code.append(addr >> 8);
         else:
@@ -81,12 +92,43 @@ if __name__ == "__main__":
         raise Exception('Invalid input/output files')
 
     mach_code = bytearray()
+    offset = 3 #leave 3 bytes for branch to entry point
+    entry_point = 'main'
 
     with open(args[0], 'r') as f:
+        fcn_name = ''
         for l in f.readlines():
-            mach_code += __convert_assembly_ins(l)
+            l = l.lstrip()
+            # deal with comments alone on line
+            if l[0] == ';': continue
+
+            #  start of new function
+            if l.find(':') > 0:
+                fcn_name = l[:l.find(':')]
+                functions[fcn_name] = (offset,mach_code)
+                offset += len(mach_code)
+                mach_code = bytearray()
+                continue
+
+            mach_code += __convert_assembly_ins(l[:l.find(';')])
+
+        functions[fcn_name] = (offset,mach_code)
+        offset += len(mach_code)
+
+    if not entry_point in functions:
+        raise Exception('No entry point found')
 
     with open(args[1], 'wb') as f:
+        import struct
+        mach_code = bytearray(offset)
+        vw = memoryview(mach_code)
+        for k, v in functions.items():
+            struct.pack_into(str(len(v[1])) + 's', vw, v[0], v[1])
+
+        mach_code[0] = 0xb0
+        mach_code[1] = functions[entry_point][0] & 0xff
+        mach_code[2] = functions[entry_point][0] >> 8
+
         f.write(mach_code)
 
     print('{} -> {} - {} bytes'.format(args[0], args[1], len(mach_code)))
