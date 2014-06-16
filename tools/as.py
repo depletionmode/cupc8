@@ -15,6 +15,7 @@ def __get_reg_value(reg):
     else: raise Exception("Invalid operand register")
 
 def __convert_assembly_ins(ins):
+    ins = ins.strip()
     #print(ins)
     # deal with comment
     if ins.lstrip()[0] == ';':
@@ -24,26 +25,30 @@ def __convert_assembly_ins(ins):
     addr = None
 
     mach_code = bytearray(1)
-    
-    ins, operands = ins.split(' ', 1)
-    op1, op2 = operands.split(',')
-    op2 = op2.lstrip().strip()
+   
+    tokens = ins.split(' ', 1)
+    ins = tokens[0]
 
     # get opcode for ins
     ins = opcodes[ins]
 
-    # op1 - always reg
-    ins |= __get_reg_value(op1)
-    
-    # 0p2 - reg/imm/addr
-    if op2[0] == '#':
-        ins |= 1 << 2;
-        imm = int(op2[1:])
-        if imm > 0xff:
-            raise Exception("Imm out of range")
-        mach_code.append(imm)
-    else:
-        ins |= __get_reg_value(op2) << 1
+    if len(tokens) > 1:
+        operands = tokens[1].split(',')
+        op1 = operands[0]
+        op2 = operands[1].strip()
+
+        # op1 - always reg
+        ins |= __get_reg_value(op1)
+        
+        # 0p2 - reg/imm/addr
+        if op2[0] == '#':
+            ins |= 1 << 2;
+            imm = int(op2[1:])
+            if imm > 0xff:
+                raise Exception("Imm out of range")
+            mach_code.append(imm)
+        else:
+            ins |= __get_reg_value(op2) << 1
 
     mach_code[0] = ins;
 
