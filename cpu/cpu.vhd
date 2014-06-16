@@ -32,6 +32,8 @@ end entity;
 -- 10101 ST -- untested
 -- 10110 B
 -- 10111 BNE
+-- 11000 CALL
+-- 11001 RET
 
 architecture behavioural of cpu is
 signal r0, r1:	unsigned(7 downto 0);
