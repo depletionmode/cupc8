@@ -16,7 +16,9 @@ def __get_reg_value(reg):
 
 def __convert_assembly_ins(ins):
     ins = ins.strip()
+
     #print(ins)
+
     # deal with comment
     if ins.lstrip()[0] == ';':
         return bytearray()
@@ -34,21 +36,38 @@ def __convert_assembly_ins(ins):
 
     if len(tokens) > 1:
         operands = tokens[1].split(',')
-        op1 = operands[0]
-        op2 = operands[1].strip()
-
-        # op1 - always reg
-        ins |= __get_reg_value(op1)
+        op1 = operands[0].strip()
         
-        # 0p2 - reg/imm/addr
-        if op2[0] == '#':
-            ins |= 1 << 2;
-            imm = int(op2[1:])
-            if imm > 0xff:
-                raise Exception("Imm out of range")
-            mach_code.append(imm)
+        # op1 - reg/addr
+        if op1[0] == '$':
+            addr = int(op1[1:], 16)
+            if addr > 0xffff:
+                raise Exception('Addr out of range')
+            # little endian
+            mach_code.append(addr & 0xff);
+            mach_code.append(addr >> 8);
         else:
-            ins |= __get_reg_value(op2) << 1
+            ins |= __get_reg_value(op1)
+        
+        if len(operands) > 1:
+            op2 = operands[1].strip()
+        
+            # 0p2 - reg/imm/addr
+            if op2[0] == '#':
+                ins |= 1 << 2;
+                imm = int(op2[1:])
+                if imm > 0xff:
+                    raise Exception("Imm out of range")
+                mach_code.append(imm)
+            elif op2[0] == '$':
+                addr = int(op2[1:], 16)
+                if addr > 0xffff:
+                    raise Exception('Addr out of range')
+                # little endian
+                mach_code.append(addr & 0xff);
+                mach_code.append(addr >> 8);
+            else:
+                ins |= __get_reg_value(op2) << 1
 
     mach_code[0] = ins;
 
