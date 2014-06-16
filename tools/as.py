@@ -4,7 +4,7 @@ opcodes = {
             'eq' :0x00,     'gt' :0x08,     'lt'  :0x10,     'and':0x18,
             'or' :0x20,     'not':0x28,     'xor' :0x30,     'nor':0x38,
             'add':0x40,     'sub':0x48,     'inc' :0x50,     'dec':0x58,
-            'shl':0x60,     'shr':0x68
+            'shl':0x60,     'shr':0x68,     'call':0xc0,     'ret':0xc1
           }
 
 registers = [ 'r0', 'r1' ]
@@ -130,7 +130,6 @@ if __name__ == "__main__":
         mach_code = bytearray(offset)
         vw = memoryview(mach_code)
         for k, v in functions.items():
-            print(k,v)
             struct.pack_into(str(len(v[1])) + 's', vw, v[0], v[1])
 
         mach_code[0] = 0xb0
