@@ -94,20 +94,27 @@ if __name__ == "__main__":
     mach_code = bytearray()
     offset = 3 #leave 3 bytes for branch to entry point
     entry_point = 'main'
+    first = True
 
     with open(args[0], 'r') as f:
         fcn_name = ''
         for l in f.readlines():
             l = l.lstrip()
+
+            #deal with blank lines
+            if len(l) == 0: continue
+
             # deal with comments alone on line
             if l[0] == ';': continue
 
             #  start of new function
             if l.find(':') > 0:
+                if not first:
+                    functions[fcn_name] = (offset,mach_code)
+                    offset += len(mach_code)
+                    mach_code = bytearray()
+                first = False
                 fcn_name = l[:l.find(':')]
-                functions[fcn_name] = (offset,mach_code)
-                offset += len(mach_code)
-                mach_code = bytearray()
                 continue
 
             mach_code += __convert_assembly_ins(l[:l.find(';')])
@@ -123,6 +130,7 @@ if __name__ == "__main__":
         mach_code = bytearray(offset)
         vw = memoryview(mach_code)
         for k, v in functions.items():
+            print(k,v)
             struct.pack_into(str(len(v[1])) + 's', vw, v[0], v[1])
 
         mach_code[0] = 0xb0
