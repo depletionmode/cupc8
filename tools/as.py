@@ -43,8 +43,14 @@ def __convert_assembly_ins(ins):
         operands = tokens[1].split(',')
         op1 = operands[0].strip()
 
-        # op1 - reg/addr/fcn
-        if op1[0] == '$':
+        # op1 - reg/addr/fcn/imm
+        if op1[0] == '#':
+            ins |= 1 << 2;
+            imm = int(op1[1:])
+            if imm > 0xff:
+                raise Exception("Imm out of range")
+            mach_code.append(imm)
+        elif op1[0] == '$':
             addr = int(op1[1:], 16)
             if addr > 0xffff:
                 raise Exception('Addr out of range')

@@ -130,6 +130,7 @@ data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
 ram_en <= not n_en;
 ram_addr <= addr;
 ram_we <= '1' when (n_en = '0' and n_wr = '0') else '0';
+ram_data <= data when (n_en = '0' and n_wr = '0') else (others=>'Z');
 
 read : process(n_en, n_wr, addr) begin
 	if n_wr = '1' and n_en='0' then
@@ -154,7 +155,7 @@ read : process(n_en, n_wr, addr) begin
 					when x"005" => data_out <= x"8d";
 					when x"006" => data_out <= x"03";
 					when x"007" => data_out <= x"90";
-					when x"008" => data_out <= x"91";
+					when x"008" => data_out <= x"92";
 					when x"009" => data_out <= x"98";
 					when x"010" => data_out <= x"99";
 					
@@ -213,8 +214,6 @@ end process;
 write : process(n_en, n_wr, addr, data) begin
 	if n_wr = '0' and n_en='0' then
 		case addr(15 downto 12) is
-			when x"0" => -- on chip RAM (for now)
-				ram_data <= data;
 			when x"f" => -- i/o
 				case addr(11 downto 8) is
 					when x"1" => -- spi

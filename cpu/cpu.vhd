@@ -187,7 +187,7 @@ case stage is
 				sp_next := sp + 1;
 				mem_en <= '0';
 			when "0011" => -- POP
-				mem_addr <= std_logic_vector(sp);
+				mem_addr <= std_logic_vector(sp - 1);
 				sp_next := sp - 1;
 				mem_en <= '0';
 			when "0100"|"0101" => -- LD|ST
