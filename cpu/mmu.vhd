@@ -51,7 +51,7 @@ entity mmu is
 end entity;
 architecture behavioural of mmu is
 -- simple internal ram for testing/stack?
-signal	ram_en:			std_logic;
+signal	ram_en:			std_logic;-- := '1';
 signal	ram_we:			std_logic;
 signal 	ram_addr:		std_logic_vector(15 downto 0);
 signal	ram_data:		std_logic_vector(7 downto 0);
@@ -132,12 +132,11 @@ ram_addr <= addr;
 ram_we <= '1' when (n_en = '0' and n_wr = '0') else '0';
 ram_data <= data when (n_en = '0' and n_wr = '0') else (others=>'Z');
 
-read : process(n_en, n_wr, addr) begin
+read : process(n_en, n_wr, addr, ram_data) begin
 	if n_wr = '1' and n_en='0' then
 		case addr(15 downto 12) is
 			when x"0" => -- on chip RAM (for now)
 				data_out <= ram_data;
-				--data_out <= "11000011";
 			when x"1" => -- fake stuff!!!
 				case addr(11 downto 0) is
 					
@@ -154,7 +153,7 @@ read : process(n_en, n_wr, addr) begin
 					when x"004" => data_out <= x"ff";
 					when x"005" => data_out <= x"98";
 					when x"006" => data_out <= x"94";
-					when x"007" => data_out <= x"00";
+					when x"007" => data_out <= x"aa";
 					when x"008" => data_out <= x"99";
 					
 					-- branch not equal loop
@@ -174,7 +173,7 @@ read : process(n_en, n_wr, addr) begin
 --					when x"005" => data_out <= "01000100"; -- ADD R0, #1
 --					when x"006" => data_out <= "00000001";
 --					when x"007" => data_out <= "01000101"; -- ADD R1, #1
---					when x"008" => data_out <= "00000001";
+--					when x"008" => data_outdata <= "00000001";
 --					when x"009" => data_out <= "01000001"; -- ADD R1, R0
 --					when x"00a" => data_out <= "01000010"; -- ADD R0, R1
 --					when x"00b" => data_out <= "10010000"; -- PUSH R0

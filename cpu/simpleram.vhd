@@ -26,7 +26,7 @@ mem_write: process(address, data, en, we) begin
 	end if;
 end process;
 
-mem_read: process(address, en, we, ram) begin
+mem_read: process(address, en, we, ram, dataout) begin
 	if (en='1' and we='0') then
 		dataout <= ram(conv_integer(address));
 	end if;
