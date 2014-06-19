@@ -153,27 +153,26 @@ case stage is
 			if(ins(1) = '0') then rb := r0; else rb := r1; end if;
 			--ra := r0 when ins(0)='0' else r1;
 			
-			-- alu setup
 			if(ins(7) = '0') then
+				-- alu setup
 				alu_ra <= ra;
-				if(imm_fetched = '1') then alu_rb <= data; else alu_rb <= rb; end if;
+				if imm_fetched = '1' then alu_rb <= data; else alu_rb <= rb; end if;
+				stage_nxt <= execute;
+			else
+				-- handle addressed instructions		
+				case ins(6 downto 3) is
+					when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
+						if addr2_fetched = '0' then
+							stage_nxt <= fetch_addr;
+						else
+							addr_value <= data & addr_value(7 downto 0);
+							stage_nxt <= execute;
+						end if;
+					when others => stage_nxt <= execute;
+				end case;
 			end if;
-			
-			-- handle addressed instructions			
-			case ins(6 downto 3) is
-				when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
-					if(addr2_fetched = '0') then
-						stage_nxt <= fetch_addr;
-					else
-						addr_value <= data & addr_value(7 downto 0);
-						stage_nxt <= execute;
-					end if;
-				when others => stage_nxt <= execute;
-			end case;
 		end if;
 	when execute =>
-		-- exec alu
-		if(ins(7) = '0') then alu_en <= '0'; end if;
 		
 		if(imm_fetched = '1') then
 			rtmp := data;
@@ -181,26 +180,31 @@ case stage is
 			rtmp := rb;
 		end if;
 		
-		case ins(6 downto 3) is
-			when "0010" => -- PUSH
-				mem_addr <= std_logic_vector(sp);
-				sp_next := sp + 1;
-				mem_en <= '0';
-			when "0011" => -- POP
-				mem_addr <= std_logic_vector(sp - 1);
-				sp_next := sp - 1;
-				mem_en <= '0';
-			when "0100"|"0101" => -- LD|ST
-				mem_addr <= std_logic_vector(addr_value);
-				mem_en <= '0';
-			when "0110" => -- B
-				pc <= addr_value;
-			when "0111" => -- BNE
-				if f(0) = '1' then
+		if(ins(7) = '0') then	
+			-- exec alu
+			alu_en <= '0';
+		else
+			case ins(6 downto 3) is
+				when "0010" => -- PUSH
+					mem_addr <= std_logic_vector(sp);
+					sp_next := sp + 1;
+					mem_en <= '0';
+				when "0011" => -- POP
+					mem_addr <= std_logic_vector(sp - 1);
+					sp_next := sp - 1;
+					mem_en <= '0';
+				when "0100"|"0101" => -- LD|ST
+					mem_addr <= std_logic_vector(addr_value);
+					mem_en <= '0';
+				when "0110" => -- B
 					pc <= addr_value;
-				end if;
-			when others => NULL;
-		end case;
+				when "0111" => -- BNE
+					if f(0) = '1' then
+						pc <= addr_value;
+					end if;
+				when others => NULL;
+			end case;
+		end if;
 		
 		stage_nxt <= writeback;
 	when writeback =>

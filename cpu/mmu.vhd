@@ -146,24 +146,24 @@ read : process(n_en, n_wr, addr, ram_data) begin
 --					when x"002" => data_out <= x"10";
 
 					-- stack test
-					when x"000" => data_out <= x"b0";
-					when x"001" => data_out <= x"03";
-					when x"002" => data_out <= x"10";
-					when x"003" => data_out <= x"94";
-					when x"004" => data_out <= x"ff";
-					when x"005" => data_out <= x"98";
-					when x"006" => data_out <= x"94";
-					when x"007" => data_out <= x"0a";
-					when x"008" => data_out <= x"99";
-					when x"009" => data_out <= x"8c";
-					when x"00a" => data_out <= x"60";
-					when x"00b" => data_out <= x"8d";
-					when x"00c" => data_out <= x"0f";
-					when x"00d" => data_out <= x"90";
-					when x"00e" => data_out <= x"92";
-					when x"00f" => data_out <= x"80";
-					when x"010" => data_out <= x"98";
-					when x"011" => data_out <= x"99";
+--					when x"000" => data_out <= x"b0";
+--					when x"001" => data_out <= x"03";
+--					when x"002" => data_out <= x"10";
+--					when x"003" => data_out <= x"94";
+--					when x"004" => data_out <= x"ff";
+--					when x"005" => data_out <= x"98";
+--					when x"006" => data_out <= x"94";
+--					when x"007" => data_out <= x"0a";
+--					when x"008" => data_out <= x"99";
+--					when x"009" => data_out <= x"8c";
+--					when x"00a" => data_out <= x"60";
+--					when x"00b" => data_out <= x"8d";
+--					when x"00c" => data_out <= x"0f";
+--					when x"00d" => data_out <= x"90";
+--					when x"00e" => data_out <= x"92";
+--					when x"00f" => data_out <= x"80";
+--					when x"010" => data_out <= x"98";
+--					when x"011" => data_out <= x"99";
 					
 					-- branch not equal loop
 --					when x"000" => data_out <= x"8c"; -- MOV R0, #3
@@ -175,23 +175,23 @@ read : process(n_en, n_wr, addr, ram_data) begin
 --					when x"006" => data_out <= x"00";
 --					when x"007" => data_out <= x"10";					
 					
---					when x"001" => data_out <= "10001100"; -- MOV R0, #1
---					when x"002" => data_out <= "00000001";
---					when x"003" => data_out <= "10001101"; -- MOV R1, #3
---					when x"004" => data_out <= "00000011";
---					when x"005" => data_out <= "01000100"; -- ADD R0, #1
---					when x"006" => data_out <= "00000001";
---					when x"007" => data_out <= "01000101"; -- ADD R1, #1
---					when x"008" => data_outdata <= "00000001";
---					when x"009" => data_out <= "01000001"; -- ADD R1, R0
---					when x"00a" => data_out <= "01000010"; -- ADD R0, R1
---					when x"00b" => data_out <= "10010000"; -- PUSH R0
---					when x"00c" => data_out <= "10010001"; -- PUSH R1
---					when x"00d" => data_out <= "10010100"; -- PUSH #0xff
---					when x"00e" => data_out <= "11111111"; --
---					when x"00f" => data_out <= "10011000"; -- POP R0
---					when x"010" => data_out <= "10011000"; -- POP R0
---					when x"011" => data_out <= "10011001"; -- POP R1
+					-- some ALU tests
+					when x"000" => data_out <= x"b0";
+					when x"001" => data_out <= x"03";
+					when x"002" => data_out <= x"10";
+					when x"003" => data_out <= x"8c";
+					when x"004" => data_out <= x"14";
+					when x"005" => data_out <= x"8d";
+					when x"006" => data_out <= x"1e";
+					when x"007" => data_out <= x"32";
+					when x"008" => data_out <= x"31";
+					when x"009" => data_out <= x"30";
+					when x"00a" => data_out <= x"33";
+					when x"00b" => data_out <= x"44";
+					when x"00c" => data_out <= x"01";
+					when x"00d" => data_out <= x"45";
+					when x"00e" => data_out <= x"02";
+					when x"00f" => data_out <= x"42";
 					
 					when others =>	data_out <= "10000000";
 				end case;
