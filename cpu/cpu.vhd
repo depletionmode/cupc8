@@ -150,7 +150,7 @@ case stage is
 		else
 			-- register decode
 			if(ins(0) = '0') then ra := r0; else ra := r1; end if;
-			if(ins(1) = '0') then rb := r0; else ra := r1; end if;
+			if(ins(1) = '0') then rb := r0; else rb := r1; end if;
 			--ra := r0 when ins(0)='0' else r1;
 			
 			-- alu setup
