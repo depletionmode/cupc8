@@ -5,7 +5,7 @@ idx = 0
 def __render_op(op):
     global idx
     # when x"000" => data_out <= x"8c"; -- MOV R0, #3
-    s = 'when x"{:03d}" => data_out <= x"{:02x}";'.format(idx, op)
+    s = 'when x"{:03x}" => data_out <= x"{:02x}";'.format(idx, op)
     idx += 1
     return s
 

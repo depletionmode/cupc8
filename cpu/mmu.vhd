@@ -147,7 +147,7 @@ read : process(n_en, n_wr, addr, ram_data) begin
 
 					-- stack test
 					when x"000" => data_out <= x"b0";
-					when x"001" => data_out <= x"03";
+					when x"001" => data_out <= x"09";
 					when x"002" => data_out <= x"10";
 					when x"003" => data_out <= x"94";
 					when x"004" => data_out <= x"ff";
@@ -155,6 +155,15 @@ read : process(n_en, n_wr, addr, ram_data) begin
 					when x"006" => data_out <= x"94";
 					when x"007" => data_out <= x"aa";
 					when x"008" => data_out <= x"99";
+					when x"009" => data_out <= x"8c";
+					when x"010" => data_out <= x"ff";
+					when x"011" => data_out <= x"8d";
+					when x"012" => data_out <= x"15";
+					when x"013" => data_out <= x"90";
+					when x"014" => data_out <= x"91";
+					when x"015" => data_out <= x"80";
+					when x"016" => data_out <= x"98";
+					when x"017" => data_out <= x"99";
 					
 					-- branch not equal loop
 --					when x"000" => data_out <= x"8c"; -- MOV R0, #3
