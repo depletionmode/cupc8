@@ -14,13 +14,22 @@ first_pass = True
 
 base = 0x1000
 
+def __ins_hacks(ins):
+    # need to hack syntax to allow decoding to work properly
+    dst_ops = ['push','st']
+    tokens = ins.split(' ')
+    if tokens[0] in dst_ops:
+        return '{} ?, {}'.format(tokens[0], tokens[1])
+    else:
+        return ins
+
 def __get_reg_value(reg):
     if reg == 'r0': return 0
     elif reg == 'r1': return 1
     else: raise Exception("Invalid operand register")
 
 def __convert_assembly_ins(ins):
-    ins = ins.strip()
+    ins = __ins_hacks(ins.strip())
 
     #print(ins)
 
@@ -65,6 +74,8 @@ def __convert_assembly_ins(ins):
 
             mach_code.append(addr & 0xff);
             mach_code.append(addr >> 8);
+        elif op1[0] == '?': # dirty hack ro allow diry hacks to work
+            pass
         else:
             ins |= __get_reg_value(op1)
 

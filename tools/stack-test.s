@@ -4,7 +4,7 @@ main:
     pop r0
     push #10
     pop r1
-    mov r0, #255
+    mov r0, #96
     mov r1, #15
     push r0
     push r1
