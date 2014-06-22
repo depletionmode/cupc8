@@ -23,9 +23,13 @@ def __ins_hacks(ins):
     else:
         return ins
 
-def __get_reg_value(reg):
+def __get_reg_value(reg, second_op=False):
     if reg == 'r0': return 0
-    elif reg == 'r1': return 1
+    elif reg == 'r1':
+        if second_op: return 2
+        else: return 1
+    elif reg == 'pch': return 6
+    elif reg == 'pcl': return 7
     else: raise Exception("Invalid operand register")
 
 def __convert_assembly_ins(ins):
@@ -74,7 +78,7 @@ def __convert_assembly_ins(ins):
 
             mach_code.append(addr & 0xff);
             mach_code.append(addr >> 8);
-        elif op1[0] == '?': # dirty hack ro allow diry hacks to work
+        elif op1[0] == '?': # dirty hack to allow diry hacks to work
             pass
         else:
             ins |= __get_reg_value(op1)
@@ -97,7 +101,7 @@ def __convert_assembly_ins(ins):
                 mach_code.append(addr & 0xff);
                 mach_code.append(addr >> 8);
             else:
-                ins |= __get_reg_value(op2) << 1
+                ins |= __get_reg_value(op2, True)
 
     mach_code[0] = ins;
 
