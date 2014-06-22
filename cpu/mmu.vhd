@@ -205,17 +205,19 @@ read : process(n_en, n_wr, addr, ram_data) begin
 --					when x"00a" => data_out <= x"00";
 --					when x"00b" => data_out <= x"20";
 
-					-- call test
+					-- pc push test
 					when x"000" => data_out <= x"b0";
-					when x"001" => data_out <= x"07";
+					when x"001" => data_out <= x"05";
 					when x"002" => data_out <= x"10";
-					when x"003" => data_out <= x"80";
-					when x"004" => data_out <= x"c0";
-					when x"005" => data_out <= x"03";
-					when x"006" => data_out <= x"10";
-					when x"007" => data_out <= x"c0";
-					when x"008" => data_out <= x"04";
+					when x"003" => data_out <= x"9e";
+					when x"004" => data_out <= x"9f";
+					when x"005" => data_out <= x"96";
+					when x"006" => data_out <= x"97";
+					when x"007" => data_out <= x"b0";
+					when x"008" => data_out <= x"03";
 					when x"009" => data_out <= x"10";
+					when x"00a" => data_out <= x"8c";
+					when x"00b" => data_out <= x"ff";
 										
 					when others =>	data_out <= "10000000";
 				end case;

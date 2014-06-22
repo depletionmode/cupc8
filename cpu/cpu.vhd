@@ -26,14 +26,17 @@ end entity;
 
 -- 10000 NOP
 -- 10001 MOV
--- 10010 PUSH -- not storing?
--- 10011 POP -- not loading?
--- 10100 LD -- untested
--- 10101 ST -- untested
+-- 10010 PUSH
+-- 10011 POP
+-- 10100 LD
+-- 10101 ST
 -- 10110 B
 -- 10111 BNE
--- 11000 CALL
--- 11001 RET
+-- For now have separate instructions to enable call/ret (dirty)
+-- 11100 PUSH.PC1
+-- 11101 PUSH.PC2
+-- 11110 POP.PC1
+-- 11111 POP.PC2
 
 architecture behavioural of cpu is
 signal r0, r1:	unsigned(7 downto 0);
@@ -106,6 +109,8 @@ variable addr2_fetched: bit := '0';
 variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
+variable tmp16: unsigned (15 downto 0);
+variable tmp16_2: unsigned (15 downto 0);
 begin
 
 case stage is
@@ -144,13 +149,26 @@ case stage is
 --		end if;
 		
 		-- fetch imm
-		if(ins(2) = '1' and imm_fetched = '0') then
+		if(ins(2) = '1' and ins(1) = '0' and imm_fetched = '0') then
 			-- fetch imm
 			stage_nxt <= fetch_imm;
 		else
 			-- register decode
-			if(ins(0) = '0') then ra := r0; else ra := r1; end if;
-			if(ins(1) = '0') then rb := r0; else rb := r1; end if;
+			if ins(0) = '0' then ra := r0; else ra := r1; end if;
+			if ins(2) = '1' and ins(1) = '1' then
+				-- use pc
+				if ins(0) = '0' then
+					tmp16 := pc + 5; -- offset 5 ops
+					rb := tmp16(15 downto 8);
+				else
+					tmp16 := pc + 4; -- offset 4 ops
+					rb := tmp16(7 downto 0);
+				end if;
+			elsif ins(1) = '0' then
+				rb := r0;
+			else
+				rb := r1;
+			end if;
 			--ra := r0 when ins(0)='0' else r1;
 			
 			if(ins(7) = '0') then
@@ -185,7 +203,7 @@ case stage is
 			alu_en <= '0';
 		else
 			case ins(6 downto 3) is
-				when "0010" => -- PUSH
+				when "0010"|"1100"|"1101" => -- PUSH|PUSH.PC1|PUSH.PC2
 					mem_addr <= std_logic_vector(sp);
 					sp_next := sp + 1;
 					mem_en <= '0';
@@ -232,13 +250,22 @@ case stage is
 				-- write back into memory
 				mem_wr <= '0';
 				mem_en <= '0';
-				rwb := rtmp;
+				rwb := rtmp;	
 			when "0011" => -- POP
-				-- write back into register
-				if(ins(0) = '0') then
-					r0 <= data;
-				else
-					r1 <= data;
+				if ins(2) = '0' then
+					-- write back into register
+					if ins(0) = '0' then
+						r0 <= data;
+					else
+						r1 <= data;
+					end if;
+				else -- pc
+					if ins(0) = '0' then
+						tmp16_2 := x"00" & data;
+					else
+						tmp16_2 := data & tmp16_2(7 downto 0);
+						pc <= tmp16_2;
+					end if;
 				end if;
 			when "0100" => -- LD
 				-- write back into register
