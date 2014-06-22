@@ -103,6 +103,8 @@ process(stage)
 variable imm_fetched: bit := '0';
 variable addr1_fetched: bit := '0';
 variable addr2_fetched: bit := '0';
+variable call1: bit := '0';
+variable call2: bit := '0';
 variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
@@ -117,7 +119,11 @@ case stage is
 	when fetch2 => -- dirty dirty hack!
 		mem_wr <= '1';
 		mem_en <= '1';
-		ins <= data;
+		if call1 = '1' then
+			ins <= "11000000";
+		else
+			ins <= data;
+		end if;
 		stage_nxt <= decode;
 	when fetch_imm =>
 		mem_addr <= std_logic_vector(pc);
@@ -136,7 +142,9 @@ case stage is
 		addr2_fetched := '1';
 		stage_nxt <= decode;
 	when decode =>	
-		pc <= pc + 1;
+		if call1 = '0' then:
+			pc <= pc + 1;
+		end if;
 		mem_en <= '1';
 		
 --		if imm_fetched = '1' then
@@ -168,19 +176,37 @@ case stage is
 							addr_value <= data & addr_value(7 downto 0);
 							stage_nxt <= execute;
 						end if;
+					when "1000" => -- CALL
+						if call1 = '0' then
+							call1 := '1';
+							ins <= "10010000"; -- PUSH
+							rtmp := pc(15 downto 8);
+							stage_nxt <= execute;
+						elsif call1 = '1' and call2 = '0' then
+							call2 := '1';
+							rtmp := pc(7 downto 0);
+							stage_nxt <= execute;
+						elsif call2 = '1' then
+							call1 := '0';
+							call2 := '0';
+							ins <= "10110000"; -- B
+							stage_nxt <= decode;
+						end if;
 					when others => stage_nxt <= execute;
 				end case;
 			end if;
 		end if;
 	when execute =>
 		
-		if(imm_fetched = '1') then
+		if imm_fetched = '1' then
 			rtmp := data;
 		else
-			rtmp := rb;
+			if call1 ='0' and call2 = '0' then
+				rtmp := rb;
+			end if;
 		end if;
 		
-		if(ins(7) = '0') then	
+		if ins(7) = '0' then	
 			-- exec alu
 			alu_en <= '0';
 		else
@@ -263,7 +289,11 @@ case stage is
 		addr1_fetched := '0';
 		addr2_fetched := '0';
 		
-		stage_nxt <= fetch;
+		if call1 = '1' then
+			stage_nxt <= decode;
+		else
+			stage_nxt <= fetch;
+		end if;
 	when reset =>
 		r0 <= x"00";
 		r1 <= x"00";

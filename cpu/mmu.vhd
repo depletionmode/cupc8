@@ -192,19 +192,31 @@ read : process(n_en, n_wr, addr, ram_data) begin
 --					when x"00f" => data_out <= x"42";
 					
 					-- mem test
+--					when x"000" => data_out <= x"b0";
+--					when x"001" => data_out <= x"03";
+--					when x"002" => data_out <= x"10";
+--					when x"003" => data_out <= x"8c";
+--					when x"004" => data_out <= x"aa";
+--					when x"005" => data_out <= x"a8";
+--					when x"006" => data_out <= x"00";
+--					when x"007" => data_out <= x"20";
+--					when x"008" => data_out <= x"30";
+--					when x"009" => data_out <= x"a0";
+--					when x"00a" => data_out <= x"00";
+--					when x"00b" => data_out <= x"20";
+
+					-- call test
 					when x"000" => data_out <= x"b0";
-					when x"001" => data_out <= x"03";
+					when x"001" => data_out <= x"07";
 					when x"002" => data_out <= x"10";
-					when x"003" => data_out <= x"8c";
-					when x"004" => data_out <= x"aa";
-					when x"005" => data_out <= x"a8";
-					when x"006" => data_out <= x"00";
-					when x"007" => data_out <= x"20";
-					when x"008" => data_out <= x"30";
-					when x"009" => data_out <= x"a0";
-					when x"00a" => data_out <= x"00";
-					when x"00b" => data_out <= x"20";
-					
+					when x"003" => data_out <= x"80";
+					when x"004" => data_out <= x"c0";
+					when x"005" => data_out <= x"03";
+					when x"006" => data_out <= x"10";
+					when x"007" => data_out <= x"c0";
+					when x"008" => data_out <= x"04";
+					when x"009" => data_out <= x"10";
+										
 					when others =>	data_out <= "10000000";
 				end case;
 			
@@ -223,7 +235,7 @@ read : process(n_en, n_wr, addr, ram_data) begin
 						end case;
 					when others => data_out <= "00000000";
 				end case;
-			when others => data_out <= ram_data;
+			when others => data_out <= ram_data; -- read from ram
 		end case;
 	end if;
 end process;
