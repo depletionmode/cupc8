@@ -3,9 +3,12 @@ main:
     xor r0, r0
     xor r1, r1
 
-    st $f10f, #12   ; config spi0
-    st $f100, #199  ; write tx data
-    st $f102, #1    ; transact
+    mov r0, #12
+    st $f10f, r0   ; config spi0
+    mov r0, #199
+    st $f100, r0  ; write tx data
+    mov r1, #1
+    st $f102, r1    ; transact
 
     ; loop until data sent
 wait:
