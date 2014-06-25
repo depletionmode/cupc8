@@ -206,18 +206,46 @@ read : process(n_en, n_wr, addr, ram_data) begin
 --					when x"00b" => data_out <= x"20";
 
 					-- pc push test
+--					when x"000" => data_out <= x"b0";
+--					when x"001" => data_out <= x"05";
+--					when x"002" => data_out <= x"10";
+--					when x"003" => data_out <= x"9e";
+--					when x"004" => data_out <= x"9f";
+--					when x"005" => data_out <= x"96";
+--					when x"006" => data_out <= x"97";
+--					when x"007" => data_out <= x"b0";
+--					when x"008" => data_out <= x"03";
+--					when x"009" => data_out <= x"10";
+--					when x"00a" => data_out <= x"8c";
+--					when x"00b" => data_out <= x"ff";
+					
+					-- spi test
 					when x"000" => data_out <= x"b0";
-					when x"001" => data_out <= x"05";
+					when x"001" => data_out <= x"03";
 					when x"002" => data_out <= x"10";
-					when x"003" => data_out <= x"9e";
-					when x"004" => data_out <= x"9f";
-					when x"005" => data_out <= x"96";
-					when x"006" => data_out <= x"97";
-					when x"007" => data_out <= x"b0";
-					when x"008" => data_out <= x"03";
-					when x"009" => data_out <= x"10";
-					when x"00a" => data_out <= x"8c";
-					when x"00b" => data_out <= x"ff";
+					when x"003" => data_out <= x"30";
+					when x"004" => data_out <= x"33";
+					when x"005" => data_out <= x"a8";
+					when x"006" => data_out <= x"0f";
+					when x"007" => data_out <= x"f1";
+					when x"008" => data_out <= x"a8";
+					when x"009" => data_out <= x"00";
+					when x"00a" => data_out <= x"f1";
+					when x"00b" => data_out <= x"a8";
+					when x"00c" => data_out <= x"02";
+					when x"00d" => data_out <= x"f1";
+					when x"00e" => data_out <= x"45";
+					when x"00f" => data_out <= x"01";
+					when x"010" => data_out <= x"a0";
+					when x"011" => data_out <= x"03";
+					when x"012" => data_out <= x"f1";
+					when x"013" => data_out <= x"04";
+					when x"014" => data_out <= x"01";
+					when x"015" => data_out <= x"b8";
+					when x"016" => data_out <= x"0e";
+					when x"017" => data_out <= x"10";
+					when x"018" => data_out <= x"8c";
+					when x"019" => data_out <= x"ff";
 										
 					when others =>	data_out <= "10000000";
 				end case;
