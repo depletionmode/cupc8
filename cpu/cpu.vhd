@@ -13,7 +13,10 @@ entity cpu is
 			spi_ss:		out std_logic_vector(3 downto 0);
 			spi_sck:		out std_logic;
 			spi_mosi:	out std_logic;
-			spi_miso:	in std_logic
+			spi_miso:	in std_logic;
+			
+			-- gpio
+			gpo:			out std_logic_vector(7 downto 0)
 		);
 end entity;
 
@@ -81,14 +84,16 @@ component mmu
 			spi_ss:			out std_logic_vector(3 downto 0);
 			spi_sck:			out std_logic;
 			spi_mosi:		out std_logic;
-			spi_miso:		in std_logic
+			spi_miso:		in std_logic;
+			
+			gpo:		out std_logic_vector(7 downto 0)
 		);
 end component;	
 
 shared variable rwb: unsigned(7 downto 0);
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
-mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso);
+mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo);
 
 f <= "000" & alu_zf;
 

@@ -17,6 +17,7 @@ use ieee.numeric_std.all;
 -- $XX08				: i/o 1
 
 -- i/o
+-- $f000				: gpo (8 pin)
 -- $f100 - $f10f	: spi 0 (master)
 -- $f110 - $f11f	: spi 1 (master)
 -- $f120 - $f12f	: spi 2 (master)
@@ -46,7 +47,9 @@ entity mmu is
 			spi_ss:			out std_logic_vector(3 downto 0);
 			spi_sck:			out std_logic;
 			spi_mosi:		out std_logic;
-			spi_miso:		in std_logic
+			spi_miso:		in std_logic;
+			
+			gpo:		out std_logic_vector(7 downto 0) := x"00"
 		);
 end entity;
 architecture behavioural of mmu is
@@ -220,41 +223,50 @@ read : process(n_en, n_wr, addr, ram_data) begin
 --					when x"00b" => data_out <= x"ff";
 					
 					-- spi test
+--					when x"000" => data_out <= x"b0";
+--					when x"001" => data_out <= x"03";
+--					when x"002" => data_out <= x"10";
+--					when x"003" => data_out <= x"30";
+--					when x"004" => data_out <= x"33";
+--					when x"005" => data_out <= x"8c";
+--					when x"006" => data_out <= x"0c";
+--					when x"007" => data_out <= x"a8";
+--					when x"008" => data_out <= x"0f";
+--					when x"009" => data_out <= x"f1";
+--					when x"00a" => data_out <= x"8c";
+--					when x"00b" => data_out <= x"c7";
+--					when x"00c" => data_out <= x"a8";
+--					when x"00d" => data_out <= x"00";
+--					when x"00e" => data_out <= x"f1";
+--					when x"00f" => data_out <= x"8d";
+--					when x"010" => data_out <= x"01";
+--					when x"011" => data_out <= x"a8";
+--					when x"012" => data_out <= x"02";
+--					when x"013" => data_out <= x"f1";
+--					when x"014" => data_out <= x"45";
+--					when x"015" => data_out <= x"01";
+--					when x"016" => data_out <= x"a0";
+--					when x"017" => data_out <= x"03";
+--					when x"018" => data_out <= x"f1";
+--					when x"019" => data_out <= x"04";
+--					when x"01a" => data_out <= x"01";
+--					when x"01b" => data_out <= x"b8";
+--					when x"01c" => data_out <= x"14";
+--					when x"01d" => data_out <= x"10";
+--					when x"01e" => data_out <= x"8c";
+--					when x"01f" => data_out <= x"ff";
+					
+					-- gpo test
 					when x"000" => data_out <= x"b0";
 					when x"001" => data_out <= x"03";
 					when x"002" => data_out <= x"10";
-					when x"003" => data_out <= x"30";
-					when x"004" => data_out <= x"33";
-					when x"005" => data_out <= x"8c";
-					when x"006" => data_out <= x"0c";
-					when x"007" => data_out <= x"a8";
-					when x"008" => data_out <= x"0f";
-					when x"009" => data_out <= x"f1";
-					when x"00a" => data_out <= x"8c";
-					when x"00b" => data_out <= x"c7";
-					when x"00c" => data_out <= x"a8";
-					when x"00d" => data_out <= x"00";
-					when x"00e" => data_out <= x"f1";
-					when x"00f" => data_out <= x"8d";
-					when x"010" => data_out <= x"01";
-					when x"011" => data_out <= x"a8";
-					when x"012" => data_out <= x"02";
-					when x"013" => data_out <= x"f1";
-					when x"014" => data_out <= x"45";
-					when x"015" => data_out <= x"01";
-					when x"016" => data_out <= x"a0";
-					when x"017" => data_out <= x"03";
-					when x"018" => data_out <= x"f1";
-					when x"019" => data_out <= x"04";
-					when x"01a" => data_out <= x"01";
-					when x"01b" => data_out <= x"b8";
-					when x"01c" => data_out <= x"14";
-					when x"01d" => data_out <= x"10";
-					when x"01e" => data_out <= x"8c";
-					when x"01f" => data_out <= x"ff";
-					
+					when x"003" => data_out <= x"8c";
+					when x"004" => data_out <= x"aa";
+					when x"005" => data_out <= x"a8";
+					when x"006" => data_out <= x"00";
+					when x"007" => data_out <= x"f0"
 										
-					when others =>	data_out <= "10000000";
+					when others =>	data_out <= "10000000"; -- nops
 				end case;
 			
 			when x"f" => -- i/o
@@ -267,8 +279,8 @@ read : process(n_en, n_wr, addr, ram_data) begin
 								--spi_transfer(spi_device) <= '1';
 							when x"3" =>
 								data_out <= "0000000" & not mux_out(8); -- '1' when done
-							when x"f" => NULL; -- todo implement config read
-							when others => NULL;
+							when x"f" => data_out <= "00000000"; -- todo implement config read
+							when others => data_out <= "00000000";
 						end case;
 					when others => data_out <= "00000000";
 				end case;
@@ -283,6 +295,8 @@ write : process(n_en, n_wr, addr, data) begin
 		case addr(15 downto 12) is
 			when x"f" => -- i/o
 				case addr(11 downto 8) is
+					when x"0" => -- gpo
+						gpo <= data;
 					when x"1" => -- spi
 						spi_device := to_integer(unsigned(addr(7 downto 4)));
 						case addr(3 downto 0) is
