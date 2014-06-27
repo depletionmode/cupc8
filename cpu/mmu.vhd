@@ -147,20 +147,28 @@ begin
 				when x"1" => -- fake stuff!!!
 					case addr(11 downto 0) is					
 						-- gpo test
-						when x"000" => data_out <= x"80";
-						when x"001" => data_out <= x"8c";
-						when x"002" => data_out <= x"aa";
-						when x"003" => data_out <= x"a8";
-						when x"004" => data_out <= x"01";
-						when x"005" => data_out <= x"00";
-						when x"006" => data_out <= x"8c";
-						when x"007" => data_out <= x"99";
-						when x"008" => data_out <= x"a0";
-						when x"009" => data_out <= x"01";
-						when x"00a" => data_out <= x"00";
-						when x"00b" => data_out <= x"a8";
+						when x"000" => data_out <= x"8c";
+						when x"001" => data_out <= x"aa";
+						when x"002" => data_out <= x"a8";
+						when x"003" => data_out <= x"01";
+						when x"004" => data_out <= x"00";
+						when x"005" => data_out <= x"a8";
+						when x"006" => data_out <= x"01";
+						when x"007" => data_out <= x"00";
+						when x"008" => data_out <= x"8c";
+						when x"009" => data_out <= x"99";
+						when x"00a" => data_out <= x"a0";
+						when x"00b" => data_out <= x"01";
 						when x"00c" => data_out <= x"00";
-						when x"00d" => data_out <= x"f0";
+						when x"00d" => data_out <= x"a0";
+						when x"00e" => data_out <= x"01";
+						when x"00f" => data_out <= x"00";
+						when x"010" => data_out <= x"a8";
+						when x"011" => data_out <= x"00";
+						when x"012" => data_out <= x"f0";
+--						when x"00d" => data_out <= x"b0";
+--						when x"00e" => data_out <= x"0a";
+--						when x"00f" => data_out <= x"10";
 						
 						
 											
@@ -178,8 +186,8 @@ begin
 						when others => NULL;
 					end case;
 				when others =>
-					ram_we <= '1';--'1' when (n_en = '0' and n_wr = '0') else '0';
 					ram_data <= data;
+					ram_we <= '1';--'1' when (n_en = '0' and n_wr = '0') else '0';
 			end case;
 		end if;
 	end if;

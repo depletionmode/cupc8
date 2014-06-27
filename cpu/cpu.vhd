@@ -144,8 +144,8 @@ begin
 		if n_hrst = '0' then
 			stage <= reset;
 		--elsif but ='0' then -- for simulation
-		elsif but_de ='0' then
-		--else
+		--elsif but_de ='0' then
+		else
 			case stage is
 				when fetch =>
 					--gpo <= pc(7 downto 0);
@@ -157,7 +157,7 @@ begin
 				when fetch2 => -- dirty dirty hack!
 					num_1 <= "0010";
 					mem_wr <= '1';
-					mem_en <= '1';
+					--mem_en <= '1';
 					ins <= data;
 					stage <= decode;
 				when fetch_imm =>
@@ -180,7 +180,7 @@ begin
 					stage <= decode;
 				when decode =>	
 					num_1 <= "0011";
-					mem_en <= '1';
+					--mem_en <= '1';
 					pc <= std_logic_vector(unsigned(pc) + 1);
 					
 					-- fetch imm
@@ -341,7 +341,10 @@ begin
 						stage <= fetch;
 					end if;
 				when waitonram =>
-					if ram_delay < 2 then
+					-- mem delay > 70ns
+					-- 4 cycles should be sufficient (80ns)
+					-- one added for good measure
+					if ram_delay < 2 then 
 						ram_delay := ram_delay + 1;
 					else
 						ram_delay := 0;
