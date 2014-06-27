@@ -7,6 +7,7 @@ END;
 
 ARCHITECTURE behavior OF cpu_tb IS 
 
+	signal but: std_logic := '0';
    signal clk: std_logic := '0';
    constant clk_period : time := 10 ns;
 	
@@ -19,6 +20,7 @@ BEGIN
 
     -- Instantiate the Unit Under Test (UUT)
    uut: entity work.cpu PORT MAP (
+			but => but,
 			n_srst => n_srst,
 			n_hrst => n_hrst,
          clk => clk,

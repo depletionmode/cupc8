@@ -22,13 +22,13 @@ data <= dataout when (en='1' and we='0') else (others=>'Z');
 
 mem_write: process(address, data, en, we) begin
 	if (en='1' and we='1') then
-		ram(conv_integer(address))  <= data;
+		ram(conv_integer(address(14 downto 0)))  <= data;
 	end if;
 end process;
 
 mem_read: process(address, en, we, ram, dataout) begin
 	if (en='1' and we='0') then
-		dataout <= ram(conv_integer(address));
+		dataout <= ram(conv_integer(address(14 downto 0)));
 	end if;
 end process;
 

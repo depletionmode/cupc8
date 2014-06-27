@@ -41,8 +41,8 @@ entity mmu is
 			
 			addr:		in std_logic_vector(15 downto 0);
 			data:		inout std_logic_vector(7 downto 0);
-			n_en:		in std_logic;
-			n_wr:		in std_logic;
+			n_en:		in std_logic := '1';
+			n_wr:		in std_logic := '1';
 			
 			spi_ss:			out std_logic_vector(3 downto 0);
 			spi_sck:			out std_logic;
@@ -85,7 +85,7 @@ component mux4x10
 		);
 end component;
 
-signal			data_out: std_logic_vector(7 downto 0);
+signal			data_out: std_logic_vector(7 downto 0) := x"00";
 
 -- spi
 type int_array is array(0 to 3) of integer;
@@ -117,6 +117,7 @@ component spi
 			n_transfer:	in std_logic
 		);
 end component;	
+signal gpo_int: std_logic_vector(7 downto 0) := x"00";
 begin
 --mux0: mux4x10 port map(mux_x0, mux_x1, mux_x2, mux_x3, mux_out, mux_s);
 spi0: spi port map(spi_ss(0), mux_x0(9), spi_mosi, spi_miso, clk, spi_clk_div(0), spi_cont(0), spi_cpol(0), spi_cpha(0), spi_tx_data, mux_x0(7 downto 0), mux_x0(8), spi_transfer(0));
@@ -124,240 +125,243 @@ spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1)
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
 spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3), spi_cont(3), spi_cpol(3), spi_cpha(3), spi_tx_data, mux_x3(7 downto 0), mux_x3(8), spi_transfer(3));
 
-ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
+--ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
 
 spi_sck <= mux_out(9);
 
 data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
 
-ram_en <= not n_en;
-ram_addr <= addr;
-ram_we <= '1' when (n_en = '0' and n_wr = '0') else '0';
-ram_data <= data when (n_en = '0' and n_wr = '0') else (others=>'Z');
-
-read : process(n_en, n_wr, addr, ram_data) begin
-	if n_wr = '1' and n_en='0' then
-		case addr(15 downto 12) is
-			when x"1" => -- fake stuff!!!
-				case addr(11 downto 0) is
-					
-					-- branch tight loop
---					when x"000" => data_out <= x"b0"; -- B $0x1000
---					when x"001" => data_out <= x"00";
---					when x"002" => data_out <= x"10";
-
-					-- stack test
---					when x"000" => data_out <= x"b0";
---					when x"001" => data_out <= x"03";
---					when x"002" => data_out <= x"10";
---					when x"003" => data_out <= x"94";
---					when x"004" => data_out <= x"ff";
---					when x"005" => data_out <= x"98";
---					when x"006" => data_out <= x"94";
---					when x"007" => data_out <= x"0a";
---					when x"008" => data_out <= x"99";
---					when x"009" => data_out <= x"8c";
---					when x"00a" => data_out <= x"60";
---					when x"00b" => data_out <= x"8d";
---					when x"00c" => data_out <= x"0f";
---					when x"00d" => data_out <= x"90";
---					when x"00e" => data_out <= x"92";
---					when x"00f" => data_out <= x"80";
---					when x"010" => data_out <= x"98";
---					when x"011" => data_out <= x"99";
-					
-					-- branch not equal loop
---					when x"000" => data_out <= x"8c"; -- MOV R0, #3
---					when x"001" => data_out <= x"03";
---					when x"002" => data_out <= x"8d"; -- MOV R1, #3
---					when x"003" => data_out <= x"03";
---					when x"004" => data_out <= x"00"; -- EQ R0, R1
---					when x"005" => data_out <= x"b8"; -- BNE $0x1000
---					when x"006" => data_out <= x"00";
---					when x"007" => data_out <= x"10";					
-					
-					-- some ALU tests
---					when x"000" => data_out <= x"b0";
---					when x"001" => data_out <= x"03";
---					when x"002" => data_out <= x"10";
---					when x"003" => data_out <= x"8c";
---					when x"004" => data_out <= x"14";
---					when x"005" => data_out <= x"8d";
---					when x"006" => data_out <= x"1e";
---					when x"007" => data_out <= x"32";
---					when x"008" => data_out <= x"31";
---					when x"009" => data_out <= x"30";
---					when x"00a" => data_out <= x"33";
---					when x"00b" => data_out <= x"44";
---					when x"00c" => data_out <= x"01";
---					when x"00d" => data_out <= x"45";
---					when x"00e" => data_out <= x"02";
---					when x"00f" => data_out <= x"42";
-					
-					-- mem test
---					when x"000" => data_out <= x"b0";
---					when x"001" => data_out <= x"03";
---					when x"002" => data_out <= x"10";
---					when x"003" => data_out <= x"8c";
---					when x"004" => data_out <= x"aa";
---					when x"005" => data_out <= x"a8";
---					when x"006" => data_out <= x"00";
---					when x"007" => data_out <= x"20";
---					when x"008" => data_out <= x"30";
---					when x"009" => data_out <= x"a0";
---					when x"00a" => data_out <= x"00";
---					when x"00b" => data_out <= x"20";
-
-					-- pc push test
---					when x"000" => data_out <= x"b0";
---					when x"001" => data_out <= x"05";
---					when x"002" => data_out <= x"10";
---					when x"003" => data_out <= x"9e";
---					when x"004" => data_out <= x"9f";
---					when x"005" => data_out <= x"96";
---					when x"006" => data_out <= x"97";
---					when x"007" => data_out <= x"b0";
---					when x"008" => data_out <= x"03";
---					when x"009" => data_out <= x"10";
---					when x"00a" => data_out <= x"8c";
---					when x"00b" => data_out <= x"ff";
-					
-					-- spi test
---					when x"000" => data_out <= x"b0";
---					when x"001" => data_out <= x"03";
---					when x"002" => data_out <= x"10";
---					when x"003" => data_out <= x"30";
---					when x"004" => data_out <= x"33";
---					when x"005" => data_out <= x"8c";
---					when x"006" => data_out <= x"0c";
---					when x"007" => data_out <= x"a8";
---					when x"008" => data_out <= x"0f";
---					when x"009" => data_out <= x"f1";
---					when x"00a" => data_out <= x"8c";
---					when x"00b" => data_out <= x"c7";
---					when x"00c" => data_out <= x"a8";
---					when x"00d" => data_out <= x"00";
---					when x"00e" => data_out <= x"f1";
---					when x"00f" => data_out <= x"8d";
---					when x"010" => data_out <= x"01";
---					when x"011" => data_out <= x"a8";
---					when x"012" => data_out <= x"02";
---					when x"013" => data_out <= x"f1";
---					when x"014" => data_out <= x"45";
---					when x"015" => data_out <= x"01";
---					when x"016" => data_out <= x"a0";
---					when x"017" => data_out <= x"03";
---					when x"018" => data_out <= x"f1";
---					when x"019" => data_out <= x"04";
---					when x"01a" => data_out <= x"01";
---					when x"01b" => data_out <= x"b8";
---					when x"01c" => data_out <= x"14";
---					when x"01d" => data_out <= x"10";
---					when x"01e" => data_out <= x"8c";
---					when x"01f" => data_out <= x"ff";
-					
-					-- gpo test
-					when x"000" => data_out <= x"b0";
-					when x"001" => data_out <= x"03";
-					when x"002" => data_out <= x"10";
-					when x"003" => data_out <= x"8c";
-					when x"004" => data_out <= x"aa";
-					when x"005" => data_out <= x"a8";
-					when x"006" => data_out <= x"00";
-					when x"007" => data_out <= x"f0"
-										
-					when others =>	data_out <= "10000000"; -- nops
-				end case;
-			
-			when x"f" => -- i/o
-				case addr(11 downto 8) is
-					when x"1" => -- spi
-						spi_device := to_integer(unsigned(addr(7 downto 4)));
-						case addr(3 downto 0) is
-							when x"1" =>
-								data_out <= mux_out(7 downto 0);
-								--spi_transfer(spi_device) <= '1';
-							when x"3" =>
-								data_out <= "0000000" & not mux_out(8); -- '1' when done
-							when x"f" => data_out <= "00000000"; -- todo implement config read
-							when others => data_out <= "00000000";
-						end case;
-					when others => data_out <= "00000000";
-				end case;
-			when others => data_out <= ram_data; -- read from ram
-		end case;
+process(clk)
+begin
+   if (falling_edge(clk) and n_en='0') then
+		if n_wr = '1' then
+			-- read
+			case addr(15 downto 12) is
+				when x"1" => -- fake stuff!!!
+					case addr(11 downto 0) is					
+						-- gpo test
+						when x"000" => data_out <= x"80";
+						when x"001" => data_out <= x"8c";
+						when x"002" => data_out <= x"aa";
+						when x"003" => data_out <= x"a8";
+						when x"004" => data_out <= x"00";
+						when x"005" => data_out <= x"f0";
+											
+						when others =>	data_out <= "10000000"; -- nops
+					end case;
+				when others => data_out <= x"ff";--ram_data; -- read from ram
+			end case;
+		else
+			-- write
+			case addr(15 downto 12) is
+				when x"f" => -- i/o
+					case addr(11 downto 8) is
+						when x"0" => -- gpo
+								gpo <= data;
+						when others => NULL;
+					end case;
+				when others => NULL;
+			end case;
+		end if;
 	end if;
 end process;
 
-
-write : process(n_en, n_wr, addr, data) begin
-	if n_wr = '0' and n_en='0' then
-		case addr(15 downto 12) is
-			when x"f" => -- i/o
-				case addr(11 downto 8) is
-					when x"0" => -- gpo
-						gpo <= data;
-					when x"1" => -- spi
-						spi_device := to_integer(unsigned(addr(7 downto 4)));
-						case addr(3 downto 0) is
-							when x"0" =>
-								spi_tx_data <= data;
-								spi_transfer(spi_device) <= '1';
-							when x"2" =>
-								mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
-								spi_transfer(spi_device) <= '0'; -- active low
-							when x"f" =>
-								spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
-								spi_cont(spi_device) <= data(0);
-								spi_cpol(spi_device) <= data(1);
-								spi_cpha(spi_device) <= data(2);
-							when others => NULL;
-						end case;
-					when others => NULL;
-				end case;
-			when others => NULL;
-		end case;
-	end if;
-end process;
-
-end architecture;
-
+--ram_en <= not n_en;
+--ram_addr <= addr;
+--ram_we <= '1' when (n_en = '0' and n_wr = '0') else '0';
+--ram_data <= data when (n_en = '0' and n_wr = '0') else (others=>'Z');
+--gpo <= addr(7 downto 0);
 --
---entity mmu is
---	port(
---			addr:		in std_logic_vector(15 downto 0);
---			data:		inout std_logic_vector(7 downto 0);
---			n_en:		in std_logic;
---			n_wr:		in std_logic
---		);
---end entity;
+--read : process(n_en, n_wr, addr, ram_data) begin
+--	if n_wr = '1' and n_en='0' then
+--		case addr(15 downto 12) is
+--			when x"1" => -- fake stuff!!!
+--				case addr(11 downto 0) is
+--					-- branch tight loop
+----					when x"000" => data_out <= x"b0"; -- B $0x1000
+----					when x"001" => data_out <= x"00";
+----					when x"002" => data_out <= x"10";
 --
+--					-- stack test
+----					when x"000" => data_out <= x"b0";
+----					when x"001" => data_out <= x"03";
+----					when x"002" => data_out <= x"10";
+----					when x"003" => data_out <= x"94";
+----					when x"004" => data_out <= x"ff";
+----					when x"005" => data_out <= x"98";
+----					when x"006" => data_out <= x"94";
+----					when x"007" => data_out <= x"0a";
+----					when x"008" => data_out <= x"99";
+----					when x"009" => data_out <= x"8c";
+----					when x"00a" => data_out <= x"60";
+----					when x"00b" => data_out <= x"8d";
+----					when x"00c" => data_out <= x"0f";
+----					when x"00d" => data_out <= x"90";
+----					when x"00e" => data_out <= x"92";
+----					when x"00f" => data_out <= x"80";
+----					when x"010" => data_out <= x"98";
+----					when x"011" => data_out <= x"99";
+--					
+--					-- branch not equal loop
+----					when x"000" => data_out <= x"8c"; -- MOV R0, #3
+----					when x"001" => data_out <= x"03";
+----					when x"002" => data_out <= x"8d"; -- MOV R1, #3
+----					when x"003" => data_out <= x"03";
+----					when x"004" => data_out <= x"00"; -- EQ R0, R1
+----					when x"005" => data_out <= x"b8"; -- BNE $0x1000
+----					when x"006" => data_out <= x"00";
+----					when x"007" => data_out <= x"10";					
+--					
+--					-- some ALU tests
+----					when x"000" => data_out <= x"b0";
+----					when x"001" => data_out <= x"03";
+----					when x"002" => data_out <= x"10";
+----					when x"003" => data_out <= x"8c";
+----					when x"004" => data_out <= x"14";
+----					when x"005" => data_out <= x"8d";
+----					when x"006" => data_out <= x"1e";
+----					when x"007" => data_out <= x"32";
+----					when x"008" => data_out <= x"31";
+----					when x"009" => data_out <= x"30";
+----					when x"00a" => data_out <= x"33";
+----					when x"00b" => data_out <= x"44";
+----					when x"00c" => data_out <= x"01";
+----					when x"00d" => data_out <= x"45";
+----					when x"00e" => data_out <= x"02";
+----					when x"00f" => data_out <= x"42";
+--					
+--					-- mem test
+----					when x"000" => data_out <= x"b0";
+----					when x"001" => data_out <= x"03";
+----					when x"002" => data_out <= x"10";
+----					when x"003" => data_out <= x"8c";
+----					when x"004" => data_out <= x"aa";
+----					when x"005" => data_out <= x"a8";
+----					when x"006" => data_out <= x"00";
+----					when x"007" => data_out <= x"20";
+----					when x"008" => data_out <= x"30";
+----					when x"009" => data_out <= x"a0";
+----					when x"00a" => data_out <= x"00";
+----					when x"00b" => data_out <= x"20";
 --
---architecture behavioural of mmu is
---begin
---process(n_en)
---begin
---	if(n_en = '0') then
---		case n_wr is
---			when '1' => -- read
---				-- fake stuff!!!
---				case addr is
---					when x"1001" => data <= "10001100"; -- MOV R0, #1
---					when x"1002" => data <= "00000001";
---					when x"1003" => data <= "10001101"; -- MOV R1, #3
---					when x"1004" => data <= "00000011";
---					when x"1005" => data <= "01000100"; -- ADD R0, #1
---					when x"1006" => data <= "00000001";
---					when x"1007" => data <= "01000101"; -- ADD R1, #1
---					when x"1008" => data <= "00000001";
---					when x"1009" => data <= "01000001"; -- ADD R1, R0
---					when x"100a" => data <= "01000010"; -- ADD R0, R1
---					when others =>	data <= "10000000"; -- NOP
---				end case; -- end fake stuff!!!
---			when '0' => -- write
---				NULL;
---			when others => NULL;
+--					-- pc push test
+----					when x"000" => data_out <= x"b0";
+----					when x"001" => data_out <= x"05";
+----					when x"002" => data_out <= x"10";
+----					when x"003" => data_out <= x"9e";
+----					when x"004" => data_out <= x"9f";
+----					when x"005" => data_out <= x"96";
+----					when x"006" => data_out <= x"97";
+----					when x"007" => data_out <= x"b0";
+----					when x"008" => data_out <= x"03";
+----					when x"009" => data_out <= x"10";
+----					when x"00a" => data_out <= x"8c";
+----					when x"00b" => data_out <= x"ff";
+--					
+--					-- spi test
+----					when x"000" => data_out <= x"b0";
+----					when x"001" => data_out <= x"03";
+----					when x"002" => data_out <= x"10";
+----					when x"003" => data_out <= x"30";
+----					when x"004" => data_out <= x"33";
+----					when x"005" => data_out <= x"8c";
+----					when x"006" => data_out <= x"0c";
+----					when x"007" => data_out <= x"a8";
+----					when x"008" => data_out <= x"0f";
+----					when x"009" => data_out <= x"f1";
+----					when x"00a" => data_out <= x"8c";
+----					when x"00b" => data_out <= x"c7";
+----					when x"00c" => data_out <= x"a8";
+----					when x"00d" => data_out <= x"00";
+----					when x"00e" => data_out <= x"f1";
+----					when x"00f" => data_out <= x"8d";
+----					when x"010" => data_out <= x"01";
+----					when x"011" => data_out <= x"a8";
+----					when x"012" => data_out <= x"02";
+----					when x"013" => data_out <= x"f1";
+----					when x"014" => data_out <= x"45";
+----					when x"015" => data_out <= x"01";
+----					when x"016" => data_out <= x"a0";
+----					when x"017" => data_out <= x"03";
+----					when x"018" => data_out <= x"f1";
+----					when x"019" => data_out <= x"04";
+----					when x"01a" => data_out <= x"01";
+----					when x"01b" => data_out <= x"b8";
+----					when x"01c" => data_out <= x"14";
+----					when x"01d" => data_out <= x"10";
+----					when x"01e" => data_out <= x"8c";
+----					when x"01f" => data_out <= x"ff";
+--					
+--					-- gpo test
+--					when x"000" => data_out <= x"80";
+--					when x"001" => data_out <= x"8c";
+--					when x"002" => data_out <= x"aa";
+--					when x"003" => data_out <= x"a8";
+--					when x"004" => data_out <= x"00";
+--					when x"005" => data_out <= x"f0";
+--										
+--					when others =>	data_out <= "10000000"; -- nops
+--				end case;
+--			
+--			when x"f" => -- i/o
+--				case addr(11 downto 8) is
+--					when x"1" => -- spi
+--						spi_device := to_integer(unsigned(addr(7 downto 4)));
+--						case addr(3 downto 0) is
+--							when x"1" =>
+--								data_out <= mux_out(7 downto 0);
+--								--spi_transfer(spi_device) <= '1';
+--							when x"3" =>
+--								data_out <= "0000000" & not mux_out(8); -- '1' when done
+--							when x"f" => data_out <= "00000000"; -- todo implement config read
+--							when others => data_out <= "00000000";
+--						end case;
+--					when others => data_out <= "00000000";
+--				end case;
+--			when others => data_out <= x"ff";--ram_data; -- read from ram
 --		end case;
 --	end if;
 --end process;
---end architecture;
+--
+--gpo_int <= gpo_int when n_wr = '1' or n_en ='1';
+--gpo <= gpo_int;
+--write : process(n_en, n_wr) 
+--variable set: bit :='0';
+--begin
+--
+--	if n_wr = '0' and n_en='0' then
+--		case addr(15 downto 12) is
+--			when x"f" => -- i/o
+--				case addr(11 downto 8) is
+--					when x"0" => -- gpo
+--						--if set ='0' then
+--							--gpo_int <= x"0f";
+--							gpo_int <= data;
+--							--set := '1';
+--						--end if;
+----					when x"1" => -- spi
+----						spi_device := to_integer(unsigned(addr(7 downto 4)));
+----						case addr(3 downto 0) is
+----							when x"0" =>
+----								spi_tx_data <= data;
+----								spi_transfer(spi_device) <= '1';
+----							when x"2" =>
+----								mux_s <= std_logic_vector(to_unsigned(spi_device, mux_s'length)); 
+----								spi_transfer(spi_device) <= '0'; -- active low
+----							when x"f" =>
+----								spi_clk_div(spi_device) <= to_integer(unsigned(data(7 downto 3)));
+----								spi_cont(spi_device) <= data(0);
+----								spi_cpol(spi_device) <= data(1);
+----								spi_cpha(spi_device) <= data(2);
+----							when others => NULL;
+----						end case;
+--					when others =>
+--						gpo_int <= gpo_int;
+--				end case;
+--			when others =>
+--				gpo_int <=  gpo_int;
+--		end case;
+--	end if;
+--end process;
+
+end architecture;

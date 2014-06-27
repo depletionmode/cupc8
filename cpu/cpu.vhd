@@ -4,6 +4,9 @@ use ieee.numeric_std.all;
 
 entity cpu is
 	port(
+         seg7_1:         out std_logic_vector(6 downto 0);
+				
+			but:			in std_logic;
 			clk: 			in std_logic;
 			n_srst:		in std_logic;
 			n_hrst:		in std_logic;
@@ -16,7 +19,8 @@ entity cpu is
 			spi_miso:	in std_logic;
 			
 			-- gpio
-			gpo:			out std_logic_vector(7 downto 0)
+			gpo:			out std_logic_vector(7 downto 0);
+			o: out std_logic
 		);
 end entity;
 
@@ -43,14 +47,33 @@ end entity;
 
 architecture behavioural of cpu is
 signal r0, r1:	unsigned(7 downto 0);
-signal pc, sp:	unsigned(15 downto 0) := x"0000";
+signal pc:	std_logic_vector(15 downto 0) := x"0000";
+signal sp:	unsigned(15 downto 0) := x"0000";
 signal f: unsigned(3 downto 0) := x"0";
 signal ins: unsigned(7 downto 0);
 signal imm_value: unsigned(7 downto 0);
 signal addr_value: unsigned(15 downto 0);
 type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2);
-signal stage, stage_nxt: stages;-- <= 'reset';
+signal stage, stage_nxt: stages := reset;
 signal data: unsigned(7 downto 0) := "10000000";
+
+    signal num_1: std_logic_vector(3 downto 0) := "0000";
+    component SEG7
+        port (
+                i_dig:  in std_logic_vector(3 downto 0);
+                o_dig:  out std_logic_vector(6 downto 0)
+              );
+    end component;
+
+signal but_de: std_logic;
+    component DEBOUNCE
+        port (
+                clk:        in std_logic;
+                in_n:       in std_logic;
+                out_n:  out std_logic
+              );
+    end component;
+	 
 -- alu
 signal			alu_en:		std_logic;
 signal			alu_ra:		unsigned(7 downto 0);
@@ -89,234 +112,255 @@ component mmu
 			gpo:		out std_logic_vector(7 downto 0)
 		);
 end component;	
+signal imm_fetched: std_logic;
 
-shared variable rwb: unsigned(7 downto 0);
+shared variable rwb: unsigned(7 downto 0) := x"aa";
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
 mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo);
+
+    seg1: SEG7
+        port map (num_1, seg7_1);
+but1: DEBOUNCE port map (clk, but, but_de);
 
 f <= "000" & alu_zf;
 
 -- mmu tristate handling
 data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
-mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
-
---imm_value <= data when imm_fetched = '1' else 
---		if imm_fetched = '1' then
---			imm_value <= data;
---		end if;
+mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');		
 		
-		
-process(stage)
-variable imm_fetched: bit := '0';
-variable addr1_fetched: bit := '0';
-variable addr2_fetched: bit := '0';
+process(clk, n_hrst)
+variable addr1_fetched: bit;
+variable addr2_fetched: bit;
 variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
 variable tmp16: unsigned (15 downto 0);
 variable tmp16_2: unsigned (15 downto 0);
+variable pc_inc, pc_inc_addr: bit;
 begin
-
-case stage is
-	when fetch =>
-		mem_wr <= '1';
-		mem_en <= '0';
-		mem_addr <= std_logic_vector(pc);
-		stage_nxt <= fetch2;
-	when fetch2 => -- dirty dirty hack!
-		mem_wr <= '1';
-		mem_en <= '1';
-		ins <= data;
-		stage_nxt <= decode;
-	when fetch_imm =>
-		mem_addr <= std_logic_vector(pc);
-		mem_en <= '0';
-		imm_fetched := '1';
-		stage_nxt <= decode;
-	when fetch_addr =>
-		mem_addr <= std_logic_vector(pc);
-		mem_en <= '0';
-		pc <= pc + 1;
-		stage_nxt <= fetch_addr2;
-	when fetch_addr2 =>
-		mem_addr <= std_logic_vector(pc);
-		mem_en <= '0';
-		addr_value <= x"00" & data;
-		addr2_fetched := '1';
-		stage_nxt <= decode;
-	when decode =>	
-		pc <= pc + 1;
-		mem_en <= '1';
-		
---		if imm_fetched = '1' then
---			imm_value <= data;
---		end if;
-		
-		-- fetch imm
-		if(ins(2) = '1' and ins(1) = '0' and imm_fetched = '0') then
-			-- fetch imm
-			stage_nxt <= fetch_imm;
-		else
-			-- register decode
-			if ins(0) = '0' then ra := r0; else ra := r1; end if;
-			if ins(2) = '1' and ins(1) = '1' then
-				-- use pc
-				if ins(0) = '0' then
-					tmp16 := pc + 5; -- offset 5 ops
-					rb := tmp16(15 downto 8);
-				else
-					tmp16 := pc + 4; -- offset 4 ops
-					rb := tmp16(7 downto 0);
-				end if;
-			elsif ins(1) = '0' then
-				rb := r0;
-			else
-				rb := r1;
-			end if;
-			--ra := r0 when ins(0)='0' else r1;
-			
-			if(ins(7) = '0') then
-				-- alu setup
-				alu_ra <= ra;
-				if imm_fetched = '1' then alu_rb <= data; else alu_rb <= rb; end if;
-				stage_nxt <= execute;
-			else
-				-- handle addressed instructions		
-				case ins(6 downto 3) is
-					when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
-						if addr2_fetched = '0' then
-							stage_nxt <= fetch_addr;
+	halt <= n_hrst;
+   if (rising_edge(clk)) then
+		if n_hrst = '0' then
+			stage <= reset;
+		--elsif but ='0' then -- for simulation
+		elsif but_de ='0' then
+		--else
+			case stage is
+				when fetch =>
+					pc_inc := '0';
+					num_1 <= "0001";
+					mem_wr <= '1';
+					mem_en <= '0';
+					mem_addr <= std_logic_vector(pc);
+					stage <= fetch2;
+				when fetch2 => -- dirty dirty hack!
+					num_1 <= "0010";
+					mem_wr <= '1';
+					mem_en <= '1';
+					ins <= data;
+					stage <= decode;
+				when fetch_imm =>
+					pc_inc := '0';
+					num_1 <= x"6";
+					mem_addr <= std_logic_vector(pc);
+					mem_en <= '0';
+					stage <= decode;
+				when fetch_addr =>
+					num_1 <= x"7";
+					mem_addr <= std_logic_vector(pc);
+					mem_en <= '0';
+					--if pc_inc_addr = '0' then
+						pc <= std_logic_vector(unsigned(pc) + 1);
+					--	pc_inc_addr := '1';
+					--end if;
+					stage <= fetch_addr2;
+				when fetch_addr2 =>
+					pc_inc := '0';
+					num_1 <= x"8";
+					pc_inc_addr := '0';
+					mem_addr <= std_logic_vector(pc);
+					mem_en <= '0';
+					addr_value <= x"00" & data;
+					addr2_fetched := '1';
+					stage <= decode;
+				when decode =>	
+					--gpo <= std_logic_vector(ins);
+					num_1 <= "0011";
+					
+					--if pc_inc = '0' then
+						pc <= std_logic_vector(unsigned(pc) + 1);
+					--	pc_inc := '1';
+					--end if;
+					mem_en <= '1';
+					
+					-- fetch imm
+					if(ins(2) = '1' and ins(1) = '0' and imm_fetched = '0') then
+						-- fetch imm
+						imm_fetched <= '1';
+						stage <= fetch_imm;
+					else
+						-- register decode
+						if ins(0) = '0' then ra := r0; else ra := r1; end if;
+						if ins(2) = '1' and ins(1) = '1' then
+							-- use pc
+							if ins(0) = '0' then
+								tmp16 := unsigned(pc) + 5; -- offset 5 ops
+								rb := tmp16(15 downto 8);
+							else
+								tmp16 := unsigned(pc) + 4; -- offset 4 ops
+								rb := tmp16(7 downto 0);
+							end if;
+						elsif ins(1) = '0' then
+							rb := r0;
 						else
-							addr_value <= data & addr_value(7 downto 0);
-							stage_nxt <= execute;
+							rb := r1;
 						end if;
-					when others => stage_nxt <= execute;
-				end case;
-			end if;
-		end if;
-	when execute =>
-		
-		if(imm_fetched = '1') then
-			rtmp := data;
-		else
-			rtmp := rb;
-		end if;
-		
-		if(ins(7) = '0') then	
-			-- exec alu
-			alu_en <= '0';
-		else
-			case ins(6 downto 3) is
-				when "0010"|"1100"|"1101" => -- PUSH|PUSH.PC1|PUSH.PC2
-					mem_addr <= std_logic_vector(sp);
-					sp_next := sp + 1;
-					mem_en <= '0';
-				when "0011" => -- POP
-					mem_addr <= std_logic_vector(sp - 1);
-					sp_next := sp - 1;
-					mem_en <= '0';
-				when "0100"|"0101" => -- LD|ST
-					mem_addr <= std_logic_vector(addr_value);
-					mem_en <= '0';
-				when "0110" => -- B
-					pc <= addr_value;
-				when "0111" => -- BNE
-					if f(0) = '1' then
-						pc <= addr_value;
+						--ra := r0 when ins(0)='0' else r1;
+						
+						if(ins(7) = '0') then
+							-- alu setup
+							alu_ra <= ra;
+							if imm_fetched = '1' then alu_rb <= data; else alu_rb <= rb; end if;
+							stage <= execute;
+						else
+							-- handle addressed instructions		
+							case ins(6 downto 3) is
+								when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
+									if addr2_fetched = '0' then
+										stage <= fetch_addr;
+									else
+										addr_value <= data & addr_value(7 downto 0);
+										stage <= execute;
+									end if;
+								when others => stage <= execute;
+							end case;
+						end if;
 					end if;
-				when others => NULL;
+				when execute =>
+					num_1 <= x"4";
+					
+					if(imm_fetched = '1') then
+						rtmp := data;
+					else
+						rtmp := rb;
+					end if;
+					
+					if(ins(7) = '0') then	
+						-- exec alu
+						alu_en <= '0';
+					else
+						case ins(6 downto 3) is
+							when "0010"|"1100"|"1101" => -- PUSH|PUSH.PC1|PUSH.PC2
+								mem_addr <= std_logic_vector(sp);
+								sp_next := sp + 1;
+								mem_en <= '0';
+							when "0011" => -- POP
+								mem_addr <= std_logic_vector(sp - 1);
+								sp_next := sp - 1;
+								mem_en <= '0';
+							when "0100" => -- LD
+								mem_addr <= std_logic_vector(addr_value);
+								mem_en <= '0';
+							when "0101" => -- ST
+								mem_addr <= std_logic_vector(addr_value);
+								--mem_en <= '0';
+							when "0110" => -- B
+								pc <= std_logic_vector(addr_value);
+							when "0111" => -- BNE
+								if f(0) = '1' then
+									pc <= std_logic_vector(addr_value);
+								end if;
+							when others => NULL;
+						end case;
+					end if;
+					stage <= writeback;
+				when writeback =>
+					num_1 <= x"5";
+					-- get result from alu
+					if(ins(7)='0') then
+							alu_en <= '1';
+							rtmp := alu_res;
+							-- write back into register
+							if(ins(0) = '0') then
+								r0 <= rtmp;
+							else
+								r1 <= rtmp;
+							end if;
+					end if;
+					
+					case ins(6 downto 3) is
+						when "0001" => -- MOV
+							-- write back into register
+							if(ins(0) = '0') then
+								r0 <= rtmp;
+							else
+								r1 <= rtmp;
+							end if;
+						when "0010" => -- PUSH
+							-- write back into memory
+							rwb := rtmp;	
+							mem_wr <= '0';
+							mem_en <= '0';
+						when "0011" => -- POP
+							if ins(2) = '0' then
+								-- write back into register
+								if ins(0) = '0' then
+									r0 <= data;
+								else
+									r1 <= data;
+								end if;
+							else -- pc
+								if ins(0) = '0' then
+									tmp16_2 := x"00" & data;
+								else
+									tmp16_2 := data & tmp16_2(7 downto 0);
+									pc <= std_logic_vector(tmp16_2);
+								end if;
+							end if;
+						when "0100" => -- LD
+							-- write back into register
+							if(ins(0) = '0') then
+								r0 <= data;
+							else
+								r1 <= data;
+							end if;
+						when "0101" => -- ST
+							-- write back into memory
+							rwb := rtmp;
+							mem_wr <= '0';
+							mem_en <= '0';
+						when others => NULL;
+					end case;
+					
+					-- make sp change if necessary
+					sp <= sp_next;
+					
+					-- clear up
+					imm_fetched <= '0';
+					addr1_fetched := '0';
+					addr2_fetched := '0';
+					stage <= fetch;
+				when reset =>
+					num_1 <= "0000";
+					r0 <= x"00";
+					r1 <= x"00";
+					sp <= x"0100";
+					sp_next := x"0100";
+					pc <= x"1000";
+					mem_en <= '1';
+					mem_wr <= '1';
+					mem_addr <= x"ffff";
+					--gpo <= x"00";
+					imm_fetched <= '0';
+					addr1_fetched := '0';
+					addr2_fetched := '0';
+					pc_inc := '0';
+					pc_inc_addr := '0';
+					stage <= fetch;
+				when others => stage <= reset;
 			end case;
 		end if;
-		
-		stage_nxt <= writeback;
-	when writeback =>
-		-- get result from alu
-		if(ins(7)='0') then
-				alu_en <= '1';
-				rtmp := alu_res;
-				-- write back into register
-				if(ins(0) = '0') then
-					r0 <= rtmp;
-				else
-					r1 <= rtmp;
-				end if;
-		end if;
-		
-		case ins(6 downto 3) is
-			when "0001" => -- MOV
-				-- write back into register
-				if(ins(0) = '0') then
-					r0 <= rtmp;
-				else
-					r1 <= rtmp;
-				end if;
-			when "0010" => -- PUSH
-				-- write back into memory
-				mem_wr <= '0';
-				mem_en <= '0';
-				rwb := rtmp;	
-			when "0011" => -- POP
-				if ins(2) = '0' then
-					-- write back into register
-					if ins(0) = '0' then
-						r0 <= data;
-					else
-						r1 <= data;
-					end if;
-				else -- pc
-					if ins(0) = '0' then
-						tmp16_2 := x"00" & data;
-					else
-						tmp16_2 := data & tmp16_2(7 downto 0);
-						pc <= tmp16_2;
-					end if;
-				end if;
-			when "0100" => -- LD
-				-- write back into register
-				if(ins(0) = '0') then
-					r0 <= data;
-				else
-					r1 <= data;
-				end if;
-			when "0101" => -- ST
-				-- write back into memory
-				mem_wr <= '0';
-				mem_en <= '0';
-				rwb := rtmp;
-			when others => NULL;
-		end case;
-		
-		-- make sp change if necessary
-		sp <= sp_next;
-		
-		-- clear up
-		imm_fetched := '0';
-		addr1_fetched := '0';
-		addr2_fetched := '0';
-		
-		stage_nxt <= fetch;
-	when reset =>
-		r0 <= x"00";
-		r1 <= x"00";
-		sp <= x"0100";
-		sp_next := x"0100";
-		pc <= x"1000";
-		stage_nxt <= fetch;
-		mem_en <= '1';
-		mem_wr <= '1';
-		mem_addr <= x"ffff";
-	when others =>
-		stage_nxt <= reset;
-	end case;
-end process;
-
-process(clk)
-begin
-	if(n_hrst = '0') then
-		stage <= reset;
-	else
-		stage <= stage_nxt;
 	end if;
 end process;
 
