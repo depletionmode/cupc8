@@ -53,7 +53,7 @@ signal f: unsigned(3 downto 0) := x"0";
 signal ins: unsigned(7 downto 0);
 signal imm_value: unsigned(7 downto 0);
 signal addr_value: unsigned(15 downto 0);
-type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2);
+type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2, waitonram);
 signal stage, stage_nxt: stages := reset;
 signal data: unsigned(7 downto 0) := "10000000";
 
@@ -127,17 +127,17 @@ f <= "000" & alu_zf;
 
 -- mmu tristate handling
 data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
-mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');		
+mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
 		
 process(clk, n_hrst)
-variable addr1_fetched: bit;
 variable addr2_fetched: bit;
 variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
 variable tmp16: unsigned (15 downto 0);
 variable tmp16_2: unsigned (15 downto 0);
-variable pc_inc, pc_inc_addr: bit;
+variable ram_delay: integer range 0 to 10 := 0;
+variable ram_ld, ram_st: bit := '0';
 begin
 	halt <= n_hrst;
    if (rising_edge(clk)) then
@@ -148,7 +148,7 @@ begin
 		--else
 			case stage is
 				when fetch =>
-					pc_inc := '0';
+					--gpo <= pc(7 downto 0);
 					num_1 <= "0001";
 					mem_wr <= '1';
 					mem_en <= '0';
@@ -161,7 +161,6 @@ begin
 					ins <= data;
 					stage <= decode;
 				when fetch_imm =>
-					pc_inc := '0';
 					num_1 <= x"6";
 					mem_addr <= std_logic_vector(pc);
 					mem_en <= '0';
@@ -170,29 +169,19 @@ begin
 					num_1 <= x"7";
 					mem_addr <= std_logic_vector(pc);
 					mem_en <= '0';
-					--if pc_inc_addr = '0' then
-						pc <= std_logic_vector(unsigned(pc) + 1);
-					--	pc_inc_addr := '1';
-					--end if;
+					pc <= std_logic_vector(unsigned(pc) + 1);
 					stage <= fetch_addr2;
 				when fetch_addr2 =>
-					pc_inc := '0';
 					num_1 <= x"8";
-					pc_inc_addr := '0';
 					mem_addr <= std_logic_vector(pc);
 					mem_en <= '0';
 					addr_value <= x"00" & data;
 					addr2_fetched := '1';
 					stage <= decode;
 				when decode =>	
-					--gpo <= std_logic_vector(ins);
 					num_1 <= "0011";
-					
-					--if pc_inc = '0' then
-						pc <= std_logic_vector(unsigned(pc) + 1);
-					--	pc_inc := '1';
-					--end if;
 					mem_en <= '1';
+					pc <= std_logic_vector(unsigned(pc) + 1);
 					
 					-- fetch imm
 					if(ins(2) = '1' and ins(1) = '0' and imm_fetched = '0') then
@@ -262,9 +251,9 @@ begin
 							when "0100" => -- LD
 								mem_addr <= std_logic_vector(addr_value);
 								mem_en <= '0';
+								ram_ld := '1';
 							when "0101" => -- ST
 								mem_addr <= std_logic_vector(addr_value);
-								--mem_en <= '0';
 							when "0110" => -- B
 								pc <= std_logic_vector(addr_value);
 							when "0111" => -- BNE
@@ -274,7 +263,12 @@ begin
 							when others => NULL;
 						end case;
 					end if;
+					
+					if ram_ld = '1' then
+						stage <= waitonram;
+					else
 					stage <= writeback;
+					end if;
 				when writeback =>
 					num_1 <= x"5";
 					-- get result from alu
@@ -330,6 +324,7 @@ begin
 							rwb := rtmp;
 							mem_wr <= '0';
 							mem_en <= '0';
+							ram_st := '1';
 						when others => NULL;
 					end case;
 					
@@ -338,9 +333,26 @@ begin
 					
 					-- clear up
 					imm_fetched <= '0';
-					addr1_fetched := '0';
 					addr2_fetched := '0';
-					stage <= fetch;
+					
+					if ram_st = '1' then
+						stage <= waitonram;
+					else
+						stage <= fetch;
+					end if;
+				when waitonram =>
+					if ram_delay < 2 then
+						ram_delay := ram_delay + 1;
+					else
+						ram_delay := 0;
+						if ram_ld ='1' then
+							stage <= writeback;
+							ram_ld := '0';
+						else
+							stage <= fetch;
+							ram_st := '0';
+						end if;
+					end if;
 				when reset =>
 					num_1 <= "0000";
 					r0 <= x"00";
@@ -351,12 +363,8 @@ begin
 					mem_en <= '1';
 					mem_wr <= '1';
 					mem_addr <= x"ffff";
-					--gpo <= x"00";
 					imm_fetched <= '0';
-					addr1_fetched := '0';
 					addr2_fetched := '0';
-					pc_inc := '0';
-					pc_inc_addr := '0';
 					stage <= fetch;
 				when others => stage <= reset;
 			end case;

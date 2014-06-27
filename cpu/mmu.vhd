@@ -125,17 +125,24 @@ spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1)
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
 spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3), spi_cont(3), spi_cpol(3), spi_cpha(3), spi_tx_data, mux_x3(7 downto 0), mux_x3(8), spi_transfer(3));
 
---ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
+ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
 
 spi_sck <= mux_out(9);
 
 data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
 
-process(clk)
+ram_en <= '1';
+ram_addr <= addr;
+--ram_we <= not n_wr;--'1' when (n_en = '0' and n_wr = '0') else '0';
+--ram_data <= data when (ram_en = '1' and ram_we = '1') else (others=>'Z');
+
+process(clk, ram_data, data, addr)
 begin
    if (falling_edge(clk) and n_en='0') then
 		if n_wr = '1' then
 			-- read
+			ram_we <= '0';
+			ram_data <= (others=>'Z');
 			case addr(15 downto 12) is
 				when x"1" => -- fake stuff!!!
 					case addr(11 downto 0) is					
@@ -144,12 +151,22 @@ begin
 						when x"001" => data_out <= x"8c";
 						when x"002" => data_out <= x"aa";
 						when x"003" => data_out <= x"a8";
-						when x"004" => data_out <= x"00";
-						when x"005" => data_out <= x"f0";
+						when x"004" => data_out <= x"01";
+						when x"005" => data_out <= x"00";
+						when x"006" => data_out <= x"8c";
+						when x"007" => data_out <= x"99";
+						when x"008" => data_out <= x"a0";
+						when x"009" => data_out <= x"01";
+						when x"00a" => data_out <= x"00";
+						when x"00b" => data_out <= x"a8";
+						when x"00c" => data_out <= x"00";
+						when x"00d" => data_out <= x"f0";
+						
+						
 											
 						when others =>	data_out <= "10000000"; -- nops
 					end case;
-				when others => data_out <= x"ff";--ram_data; -- read from ram
+				when others => data_out <= ram_data; -- read from ram (with bram, 32k block repeated)
 			end case;
 		else
 			-- write
@@ -160,7 +177,9 @@ begin
 								gpo <= data;
 						when others => NULL;
 					end case;
-				when others => NULL;
+				when others =>
+					ram_we <= '1';--'1' when (n_en = '0' and n_wr = '0') else '0';
+					ram_data <= data;
 			end case;
 		end if;
 	end if;
@@ -311,7 +330,7 @@ end process;
 --							when x"1" =>
 --								data_out <= mux_out(7 downto 0);
 --								--spi_transfer(spi_device) <= '1';
---							when x"3" =>
+--							when x"3" => 
 --								data_out <= "0000000" & not mux_out(8); -- '1' when done
 --							when x"f" => data_out <= "00000000"; -- todo implement config read
 --							when others => data_out <= "00000000";
