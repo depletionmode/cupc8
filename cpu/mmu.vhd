@@ -129,14 +129,12 @@ ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
 
 spi_sck <= mux_out(9);
 
-data <= data_out when (n_en = '0' and n_wr = '1') else (others=>'Z');
-
 ram_en <= '1';
 ram_addr <= addr;
 --ram_we <= not n_wr;--'1' when (n_en = '0' and n_wr = '0') else '0';
 --ram_data <= data when (ram_en = '1' and ram_we = '1') else (others=>'Z');
 
-process(clk, ram_data, data, addr)
+process(clk, ram_data, data, addr, n_en)
 begin
    if (falling_edge(clk) and n_en='0') then
 		if n_wr = '1' then
@@ -147,34 +145,35 @@ begin
 				when x"1" => -- fake stuff!!!
 					case addr(11 downto 0) is					
 						-- gpo test
-						when x"000" => data_out <= x"8c";
-						when x"001" => data_out <= x"aa";
-						when x"002" => data_out <= x"a8";
-						when x"003" => data_out <= x"01";
-						when x"004" => data_out <= x"00";
-						when x"005" => data_out <= x"a8";
-						when x"006" => data_out <= x"01";
-						when x"007" => data_out <= x"00";
-						when x"008" => data_out <= x"8c";
-						when x"009" => data_out <= x"99";
-						when x"00a" => data_out <= x"a0";
-						when x"00b" => data_out <= x"01";
-						when x"00c" => data_out <= x"00";
-						when x"00d" => data_out <= x"a8";
-						when x"00e" => data_out <= x"00";
-						when x"00f" => data_out <= x"f0";
---						when x"00d" => data_out <= x"b0";
---						when x"00e" => data_out <= x"0a";
---						when x"00f" => data_out <= x"10";
+						when x"000" => data <= x"8c";
+						when x"001" => data <= x"aa";
+						when x"002" => data <= x"a8";
+						when x"003" => data <= x"01";
+						when x"004" => data <= x"00";
+						--when x"005" => data <= x"a8";
+						--when x"006" => data <= x"01";
+						--when x"007" => data <= x"00";
+						when x"005" => data <= x"8c";
+						when x"006" => data <= x"99";
+						when x"007" => data <= x"a0";
+						when x"008" => data <= x"01";
+						when x"009" => data <= x"00";
+						when x"00a" => data <= x"a8";
+						when x"00b" => data <= x"00";
+						when x"00c" => data <= x"f0";
+--						when x"00d" => data <= x"b0";
+--						when x"00e" => data <= x"0a";
+--						when x"00f" => data <= x"10";
 						
 						
 											
-						when others =>	data_out <= "10000000"; -- nops
+						when others =>	data <= "10000000"; -- nops
 					end case;
-				when others => data_out <= ram_data; -- read from ram (with bram, 32k block repeated)
+				when others => data <= ram_data; -- read from ram (with bram, 32k block repeated)
 			end case;
 		else
 			-- write
+			data <= (others=>'Z');
 			case addr(15 downto 12) is
 				when x"f" => -- i/o
 					case addr(11 downto 8) is

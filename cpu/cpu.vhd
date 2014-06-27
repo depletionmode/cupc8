@@ -147,7 +147,7 @@ begin
 		--else
 			case stage is
 				when fetch =>
-					--gpo <= pc(7 downto 0);
+					mem_data <= (others => 'Z');
 					num_1 <= "0001";
 					mem_wr <= '1';
 					mem_en <= '0';
@@ -157,7 +157,7 @@ begin
 					num_1 <= "0010";
 					mem_wr <= '1';
 					--mem_en <= '1';
-					ins <= data;
+					ins <= unsigned(mem_data);
 					stage <= decode;
 				when fetch_imm =>
 					num_1 <= x"6";
@@ -174,7 +174,7 @@ begin
 					num_1 <= x"8";
 					mem_addr <= std_logic_vector(pc);
 					mem_en <= '0';
-					addr_value <= x"00" & data;
+					addr_value <= x"00" & unsigned(mem_data);
 					addr2_fetched := '1';
 					stage <= decode;
 				when decode =>	
@@ -209,7 +209,7 @@ begin
 						if(ins(7) = '0') then
 							-- alu setup
 							alu_ra <= ra;
-							if imm_fetched = '1' then alu_rb <= data; else alu_rb <= rb; end if;
+							if imm_fetched = '1' then alu_rb <= unsigned(mem_data); else alu_rb <= rb; end if;
 							stage <= execute;
 						else
 							-- handle addressed instructions		
@@ -218,7 +218,7 @@ begin
 									if addr2_fetched = '0' then
 										stage <= fetch_addr;
 									else
-										addr_value <= data & addr_value(7 downto 0);
+										addr_value <= unsigned(mem_data) & addr_value(7 downto 0);
 										stage <= execute;
 									end if;
 								when others => stage <= execute;
@@ -226,11 +226,10 @@ begin
 						end if;
 					end if;
 				when execute =>
-					mem_data <= (others => 'Z');
 					num_1 <= x"4";
 					
 					if(imm_fetched = '1') then
-						rtmp := data;
+						rtmp := unsigned(mem_data);
 					else
 						rtmp := rb;
 					end if;
@@ -248,12 +247,10 @@ begin
 								mem_addr <= std_logic_vector(sp - 1);
 								sp_next := sp - 1;
 								mem_en <= '0';
-								data <= unsigned(mem_data);
 								ram_ld := '1';
 							when "0100" => -- LD
 								mem_addr <= std_logic_vector(addr_value);
 								mem_en <= '0';
-								data <= unsigned(mem_data);
 								ram_ld := '1';
 							when "0101" => -- ST
 								mem_addr <= std_logic_vector(addr_value);
@@ -305,24 +302,24 @@ begin
 							if ins(2) = '0' then
 								-- write back into register
 								if ins(0) = '0' then
-									r0 <= data;
+									r0 <= unsigned(mem_data);
 								else
-									r1 <= data;
+									r1 <= unsigned(mem_data);
 								end if;
 							else -- pc
 								if ins(0) = '0' then
-									tmp16_2 := x"00" & data;
+									tmp16_2 := x"00" & unsigned(mem_data);
 								else
-									tmp16_2 := data & tmp16_2(7 downto 0);
+									tmp16_2 := unsigned(mem_data) & tmp16_2(7 downto 0);
 									pc <= std_logic_vector(tmp16_2);
 								end if;
 							end if;
 						when "0100" => -- LD
 							-- write back into register
 							if(ins(0) = '0') then
-								r0 <= data;
+								r0 <= unsigned(mem_data);
 							else
-								r1 <= data;
+								r1 <= unsigned(mem_data);
 							end if;
 						when "0101" => -- ST
 							-- write back into memory
