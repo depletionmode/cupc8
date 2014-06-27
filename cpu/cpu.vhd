@@ -126,8 +126,8 @@ but1: DEBOUNCE port map (clk, but, but_de);
 f <= "000" & alu_zf;
 
 -- mmu tristate handling
-data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
-mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
+--data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
+--mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
 		
 process(clk, n_hrst)
 variable addr2_fetched: bit;
@@ -143,9 +143,8 @@ begin
    if (rising_edge(clk)) then
 		if n_hrst = '0' then
 			stage <= reset;
-		--elsif but ='0' then -- for simulation
-		--elsif but_de ='0' then
-		else
+		elsif but_de ='0' then
+		--else
 			case stage is
 				when fetch =>
 					--gpo <= pc(7 downto 0);
@@ -227,6 +226,7 @@ begin
 						end if;
 					end if;
 				when execute =>
+					mem_data <= (others => 'Z');
 					num_1 <= x"4";
 					
 					if(imm_fetched = '1') then
@@ -248,9 +248,12 @@ begin
 								mem_addr <= std_logic_vector(sp - 1);
 								sp_next := sp - 1;
 								mem_en <= '0';
+								data <= unsigned(mem_data);
+								ram_ld := '1';
 							when "0100" => -- LD
 								mem_addr <= std_logic_vector(addr_value);
 								mem_en <= '0';
+								data <= unsigned(mem_data);
 								ram_ld := '1';
 							when "0101" => -- ST
 								mem_addr <= std_logic_vector(addr_value);
@@ -270,6 +273,7 @@ begin
 					stage <= writeback;
 					end if;
 				when writeback =>
+				
 					num_1 <= x"5";
 					-- get result from alu
 					if(ins(7)='0') then
@@ -293,9 +297,10 @@ begin
 							end if;
 						when "0010" => -- PUSH
 							-- write back into memory
-							rwb := rtmp;	
+							mem_data <= std_logic_vector(rtmp);	
 							mem_wr <= '0';
 							mem_en <= '0';
+							ram_st := '1';
 						when "0011" => -- POP
 							if ins(2) = '0' then
 								-- write back into register
@@ -321,7 +326,7 @@ begin
 							end if;
 						when "0101" => -- ST
 							-- write back into memory
-							rwb := rtmp;
+							mem_data <= std_logic_vector(rtmp);
 							mem_wr <= '0';
 							mem_en <= '0';
 							ram_st := '1';

@@ -160,12 +160,9 @@ begin
 						when x"00a" => data_out <= x"a0";
 						when x"00b" => data_out <= x"01";
 						when x"00c" => data_out <= x"00";
-						when x"00d" => data_out <= x"a0";
-						when x"00e" => data_out <= x"01";
-						when x"00f" => data_out <= x"00";
-						when x"010" => data_out <= x"a8";
-						when x"011" => data_out <= x"00";
-						when x"012" => data_out <= x"f0";
+						when x"00d" => data_out <= x"a8";
+						when x"00e" => data_out <= x"00";
+						when x"00f" => data_out <= x"f0";
 --						when x"00d" => data_out <= x"b0";
 --						when x"00e" => data_out <= x"0a";
 --						when x"00f" => data_out <= x"10";
