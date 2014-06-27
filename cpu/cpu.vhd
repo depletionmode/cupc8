@@ -93,7 +93,6 @@ end component;
 -- mmu
 signal 			mem_addr:	std_logic_vector(15 downto 0);
 signal 			mem_data:	std_logic_vector(7 downto 0);
-signal 			mem_en:		std_logic := '1';
 signal 			mem_wr:		std_logic := '1';
 component mmu
 	port(
@@ -101,7 +100,6 @@ component mmu
 			
 			addr:		in std_logic_vector(15 downto 0);
 			data:		inout std_logic_vector(7 downto 0);
-			n_en:		in std_logic;
 			n_wr:		in std_logic;	
 			
 			spi_ss:			out std_logic_vector(3 downto 0);
@@ -117,17 +115,13 @@ signal imm_fetched: std_logic;
 shared variable rwb: unsigned(7 downto 0) := x"aa";
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
-mmu1: mmu port map(clk, mem_addr, mem_data, mem_en, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo);
+mmu1: mmu port map(clk, mem_addr, mem_data, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo);
 
     seg1: SEG7
         port map (num_1, seg7_1);
 but1: DEBOUNCE port map (clk, but, but_de);
 
 f <= "000" & alu_zf;
-
--- mmu tristate handling
---data <= unsigned(mem_data) when mem_en='0' and mem_wr='1';
---mem_data <= std_logic_vector(rwb) when mem_en='0' and mem_wr='0' else (others=>'Z');
 		
 process(clk, n_hrst)
 variable addr2_fetched: bit;
@@ -150,36 +144,30 @@ begin
 					mem_data <= (others => 'Z');
 					num_1 <= "0001";
 					mem_wr <= '1';
-					mem_en <= '0';
 					mem_addr <= std_logic_vector(pc);
 					stage <= fetch2;
 				when fetch2 => -- dirty dirty hack!
 					num_1 <= "0010";
 					mem_wr <= '1';
-					--mem_en <= '1';
 					ins <= unsigned(mem_data);
 					stage <= decode;
 				when fetch_imm =>
 					num_1 <= x"6";
 					mem_addr <= std_logic_vector(pc);
-					mem_en <= '0';
 					stage <= decode;
 				when fetch_addr =>
 					num_1 <= x"7";
 					mem_addr <= std_logic_vector(pc);
-					mem_en <= '0';
 					pc <= std_logic_vector(unsigned(pc) + 1);
 					stage <= fetch_addr2;
 				when fetch_addr2 =>
 					num_1 <= x"8";
 					mem_addr <= std_logic_vector(pc);
-					mem_en <= '0';
 					addr_value <= x"00" & unsigned(mem_data);
 					addr2_fetched := '1';
 					stage <= decode;
 				when decode =>	
 					num_1 <= "0011";
-					--mem_en <= '1';
 					pc <= std_logic_vector(unsigned(pc) + 1);
 					
 					-- fetch imm
@@ -242,15 +230,12 @@ begin
 							when "0010"|"1100"|"1101" => -- PUSH|PUSH.PC1|PUSH.PC2
 								mem_addr <= std_logic_vector(sp);
 								sp_next := sp + 1;
-								mem_en <= '0';
 							when "0011" => -- POP
 								mem_addr <= std_logic_vector(sp - 1);
 								sp_next := sp - 1;
-								mem_en <= '0';
 								ram_ld := '1';
 							when "0100" => -- LD
 								mem_addr <= std_logic_vector(addr_value);
-								mem_en <= '0';
 								ram_ld := '1';
 							when "0101" => -- ST
 								mem_addr <= std_logic_vector(addr_value);
@@ -296,7 +281,6 @@ begin
 							-- write back into memory
 							mem_data <= std_logic_vector(rtmp);	
 							mem_wr <= '0';
-							mem_en <= '0';
 							ram_st := '1';
 						when "0011" => -- POP
 							if ins(2) = '0' then
@@ -325,7 +309,6 @@ begin
 							-- write back into memory
 							mem_data <= std_logic_vector(rtmp);
 							mem_wr <= '0';
-							mem_en <= '0';
 							ram_st := '1';
 						when others => NULL;
 					end case;
@@ -365,7 +348,6 @@ begin
 					sp <= x"0100";
 					sp_next := x"0100";
 					pc <= x"1000";
-					mem_en <= '1';
 					mem_wr <= '1';
 					mem_addr <= x"ffff";
 					imm_fetched <= '0';

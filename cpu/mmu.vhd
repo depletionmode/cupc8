@@ -41,7 +41,6 @@ entity mmu is
 			
 			addr:		in std_logic_vector(15 downto 0);
 			data:		inout std_logic_vector(7 downto 0);
-			n_en:		in std_logic := '1';
 			n_wr:		in std_logic := '1';
 			
 			spi_ss:			out std_logic_vector(3 downto 0);
@@ -131,12 +130,10 @@ spi_sck <= mux_out(9);
 
 ram_en <= '1';
 ram_addr <= addr;
---ram_we <= not n_wr;--'1' when (n_en = '0' and n_wr = '0') else '0';
---ram_data <= data when (ram_en = '1' and ram_we = '1') else (others=>'Z');
 
-process(clk, ram_data, data, addr, n_en)
+process(clk, ram_data, data, addr)
 begin
-   if (falling_edge(clk) and n_en='0') then
+   if falling_edge(clk) then
 		if n_wr = '1' then
 			-- read
 			ram_we <= '0';
@@ -183,7 +180,7 @@ begin
 					end case;
 				when others =>
 					ram_data <= data;
-					ram_we <= '1';--'1' when (n_en = '0' and n_wr = '0') else '0';
+					ram_we <= '1';
 			end case;
 		end if;
 	end if;
