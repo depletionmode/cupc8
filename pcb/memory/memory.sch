@@ -9907,7 +9907,7 @@ Source: www.kingbright.com</description>
 <bus name="D[0..7]">
 <segment>
 <wire x1="220.98" y1="63.5" x2="254" y2="63.5" width="0.762" layer="92"/>
-<label x="218.44" y="66.04" size="1.778" layer="95"/>
+<label x="220.98" y="66.04" size="1.778" layer="95"/>
 </segment>
 <segment>
 <wire x1="322.58" y1="114.3" x2="322.58" y2="96.52" width="0.762" layer="92"/>
@@ -9915,7 +9915,7 @@ Source: www.kingbright.com</description>
 </segment>
 <segment>
 <wire x1="124.46" y1="111.76" x2="124.46" y2="93.98" width="0.762" layer="92"/>
-<label x="129.54" y="81.28" size="1.016" layer="95" rot="R90"/>
+<label x="127" y="93.98" size="1.016" layer="95" rot="R90"/>
 </segment>
 </bus>
 </busses>
@@ -10291,7 +10291,6 @@ Source: www.kingbright.com</description>
 <wire x1="281.94" y1="83.82" x2="276.86" y2="83.82" width="0.1524" layer="91"/>
 <wire x1="276.86" y1="83.82" x2="276.86" y2="81.28" width="0.1524" layer="91"/>
 <pinref part="U1" gate="A" pin="A5"/>
-<junction x="281.94" y="83.82"/>
 </segment>
 <segment>
 <pinref part="IC1" gate="G$1" pin="PD5"/>
