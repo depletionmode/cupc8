@@ -9,7 +9,8 @@ import pyb
 WRITE_DELAY_MS = 1
 
 # flash red led on error
-def __err():
+def err():
+	print("[!] err")
 	led = pyb.LED(1)
 	while True:
 		led.toggle()
@@ -17,12 +18,12 @@ def __err():
 
 
 def __read_pin(prefix, number):
-	pin = pyb.Pin('{}{}'.format(prefix, i), pyb.Pin.IN, pyb.PULL_UP)
+	pin = pyb.Pin('{}{}'.format(prefix, number), pyb.Pin.IN, pyb.Pin.PULL_UP)
 	return pin.value()
 
 def __write_pin(prefix, number, val_bit):
-	pin = pyb.Pin('{}{}'.format(prefix, i), pyb.Pin.OUT_PP)
-	if val & 1 == 1: pin.high()
+	pin = pyb.Pin('{}{}'.format(prefix, number), pyb.Pin.OUT_PP)
+	if val_bit & 1 == 1: pin.high()
 	else: pin.low()
 
 # write byte to address
@@ -58,6 +59,7 @@ def __read(addr):
 	return val
 
 def __test_data_bus():
+	print("[+] Data bus")
 	led = pyb.LED(2)
 	led.on()
 
@@ -66,10 +68,11 @@ def __test_data_bus():
 
 	for i in range(8):
 		if __read(i) != 1 << i: err()
-		
+
 	led.off()
 
 def __test_address_bus():
+	print("[+] Address bus")
 	led = pyb.LED(3)
 	led.on()
 
@@ -82,6 +85,7 @@ def __test_address_bus():
 	led.off()
 
 def __test_Xk(num_bytes):
+	print("[+] {}K test".format(num_bytes))
 	led = pyb.LED(4)
 	led.on()
 
@@ -94,7 +98,8 @@ def __test_Xk(num_bytes):
 	led.off()
 
 # run tests
+print("Testing SRAM...")
 __test_data_bus()
 __test_address_bus()
-__test_Xk(64)
+__test_Xk(1)
 
