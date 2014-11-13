@@ -3,10 +3,8 @@
 import pyb
 
 # pins Y1-8 - data
-# pins X1-12,17-20 - address
+# pins X1-12,Y9-12 - address
 # pin X22 - !we
-
-WRITE_DELAY_MS = 1
 
 # flash red led on error
 def err():
@@ -36,11 +34,11 @@ def __write(addr, val):
 	for i in range(1,13):
 		__write_pin('X', i, addr >> (i-1))
 
-	for i in range(17,21):
-		__write_pin('X', i, addr >> 12 >> (i-1))
+	for i in range(9,13):
+		__write_pin('Y', i, (addr >> 12) >> (i-9))
 
 	__write_pin('X', 22, 0)
-#	pyb.delay(WRITE_DELAY_MS)
+#	pyb.delay(1)  # interpreter is slow so time low >55ns
 	__write_pin('X', 22, 1)
 
 # read byte from address
@@ -48,10 +46,8 @@ def __read(addr):
 	for i in range(1,13):
 		__write_pin('X', i, addr >> (i-1))
 
-	for i in range(17,21):
-		__write_pin('X', i, addr >> 12 >> (i-1))
-
-	# in theory we need to wait >55ns here but not adding delay as hopefully MicroPython is slow enough...
+	for i in range(9,13):
+		__write_pin('Y', i, (addr >> 12) >> (i-9))
 
 	val = 0
 
@@ -113,6 +109,14 @@ def __test_Xk(num_bytes):
 # run tests
 print("Testing SRAM...")
 __test_data_bus()
-#__test_address_bus()
-__test_Xk(2)
+__test_address_bus()
+__test_Xk(64)
+print("DONE!")
 
+while True:
+    pyb.delay(60)
+    pyb.LED(2).toggle()
+    pyb.delay(60)
+    pyb.LED(3).toggle()
+    pyb.delay(60)
+    pyb.LED(4).toggle()
