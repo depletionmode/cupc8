@@ -18,10 +18,12 @@ def err():
 
 
 def __read_pin(prefix, number):
-	pin = pyb.Pin('{}{}'.format(prefix, number), pyb.Pin.IN, pyb.Pin.PULL_UP)
+	pin = pyb.Pin('{}{}'.format(prefix, number), pyb.Pin.IN, pyb.Pin.PULL_DOWN)
+	#print("[-] read pin {}{}: {})".format(prefix, number, pin.value()))
 	return pin.value()
 
 def __write_pin(prefix, number, val_bit):
+	#print("[-] write pin {}{}: {})".format(prefix, number, val_bit))
 	pin = pyb.Pin('{}{}'.format(prefix, number), pyb.Pin.OUT_PP)
 	if val_bit & 1 == 1: pin.high()
 	else: pin.low()
@@ -38,7 +40,7 @@ def __write(addr, val):
 		__write_pin('X', i, addr >> 12 >> (i-1))
 
 	__write_pin('X', 22, 0)
-	pyb.delay(WRITE_DELAY_MS)
+#	pyb.delay(WRITE_DELAY_MS)
 	__write_pin('X', 22, 1)
 
 # read byte from address
@@ -53,7 +55,7 @@ def __read(addr):
 
 	val = 0
 
-	for i in range(1,8):
+	for i in range(1,9):
 		val |= __read_pin('Y', i) << (i-1)
 
 	return val
@@ -63,43 +65,54 @@ def __test_data_bus():
 	led = pyb.LED(2)
 	led.on()
 
-	for i in range(8):
-		__write(i, 1 << i)
+	err_ = False
 
-	for i in range(8):
-		if __read(i) != 1 << i: err()
+	for i in range(1,9):
+		__write(i, 1 << i-1)
 
-	led.off()
+	for i in range(1,9):
+		if __read(i) != 1 << i-1: print(" -> Issue with data pin {}!".format(i)); err_ = True;
+
+	if err_: err()
+
+	print(" -> OK")
 
 def __test_address_bus():
 	print("[+] Address bus")
 	led = pyb.LED(3)
 	led.on()
 
+	err_ = False
+
 	for i in range(16):
 		__write(1 << i, i)
 
 	for i in range(16):
-		if __read(1 << i) != i: err()
+		if __read(1 << i) != i: print(" -> Issue with address pin {}!".format(i)); err_ = True;
 
-	led.off()
+	if err_: err()
+
+	print(" -> OK")
 
 def __test_Xk(num_bytes):
 	print("[+] {}K test".format(num_bytes))
+
+	num_bytes*=1024
+
 	led = pyb.LED(4)
 	led.on()
 
-	for i in range(num_bytes*1024):
+	for i in range(num_bytes):
 		__write(i, i % 256)
 
-	for i in range(num_bytes*1024):
+	for i in range(num_bytes):
 		if __read(i) != i % 256: err()
 
-	led.off()
+	print(" -> OK")
 
 # run tests
 print("Testing SRAM...")
 __test_data_bus()
-__test_address_bus()
-__test_Xk(1)
+#__test_address_bus()
+__test_Xk(2)
 
