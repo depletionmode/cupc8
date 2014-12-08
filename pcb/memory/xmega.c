@@ -108,6 +108,59 @@ void go_hiz()
     PORTD.DIR &= 0xf;
 }
 
+void usart_tx(int val)
+{
+    while (!(USARTD0.STATUS & USART_DREIF_bm));
+    USARTD0.DATA = val;
+}
+
+int usart_rx()
+{
+    while (!(USARTD0.STATUS & USART_DREIF_bm));
+    return USARTD0.DATA;
+}
+
+/* todo */
+/*
+void usart_printf(uint8_t* str)
+{
+
+}
+*/
+
+void write_rom_from_usart()
+{
+    _delay_ms(200);
+    int len = usart_rx() << 8 | usart_rx();
+    {
+        int offset = usart_rx() << 8 | usart_rx();
+        while (len--) {
+            write(offset++, usart_rx());
+        }
+    }
+}
+
+void usart_init()
+{
+    /* bsel = (f_per/(2^bscale*16*f_baud)) - 1
+     *      = (2000000/(2^bscale*16*9600)) - 1
+     *      = 0xc when bscale = 0, f_baud = 9615.4
+     */
+    int bsel = 0xc, bscale = 0;
+
+    USARTD0.BAUDCTRLA = bsel;
+    USARTD0.BAUDCTRLB = 0 /* bscale */;
+
+    PORTD.DIRSET = PIN3_bm;     /* tx */
+    PORTD.DIRCLR = PIN2_bm;     /* rx */
+
+    USARTD0.CTRLA = USART_RXCINTLVL_LO_gc;
+    USARTD0.CTRLC = USART_CHSIZE_8BIT_gc | USART_PMODE_DISABLED_gc;
+    //USARTD0.CTRLC = (USARTC0.CTRLC & ~USART_CHSIZE_gm) | USART_CHSIZE_8BIT_gc | USART_PMODE_DISABLED_gc;
+
+    USARTD0.CTRLB = (USART_RXEN_bm | USART_TXEN_bm);    /* enable */
+}
+
 void write(int addr, int val)
 {
     /* switch A10 and A11 because of board error */
@@ -134,6 +187,7 @@ int main(void)
     CCP = CCP_IOREG_gc;
     MCU.MCUCR = 0b00000001;
 
+    usart_init();
     init_ram();
     
     /* test data */
