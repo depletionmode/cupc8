@@ -144,14 +144,6 @@ int usart_rx()
     return val;
 }
 
-/* todo */
-/*
-void usart_printf(uint8_t* str)
-{
-
-}
-*/
-
 void usart_init()
 {
     /* bsel = (f_per/(2^bscale*16*f_baud)) - 1
@@ -159,6 +151,10 @@ void usart_init()
      *      = 0xc when bscale = 0, f_baud = 9615.4
      */
     int bsel = 0xc, bscale = 0;
+
+    /* pull ups */
+    PORTD.PIN2CTRL = PINCFG;
+    PORTD.PIN3CTRL = PINCFG;
 
     USARTD0.BAUDCTRLA = bsel;
     USARTD0.BAUDCTRLB = 0 /* bscale */;
@@ -168,7 +164,6 @@ void usart_init()
 
     USARTD0.CTRLA = USART_RXCINTLVL_LO_gc;
     USARTD0.CTRLC = USART_CHSIZE_8BIT_gc | USART_PMODE_DISABLED_gc;
-    //USARTD0.CTRLC = (USARTC0.CTRLC & ~USART_CHSIZE_gm) | USART_CHSIZE_8BIT_gc | USART_PMODE_DISABLED_gc;
 
     USARTD0.CTRLB = (USART_RXEN_bm | USART_TXEN_bm);    /* enable */
 }
