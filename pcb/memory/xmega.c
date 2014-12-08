@@ -108,16 +108,34 @@ void go_hiz()
     PORTD.DIR &= 0xf;
 }
 
+#define USART_BUSY !(USARTD0.STATUS & USART_DREIF_bm)
+
 void usart_tx(int val)
 {
-    while (!(USARTD0.STATUS & USART_DREIF_bm));
+    while (USART_BUSY);
+
     USARTD0.DATA = val;
+}
+
+int usart_try_rx(int* err)
+{
+    if (USART_BUSY) {
+        *err = 1;
+    }
+
+    *err = 0;
+    return USARTD0.DATA;
 }
 
 int usart_rx()
 {
-    while (!(USARTD0.STATUS & USART_DREIF_bm));
-    return USARTD0.DATA;
+    int err = 1;
+    int val;
+
+    while (err)
+        val = usart_try_rx(&err);
+
+    return val;
 }
 
 /* todo */
