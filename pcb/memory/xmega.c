@@ -218,15 +218,6 @@ int main(void)
 
     usart_init();
     ram_init();
-    
-    /* test data */
-    /*
-    int i;
-    for (i=0; i<16; i++) {
-    //    nvm_eeprom_write(i, i);
-        write(1<<i, nvm_eeprom_read(i));
-    }
-    */
  
     go_hiz();
 
