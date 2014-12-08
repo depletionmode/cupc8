@@ -57,7 +57,7 @@ void nvm_eeprom_write(uint16_t addr, uint8_t val)
     nvm_exec();
 }
 
-void init_ram()
+void ram_init()
 {
     PORTA.DIR = 0xff;
     PORTB.DIR |= 0xf;
@@ -152,24 +152,6 @@ void usart_printf(uint8_t* str)
 }
 */
 
-void write_rom_from_usart()
-{
-    init_ram();
-
-    PORTD.OUTCLR = PIN0_bm;
-
-    int len = usart_rx() << 8 | usart_rx();
-    {
-        int offset = usart_rx() << 8 | usart_rx();
-        while (len--) {
-            PORTD.OUTTGL = PIN1_bm;
-            write(offset++, usart_rx());
-        }
-    }
-
-    go_hiz();
-}
-
 void usart_init()
 {
     /* bsel = (f_per/(2^bscale*16*f_baud)) - 1
@@ -191,7 +173,7 @@ void usart_init()
     USARTD0.CTRLB = (USART_RXEN_bm | USART_TXEN_bm);    /* enable */
 }
 
-void write(int addr, int val)
+void ram_write(int addr, int val)
 {
     /* switch A10 and A11 because of board error */
     addr = (addr & 0xf3ff) | (addr & 0x0800) >> 1 | (addr & 0x0400) << 1;
@@ -205,6 +187,23 @@ void write(int addr, int val)
     PORTE.OUTSET = PIN2_bm;
 }
 
+void write_rom_from_usart()
+{
+    ram_init();
+
+    PORTD.OUTCLR = PIN0_bm;
+
+    int len = usart_rx() << 8 | usart_rx();
+    {
+        int offset = usart_rx() << 8 | usart_rx();
+        while (len--) {
+            PORTD.OUTTGL = PIN1_bm;
+            ram_write(offset++, usart_rx());
+        }
+    }
+
+    go_hiz();
+}
 
 int main(void)
 {
@@ -218,7 +217,7 @@ int main(void)
     MCU.MCUCR = 0b00000001;
 
     usart_init();
-    init_ram();
+    ram_init();
     
     /* test data */
     /*
