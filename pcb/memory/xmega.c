@@ -96,6 +96,9 @@ void init_ram()
     PORTD.PIN7CTRL = PINCFG;
 
     PORTE.PIN2CTRL = PINCFG;
+    PORTE.PIN3CTRL = PINCFG;
+
+    PORTE.OUTSET = PIN3_bm;
     PORTE.OUTSET = PIN2_bm;
     _delay_ms(100);
 }
@@ -106,6 +109,9 @@ void go_hiz()
     PORTB.DIR &= 0xf0;
     PORTC.DIR = 0;
     PORTD.DIR &= 0xf;
+
+    /* indicate ram ready */
+    PORTE.OUTCLR = PIN3_bm;
 }
 
 #define USART_BUSY !(USARTD0.STATUS & USART_DREIF_bm)
@@ -148,7 +154,8 @@ void usart_printf(uint8_t* str)
 
 void write_rom_from_usart()
 {
-    _delay_ms(200);
+    init_ram();
+
     int len = usart_rx() << 8 | usart_rx();
     {
         int offset = usart_rx() << 8 | usart_rx();
@@ -156,6 +163,8 @@ void write_rom_from_usart()
             write(offset++, usart_rx());
         }
     }
+
+    go_hiz();
 }
 
 void usart_init()
@@ -219,7 +228,24 @@ int main(void)
  
     go_hiz();
 
+    PORTE.OUTCLR = PIN3_bm;
+
     PORTD.OUTCLR = PIN1_bm;
+
+    /* user has 30 seconds to indicate ROM update */
+    int n = 30;
+    do {
+        int e;
+
+        _delay_ms(1000);
+
+        if (usart_try_rx(&e) == '?') {
+            write_rom_from_usart();
+            n = 10; /* 10 seconds more for next packet */
+        }
+
+        
+    } while (n--);
 
     _delay_ms(30000);
 
