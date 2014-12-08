@@ -156,10 +156,13 @@ void write_rom_from_usart()
 {
     init_ram();
 
+    PORTD.OUTCLR = PIN0_bm;
+
     int len = usart_rx() << 8 | usart_rx();
     {
         int offset = usart_rx() << 8 | usart_rx();
         while (len--) {
+            PORTD.OUTTGL = PIN1_bm;
             write(offset++, usart_rx());
         }
     }
@@ -228,8 +231,6 @@ int main(void)
  
     go_hiz();
 
-    PORTE.OUTCLR = PIN3_bm;
-
     PORTD.OUTCLR = PIN1_bm;
 
     /* user has 30 seconds to indicate ROM update */
@@ -242,6 +243,8 @@ int main(void)
         if (usart_try_rx(&e) == '?') {
             write_rom_from_usart();
             n = 10; /* 10 seconds more for next packet */
+        } else if (usart_try_rx(&e) == '!') {
+            RST.CTRL=RST_SWRST_bm;  /* soft reset */
         }
 
         
@@ -250,13 +253,6 @@ int main(void)
     _delay_ms(30000);
 
     SLEEP.CTRL  = (SLEEP_SMODE_PSAVE_gc|SLEEP_SEN_bm);
-/*
-    while (1) {
-        PORTD.OUTTGL = PIN0_bm;
-        PORTD.OUTTGL = PIN1_bm;
-        _delay_ms(500);
-    }
-*/
 
    while(1); 
 }
