@@ -10,3 +10,10 @@ main:
     add r0, #1
     add r1, #2
     add r0, r1
+    or r0, r0
+    or r1, r1
+    or r0, r1
+    or r1, r0
+    or r0, #255
+    or r1, #255
+    
