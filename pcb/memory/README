@@ -1,0 +1,9 @@
+Build:
+$ avr-gcc xmega.c -mmcu=atxmega16a4 -o xmega.elf
+$ avr-objcopy -O ihex xmega.elf xmega.hex
+
+Flash:
+* Patched avrdude for PDI
+* avrdude.conf with id for x16c4
+avrdude - C avrdude.conf -c usbasp -p x16c4 -U flash:xmega.hex:i -E noreset
+
