@@ -4,7 +4,7 @@ import sys, argparse
 
 parser = argparse.ArgumentParser(prog='python3 sim.py', description='Simulate CUPCake CPU.')
 parser.add_argument('file', help='binary code file to execute', type=argparse.FileType('rb'))
-parser.add_argument('-v', help='verbose', action='count')
+parser.add_argument('-v', help='verbosity [-v ins, -vv reg, -vvv fetch+decode]', action='count')
 args = parser.parse_args()
 
 from colorama import init, Style, Back, Fore
@@ -108,7 +108,7 @@ def _st(operands):
     mem[addr] = reg_read(operands)
     # mmu
     if addr == 0xf000:  # gpo
-        _log(0, Fore.RED + Style.BRIGHT + '  GPO: {0:8b}'.format(mem[addr]))
+        _log(0, Fore.RED + Style.BRIGHT + 'GPO: {0:8b}'.format(mem[addr]))
 
 def _gt(operands):
     pass
