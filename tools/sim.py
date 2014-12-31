@@ -136,10 +136,10 @@ def _shr(operands):
 def _push(operands):
     global SP
     rb = 0
-    if operands & 6 == 6:
-        rb = (PC + 2) >> 8
-    elif operands & 7 == 7:
-        rb = (PC + 1)  & 0xff
+    if operands & 7 == 7:
+        rb = (PC + 3) & 0xff
+    elif operands & 6 == 6:
+        rb = (PC + 4) >> 8
     else:
         (imm, rb) = get_imm(operands)
         if not imm:
@@ -147,6 +147,7 @@ def _push(operands):
 
     SP += 1
     mem[SP] = rb
+    _log(3, 'stack push({:3x}): {:2x}'.format(SP, mem[SP]))
 
 def _b(operands):
     global PC
@@ -171,12 +172,14 @@ def _call(operands):
 
 def _pop(operands):
     global SP, PC, pcl
-    if operands & 6 == 6:
-        PC = pcl | mem[SP] << 8
-    elif operands & 7 == 7:
+    if operands & 7 == 7:
         pcl = mem[SP]
+    elif operands & 6 == 6:
+        PC = pcl | mem[SP] << 8
     else:
         reg_write(operands, mem[SP])
+
+    _log(3, 'stack pop({:3x}): {:2x}'.format(SP, mem[SP]))
     SP -= 1
 
 def _bne(operands):
