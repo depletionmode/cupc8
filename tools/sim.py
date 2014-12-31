@@ -1,6 +1,14 @@
 # cpu simulator
 
-import sys
+import sys, argparse
+
+parser = argparse.ArgumentParser(prog='python3 sim.py', description='Simulate CUPCake CPU.')
+parser.add_argument('file', help='binary code file to execute', type=argparse.FileType('rb'))
+parser.add_argument('-v', help='verbose', action='count')
+args = parser.parse_args()
+
+from colorama import init, Style, Back, Fore
+init()
 
 PC = 0x1000
 SP = 0x0100
@@ -11,9 +19,21 @@ ZF = 0
 mem = bytearray(0x10000)
 eof = 0
 
+LOG_DIM=False
+SHOW_REG=False
+
+def _log(v, s):
+    _v = args.v
+    if _v == None: _v = 0
+    if v <= _v:
+        if v >= 3:
+            print(Style.DIM + s + Style.RESET_ALL)
+        else:
+            print(s + Style.RESET_ALL)
+
 def fetch():
     global PC
-    print('fetch(): {:x} {:x}'.format(PC, mem[PC]))
+    _log(3, 'fetch(): {:x} {:x}'.format(PC, mem[PC]))
     PC += 1
     return mem[PC-1]
 
@@ -32,7 +52,7 @@ def reg_read(operands, dst_reg=False):
 
 def get_imm(operands):
     if operands & 4:
-        print('get_imm(): ', operands)
+        _log(3, 'get_imm(): {}'.format(operands))
         return (True, fetch())
     return (False, 0)
 
@@ -88,7 +108,7 @@ def _st(operands):
     mem[addr] = reg_read(operands)
     # mmu
     if addr == 0xf000:  # gpo
-        print('GPO: {0:8b}'.format(mem[addr]))
+        _log(0, Fore.RED + Style.BRIGHT + '  GPO: {0:8b}'.format(mem[addr]))
 
 def _gt(operands):
     pass
@@ -131,7 +151,6 @@ def _xor(operands):
     if not imm:
         rb = reg_read(operands)
     ra = reg_read(operands, True)
-    print(ra, rb, ra^rb)
     reg_write(operands, ra ^ rb)
 
 def _inc(operands):
@@ -180,27 +199,26 @@ fops = {
 
 def decode():
     op = fetch()
-    print('decode: {:b}'.format(op))
+    _log(3, 'decode: {:b}'.format(op))
     ins = op & 0xf8
     for k,v in ops.items(): # dirty
-        if v == ins: print('{0:x}: {1}'.format(PC-1, k))
+        if v == ins: _log(1, Style.BRIGHT + Fore.WHITE + '{0:x}: {1}'.format(PC-1, k))
     fops[ins](op & 7)
-    print('R0={:x} | R1={:x} | PC={:x} | SP={:x} | ZF={:b}'.format(R0, R1, PC, SP, ZF))
+    _log(2, Fore.GREEN + '  r0 = {:2x}\n  r1 = {:2x}\n  pc = {:4x}\n  sp = {:4x}\n  zf = {:b}\n'.format(R0, R1, PC, SP, ZF))
 
 def exec():
     while PC != eof:
         decode()
 
 # load code into mem
-with open(sys.argv[1], "rb") as f:
-    i = 0
-    while True:
-        b = f.read(1)
-        if len(b) == 0: break
-        mem[0x1000+i] = int.from_bytes(b, byteorder='little')
-        i += 1
-    eof = PC + i
+i = 0
+while True:
+    b = args.file.read(1)
+    if len(b) == 0: break
+    mem[0x1000+i] = int.from_bytes(b, byteorder='little')
+    i += 1
+eof = PC + i
 
 exec()
 
-print('Simulation done.')
+_log(0, Fore.GREEN + 'Simulation done.')
