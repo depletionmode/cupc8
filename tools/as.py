@@ -16,7 +16,8 @@ base = 0x1000
 
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
-    dst_ops = ['push','st']
+    #dst_ops = ['push','st']
+    dst_ops = ['push']
     tokens = ins.split(' ')
     if tokens[0] in dst_ops:
         return '{} ?, {}'.format(tokens[0], tokens[1])
@@ -47,6 +48,7 @@ def __convert_assembly_ins(ins):
     mach_code = bytearray(1)
 
     tokens = ins.split(' ', 1)
+    #print(tokens)
     ins = tokens[0]
 
     # get opcode for ins
