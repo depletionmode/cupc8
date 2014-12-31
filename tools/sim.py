@@ -16,6 +16,8 @@ R0 = 0
 R1 = 0
 ZF = 0
 
+pcl = 0
+
 mem = bytearray(0x10000)
 eof = 0
 
@@ -132,16 +134,23 @@ def _shr(operands):
     reg_write(operands, ra >> rb)
 
 def _push(operands):
-    (imm, rb) = get_imm(operands)
-    if not imm:
-        rb = reg_read(operands)
+    global SP
+    rb = 0
+    if operands & 6 == 6:
+        rb = (PC + 2) >> 8
+    elif operands & 7 == 7:
+        rb = (PC + 1)  & 0xff
+    else:
+        (imm, rb) = get_imm(operands)
+        if not imm:
+            rb = reg_read(operands)
+
     SP += 1
     mem[SP] = rb
 
 def _b(operands):
-    # todo currently fetch and nop
-    fetch()
-    fetch()
+    global PC
+    PC = fetch() | fetch() << 8
 
 def _lt(operands):
     pass
@@ -161,7 +170,13 @@ def _call(operands):
     pass
 
 def _pop(operands):
-    reg_write(operands, mem[SP])
+    global SP, PC, pcl
+    if operands & 6 == 6:
+        PC = pcl | mem[SP] << 8
+    elif operands & 7 == 7:
+        pcl = mem[SP]
+    else:
+        reg_write(operands, mem[SP])
     SP -= 1
 
 def _bne(operands):

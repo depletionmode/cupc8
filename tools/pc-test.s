@@ -1,7 +1,7 @@
 func1:
     ; return to caller
-    pop pch
     pop pcl
+    pop pch
 
 main:
     ; call func1
