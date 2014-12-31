@@ -111,7 +111,7 @@ if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
 
-    if len(args) < 2:
+    if len(args) < 1:
         raise Exception('Invalid input/output files')
 
     mach_code = bytearray()
@@ -148,7 +148,10 @@ if __name__ == "__main__":
     if not entry_point in functions:
         raise Exception('No entry point found')
 
-    with open(args[1], 'wb') as f:
+    outf = '{}.o'.format(args[0].split('.')[0])
+    if len(args) == 2: outf = args[1]
+
+    with open(outf, 'wb') as f:
         import struct
         mach_code = bytearray(offset)
         vw = memoryview(mach_code)
@@ -161,4 +164,4 @@ if __name__ == "__main__":
 
         f.write(mach_code)
 
-    print('{} -> {} - {} bytes'.format(args[0], args[1], len(mach_code)))
+    print('{} -> {} - {} bytes'.format(args[0], outf, len(mach_code)))

@@ -221,4 +221,4 @@ eof = PC + i
 
 exec()
 
-_log(0, Fore.GREEN + 'Simulation done.')
+_log(0, Style.DIM + Fore.GREEN + 'Simulation done.')
