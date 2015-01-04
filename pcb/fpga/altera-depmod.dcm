@@ -1,0 +1,15 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP 32
+D MC78M05CDT, Positive 0.5A 35V Linear Regulator, Fixed Output 5V, TO-252 (D-PAK)
+K Voltage Regulator 0.5A Positive
+F http://www.fairchildsemi.com/ds/LM/LM78M05.pdf
+$ENDCMP
+#
+$CMP MC78M05CDT
+D MC78M05CDT, Positive 0.5A 35V Linear Regulator, Fixed Output 5V, TO-252 (D-PAK)
+K Voltage Regulator 0.5A Positive
+F http://www.fairchildsemi.com/ds/LM/LM78M05.pdf
+$ENDCMP
+#
+#End Doc Library
