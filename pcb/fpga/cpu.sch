@@ -53,7 +53,8 @@ P 2700 1050
 F 0 "U1" H 3150 900 60  0000 C CNN
 F 1 "EPCS1" H 2950 1450 60  0000 C CNN
 F 2 "" H 2700 1050 60  0000 C CNN
-F 3 "" H 2700 1050 60  0000 C CNN
+F 3 "http://www.altera.com/literature/hb/cfg/cyc_c51014.pdf" H 2700 1050 60  0001 C CNN
+F 4 "EPCS1" H 2700 1050 60  0001 C CNN "PARTNO"
 	1    2700 1050
 	1    0    0    -1  
 $EndComp
@@ -580,7 +581,9 @@ P 10950 4800
 F 0 "RP2" H 10950 5250 40  0000 C CNN
 F 1 "270" H 10950 4350 40  0000 C CNN
 F 2 "" H 10950 4800 60  0000 C CNN
-F 3 "" H 10950 4800 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/1695346.pdf" H 10950 4800 60  0000 C CNN
+F 4 "http://il.farnell.com/bourns/4116r-1-271lf/resistor-network-270r/dp/9355910" H 10950 4800 60  0001 C CNN "Farnell"
+F 5 "4116R-1-271LF" H 10950 4800 60  0001 C CNN "PARTNO"
 	1    10950 4800
 	1    0    0    -1  
 $EndComp
@@ -635,7 +638,9 @@ P 9850 3850
 F 0 "D1" H 9850 3950 50  0000 C CNN
 F 1 "LED" H 9850 3750 50  0000 C CNN
 F 2 "" H 9850 3850 60  0000 C CNN
-F 3 "" H 9850 3850 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/1484480.pdf" H 9850 3850 60  0001 C CNN
+F 4 "http://il.farnell.com/dialight/5988150107f/led-yellow-1-25mm-x-1-4mm-130mcd/dp/2369031" H 9850 3850 60  0001 C CNN "Farnell"
+F 5 "5988150107F " H 9850 3850 60  0001 C CNN "PARTNO"
 	1    9850 3850
 	-1   0    0    1   
 $EndComp
@@ -701,7 +706,9 @@ P 2150 8000
 F 0 "OSC1" H 2300 7700 60  0000 C CNN
 F 1 "501AAA" H 2150 8150 60  0000 C CNN
 F 2 "" H 2100 7800 60  0000 C CNN
-F 3 "" H 2100 7800 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/1792138.pdf" H 2100 7800 60  0001 C CNN
+F 4 "http://il.farnell.com/silicon-labs/501aaa50m0000daf/osc-50mhz-50ppm-1-8-3-3v-smd/dp/2394197" H 2150 8000 60  0001 C CNN "Farnell"
+F 5 "501AAA50M0000DAF" H 2150 8000 60  0001 C CNN "PARTNO"
 	1    2150 8000
 	1    0    0    -1  
 $EndComp
@@ -745,7 +752,9 @@ P 10350 1100
 F 0 "U3" H 10150 1300 40  0000 C CNN
 F 1 "BA15BC0FP-E2_-_LDO" H 10350 1300 40  0000 L CNN
 F 2 "TO-252" H 10350 1200 30  0000 C CIN
-F 3 "" H 10350 1100 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/1747234.pdf" H 10350 1100 60  0001 C CNN
+F 4 "http://il.farnell.com/rohm/ba15bc0fp-e2/ldo-fixed-1-5v-1a-to-252-3/dp/2342871" H 10350 1100 60  0001 C CNN "Farnell"
+F 5 "BA15BC0FP-E2" H 10350 1100 60  0001 C CNN "PARTNO"
 	1    10350 1100
 	1    0    0    -1  
 $EndComp
@@ -1651,7 +1660,9 @@ P 2200 2550
 F 0 "RP1" H 2200 3000 40  0000 C CNN
 F 1 "10K" H 2200 2500 40  0000 C CNN
 F 2 "" H 2200 2550 60  0000 C CNN
-F 3 "" H 2200 2550 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/443424.pdf" H 1900 2300 60  0001 C CNN
+F 4 "http://il.farnell.com/yageo/yc164-jr-0710kl/resistor-iso-array-4res-10kohm/dp/2413810" H 2200 2550 60  0001 C CNN "Farnell"
+F 5 "YC164-JR-0710KL" H 2200 2550 60  0001 C CNN "PARTNO"
 	1    2200 2550
 	1    0    0    -1  
 $EndComp
