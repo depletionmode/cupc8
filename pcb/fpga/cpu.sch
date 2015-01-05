@@ -65,7 +65,10 @@ P 4700 5050
 F 0 "U2" H 6550 2700 60  0000 C CNN
 F 1 "EP1C3T100" H 4700 5050 60  0000 C CNN
 F 2 "" H 3150 7700 60  0000 C CNN
-F 3 "" H 3150 7700 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/5080.pdf" H 3150 7700 60  0001 C CNN
+F 4 "http://il.farnell.com/altera/ep1c3t100c8n/ic-cyclone-fpga-2910-smd-1c3t100/dp/1453501" H 4700 5050 60  0001 C CNN "Farnell"
+F 5 "EP1C3T100C8N " H 4700 5050 60  0001 C CNN "PARTNO"
+F 6 "http://www.altera.com/literature/dp/cyclone/ep1c3t100.pdf" H 4700 5050 60  0001 C CNN "Pinout"
 	1    4700 5050
 	1    0    0    -1  
 $EndComp
@@ -499,7 +502,9 @@ P 10750 2150
 F 0 "C25" H 10750 2250 40  0000 L CNN
 F 1 "1000uF" H 10756 2065 40  0000 L CNN
 F 2 "" H 10788 2000 30  0000 C CNN
-F 3 "" H 10750 2150 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/58258.pdf" H 10750 2150 60  0001 C CNN
+F 4 "EEEFK0J102AP " H 10750 2150 60  0001 C CNN "PARTNO"
+F 5 "http://il.farnell.com/panasonic-electronic-components/eeefk0j102ap/cap-alu-elec-1000uf-6-3v-smd-reel/dp/2254374" H 10750 2150 60  0001 C CNN "Farnell"
 	1    10750 2150
 	1    0    0    -1  
 $EndComp
@@ -581,7 +586,7 @@ P 10950 4800
 F 0 "RP2" H 10950 5250 40  0000 C CNN
 F 1 "270" H 10950 4350 40  0000 C CNN
 F 2 "" H 10950 4800 60  0000 C CNN
-F 3 "http://www.farnell.com/datasheets/1695346.pdf" H 10950 4800 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/1695346.pdf" H 10950 4800 60  0001 C CNN
 F 4 "http://il.farnell.com/bourns/4116r-1-271lf/resistor-network-270r/dp/9355910" H 10950 4800 60  0001 C CNN "Farnell"
 F 5 "4116R-1-271LF" H 10950 4800 60  0001 C CNN "PARTNO"
 	1    10950 4800
@@ -798,7 +803,9 @@ P 10750 1300
 F 0 "C24" H 10750 1400 40  0000 L CNN
 F 1 "1000uF" H 10756 1215 40  0000 L CNN
 F 2 "" H 10788 1150 30  0000 C CNN
-F 3 "" H 10750 1300 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/58258.pdf" H 10750 1300 60  0001 C CNN
+F 4 "http://il.farnell.com/panasonic-electronic-components/eeefk0j102ap/cap-alu-elec-1000uf-6-3v-smd-reel/dp/2254374" H 10750 1300 60  0001 C CNN "Farnell"
+F 5 "EEEFK0J102AP " H 10750 1300 60  0001 C CNN "PARTNO"
 	1    10750 1300
 	1    0    0    -1  
 $EndComp
@@ -842,7 +849,9 @@ P 7450 2650
 F 0 "FB1" H 7450 2800 60  0000 C CNN
 F 1 "FILTER" H 7450 2550 60  0000 C CNN
 F 2 "" H 7450 2650 60  0000 C CNN
-F 3 "" H 7450 2650 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/712877.pdf" H 7450 2650 60  0001 C CNN
+F 4 "http://il.farnell.com/tdk/mmz2012202bt000/ferrite-bead-0-5ohm-400ma-0805/dp/2372958" H 7450 2650 60  0001 C CNN "Farnell"
+F 5 "MMZ2012Y202BT000 " H 7450 2650 60  0001 C CNN "PARTNO"
 	1    7450 2650
 	1    0    0    -1  
 $EndComp
@@ -1216,7 +1225,9 @@ P 9200 2000
 F 0 "FB2" H 9200 2150 60  0000 C CNN
 F 1 "FILTER" H 9200 1900 60  0000 C CNN
 F 2 "" H 9200 2000 60  0000 C CNN
-F 3 "" H 9200 2000 60  0000 C CNN
+F 3 "http://www.farnell.com/datasheets/712877.pdf" H 9200 2000 60  0001 C CNN
+F 4 "http://il.farnell.com/tdk/mmz2012202bt000/ferrite-bead-0-5ohm-400ma-0805/dp/2372958" H 9200 2000 60  0001 C CNN "Farnell"
+F 5 "MMZ2012Y202BT000 " H 9200 2000 60  0001 C CNN "PARTNO"
 	1    9200 2000
 	1    0    0    -1  
 $EndComp
@@ -1695,4 +1706,24 @@ Text GLabel 2400 2500 2    39   Input ~ 0
 OSC_OE
 Text GLabel 1750 8000 0    39   Input ~ 0
 OSC_OE
+Text GLabel 2550 3400 0    39   Input ~ 0
+0B10
+Text GLabel 2550 3500 0    39   Input ~ 0
+0B11
+Text GLabel 2550 3600 0    39   Input ~ 0
+0B12
+Text GLabel 2550 3700 0    39   Input ~ 0
+0B13
+Text GLabel 2550 3850 0    39   Input ~ 0
+1B10
+Text GLabel 2550 4000 0    39   Input ~ 0
+2B10
+Text GLabel 2550 4100 0    39   Input ~ 0
+2B11
+Text GLabel 2550 4200 0    39   Input ~ 0
+2B12
+Text GLabel 2550 4300 0    39   Input ~ 0
+2B13
+Text GLabel 2550 4400 0    39   Input ~ 0
+2B14
 $EndSCHEMATC
