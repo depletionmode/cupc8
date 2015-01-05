@@ -303,17 +303,6 @@ Text GLabel 8650 6200 2    39   Input ~ 0
 2B45
 Text GLabel 7850 6300 0    39   Input ~ 0
 2B46
-$Comp
-L CONN_5X2 P1
-U 1 1 549CD2BD
-P 1500 3850
-F 0 "P1" H 1500 4150 60  0000 C CNN
-F 1 "BANK1" V 1500 3850 50  0000 C CNN
-F 2 "" H 1500 3850 60  0000 C CNN
-F 3 "" H 1500 3850 60  0000 C CNN
-	1    1500 3850
-	1    0    0    -1  
-$EndComp
 Text GLabel 9650 3850 0    39   Input ~ 0
 0B10
 Text GLabel 9650 4150 0    39   Input ~ 0
@@ -375,25 +364,25 @@ F 3 "" H 1500 5650 60  0000 C CNN
 	1    1500 5650
 	1    0    0    -1  
 $EndComp
-Text GLabel 1100 3650 0    39   Input ~ 0
-0B10
-Text GLabel 1900 3650 2    39   Input ~ 0
-0B11
 Text GLabel 1100 3750 0    39   Input ~ 0
-0B12
+0B10
 Text GLabel 1900 3750 2    39   Input ~ 0
-0B13
+0B11
 Text GLabel 1100 3850 0    39   Input ~ 0
-1B10
+0B12
 Text GLabel 1900 3850 2    39   Input ~ 0
-2B10
+0B13
 Text GLabel 1100 3950 0    39   Input ~ 0
-2B11
+1B10
 Text GLabel 1900 3950 2    39   Input ~ 0
-2B12
+2B10
 Text GLabel 1100 4050 0    39   Input ~ 0
-2B13
+2B11
 Text GLabel 1900 4050 2    39   Input ~ 0
+2B12
+Text GLabel 1100 4150 0    39   Input ~ 0
+2B13
+Text GLabel 1900 4150 2    39   Input ~ 0
 2B14
 Text GLabel 1100 5300 0    39   Input ~ 0
 0B20
@@ -1726,4 +1715,19 @@ Text GLabel 2550 4300 0    39   Input ~ 0
 2B13
 Text GLabel 2550 4400 0    39   Input ~ 0
 2B14
+$Comp
+L CONN_6X2 P?
+U 1 1 54ADB017
+P 1500 4000
+F 0 "P?" H 1500 4350 60  0000 C CNN
+F 1 "BANK1" V 1500 4000 60  0000 C CNN
+F 2 "" H 1500 4000 60  0000 C CNN
+F 3 "" H 1500 4000 60  0000 C CNN
+	1    1500 4000
+	1    0    0    -1  
+$EndComp
+Text GLabel 2550 4500 0    39   Input ~ 0
+2B15
+Text GLabel 1100 4250 0    39   Input ~ 0
+2B15
 $EndSCHEMATC
