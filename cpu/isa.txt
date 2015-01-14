@@ -1,0 +1,125 @@
+Instruction formats
+===================
+
+ ---
+| A | reg
+ ---
+ --------------------------
+[   ins   |    ?    |  ra  ]
+ --------------------------
+  {7..3}     {2..1}    {0}
+
+ ---
+| R | reg<->reg
+ ---
+ -----------------------------
+[   ins   |  0  |  rb  |  ra  ]
+ -----------------------------
+  {7..3}    {2}    {1}    {0}
+
+ ---
+| I | reg<-imm
+ ---
+
+ ------------------------------    -------
+[    INS    |  1  |  ?  |  Ra  ]  [  IMM  ]
+ ------------------------------    -------
+   {15..11}   {10}  {9}    {8}      {7..0}
+
+ ---
+| M | reg<->mem
+ ---
+
+ ------------------------------    ----------
+[    INS    |     ?     |  Ra  ]  [   ADDR   ]
+ ------------------------------    ----------
+   {23..19}   {18..17}    {16}      {15..0}
+
+ ---
+| F | flow
+ ---
+
+ ----------------------    ----------
+[    INS    |    ?     ]  [   ADDR   ]
+ ----------------------    ----------
+   {23..19}   {18..16}      {15..0}
+
+Registers
+=========
+
+8 bit registers:
+    R0  - general purpose
+    R1  - general purpose
+    PCL - PC & 0xff
+    PCH - PC >> 8
+    S   - status
+
+16 bit registers:
+    PC  - program counter
+    SP  - stack pointer
+
+flags:
+    ZF  - S & 1
+
+Instruction list
+================
+
+F.  Mneumonic   Opcode  Syntax          Operation                   Special
+R   NOP         80      NOP
+R   MOVr        88      MOV Ra, Rb      Ra <= Rb
+I   MOVi        8c      MOV Ra, #imm    Ra <= imm
+R   PUSHr       90      PUSH Rb         [SP] <= Rb; SP <= SP + 1    Can act on PCL, PCH
+I   PUSHi       94      PUSH #imm       [SP] <= imm; SP <= SP + 1
+R   POP         98      POP Ra          Ra <= [SP]; SP <= SP - 1    Can act on PCL, PCH
+M   LD          a0      LD Ra, $addr    Ra <= [addr]
+M   ST          a8      ST $addr, Rb    [addr] <= Rb
+F   B           b0      B $addr         PC <= addr
+F   BZF         b8      BZF $addr       if ZF, PC <= addr
+R   EQr         00      EQ Ra, Rb       ZF <= Ra == Rb
+I   EQi         04      EQ Ra, #imm     ZF <= Ra == imm
+R   GTr         08      GT Ra, Rb       ZF <= Ra > Rb
+I   GTi         0c      GT Ra, #imm     ZF <= Ra > imm
+R   LTr         10      LT Ra, Rb       ZF <= Ra < Rb
+I   LTi         14      LT Ra, #imm     ZF <= Ra < imm
+R   ANDr        18      AND Ra, Rb      Ra <= Ra & Rb
+I   ANDi        1c      AND Ra, #imm    Ra <= Ra & imm
+R   ORr         20      OR Ra, Rb       Ra <= Ra | Rb
+I   ORi         24      OR Ra, #imm     Ra <= Ra | imm
+R   XORr        30      XOR Ra, Rb      Ra <= Ra ^ Rb
+I   XORi        34      XOR Ra, #imm    Ra <= Ra ^ imm
+R   NORr        38      NOR Ra, Rb      Ra <= ~(Ra | Rb)
+I   NORi        3c      NOR Ra, #imm    Ra <= ~(Ra | imm)
+R   ADDr        40      ADD Ra, Rb      Ra <= Ra + Rb
+I   ADDi        44      ADD Ra, #imm    Ra <= Ra + imm
+R   SUBr        48      SUB Ra, Rb      Ra <= Ra - Rb
+I   SUBi        4c      SUB Ra, #imm    Ra <= Ra - imm
+R   SHLr        60      SHL Ra, Rb      Ra <= Ra << Rb
+I   SHLi        64      SHL Ra, #imm    Ra <= Ra << imm
+R   SHRr        60      SHR Ra, Rb      Ra <= Ra >> Rb
+I   SHRi        64      SHR Ra, #imm    Ra <= Ra >> imm
+
+Flow modification
+=================
+
+(*dirty*)
+
+Currently no call, ret instructions. Program counter will be modified when
+PCH is popped off the stack. This can be used to return.
+
+Example:
+
+(1)     func1:
+(2)         pop pcl
+(3)         pop pch     ; return to caller
+(4)
+(5)     main:
+(6)         push pch
+(7)         push pcl
+(8)         b .func1    ; call func1
+(9)         nop
+
+Line (6) will push high bytes of PC + 2 - i.e. line (8) - to the stack
+Line (7) will push low bytes of PC + 1 - i.e. line (8) - to the stack
+Line (2) will pop low bytes of stored PC off the stack into a temporary register (no PC modification)
+Line (3) will pop high bytes of stored PC off the stack and modify PC
+
