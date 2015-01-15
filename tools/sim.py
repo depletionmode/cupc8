@@ -81,7 +81,6 @@ def _eq(operands):
         rb = reg_read(operands)
     ra = reg_read(operands, True)
     ZF = ra == rb
-    pass
 
 def _or(operands):
     (imm, rb) = get_imm(operands)
@@ -119,7 +118,12 @@ def _st(operands):
         _log(0, Fore.RED + Style.BRIGHT + 'GPO: {0:8b}'.format(mem[addr]))
 
 def _gt(operands):
-    pass
+    global ZF
+    (imm, rb) = get_imm(operands)
+    if not imm:
+        rb = reg_read(operands)
+    ra = reg_read(operands, True)
+    ZF = ra > rb
 
 def _not(operands):
     ra = reg_read(operands, True)
@@ -160,7 +164,12 @@ def _b(operands):
     PC = fetch() | fetch() << 8
 
 def _lt(operands):
-    pass
+    global ZF
+    (imm, rb) = get_imm(operands)
+    if not imm:
+        rb = reg_read(operands)
+    ra = reg_read(operands, True)
+    ZF = ra < rb
 
 def _xor(operands):
     (imm, rb) = get_imm(operands)
