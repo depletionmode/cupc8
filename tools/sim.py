@@ -60,11 +60,11 @@ def get_imm(operands):
 
 ops = {
         'nop':0x80, 'mov':0x88, 'push':0x90, 'pop':0x98,
-        'ld' :0xa0, 'st' :0xa8, 'b' :0xb0, 'bne':0xb8,
+        'ld' :0xa0, 'st' :0xa8, 'b' :0xb0, 'bzf':0xb8,
         'eq' :0x00, 'gt' :0x08, 'lt' :0x10, 'and':0x18,
-        'or' :0x20, 'not':0x28, 'xor' :0x30, 'nor':0x38,
-        'add':0x40, 'sub':0x48, 'inc' :0x50, 'dec':0x58,
-        'shl':0x60, 'shr':0x68, 'call':0xc0, 'ret':0xc1
+        'or' :0x20, 'xor' :0x30, 'nor':0x38,
+        'add':0x40, 'sub':0x48,
+        'shl':0x60, 'shr':0x68
       }
 
 def _nop(operands):
@@ -75,6 +75,12 @@ def _ld(operands):
     reg_write(operands, v)
 
 def _eq(operands):
+    global ZF
+    (imm, rb) = get_imm(operands)
+    if not imm:
+        rb = reg_read(operands)
+    ra = reg_read(operands, True)
+    ZF = ra == rb
     pass
 
 def _or(operands):
@@ -182,8 +188,11 @@ def _pop(operands):
     _log(3, 'stack pop({:3x}): {:2x}'.format(SP, mem[SP]))
     SP -= 1
 
-def _bne(operands):
-    pass
+def _bzf(operands):
+    global PC
+    tmp = fetch() | fetch() << 8
+    if ZF:
+       PC = tmp
 
 def _and(operands):
     (imm, rb) = get_imm(operands)

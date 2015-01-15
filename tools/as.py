@@ -17,7 +17,6 @@ base = 0x1000
 
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
-    #dst_ops = ['push','st']
     dst_ops = ['push']
     tokens = ins.split(' ')
     if tokens[0] in dst_ops:
