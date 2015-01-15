@@ -1,12 +1,10 @@
 ; kernel entry point
 main:
     nop
-    push #10
-    push #10
-    push #0
+    mov r0, #65    ; 'A'
     push pch
     push pcl
-    b .st7735_draw_pixel
+    b .print_char
 
 hang:
     nop
