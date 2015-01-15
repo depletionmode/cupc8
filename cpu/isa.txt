@@ -13,7 +13,7 @@ Instruction formats
 | R | reg<->reg
  ---
  -----------------------------
-[   ins   |  0  |  rb  |  ra  ]
+[   ins   |  0  |  Rb  |  Ra  ]
  -----------------------------
   {7..3}    {2}    {1}    {0}
 
@@ -30,10 +30,10 @@ Instruction formats
 | M | reg<->mem
  ---
 
- ------------------------------    ----------
-[    INS    |     ?     |  Ra  ]  [   ADDR   ]
- ------------------------------    ----------
-   {23..19}   {18..17}    {16}      {15..0}
+ -------------------------------    ----------
+[    INS    |  ?  |  Rb  |  Ra  ]  [   ADDR   ]
+ -------------------------------    ----------
+   {23..19}   {18}  {17}   {16}      {15..0}
 
  ---
 | F | flow
@@ -72,7 +72,9 @@ R   PUSHr       90      PUSH Rb         [SP] <= Rb; SP <= SP + 1    Can act on P
 I   PUSHi       94      PUSH #imm       [SP] <= imm; SP <= SP + 1
 R   POP         98      POP Ra          Ra <= [SP]; SP <= SP - 1    Can act on PCL, PCH
 M   LD          a0      LD Ra, $addr    Ra <= [addr]
+M   LDind       a4      LD Ra, $addr+Rb Ra <= [addr + Rb]
 M   ST          a8      ST $addr, Rb    [addr] <= Rb
+M   STind       ac      ST $addr+Ra, Rb [addr + Ra] <= Rb
 F   B           b0      B $addr         PC <= addr
 F   BZF         b8      BZF $addr       if ZF, PC <= addr
 R   EQr         00      EQ Ra, Rb       ZF <= Ra == Rb
