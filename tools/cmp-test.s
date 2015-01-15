@@ -1,3 +1,6 @@
+%define ret1 pop pcl
+%define ret2 pop pch
+
 led:
     st $f000, r1
     pop pcl

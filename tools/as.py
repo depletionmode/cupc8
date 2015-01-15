@@ -9,12 +9,14 @@ opcodes = {
 
 registers = [ 'r0', 'r1' ]
 
+bss = {}
 functions = {}
 unresolved_fcns = {}
 defines = {}
 first_pass = True
 
 base = 0x1000
+bss_base = 0x3000
 
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
@@ -120,8 +122,11 @@ def __replace_defines(l):
 def __assemble(filename):
     global functions
     global first_pass
+    global bss
     mach_code = bytearray()
     offset = 3 #leave 3 bytes for branch to entry point
+    bss = {}
+    bss_offset = bss_base
     first = True
 
     with open(filename, 'r') as f:
@@ -135,9 +140,32 @@ def __assemble(filename):
             # deal with comments alone on line
             if l[0] == ';': continue
 
+            # .bss
+            if l.find('resb') > -1:
+                toks = l.split()
+                bss[toks[0][:-1]] = (bss_offset, int(toks[2]))
+                bss_offset += int(toks[2])
+
+            # variables
+            start = l.find('[')
+            if start > -1:
+                end = l.find(']')
+                var = l[start+1:end]
+                try:
+                    toks = var.split('+')
+                    val = bss[toks[0]][0]
+                    if len(toks) > 1:
+                        if int(toks[1]) >= bss[toks[0]][1]:
+                            raise Exception('Variable {} expression out of bounds!'.format(toks[0]))
+                        val += int(toks[1])
+                    l = l.replace('[{}]'.format(var), '${:x}'.format(val))
+                except:
+                    raise Exception('Variable {} not found in .bss!'.format(toks[0]))
+
+
             # defines
             if l[:7] == '%define':
-                toks = l.split(' ')
+                toks = l.split(' ', 2)
                 defines[toks[1]] = toks[2].strip()
                 continue
 
