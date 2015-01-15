@@ -1,10 +1,10 @@
 opcodes = {
-            'nop':0x80,     'mov':0x88,     'push':0x90,     'pop':0x98,
-            'ld' :0xa0,     'st' :0xa8,     'b'   :0xb0,     'bne':0xb8,
-            'eq' :0x00,     'gt' :0x08,     'lt'  :0x10,     'and':0x18,
-            'or' :0x20,     'not':0x28,     'xor' :0x30,     'nor':0x38,
-            'add':0x40,     'sub':0x48,     'inc' :0x50,     'dec':0x58,
-            'shl':0x60,     'shr':0x68,     'call':0xc0,     'ret':0xc1
+            'nop':0x80,     'mov' :0x88,     'push':0x90,     'pop':0x98,
+            'ld' :0xa0,     'st'  :0xa8,     'b'   :0xb0,     'bzf':0xb8,
+            'eq' :0x00,     'gt'  :0x08,     'lt'  :0x10,     'and':0x18,
+            'or' :0x20,     'xor' :0x30,    'nor':0x38,
+            'add':0x40,     'sub' :0x48,
+            'shl':0x60,     'shr' :0x68
           }
 
 registers = [ 'r0', 'r1' ]
@@ -37,8 +37,6 @@ def __get_reg_value(reg, second_op=False):
 def __convert_assembly_ins(ins):
     ins = __ins_hacks(ins.strip())
 
-    #print(ins)
-
     # deal with comment
     if ins.lstrip()[0] == ';':
         return bytearray()
@@ -49,7 +47,6 @@ def __convert_assembly_ins(ins):
     mach_code = bytearray(1)
 
     tokens = ins.split(' ', 1)
-    #print(tokens)
     ins = tokens[0]
 
     # get opcode for ins
@@ -111,8 +108,9 @@ def __convert_assembly_ins(ins):
     return mach_code
 
 def __replace_defines(l):
-    for k, v in defines:
-	l = ins.replace(k, v)
+    global defines
+    for k, v in defines.items():
+        l = l.replace(k, v)
     return l
 
 if __name__ == "__main__":
@@ -139,9 +137,9 @@ if __name__ == "__main__":
             if l[0] == ';': continue
 
             # defines
-            if l[0] == '%':
+            if l[:7] == '%define':
                 toks = l.split(' ')
-                defines[toks[1]] = toks[2]
+                defines[toks[1]] = toks[2].strip()
                 continue
 
             # perform replacements
