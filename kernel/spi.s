@@ -29,7 +29,3 @@ wait_spi_read_DEV0_:
     b .wait_spi_read_DEV0_
 end_spi_read_DEV0_:
     ld r0, $f1_DEV0_1  ;read rx buffer
-
-main:
-    b .spi_read_DEV0_
-    b .spi_write_DEV0_
