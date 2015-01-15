@@ -1,4 +1,7 @@
 main:
+    b .test_gpo
+
+test_gpo:
     ; write pattern to gpo
     mov r0, #255
     mov r1, #0

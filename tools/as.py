@@ -119,6 +119,7 @@ def __replace_defines(l):
 
 def __assemble(filename):
     global functions
+    global first_pass
     mach_code = bytearray()
     offset = 3 #leave 3 bytes for branch to entry point
     first = True
@@ -169,7 +170,7 @@ if __name__ == "__main__":
         raise Exception('Invalid input/output files')
 
     offset = __assemble(args[0])
-    offset = __assemble(args[0]) # ulgy hack for bas function lookup logic
+    offset = __assemble(args[0]) # ulgy hack for bad function lookup logic
 
     entry_point = 'main'
     if not entry_point in functions:
