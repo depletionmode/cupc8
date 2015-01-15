@@ -10,6 +10,7 @@ opcodes = {
 registers = [ 'r0', 'r1' ]
 
 functions = {}
+defines = {}
 first_pass = True
 
 base = 0x1000
@@ -109,6 +110,11 @@ def __convert_assembly_ins(ins):
 
     return mach_code
 
+def __replace_defines(l):
+    for k, v in defines:
+	l = ins.replace(k, v)
+    return l
+
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
@@ -131,6 +137,15 @@ if __name__ == "__main__":
 
             # deal with comments alone on line
             if l[0] == ';': continue
+
+            # defines
+            if l[0] == '%':
+                toks = l.split(' ')
+                defines[toks[1]] = toks[2]
+                continue
+
+            # perform replacements
+            l = __replace_defines(l)
 
             #  start of new function
             if l.find(':') > 0:
