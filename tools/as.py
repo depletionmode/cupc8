@@ -10,6 +10,7 @@ opcodes = {
 registers = [ 'r0', 'r1' ]
 
 functions = {}
+unresolved_fcns = {}
 defines = {}
 first_pass = True
 
@@ -71,12 +72,16 @@ def __convert_assembly_ins(ins):
             mach_code.append(addr >> 8);
         elif op1[0] == '.':
             if not op1[1:] in functions:
-                raise Exception('Function {} not found'.format(op1[1:]))
+                # function not yet resolved?
+                if not first_pass:
+                    raise Exception('Function {} not found'.format(op1[1:]))
+                mach_code.append(0)
+                mach_code.append(0)
+            else:
+                addr = functions[op1[1:]][0] + base
 
-            addr = functions[op1[1:]][0] + base
-
-            mach_code.append(addr & 0xff);
-            mach_code.append(addr >> 8);
+                mach_code.append(addr & 0xff);
+                mach_code.append(addr >> 8);
         elif op1[0] == '?': # dirty hack to allow diry hacks to work
             pass
         else:
@@ -112,19 +117,13 @@ def __replace_defines(l):
         l = l.replace(k, v)
     return l
 
-if __name__ == "__main__":
-    import sys
-    args = sys.argv[1:]
-
-    if len(args) < 1:
-        raise Exception('Invalid input/output files')
-
+def __assemble(filename):
+    global functions
     mach_code = bytearray()
     offset = 3 #leave 3 bytes for branch to entry point
-    entry_point = 'main'
     first = True
 
-    with open(args[0], 'r') as f:
+    with open(filename, 'r') as f:
         fcn_name = ''
         for l in f.readlines():
             l = l.lstrip()
@@ -159,6 +158,20 @@ if __name__ == "__main__":
         functions[fcn_name] = (offset,mach_code)
         offset += len(mach_code)
 
+    first_pass = False
+    return offset
+
+if __name__ == "__main__":
+    import sys
+    args = sys.argv[1:]
+
+    if len(args) < 1:
+        raise Exception('Invalid input/output files')
+
+    offset = __assemble(args[0])
+    offset = __assemble(args[0]) # ulgy hack for bas function lookup logic
+
+    entry_point = 'main'
     if not entry_point in functions:
         raise Exception('No entry point found')
 
