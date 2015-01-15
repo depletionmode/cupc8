@@ -1,5 +1,5 @@
 #!/bin/bash
 
-cat *.s > in.ss
-python3 ../tools/as.py in.ss kernel.o
-rm in.ss
+cat *.s > merged.ss
+python3 ../tools/as.py merged.ss kernel.o
+rm merged.ss
