@@ -71,8 +71,11 @@ def _nop(operands):
     pass
 
 def _ld(operands):
-    v = mem[fetch() | fetch() << 8]
-    reg_write(operands, v)
+    addr = fetch() | fetch() << 8
+    if operands & 4:
+        rb = reg_read(operands)
+        addr += rb
+    reg_write(operands, mem[addr])
 
 def _eq(operands):
     global ZF
@@ -112,6 +115,9 @@ def _mov(operands):
 
 def _st(operands):
     addr = fetch() | fetch() << 8
+    if operands & 4:
+        ra = reg_read(operands, True)
+        addr += ra
     mem[addr] = reg_read(operands)
     # mmu
     if addr == 0xf000:  # gpo

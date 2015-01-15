@@ -60,13 +60,18 @@ def __convert_assembly_ins(ins):
 
         # op1 - reg/addr/fcn/imm
         if op1[0] == '#':
-            ins |= 1 << 2;
+            ins |= 1 << 2
             imm = int(op1[1:])
             if imm > 0xff:
                 raise Exception("Imm out of range")
             mach_code.append(imm)
         elif op1[0] == '$':
-            addr = int(op1[1:], 16)
+            pos = op1.find('+')
+            if pos > -1:  # address register offset
+                ins |= 1 << 2
+                ins |= __get_reg_value(op1[pos+1:])
+            else: pos = None
+            addr = int(op1[1:pos], 16)
             if addr > 0xffff:
                 raise Exception('Addr out of range')
             # little endian
@@ -100,7 +105,12 @@ def __convert_assembly_ins(ins):
                     raise Exception("Imm out of range")
                 mach_code.append(imm)
             elif op2[0] == '$':
-                addr = int(op2[1:], 16)
+                pos = op2.find('+')
+                if pos > -1:  # address register offset
+                    ins |= 1 << 2
+                    ins |= __get_reg_value(op2[pos+1:], True)
+                else: pos = None
+                addr = int(op2[1:pos], 16)
                 if addr > 0xffff:
                     raise Exception('Addr out of range')
                 # little endian
