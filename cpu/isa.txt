@@ -98,8 +98,8 @@ I   SHLi        64      SHL Ra, #imm    Ra <= Ra << imm
 R   SHRr        60      SHR Ra, Rb      Ra <= Ra >> Rb
 I   SHRi        64      SHR Ra, #imm    Ra <= Ra >> imm
 
-Flow modification
-=================
+Flow control
+============
 
 (*dirty*)
 
@@ -118,8 +118,8 @@ Example:
 (8)         b .func1    ; call func1
 (9)         nop
 
-Line (6) will push high bytes of PC + 2 - i.e. line (8) - to the stack
-Line (7) will push low bytes of PC + 1 - i.e. line (8) - to the stack
+Line (6) will push high bytes of PC + 3 - i.e. line (9) - to the stack
+Line (7) will push low bytes of PC + 2 - i.e. line (9) - to the stack
 Line (2) will pop low bytes of stored PC off the stack into a temporary register (no PC modification)
-Line (3) will pop high bytes of stored PC off the stack and modify PC
+Line (3) will pop high bytes of stored PC off the stack and modify PC; execution will continue from line (9)
 
