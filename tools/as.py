@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 opcodes = {
             'nop':0x80,     'mov' :0x88,     'push':0x90,     'pop':0x98,
             'ld' :0xa0,     'st'  :0xa8,     'b'   :0xb0,     'bzf':0xb8,
@@ -143,6 +145,7 @@ def __assemble(filename):
         fcn_name = ''
         for l in f.readlines():
             l = l.lstrip()
+            #print(l)
 
             #deal with blank lines
             if len(l) == 0: continue
@@ -155,6 +158,7 @@ def __assemble(filename):
                 toks = l.split()
                 bss[toks[0][:-1]] = (bss_offset, int(toks[2]))
                 bss_offset += int(toks[2])
+                continue
 
             # variables
             start = l.find('[')
@@ -183,7 +187,7 @@ def __assemble(filename):
             l = __replace_defines(l)
 
             #  start of new function
-            if l.find(':') > 0:
+            if l.find(':') > 0 and l.find(': resb') < 0:
                 if not first:
                     functions[fcn_name] = (offset,mach_code)
                     offset += len(mach_code)
@@ -216,6 +220,9 @@ if __name__ == "__main__":
 
     outf = '{}.o'.format(args[0].split('.')[0])
     if len(args) == 2: outf = args[1]
+
+    for k,v in functions.items():
+        print(k, v[0], len(v[1]))
 
     with open(outf, 'wb') as f:
         import struct
