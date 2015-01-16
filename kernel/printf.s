@@ -55,8 +55,14 @@ print_char_loop:
     ;st $f000, r0
 
     ld r1, [j0]
-    ld r1, [offset0]+r1
+    push r0
+    ld r0, [char0]
+    add r1, r0
+    ld r1, [charset]+r1
+    st $f000, r1
+    pop r0
     and r0, r1
+    st $f000, r0
     eq r0, #0
     bzf .print_char_draw_done
 print_char_draw:

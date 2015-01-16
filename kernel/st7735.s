@@ -56,6 +56,7 @@ st7735_init:
 
 st7735_pc_0: resb 2
 
+saw_i0: resb 1
 st7735_set_addr_window:
     ; args on stack:
     ; - col start
@@ -69,17 +70,49 @@ st7735_set_addr_window:
     pop r0
     st [st7735_pc_0+1], r0
 
+    mov r0, ST7735_CASET
+    push pch
+    push pcl
+    b .spi_write_DEV_
+
     mov r1, #0  ; ctr
-saw_loop:
+saw_loop_col:
+    st [saw_i0], r1
     pop r0
     push pch
     push pcl
     b .spi_write_DEV_
+    ld r1, [saw_i0]
+
     add r1, #1  ; ctr++
-    eq r1, #4
-    bzf .saw_done
-    b .saw_loop
-saw_done:
+    eq r1, #2
+    bzf .saw_col_done
+    b .saw_loop_col
+saw_col_done:
+    mov r0, ST7735_RASET
+    push pch
+    push pcl
+    b .spi_write_DEV_
+
+    mov r1, #0  ; ctr
+saw_loop_row:
+    st [saw_i0], r1
+    pop r0
+    push pch
+    push pcl
+    b .spi_write_DEV_
+    ld r1, [saw_i0]
+
+    add r1, #1  ; ctr++
+    eq r1, #2
+    bzf .saw_row_done
+    b .saw_loop_row
+saw_row_done:
+    mov r0, ST7735_RAMWR
+    push pch
+    push pcl
+    b .spi_write_DEV_
+
     ; restore return pc
     ld r0, [st7735_pc_0+1]
     push r0
@@ -144,17 +177,15 @@ st7735_draw_pixel:
 
     ; x coord
     pop r0
-    mov r1, r0
-    add r1, #1
     st [st7735_x1], r0
-    st [st7735_x2], r1
+    add r0, #1
+    st [st7735_x2], r0
 
     ; y coord
     pop r0
-    mov r1, r0
-    add r1, #1
     st [st7735_y1], r0
-    st [st7735_y2], r1
+    add r0, #1
+    st [st7735_y2], r0
 
     ; set window (1 px in size)
     ld r0, [st7735_y2]

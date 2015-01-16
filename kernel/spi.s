@@ -16,7 +16,8 @@ wait_spi_write_DEV0_:
     bzf .end_spi_write_DEV0_
     b .wait_spi_write_DEV0_
 end_spi_write_DEV0_:
-    mov r0, #0
+    pop pcl
+    pop pch
 
 ; read byte (r0) - device 0
 spi_read_DEV0_:
@@ -29,3 +30,5 @@ wait_spi_read_DEV0_:
     b .wait_spi_read_DEV0_
 end_spi_read_DEV0_:
     ld r0, $f1_DEV0_1  ;read rx buffer
+    pop pcl
+    pop pch

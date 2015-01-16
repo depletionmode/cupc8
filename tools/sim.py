@@ -13,7 +13,8 @@ from colorama import init, Style, Back, Fore
 init()
 
 # display on spi 0
-#import simdisplay
+import simdisplay
+display_active=False
 spi0_tx_buf = 0
 
 PC = 0x1000
@@ -122,12 +123,16 @@ def _st(operands):
     if addr == 0xf000:  # gpo
         _log(0, Fore.RED + Style.BRIGHT + 'GPO: {0:8b}'.format(mem[addr]))
     if addr >> 4 == 0xf10:  # spi0
-        global spi0_tx_buf
+        global spi0_tx_buf, display_active
+        if not display_active:
+            simdisplay.init()
+            display_active = True
         reg = addr & 0xf
         if reg == 0:  # tx buf
             spi0_tx_buf = reg_read(operands)  # save for transact
         elif reg == 2: # transact
-            _log(0, Fore.RED + Style.BRIGHT + 'SPI0 WRITE: 0x{:x}'.format(spi0_tx_buf))
+#            _log(0, Fore.RED + Style.BRIGHT + 'SPI0 WRITE: 0x{:x}'.format(spi0_tx_buf))
+            simdisplay.transact(spi0_tx_buf)
             #simdisplay.write(spi0_tx_buf)
 
 def _ld(operands):
