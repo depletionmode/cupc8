@@ -16,6 +16,7 @@ functions = {}
 unresolved_fcns = {}
 defines = {}
 first_pass = True
+labels = {}
 
 base = 0x1000
 bss_base = 0x3000
@@ -80,14 +81,16 @@ def __convert_assembly_ins(ins):
             mach_code.append(addr & 0xff);
             mach_code.append(addr >> 8);
         elif op1[0] == '.':
-            if not op1[1:] in functions:
+            #if not op1[1:] in functions:
+            if not op1[1:] in labels:
                 # function not yet resolved?
                 if not first_pass:
                     raise Exception('Function {} not found'.format(op1[1:]))
                 mach_code.append(0)
                 mach_code.append(0)
             else:
-                addr = functions[op1[1:]][0] + base
+                #addr = functions[op1[1:]][0] + base
+                addr = labels[op1[1:]] + base
 
                 mach_code.append(addr & 0xff);
                 mach_code.append(addr >> 8);
@@ -133,9 +136,10 @@ def __replace_defines(l):
 
 def __assemble(filename):
     global functions
+    global labels
     global first_pass
     global bss
-    mach_code = bytearray()
+    mach_code = bytearray(3)
     offset = 3 #leave 3 bytes for branch to entry point
     bss = {}
     bss_offset = bss_base
@@ -188,21 +192,24 @@ def __assemble(filename):
 
             #  start of new function
             if l.find(':') > 0 and l.find(': resb') < 0:
-                if not first:
-                    functions[fcn_name] = (offset,mach_code)
-                    offset += len(mach_code)
-                    mach_code = bytearray()
-                first = False
-                fcn_name = l[:l.find(':')]
+                if first_pass:
+                    labels[l[:l.find(':')]] = offset
+               # if not first:
+               #     functions[fcn_name] = (offset,mach_code)
+               #     offset += len(mach_code)
+               #     mach_code = bytearray()
+               # first = False
+               # fcn_name = l[:l.find(':')]
                 continue
+            code = __convert_assembly_ins(l[:l.find(';')])
+            mach_code += code
+            offset += len(code)
 
-            mach_code += __convert_assembly_ins(l[:l.find(';')])
-
-        functions[fcn_name] = (offset,mach_code)
-        offset += len(mach_code)
+#        functions[fcn_name] = (offset,mach_code)
+#        offset += len(mach_code)
 
     first_pass = False
-    return offset
+    return offset, mach_code
 
 if __name__ == "__main__":
     import sys
@@ -211,29 +218,32 @@ if __name__ == "__main__":
     if len(args) < 1:
         raise Exception('Invalid input/output files')
 
-    offset = __assemble(args[0])
-    offset = __assemble(args[0]) # ulgy hack for bad function lookup logic
+    offset, mach_code = __assemble(args[0])
+    offset, mach_code = __assemble(args[0]) # ulgy hack for bad function lookup logic
 
     entry_point = 'main'
-    if not entry_point in functions:
+    if not entry_point in labels:
+    #if not entry_point in functions:
         raise Exception('No entry point found')
 
     outf = '{}.o'.format(args[0].split('.')[0])
     if len(args) == 2: outf = args[1]
 
-    for k,v in functions.items():
-        print(k, v[0], len(v[1]))
+#    for k,v in labels.items():
+#        print(k, v)
 
     with open(outf, 'wb') as f:
-        import struct
-        mach_code = bytearray(offset)
-        vw = memoryview(mach_code)
-        for k, v in functions.items():
-            struct.pack_into(str(len(v[1])) + 's', vw, v[0], v[1])
+#        import struct
+#        mach_code = bytearray(offset)
+#        vw = memoryview(mach_code)
+#        for k, v in functions.items():
+#            struct.pack_into(str(len(v[1])) + 's', vw, v[0], v[1])
 
         mach_code[0] = 0xb0
-        mach_code[1] = (functions[entry_point][0] + base) & 0xff
-        mach_code[2] = (functions[entry_point][0] + base) >> 8
+        #mach_code[1] = (functions[entry_point][0] + base) & 0xff
+        #mach_code[2] = (functions[entry_point][0] + base) >> 8
+        mach_code[1] = (labels[entry_point] + base) & 0xff
+        mach_code[2] = (labels[entry_point] + base) >> 8
 
         f.write(mach_code)
 
