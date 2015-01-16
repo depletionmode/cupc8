@@ -12,7 +12,7 @@ j0: resb 1
 char0: resb 1
 offset0: resb 1
 
-temp_msg db 67, 85, 80, 67, 65, 75, 69, 32, 75, 69, 82, 78, 69, 76, 32, 84, 69, 83, 84, 00
+temp_msg db 10, 67, 85, 80, 67, 65, 75, 69, 32, 75, 69, 82, 78, 69, 76, 32, 84, 69, 83, 84, 10, 10, 65, 66, 67, 00
 
 pm_i: resb 1
 print_msg:
@@ -40,6 +40,18 @@ print_char:
     ; arg
     ; - ascii value in r0
 
+    ; newline
+    eq r0, #10
+    bzf .pc_newline
+    b .pc_cont
+pc_newline:
+    ld r0, [posy]
+    add r0, #8
+    st [posy], r0
+    xor r0, r0
+    st [posx], r0
+    b .print_char_done 
+pc_cont:
     ; normalize ascii
     sub r0, #65
     st [char0], r0
@@ -107,16 +119,16 @@ print_char_draw_done:
     
     ld r0, [posx]
     add r0, #8
-    eq r0, #0 : ? posx == 0
+    eq r0, #0
     bzf .print_char_inc_posy
+    st [posx], r0
     b .print_char_done
 print_char_inc_posy:
     ld r0, [posy]
     add r0, #8
     st [posy], r0
-print_char_done:
-    ld r0, [posx]
-    add r0, #8
+    xor r0, r0
     st [posx], r0
+print_char_done:
     pop pcl
     pop pch

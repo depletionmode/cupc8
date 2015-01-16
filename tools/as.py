@@ -244,7 +244,6 @@ if __name__ == "__main__":
 #    for k,v in labels.items():
 #        print(k, v)
 
-    print(data)
     with open(outf, 'wb') as f:
         mach_code[0] = 0xb0
         mach_code[1] = (labels[entry_point] + base) & 0xff
@@ -252,7 +251,6 @@ if __name__ == "__main__":
 
         # pass until .data
         padding = bytearray(data_base - len(mach_code) - base)
-        print(data_buf)
         buf = mach_code + padding + data_buf
         f.write(buf)
 
