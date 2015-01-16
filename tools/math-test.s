@@ -1,4 +1,6 @@
 
+%define GPO $f000
+
 mul_n: resb 1
 mul_v: resb 1
 mul:
@@ -20,5 +22,13 @@ mul_loop:
     b .mul_loop
 mul_done:
     pop pcl
-    pop pch
+    pop pch 
 
+main:
+    ; 3 * 2
+    mov r0, #3
+    mov r1, #3
+    push pch
+    push pcl
+    b .mul
+    st GPO, r0

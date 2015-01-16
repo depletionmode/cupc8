@@ -1,4 +1,6 @@
-# cpu simulator
+#!/usr/bin/env python3
+
+# cupcake cpu simulator
 
 import sys, argparse
 
@@ -9,6 +11,10 @@ args = parser.parse_args()
 
 from colorama import init, Style, Back, Fore
 init()
+
+# display on spi 0
+#import simdisplay
+spi0_tx_buf = 0
 
 PC = 0x1000
 SP = 0x0100
@@ -70,13 +76,6 @@ ops = {
 def _nop(operands):
     pass
 
-def _ld(operands):
-    addr = fetch() | fetch() << 8
-    if operands & 4:
-        rb = reg_read(operands)
-        addr += rb
-    reg_write(operands, mem[addr])
-
 def _eq(operands):
     global ZF
     (imm, rb) = get_imm(operands)
@@ -122,6 +121,28 @@ def _st(operands):
     # mmu
     if addr == 0xf000:  # gpo
         _log(0, Fore.RED + Style.BRIGHT + 'GPO: {0:8b}'.format(mem[addr]))
+    if addr >> 4 == 0xf10:  # spi0
+        global spi0_tx_buf
+        reg = addr & 0xf
+        if reg == 0:  # tx buf
+            spi0_tx_buf = reg_read(operands)  # save for transact
+        elif reg == 2: # transact
+            _log(0, Fore.RED + Style.BRIGHT + 'SPI0 WRITE: 0x{:x}'.format(spi0_tx_buf))
+            #simdisplay.write(spi0_tx_buf)
+
+def _ld(operands):
+    addr = fetch() | fetch() << 8
+    if operands & 4:
+        rb = reg_read(operands)
+        addr += rb
+    reg_write(operands, mem[addr])
+    # mmu
+    if addr >> 4 == 0xf10:  # spi0
+        reg = addr & 0xf
+        if reg == 1:  # rx buf
+            reg_write(operands, 0)  # no rx from display module
+        elif reg == 3: # status
+            reg_write(operands, 1)  # always return DONE for now
 
 def _gt(operands):
     global ZF

@@ -70,16 +70,16 @@ st7735_set_addr_window:
     st [st7735_pc_0+1], r0
 
     mov r1, #0  ; ctr
-loop0:
+saw_loop:
     pop r0
     push pch
     push pcl
     b .spi_write_DEV_
     add r1, #1  ; ctr++
     eq r1, #4
-    bzf .done0
-    b .loop0
-done0:
+    bzf .saw_done
+    b .saw_loop
+saw_done:
     ; restore return pc
     ld r0, [st7735_pc_0+1]
     push r0
