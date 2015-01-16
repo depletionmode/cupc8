@@ -12,7 +12,7 @@ j0: resb 1
 char0: resb 1
 offset0: resb 1
 
-temp_msg db 10, 67, 85, 80, 67, 65, 75, 69, 32, 75, 69, 82, 78, 69, 76, 32, 84, 69, 83, 84, 10, 10, 65, 66, 67, 00
+temp_msg db "\nCUPCAKE KERNEL TEST\n\nABC"
 
 pm_i: resb 1
 print_msg:

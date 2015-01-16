@@ -170,11 +170,28 @@ def __assemble(filename):
             # .data
             if l.find('db') > -1:
                 toks = l.split(' ', 2)
-                data_b = toks[2].split(',')
-                data_c = bytearray(len(data_b))
-                for i in range(len(data_b)):
-                    d = data_b[i].strip()
-                    data_c[i] = int(d)
+                data_d = []
+                data_c =''
+                if toks[2].find('"') > -1:
+                    esc = False
+                    for t in toks[2][1:-2]:
+                        if t == '\\':
+                            esc = True
+                            continue
+                        if esc:
+                            esc = False
+                            if t == 'n': t = '\n'
+                        data_d.append(ord(t))
+                    data_d.append(0)
+                    data_c = bytearray(len(data_d))
+                    for i in range(len(data_d)):
+                        data_c[i] = data_d[i]
+                else:
+                    data_b = toks[2].split(',')
+                    data_c = bytearray(len(data_b))
+                    for i in range(len(data_b)):
+                        d = data_b[i].strip()
+                        data_c[i] = int(d)
                     
                 data[toks[0]] = (data_offset, data_c)
                 data_buf += data_c
