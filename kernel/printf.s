@@ -6,7 +6,7 @@ posy: resb 1
 charset: resb 208  ; temporary until .data assembler implementation
 
 ; character set
-;charset db 0, 0, 0, 0, 0, 0, 0, 0,  ; A
+charseta db 24, 60, 102, 126, 102, 102, 102, 0
 
 i0: resb 1
 j0: resb 1
@@ -14,19 +14,35 @@ char0: resb 1
 offset0: resb 1
 
 tmp_fill_charset:
-    mov r0, #0
+    ;mov r0, #0
+    ;st [charset], r0
+    ;mov r0, #0
+    ;st [charset+1], r0
+    ;mov r0, #60
+    ;st [charset+2], r0
+    ;mov r0, #6
+    ;st [charset+3], r0
+    ;mov r0, #62
+    ;st [charset+4], r0
+    ;mov r0, #102
+    ;st [charset+5], r0
+    ;mov r0, #62
+    ;st [charset+6], r0
+    ;mov r0, #0
+    ;st [charset+7], r0
+    mov r0, #24
     st [charset], r0
-    mov r0, #0
-    st [charset+1], r0
     mov r0, #60
+    st [charset+1], r0
+    mov r0, #102
     st [charset+2], r0
-    mov r0, #6
+    mov r0, #126
     st [charset+3], r0
-    mov r0, #62
+    mov r0, #102
     st [charset+4], r0
     mov r0, #102
     st [charset+5], r0
-    mov r0, #62
+    mov r0, #102
     st [charset+6], r0
     mov r0, #0
     st [charset+7], r0
@@ -38,6 +54,10 @@ print_char:
     ; normalize ascii
     sub r0, #65
     st [char0], r0
+
+    xor r0, r0
+    st [posx], r0
+    st [posy], r0
 
     mov r1, #8
     push pch
@@ -58,11 +78,11 @@ print_char_loop:
     push r0
     ld r0, [char0]
     add r1, r0
-    ld r1, [charset]+r1
-    st $f000, r1
+    ld r1, [charseta]+r1
+    ;st $f000, r1
     pop r0
     and r0, r1
-    st $f000, r0
+    ;st $f000, r0
     eq r0, #0
     bzf .print_char_draw_done
 print_char_draw:

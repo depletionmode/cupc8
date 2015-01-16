@@ -12,12 +12,15 @@ opcodes = {
 registers = [ 'r0', 'r1' ]
 
 bss = {}
+data = {}
+data_buf = bytearray()
 unresolved_fcns = {}
 defines = {}
 first_pass = True
 labels = {}
 
 base = 0x1000
+data_base = 0x2000
 bss_base = 0x3000
 
 def __ins_hacks(ins):
@@ -134,11 +137,15 @@ def __replace_defines(l):
 def __assemble(filename):
     global labels
     global first_pass
-    global bss
+    global bss,data
+    global data_buf
     mach_code = bytearray(3)
     offset = 3 #leave 3 bytes for branch to entry point
     bss = {}
+    data = {}
+    data_offset = data_base
     bss_offset = bss_base
+    data_buf = bytearray()
     first = True
 
     with open(filename, 'r') as f:
@@ -160,6 +167,20 @@ def __assemble(filename):
                 bss_offset += int(toks[2])
                 continue
 
+            # .data
+            if l.find('db') > -1:
+                toks = l.split(' ', 2)
+                data_b = toks[2].split(',')
+                data_c = bytearray(len(data_b))
+                for i in range(len(data_b)):
+                    d = data_b[i].strip()
+                    data_c[i] = int(d)
+                    
+                data[toks[0]] = (data_offset, data_c)
+                data_buf += data_c
+                data_offset += len(data_c)
+                continue
+
             # variables
             start = l.find('[')
             if start > -1:
@@ -167,14 +188,18 @@ def __assemble(filename):
                 var = l[start+1:end]
                 try:
                     toks = var.split('+')
-                    val = bss[toks[0]][0]
+                    val = bss.get(toks[0], None)
+                    if val == None:
+                        val = data[toks[0]][0]
+                    else:
+                        val = val[0]
                     if len(toks) > 1:
                         if int(toks[1]) >= bss[toks[0]][1]:
                             raise Exception('Variable {} expression out of bounds!'.format(toks[0]))
                         val += int(toks[1])
                     l = l.replace('[{}]'.format(var), '${:x}'.format(val))
                 except:
-                    raise Exception('Variable {} not found in .bss!'.format(toks[0]))
+                    raise Exception('Variable {} not found in .bss or .data!'.format(toks[0]))
 
 
             # defines
@@ -219,11 +244,16 @@ if __name__ == "__main__":
 #    for k,v in labels.items():
 #        print(k, v)
 
+    print(data)
     with open(outf, 'wb') as f:
         mach_code[0] = 0xb0
         mach_code[1] = (labels[entry_point] + base) & 0xff
         mach_code[2] = (labels[entry_point] + base) >> 8
 
-        f.write(mach_code)
+        # pass until .data
+        padding = bytearray(data_base - len(mach_code) - base)
+        print(data_buf)
+        buf = mach_code + padding + data_buf
+        f.write(buf)
 
-    print('{} -> {} - {} bytes'.format(args[0], outf, len(mach_code)))
+    print('{} -> {} - {} bytes'.format(args[0], outf, len(buf)))
