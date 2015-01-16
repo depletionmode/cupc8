@@ -3,7 +3,6 @@
 ; global variables
 posx: resb 1
 posy: resb 1
-charset: resb 208  ; temporary until .data assembler implementation
 
 ; character set
 charset db 24, 60, 102, 126, 102, 102, 102, 0
