@@ -7,6 +7,7 @@ import sys, argparse
 parser = argparse.ArgumentParser(prog='python3 sim.py', description='Simulate CUPCake CPU.')
 parser.add_argument('file', help='binary code file to execute', type=argparse.FileType('rb'))
 parser.add_argument('-v', help='verbosity [-v ins, -vv reg, -vvv fetch+decode]', action='count')
+parser.add_argument('-s', help='speed', action='count')
 args = parser.parse_args()
 
 from colorama import init, Style, Back, Fore
@@ -274,8 +275,8 @@ def decode():
     fops[ins](op & 7)
     _log(2, Fore.GREEN + '  r0 = {:2x}\n  r1 = {:2x}\n  pc = {:4x}\n  sp = {:4x}\n  zf = {:b}\n'.format(R0, R1, PC, SP, ZF))
 
-#exec_time = []
 NUM_INS = 100000
+AVE_CLK_PER_INS = 5
 def exec():
     import time, functools
     ins_ctr = 0
@@ -285,10 +286,9 @@ def exec():
         ins_ctr += 1
         decode()
         if ins_ctr == NUM_INS:
-#            exec_time.append(time.clock() - start)
             ins_ctr = 0
-#            print('{:.2f} KHz'.format(NUM_INS/(functools.reduce(lambda x, y: x + y, exec_time)/len(exec_time))/1000))
-            print('{:.2f} KHz'.format(NUM_INS/(time.clock() - start)/1000))
+            if args.s != None:
+                print('{:.2f} KHz'.format(NUM_INS*4/(time.clock() - start)/1000))
 
 # load code into mem
 i = 0
