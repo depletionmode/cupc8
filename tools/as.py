@@ -21,7 +21,7 @@ labels = {}
 
 base = 0x1000
 data_base = 0x2000
-bss_base = 0x3000
+bss_base = 0x5000
 
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
@@ -211,8 +211,8 @@ def __assemble(filename):
                     else:
                         val = val[0]
                     if len(toks) > 1:
-                        if int(toks[1]) >= bss[toks[0]][1]:
-                            raise Exception('Variable {} expression out of bounds!'.format(toks[0]))
+#                        if int(toks[1]) >= bss[toks[0]][1]:
+#                            raise Exception('Variable {} expression out of bounds!'.format(toks[0]))
                         val += int(toks[1])
                     l = l.replace('[{}]'.format(var), '${:x}'.format(val))
                 except:
