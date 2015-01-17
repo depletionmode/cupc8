@@ -274,9 +274,21 @@ def decode():
     fops[ins](op & 7)
     _log(2, Fore.GREEN + '  r0 = {:2x}\n  r1 = {:2x}\n  pc = {:4x}\n  sp = {:4x}\n  zf = {:b}\n'.format(R0, R1, PC, SP, ZF))
 
+#exec_time = []
+NUM_INS = 100000
 def exec():
+    import time, functools
+    ins_ctr = 0
+    start = None
     while PC != eof:
+        if ins_ctr == 0: start = time.clock()
+        ins_ctr += 1
         decode()
+        if ins_ctr == NUM_INS:
+#            exec_time.append(time.clock() - start)
+            ins_ctr = 0
+#            print('{:.2f} KHz'.format(NUM_INS/(functools.reduce(lambda x, y: x + y, exec_time)/len(exec_time))/1000))
+            print('{:.2f} KHz'.format(NUM_INS/(time.clock() - start)/1000))
 
 # load code into mem
 i = 0
