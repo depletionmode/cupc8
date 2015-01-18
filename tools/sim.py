@@ -275,20 +275,20 @@ def decode():
     fops[ins](op & 7)
     _log(2, Fore.GREEN + '  r0 = {:2x}\n  r1 = {:2x}\n  pc = {:4x}\n  sp = {:4x}\n  zf = {:b}\n'.format(R0, R1, PC, SP, ZF))
 
-NUM_INS = 100000
+NUM_INS = 500000
 AVE_CLK_PER_INS = 5
 def exec():
     import time, functools
     ins_ctr = 0
-    start = None
+    start = time.clock()
     while PC != eof:
-        if ins_ctr == 0: start = time.clock()
         ins_ctr += 1
         decode()
-        if ins_ctr == NUM_INS:
+        if ins_ctr % NUM_INS == 0:
             ins_ctr = 0
             if args.s != None:
                 print('{:.2f} KHz'.format(NUM_INS*4/(time.clock() - start)/1000))
+            start = time.clock()
 
 # load code into mem
 i = 0
