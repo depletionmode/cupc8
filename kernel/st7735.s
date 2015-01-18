@@ -157,64 +157,9 @@ st7735_set_color:
     pop pcl
     pop pch
 
-st7735_pc_1: resb 2
+
 st7735_x1: resb 1
-st7735_x2: resb 1
 st7735_y1: resb 1
-st7735_y2: resb 1
-
-st7735_draw_pixel_old:
-    ; args on stack:
-    ; - x
-    ; - y
-    ; - color
-
-    ; save return pc
-    pop r0
-    st [st7735_pc_1], r0
-    pop r0
-    st [st7735_pc_1+1], r0
-
-    ; x coord
-    pop r0
-    st [st7735_x1], r0
-    add r0, #1
-    st [st7735_x2], r0
-
-    ; y coord
-    pop r0
-    st [st7735_y1], r0
-    add r0, #1
-    st [st7735_y2], r0
-
-    ; set window (1 px in size)
-    ld r0, [st7735_y2]
-    push r0
-    ld r0, [st7735_y1]
-    push r0
-    ld r0, [st7735_x2]
-    push r0
-    ld r0, [st7735_x1]
-    push r0
-    push pch
-    push pcl
-    b .st7735_set_addr_window
-
-    ; write color
-    pop r0
-    push pch
-    push pcl
-    b .st7735_set_color
-
-    ; restore return pc
-    ld r0, [st7735_pc_1+1]
-    push r0
-    ld r0, [st7735_pc_1]
-    push r0
-
-    pop pcl
-    pop pch
-
 st7735_pc_3: resb 2
 
 st7735_draw_pixel:
