@@ -233,7 +233,6 @@ pc_after_offset:
 print_char_draw:
     push #255   ; colour
 
-    nop
     ld r0, [j0]
     ld r1, [posy]
     add r1, r0
@@ -278,5 +277,46 @@ print_char_inc_posy:
     xor r0, r0
     st [posx], r0
 print_char_done:
+    pop pcl
+    pop pch
+
+cd_end: resb 1
+fill_screen_pixels:
+    ; [testing routine]
+    ; fill scree with pixels (slow)
+
+    xor r1, r1
+    st [posx], r1
+    st [posy], r1
+cd_draw_pixel:
+    push #255
+
+    ld r1, [posy]
+    push r1     ; y
+
+    ld r1, [posx]
+    push r1     ; x
+
+    push pch
+    push pcl
+    b .st7735_draw_pixel
+
+    ld r1, [posx]
+    add r1, #1
+    st [posx], r1
+    eq r1, #0   ; 256
+    bzf .cd_0
+    b .cd_draw_pixel
+cd_0:
+    xor r1, r1
+    st [posx], r1
+
+    ld r1, [posy]
+    add r1, #1
+    st [posy], r1
+    eq r1, #255
+    bzf .cs_done
+    b .cd_draw_pixel
+cs_done:
     pop pcl
     pop pch

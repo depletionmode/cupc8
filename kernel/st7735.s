@@ -163,7 +163,7 @@ st7735_x2: resb 1
 st7735_y1: resb 1
 st7735_y2: resb 1
 
-st7735_draw_pixel:
+st7735_draw_pixel_old:
     ; args on stack:
     ; - x
     ; - y
@@ -210,6 +210,106 @@ st7735_draw_pixel:
     ld r0, [st7735_pc_1+1]
     push r0
     ld r0, [st7735_pc_1]
+    push r0
+
+    pop pcl
+    pop pch
+
+st7735_pc_3: resb 2
+
+st7735_draw_pixel:
+    ; args on stack:
+    ; - x
+    ; - y
+    ; - color
+
+    ; save return pc
+    pop r0
+    st [st7735_pc_3], r0
+    pop r0
+    st [st7735_pc_3+1], r0
+
+    pop r0  ; x
+    pop r1  ; y
+
+    push #1
+    push #1
+
+    push r1
+    push r0
+
+    push pch
+    push pcl
+    b .st7735_fill_rect
+
+    ; restore return pc
+    ld r0, [st7735_pc_3+1]
+    push r0
+    ld r0, [st7735_pc_3]
+    push r0
+
+    pop pcl
+    pop pch
+
+st7735_pc_4: resb 2
+st7735_w: resb 1
+st7735_h: resb 1
+st7735_fill_rect:
+    ; args on stack:
+    ; - x
+    ; - y
+    ; - width
+    ; - height
+    ; - color
+
+    ; save return pc
+    pop r0
+    st [st7735_pc_4], r0
+    pop r0
+    st [st7735_pc_4+1], r0
+
+    pop r0
+    st [st7735_x1], r0
+
+    pop r0
+    st [st7735_y1], r0
+
+    pop r0
+    st [st7735_w], r0
+
+    pop r0
+    st [st7735_h], r0
+
+    ld r0, [st7735_y1]
+    ld r1, [st7735_h]
+    add r1, r0
+    push r1
+    st $f000, r1
+    push r0
+    st $f000, r0
+
+    ld r0, [st7735_x1]
+    ld r1, [st7735_w]
+    add r1, r0
+    push r1
+    st $f000, r1
+    push r0
+    st $f000, r0
+
+    push pch
+    push pcl
+    b .st7735_set_addr_window
+
+    ; write color
+    pop r0
+    push pch
+    push pcl
+    b .st7735_set_color
+
+    ; restore return pc
+    ld r0, [st7735_pc_4+1]
+    push r0
+    ld r0, [st7735_pc_4]
     push r0
 
     pop pcl

@@ -15,8 +15,8 @@ def draw_pixel(x, y):
 
 def fill(x0, x1, y0, y1):
     #print(x0,x1,y0,y1)
-    screen.set_at((x0,y0),WHITE)
-#    screen.fill(WHITE, ((x0,y0),(x1,y1)))
+    #screen.set_at((x0,y0),WHITE)
+    screen.fill(WHITE, ((x0,y0),(x1-x0,y1-y0)))
     pygame.display.update()
 
 state = ''

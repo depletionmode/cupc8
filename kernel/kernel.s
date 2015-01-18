@@ -1,5 +1,9 @@
 ; kernel entry point
 main:
+;    push pch
+;    push pcl
+;    b .fill_screen_pixels
+
     push pch
     push pcl
     b .print_msg
