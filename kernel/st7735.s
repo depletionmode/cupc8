@@ -229,17 +229,13 @@ st7735_fill_rect:
     ld r1, [st7735_h]
     add r1, r0
     push r1
-    st $f000, r1
     push r0
-    st $f000, r0
 
     ld r0, [st7735_x1]
     ld r1, [st7735_w]
     add r1, r0
     push r1
-    st $f000, r1
     push r0
-    st $f000, r0
 
     push pch
     push pcl

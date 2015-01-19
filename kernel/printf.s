@@ -7,6 +7,49 @@ posy: resb 1
 
 temp_msg db "\nCUPCAKE KERNEL TEST\n\n1234567890...\n\nChar rom dump:\n\n"
 
+print_ascii_char_inverse:
+    ; convert ascii to c64 char rom offsets
+
+    ; 96-127: offset 12
+    lt r0, #96
+    bzf .pac_lt_96_inv
+    gt r0, #127
+    bzf .pac_done_inv
+    sub r0, #64
+    mov r1, #12
+    b .pac_print_char_inv
+pac_lt_96_inv:
+    ; 64-95: offset 4
+    lt r0, #64
+    bzf .pac_lt_64_inv
+    gt r0, #95
+    bzf .pac_done_inv
+    sub r0, #64
+    mov r1, #4
+    b .pac_print_char_inv
+pac_lt_64_inv:
+    ; 32-63: offset 5
+    lt r0, #32
+    bzf .pac_newline_inv
+    gt r0, #63
+    bzf .pac_done_inv
+    sub r0, #32
+    mov r1, #5
+    b .pac_print_char_inv
+pac_newline_inv:
+    ; newline: #10
+    mov r1, #16
+    eq r0, #10
+    bzf .pac_print_char_inv
+    b .pac_done_inv
+pac_print_char_inv:
+    push pch
+    push pcl
+    b .print_char
+pac_done_inv:
+    pop pcl
+    pop pch
+
 print_ascii_char:
     ; convert ascii to c64 char rom offsets
 
@@ -89,6 +132,7 @@ pm_loop:
     push pch
     push pcl
     b .print_ascii_char
+;    b .print_ascii_char_inverse
 ;    b .print_char
     ld r1, [pm_i]
     add r1, #1
@@ -318,5 +362,20 @@ cd_0:
     bzf .cs_done
     b .cd_draw_pixel
 cs_done:
+    pop pcl
+    pop pch
+
+clr_screen:
+    xor r0, r0
+    st [posx], r0
+    st [posy], r0
+    push #0     ; color
+    push #255
+    push #255
+    push #0
+    push #0
+    push pch
+    push pcl
+    b .st7735_fill_rect
     pop pcl
     pop pch
