@@ -167,6 +167,18 @@ void usart_init()
 	USARTD0.CTRLB = (USART_RXEN_bm | USART_TXEN_bm);	/* enable */
 }
 
+uint8_t ram_read(int addr)
+{
+	/* switch A10 and A11 because of board error */
+	addr = (addr & 0xf3ff) | (addr & 0x0800) >> 1 | (addr & 0x0400) << 1;
+
+	PORTB.OUT = PORTB.IN & 0xf0 | addr & 0x0f;
+	PORTD.OUT = addr & 0xf0 | PORTD.IN & 0x0f;
+	PORTC.OUT = (addr >> 8) & 0xff;
+
+	val = PORTA.IN;
+}
+
 void ram_write(int addr, int val)
 {
 	/* switch A10 and A11 because of board error */
@@ -225,6 +237,19 @@ void load_rom()
 {
 	// todo - load from rom into ram
 }
+
+void rom_write(uint16_t addr, uint8_t val)
+{
+	// todo - write to external e2
+	
+	nvm_eeprom_write(addr, val);
+}
+
+uint8_t rom_read(uint16_t addr)
+{
+	// todo - read from external e2
+	
+	return nvm_eeprom_read(addr);
 
 int main(void)
 {
