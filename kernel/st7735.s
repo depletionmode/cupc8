@@ -1,7 +1,5 @@
 ; st7735 display driver
 
-%define _DEV_ 0     ; spi device
-
 ; ported from adafruit library
 %define ST7735_NOP     #0
 %define ST7735_SWRESET #1
@@ -73,7 +71,7 @@ st7735_set_addr_window:
     mov r0, ST7735_CASET
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
 
     mov r1, #0  ; ctr
 saw_loop_col:
@@ -81,7 +79,7 @@ saw_loop_col:
     pop r0
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
     ld r1, [saw_i0]
 
     add r1, #1  ; ctr++
@@ -92,7 +90,7 @@ saw_col_done:
     mov r0, ST7735_RASET
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
 
     mov r1, #0  ; ctr
 saw_loop_row:
@@ -100,7 +98,7 @@ saw_loop_row:
     pop r0
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
     ld r1, [saw_i0]
 
     add r1, #1  ; ctr++
@@ -111,7 +109,7 @@ saw_row_done:
     mov r0, ST7735_RAMWR
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
 
     ; restore return pc
     ld r0, [st7735_pc_0+1]
@@ -141,12 +139,12 @@ st7735_set_color:
     ; write high byte
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
 
     ; write low byte
     push pch
     push pcl
-    b .spi_write_DEV_
+    b .spi_write_0
 
     ; restore return pc
     ld r0, [st7735_pc_2+1]
