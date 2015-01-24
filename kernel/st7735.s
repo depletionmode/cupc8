@@ -69,6 +69,7 @@ st7735_set_addr_window:
     st [st7735_pc_0+1], r0
 
     mov r0, ST7735_CASET
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
@@ -77,17 +78,18 @@ st7735_set_addr_window:
 saw_loop_col:
     st [saw_i0], r1
     pop r0
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
     ld r1, [saw_i0]
-
     add r1, #1  ; ctr++
     eq r1, #2
     bzf .saw_col_done
     b .saw_loop_col
 saw_col_done:
     mov r0, ST7735_RASET
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
@@ -96,6 +98,7 @@ saw_col_done:
 saw_loop_row:
     st [saw_i0], r1
     pop r0
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
@@ -107,6 +110,7 @@ saw_loop_row:
     b .saw_loop_row
 saw_row_done:
     mov r0, ST7735_RAMWR
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
@@ -137,15 +141,16 @@ st7735_set_color:
     mov r0, #255
 
     ; write high byte
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
 
     ; write low byte
+	xor r1, r1
     push pch
     push pcl
     b .spi_write_0
-
     ; restore return pc
     ld r0, [st7735_pc_2+1]
     push r0
