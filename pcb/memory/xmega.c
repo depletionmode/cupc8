@@ -57,6 +57,25 @@ void nvm_eeprom_write(uint16_t addr, uint8_t val)
 	nvm_exec();
 }
 
+void load_rom()
+{
+	// todo - load from rom into ram
+}
+
+void rom_write(uint16_t addr, uint8_t val)
+{
+	// todo - write to external e2
+	
+	nvm_eeprom_write(addr, val);
+}
+
+uint8_t rom_read(uint16_t addr)
+{
+	// todo - read from external e2
+	
+	return nvm_eeprom_read(addr);
+}
+
 void ram_init()
 {
 	PORTA.DIR = 0xff;
@@ -65,8 +84,8 @@ void ram_init()
 	PORTD.DIR |= 0xf0;
 	PORTE.DIRSET = PIN2_bm | PIN3_bm;
 
-#define PINCFG PORT_OPC_WIREDANDPULL_gc
 
+#define PINCFG PORT_OPC_WIREDANDPULL_gc
 	PORTA.PIN0CTRL = PINCFG;
 	PORTA.PIN1CTRL = PINCFG;
 	PORTA.PIN2CTRL = PINCFG;
@@ -114,19 +133,22 @@ void go_hiz()
 	PORTE.OUTCLR = PIN3_bm;
 }
 
-#define USART_BUSY !(USARTD0.STATUS & USART_DREIF_bm)
+#define USART_BUSY_TX !(USARTD0.STATUS & USART_DREIF_bm)
+#define USART_BUSY_RX !(USARTD0.STATUS & USART_RXCIF_bm)
 
 void usart_tx(int val)
 {
-	while (USART_BUSY);
+	while (USART_BUSY_TX);
 
 	USARTD0.DATA = val;
 }
 
 int usart_try_rx(int* err)
 {
-	if (USART_BUSY) 
+	if (USART_BUSY_RX) { 
 		*err = 1;
+		return 0xff;
+	}
 
 	*err = 0;
 	return USARTD0.DATA;
@@ -169,6 +191,8 @@ void usart_init()
 
 uint8_t ram_read(int addr)
 {
+	PORTA.DIR = 0;
+
 	/* switch A10 and A11 because of board error */
 	addr = (addr & 0xf3ff) | (addr & 0x0800) >> 1 | (addr & 0x0400) << 1;
 
@@ -176,7 +200,7 @@ uint8_t ram_read(int addr)
 	PORTD.OUT = addr & 0xf0 | PORTD.IN & 0x0f;
 	PORTC.OUT = (addr >> 8) & 0xff;
 
-	val = PORTA.IN;
+	return PORTA.IN;
 }
 
 void ram_write(int addr, int val)
@@ -193,9 +217,9 @@ void ram_write(int addr, int val)
 	PORTE.OUTSET = PIN2_bm;
 }
 
-void read_mem_from_usart(int rom)
+void read_mem_to_usart(int rom)
 {
-	PORTD.OUTCLR = PIN0_bm;
+	PORTD.OUTSET = PIN0_bm;
 
 	int len = usart_rx() << 8 | usart_rx();
 	{
@@ -211,45 +235,37 @@ void read_mem_from_usart(int rom)
 			}
 		}
 	}
+
+	PORTD.OUTCLR = PIN0_bm;
 }
 
 void write_mem_from_usart(int rom)
 {
-	PORTD.OUTCLR = PIN0_bm;
+	PORTD.OUTSET = PIN0_bm;
 
 	int len = usart_rx() << 8 | usart_rx();
-	{
-		int offset = usart_rx() << 8 | usart_rx();
-		while (len--) {
-			PORTD.OUTTGL = PIN1_bm;
-			if (rom)
-				rom_write(offset++, usart_rx());
-			else {
-				ram_init();
-				ram_write(offset++, usart_rx());
-				go_hiz();
-			}
+	int offset = usart_rx() << 8 | usart_rx();
+	while (len--) {
+		PORTD.OUTTGL = PIN1_bm;
+		if (rom)
+			rom_write(offset++, usart_rx());
+		else {
+			ram_init();
+			ram_write(offset++, usart_rx());
+			go_hiz();
 		}
 	}
+
+	PORTD.OUTCLR = PIN0_bm;
 }
 
-void load_rom()
+void usart_print(char *str)
 {
-	// todo - load from rom into ram
+	while (*str) {
+		usart_tx(*str++);
+		_delay_ms(10);
+	}
 }
-
-void rom_write(uint16_t addr, uint8_t val)
-{
-	// todo - write to external e2
-	
-	nvm_eeprom_write(addr, val);
-}
-
-uint8_t rom_read(uint16_t addr)
-{
-	// todo - read from external e2
-	
-	return nvm_eeprom_read(addr);
 
 int main(void)
 {
@@ -267,10 +283,20 @@ int main(void)
  
 	load_rom();
 
+	/* test code
+	int zz;
+	for (zz=0;zz < 5; zz++)
+		ram_write(zz, 0xff-zz);
+	for (zz=0;zz<5;zz++)
+		usart_tx(ram_read(zz));
+	*/
+
 	go_hiz();
 
 	PORTD.OUTCLR = PIN1_bm;
 
+	usart_print("CUPCake mem module\n");
+	usart_print("\n30 seconds until sleep...\n");
 	/* user has 30 seconds to initiate action */
 	int n = 30;
 	int cont = 0;
@@ -300,8 +326,9 @@ int main(void)
 			}
 		}
 		
-		delay_ms(1000);
+		_delay_ms(1000);
 	} while (n-- || cont);
+	usart_print("...goodnight!\n");
 
 	SLEEP.CTRL	= (SLEEP_SMODE_PSAVE_gc|SLEEP_SEN_bm);
 

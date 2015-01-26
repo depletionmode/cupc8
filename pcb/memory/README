@@ -5,5 +5,5 @@ $ avr-objcopy -O ihex xmega.elf xmega.hex
 Flash:
 * Patched avrdude for PDI
 * avrdude.conf with id for x16c4
-$ avrdude - C avrdude.conf -c usbasp -p x16c4 -U flash:xmega.hex:i -E noreset
+$ avrdude -C avrdude.conf -c usbasp -p x16c4 -U flash:w:xmega.hex:i -E noreset
 
