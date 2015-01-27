@@ -6,6 +6,7 @@ import sys
 def write_ram(s, addr, data):
     print('Writing...');
     data = bytearray(5) + data
+    #struct.pack_into('>BHH', data, 0, 45, len(data)-5, addr)
     struct.pack_into('>BHH', data, 0, 61, len(data)-5, addr)
     import time
     for d in data:
@@ -20,6 +21,7 @@ def write_ram(s, addr, data):
 def read_ram(s, addr, size):
     print('Reading...');
     data = bytearray(5)
+    #struct.pack_into('>BHH', data, 0, 95, size, addr)
     struct.pack_into('>BHH', data, 0, 43, size, addr)
     import time
     for d in data:
@@ -62,14 +64,5 @@ device = sys.argv[1]
 import serial
 s = serial.Serial(port=device, baudrate=115200)
 #s = serial.Serial(port=device, baudrate=9600)
-#q = bytearray(1)
-#q[0] = ord('?')
-#s.write(q)
-#print(s.readline())
-#print(s.readline())
-#print(s.readline())
-for i in range(100):
-    print('{}:'.format(i*5))
-    r = write_file(s, addr+5*i, sys.argv[2])
-    if not r: break
+write_file(s, addr, sys.argv[2])
 s.close()

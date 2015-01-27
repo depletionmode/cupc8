@@ -147,7 +147,7 @@ int usart_try_rx(int* err)
 {
 	if (USART_BUSY_RX) { 
 		*err = 1;
-		return 0xff;
+		return -1;
 	}
 
 	*err = 0;
@@ -282,13 +282,12 @@ int main(void)
  
 	load_rom();
 
-	/* test code
 	int zz;
-	for (zz=0;zz < 5; zz++)
-		ram_write(zz, 0xff-zz);
-	for (zz=0;zz<5;zz++)
-		usart_tx(ram_read(zz));
-	*/
+	for (zz=0;zz < 32; zz++)
+		ram_write(zz, zz);
+//	for (zz=0;zz<5;zz++)
+//		usart_tx(ram_read(zz));
+	
 
 	go_hiz();
 
