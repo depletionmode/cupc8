@@ -165,6 +165,14 @@ int usart_rx()
 	return val;
 }
 
+void usart_print(char *str)
+{
+	while (*str) {
+		usart_tx(*str++);
+		_delay_ms(10);
+	}
+}
+
 void usart_init()
 {
 	/* bsel = (f_per/(2^bscale*16*f_baud)) - 1
@@ -242,7 +250,6 @@ void read_mem_to_usart(int rom)
 void write_mem_from_usart(int rom)
 {
 	PORTD.OUTSET = PIN0_bm;
-
 	int len = usart_rx() << 8 | usart_rx();
 	int offset = usart_rx() << 8 | usart_rx();
 	while (len--) {
@@ -257,14 +264,6 @@ void write_mem_from_usart(int rom)
 	}
 
 	PORTD.OUTCLR = PIN0_bm;
-}
-
-void usart_print(char *str)
-{
-	while (*str) {
-		usart_tx(*str++);
-		_delay_ms(10);
-	}
 }
 
 int main(void)
@@ -295,11 +294,13 @@ int main(void)
 
 	PORTD.OUTCLR = PIN1_bm;
 
-	usart_print("CUPCake mem module\n");
-	usart_print("\n30 seconds until sleep...\n");
 	/* user has 30 seconds to initiate action */
-	int n = 30;
+	int n = 3000;
 	int cont = 0;
+	int z = 0;
+	//do { z = usart_rx(); } while (z != '?');
+	//usart_print("CUPCake mem module\n");
+	//usart_print("\n30 seconds until sleep...\n");
 	do {
 		int e;
 
@@ -328,7 +329,7 @@ int main(void)
 		
 		_delay_ms(1000);
 	} while (n-- || cont);
-	usart_print("...goodnight!\n");
+//	usart_print("...goodnight!\n");
 
 	SLEEP.CTRL	= (SLEEP_SMODE_PSAVE_gc|SLEEP_SEN_bm);
 
