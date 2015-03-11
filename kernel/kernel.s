@@ -14,6 +14,7 @@ main:
 
     mov r0, #255
     st $f000, r0
-hang:
+
+kernel_loop:
     nop
-    b .hang
+    b .kernel_loop
