@@ -16,4 +16,5 @@ main:
     or r1, r0
     or r0, #255
     or r1, #255
-    
+	halt
+

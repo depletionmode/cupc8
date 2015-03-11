@@ -6,7 +6,8 @@ opcodes = {
             'eq' :0x00,     'gt'  :0x08,     'lt'  :0x10,     'and':0x18,
             'or' :0x20,     'xor' :0x30,    'nor':0x38,
             'add':0x40,     'sub' :0x48,
-            'shl':0x60,     'shr' :0x68
+            'shl':0x60,     'shr' :0x68,
+            'halt':0xf8
           }
 
 registers = [ 'r0', 'r1' ]
