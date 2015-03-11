@@ -4,5 +4,8 @@ res=`python3 as.py $1`
 outf=`echo $res | cut -d' ' -f3`
 echo $res
 shift
-python3 sim.py $outf $@
+if [ ! -f sim ]; then
+	nim c -d:release sim.nim
+fi
+./sim $outf $@
 
