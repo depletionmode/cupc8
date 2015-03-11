@@ -3,6 +3,7 @@
 
 import strutils
 import simdisplay
+import times
 
 proc log(lvl, msg) =
     if lvl <= 1:
@@ -301,11 +302,15 @@ proc decode() =
 proc exec() =
   # todo - time/speed
   var ins_ctr = 0
+  var start = cpuTime()
   while PC != eof and not HF:
     ins_ctr += 1
     decode()
-    if ins_ctr mod 500000 == 0:
+    if ins_ctr mod 1000000 == 0:
       ins_ctr = 0
+      var elapsed = cpuTime() - start
+      log(1, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
+      start = cpuTime()
   while true:
       var a = 1 # pass?
 
