@@ -9,3 +9,4 @@ test_gpo:
     st $f000, r1
     mov r0, #170
     st $f000, r0
+	halt

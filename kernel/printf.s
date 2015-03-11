@@ -126,6 +126,7 @@ print_msg:
     st [pm_i], r1
 pm_loop:
     ld r0, [temp_msg]+r1
+;    st $f000, r0
     eq r0, #0
     bzf .pm_done
 ;    xor r1, r1

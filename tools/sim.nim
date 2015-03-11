@@ -2,9 +2,11 @@
 # cupcake simulator - nim edition!
 
 import strutils
+import simdisplay
 
 proc log(lvl, msg) =
-    writeln(stdout, msg)
+    if lvl <= 1:
+        writeln(stdout, msg)
 
 var
   PC: int = 0x1000
@@ -16,6 +18,13 @@ var
   pcl: int = 0
   mem: array[0..0x10000, int]
   eof: int = 0
+
+var
+  spi_tx_buf: array[0..4, int]
+  spi_rx_buf: array[0..4, int]
+
+var
+  display_active: bool = false
 
 proc fetch(): int =
   result = mem[PC] and 0xff
@@ -88,30 +97,66 @@ proc ins_shl(o: int) =
   reg_write(o, ra shl rb)
 
 proc ins_mov(o: int) = 
-  log(0, "mov")
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
-  log(0, "$1" % toHex(rb, 2))
   if not imm:
     rb = reg_read(o, false)
   reg_write(o, rb)
 
 proc ins_st(o: int) =
-  var address = fetch() or fetch() shl 8
+  var address = fetch() or (fetch() shl 8)
   if (o and 4) == 4:
     var ra = reg_read(o, true)
     address += ra
   mem[address] = reg_read(o, false)
   # todo -mmu
+  # mmu
+  case address shr 8:
+    of 0xf0:
+      if (address and 0xff) == 0: #gpo
+        log(1, "GPO: $1" % toBin(mem[address], 8))
+    of 0xf1:    # spi
+      var dev = address shr 4 and 0xf
+      if dev == 0:  # display
+        if not display_active:
+          display_active = true
+          # simdisplay.init()
+      var reg = address and 0xf
+      case reg:
+        of 0:   # tx
+          spi_tx_buf[dev] = reg_read(o, false)
+        of 2:   # transact
+          display_transact(spi_tx_buf[dev])
+          var a = 1 # pass?
+        else:
+          var a = 1 # pass?
+    else:
+      # pass??
+      var a = 1
 
 proc ins_ld(o: int) =
-  var address = fetch() or fetch() shl 8
+  var address = fetch() or (fetch() shl 8)
   if (o and 4) == 4:
-    var rb = reg_read(o, true)
+    var rb = reg_read(o, false)
     address += rb
   reg_write(o, mem[address])
   # todo -mmu
+  # mmu
+  case address shr 8:
+    of 0xf1:    #spi
+      var dev = address shr 4 and 0xf
+      var reg = address and 0xf
+      case reg:
+        of 1:   # rx
+          reg_write(o, spi_rx_buf[dev])
+        of 3:   # status
+          if dev == 0: #display
+            reg_write(o, 1) # always return 1 for now (TODO)
+        else:
+          var a = 1 # pass?
+    else:
+      var a = 1 # pass?
 
 proc ins_gt(o: int) = 
   var tup = get_imm(o)
@@ -180,6 +225,33 @@ proc ins_nor(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, not (ra or rb))
 
+proc ins_push(o: int) =
+  var rb = 0
+  if (o and 7) == 7:
+    rb = (PC + 3) and 0xff
+  elif (o and 6) == 6:
+    rb = (PC + 4) shr 8
+  else:
+    var tup = get_imm(o)
+    var imm = tup[0]
+    rb = tup[1]
+    if not imm:
+      rb = reg_read(o, false)
+
+  SP += 1
+  mem[SP] = rb
+  log(3, "stack push($1): $2" % [toHex(SP, 4), toHex(mem[SP], 2)])
+
+proc ins_pop(o: int) =
+  if (o and 7) == 7:
+    pcl = mem[SP]
+  elif (o and 6) == 6:
+    PC = pcl or (mem[SP] shl 8)
+  else:
+    reg_write(o, mem[SP])
+
+  SP -= 1
+
 proc ins_b(o: int) =
   PC = fetch() or (fetch() shl 8)
 
@@ -189,7 +261,6 @@ proc ins_bzf(o: int) =
     PC = tmp
 
 proc ins_halt(o: int) =
-  log(0, "HALT!")
   HF = true
 
 proc decode() =
@@ -201,8 +272,8 @@ proc decode() =
   case ins:
     of 0x80: ins_nop(r)
     of 0x88: ins_mov(r)
-    #of 0x90: ins_push(r)
-    #of 0x98: ins_pop(r)
+    of 0x90: ins_push(r)
+    of 0x98: ins_pop(r)
     of 0xa0: ins_ld(r)
     of 0xa8: ins_st(r)
     of 0xb0: ins_b(r)
@@ -235,6 +306,8 @@ proc exec() =
     decode()
     if ins_ctr mod 500000 == 0:
       ins_ctr = 0
+  while true:
+      var a = 1 # pass?
 
 import os
 proc loadcode() =

@@ -23,6 +23,7 @@ SP = 0x0100
 R0 = 0
 R1 = 0
 ZF = 0
+HF = 0
 
 pcl = 0
 
@@ -254,6 +255,10 @@ def _dec(operands):
     ra = reg_read(operands, True)
     reg_write(operands, ra - 1)
 
+def _halt(operands):
+    global HF
+    HF = 1
+
 def _ret(operands):
     pass
 
@@ -263,7 +268,8 @@ fops = {
         0x00:_eq,  0x08:_gt,   0x10:_lt,   0x18:_and,
         0x20:_or,  0x30:_xor,  0x38:_nor,
         0x40:_add, 0x48:_sub,
-        0x60:_shl, 0x68:_shr
+        0x60:_shl, 0x68:_shr,
+        0xf8:_halt
        }
 
 def decode():
@@ -281,7 +287,7 @@ def exec():
     import time, functools
     ins_ctr = 0
     start = time.clock()
-    while PC != eof:
+    while PC != eof and HF == 0:
         ins_ctr += 1
         decode()
         if ins_ctr % NUM_INS == 0:

@@ -15,3 +15,4 @@ main:
     add r1, #1
     ld r0, [var1]+r1
     st $f000, r0    ; write to GPO
+	halt
