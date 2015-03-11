@@ -1,3 +1,4 @@
+import strutils
 import sdl2, sdl2/gfx
 
 discard sdl2.init(INIT_EVERYTHING)
@@ -26,7 +27,7 @@ proc display_transact*(b) =
                 r.x = v
                 rect_bitmask = rect_bitmask or 1
             elif (rect_bitmask and 2) == 0:
-                r.w = v - r.x
+                r.w = (v - r.x) and 0xff
                 rect_bitmask = rect_bitmask or 2
             if (rect_bitmask and 3) == 3:
                 state = "NOSTATE"
@@ -35,7 +36,7 @@ proc display_transact*(b) =
                 r.y = v
                 rect_bitmask = rect_bitmask or 4
             elif (rect_bitmask and 8) == 0:
-                r.h = v - r.y
+                r.h = (v - r.y) and 0xff
                 rect_bitmask = rect_bitmask or 8
             if (rect_bitmask and 12) == 12:
                 state = "NOSTATE"
@@ -48,9 +49,13 @@ proc display_transact*(b) =
                 of 42:
                     state = "CASET"
                     rect_bitmask = rect_bitmask and 12
+                    r.x = 0
+                    r.w = 0
                 of 43:
                     state = "RASET"
                     rect_bitmask = rect_bitmask and 3
+                    r.y = 0
+                    r.h = 0
                 of 44:
                     state = "COLOR_A"
                     render.fillRect r
