@@ -4,10 +4,20 @@
 import strutils
 import simdisplay
 import times
+import terminal
+
+system.addQuitProc(resetAttributes)
 
 proc log(lvl, msg) =
-    if lvl <= 1:
+    case lvl:
+        of 3:
+            setStyle({styleDim})
+        else:
+            var a =1
+    if lvl <= 3:
+        #writeStyled("$1\n" % msg)
         writeln(stdout, msg)
+        resetAttributes()
 
 var
   PC: int = 0x1000
@@ -116,6 +126,8 @@ proc ins_st(o: int) =
   case address shr 8:
     of 0xf0:
       if (address and 0xff) == 0: #gpo
+        setStyle({styleBright})
+        setForegroundColor(fgRed, true)
         log(1, "GPO: $1" % toBin(mem[address], 8))
     of 0xf1:    # spi
       var dev = address shr 4 and 0xf
@@ -293,9 +305,13 @@ proc decode() =
     of 0xf8: ins_halt(r)
     else:
       log(1, "Unsupported op = $1!" % toHex(ins, 2))
+  setForegroundColor(fgGreen)
   log(2, "  r0 = $1" % toHex(R0, 2))
+  setForegroundColor(fgGreen)
   log(2, "  r1 = $1" % toHex(R1, 2))
+  setForegroundColor(fgGreen)
   log(2, "  pc = $1" % toHex(PC, 4))
+  setForegroundColor(fgGreen)
   log(2, "  sp = $1" % toHex(SP, 4))
   #log(2, "  zf = $1" % ZF)
 
