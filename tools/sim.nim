@@ -8,14 +8,22 @@ import terminal
 
 system.addQuitProc(resetAttributes)
 
+var log_mask = 9
 proc log(lvl, msg) =
-    case lvl:
-        of 3:
-            setStyle({styleDim})
-        else:
-            var a =1
-    if lvl <= 3:
-        #writeStyled("$1\n" % msg)
+    if (lvl and log_mask) > 0:
+        case lvl:
+            of 8:
+                setStyle({styleBright})
+                setForegroundColor(fgBlue, true)
+            of 1:
+                setStyle({styleBright})
+                setForegroundColor(fgRed, true)
+            of 2:
+                setForegroundColor(fgGreen)
+            of 4:
+                setStyle({styleDim})
+            else:
+                var a =1
         writeln(stdout, msg)
         resetAttributes()
 
@@ -39,7 +47,7 @@ var
 
 proc fetch(): int =
   result = mem[PC] and 0xff
-  log(3, "fetch(): $1 $2" % [toHex(PC, 4), toHex(mem[PC], 2)])
+  log(4, "fetch(): $1 $2" % [toHex(PC, 4), toHex(mem[PC], 2)])
   PC += 1
 
 proc reg_write(operands, val: int) =
@@ -59,7 +67,7 @@ proc reg_read(operands: int, dst_reg: bool): int =
 
 proc get_imm(operands: int): tuple[has_imm: bool, val: int] =
   if (operands and 4) == 4:
-    log(3, "get_imm(): $1" % $operands)
+    log(4, "get_imm(): $1" % $operands)
     var imm = fetch()
     result = (true, imm)
   else:
@@ -126,8 +134,6 @@ proc ins_st(o: int) =
   case address shr 8:
     of 0xf0:
       if (address and 0xff) == 0: #gpo
-        setStyle({styleBright})
-        setForegroundColor(fgRed, true)
         log(1, "GPO: $1" % toBin(mem[address], 8))
     of 0xf1:    # spi
       var dev = address shr 4 and 0xf
@@ -253,7 +259,7 @@ proc ins_push(o: int) =
 
   SP += 1
   mem[SP] = rb
-  log(3, "stack push($1): $2" % [toHex(SP, 4), toHex(mem[SP], 2)])
+  log(4, "stack push($1): $2" % [toHex(SP, 4), toHex(mem[SP], 2)])
 
 proc ins_pop(o: int) =
   if (o and 7) == 7:
@@ -278,7 +284,7 @@ proc ins_halt(o: int) =
 
 proc decode() =
   var op = fetch()
-  log(3, "decode: $1" % toBin(op, 8))
+  log(4, "decode: $1" % toBin(op, 8))
   var ins = op and 0xf8
   # todo - call function table1
   var r = op and 7
@@ -305,13 +311,9 @@ proc decode() =
     of 0xf8: ins_halt(r)
     else:
       log(1, "Unsupported op = $1!" % toHex(ins, 2))
-  setForegroundColor(fgGreen)
   log(2, "  r0 = $1" % toHex(R0, 2))
-  setForegroundColor(fgGreen)
   log(2, "  r1 = $1" % toHex(R1, 2))
-  setForegroundColor(fgGreen)
   log(2, "  pc = $1" % toHex(PC, 4))
-  setForegroundColor(fgGreen)
   log(2, "  sp = $1" % toHex(SP, 4))
   #log(2, "  zf = $1" % ZF)
 
@@ -325,7 +327,7 @@ proc exec() =
     if ins_ctr mod 1000000 == 0:
       ins_ctr = 0
       var elapsed = cpuTime() - start
-      log(1, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
+      log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
       start = cpuTime()
   while true:
       var a = 1 # pass?
