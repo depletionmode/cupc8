@@ -75,6 +75,15 @@ proc get_imm(operands: int): tuple[has_imm: bool, val: int] =
 
 type fop = (proc(operands: int))
 
+proc do_alu(o: int, v: int) =
+  var tup = get_imm(o)
+  var imm = tup[0]
+  var rb = tup[1]
+  if not imm:
+    rb = reg_read(o, false)
+  var ra = reg_read(o, true)
+  reg_write(o, v)
+
 proc ins_nop(o: int) = 
   # do nothing?? how to do this? todo python 'pass' equivalent
   var a: int = 1
