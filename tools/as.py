@@ -19,6 +19,7 @@ unresolved_fcns = {}
 defines = {}
 first_pass = True
 labels = {}
+current_label = None
 
 base = 0x1000
 data_base = 0x2000
@@ -83,15 +84,17 @@ def __convert_assembly_ins(ins):
             # little endian
             mach_code.append(addr & 0xff);
             mach_code.append(addr >> 8);
-        elif op1[0] == '.':
-            if not op1[1:] in labels:
+        elif ins >> 4 == 0xb:   # branch label
+            if op1[0] == '.':
+                op1 = current_label + op1
+            if not op1 in labels:
                 # label not yet resolved?
                 if not first_pass:
-                    raise Exception('Function {} not found'.format(op1[1:]))
+                    raise Exception('Label {} not found'.format(op1))
                 mach_code.append(0)
                 mach_code.append(0)
             else:
-                addr = labels[op1[1:]] + base
+                addr = labels[op1] + base
 
                 mach_code.append(addr & 0xff);
                 mach_code.append(addr >> 8);
@@ -137,6 +140,7 @@ def __replace_defines(l):
 
 def __assemble(filename):
     global labels
+    global current_label
     global first_pass
     global bss,data
     global data_buf
@@ -231,8 +235,13 @@ def __assemble(filename):
 
             #  start of new label
             if l.find(':') > 0 and l.find(': resb') < 0:
+                label = l[:l.find(':')]
+                if label[0] == '.':
+                    label = current_label + label
+                else:
+                    current_label = label
                 if first_pass:
-                    labels[l[:l.find(':')]] = offset
+                    labels[label] = offset
                 continue
 
             code = __convert_assembly_ins(l[:l.find(';')])

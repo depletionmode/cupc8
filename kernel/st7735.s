@@ -72,48 +72,48 @@ st7735_set_addr_window:
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
 
     mov r1, #0  ; ctr
-saw_loop_col:
+.loop_col:
     st [saw_i0], r1
     pop r0
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
     ld r1, [saw_i0]
     add r1, #1  ; ctr++
     eq r1, #2
-    bzf .saw_col_done
-    b .saw_loop_col
-saw_col_done:
+    bzf .col_done
+    b .loop_col
+.col_done:
     mov r0, ST7735_RASET
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
 
     mov r1, #0  ; ctr
-saw_loop_row:
+.loop_row:
     st [saw_i0], r1
     pop r0
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
     ld r1, [saw_i0]
 
     add r1, #1  ; ctr++
     eq r1, #2
-    bzf .saw_row_done
-    b .saw_loop_row
-saw_row_done:
+    bzf .row_done
+    b .loop_row
+.row_done:
     mov r0, ST7735_RAMWR
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
 
     ; restore return pc
     ld r0, [st7735_pc_0+1]
@@ -144,13 +144,13 @@ st7735_set_color:
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
 
     ; write low byte
 	xor r1, r1
     push pch
     push pcl
-    b .spi_write_0
+    b spi_write
     ; restore return pc
     ld r0, [st7735_pc_2+1]
     push r0
@@ -188,7 +188,7 @@ st7735_draw_pixel:
 
     push pch
     push pcl
-    b .st7735_fill_rect
+    b st7735_fill_rect
 
     ; restore return pc
     ld r0, [st7735_pc_3+1]
@@ -242,13 +242,13 @@ st7735_fill_rect:
 
     push pch
     push pcl
-    b .st7735_set_addr_window
+    b st7735_set_addr_window
 
     ; write color
     pop r0
     push pch
     push pcl
-    b .st7735_set_color
+    b st7735_set_color
 
     ; restore return pc
     ld r0, [st7735_pc_4+1]
@@ -258,3 +258,4 @@ st7735_fill_rect:
 
     pop pcl
     pop pch
+
