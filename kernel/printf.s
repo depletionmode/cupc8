@@ -6,7 +6,7 @@ posy: resb 1
 
 
 temp_msg db "\nCUPCAKE KERNEL TEST\n\n1234567890...\n\nChar rom dump:\n\n"
-;temp_msg db "\n4"
+;temp_msg db "\n9"
 
 print_ascii_char_inverse:
     ; convert ascii to c64 char rom offsets
@@ -46,7 +46,7 @@ print_ascii_char_inverse:
 .print_char:
     push pch
     push pcl
-    b print_char
+    b print_char_block
 .done:
     pop pcl
     pop pch
@@ -201,8 +201,8 @@ print_msg2:
     push pch
     push pcl
     b print_ascii_char2
-;    b .print_ascii_char_inverse
-;    b .print_char
+;    b print_ascii_char_inverse
+;    b print_char
     ld r1, [pm_i]
     add r1, #1
     st [pm_i], r1
@@ -532,8 +532,8 @@ print_char_block:
 	st [xpos_atend], r0
 	bzf .draw
 	; check if first encounter after draw
-	ld r0, [first_after_draw]
-	eq r0, #0
+	ld r1, [first_after_draw]
+	eq r1, #0
 	bzf .draw_done
 	mov r0, #0
 	st [first_after_draw], r0
@@ -542,11 +542,23 @@ print_char_block:
 	st [xpos_start], r1
 	b .draw_done
 .draw:
-	; check if first encounter after draw
-	ld r0, [first_after_draw]
+	ld r1, [first_after_draw]
+	ld r0, [xpos_atend]
 	eq r0, #1
+	bzf .isatend
+	b .cont2
+.isatend:
+	eq r1, #1
+	bzf .isfirstafterdraw
+	b .cont2
+.isfirstafterdraw:
+	mov r0, #7
+	st [xpos_start], r0
+	b .skip
+.cont2:
+	eq r1, #1
 	bzf .draw_done
-
+.skip:
 	mov r0, #1
 	st [first_after_draw], r0
 
@@ -563,7 +575,9 @@ print_char_block:
 .no_sub:
 	ld r0, [xpos_atend]
 	add r1, r0
+	st $f000, r1
 .sub:
+	;st $f000, r1
 	push r1
 
     ld r0, [j0]
@@ -572,6 +586,7 @@ print_char_block:
     push r1     ; y
 
     ld r0, [xpos_start]
+	;st $f000, r0
     ld r1, [posx]
     add r1, r0
     push r1     ; x
