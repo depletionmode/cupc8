@@ -2,7 +2,7 @@
 main:
     push pch
     push pcl
-    b print_msg2
+    b print_msg
 
 ;    push pch
 ;    push pcl
@@ -15,7 +15,7 @@ main:
     mov r0, #255
     st $f000, r0
 
-	halt
+;	halt
 
 kernel_loop:
     nop
