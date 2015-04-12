@@ -393,6 +393,8 @@ print_char:
 
 mask0: resb 1
 xpos_start: resb 1
+xpos_atend: resb 1
+ypos_current: resb 1
 first_after_draw: resb 1
 print_char_block:
     ; arg
@@ -435,7 +437,6 @@ print_char_block:
     ld r1, [i0]
     mov r0, #128
     shr r0, r1
-    ;st $f000, r0
 
     ld r1, [j0]
     push r0
@@ -520,31 +521,25 @@ print_char_block:
     b .after_offset
 .after_offset:
     pop r0
-	st [mask0], r0
     and r0, r1
-    ;st $f000, r0
     eq r0, #0
 	; if r0 == 0, end of block so draw!
     bzf .draw
-	; if r1 == 128 && !first_after_draw, end of block so draw!
-	ld r0, [first_after_draw]
-	ld r1, [mask0]
-	xor r0, r1
-	;st $f000, r0
-	eq r0, #1
+	; check if end of line so draw!
+	ld r1, [i0]
+	eq r1, #7
+	and r0, #1
+	st [xpos_atend], r0
 	bzf .draw
-	; else r1 == 1
 	; check if first encounter after draw
 	ld r0, [first_after_draw]
 	eq r0, #0
-	bzf .not_first
+	bzf .draw_done
 	mov r0, #0
 	st [first_after_draw], r0
 	; record x pos
     ld r1, [i0]
-	;st $f000, r1
 	st [xpos_start], r1
-.not_first:
 	b .draw_done
 .draw:
 	; check if first encounter after draw
@@ -560,18 +555,15 @@ print_char_block:
 	push #1
 
 	ld r0, [xpos_start]
-	;st $f000, r0
 	ld r1, [i0]
-	; if i0 == 0 then whole line
-	gt r1, #0
-	bzf .partial_line
-	mov r1, #8
-	b .line_cont
-.partial_line:
-	;st $f000, r1
+	eq r1, #7
 	sub r1, r0
-.line_cont:
-	;st $f000, r1
+	bzf .no_sub
+	b .sub
+.no_sub:
+	ld r0, [xpos_atend]
+	add r1, r0
+.sub:
 	push r1
 
     ld r0, [j0]
