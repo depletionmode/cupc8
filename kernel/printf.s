@@ -6,7 +6,7 @@ posy: resb 1
 
 
 temp_msg db "\nCUPCAKE KERNEL TEST\n\n1234567890...\n\nChar rom dump:\n\n"
-;temp_msg db "\n9"
+;temp_msg db "\n4"
 
 print_ascii_char_inverse:
     ; convert ascii to c64 char rom offsets
@@ -520,6 +520,8 @@ print_char_block:
     ld r1, [charset_c64+3840]+r1
     b .after_offset
 .after_offset:
+	xor r0, r0
+	st [xpos_atend], r0
     pop r0
     and r0, r1
     eq r0, #0
@@ -570,14 +572,21 @@ print_char_block:
 	ld r1, [i0]
 	eq r1, #7
 	sub r1, r0
-	bzf .no_sub
+
+; hack to deal with whole row
+	gt r1, #8
+	bzf .hack
+	b .after_hack
+.hack:
+	mov r1, #0
+	mov r0, #0
+	st [xpos_start], r0
+	mov r0, #255
 	b .sub
-.no_sub:
+.after_hack:
 	ld r0, [xpos_atend]
 	add r1, r0
-	st $f000, r1
 .sub:
-	;st $f000, r1
 	push r1
 
     ld r0, [j0]
