@@ -1,0 +1,35 @@
+Completely Useless and Pointless Filesystem (CupFS)
+---------------------------------------------------
+
+* Numbers little endian
+* Max 15 files
+* Filesystem metadata first 256 bytes of disk
+* Supports max
+
+Filesystem metadata structure:
+
+ --------------------------------------------------------
+| Offset | Size | Description  | Notes                   |
+ --------------------------------------------------------
+| 0      | 2    | Version      | Major.Minor             |
+|        |      |              | (1.0 in current spec)   |
+| 2      | 6    | Reserved     |                         |
+| 8      | 16   | File entry 1 | First file metadata     |
+| ...    |      |              |                         |
+| 232    | 16   | File entry N | Last file metadata      |
+| 248    | 6    | Reserved     |                         |
+| 254    | 2    | Magic number | 0xf00d                  |
+ --------------------------------------------------------
+
+File entry structure:
+
+ -----------------------------------------------------------
+| Offset | Size | Description   | Notes                     |
+ -----------------------------------------------------------
+| 0      | 10   | File name     | 0x20 (space) padded       |
+| 10     | 2    | File size     | Max 64k                   |
+| 12     | 3    | File position | Absolute location on disk |
+| 15     | 1    | Flags         | 0x01 - Valid              |
+ -----------------------------------------------------------
+
+
