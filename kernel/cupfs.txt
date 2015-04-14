@@ -2,9 +2,8 @@ Completely Useless and Pointless Filesystem (CupFS)
 ---------------------------------------------------
 
 * Numbers little endian
-* Max 15 files
+* Max 15 files of max 64 KB size each
 * Filesystem metadata first 256 bytes of disk
-* Supports max
 
 Filesystem metadata structure:
 
