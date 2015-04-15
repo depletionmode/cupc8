@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # cupcake cpu simulator
 
 import sys, argparse

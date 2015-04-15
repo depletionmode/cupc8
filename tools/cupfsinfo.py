@@ -24,7 +24,7 @@ if len(metadata) == 256:
             print('File entry #{}:'.format(i))
             print('  File name: {}'.format(fileinfo[0:10]))
             print('  File size: {}'.format(fileinfo[11] << 8 | fileinfo[10]))
-            print('  File offset: {}'.format(fileinfo[12] << 16 | fileinfo[13] << 8 | fileinfo[14]))
+            print('  File offset: {}'.format(fileinfo[14] << 16 | fileinfo[13] << 8 | fileinfo[12]))
 
 else:
     print('Error: File too short!')
