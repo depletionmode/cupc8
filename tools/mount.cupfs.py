@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 
+# uses fusepy from - https://github.com/terencehonles/fusepy
+
 from collections import defaultdict
 from errno import ENOENT, EDQUOT
 from stat import S_IFDIR, S_IFLNK, S_IFREG
