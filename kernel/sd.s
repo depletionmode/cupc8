@@ -146,3 +146,34 @@ sd_set_blocklen:
     pop pcl
     pop pch
 
+sd_start:
+	push r0
+	push r1
+
+	b sd_reset
+	b sd_init
+	b sd_set_blocklen
+
+	pop r1
+	pop r0
+	pop pcl
+	pop pch
+
+sd_read_block:
+	push r0
+	push r1
+
+	pop r1
+	pop r0
+	pop pcl
+	pop pch
+
+sd_write_block:
+	push r0
+	push r1
+
+	pop r1
+	pop r0
+	pop pcl
+	pop pch
+
