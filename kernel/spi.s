@@ -67,6 +67,8 @@ spi_read:
 	bzf .wait_3
 	b .end
 .wait_0:
+    mov r0, #255
+    st $f100, r0  ;fill tx buffer
     mov r0, #1
     st $f102, r0  ;transact
     ld r0, $f103  ;read status
@@ -75,6 +77,8 @@ spi_read:
     ld r0, $f101  ;read rx buffer
     b .end
 .wait_1:
+    mov r0, #255
+    st $f110, r0  ;fill tx buffer
     mov r0, #1
     st $f112, r0  ;transact
     ld r0, $f113  ;read status
@@ -83,6 +87,8 @@ spi_read:
     ld r0, $f111  ;read rx buffer
     b .end
 .wait_2:
+    mov r0, #255
+    st $f120, r0  ;fill tx buffer
     mov r0, #1
     st $f122, r0  ;transact
     ld r0, $f123  ;read status
@@ -91,6 +97,8 @@ spi_read:
     ld r0, $f121  ;read rx buffer
     b .end
 .wait_3:
+    mov r0, #255
+    st $f130, r0  ;fill tx buffer
     mov r0, #1
     st $f132, r0  ;transact
     ld r0, $f133  ;read status

@@ -2,9 +2,11 @@
 # cupcake simulator - nim edition!
 
 import strutils
-import simdisplay
 import times
 import terminal
+
+import simdisplay
+import simsd
 
 system.addQuitProc(resetAttributes)
 
@@ -155,8 +157,13 @@ proc ins_st(o: int) =
         of 0:   # tx
           spi_tx_buf[dev] = reg_read(o, false)
         of 2:   # transact
-          display_transact(spi_tx_buf[dev])
-          var a = 1 # pass?
+          case dev:
+          of 0:
+            display_transact(spi_tx_buf[dev])
+          of 1:
+            spi_rx_buf[dev] = sd_transact(spi_tx_buf[dev])
+          else:
+            var a = 1 # pass?
         else:
           var a = 1 # pass?
     else:
@@ -179,8 +186,13 @@ proc ins_ld(o: int) =
         of 1:   # rx
           reg_write(o, spi_rx_buf[dev])
         of 3:   # status
-          if dev == 0: #display
-            reg_write(o, 1) # always return 1 for now (TODO)
+          case dev:
+            of 0: #display
+              reg_write(o, 1) # always return 1 for now (TODO)
+            of 1: #sd
+              reg_write(o, sd_isready())
+            else:
+              var a = 1
         else:
           var a = 1 # pass?
     else:
