@@ -257,7 +257,6 @@ sd_read_block:
 	xor r1, r1
 	b sd_send_cmd
 
-	; todo - poll for read token
 	mov r1, SD_SPI_DEVICE
 	xor r0, r0
 .loop0:
