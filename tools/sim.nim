@@ -12,10 +12,10 @@ system.addQuitProc(resetAttributes)
 
 var log_mask = 9
 proc log(lvl, msg) =
-  when defined(emscripten):
-    return
-  else:
-    if (lvl and log_mask) > 0:
+  if (lvl and log_mask) > 0:
+    when defined(emscripten):
+      echo msg
+    else:
         case lvl:
             of 8:
                 setStyle({styleBright})
@@ -28,7 +28,7 @@ proc log(lvl, msg) =
             of 4:
                 setStyle({styleDim})
             else:
-                var a =1
+                discard
         writeln(stdout, msg)
         resetAttributes()
 
@@ -52,7 +52,7 @@ var
 
 proc fetch(): int =
   result = mem[PC] and 0xff
-  log(4, "fetch(): $1 $2" % [toHex(PC, 4), toHex(mem[PC], 2)])
+  #log(4, "fetch(): $1 $2" % [toHex(PC, 4), toHex(mem[PC], 2)])
   PC += 1
 
 proc reg_write(operands, val: int) =
@@ -72,7 +72,7 @@ proc reg_read(operands: int, dst_reg: bool): int =
 
 proc get_imm(operands: int): tuple[has_imm: bool, val: int] =
   if (operands and 4) == 4:
-    log(4, "get_imm(): $1" % $operands)
+    #log(4, "get_imm(): $1" % $operands)
     var imm = fetch()
     result = (true, imm)
   else:
@@ -90,8 +90,7 @@ proc do_alu(o: int, v: int) =
   reg_write(o, v)
 
 proc ins_nop(o: int) = 
-  # do nothing?? how to do this? todo python 'pass' equivalent
-  var a: int = 1
+  discard
 
 proc ins_eq(o: int) =
   var tup = get_imm(o)
@@ -166,12 +165,11 @@ proc ins_st(o: int) =
           of 1:
             spi_rx_buf[dev] = sd_transact(spi_tx_buf[dev])
           else:
-            var a = 1 # pass?
+            discard
         else:
-          var a = 1 # pass?
+          discard
     else:
-      # pass??
-      var a = 1
+      discard
 
 proc ins_ld(o: int) =
   var address = fetch() or (fetch() shl 8)
@@ -195,11 +193,11 @@ proc ins_ld(o: int) =
             of 1: #sd
               reg_write(o, sd_isready())
             else:
-              var a = 1
+              discard
         else:
-          var a = 1 # pass?
+          discard
     else:
-      var a = 1 # pass?
+      discard
 
 proc ins_gt(o: int) = 
   var tup = get_imm(o)
@@ -283,7 +281,7 @@ proc ins_push(o: int) =
 
   SP += 1
   mem[SP] = rb
-  log(4, "stack push($1): $2" % [toHex(SP, 4), toHex(mem[SP], 2)])
+  #log(4, "stack push($1): $2" % [toHex(SP, 4), toHex(mem[SP], 2)])
 
 proc ins_pop(o: int) =
   if (o and 7) == 7:
@@ -334,7 +332,8 @@ proc decode() =
     of 0x68: ins_shr(r)
     of 0xf8: ins_halt(r)
     else:
-      log(1, "Unsupported op = $1!" % toHex(ins, 2))
+      discard
+      #log(1, "Unsupported op = $1!" % toHex(ins, 2))
   #log(2, "  r0 = $1" % toHex(R0, 2))
   #log(2, "  r1 = $1" % toHex(R1, 2))
   #log(2, "  pc = $1" % toHex(PC, 4))

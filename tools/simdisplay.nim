@@ -64,4 +64,4 @@ proc display_transact*(b) =
                     render.fillRect r
                     render.present
                 else:
-                    var a = 1 # pass?
+                    discard

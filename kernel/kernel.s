@@ -15,7 +15,7 @@ main:
     mov r0, #255
     st $f000, r0
 
-	halt
+;	halt
 
 kernel_loop:
     nop
