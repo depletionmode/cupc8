@@ -8,15 +8,18 @@ var
     render: RendererPtr
 
 win = createWindow("CUPCake Simulator", 100, 100, 256, 256, SDL_WINDOW_SHOWN)
-render = createRenderer(win, -1, Renderer_Accelerated)
+when defined(emscripten):
+  render = createRenderer(win, -1, Renderer_Software)
+else:
+  render = createRenderer(win, -1, Renderer_Accelerated)
 
 render.setDrawColor 0,0,0,255 # black background
 render.clear
+render.present
 
 render.setDrawColor 255,255,255,255 # always use white for now
-var r : Rect = rect(10,10,10,10)
-#render.fillRect r
 
+var r : Rect
 var state = "NOSTATE"
 var rect_bitmask = 0
 proc display_transact*(b) =

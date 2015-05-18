@@ -12,6 +12,9 @@ system.addQuitProc(resetAttributes)
 
 var log_mask = 9
 proc log(lvl, msg) =
+  when defined(emscripten):
+    return
+  else:
     if (lvl and log_mask) > 0:
         case lvl:
             of 8:
@@ -305,9 +308,9 @@ proc ins_halt(o: int) =
 
 proc decode() =
   var op = fetch()
-  log(4, "decode: $1" % toBin(op, 8))
+  #log(4, "decode: $1" % toBin(op, 8))
   var ins = op and 0xf8
-  # todo - call function table1
+  ## todo - call function table1
   var r = op and 7
   case ins:
     of 0x80: ins_nop(r)
@@ -332,36 +335,63 @@ proc decode() =
     of 0xf8: ins_halt(r)
     else:
       log(1, "Unsupported op = $1!" % toHex(ins, 2))
-  log(2, "  r0 = $1" % toHex(R0, 2))
-  log(2, "  r1 = $1" % toHex(R1, 2))
-  log(2, "  pc = $1" % toHex(PC, 4))
-  log(2, "  sp = $1" % toHex(SP, 4))
+  #log(2, "  r0 = $1" % toHex(R0, 2))
+  #log(2, "  r1 = $1" % toHex(R1, 2))
+  #log(2, "  pc = $1" % toHex(PC, 4))
+  #log(2, "  sp = $1" % toHex(SP, 4))
   #log(2, "  zf = $1" % ZF)
-
-proc exec() =
-  # todo - time/speed
-  var ins_ctr = 0
-  var start = cpuTime()
-  while PC != eof and not HF:
-    ins_ctr += 1
-    decode()
-    if ins_ctr mod 1000000 == 0:
-      ins_ctr = 0
-      var elapsed = cpuTime() - start
-      log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
-      start = cpuTime()
-  while true:
-      var a = 1 # pass?
 
 import os
 proc loadcode() =
-  let code = if paramCount() > 0: readFile paramStr(1)
-             else: readAll stdin
+  when defined(emscripten):
+    let code = readFile "kernel.o"
+  else:
+    let code = if paramCount() > 0: readFile paramStr(1)
+               else: readAll stdin
   var i = 0
   while i < code.len:
     mem[0x1000+i] = int(code[i])
     i += 1
   eof = PC + i 
 
+when defined(emscripten):
+  proc emscripten_set_main_loop(fun: proc() {.cdecl.}, fps,
+                                simulate_infinite_loop: cint) {.header: "<emscripten.h>".}
+
+  proc emscripten_cancel_main_loop() {.header: "<emscripten.h>".}
+
+  proc emscripten_set_main_loop_timing(mode: cint, value: cint) {.header: "<emscripten.h>".}
+
 loadcode()
-exec()
+
+var atend = false
+proc exec() {.cdecl.} =
+  if PC >= eof or HF:
+    echo "HALT!"
+    when defined(emscripten):
+      emscripten_cancel_main_loop()
+    atend = true
+    return
+
+  when defined(emscripten):
+    # run multiple loops per frame
+    for i in 0..10000:
+      decode()
+  else:
+    # native so run as fast as possible
+    decode()
+
+when defined(emscripten):
+  emscripten_set_main_loop(exec, 0, 0)
+else:
+  var ins_ctr = 0
+  var start = cpuTime()
+  while not atend:
+    ins_ctr += 1
+    exec()
+    if ins_ctr mod 1000000 == 0:
+      ins_ctr = 0
+      var elapsed = cpuTime() - start
+      log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
+      start = cpuTime()
+
