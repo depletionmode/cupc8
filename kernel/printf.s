@@ -5,7 +5,7 @@ posx: resb 1
 posy: resb 1
 
 
-temp_msg db "\nCUPCAKE KERNEL TEST\n\n1234567890...\n\nChar rom dump:\n\n"
+temp_msg db "\nChar rom dump:\n\n"
 
 print_ascii_char_inverse:
     ; convert ascii to c64 char rom offsets
@@ -118,27 +118,43 @@ dump_char_rom:
     pop pcl
     pop pch
 
-pm_i: resb 1
-print_msg:
+ps_msg_addr: resb 2
+ps_i: resb 1
+print_string:
+	; r0 - high address of string
+	; r1 = low address of string
+;
+;	; first store string address in memory
+	st [ps_msg_addr], r1
+	st [ps_msg_addr+1], r0
+
+	; loop through string until null terminator
     xor r1, r1
-    st [posx], r1
-    st [posy], r1
-    st [pm_i], r1
+;    st [posx], r1
+;    st [posy], r1
+    st [ps_i], r1
 .loop:
-    ld r0, [temp_msg]+r1
-;    st $f000, r0
+    ldd r0, [ps_msg_addr]+r1
     eq r0, #0
     bzf .done
-;    xor r1, r1
     push pch
     push pcl
     b print_ascii_char
-;    b .print_ascii_char_inverse
-;    b .print_char
-    ld r1, [pm_i]
+    ld r1, [ps_i]
     add r1, #1
-    st [pm_i], r1
+    st [ps_i], r1
     b .loop
+.done:
+    pop pcl
+    pop pch
+	
+pm_i: resb 1
+print_msg:
+	mov r0, #>[temp_msg]
+	mov r1, #<[temp_msg]
+    push pch
+    push pcl
+	b print_string
 .done:
     pop pcl
     pop pch

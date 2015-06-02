@@ -7,6 +7,7 @@ opcodes = {
             'or' :0x20,     'xor' :0x30,    'nor':0x38,
             'add':0x40,     'sub' :0x48,
             'shl':0x60,     'shr' :0x68,
+            'ldd':0x70,     'std' :0x78,
             'halt':0xf8
           }
 
@@ -66,9 +67,17 @@ def __convert_assembly_ins(ins):
         op1 = operands[0].strip()
 
         # op1 - reg/addr/fcn/imm
-        if op1[0] == '#':
+        if op1[0] == '?': # dirty hack to allow diry hacks to work
+            pass
+        elif op1[0] == '#':
             ins |= 1 << 2
-            imm = int(op1[1:])
+            # check if need to resolve high/low part of address
+            if op1[1] == '<':
+                imm = int(op1[3:], 16) & 0xff
+            elif op1[1] == '>':
+                imm = int(op1[3:], 16) >> 8
+            else:
+                imm = int(op1[1:])
             if imm > 0xff:
                 raise Exception("Imm out of range")
             mach_code.append(imm)
@@ -98,8 +107,6 @@ def __convert_assembly_ins(ins):
 
                 mach_code.append(addr & 0xff);
                 mach_code.append(addr >> 8);
-        elif op1[0] == '?': # dirty hack to allow diry hacks to work
-            pass
         else:
             ins |= __get_reg_value(op1)
 
@@ -109,7 +116,13 @@ def __convert_assembly_ins(ins):
             # 0p2 - reg/imm/addr
             if op2[0] == '#':
                 ins |= 1 << 2;
-                imm = int(op2[1:])
+                # check if need to resolve high/low part of address
+                if op2[1] == '<':
+                    imm = int(op2[3:], 16) & 0xff
+                elif op2[1] == '>':
+                    imm = int(op2[3:], 16) >> 8
+                else:
+                    imm = int(op2[1:])
                 if imm > 0xff:
                     raise Exception("Imm out of range")
                 mach_code.append(imm)

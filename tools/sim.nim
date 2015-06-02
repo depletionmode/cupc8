@@ -61,9 +61,9 @@ proc reg_write(operands, val: int) =
   else:
     R0 = val and 0xff
 
-proc reg_read(operands: int, dst_reg: bool): int =
+proc reg_read(operands: int, dst_doreg: bool): int =
   var bit = 2
-  if dst_reg:
+  if dst_doreg:
     bit = 1
   if (operands and bit) == bit:
     result = R1 and 0xff
@@ -136,8 +136,8 @@ proc ins_mov(o: int) =
     rb = reg_read(o, false)
   reg_write(o, rb)
 
-proc ins_st(o: int) =
-  var address = fetch() or (fetch() shl 8)
+proc ins_st_do(o: int, a: int) =
+  var address = a
   if (o and 4) == 4:
     var ra = reg_read(o, true)
     address += ra
@@ -147,7 +147,7 @@ proc ins_st(o: int) =
   case address shr 8:
     of 0xf0:
       if (address and 0xff) == 0: #gpo
-        log(1, "GPO: $1" % toBin(mem[address], 8))
+        log(1, "GPO: $1 $2" % [toBin(mem[address], 8), toHex(mem[address], 2)])
     of 0xf1:    # spi
       var dev = address shr 4 and 0xf
       if dev == 0:  # display
@@ -171,8 +171,17 @@ proc ins_st(o: int) =
     else:
       discard
 
-proc ins_ld(o: int) =
+proc ins_st(o: int) =
   var address = fetch() or (fetch() shl 8)
+  ins_st_do(o, address)
+
+proc ins_std(o: int) =
+  var address = fetch() or (fetch() shl 8)
+  var address_d = mem[address] or (mem[address+1] shl 8)
+  ins_st_do(o, address_d)
+
+proc ins_ld_do(o: int, a: int) =
+  var address = a
   if (o and 4) == 4:
     var rb = reg_read(o, false)
     address += rb
@@ -198,6 +207,15 @@ proc ins_ld(o: int) =
           discard
     else:
       discard
+
+proc ins_ld(o: int) =
+  var address = fetch() or (fetch() shl 8)
+  ins_ld_do(o, address)
+
+proc ins_ldd(o: int) =
+  var address = fetch() or (fetch() shl 8)
+  var address_d = mem[address] or (mem[address+1] shl 8)
+  ins_ld_do(o, address_d)
 
 proc ins_gt(o: int) = 
   var tup = get_imm(o)
@@ -317,6 +335,8 @@ proc decode() =
     of 0x98: ins_pop(r)
     of 0xa0: ins_ld(r)
     of 0xa8: ins_st(r)
+    of 0x70: ins_ldd(r)
+    of 0x78: ins_std(r)
     of 0xb0: ins_b(r)
     of 0xb8: ins_bzf(r)
     of 0x00: ins_eq(r)
@@ -393,4 +413,6 @@ else:
       var elapsed = cpuTime() - start
       log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
       start = cpuTime()
+  while true:
+      discard
 

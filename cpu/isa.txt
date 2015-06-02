@@ -75,6 +75,8 @@ M   LD          a0      LD Ra, $addr    Ra <= [addr]
 M   LDind       a4      LD Ra, $addr+Rb Ra <= [addr + Rb]
 M   ST          a8      ST $addr, Rb    [addr] <= Rb
 M   STind       ac      ST $addr+Ra, Rb [addr + Ra] <= Rb
+M   LDD         70      LDD Ra, $addr   Ra <= [[addr]]
+M   STD         78      STD $addr, Rb   [[addr]] <= Rb
 F   B           b0      B $addr         PC <= addr
 F   BZF         b8      BZF $addr       if ZF, PC <= addr
 R   EQr         00      EQ Ra, Rb       ZF <= Ra == Rb
