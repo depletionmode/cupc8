@@ -91,10 +91,11 @@ spi_read:
     st $f120, r0  ;fill tx buffer
     mov r0, #1
     st $f122, r0  ;transact
-    ld r0, $f123  ;read status
-    eq r0, #0
-    bzf .wait_2
+    ;ld r0, $f123  ;read status
+    ;eq r0, #0
+    ;bzf .wait_2
     ld r0, $f121  ;read rx buffer
+	eq r0, #255
     b .end
 .wait_3:
     mov r0, #255

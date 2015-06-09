@@ -239,7 +239,7 @@ def __assemble(filename):
 
             # defines
             if l[:7] == '%define':
-                toks = l.split(' ', 2)
+                toks = l.split(None, 2)
                 defines[toks[1]] = toks[2].strip()
                 continue
 

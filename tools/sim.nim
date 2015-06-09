@@ -4,9 +4,12 @@
 import strutils
 import times
 import terminal
+import sdl2, sdl2/gfx
 
 import simdisplay
 import simsd
+
+discard sdl2.init(INIT_EVERYTHING)
 
 system.addQuitProc(resetAttributes)
 
@@ -46,6 +49,8 @@ var
 var
   spi_tx_buf: array[0..4, int]
   spi_rx_buf: array[0..4, int]
+  keybuffer: int = 0xff
+  has_key: bool = false
 
 var
   display_active: bool = false
@@ -164,6 +169,13 @@ proc ins_st_do(o: int, a: int) =
             display_transact(spi_tx_buf[dev])
           of 1:
             spi_rx_buf[dev] = sd_transact(spi_tx_buf[dev])
+          of 2:
+            if not has_key:
+              spi_rx_buf[dev] = 0xff
+            else:
+              log(1, "HAS KEY $1" % [toHex(keybuffer, 2)])
+              spi_rx_buf[dev] = keybuffer
+              has_key = false
           else:
             discard
         else:
@@ -194,11 +206,19 @@ proc ins_ld_do(o: int, a: int) =
       var reg = address and 0xf
       case reg:
         of 1:   # rx
+          if spi_rx_buf[dev] != 0xff:
+              echo "READ"
           reg_write(o, spi_rx_buf[dev])
         of 3:   # status
           case dev:
             of 0: #display
               reg_write(o, 1) # always return 1 for now (TODO)
+            of 2: #keyboard
+              # TODO THIS BLOCKING HACK WONT WORK ON REAL HARDWARE!!! :( :(
+              if has_key:
+                reg_write(o, 1) # always return 1 for now (TODO)
+              else:
+                reg_write(o, 0) # always return 1 for now (TODO)
             of 1: #sd
               reg_write(o, sd_isready())
             else:
@@ -384,6 +404,8 @@ when defined(emscripten):
 loadcode()
 
 var atend = false
+var evt = defaultEvent
+
 proc exec() {.cdecl.} =
   if PC >= eof or HF:
     echo "HALT!"
@@ -399,6 +421,19 @@ proc exec() {.cdecl.} =
   else:
     # native so run as fast as possible
     decode()
+  
+  while pollEvent(evt):
+    case evt.kind:
+      of QuitEvent:
+        atend = true
+        break
+      of KeyDown:
+        let e = evt.key()
+        keybuffer = getKeyFromScancode(e.keysym.scancode)
+        has_key = true
+        writeln(stdout, "key")
+      else:
+        discard
 
 when defined(emscripten):
   emscripten_set_main_loop(exec, 0, 0)
