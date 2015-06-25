@@ -60,6 +60,7 @@ def get_file_entry_idx(files, path):
 
 def get_file_entry(files, path):
     fe = get_file_entry_idx(files, path)
+    print('get_file_entry(): idx =', fe)
     if fe != None:
         return files[get_file_entry_idx(files, path)]
     return None
@@ -195,6 +196,7 @@ class CupFS(LoggingMixIn, Operations):
         fe = get_file_entry(self.files, path)
         if fe != None:
             fe.is_valid = False
+        self.UpdateMetadata()
 
     def utimens(self, path, times=None):
         pass
