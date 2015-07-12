@@ -2557,7 +2557,7 @@
   )
 
   (module Resistors_SMD:R_0805_HandSoldering (layer F.Cu) (tedit 55A22D72) (tstamp 55A250AD)
-    (at 224.79 67.31 90)
+    (at 224.79 68.58 90)
     (descr "Resistor SMD 0805, hand soldering")
     (tags "resistor 0805")
     (path /55A2B189)
@@ -2615,7 +2615,7 @@
   )
 
   (module Resistors_SMD:R_0805_HandSoldering (layer F.Cu) (tedit 55A22D7C) (tstamp 55A250B9)
-    (at 217.17 67.31 90)
+    (at 217.17 67.63 90)
     (descr "Resistor SMD 0805, hand soldering")
     (tags "resistor 0805")
     (path /55A2B2B1)
@@ -2644,7 +2644,7 @@
   )
 
   (module Resistors_SMD:R_0805_HandSoldering (layer F.Cu) (tedit 55A22D80) (tstamp 55A250BF)
-    (at 213.36 67.31 90)
+    (at 213.36 67.63 90)
     (descr "Resistor SMD 0805, hand soldering")
     (tags "resistor 0805")
     (path /55A2B3DD)
@@ -2673,7 +2673,7 @@
   )
 
   (module Resistors_SMD:R_0805_HandSoldering (layer F.Cu) (tedit 55A22DA9) (tstamp 55A250C5)
-    (at 209.55 67.31 90)
+    (at 209.55 67.63 90)
     (descr "Resistor SMD 0805, hand soldering")
     (tags "resistor 0805")
     (path /55A2B49C)
@@ -2702,7 +2702,7 @@
   )
 
   (module Resistors_SMD:R_0805_HandSoldering (layer F.Cu) (tedit 55A22DD8) (tstamp 55A250CB)
-    (at 205.74 67.31 90)
+    (at 205.74 67.63 90)
     (descr "Resistor SMD 0805, hand soldering")
     (tags "resistor 0805")
     (path /55A2B55E)
@@ -2731,7 +2731,7 @@
   )
 
   (module Resistors_SMD:R_0805_HandSoldering (layer F.Cu) (tedit 55A22DDB) (tstamp 55A250D1)
-    (at 201.93 67.31 90)
+    (at 201.93 67.63 90)
     (descr "Resistor SMD 0805, hand soldering")
     (tags "resistor 0805")
     (path /55A2B627)
