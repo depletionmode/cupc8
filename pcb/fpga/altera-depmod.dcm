@@ -6,6 +6,23 @@ K Voltage Regulator 0.5A Positive
 F http://www.fairchildsemi.com/ds/LM/LM78M05.pdf
 $ENDCMP
 #
+$CMP LM1084IS-3.3/NOPB
+D LM1084IS-3.3, 5A 27V Linear Regulator, Fixed Output 3.3V, TO-263
+K Voltage Regulator Adjustable 5A Positive
+F http://www.ti.com/lit/ds/symlink/lm1084.pdf
+$ENDCMP
+#
+$CMP LM1084IS-5.0/NOPB
+D LM1084IS-5.0, 5A 27V Linear Regulator, Fixed Output 5.0V, TO-263
+K Voltage Regulator 5A Positive
+F http://www.ti.com/lit/ds/symlink/lm1084.pdf
+$ENDCMP
+#
+$CMP LMS1585/7
+D LMS1585/7 TO-263
+F http://www.farnell.com/datasheets/1885840.pdf
+$ENDCMP
+#
 $CMP MC78M05CDT
 D MC78M05CDT, Positive 0.5A 35V Linear Regulator, Fixed Output 5V, TO-252 (D-PAK)
 K Voltage Regulator 0.5A Positive
