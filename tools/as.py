@@ -210,7 +210,7 @@ def __assemble(filename):
                     for i in range(len(data_b)):
                         d = data_b[i].strip()
                         data_c[i] = int(d)
-                    
+
                 data[toks[0]] = (data_offset, data_c)
                 data_buf += data_c
                 data_offset += len(data_c)
