@@ -20,7 +20,7 @@ main:
 	b keyb_read_char
 	push pch
 	push pcl
-	b print_char
+	b print_ascii_char
 	b .charloop
 
 ;    push pch

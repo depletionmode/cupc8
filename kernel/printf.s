@@ -80,9 +80,11 @@ print_ascii_char:
     mov r1, #1
     b .print_char
 .newline:
-    ; newline: #10
+    ; newline: #10,#13
     mov r1, #16
     eq r0, #10
+    bzf .print_char
+    eq r0, #13
     bzf .print_char
     b .done
 .print_char:
@@ -184,6 +186,8 @@ print_char:
     ; newline
     eq r0, #10
     bzf .newline
+	eq r0, #13
+	bzf .newline
     b .cont
 .newline:
     eq r1, #16
