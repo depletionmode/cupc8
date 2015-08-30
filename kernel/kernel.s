@@ -14,10 +14,30 @@ main:
     push pcl
 	b print_string
 
+	mov r0, #1
+	push pch
+	push pcl
+	b set_echo_char
+
+	s_buf0: resb 256
+.readstring:
+	mov r0, #>[s_buf0]
+	mov r1, #<[s_buf0]
+	push pch
+	push pcl
+	b read_string
+	mov r0, #>[s_buf0]
+	mov r1, #<[s_buf0]
+    push pch
+    push pcl
+	b print_string
+b .readstring
+
 .charloop:
 	push pch
 	push pcl
 	b keyb_read_char
+	sub r0, #32
 	push pch
 	push pcl
 	b print_ascii_char

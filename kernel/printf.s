@@ -95,6 +95,55 @@ print_ascii_char:
     pop pcl
     pop pch
 
+g_echo_char: resb 1
+set_echo_char:
+	st [g_echo_char], r0
+    pop pcl
+    pop pch
+
+rs_msg_addr: resb 2
+rs_i: resb 1
+read_string:
+	; r0 - high address of string
+	; r1 = low address of string
+;
+;	; first store string address in memory
+	st [rs_msg_addr], r1
+	st [rs_msg_addr+1], r0
+
+	; loop through string until <enter>
+    xor r1, r1
+    st [rs_i], r1
+.loop:
+	push pch
+	push pcl
+	b keyb_read_char
+	eq r0, #10
+	bzf .done
+	eq r0, #13
+	bzf .done
+    ld r1, [rs_i]
+    std [rs_msg_addr]+r1, r0
+	; check if echo
+	ld r1, [g_echo_char]
+	eq r1, #1
+	bzf .echo
+	b .cont
+.echo:
+    push pch
+    push pcl
+    b print_ascii_char
+.cont:
+    ld r1, [rs_i]
+    add r1, #1
+    st [rs_i], r1
+    b .loop
+.done:
+	mov r0, #100
+	st $f000, r0
+    pop pcl
+    pop pch
+
 dcr_cur: resb 1
 dcr_i: resb 1
 dump_char_rom:
