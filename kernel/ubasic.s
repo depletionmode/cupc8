@@ -62,6 +62,9 @@ ubasic_init:
 	push pcl
 	b ubasic_tokenizer_init
 
+	pop pcl
+	pop pch
+
 token: resb 1
 ubasic_accept:
 	st [token], r0
@@ -82,6 +85,9 @@ ubasic_accept:
 	puch pcl
 	b ubasic_tokanizer_next
 
+	pop pcl
+	pop pch
+
 r: resb 1
 ubasic_varfactor:
 	push pch
@@ -99,3 +105,318 @@ ubasic_varfactor:
 	b ubasic_accept
 
 	ld r0, [r]
+	pop pcl
+	pop pch
+
+ubasic_factor:
+	push pch
+	puch pcl
+	b ubasic_tokenizer_token
+
+	eq r0, TOKENIZER_NUMBER
+	bzf .number
+	eq r0, TOKENIZER_LEFTPAREN
+	bzf .leftparen
+	; default
+	push pch
+	push pcl
+	b ubasic_varfactor
+	st [r], r0
+	b .end
+
+.number:
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	st [r], r0
+
+	mov r0, TOKENIZER_NUMBER
+	push pch
+	push pcl
+	b ubasic_accept
+
+	b .end
+
+.leftparen:
+	mov r0, TOKENIZER_LEFTPAREN
+	push pch
+	push pcl
+	b ubasic_accept
+
+	push pch
+	push pcl
+	b ubasic_expr
+	st [r], r0
+
+	mov r0, TOKENIZER_RIGHTPAREN
+	push pch
+	push pcl
+	b ubasic_accept
+
+.end:
+	ld r0, [r]
+	pop pcl
+	pop pch
+
+f1: resb 1
+f2: resb 1
+op: resb 1
+ubasic_term:
+	push pch
+	push pcl
+	b ubasic_factor
+	st [f1], r0
+
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [op], r0
+
+.loop:	
+	ld r0, [op]
+	eq r0, TOKENIZER_ASTR
+	bzf .next
+	eq r0, TOKENIZER_SLASH
+	bzf .next
+	eq r0, TOKENIZER_MOD
+	bzf .next
+	b .end
+
+.next:
+	push pch
+	puch pcl
+	b ubasic_tokenizer_next
+
+	push pch
+	push pcl
+	b ubasic_factor
+	st [f2], r0
+
+	ld r0, [op]
+	eq r0, TOKENIZER_ASTR
+	bzf .astr
+	eq r0, TOKENIZER_SLASH
+	bzf .slash
+	eq r0, TOKENIZER_MOD
+	bzf .mod
+	b .getop
+
+.astr:
+	ld r0, [f1]
+	ld r1, [f2]
+    push pch
+    push pcl
+    b math_mul
+    st [f1], r0
+	b .getop
+
+.slash:
+	ld r0, [f1]
+	ld r1, [f2]
+    push pch
+    push pcl
+    ;todo b math_div
+    st [f1], r0
+	b .getop
+
+.mod:
+	ld r0, [f1]
+	ld r1, [f2]
+    push pch
+    push pcl
+    ;todo b math_mod
+    st [f1], r0
+	b .getop
+
+.getop:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [op], r0
+
+	b .loop
+
+.end:
+	ld r0, [f1]
+	pop pcl
+	pop pch
+
+t1: resb 1
+t2: resb 1
+ubasic_expr:
+	push pch
+	push pcl
+	b ubasic_term
+	st [t1], r0
+
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [op], r0
+
+.loop:	
+	ld r0, [op]
+	eq r0, TOKENIZER_PLUS
+	bzf .next
+	eq r0, TOKENIZER_MINUS
+	bzf .next
+	eq r0, TOKENIZER_AND
+	bzf .next
+	eq r0, TOKENIZER_OR
+	bzf .next
+	b .end
+
+.next:
+	push pch
+	puch pcl
+	b ubasic_tokenizer_next
+
+	push pch
+	push pcl
+	b ubasic_factor
+	st [t2], r0
+
+	ld r0, [op]
+	eq r0, TOKENIZER_PLUS
+	bzf .plus
+	eq r0, TOKENIZER_MINUS
+	bzf .minus
+	eq r0, TOKENIZER_AND
+	bzf .and
+	eq r0, TOKENIZER_OR
+	bzf .or
+	b .getop
+
+.plus:
+	ld r0, [t1]
+	ld r1, [t2]
+	add r0, r1
+    st [t1], r0
+	b .getop
+
+.minus:
+	ld r0, [t1]
+	ld r1, [t2]
+	sub r0, r1
+    st [t1], r0
+	b .getop
+
+.and:
+	ld r0, [t1]
+	ld r1, [t2]
+	and r0, r1
+    st [t1], r0
+	b .getop
+
+.or:
+	ld r0, [t1]
+	ld r1, [t2]
+	or r0, r1
+    st [t1], r0
+	b .getop
+
+.getop:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [op], r0
+
+	b .loop
+
+.end:
+	ld r0, [t1]
+	pop pcl
+	pop pch
+
+re1: resb 1
+re2: resb 1
+ubasic_relation:
+	push pch
+	push pcl
+	b ubasic_expr
+	st [re1], r0
+
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [op], r0
+
+.loop:	
+	ld r0, [op]
+	eq r0, TOKENIZER_LT
+	bzf .next
+	eq r0, TOKENIZER_GT
+	bzf .next
+	eq r0, TOKENIZER_EQ
+	bzf .next
+	b .end
+
+.next:
+	push pch
+	puch pcl
+	b ubasic_tokenizer_next
+
+	push pch
+	push pcl
+	b ubasic_factor
+	st [re2], r0
+
+	ld r0, [op]
+	eq r0, TOKENIZER_LT
+	bzf .lt
+	eq r0, TOKENIZER_GT
+	bzf .gt
+	eq r0, TOKENIZER_EQ
+	b .getop
+
+.lt:
+	ld r0, [re1]
+	ld r1, [re2]
+	lt r0, r1
+	bzf .islt
+	mov r0, #0
+	b .lt_next
+.islt:
+	mov r0, #1
+.lt_next:
+    st [re1], r0
+	b .getop
+
+.gt:
+	ld r0, [re1]
+	ld r1, [re2]
+	gt r0, r1
+	bzf .isgt
+	mov r0, #0
+	b .gt_next
+.isgt:
+	mov r0, #1
+.gt_next:
+    st [re1], r0
+	b .getop
+
+.eq:
+	ld r0, [re1]
+	ld r1, [re2]
+	eq r0, r1
+	bzf .iseq
+	mov r0, #0
+	b .eq_next
+.iseq:
+	mov r0, #1
+.eq_next:
+    st [re1], r0
+	b .getop
+
+.getop:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [op], r0
+
+	b .loop
+
+.end:
+	ld r0, [re1]
+	pop pcl
+	pop pch
