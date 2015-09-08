@@ -517,3 +517,9 @@ clr_screen:
     b st7735_fill_rect
     pop pcl
     pop pch
+
+str_atoi:
+	;todo
+.done:
+	pop pcl
+	pop pch

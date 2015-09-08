@@ -857,10 +857,7 @@ ubasic_statement:
 	pop pch
 
 ubasic_line_statement:
-	push pch
-	push pcl
-	b ubasic_tokenizer_pos
-	mov r1, r0
+	; ub_ptr used directly by index_add
 	push pch
 	push pcl
 	b ubasic_tokenizer_num
