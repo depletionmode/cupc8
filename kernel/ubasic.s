@@ -420,3 +420,241 @@ ubasic_relation:
 	ld r0, [re1]
 	pop pcl
 	pop pch
+
+ubasic_index_free:
+	; todo - implement fcn - address mess
+	ld r0, [line_index_head]
+	eq r0, #0
+	bzf .end
+
+	st [line_index_current], r0
+
+.loop:
+	ld r0, [line_index_current]
+	st [line_index_head], r0
+
+.end:
+	pop pcl
+	pop pch
+
+linenum: resb 1
+ubasic_jump_linenum_slow:
+	st [linenum], r0
+
+	ld r0, [program_ptr]
+	push pch
+	push pcl
+	b ubasic_tokenizer_init
+
+.loop0:
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	ld r1, [linenum]
+	eq r0, r1
+	bzf .end
+
+.loop1:
+.loop2:
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .n0
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .n0
+	b .loop2
+.n0:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .n1
+	b .n2
+.n1:
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+.n2:	
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_NUMBER
+	bzf .loop0
+	b .loop1
+	
+.end:
+	pop pcl
+	pop pch
+
+pos: resb 1
+ubasic_jump_linenum:
+	st [linenum], r0
+	push pch
+	push pcl
+	b ubasic_index_find
+	st [pos], r0
+	eq r0, #0
+	bzf .pos_null
+	push pch
+	push pcl
+	b ubasic_tokanizer_goto
+	b .end
+.pos_null:
+	ld r0, [linenum]
+	push pch
+	push pcl
+	b ubasic_jump_linenum_slow
+.end:
+	pop pcl
+	pop pch
+	
+ubasic_goto_statement:
+	push pch
+	push pcl
+	mov r0, TOKENIZER_GOTO
+	b ubasic_accept
+
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	push pch
+	push pcl
+	b ubasic_jump_linenum
+
+	pop pcl
+	pop pch
+
+ubasic_print_statement:
+	push pch
+	push pcl
+	mov r0, TOKENIZER_PRINT
+	b ubasic_accept
+
+.loop:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_STRING
+	bzf .string
+	eq r0, TOKENIZER_COMMA
+	bzf .comma
+	eq r0, TOKENIZER_SEMICOLON
+	bzf .semicolon
+	eq r0, TOKENIZER_VARIABLE
+	bzf .var_or_num
+	eq r0, TOKENIZER_NUMBER
+	bzf .var_or_num
+	b .end
+
+.string:
+	; todo
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	b .next
+.comma
+	; todo
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	b .next
+.semicolon
+	; todo
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	b .next
+.var_or_num
+	; todo
+	b .next
+.
+.next:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .end
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .end
+	b .loop
+
+.end:
+	; todo - print eol
+	push pch
+	push pcl
+	b ubasic_tokanizer_next
+
+	pop pcl
+	pop pch
+
+ubasic_if_statement:
+	mov r0, TOKENIZER_IF
+	push pch
+	push pcl
+	b ubasic_accept
+
+	push pch
+	push pcl
+	b ubasic_relation
+	st [r], r0
+
+	mov r0, TOKENIZER_THEN
+	push pch
+	push pcl
+	b ubasic_accept
+
+	ld r0, [r]
+	eq r0, #0
+	bzf .else
+	push pch
+	push pcl
+	b ubasic_statement
+	b .end
+.else:
+.loop:
+	push pch
+	puch pcl
+	b ubasic_tokenizer_next
+	push pch
+	puch pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_ELSE
+	bzf .n
+	eq r0, TOKENIZER_CR
+	bzf .n
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .n
+	b .loop
+.n:
+	push pch
+	puch pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_ELSE
+	bzf .tok_else
+	eq r0, TOKENIZER_CR
+	bzf .tok_next
+
+.tok_else:
+	push pch	
+	push pcl
+	b ubasic_tokanizer_next
+	push pch	
+	push pcl
+	b ubasic_statement
+	b .end
+
+.tok_next:
+	push pch	
+	push pcl
+	b ubasic_tokanizer_next
+
+.end:
+	pop pcl
+	pop pch
