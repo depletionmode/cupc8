@@ -78,6 +78,8 @@ ubasic_accept:
 	eq r0, #0
 	bzf .cont
 	; err
+	push pch
+	push pcl
 	b ubasic_fatal
 
 .cont:
@@ -658,3 +660,264 @@ ubasic_if_statement:
 .end:
 	pop pcl
 	pop pch
+
+var: resb 1
+ubasic_let_statement:
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [var], r0
+
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
+
+	mov r0, TOKENIZER_EQ
+	push pch
+	push pcl
+	b ubasic_accept
+
+	push pch
+	push pcl
+	b ubasic_expr
+	mov r1, r0
+	ld r0, [var]
+	push pch
+	push pcl
+	b ubasic_set_variable
+
+	mov r0, TOKENIZER_CR
+	push pch
+	push pcl
+	b ubasic_accept
+
+	pop pcl
+	pop pch
+
+ubasic_gosub_statement:
+;todo
+
+	pop pcl
+	pop pch
+
+ubasic_return_statement:
+;todo
+
+	pop pcl
+	pop pch
+
+ubasic_next_statement:
+;todo
+
+	pop pcl
+	pop pch
+
+ubasic_for_statement:
+;todo
+
+	pop pcl
+	pop pch
+
+ubasic_peek_statement:
+;todo
+
+	pop pcl
+	pop pch
+
+ubasic_poke_statement:
+;todo
+
+	pop pcl
+	pop pch
+
+ubasic_end_statement:
+	mov r0, TOKENIZER_END
+	push pch
+	push pcl
+	b ubasic_accept
+	mov r0, #1
+	st [ended], r0
+
+	pop pcl
+	pop pch
+
+token: resb 1
+ubasic_statement:
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	st [token], r0
+
+	eq r0, TOKENIZER_PRINT
+	bzf .print
+	eq r0, TOKENIZER_IF
+	bzf .if
+	eq r0, TOKENIZER_GOTO
+	bzf .goto
+	eq r0, TOKENIZER_GOSUB
+	bzf .gosub
+	eq r0, TOKENIZER_RETURN
+	bzf .return
+	eq r0, TOKENIZER_FOR:
+	bzf .for
+	eq r0, TOKENIZER_PEEK:
+	bzf .peek
+	eq r0, TOKENIZER_POKE:
+	bzf .poke
+	eq r0, TOKENIZER_NEXT:
+	bzf .next
+	eq r0, TOKENIZER_END:
+	bzf .end
+	eq r0, TOKENIZER_LET:
+	bzf .let
+	eq r0, TOKENIZER_VARIABLE
+	bzf .variable
+
+.invalid:
+	; err
+	push pch
+	push pcl
+	b ubasic_fatal
+
+.print:
+	push pch
+	push pcl
+	b ubasic_print_statement
+	b .done
+
+.if:
+	push pch
+	push pcl
+	b ubasic_if_statement
+	b .done
+
+.goto:
+	push pch
+	push pcl
+	b ubasic_goto_statement
+	b .done
+
+.godub:
+	push pch
+	push pcl
+	b ubasic_gosub_statement
+	b .done
+
+.return:
+	push pch
+	push pcl
+	b ubasic_return_statement
+	b .done
+
+.for:
+	push pch
+	push pcl
+	b ubasic_for_statement
+	b .done
+
+.peek:
+	push pch
+	push pcl
+	b ubasic_peek_statement
+	b .done
+
+.poke:
+	push pch
+	push pcl
+	b ubasic_poke_statement
+	b .done
+
+.next:
+	push pch
+	push pcl
+	b ubasic_next_statement
+	b .done
+
+.end:
+	push pch
+	push pcl
+	b ubasic_end_statement
+	b .done
+
+.let:
+	mov r0, TOKENIZER_LET
+	push pch
+	push pcl
+	b ubasic_accept
+	; fall through
+
+.variable:
+	push pch
+	push pcl
+	b ubasic_let_statement
+
+.done:
+	pop pcl
+	pop pch
+
+ubasic_line_statement:
+	push pch
+	push pcl
+	b ubasic_tokenizer_pos
+	mov r1, r0
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	push pch
+	push pcl
+	b ubasic_index_add
+
+	mov r0, TOKENIZER_NUMBER
+	push pch
+	push pcl
+	b ubasic_accept
+
+	push pch
+	push pcl
+	b ubasic_statement
+
+	pop pcl
+	pop pch
+
+ubasic_run:
+	push pch
+	push pcl
+	b ubasic_tokenizer_finished
+	gt r0, #0
+	b .done
+
+	push pch
+	push pcl
+	b ubasic_line_statement
+
+.done:
+	pop pcl
+	pop pch
+
+ubasic_finished:
+	push pch
+	push pcl
+	b ubasic_tokenizer_finished
+
+	ld r1, [ended]
+
+	or r0, r1
+
+	pop pcl
+	pop pch
+
+varnum: resb 1
+value: resb 1
+ubasic_set_variable:
+	; todo
+	
+	pop pcl
+	pop pch
+
+ubasic_get_variable:
+	; todo
+
+	pop pcl
+	pop pch
+	
