@@ -169,6 +169,17 @@ dump_char_rom:
     pop pcl
     pop pch
 
+str_printuint16:
+	pop pcl
+	pop pch
+
+str_printstr:
+	push pch
+	push pcl
+	b print_string
+	pop pcl
+	pop pch
+
 ps_msg_addr: resb 2
 ps_i: resb 1
 print_string:

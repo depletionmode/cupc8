@@ -1,5 +1,8 @@
 ; https://github.com/adamdunkels/ubasic
 
+%define MAX_STRINGLEN 40
+ub_string: resb 40
+
 %define TOKENIZER_ERROR			#0 
 %define TOKENIZER_ENDOFINPUT	#1
 %define TOKENIZER_NUMBER		#2
@@ -557,24 +560,44 @@ ubasic_print_statement:
 
 .string:
 	; todo
+	mov r0, #>[ub_string]
+	mov r1, #<[ub_string]
+	push pch
+	push pcl
+	b ubasic_tokenizer_string
+	mov r0, #>[ub_string]
+	mov r1, #<[ub_string]
+	push pch
+	push pcl
+	b str_printstr
 	push pch
 	push pcl
 	b ubasic_tokenizer_next
 	b .next
 .comma
-	; todo
+	st [ub_string], #32
+	st [ub_string], #0
+	mov r0, #>[ub_string]
+	mov r1, #<[ub_string]
+	push pch
+	push pcl
+	b str_printstr
 	push pch
 	push pcl
 	b ubasic_tokenizer_next
 	b .next
 .semicolon
-	; todo
 	push pch
 	push pcl
 	b ubasic_tokenizer_next
 	b .next
 .var_or_num
-	; todo
+	push pch
+	push pcl
+	b ubasic_expr
+	push pch
+	push pcl
+	b str_printuint16
 	b .next
 .
 .next:
@@ -588,11 +611,16 @@ ubasic_print_statement:
 	b .loop
 
 .end:
-	; todo - print eol
+	st [ub_string], #10
+	st [ub_string], #0
+	mov r0, #>[ub_string]
+	mov r1, #<[ub_string]
+	push pch
+	push pcl
+	b str_printstr
 	push pch
 	push pcl
 	b ubasic_tokanizer_next
-
 	pop pcl
 	pop pch
 
