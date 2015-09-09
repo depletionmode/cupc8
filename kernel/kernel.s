@@ -7,12 +7,39 @@ main:
     push pcl
 	b print_string
 
-	s_basic_test db "\nuBASIC test...\n"
-	mov r0, #>[s_basic_test]
-	mov r1, #<[s_basic_test]
+	s_ubasic_test db "\nuBASIC test...\n"
+	mov r0, #>[s_ubasic_test]
+	mov r1, #<[s_ubasic_test]
     push pch
     push pcl
 	b print_string
+
+	;s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
+	s_ubasic_program db "10 let a = 42\n20 end\n"
+	push pch
+	push pcl
+	mov r0, #>[s_ubasic_program]
+	mov r1, #<[s_ubasic_program]
+	b ubasic_init
+    ;mov r0, #1
+    ;st $f000, r0
+.ubasic_loop:
+	push pch
+	push pcl
+	b ubasic_run
+	push pch
+	push pcl
+	b ubasic_finished
+	eq r0, #0
+	bzf .ubasic_loop
+
+	s_ubasic_test_done db "\nDONE!\n"
+	mov r0, #>[s_ubasic_test_done]
+	mov r1, #<[s_ubasic_test_done]
+    push pch
+    push pcl
+	b print_string
+	
 
 ;	s_prompt db "\n>> "
 ;	mov r0, #>[s_prompt]
