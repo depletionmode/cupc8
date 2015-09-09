@@ -1,32 +1,32 @@
 ; kernel entry point
 main:
-	s_kernel_ver db "\nCUPCAKE KERNEL v0.1\n"
-	mov r0, #>[s_kernel_ver]
-	mov r1, #<[s_kernel_ver]
-    push pch
-    push pcl
-	b print_string
-
-	s_ubasic_test db "\nuBASIC test...\n"
-	mov r0, #>[s_ubasic_test]
-	mov r1, #<[s_ubasic_test]
-    push pch
-    push pcl
-	b print_string
+;'	s_kernel_ver db "\nCUPCAKE KERNEL v0.1\n"
+;'	mov r0, #>[s_kernel_ver]
+;'	mov r1, #<[s_kernel_ver]
+;'    push pch
+;'    push pcl
+;'	b print_string
+;'
+;'	s_ubasic_test db "\nuBASIC test...\n"
+;'	mov r0, #>[s_ubasic_test]
+;'	mov r1, #<[s_ubasic_test]
+;'    push pch
+;'    push pcl
+;'	b print_string
 
 	;s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
 	s_ubasic_program db "10 let a = 42\n20 end\n"
-	push pch
-	push pcl
 	mov r0, #>[s_ubasic_program]
 	mov r1, #<[s_ubasic_program]
+	push pch
+	push pcl
 	b ubasic_init
-    ;mov r0, #1
-    ;st $f000, r0
 .ubasic_loop:
 	push pch
 	push pcl
 	b ubasic_run
+	mov r0, #15
+	st $f000, r0
 	push pch
 	push pcl
 	b ubasic_finished

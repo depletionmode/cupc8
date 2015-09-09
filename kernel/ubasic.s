@@ -41,6 +41,11 @@ ub_string: resb 40
 %define TOKENIZER_EQ			#35
 %define TOKENIZER_CR			#36
 
+; index offsets in chunk (not pointers like original uBASIC code)
+ub_line_index_current: resb 2
+ub_line_index_chunk: resb 400	; support for 100 lines
+ub_ptr: resb 2
+
 program_ptr: resb 2
 for_stack_ptr: resb 2
 gosub_stack_ptr: resb 2
@@ -56,6 +61,9 @@ ubasic_init:
 	st [gosub_stack_ptr+1], r0
 
 	st [ended], r0
+
+	st [ub_line_index_current], r0
+	st [ub_line_index_current+1], r0
 
 	push pch
 	push pcl
@@ -423,22 +431,6 @@ ubasic_relation:
 
 .end:
 	ld r0, [re1]
-	pop pcl
-	pop pch
-
-ubasic_index_free:
-	; todo - implement fcn - address mess
-;	ld r0, [line_index_head]
-;	eq r0, #0
-;	bzf .end
-;
-;	st [line_index_current], r0
-;
-;.loop:
-;	ld r0, [line_index_current]
-;	st [line_index_head], r0
-;
-.end:
 	pop pcl
 	pop pch
 
@@ -949,12 +941,86 @@ ubasic_fatal:
 	pop pcl
 	pop pch	
 
-ubasic_index_find:
-	; todo
+ub_linenum: resb 1
+ub_cur_chunk_offset: resb 1
+ubasic_index_add:
+	st [ub_linenum], r0
+
+	; see if index entry already exists
+;	ld r0, [line_index_head]
+;	eq r0, #0
+;	bzf .done
+	push pch
+	push pcl
+	b ubasic_index_find
+	gt r0, #0
+	bzf .done
+	
+	ld r0, [ub_linenum]
+	ld r1, [ub_line_index_current]
+	st [ub_line_index_chunk]+r1, r0
+
+	ld r1, [ub_line_index_current]
+	add r1, #2
+	mov r0, #>[ub_ptr]
+	st [ub_line_index_chunk]+r1, r0
+	sub r1, #1
+	mov r0, #<[ub_ptr]
+	st [ub_line_index_chunk]+r1, r0
+
+.done:
 	pop pcl
 	pop pch
 
-ubasic_index_add:
-	; todo
+ub_i: resb 1
+ubasic_index_find:
+	st [ub_linenum], r0
+
+	xor r1, r1
+	push r1
+
+.loop:
+	pop r1
+	ld r0, [ub_line_index_chunk]+r1
+	eq r0, #0
+	bzf .nomatch
+	push r1
+	ld r1, [ub_linenum]
+	eq r0, r1
+	pop r1
+	bzf .match
+	add r1, #3
+	push r1
+	b .loop
+	
+.match:
+	; offset in r1
+	add r1, #1
+	ld r0, [ub_line_index_chunk]+r1
+	add r1, #1
+	ld r1, [ub_line_index_chunk]+r1
+	b .done
+
+.nomatch:
+	xor r0, r0
+	xor r1, r1
+
+.done:
 	pop pcl
 	pop pch
+	
+ubasic_index_free:
+	xor r1, r1
+.loop:
+	ld r0, [ub_line_index_chunk]+r1
+	eq r0, #0
+	bzf .done
+	xor r0, r0
+	st [ub_line_index_chunk]+r1, r0
+	add r1, #3
+	b .loop
+;
+.done:
+	pop pcl
+	pop pch
+

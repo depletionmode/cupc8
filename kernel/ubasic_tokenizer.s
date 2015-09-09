@@ -1,4 +1,3 @@
-ub_ptr: resb 2
 ub_nextptr: resb 2
 ub_current_token: resb 1
 
@@ -280,7 +279,7 @@ ubasic_tokenizer_finished:
 	ld r1, [ub_ptr]
 	or r0, r1
 	ld r1, [ub_current_token]
-	;eq r1, TOKENIZER_ENDOFINPUT
+	eq r1, TOKENIZER_ENDOFINPUT
 	bzf .eoi
 	mov r1, #0
 	b .done
