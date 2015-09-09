@@ -26,6 +26,9 @@ base = 0x1000
 data_base = 0x2000
 bss_base = 0x5000
 
+line_num = 0
+file_name = ''
+
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
     dst_ops = ['push']
@@ -42,113 +45,118 @@ def __get_reg_value(reg, second_op=False):
         else: return 1
     elif reg == 'pch': return 6
     elif reg == 'pcl': return 7
-    else: raise Exception("Invalid operand register")
+    else: raise Exception("Invalid operand register [{}:{}]".format(line_num, file_name))
 
 def __convert_assembly_ins(ins):
-    ins = __ins_hacks(ins.strip())
+    try:
+        ins = __ins_hacks(ins.strip())
 
-    # deal with comment
-    if ins.lstrip()[0] == ';':
-        return bytearray()
+        # deal with comment
+        if ins.lstrip()[0] == ';':
+            return bytearray()
 
-    imm = None
-    addr = None
+        imm = None
+        addr = None
 
-    mach_code = bytearray(1)
+        mach_code = bytearray(1)
 
-    tokens = ins.split(' ', 1)
-    ins = tokens[0]
+        tokens = ins.split(' ', 1)
+        ins = tokens[0]
 
-    # get opcode for ins
-    ins = opcodes[ins]
+        # get opcode for ins
+        ins = opcodes[ins]
 
-    if len(tokens) > 1:
-        operands = tokens[1].split(',')
-        op1 = operands[0].strip()
+        if len(tokens) > 1:
+            operands = tokens[1].split(',')
+            op1 = operands[0].strip()
 
-        # op1 - reg/addr/fcn/imm
-        if op1[0] == '?': # dirty hack to allow diry hacks to work
-            pass
-        elif op1[0] == '#':
-            ins |= 1 << 2
-            # check if need to resolve high/low part of address
-            if op1[1] == '<':
-                imm = int(op1[3:], 16) & 0xff
-            elif op1[1] == '>':
-                imm = int(op1[3:], 16) >> 8
-            else:
-                imm = int(op1[1:])
-            if imm > 0xff:
-                raise Exception("Imm out of range")
-            mach_code.append(imm)
-        elif op1[0] == '$':
-            pos = op1.find('+')
-            if pos > -1:  # address register offset
+            # op1 - reg/addr/fcn/imm
+            if op1[0] == '?': # dirty hack to allow diry hacks to work
+                pass
+            elif op1[0] == '#':
                 ins |= 1 << 2
-                ins |= __get_reg_value(op1[pos+1:])
-            else: pos = None
-            addr = int(op1[1:pos], 16)
-            if addr > 0xffff:
-                raise Exception('Addr out of range')
-            # little endian
-            mach_code.append(addr & 0xff);
-            mach_code.append(addr >> 8);
-        elif ins >> 4 == 0xb:   # branch label
-            if op1[0] == '.':
-                op1 = current_label + op1
-            if not op1 in labels:
-                # label not yet resolved?
-                if not first_pass:
-                    raise Exception('Label {} not found'.format(op1))
-                mach_code.append(0)
-                mach_code.append(0)
-            else:
-                addr = labels[op1] + base
-
-                mach_code.append(addr & 0xff);
-                mach_code.append(addr >> 8);
-        else:
-            ins |= __get_reg_value(op1)
-
-        if len(operands) > 1:
-            op2 = operands[1].strip()
-
-            # 0p2 - reg/imm/addr
-            if op2[0] == '#':
-                ins |= 1 << 2;
                 # check if need to resolve high/low part of address
-                if op2[1] == '<':
-                    imm = int(op2[3:], 16) & 0xff
-                elif op2[1] == '>':
-                    imm = int(op2[3:], 16) >> 8
+                if op1[1] == '<':
+                    imm = int(op1[3:], 16) & 0xff
+                elif op1[1] == '>':
+                    imm = int(op1[3:], 16) >> 8
                 else:
-                    imm = int(op2[1:])
+                    imm = int(op1[1:])
                 if imm > 0xff:
                     raise Exception("Imm out of range")
                 mach_code.append(imm)
-            elif op2[0] == '$':
-                pos = op2.find('+')
+            elif op1[0] == '$':
+                pos = op1.find('+')
                 if pos > -1:  # address register offset
                     ins |= 1 << 2
-                    ins |= __get_reg_value(op2[pos+1:], True)
+                    ins |= __get_reg_value(op1[pos+1:])
                 else: pos = None
-                addr = int(op2[1:pos], 16)
+                addr = int(op1[1:pos], 16)
                 if addr > 0xffff:
                     raise Exception('Addr out of range')
                 # little endian
                 mach_code.append(addr & 0xff);
                 mach_code.append(addr >> 8);
+            elif ins >> 4 == 0xb:   # branch label
+                if op1[0] == '.':
+                    op1 = current_label + op1
+                if not op1 in labels:
+                    # label not yet resolved?
+                    if not first_pass:
+                        print(labels)
+                        raise Exception('Label {} not found'.format(op1))
+                    mach_code.append(0)
+                    mach_code.append(0)
+                else:
+                    addr = labels[op1] + base
+
+                    mach_code.append(addr & 0xff);
+                    mach_code.append(addr >> 8);
             else:
-                ins |= __get_reg_value(op2, True)
+                ins |= __get_reg_value(op1)
 
-    mach_code[0] = ins;
+            if len(operands) > 1:
+                op2 = operands[1].strip()
 
-    return mach_code
+                # 0p2 - reg/imm/addr
+                if op2[0] == '#':
+                    ins |= 1 << 2;
+                    # check if need to resolve high/low part of address
+                    if op2[1] == '<':
+                        imm = int(op2[3:], 16) & 0xff
+                    elif op2[1] == '>':
+                        imm = int(op2[3:], 16) >> 8
+                    else:
+                        imm = int(op2[1:])
+                    if imm > 0xff:
+                        raise Exception("Imm out of range [{}:{}]".format(line_num, file_name))
+                    mach_code.append(imm)
+                elif op2[0] == '$':
+                    pos = op2.find('+')
+                    if pos > -1:  # address register offset
+                        ins |= 1 << 2
+                        ins |= __get_reg_value(op2[pos+1:], True)
+                    else: pos = None
+                    addr = int(op2[1:pos], 16)
+                    if addr > 0xffff:
+                        raise Exception('Addr out of range [{}:{}]'.format(line_num, file_name))
+                    # little endian
+                    mach_code.append(addr & 0xff);
+                    mach_code.append(addr >> 8);
+                else:
+                    ins |= __get_reg_value(op2, True)
+
+        mach_code[0] = ins;
+
+        return mach_code
+    except:
+        raise Exception("Convert assembly instruction error [{}:{}]".format(line_num, file_name))
 
 def __replace_defines(l):
     global defines
-    for k, v in defines.items():
-        l = l.replace(k, v)
+    # must perform longest replacements first to prevent inner replacements
+    for k in sorted(defines, key=len, reverse=True):
+        l = l.replace(k, defines[k])
     return l
 
 def __assemble(filename):
@@ -167,8 +175,11 @@ def __assemble(filename):
     first = True
 
     with open(filename, 'r') as f:
+        global line_num
+        line_num = 0
         fcn_name = ''
         for l in f.readlines():
+            line_num += 1
             l = l.lstrip()
             #print(l)
 
@@ -234,7 +245,7 @@ def __assemble(filename):
                         val += int(toks[1])
                     l = l.replace('[{}]'.format(var), '${:x}'.format(val))
                 except:
-                    raise Exception('Variable {} not found in .bss or .data!'.format(toks[0]))
+                    raise Exception('Variable {} not found in .bss or .data! [{}:{}]'.format(toks[0], line_num, file_name))
 
 
             # defines
@@ -254,6 +265,7 @@ def __assemble(filename):
                 else:
                     current_label = label
                 if first_pass:
+                    #print('label: {}, [{}:{}]'.format(label, line_num, file_name))
                     labels[label] = offset
                 continue
 
@@ -265,20 +277,25 @@ def __assemble(filename):
     return offset, mach_code
 
 if __name__ == "__main__":
+    global file_name
     import sys
     args = sys.argv[1:]
 
     if len(args) < 1:
         raise Exception('Invalid input/output files')
 
-    offset, mach_code = __assemble(args[0])
-    offset, mach_code = __assemble(args[0]) # ulgy hack for bad label lookup logic
+    file_name = args[0]
+
+    #print('1st pass')
+    offset, mach_code = __assemble(file_name)
+    #print('2nd pass')
+    offset, mach_code = __assemble(file_name) # ulgy hack for bad label lookup logic
 
     entry_point = 'main'
     if not entry_point in labels:
         raise Exception('No entry point found')
 
-    outf = '{}.o'.format(args[0].split('.')[0])
+    outf = '{}.o'.format(file_name.split('.')[0])
     if len(args) == 2: outf = args[1]
 
 #    for k,v in labels.items():

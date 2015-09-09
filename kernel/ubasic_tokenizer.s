@@ -43,67 +43,67 @@ ubasic_singlechar:
 	mov r0, #0
 	b .done
 
-.cr
+.cr:
 	mov r0, TOKENIZER_CR
 	b .done
 
-.comma
+.comma:
 	mov r0, TOKENIZER_COMMA
 	b .done
 
-.semicolon
+.semicolon:
 	mov r0, TOKENIZER_SEMICOLON
 	b .done
 
-.plus
+.plus:
 	mov r0, TOKENIZER_PLUS
 	b .done
 
-.minus
+.minus:
 	mov r0, TOKENIZER_MINUS
 	b .done
 
-.and
+.and:
 	mov r0, TOKENIZER_AND
 	b .done
 
-.or
+.or:
 	mov r0, TOKENIZER_OR
 	b .done
 
-.astr
+.astr:
 	mov r0, TOKENIZER_ASTR
 	b .done
 
-.slash
+.slash:
 	mov r0, TOKENIZER_SLASH
 	b .done
 
-.mod
+.mod:
 	mov r0, TOKENIZER_MOD
 	b .done
 
-.lparen
+.lparen:
 	mov r0, TOKENIZER_LEFTPAREN
 	b .done
 
-.hash
+.hash:
 	mov r0, TOKENIZER_HASH
 	b .done
 
-.rparen
+.rparen:
 	mov r0, TOKENIZER_RIGHTPAREN
 	b .done
 
-.lt
+.lt:
 	mov r0, TOKENIZER_LT
 	b .done
 
-.gt
+.gt:
 	mov r0, TOKENIZER_GT
 	b .done
 
-.eq
+.eq:
 	mov r0, TOKENIZER_EQ
 	b .done
 
@@ -136,7 +136,7 @@ ubasic_tokenizer_init:
 	; program pointer r0||r1
 	push pch
 	push pcl
-	b ubasic_tokanizer_goto
+	b ubasic_tokenizer_goto
 
 	push pch
 	push pcl
@@ -153,10 +153,10 @@ ubasic_tokenizer_token:
 	pop pcl
 	pop pch
 
-ubasic_tokanizer_next:
+ubasic_tokenizer_next:
 	push pch
 	push pcl
-	push ubasic_tokenizer_finished
+	b ubasic_tokenizer_finished
 	gt r0, #0
 	bzf .done
 
@@ -251,7 +251,7 @@ ubasic_tokanizer_next:
 	st [ub_nextptr], r1
 .after_inc_nextptr:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_next
 
 .done:
@@ -280,7 +280,7 @@ ubasic_tokenizer_finished:
 	ld r1, [ub_ptr]
 	or r0, r1
 	ld r1, [ub_current_token]
-	eq r1, TOKENIZER_ENDOFINPUT
+	;eq r1, TOKENIZER_ENDOFINPUT
 	bzf .eoi
 	mov r1, #0
 	b .done

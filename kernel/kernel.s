@@ -7,41 +7,48 @@ main:
     push pcl
 	b print_string
 
-	s_prompt db "\n>> "
-	mov r0, #>[s_prompt]
-	mov r1, #<[s_prompt]
+	s_basic_test db "\nuBASIC test...\n"
+	mov r0, #>[s_basic_test]
+	mov r1, #<[s_basic_test]
     push pch
     push pcl
 	b print_string
 
-	mov r0, #1
-	push pch
-	push pcl
-	b set_echo_char
-
-	s_buf0: resb 256
-.readstring:
-	mov r0, #>[s_buf0]
-	mov r1, #<[s_buf0]
-	push pch
-	push pcl
-	b read_string
-	mov r0, #>[s_buf0]
-	mov r1, #<[s_buf0]
-    push pch
-    push pcl
-	b print_string
-b .readstring
-
-.charloop:
-	push pch
-	push pcl
-	b keyb_read_char
-	sub r0, #32
-	push pch
-	push pcl
-	b print_ascii_char
-	b .charloop
+;	s_prompt db "\n>> "
+;	mov r0, #>[s_prompt]
+;	mov r1, #<[s_prompt]
+;    push pch
+;    push pcl
+;	b print_string
+;
+;	mov r0, #1
+;	push pch
+;	push pcl
+;	b set_echo_char
+;
+;	s_buf0: resb 256
+;.readstring:
+;	mov r0, #>[s_buf0]
+;	mov r1, #<[s_buf0]
+;	push pch
+;	push pcl
+;	b read_string
+;	mov r0, #>[s_buf0]
+;	mov r1, #<[s_buf0]
+;    push pch
+;    push pcl
+;	b print_string
+;b .readstring
+;
+;.charloop:
+;	push pch
+;	push pcl
+;	b keyb_read_char
+;	sub r0, #32
+;	push pch
+;	push pcl
+;	b print_ascii_char
+;	b .charloop
 
 ;    push pch
 ;    push pcl

@@ -3,7 +3,7 @@
 %define MAX_STRINGLEN 40
 ub_string: resb 40
 
-%define TOKENIZER_ERROR			#0 
+%define TOKENIZER_ERROR			#0
 %define TOKENIZER_ENDOFINPUT	#1
 %define TOKENIZER_NUMBER		#2
 %define TOKENIZER_STRING		#3
@@ -87,8 +87,8 @@ ubasic_accept:
 
 .cont:
 	push pch
-	puch pcl
-	b ubasic_tokanizer_next
+	push pcl
+	b ubasic_tokenizer_next
 
 	pop pcl
 	pop pch
@@ -115,7 +115,7 @@ ubasic_varfactor:
 
 ubasic_factor:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_token
 
 	eq r0, TOKENIZER_NUMBER
@@ -189,7 +189,7 @@ ubasic_term:
 
 .next:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_next
 
 	push pch
@@ -273,7 +273,7 @@ ubasic_expr:
 
 .next:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_next
 
 	push pch
@@ -358,7 +358,7 @@ ubasic_relation:
 
 .next:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_next
 
 	push pch
@@ -428,16 +428,16 @@ ubasic_relation:
 
 ubasic_index_free:
 	; todo - implement fcn - address mess
-	ld r0, [line_index_head]
-	eq r0, #0
-	bzf .end
-
-	st [line_index_current], r0
-
-.loop:
-	ld r0, [line_index_current]
-	st [line_index_head], r0
-
+;	ld r0, [line_index_head]
+;	eq r0, #0
+;	bzf .end
+;
+;	st [line_index_current], r0
+;
+;.loop:
+;	ld r0, [line_index_current]
+;	st [line_index_head], r0
+;
 .end:
 	pop pcl
 	pop pch
@@ -509,7 +509,7 @@ ubasic_jump_linenum:
 	bzf .pos_null
 	push pch
 	push pcl
-	b ubasic_tokanizer_goto
+	b ubasic_tokenizer_goto
 	b .end
 .pos_null:
 	ld r0, [linenum]
@@ -574,7 +574,7 @@ ubasic_print_statement:
 	push pcl
 	b ubasic_tokenizer_next
 	b .next
-.comma
+.comma:
 	st [ub_string], #32
 	st [ub_string], #0
 	mov r0, #>[ub_string]
@@ -586,12 +586,12 @@ ubasic_print_statement:
 	push pcl
 	b ubasic_tokenizer_next
 	b .next
-.semicolon
+.semicolon:
 	push pch
 	push pcl
 	b ubasic_tokenizer_next
 	b .next
-.var_or_num
+.var_or_num:
 	push pch
 	push pcl
 	b ubasic_expr
@@ -599,14 +599,14 @@ ubasic_print_statement:
 	push pcl
 	b str_printuint16
 	b .next
-.
+
 .next:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
 	eq r0, TOKENIZER_CR
 	bzf .end
-	eq r0, TOKENIZER_ENDOFINPUT
+	;eq r0, TOKENIZER_ENDOFINPUT
 	bzf .end
 	b .loop
 
@@ -620,7 +620,7 @@ ubasic_print_statement:
 	b str_printstr
 	push pch
 	push pcl
-	b ubasic_tokanizer_next
+	b ubasic_tokenizer_next
 	pop pcl
 	pop pch
 
@@ -650,21 +650,21 @@ ubasic_if_statement:
 .else:
 .loop:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_next
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_token
 	eq r0, TOKENIZER_ELSE
 	bzf .n
 	eq r0, TOKENIZER_CR
 	bzf .n
-	eq r0, TOKENIZER_ENDOFINPUT
+	;eq r0, TOKENIZER_ENDOFINPUT
 	bzf .n
 	b .loop
 .n:
 	push pch
-	puch pcl
+	push pcl
 	b ubasic_tokenizer_token
 	eq r0, TOKENIZER_ELSE
 	bzf .tok_else
@@ -674,7 +674,7 @@ ubasic_if_statement:
 .tok_else:
 	push pch	
 	push pcl
-	b ubasic_tokanizer_next
+	b ubasic_tokenizer_next
 	push pch	
 	push pcl
 	b ubasic_statement
@@ -683,7 +683,7 @@ ubasic_if_statement:
 .tok_next:
 	push pch	
 	push pcl
-	b ubasic_tokanizer_next
+	b ubasic_tokenizer_next
 
 .end:
 	pop pcl
@@ -787,17 +787,17 @@ ubasic_statement:
 	bzf .gosub
 	eq r0, TOKENIZER_RETURN
 	bzf .return
-	eq r0, TOKENIZER_FOR:
+	eq r0, TOKENIZER_FOR
 	bzf .for
-	eq r0, TOKENIZER_PEEK:
+	eq r0, TOKENIZER_PEEK
 	bzf .peek
-	eq r0, TOKENIZER_POKE:
+	eq r0, TOKENIZER_POKE
 	bzf .poke
-	eq r0, TOKENIZER_NEXT:
+	eq r0, TOKENIZER_NEXT
 	bzf .next
-	eq r0, TOKENIZER_END:
+	eq r0, TOKENIZER_END
 	bzf .end
-	eq r0, TOKENIZER_LET:
+	eq r0, TOKENIZER_LET
 	bzf .let
 	eq r0, TOKENIZER_VARIABLE
 	bzf .variable
@@ -826,7 +826,7 @@ ubasic_statement:
 	b ubasic_goto_statement
 	b .done
 
-.godub:
+.gosub:
 	push pch
 	push pcl
 	b ubasic_gosub_statement
@@ -894,9 +894,7 @@ ubasic_line_statement:
 	b ubasic_index_add
 
 	mov r0, TOKENIZER_NUMBER
-	push pch
-	push pcl
-	b ubasic_accept
+	push pch push pcl b ubasic_accept
 
 	push pch
 	push pcl
@@ -945,4 +943,18 @@ ubasic_get_variable:
 
 	pop pcl
 	pop pch
-	
+
+ubasic_fatal:
+	; todo
+	pop pcl
+	pop pch	
+
+ubasic_index_find:
+	; todo
+	pop pcl
+	pop pch
+
+ubasic_index_add:
+	; todo
+	pop pcl
+	pop pch
