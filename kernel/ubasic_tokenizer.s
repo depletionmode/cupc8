@@ -580,7 +580,7 @@ ubasic_tokenizer_next:
 	ld r0, [ub_nextptr+1]
 	st [ub_ptr], r1
 	st [ub_ptr+1], r0
-
+	
 .loop0:
 	ldd r0, [ub_ptr]
 	eq r0, #32
@@ -673,11 +673,11 @@ ubasic_tokenizer_next:
 	pop pch
 
 ubasic_tokenizer_num:
-	mov r0, #>[ub_ptr]
-	mov r1, #<[ub_ptr]
+	ld r1, [ub_ptr]
+	ld r0, [ub_ptr+1]
 	push pch
 	push pcl
-	b str_atoi	; todo implement str_atoi
+	b str_atoi
 
 .done:
 	pop pcl
@@ -698,10 +698,10 @@ ubasic_tokenizer_finished:
 	ld r1, [ub_current_token]
 	eq r1, TOKENIZER_ENDOFINPUT
 	bzf .eoi
-	mov r1, #0
+	mov r0, #0
 	b .done
 .eoi:
-	mov r1, #1
+	mov r0, #1
 .done:
 	pop pcl
 	pop pch

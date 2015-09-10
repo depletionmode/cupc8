@@ -140,7 +140,6 @@ read_string:
     b .loop
 .done:
 	mov r0, #100
-	st $f000, r0
     pop pcl
     pop pch
 
@@ -529,9 +528,44 @@ clr_screen:
     pop pcl
     pop pch
 
+str_int_res: resb 1
+str_int_addr: resb 2
 str_atoi:
-	;todo
+	st [str_int_addr], r1
+	st [str_int_addr+1], r0
+
+	xor r1, r1
+	st [str_int_res], r1
+
+.loop:
+	ldd r0, [str_int_addr]+r1
+	push r1
+	eq r0, #0
+	bzf .done
+	eq r0, #20
+	bzf .next
+	lt r0, #48
+	bzf .done
+	gt r0, #57
+	bzf .done
+	sub r0, #48
+	push r0
+	mov r0, #10
+	ld r1, [str_int_res]	
+	push pch
+	push pcl
+	b math_mul
+	pop r1
+	add r0, r1
+	st [str_int_res], r0
+.next:
+	pop r1
+	add r1, #1
+	b .loop
+
 .done:
+	ld r0, [str_int_res]
+st $f000, r0
 	pop pcl
 	pop pch
 

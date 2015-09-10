@@ -882,7 +882,6 @@ ubasic_statement:
 	pop pch
 
 ubasic_line_statement:
-	; ub_ptr used directly by index_add
 	push pch
 	push pcl
 	b ubasic_tokenizer_num
