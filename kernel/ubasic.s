@@ -570,8 +570,10 @@ ubasic_print_statement:
 	b ubasic_tokenizer_next
 	b .next
 .comma:
-	st [ub_string], #32
-	st [ub_string], #0
+	mov r0, #32
+	mov r1, #0
+	st [ub_string], r0
+	st [ub_string+1], r1
 	mov r0, #>[ub_string]
 	mov r1, #<[ub_string]
 	push pch
