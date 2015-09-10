@@ -171,7 +171,7 @@ ub_s_peek db "peek"
 ub_s_poke db "poke"
 ub_s_end db "end"
 ubasic_get_next_token:
-	ld r0, [ub_ptr]
+	ldd r0, [ub_ptr]
 	gt r0, #0
 	bzf .if0
 	mov r0, TOKENIZER_ENDOFINPUT
@@ -185,7 +185,9 @@ ubasic_get_next_token:
 	bzf .elseif0_0
 
 	xor r1, r1 ; r1 = i
+	push r1
 .loop:
+	pop r1
 	gt r1, #5
 	bzf .error
 .if1:
@@ -550,9 +552,11 @@ ubasic_tokenizer_init:
 	push pcl
 	b ubasic_tokenizer_goto
 
+	; is this redundant?
 	push pch
 	push pcl
 	b ubasic_get_next_token
+
 	st [ub_current_token], r0
 
 .done:
@@ -686,9 +690,11 @@ ubasic_tokenizer_string:
 	pop pch
 
 ubasic_tokenizer_finished:
-	ld r0, [ub_ptr]
 	ld r1, [ub_ptr]
+	ld r0, [ub_ptr+1]
 	or r0, r1
+	eq r0, #0
+	bzf .eoi
 	ld r1, [ub_current_token]
 	eq r1, TOKENIZER_ENDOFINPUT
 	bzf .eoi
@@ -697,7 +703,6 @@ ubasic_tokenizer_finished:
 .eoi:
 	mov r1, #1
 .done:
-	or r0, r1
 	pop pcl
 	pop pch
 

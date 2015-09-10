@@ -210,8 +210,11 @@ def __assemble(filename):
                         if esc:
                             esc = False
                             if t == 'n': t = '\n'
+                            if t == '"': t = '"'
                         data_d.append(ord(t))
                     data_d.append(0)
+                    #print(l)
+                    #print(data_d)
                     data_c = bytearray(len(data_d))
                     for i in range(len(data_d)):
                         data_c[i] = data_d[i]
@@ -265,7 +268,7 @@ def __assemble(filename):
                 else:
                     current_label = label
                 if first_pass:
-                    #print('label: {}, [{}:{}]'.format(label, line_num, file_name))
+                    print('label: {}, [{}:{}]'.format(label, line_num, file_name))
                     labels[label] = offset
                 continue
 

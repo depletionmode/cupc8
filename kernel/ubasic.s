@@ -51,6 +51,9 @@ for_stack_ptr: resb 2
 gosub_stack_ptr: resb 2
 ended: resb 1
 ubasic_init:
+	push r0
+	push r1
+
 	st [program_ptr], r1
 	st [program_ptr+1], r0
 
@@ -69,6 +72,8 @@ ubasic_init:
 	push pcl
 	b ubasic_index_free
 
+	pop r1
+	pop r0
 	push pch
 	push pcl
 	b ubasic_tokenizer_init
@@ -886,7 +891,9 @@ ubasic_line_statement:
 	b ubasic_index_add
 
 	mov r0, TOKENIZER_NUMBER
-	push pch push pcl b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_accept
 
 	push pch
 	push pcl
@@ -900,7 +907,7 @@ ubasic_run:
 	push pcl
 	b ubasic_tokenizer_finished
 	gt r0, #0
-	b .done
+	bzf .done
 
 	push pch
 	push pcl
