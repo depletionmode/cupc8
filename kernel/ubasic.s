@@ -557,7 +557,6 @@ ubasic_print_statement:
 	b .end
 
 .string:
-	; todo
 	push pch
 	push pcl
 	b ubasic_tokenizer_string
@@ -602,7 +601,7 @@ ubasic_print_statement:
 	b ubasic_tokenizer_token
 	eq r0, TOKENIZER_CR
 	bzf .end
-	;eq r0, TOKENIZER_ENDOFINPUT
+	eq r0, TOKENIZER_ENDOFINPUT
 	bzf .end
 	b .loop
 
@@ -655,7 +654,7 @@ ubasic_if_statement:
 	bzf .n
 	eq r0, TOKENIZER_CR
 	bzf .n
-	;eq r0, TOKENIZER_ENDOFINPUT
+	eq r0, TOKENIZER_ENDOFINPUT
 	bzf .n
 	b .loop
 .n:

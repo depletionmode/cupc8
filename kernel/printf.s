@@ -630,16 +630,64 @@ mem_cpy:
 .loop:
 	pop r0
 	eq r0, #0
-	push r0
 	bzf .done
+	push r0
 	mov r1, r0
 	sub r1, #1
-	ldd r0, [mem_p_src+r1]
-	sdd [mem_p_dst+r1], r0
+	ldd r0, [mem_p_src]+r1
+	std [mem_p_dst]+r1, r0
 	pop r0
-	add r0, #1
+	sub r0, #1
+	push r0
 	b .loop
 
 .done:
+	pop pcl
+	pop pch
+
+str_chr_ptr: resb 2
+str_chr_set:
+	st [str_chr_ptr], r1
+	st [str_chr_ptr+1], r0
+	pop pcl
+	pop pch
+
+str_chr_offset: resb 1
+str_chr:
+	xor r1, r1
+	st [str_chr_offset], r1
+.loop:
+	ldd r1, [str_chr_ptr]+r1
+	eq r1, #0
+	bzf .notfound
+	eq r1, r0
+	bzf .found
+	ld r1, [str_chr_offset]
+	add r1, #1
+	st [str_chr_offset], r1
+	b .loop
+
+.notfound:
+	xor r0, r0
+	xor r1, r1
+	b .end
+
+.found:
+	ld r1, [str_chr_ptr]
+	ld r0, [str_chr_offset]
+	add r0, r1
+;st $f000, r0
+	st [str_chr_ptr], r0
+	lt r1, r0
+	bzf .carry
+	b .end
+.carry:
+	ld r0, [str_chr_ptr+1]
+	add r0, #1
+	st [str_chr_ptr+1], r0
+
+	ld r1, [str_chr_ptr]
+	ld r0, [str_chr_ptr+1]
+.end:	
 	pop pcl
 	pop pch

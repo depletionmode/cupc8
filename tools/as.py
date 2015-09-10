@@ -23,7 +23,7 @@ labels = {}
 current_label = None
 
 base = 0x1000
-data_base = 0x2000
+data_base = 0x3000
 bss_base = 0x5000
 
 line_num = 0

@@ -702,10 +702,12 @@ ubasic_tokenizer_string:
 	add r1, #1
 	eq r1, #0
 	bzf .carry
-.	b .nocarry
+	b .nocarry
 .carry:
 	add r0, #1
 .nocarry:
+	push r0
+	push r1
 	push pch
 	push pcl
 	b str_chr_set
@@ -722,16 +724,31 @@ ubasic_tokenizer_string:
 	sub r1, r0
 	sub r1, #1
 	st [ub_tok_str_len], r1
-	ld r0, [ub_tok_str_len_arg]
-	lt r0, r1
-	bzf .arg_len
-	b .next
-.arg_len:
-	st [ub_tok_str_len], r0
-.next:
-	; todo memcpy
-	ld r1, [ub_tok_str_len]	
-	st [ub_string]+r1, #0
+;	ld r0, [ub_tok_str_len_arg]
+;	lt r0, r1
+;	bzf .arg_len
+;	b .next
+;.arg_len:
+;	st [ub_tok_str_len], r0
+;.next:
+	mov r0, #>[ub_string]
+	mov r1, #<[ub_string]
+	push pch
+	push pcl
+	b mem_cpy_set0
+	pop r1
+	pop r0
+	push pch
+	push pcl
+	b mem_cpy_set1
+	ld r0, [ub_tok_str_len]
+	push r0
+	push pch
+	push pcl
+	b mem_cpy
+	pop r0
+	xor r1, r1
+	st [ub_string]+r0, r1
 .done:
 	pop pcl
 	pop pch
