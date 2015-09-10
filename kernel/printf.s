@@ -534,3 +534,49 @@ str_atoi:
 .done:
 	pop pcl
 	pop pch
+
+str_cmp_ptr0: resb 2
+str_cmp_set:
+	st [str_cmp_ptr0], r1
+	st [str_cmp_ptr0+1], r0
+	pop pcl
+	pop pch
+
+str_cmp_mismatch: resb 1
+str_cmp_pos: resb 1
+str_cmp_ptr1: resb 2
+str_cmp:
+	st [str_cmp_ptr1], r1
+	st [str_cmp_ptr1+1], r0
+
+	xor r1, r1
+	st [str_cmp_pos], r1
+	st [str_cmp_mismatch], r1
+.loop:
+	ld r1, [str_cmp_pos]
+	ldd r0, [str_cmp_ptr0]+r1
+	eq r0, #0
+	bzf .done
+	ld r1, [str_cmp_pos]
+	ldd r0, [str_cmp_ptr0]+r1
+	push r0
+	ldd r0, [str_cmp_ptr1]+r1
+	pop r1
+	eq r0, r1
+	bzf .match:
+.mismatch:
+	mov r0, #1
+	st [str_cmp_mismatch], r0
+	b .done
+.match:
+	ld r1, [str_cmp_pos]
+	add r1, #1
+	st [str_cmp_pos], r1
+	b .loop
+	
+.done:
+	ld r0, [str_cmp_mismatch]
+	pop pcl
+	pop pch
+
+
