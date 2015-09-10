@@ -557,6 +557,7 @@ ubasic_print_statement:
 	b .end
 
 .string:
+st $f000, r0
 	push pch
 	push pcl
 	b ubasic_tokenizer_string
