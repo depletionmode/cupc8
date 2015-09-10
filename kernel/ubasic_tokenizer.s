@@ -240,6 +240,7 @@ ubasic_get_next_token:
 	b .done
 	
 .elseif0_1:
+	pop r0
 	ldd r0, [ub_ptr]
 	eq r0, #34
 	bzf .true0_1
@@ -277,8 +278,8 @@ ubasic_get_next_token:
 	b .done
 	
 .else0:
-	mov r0, #>[ub_ptr]
-	mov r1, #<[ub_ptr]
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
 	push pch
 	push pcl
 	b str_cmp_set
@@ -683,8 +684,54 @@ ubasic_tokenizer_num:
 	pop pcl
 	pop pch
 
+ub_tok_str_len: resb 1
+ub_tok_str_end_ptr: resb 2
+ub_tok_str_len_arg: resb 1
 ubasic_tokenizer_string:
-	; todo
+	st [ub_tok_str_len_arg], r0
+	;push pch
+	;push pcl
+	;b ubasic_tokenizer_token
+	;eq r0, TOKENIZER_STRING
+	;bzf .cont
+	;b .done
+
+.cont:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	add r1, #1
+	eq r1, #0
+	bzf .carry
+.	b .nocarry
+.carry:
+	add r0, #1
+.nocarry:
+	push pch
+	push pcl
+	b str_chr_set
+	mov r0, #34
+	push pch
+	push pcl
+	b str_chr
+	st [ub_tok_str_end_ptr], r1
+	st [ub_tok_str_end_ptr+1], r0
+	eq r0, #0	; it's enough to test high byte here
+	bzf .done
+	; subtract low byte only as have max length < 256
+	ld r0, [ub_ptr]
+	sub r1, r0
+	sub r1, #1
+	st [ub_tok_str_len], r1
+	ld r0, [ub_tok_str_len_arg]
+	lt r0, r1
+	bzf .arg_len
+	b .next
+.arg_len:
+	st [ub_tok_str_len], r0
+.next:
+	; todo memcpy
+	ld r1, [ub_tok_str_len]	
+	st [ub_string]+r1, #0
 .done:
 	pop pcl
 	pop pch

@@ -430,7 +430,6 @@ print_char:
     push r1     ; y
 
     ld r0, [xpos_start]
-	;st $f000, r0
     ld r1, [posx]
     add r1, r0
     push r1     ; x
@@ -537,13 +536,11 @@ str_atoi:
 	xor r1, r1
 	st [str_int_res], r1
 
+	push r1
 .loop:
 	ldd r0, [str_int_addr]+r1
-	push r1
 	eq r0, #0
 	bzf .done
-	eq r0, #20
-	bzf .next
 	lt r0, #48
 	bzf .done
 	gt r0, #57
@@ -558,14 +555,12 @@ str_atoi:
 	pop r1
 	add r0, r1
 	st [str_int_res], r0
-.next:
 	pop r1
 	add r1, #1
 	b .loop
 
 .done:
 	ld r0, [str_int_res]
-st $f000, r0
 	pop pcl
 	pop pch
 
@@ -591,6 +586,9 @@ str_cmp:
 	ldd r0, [str_cmp_ptr0]+r1
 	eq r0, #0
 	bzf .done
+	ldd r0, [str_cmp_ptr1]+r1
+	eq r0, #0
+	bzf .done
 	ld r1, [str_cmp_pos]
 	ldd r0, [str_cmp_ptr0]+r1
 	push r0
@@ -613,4 +611,35 @@ str_cmp:
 	pop pcl
 	pop pch
 
+mem_p_dst: resb 2
+mem_cpy_set0:
+	st [mem_p_dst], r1
+	st [mem_p_dst+1], r0
+	pop pcl
+	pop pch
 
+mem_p_src: resb 2
+mem_cpy_set1:
+	st [mem_p_src], r1
+	st [mem_p_src+1], r0
+	pop pcl
+	pop pch
+
+mem_cpy:
+	push r0
+.loop:
+	pop r0
+	eq r0, #0
+	push r0
+	bzf .done
+	mov r1, r0
+	sub r1, #1
+	ldd r0, [mem_p_src+r1]
+	sdd [mem_p_dst+r1], r0
+	pop r0
+	add r0, #1
+	b .loop
+
+.done:
+	pop pcl
+	pop pch

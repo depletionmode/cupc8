@@ -98,6 +98,7 @@ ubasic_accept:
 	push pcl
 	b ubasic_fatal
 
+
 .cont:
 	push pch
 	push pcl
@@ -534,9 +535,9 @@ ubasic_goto_statement:
 	pop pch
 
 ubasic_print_statement:
+	mov r0, TOKENIZER_PRINT
 	push pch
 	push pcl
-	mov r0, TOKENIZER_PRINT
 	b ubasic_accept
 
 .loop:
@@ -557,8 +558,6 @@ ubasic_print_statement:
 
 .string:
 	; todo
-	mov r0, #>[ub_string]
-	mov r1, #<[ub_string]
 	push pch
 	push pcl
 	b ubasic_tokenizer_string
@@ -943,7 +942,8 @@ ubasic_get_variable:
 	pop pch
 
 ubasic_fatal:
-	; todo
+	mov r0, #255
+	st $f000, r0
 	pop pcl
 	pop pch	
 
