@@ -563,7 +563,7 @@ str_cmp:
 	ldd r0, [str_cmp_ptr1]+r1
 	pop r1
 	eq r0, r1
-	bzf .match:
+	bzf .match
 .mismatch:
 	mov r0, #1
 	st [str_cmp_mismatch], r0

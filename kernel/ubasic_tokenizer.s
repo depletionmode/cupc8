@@ -110,14 +110,24 @@ ubasic_singlechar:
 	pop pcl
 	pop pch
 
-ubasic_isdigit_ptr:
+ubasic_isdigit:
+	mov r1, r0
 	xor r0, r0
-	ldd r0, [ub_ptr]
-	lt r0, #48
+	lt r1, #48
 	bzf .done
-	gt r0, #57
+	gt r1, #57
 	bzf .done
 	mov r0, #1
+	
+.done:
+	pop pcl
+	pop pch
+
+ubasic_isdigit_ptr:
+	ldd r0, [ub_ptr]
+	push pch
+	push pcl
+	b ubasic_isdigit
 	
 .done:
 	pop pcl
@@ -156,16 +166,14 @@ ub_s_goto db "goto"
 ub_s_gosub db "gosub"
 ub_s_return db "return"
 ub_s_call db "call"
-us_s_rem db "rem"
+ub_s_rem db "rem"
 ub_s_peek db "peek"
 ub_s_poke db "poke"
 ub_s_end db "end"
 ubasic_get_next_token:
-	;todo
-
 	ld r0, [ub_ptr]
 	gt r0, #0
-	bzf .next
+	bzf .if0
 	mov r0, TOKENIZER_ENDOFINPUT
 	b .done
 
@@ -176,7 +184,7 @@ ubasic_get_next_token:
 	eq r0, #0
 	bzf .elseif0_0
 
-	xor r1, r1 ; r1 := i
+	xor r1, r1 ; r1 = i
 .loop:
 	gt r1, #5
 	bzf .error
@@ -273,7 +281,6 @@ ubasic_get_next_token:
 	push pcl
 	b str_cmp_set
 
-	; todo string matches
 	mov r0, #>[ub_s_let]
 	mov r1, #<[ub_s_let]
 	push pch
@@ -400,7 +407,7 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_GOTO
 	b .done
 .n8:
-	mov r0, #>[ub_s_godub]
+	mov r0, #>[ub_s_gosub]
 	mov r1, #<[ub_s_gosub]
 	push pch
 	push pcl
@@ -517,7 +524,7 @@ ubasic_get_next_token:
 	b .done
 	
 .error:
-	mov r0, TOKENIZER_ERROR	
+	mov r0, TOKENIZER_ERROR
 
 .done:
 	pop pcl
