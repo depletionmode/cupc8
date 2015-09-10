@@ -557,7 +557,6 @@ ubasic_print_statement:
 	b .end
 
 .string:
-st $f000, r0
 	push pch
 	push pcl
 	b ubasic_tokenizer_string
@@ -607,8 +606,10 @@ st $f000, r0
 	b .loop
 
 .end:
-	st [ub_string], #10
-	st [ub_string], #0
+	mov r0, #10
+	mov r1, #0
+	st [ub_string], r0
+	st [ub_string+1], r1
 	mov r0, #>[ub_string]
 	mov r1, #<[ub_string]
 	push pch
