@@ -168,9 +168,64 @@ dump_char_rom:
     pop pcl
     pop pch
 
+str_uint_rem: resb 1
+str_uint_buf: resb 5
 str_printuint8:
-st $f000, r0
-halt
+	xor r1, r1
+	gt r0, #0
+	bzf .gt0
+	mov r1, #48
+	st [str_uint_buf], r1
+	b .done
+
+.gt0:
+.loop:
+	eq r0, #0
+	bzf .done
+	push r1		; idx
+
+	mov r1, r0
+	push r1
+	mov r1, #10
+	push pch
+	push pcl
+	b math_div
+	mov r0, r1
+	pop r1
+	st [str_uint_rem], r0
+	mov r0, r1
+
+	ld r1, [str_uint_rem]
+	gt r1, #9
+	bzf .gt9
+	add r1, #48
+	b .after_gt9
+.gt9:
+	sub r1, #10
+	add r1, #97
+.after_gt9:
+	push r0		; num
+	mov r0, r1
+	pop r1		; idx
+	st [str_uint_buf]+r1, r0
+	pop r0		; num
+	push r1
+	mov r1, #10
+	push pch
+	push pcl
+	b math_div
+	pop r1
+	add r1, #1
+	b .loop
+
+.done:
+	xor r0, r0
+	st [str_uint_buf]+r1, r0
+	mov r0, #>[str_uint_buf]
+	mov r1, #<[str_uint_buf]
+	push pch
+	push pcl
+	b str_printstr
 	pop pcl
 	pop pch
 

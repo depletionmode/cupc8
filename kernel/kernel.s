@@ -16,7 +16,7 @@ main:
 
 	;s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
 	;s_ubasic_program db "10 let a = 42\n20 end\n"
-	s_ubasic_program db "5 print \"abc\"\n6 let k = 42\n10 print "\test",k\n12 end\n"
+	s_ubasic_program db "5 print \"abc\"\n6 let k = 1\n10 print "\test",k\n12 end\n"
 	;s_ubasic_program db "5 print \"abc\",\"123\"\n6 print \"XYZ\"\n"
 	;s_ubasic_program db "5 print \"abc\"\n"
 	mov r0, #>[s_ubasic_program]
