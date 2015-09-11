@@ -536,7 +536,6 @@ str_atoi:
 	xor r1, r1
 	st [str_int_res], r1
 
-	push r1
 .loop:
 	ldd r0, [str_int_addr]+r1
 	eq r0, #0
@@ -545,6 +544,7 @@ str_atoi:
 	bzf .done
 	gt r0, #57
 	bzf .done
+	push r1
 	sub r0, #48
 	push r0
 	mov r0, #10
@@ -676,7 +676,6 @@ str_chr:
 	ld r1, [str_chr_ptr]
 	ld r0, [str_chr_offset]
 	add r0, r1
-;st $f000, r0
 	st [str_chr_ptr], r0
 	lt r1, r0
 	bzf .carry

@@ -1,6 +1,7 @@
 ; https://github.com/adamdunkels/ubasic
 
-%define MAX_STRINGLEN 40
+%define MAX_VARNUM #40
+ub_variables: resb 40
 ub_string: resb 40
 
 %define TOKENIZER_ERROR			#0
@@ -688,12 +689,12 @@ ubasic_if_statement:
 	pop pcl
 	pop pch
 
-var: resb 1
+ub_var: resb 1
 ubasic_let_statement:
 	push pch
 	push pcl
 	b ubasic_tokenizer_variable_num
-	st [var], r0
+	st [ub_var], r0
 
 	mov r0, TOKENIZER_VARIABLE
 	push pch
@@ -709,7 +710,7 @@ ubasic_let_statement:
 	push pcl
 	b ubasic_expr
 	mov r1, r0
-	ld r0, [var]
+	ld r0, [ub_var]
 	push pch
 	push pcl
 	b ubasic_set_variable
@@ -718,6 +719,8 @@ ubasic_let_statement:
 	push pch
 	push pcl
 	b ubasic_accept
+st $f000, r0
+halt
 
 	pop pcl
 	pop pch
@@ -930,17 +933,21 @@ ubasic_finished:
 	pop pcl
 	pop pch
 
-varnum: resb 1
-value: resb 1
 ubasic_set_variable:
-	; todo
+	gt r0, MAX_VARNUM
+	bzf .done
+	st [ub_variables]+r0, r1
 	
+.done:
 	pop pcl
 	pop pch
 
 ubasic_get_variable:
-	; todo
-
+	gt r0, MAX_VARNUM
+	bzf .done
+	ld r0, [ub_variables]+r0
+	
+.done:
 	pop pcl
 	pop pch
 

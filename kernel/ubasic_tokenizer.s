@@ -500,7 +500,7 @@ ubasic_get_next_token:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .error
+	bzf .variable
 	mov r0, #3	; strlen
 	push pch
 	push pcl
@@ -528,6 +528,9 @@ ubasic_get_next_token:
 	
 .error:
 	mov r0, TOKENIZER_ERROR
+;mov r0, #15
+;st $f000, r0
+;halt
 
 .done:
 	pop pcl
