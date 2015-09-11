@@ -168,6 +168,12 @@ dump_char_rom:
     pop pcl
     pop pch
 
+str_printuint8:
+st $f000, r0
+halt
+	pop pcl
+	pop pch
+
 str_printuint16:
 	pop pcl
 	pop pch

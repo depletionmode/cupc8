@@ -91,6 +91,8 @@ ubasic_accept:
 	b ubasic_tokenizer_token
 
 	ld r1, [token]
+;st $f000, r1
+;st $f000, r0
 	xor r0, r1
 	eq r0, #0
 	bzf .cont
@@ -595,7 +597,8 @@ ubasic_print_statement:
 	b ubasic_expr
 	push pch
 	push pcl
-	b str_printuint16
+	b str_printuint8
+	;b str_printuint16
 	b .next
 
 .next:
@@ -719,8 +722,6 @@ ubasic_let_statement:
 	push pch
 	push pcl
 	b ubasic_accept
-st $f000, r0
-halt
 
 	pop pcl
 	pop pch
@@ -954,6 +955,7 @@ ubasic_get_variable:
 ubasic_fatal:
 	mov r0, #255
 	st $f000, r0
+halt
 	pop pcl
 	pop pch	
 

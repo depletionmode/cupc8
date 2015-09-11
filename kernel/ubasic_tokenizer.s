@@ -188,7 +188,8 @@ ubasic_get_next_token:
 	push r1
 .loop:
 	pop r1
-	gt r1, #5
+;st $f000, r1
+	gt r1, #3
 	bzf .error
 .if1:
 	ldd r0, [ub_ptr]+r1
@@ -202,15 +203,18 @@ ubasic_get_next_token:
 .if2:
 	eq r1, #0
 	bzf .else2
+	mov r0, r1
 	ld r1, [ub_ptr]
+	add r1, r0
+	st [ub_nextptr], r1
 	ld r0, [ub_ptr+1]
-	add r1, #1
+	st [ub_nextptr+1], r0
 	gt r1, #0
 	bzf .nocarry0
+	ld r0, [ub_ptr+1]
+	st [ub_nextptr+1], r0
 	add r0, #1
 .nocarry0:
-	st [ub_nextptr], r1
-	st [ub_nextptr+1], r0
 	mov r0, TOKENIZER_NUMBER
 	b .done
 .else2:
@@ -528,9 +532,9 @@ ubasic_get_next_token:
 	
 .error:
 	mov r0, TOKENIZER_ERROR
-;mov r0, #15
-;st $f000, r0
-;halt
+mov r0, #15
+st $f000, r0
+halt
 
 .done:
 	pop pcl
