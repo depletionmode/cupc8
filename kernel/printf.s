@@ -184,14 +184,14 @@ str_printuint8:
 	bzf .done
 	push r1		; idx
 
-	mov r1, r0
+	mov r1, r0	; num
 	push r1
 	mov r1, #10
 	push pch
 	push pcl
 	b math_div
 	mov r0, r1
-	pop r1
+	pop r1		; num
 	st [str_uint_rem], r0
 	mov r0, r1
 
@@ -204,9 +204,10 @@ str_printuint8:
 	sub r1, #10
 	add r1, #97
 .after_gt9:
-	push r0		; num
-	mov r0, r1
+	st [str_uint_rem], r1
 	pop r1		; idx
+	push r0		; num
+	ld r0, [str_uint_rem]
 	st [str_uint_buf]+r1, r0
 	pop r0		; num
 	push r1
@@ -221,6 +222,11 @@ str_printuint8:
 .done:
 	xor r0, r0
 	st [str_uint_buf]+r1, r0
+	mov r0, #>[str_uint_buf]
+	mov r1, #<[str_uint_buf]
+	push pch
+	push pcl
+	b str_reverse
 	mov r0, #>[str_uint_buf]
 	mov r1, #<[str_uint_buf]
 	push pch
@@ -749,5 +755,38 @@ str_chr:
 	ld r1, [str_chr_ptr]
 	ld r0, [str_chr_ptr+1]
 .end:	
+	pop pcl
+	pop pch
+
+str_rev_i: resb 1
+str_rev_ptr: resb 2
+str_reverse:
+	st [str_rev_ptr], r1
+	st [str_rev_ptr+1], r0
+
+	xor r0, r0
+	st [str_rev_i], r0
+.loop0:
+	ldd r1, [str_rev_ptr]+r0
+	eq r1, #0
+	bzf .loop1
+	push r1
+	add r0, #1
+	b .loop0
+
+.loop1:
+	eq r0, #0
+	bzf .done
+	pop r1
+	push r0
+	ld r0, [str_rev_i]
+	std [str_rev_ptr]+r0, r1
+	add r0, #1
+	st [str_rev_i], r0
+	pop r0
+	sub r0, #1
+	b .loop1
+
+.done:
 	pop pcl
 	pop pch
