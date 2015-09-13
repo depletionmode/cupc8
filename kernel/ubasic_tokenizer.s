@@ -532,9 +532,9 @@ ubasic_get_next_token:
 	
 .error:
 	mov r0, TOKENIZER_ERROR
-mov r0, #15
-st $f000, r0
-halt
+	mov r0, #254
+	st $f000, r0
+	halt
 
 .done:
 	pop pcl
@@ -548,6 +548,7 @@ ubasic_tokenizer_goto:
 	push pch
 	push pcl
 	b ubasic_get_next_token
+
 	st [ub_current_token], r0
 
 .done:

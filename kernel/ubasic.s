@@ -522,14 +522,15 @@ ubasic_jump_linenum:
 	pop pch
 	
 ubasic_goto_statement:
+	mov r0, TOKENIZER_GOTO
 	push pch
 	push pcl
-	mov r0, TOKENIZER_GOTO
 	b ubasic_accept
 
 	push pch
 	push pcl
 	b ubasic_tokenizer_num
+
 	push pch
 	push pcl
 	b ubasic_jump_linenum
@@ -980,12 +981,15 @@ ubasic_index_add:
 
 	ld r1, [ub_line_index_current]
 	add r1, #2
-	mov r0, #>[ub_ptr]
+	ld r0, [ub_ptr+1]
 	st [ub_line_index_chunk]+r1, r0
 	sub r1, #1
-	mov r0, #<[ub_ptr]
+	ld r0, [ub_ptr]
 	st [ub_line_index_chunk]+r1, r0
 
+	sub r1, #1
+	add r1, #3
+	st [ub_line_index_current], r1
 .done:
 	pop pcl
 	pop pch
@@ -1013,9 +1017,9 @@ ubasic_index_find:
 	
 .match:
 	; offset in r1
-	add r1, #1
+	add r1, #2
 	ld r0, [ub_line_index_chunk]+r1
-	add r1, #1
+	sub r1, #1
 	ld r1, [ub_line_index_chunk]+r1
 	b .done
 
