@@ -237,7 +237,7 @@ ubasic_term:
 	ld r1, [f2]
     push pch
     push pcl
-    ;todo b math_div
+    b math_div
     st [f1], r0
 	b .getop
 
@@ -246,8 +246,8 @@ ubasic_term:
 	ld r1, [f2]
     push pch
     push pcl
-    ;todo b math_mod
-    st [f1], r0
+    b math_div
+    st [f1], r1
 	b .getop
 
 .getop:
