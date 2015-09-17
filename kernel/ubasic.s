@@ -47,11 +47,11 @@ ub_line_index_current: resb 2
 ub_line_index_chunk: resb 300	; support for 100 lines
 ub_for_stack_index: resb 1
 ub_for_stack: resb 12 ; MAX_FOR_STACK_DEPTH = 4
+ub_gosub_stack_index: resb 1
+ub_gosub_stack: resb 10	; MAX_GODUB_STACK_DEPTH = 10
 ub_ptr: resb 2
 
 program_ptr: resb 2
-for_stack_ptr: resb 2
-gosub_stack_ptr: resb 2
 ended: resb 1
 ubasic_init:
 	push r0
@@ -61,8 +61,14 @@ ubasic_init:
 	st [program_ptr+1], r0
 
 	xor r0, r0
-	st [gosub_stack_ptr], r0
-	st [gosub_stack_ptr+1], r0
+	xor r1, r1
+.clear_gosub_stack:
+	st [ub_gosub_stack_index], r0
+	gt r1, #9
+	bzf .done_clear_gosub_stack
+	st [ub_gosub_stack]+r1, r0
+	add r1, #1
+.done_clear_gosub_stack:
 
 	st [ended], r0
 
@@ -453,7 +459,8 @@ linenum: resb 1
 ubasic_jump_linenum_slow:
 	st [linenum], r0
 
-	ld r0, [program_ptr]
+	ld r1, [program_ptr]
+	ld r0, [program_ptr+1]
 	push pch
 	push pcl
 	b ubasic_tokenizer_init
@@ -505,14 +512,11 @@ ubasic_jump_linenum_slow:
 	pop pcl
 	pop pch
 
-pos: resb 1
 ubasic_jump_linenum:
 	st [linenum], r0
 	push pch
 	push pcl
 	b ubasic_index_find
-	st [pos], r0
-	eq r0, #0
 	bzf .pos_null
 	push pch
 	push pcl
@@ -735,14 +739,70 @@ ubasic_let_statement:
 	pop pch
 
 ubasic_gosub_statement:
-;todo
+	mov r0, TOKENIZER_GOSUB
+	push pch
+	push pcl
+	b ubasic_accept
 
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	push r0		; linenum
+
+	mov r0, TOKENIZER_NUMBER
+	push pch
+	push pcl
+	b ubasic_accept
+	mov r0, TOKENIZER_CR
+	push pch
+	push pcl
+	b ubasic_accept
+
+.if:
+	ld r1, [ub_gosub_stack_index]
+	gt r1, #9
+	bzf .else
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	st [ub_gosub_stack]+r1, r0
+	add r1, #1
+	st [ub_gosub_stack_index], r1
+	pop r0
+	b ubasic_jump_linenum
+	b .done
+.else:
+	push pch
+	push pcl
+	b ubasic_fatal
+
+.done:
 	pop pcl
 	pop pch
 
 ubasic_return_statement:
-;todo
+	mov r0, TOKENIZER_RETURN
+	push pch
+	push pcl
+	b ubasic_accept
 
+.if:
+	ld r1, [ub_gosub_stack_index]
+	eq r1, #0
+	bzf .else
+	sub r1, #1
+	st [ub_gosub_stack_index], r1
+	ld r0, [ub_gosub_stack]+r1
+	push pch
+	push pcl
+	b ubasic_jump_linenum
+	b .done
+.else:
+	push pch
+	push pcl
+	b ubasic_fatal
+
+.done:
 	pop pcl
 	pop pch
 
@@ -891,14 +951,19 @@ ubasic_for_statement:
 	pop pcl
 	pop pch
 
+ub_mem_ptr: resb 2
 ubasic_peek_statement:
-;todo
+;todo - need 16 bit number support first!
+;	st [ub_mem_ptr], r1
+;	st [ub_mem_ptr+1], r0
+;
+;	ldd r0, [ub_mem_ptr]
 
 	pop pcl
 	pop pch
 
 ubasic_poke_statement:
-;todo
+;todo - need 16 bit number support first!
 
 	pop pcl
 	pop pch
@@ -1105,10 +1170,6 @@ ub_cur_chunk_offset: resb 1
 ubasic_index_add:
 	st [ub_linenum], r0
 
-	; see if index entry already exists
-;	ld r0, [line_index_head]
-;	eq r0, #0
-;	bzf .done
 	push pch
 	push pcl
 	b ubasic_index_find
