@@ -6,6 +6,9 @@ posy: resb 1
 
 temp_msg db "\nChar rom dump:\n\n"
 
+mem_p_dst: resb 2
+mem_p_src: resb 2
+
 print_ascii_char_inverse:
     ; convert ascii to c64 char rom offsets
 
@@ -695,14 +698,36 @@ str_cmp:
 	pop pcl
 	pop pch
 
-mem_p_dst: resb 2
+str_cpy_set0:
+	st [mem_p_dst], r1
+	st [mem_p_dst+1], r0
+	pop pcl
+	pop pch
+
+str_cpy_set1:
+	st [mem_p_src], r1
+	st [mem_p_src+1], r0
+	pop pcl
+	pop pch
+
+str_cpy:
+	ld r1, [mem_p_src]
+	ld r0, [mem_p_src+1]
+	push pch
+	push pcl
+	b str_len
+	push pch
+	push pcl
+	b mem_cpy
+	pop pcl
+	pop pch
+
 mem_cpy_set0:
 	st [mem_p_dst], r1
 	st [mem_p_dst+1], r0
 	pop pcl
 	pop pch
 
-mem_p_src: resb 2
 mem_cpy_set1:
 	st [mem_p_src], r1
 	st [mem_p_src+1], r0
