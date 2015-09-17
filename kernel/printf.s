@@ -4,7 +4,6 @@
 posx: resb 1
 posy: resb 1
 
-
 temp_msg db "\nChar rom dump:\n\n"
 
 print_ascii_char_inverse:
@@ -631,10 +630,28 @@ str_atoi:
 	pop pcl
 	pop pch
 
+str_len_ptr: resb 2
+str_len:
+	st [str_len_ptr], r1
+	st [str_len_ptr+1], r0
+
+	xor r0, r0
+.loop:
+	ldd r1, [str_len_ptr]+r0
+	eq r1, #0
+	bzf .done
+	add r0, #1
+	b .loop
+
+.done:
+	pop pcl
+	pop pch
+
 str_cmp_ptr0: resb 2
 str_cmp_set:
 	st [str_cmp_ptr0], r1
 	st [str_cmp_ptr0+1], r0
+
 	pop pcl
 	pop pch
 
