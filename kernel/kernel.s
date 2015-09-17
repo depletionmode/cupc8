@@ -15,8 +15,8 @@ main:
 ;'	b print_string
 
 	;s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
-	;s_ubasic_program db "10 let a = 42\n20 end\n"
-	s_ubasic_program db "5 print \"abc\"\n6 let k = 234\n8 let l = 34\n10 print "\test",k\n11 goto 5\n15 print k - l\n20 end\n"
+	s_ubasic_program db "12 for i = 1 to 3\n14 print i\n16 next i\n20 end\n"
+	;s_ubasic_program db "5 print \"abc\"\n6 let k = 234\n8 let l = 34\n10 print "\test",k\n11 goto 5\n15 print k - l\n20 end\n"
 	;s_ubasic_program db "5 print \"abc\",\"123\"\n6 print \"XYZ\"\n"
 	;s_ubasic_program db "5 print \"abc\"\n"
 	mov r0, #>[s_ubasic_program]

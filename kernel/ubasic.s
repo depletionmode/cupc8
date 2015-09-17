@@ -44,7 +44,9 @@ ub_string: resb 40
 
 ; index offsets in chunk (not pointers like original uBASIC code)
 ub_line_index_current: resb 2
-ub_line_index_chunk: resb 400	; support for 100 lines
+ub_line_index_chunk: resb 300	; support for 100 lines
+ub_for_stack_index: resb 1
+ub_for_stack: resb 12 ; MAX_FOR_STACK_DEPTH = 4
 ub_ptr: resb 2
 
 program_ptr: resb 2
@@ -59,8 +61,6 @@ ubasic_init:
 	st [program_ptr+1], r0
 
 	xor r0, r0
-	st [for_stack_ptr], r0
-	st [for_stack_ptr+1], r0
 	st [gosub_stack_ptr], r0
 	st [gosub_stack_ptr+1], r0
 
@@ -68,6 +68,12 @@ ubasic_init:
 
 	st [ub_line_index_current], r0
 	st [ub_line_index_current+1], r0
+
+	st [ub_for_stack_index], r0
+	st [ub_for_stack], r0
+	st [ub_for_stack+3], r0
+	st [ub_for_stack+6], r0
+	st [ub_for_stack+9], r0
 
 	push pch
 	push pcl
@@ -539,6 +545,7 @@ ubasic_goto_statement:
 	pop pch
 
 ubasic_print_statement:
+	mov r0, TOKENIZER_FOR
 	mov r0, TOKENIZER_PRINT
 	push pch
 	push pcl
@@ -740,14 +747,147 @@ ubasic_return_statement:
 	pop pch
 
 ubasic_next_statement:
-;todo
+	mov r0, TOKENIZER_NEXT
+	push pch
+	push pcl
+	b ubasic_accept
 
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	push r0			; var
+
+.if0:
+	ld r1, [ub_for_stack_index]
+	eq r1, #0
+	bzf .else0
+	sub r1, #3
+	add r1, #1
+	ld r0, [ub_for_stack]+r1	; for_variable
+	pop r1			; var
+	eq r0, r1
+	bzf .if0_next
+	b .else0
+.if0_next:
+	mov r0, r1		; var
+	push pch
+	push pcl
+	b ubasic_get_variable
+	add r0, #1
+	push r1			; var
+	mov r1, r0
+	pop r0			; var
+	push pch
+	push pcl
+	b ubasic_set_variable
+.if1:
+	push pch
+	push pcl
+	b ubasic_get_variable
+	push r0			; var
+	ld r1, [ub_for_stack_index]
+	sub r1, #3
+	add r1, #2
+	ld r0, [ub_for_stack]+r1	; to
+	pop r1			; var
+	gt r1, r0
+	bzf .else1
+.if1_next:
+	ld r1, [ub_for_stack_index]
+	sub r1, #3	
+	ld r0, [ub_for_stack]+r1	; line_after_for
+	push pch
+	push pcl
+	b ubasic_jump_linenum
+	b .done
+.else1:
+	ld r1, [ub_for_stack_index]
+	sub r1, #3
+	st [ub_for_stack_index], r1
+	mov r0, TOKENIZER_CR
+	push pch
+	push pcl
+	b ubasic_accept
+	b .done
+
+.else0:
+	mov r0, TOKENIZER_CR
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_fatal
+
+.done:
 	pop pcl
 	pop pch
 
 ubasic_for_statement:
-;todo
+	push pch
+	push pcl
+	b ubasic_accept
 
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	push r0			; for_variable
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
+	mov r0, TOKENIZER_EQ
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_expr
+	mov r1, r0
+	pop r0			; for_variable
+	push r0			; for_variable
+	push pch
+	push pcl
+	b ubasic_set_variable
+	mov r0, TOKENIZER_TO
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_expr
+	push r0			; to
+	mov r0, TOKENIZER_CR
+	push pch
+	push pcl
+	b ubasic_accept
+
+	ld r1, [ub_for_stack_index]
+	gt r1, #11
+	push r1
+	bzf .stack_depth_exceeded
+	push pch
+	push pcl
+	b ubasic_tokenizer_num
+	pop r1
+	st [ub_for_stack]+r1, r0
+	pop r0			; to
+	add r1, #2
+	st [ub_for_stack]+r1, r0
+	pop r0			; for_variable
+	sub r1, #1
+	st [ub_for_stack]+r1, r0
+
+	add r1, #2
+	st [ub_for_stack_index], r1
+	b .done
+
+.stack_depth_exceeded:
+	push pch
+	push pcl
+	b ubasic_fatal
+
+.done:
 	pop pcl
 	pop pch
 
