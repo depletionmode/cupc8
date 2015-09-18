@@ -103,8 +103,6 @@ ubasic_accept:
 	b ubasic_tokenizer_token
 
 	ld r1, [token]
-;st $f000, r1
-;st $f000, r0
 	xor r0, r1
 	eq r0, #0
 	bzf .cont
@@ -127,7 +125,7 @@ ubasic_varfactor:
 	push pch
 	push pcl
 	b ubasic_tokenizer_variable_num
-	
+
 	push pch
 	push pcl
 	b ubasic_get_variable
@@ -206,7 +204,7 @@ ubasic_term:
 	b ubasic_tokenizer_token
 	st [op], r0
 
-.loop:	
+.loop:
 	ld r0, [op]
 	eq r0, TOKENIZER_ASTR
 	bzf .next
@@ -288,7 +286,7 @@ ubasic_expr:
 	b ubasic_tokenizer_token
 	st [op], r0
 
-.loop:	
+.loop:
 	ld r0, [op]
 	eq r0, TOKENIZER_PLUS
 	bzf .next
@@ -375,7 +373,7 @@ ubasic_relation:
 	b ubasic_tokenizer_token
 	st [op], r0
 
-.loop:	
+.loop:
 	ld r0, [op]
 	eq r0, TOKENIZER_LT
 	bzf .next
@@ -500,14 +498,14 @@ ubasic_jump_linenum_slow:
 	push pch
 	push pcl
 	b ubasic_tokenizer_next
-.n2:	
+.n2:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
 	eq r0, TOKENIZER_NUMBER
 	bzf .loop0
 	b .loop1
-	
+
 .end:
 	pop pcl
 	pop pch
@@ -530,7 +528,7 @@ ubasic_jump_linenum:
 .end:
 	pop pcl
 	pop pch
-	
+
 ubasic_goto_statement:
 	mov r0, TOKENIZER_GOTO
 	push pch
@@ -687,16 +685,16 @@ ubasic_if_statement:
 	bzf .tok_next
 
 .tok_else:
-	push pch	
+	push pch
 	push pcl
 	b ubasic_tokenizer_next
-	push pch	
+	push pch
 	push pcl
 	b ubasic_statement
 	b .end
 
 .tok_next:
-	push pch	
+	push pch
 	push pcl
 	b ubasic_tokenizer_next
 
@@ -854,7 +852,7 @@ ubasic_next_statement:
 	bzf .else1
 .if1_next:
 	ld r1, [ub_for_stack_index]
-	sub r1, #3	
+	sub r1, #3
 	ld r0, [ub_for_stack]+r1	; line_after_for
 	push pch
 	push pcl
@@ -1144,7 +1142,7 @@ ubasic_set_variable:
 	gt r0, MAX_VARNUM
 	bzf .done
 	st [ub_variables]+r0, r1
-	
+
 .done:
 	pop pcl
 	pop pch
@@ -1153,17 +1151,17 @@ ubasic_get_variable:
 	gt r0, MAX_VARNUM
 	bzf .done
 	ld r0, [ub_variables]+r0
-	
+
 .done:
 	pop pcl
 	pop pch
 
 ubasic_fatal:
-	mov r0, #255
+	mov r0, #253
 	st $f000, r0
 halt
 	pop pcl
-	pop pch	
+	pop pch
 
 ub_linenum: resb 1
 ub_cur_chunk_offset: resb 1
@@ -1175,7 +1173,7 @@ ubasic_index_add:
 	b ubasic_index_find
 	gt r0, #0
 	bzf .done
-	
+
 	ld r0, [ub_linenum]
 	ld r1, [ub_line_index_current]
 	st [ub_line_index_chunk]+r1, r0
@@ -1215,7 +1213,7 @@ ubasic_index_find:
 	add r1, #3
 	push r1
 	b .loop
-	
+
 .match:
 	; offset in r1
 	add r1, #2
@@ -1231,7 +1229,7 @@ ubasic_index_find:
 .done:
 	pop pcl
 	pop pch
-	
+
 ubasic_index_free:
 	xor r1, r1
 .loop:
@@ -1246,4 +1244,3 @@ ubasic_index_free:
 .done:
 	pop pcl
 	pop pch
-

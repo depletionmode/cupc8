@@ -141,7 +141,7 @@ read_string:
     st [rs_i], r1
     b .loop
 .done:
-  ld r1, [rs_i]
+    ld r1, [rs_i]
   xor r0, r0
   std [rs_msg_addr]+r1, r0
     pop pcl
@@ -711,6 +711,40 @@ str_cpy:
   std [mem_p_dst]+r1, r0
 	pop pcl
 	pop pch
+
+mem_cmp_set0:
+	st [mem_p_dst], r1
+	st [mem_p_dst+1], r0
+	pop pcl
+	pop pch
+
+mem_cmp_set1:
+	st [mem_p_src], r1
+	st [mem_p_src+1], r0
+	pop pcl
+	pop pch
+
+mem_cmp_val: resb 1
+mem_cmp:
+  xor r1, r1
+.loop:
+  eq r1, r0
+  bzf .done
+  push r0
+  push r1
+  ldd r0, [mem_p_src]+r1
+  ldd r1, [mem_p_dst]+r1
+  sub r1, r0
+  st [mem_cmp_val], r1
+  pop r1
+  add r1, #1
+  pop r0
+  b .loop
+
+.done:
+  ld r0, [mem_cmp_val]
+  pop pcl
+  pop pch
 
 mem_cpy_set0:
 	st [mem_p_dst], r1

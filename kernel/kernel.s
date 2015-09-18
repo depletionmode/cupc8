@@ -18,8 +18,10 @@ main:
 	push pcl
 	b term_do
 	halt
-	
-	s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i * 2\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
+
+;	s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i * 2\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
+;	s_ubasic_program db "20 for i = 1 to 10\n30 print i * 2\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
+	s_ubasic_program db "5 let i = 5\n10 print \"test\", i\n20 end\n"
 	mov r0, #>[s_ubasic_program]
 	mov r1, #<[s_ubasic_program]
 	push pch

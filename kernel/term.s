@@ -142,7 +142,6 @@ term_parse:
 	push pch
 	push pcl
 	b str_cmp
-  st $f000, r0
 	gt r0, #0
 	bzf .new
 	push pch
@@ -165,7 +164,7 @@ term_parse:
 	b .done
 
 .run:
-	term_s_run db "help"
+	term_s_run db "run"
 	mov r0, #>[term_s_run]
 	mov r1, #<[term_s_run]
 	push pch
@@ -210,6 +209,23 @@ term_cmd_help:
 
 term_cmd_run:
 	; run program in BASIC program buffer
+	term_s_cr db "\n"
+	mov r0, #>[term_s_cr]
+	mov r1, #<[term_s_cr]
+	push pch
+	push pcl
+	b str_printstr
+
+	mov r0, #>[term_basic_prog_buf]
+	mov r1, #<[term_basic_prog_buf]
+	push pch
+	push pcl
+	b str_cpy_set
+	mov r0, #>[s_ubasic_program]
+	mov r1, #<[s_ubasic_program]
+	push pch
+	push pcl
+	b str_cpy
 
 	mov r0, #>[term_basic_prog_buf]
 	mov r1, #<[term_basic_prog_buf]
@@ -225,6 +241,13 @@ term_cmd_run:
 	b ubasic_finished
 	eq r0, #0
 	bzf .loop
+
+	term_s_done db "\nDONE.\n"
+	mov r0, #>[term_s_done]
+	mov r1, #<[term_s_done]
+	push pch
+	push pcl
+	b str_printstr
 
 .done:
 	pop pcl
