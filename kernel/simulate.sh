@@ -1,4 +1,3 @@
 #!/bin/bash
 
-./assemble.sh
-../tools/sim kernel.o
+./assemble.sh && ../tools/sim kernel.o

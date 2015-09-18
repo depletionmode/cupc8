@@ -4,7 +4,7 @@ term_basic_prog_buf: resb 256
 
 term_line_buf: resb 40
 
-term:
+term_do:
 .loop:
 	push pch
 	push pcl
@@ -13,6 +13,8 @@ term:
 	push pch
 	push pcl
 	b term_parse
+
+	b .loop
 
 .done:
 	pop pcl
@@ -29,12 +31,12 @@ term_get_token:
 	mov r1, #<[term_token_buf]
 	push pch
 	push pcl
-	str_cpy_set
+	b str_cpy_set
 	mov r0, #>[term_line_buf]
 	mov r1, #<[term_line_buf]
 	push pch
 	push pcl
-	str_cpy
+	b str_cpy
 
 	xor r0, r0
 	st [term_token_num], r0
@@ -45,6 +47,8 @@ term_get_token:
 	eq r1, #10
 	bzf .whitespace_found
 	eq r1, #13
+	bzf .whitespace_found
+	eq r1, #0
 	bzf .whitespace_found
 	add r0, #1
 	b .loop
@@ -63,35 +67,33 @@ term_get_token:
 	add r0, #1
 	st [term_token_num], r0
 	pop r0
-	bzf .found
+	bzf .done
+	push r0
 
 .not_at_token:
-
-	; cut toekn from token buffer
+	; cut token from token buffer
 	mov r0, #>[term_token_buf]
 	mov r1, #<[term_token_buf]
 	push pch
 	push pcl
-	str_cpy_set
-	mov r0, #>[term_line_buf]
+	b str_cpy_set
+	pop r0
 	mov r1, #<[term_line_buf]
+	add r1, r0
+	lt r1, r0
+	mov r0, #>[term_line_buf]
+	bzf .carry
+	b .nocarry
+.carry:
+	add r0, #1
+.nocarry:
 	push pch
 	push pcl
-	str_cpy
-
-	; calc offset and copy
-	pop r0
-	pop r1
-	eq r0, r1
-	bzf .done
-	add r0, #1
-	push r1
-	push r0
+	b str_cpy
+	xor r0, r0
 	b .loop
 
 .done:
-	pop r0
-	pop r1
 	pop pcl
 	pop pch
 
@@ -102,6 +104,13 @@ term_prompt:
 	push pcl
 	b set_echo_char
 
+	term_s_prompt db ">> "
+	mov r0, #>[term_s_prompt]
+	mov r1, #<[term_s_prompt]
+	push pch
+	push pcl
+	b str_printstr
+
 .read_string:
 	mov r0, #>[term_line_buf]
 	mov r1, #<[term_line_buf]
@@ -110,21 +119,21 @@ term_prompt:
 	b read_string
 
 .done:
-	term_s_prompt db ">> "
 	pop pcl
 	pop pch
 
 term_parse:
 	xor r0, r0
 	push pch
-	psuh pcl
+	push pcl
 	b term_get_token	; get first token (cmd)
 
-	ld r0, [term_line_buf+1]
-	ld r1, [term_line_buf]
+	mov r0, #>[term_token_buf]
+	mov r1, #<[term_token_buf]
 	push pch
 	push pcl
 	b str_cmp_set
+	ld r0, [term_token_buf]
 
 .help:
 	term_s_help db "help"
@@ -133,7 +142,8 @@ term_parse:
 	push pch
 	push pcl
 	b str_cmp
-`	gt r0, #0
+  st $f000, r0
+	gt r0, #0
 	bzf .new
 	push pch
 	push pcl
@@ -147,7 +157,7 @@ term_parse:
 	push pch
 	push pcl
 	b str_cmp
-`	gt r0, #0
+	gt r0, #0
 	bzf .run
 	push pch
 	push pcl
@@ -161,15 +171,19 @@ term_parse:
 	push pch
 	push pcl
 	b str_cmp
-`	gt r0, #0
-	bzf .invalid
+	gt r0, #0
+	bzf .num
 	push pch
 	push pcl
 	b term_cmd_run
 	b .done
 
+.num:
+	;todo
+	b .invalid
+
 .invalid:
-	term_s_invalid_cmd db "ERROR: invalid cmd!"
+	term_s_invalid_cmd db "\nERROR: invalid cmd!\n"
 	mov r0, #>[term_s_invalid_cmd]
 	mov r1, #<[term_s_invalid_cmd]
 	push pch
@@ -228,7 +242,7 @@ term_cmd_new:
 	st [term_basic_prog_buf]+r1, r0
 	add r1, #1
 	b .loop
-	
+
 .zeroed:
 	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
@@ -242,4 +256,3 @@ term_cmd_basic_statement:
 .done:
 	pop pcl
 	pop pch
-

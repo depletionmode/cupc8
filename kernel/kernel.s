@@ -14,6 +14,11 @@ main:
 ;'    push pcl
 ;'	b print_string
 
+	push pch
+	push pcl
+	b term_do
+	halt
+	
 	s_ubasic_program db "10 gosub 100\n20 for i = 1 to 10\n30 print i * 2\n40 next i\n50 print \"end\"\n60 end\n100 print \"subroutine\"\n110 return\n"
 	mov r0, #>[s_ubasic_program]
 	mov r1, #<[s_ubasic_program]
@@ -36,7 +41,7 @@ main:
 ;    push pch
 ;    push pcl
 ;	b print_string
-	
+
 
 ;	s_prompt db "\n>> "
 ;	mov r0, #>[s_prompt]

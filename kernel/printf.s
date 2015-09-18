@@ -124,8 +124,8 @@ read_string:
 	bzf .done
 	eq r0, #13
 	bzf .done
-    ld r1, [rs_i]
-    std [rs_msg_addr]+r1, r0
+  ld r1, [rs_i]
+  std [rs_msg_addr]+r1, r0
 	; check if echo
 	ld r1, [g_echo_char]
 	eq r1, #1
@@ -141,7 +141,9 @@ read_string:
     st [rs_i], r1
     b .loop
 .done:
-	mov r0, #100
+  ld r1, [rs_i]
+  xor r0, r0
+  std [rs_msg_addr]+r1, r0
     pop pcl
     pop pch
 
@@ -277,7 +279,7 @@ print_string:
 .done:
     pop pcl
     pop pch
-	
+
 pm_i: resb 1
 print_msg:
 	mov r0, #>[temp_msg]
@@ -288,7 +290,7 @@ print_msg:
 .done:
     pop pcl
     pop pch
-    
+
 i0: resb 1
 j0: resb 1
 char0: resb 1
@@ -327,7 +329,7 @@ print_char:
     st [posy], r0
     xor r0, r0
     st [posx], r0
-    b .done 
+    b .done
 .cont:
     mov r1, #8
     push pch
@@ -523,7 +525,7 @@ print_char:
 
     lt r1, #8   ; ? j < 8
     bzf .loop
-    
+
     ld r0, [posx]
     add r0, #8
     eq r0, #0
@@ -617,7 +619,7 @@ str_atoi:
 	sub r0, #48
 	push r0
 	mov r0, #10
-	ld r1, [str_int_res]	
+	ld r1, [str_int_res]
 	push pch
 	push pcl
 	b math_mul
@@ -667,32 +669,22 @@ str_cmp:
 
 	xor r1, r1
 	st [str_cmp_pos], r1
-	st [str_cmp_mismatch], r1
 .loop:
 	ld r1, [str_cmp_pos]
 	ldd r0, [str_cmp_ptr0]+r1
+	ldd r1, [str_cmp_ptr1]+r1
+  sub r1, r0
+  st [str_cmp_mismatch], r1
+  gt r1, #0
+  bzf .done
 	eq r0, #0
 	bzf .done
-	ldd r0, [str_cmp_ptr1]+r1
-	eq r0, #0
-	bzf .done
+
 	ld r1, [str_cmp_pos]
-	ldd r0, [str_cmp_ptr0]+r1
-	push r0
-	ldd r0, [str_cmp_ptr1]+r1
-	pop r1
-	eq r0, r1
-	bzf .match
-.mismatch:
-	mov r0, #1
-	st [str_cmp_mismatch], r0
-	b .done
-.match:
-	ld r1, [str_cmp_pos]
-	add r1, #1
-	st [str_cmp_pos], r1
-	b .loop
-	
+  add r1, #1
+  st [str_cmp_pos], r1
+  b .loop
+
 .done:
 	ld r0, [str_cmp_mismatch]
 	pop pcl
@@ -710,9 +702,13 @@ str_cpy:
 	push pch
 	push pcl
 	b str_len
+  push r0
 	push pch
 	push pcl
 	b mem_cpy
+  xor r0, r0
+  pop r1
+  std [mem_p_dst]+r1, r0
 	pop pcl
 	pop pch
 
@@ -790,7 +786,7 @@ str_chr:
 
 	ld r1, [str_chr_ptr]
 	ld r0, [str_chr_ptr+1]
-.end:	
+.end:
 	pop pcl
 	pop pch
 
