@@ -104,7 +104,7 @@ term_prompt:
 	push pcl
 	b set_echo_char
 
-	term_s_prompt db ">> "
+	term_s_prompt db "\n>> "
 	mov r0, #>[term_s_prompt]
 	mov r1, #<[term_s_prompt]
 	push pch
@@ -160,7 +160,7 @@ term_parse:
 	bzf .run
 	push pch
 	push pcl
-	b term_cmd_run
+	b term_cmd_new
 	b .done
 
 .run:
@@ -178,8 +178,15 @@ term_parse:
 	b .done
 
 .num:
-	;todo
-	b .invalid
+	mov r0, #>[term_token_buf]
+	mov r1, #<[term_token_buf]
+	push pch
+	push pcl
+	b str_atoi
+	eq r0, #0
+	bzf .invalid
+	b term_cmd_basicline
+	b .done
 
 .invalid:
 	term_s_invalid_cmd db "\nERROR: invalid cmd!\n"
@@ -188,6 +195,46 @@ term_parse:
 	push pch
 	push pcl
 	b str_printstr
+
+.done:
+	pop pcl
+	pop pch
+
+term_basic_prog_ptr: resb 2
+term_cmd_basicline:
+	mov r0, #>[term_basic_prog_buf]
+	st [term_basic_prog_ptr+1], r0
+	mov r1, #<[term_basic_prog_buf]
+	ld r0, [term_basic_prog_buf_idx]
+	add r1, r0
+	st [term_basic_prog_ptr], r1
+	lt r1, r0
+	bzf .carry
+	b .nocarry
+.carry:
+	mov r0, #>[term_basic_prog_buf]
+	add r0, #1
+	st [term_basic_prog_ptr+1], r0
+.nocarry:
+	mov r0, [term_basic_prog_ptr+1]
+	mov r1, [term_basic_prog_ptr]
+	push pch
+	push pcl
+	b str_cpy_set
+	mov r0, #>[term_line_buf]
+	mov r1, #<[term_line_buf]
+	push pch
+	push pcl
+	b str_cpy
+	mov r0, #>[term_line_buf]
+	mov r1, #<[term_line_buf]
+	push pch
+	push pcl
+	b str_len
+	st $f000, r0
+	ld r1, [term_basic_prog_buf_idx]
+	add r1, r0
+	st [term_basic_prog_buf_idx], r1
 
 .done:
 	pop pcl
@@ -209,23 +256,12 @@ term_cmd_help:
 
 term_cmd_run:
 	; run program in BASIC program buffer
-	term_s_cr db "\n"
-	mov r0, #>[term_s_cr]
-	mov r1, #<[term_s_cr]
-	push pch
-	push pcl
-	b str_printstr
 
 	mov r0, #>[term_basic_prog_buf]
 	mov r1, #<[term_basic_prog_buf]
 	push pch
 	push pcl
-	b str_cpy_set
-	mov r0, #>[s_ubasic_program]
-	mov r1, #<[s_ubasic_program]
-	push pch
-	push pcl
-	b str_cpy
+	b str_printstr
 
 	mov r0, #>[term_basic_prog_buf]
 	mov r1, #<[term_basic_prog_buf]
