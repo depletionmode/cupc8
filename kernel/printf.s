@@ -698,21 +698,15 @@ str_cmp:
 	pop pcl
 	pop pch
 
-str_cpy_set0:
+str_cpy_set:
 	st [mem_p_dst], r1
 	st [mem_p_dst+1], r0
 	pop pcl
 	pop pch
 
-str_cpy_set1:
+str_cpy:
 	st [mem_p_src], r1
 	st [mem_p_src+1], r0
-	pop pcl
-	pop pch
-
-str_cpy:
-	ld r1, [mem_p_src]
-	ld r0, [mem_p_src+1]
 	push pch
 	push pcl
 	b str_len
