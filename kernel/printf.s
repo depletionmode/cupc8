@@ -142,6 +142,9 @@ read_string:
     b .loop
 .done:
     ld r1, [rs_i]
+  mov r0, #13
+  std [rs_msg_addr]+r1, r0
+  add r1, #1
   xor r0, r0
   std [rs_msg_addr]+r1, r0
     pop pcl

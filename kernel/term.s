@@ -216,24 +216,28 @@ term_cmd_basicline:
 	add r0, #1
 	st [term_basic_prog_ptr+1], r0
 .nocarry:
-	mov r0, [term_basic_prog_ptr+1]
-	mov r1, [term_basic_prog_ptr]
+	ld r0, [term_basic_prog_ptr+1]
+	ld r1, [term_basic_prog_ptr]
 	push pch
 	push pcl
-	b str_cpy_set
+	b mem_cpy_set0
 	mov r0, #>[term_line_buf]
 	mov r1, #<[term_line_buf]
 	push pch
 	push pcl
-	b str_cpy
+	b mem_cpy_set1
 	mov r0, #>[term_line_buf]
 	mov r1, #<[term_line_buf]
 	push pch
 	push pcl
 	b str_len
+	push pch
+	push pcl
+	b mem_cpy
 	st $f000, r0
 	ld r1, [term_basic_prog_buf_idx]
 	add r1, r0
+	add r1, #1
 	st [term_basic_prog_buf_idx], r1
 
 .done:
