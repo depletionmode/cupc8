@@ -36,7 +36,9 @@ There is no compiler available for the CUPC/8 ISA. Development tools are cross-p
 
 The **CUPC/8** has two 8-bit General Purpose Reigsters (GPRs), **r0** and **r1**. These are available for use by arithmetic operations and *LOAD*/*STORE* operations.
 
-Two internal 16-bit address registers are provided for program flow; the **pc** (Program Counter) and **sp** (Stack Pointer) registers. The **pc** register holds the address of the next instruction awaiting execution. The **sp** register points to the address of the next free chunk of the stack memory region. Neither of these two registers can be acted upon directly and are modified through program flow and stack operations only.
+A status register exists which provides the internal logic with flags that are set due to operations. The only flag currenty is the **Z** (*zero*) flag which is set during comparison operations (*EQ*/*GT*/*LT*) and allows the CPU to perform decisions based on the **Z** flag value (for example, *BZF* - which branches if the flag is not set).
+
+Two internal 16-bit address registers are provided for program flow; the **pc** (program counter) and **sp** (stack pointer) registers. The **pc** register holds the address of the next instruction awaiting execution. The **sp** register points to the address of the next free chunk of the stack memory region. Neither of these two registers can be acted upon directly and are modified through program flow and stack operations only.
 
 There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high' program counter registers). These registers can be acted upon through the use of stack operations (i.e. *PUSH*/*POP*) only. The **pch** register is special in that upon receiving a value though a stack *POP* operation, the 8-bit values of the **pcl** and **pch** registers are copied into the **pc** register such that _**pc** := **pch**||**pcl**_ and program flow jumps immediately to the new **pc** address. This is used to return from functions (as there is currently no dedicated *RET* instruction).
 
