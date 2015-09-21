@@ -58,7 +58,7 @@ On boot, the CPU will start executing from the Hard Reset Vector, *$f000* (i.e. 
 The kernel is responsible for setting up the IVT to handle interrupts that may occur from external sources (such as peripherals). *[TODO]*
 
 ###### Stack Region
-The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. The architecture does not support addressing off the stack pointer (there is no way to access something like _**sp** + $10_ for example) or block allocation of stack regions (there are no base/frame pointers). *Warning: Overflowing the stack is completely possible and the CPU will not care - so **don't do this!***
+The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. The architecture does not support addressing off the stack pointer (there is no way to access something like _[**sp** + $10]_ for example) or block allocation of stack regions (there are no base/frame pointers). *Warning: Overflowing the stack is completely possible and the CPU will not care - so **don't do this!***
 
 ###### Program Region
 This is where the code goes. The CPU will start executing from *$1000* and the **CUPC/8** kernel places a jump to the kernel initialization function vector at this address.
