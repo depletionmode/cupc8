@@ -116,5 +116,17 @@ After configuration of the SPI device, a typical transaction might look as follo
 		ld r0, $f101	; read RX buffer
 
 
+#### Instruction Set
 
-
+Mneumonic | Opcode | Format | Syntax | Operation
+:--- | :--- | :--- | :--- | :---
+NOP|80|R|NOP
+MOVr|88|R|MOV Ra, Rb|Ra <= Rb
+MOVi|8c|I|MOV Ra, #imm|Ra <= imm
+PUSHr|90|R|PUSH Rb|[SP] <= Rb; SP <= SP + 1
+PUSHi|94|I|PUSH #imm|[SP] <= imm; SP <= SP + 1
+POP|98|R|POP Ra|Ra <= [SP]; SP <= SP - 1
+LD|a0|M|LD Ra, $addr|Ra <= [addr]
+LDind|a4|M|LD Ra, $addr+Rb|Ra <= [addr + Rb]
+ST|a8|M|ST $addr, Rb|[addr] <= Rb
+STind|ac|M|ST $addr+Ra, Rb|[addr + Ra] <= Rb
