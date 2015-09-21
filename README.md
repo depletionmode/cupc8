@@ -1,7 +1,7 @@
-# CUPC/8
+## CUPC/8
 
-**Documentation**
+###### Documentation
 https://github.com/depletionmode/cupcake/blob/master/doc/CUPC8%20Manual.md
 
-**Blog**
+###### Blog
 http://depletionmode.com/projects
