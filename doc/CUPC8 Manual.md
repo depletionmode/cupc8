@@ -2,7 +2,7 @@
 
 ## Introduction
 
-> The ***C**ompletely **U**seless and **P**ointless **C**omputer / **8*** bit.
+> The _**C**ompletely **U**seless and **P**ointless **C**omputer / **8**_ bit.
 
 **CUPC/8** is a simple 8-bit microcomputer designed and built by myself *(David Kaplan)* for fun over the years 2014-2016. The design is pretty dirty and 'evolved' as I added features necessary to achive the goal of a fully working, custom-designed 8-bit machine that could connect to the Internet.
 The full hardware and software stacks have been designed and coded from the ground up (with the exception of certain 3rd-party open source pieces of software whch I ported over to the CUPC/8 ISA). This document serves as a manual detailing all aspects of the computer for anyone that may, however unlikely, be interested in my work in the future.
@@ -38,7 +38,7 @@ The **CUPC/8** has two 8-bit General Purpose Reigsters (GPRs), **r0** and **r1**
 
 Two internal 16-bit address registers are provided for program flow; the **pc** (Program Counter) and **sp** (Stack Pointer) registers. The **pc** register holds the address of the next instruction awaiting execution. The **sp** register points to the address of the next free chunk of the stack memory region. Neither of these two registers can be acted upon directly and are modified through program flow and stack operations only.
 
-There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high' program counter registers). These registers can be acted upon through the use of stack operations (i.e. *PUSH*/*POP*) only. The **pch** register is special in that upon receiving a value though a stack *POP* operation, the 8-bit values of the **pcl** and **pch** registers are copied into the **pc** register such that ***pc** := **pch**||**pcl*** and program flow jumps immediately to the new **pc** address. This is used to return from functions (as there is currently no dedicated *RET* instruction).
+There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high' program counter registers). These registers can be acted upon through the use of stack operations (i.e. *PUSH*/*POP*) only. The **pch** register is special in that upon receiving a value though a stack *POP* operation, the 8-bit values of the **pcl** and **pch** registers are copied into the **pc** register such that _**pc** := **pch**||**pcl**_ and program flow jumps immediately to the new **pc** address. This is used to return from functions (as there is currently no dedicated *RET* instruction).
 
 #### Memory layout
 
@@ -52,13 +52,13 @@ There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high'
  I/O | $f000 | $ffff
 
 ###### Soft Reset Vector (SRV) Region
-On boot, the CPU will start executing from the Hard Reset Vector, *$f000* (i.e. ***pc** := $1000*) and **sp** will be reset to the bottom of the stack (***sp** := $0100*). A configurable SRV can be set at *$0000*. Even if unused this vector should be set to *$1000* as soon as possible after boot.
+On boot, the CPU will start executing from the Hard Reset Vector, *$f000* (i.e. _**pc** := $1000_) and **sp** will be reset to the bottom of the stack (_**sp** := $0100_). A configurable SRV can be set at *$0000*. Even if unused this vector should be set to *$1000* as soon as possible after boot.
 
 ###### Interrupt Vector Table (IVT) Region
 The kernel is responsible for setting up the IVT to handle interrupts that may occur from external sources (such as peripherals). *[TODO]*
 
 ###### Stack Region
-The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. The architecture does not support addressing off the stack pointer (there is no way to access something like ***sp** + $10* for example) or block allocation of stack regions (there are no base/frame pointers). *Warning: Overflowing the stack is completely possible and the CPU will not care - so **don't do this!***
+The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. The architecture does not support addressing off the stack pointer (there is no way to access something like _**sp** + $10_ for example) or block allocation of stack regions (there are no base/frame pointers). *Warning: Overflowing the stack is completely possible and the CPU will not care - so **don't do this!***
 
 ###### Program Region
 This is where the code goes. The CPU will start executing from *$1000* and the **CUPC/8** kernel places a jump to the kernel initialization function vector at this address.
