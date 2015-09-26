@@ -173,7 +173,7 @@ proc ins_st_do(o: int, a: int) =
             if not has_key:
               spi_rx_buf[dev] = 0xff
             else:
-              log(1, "HAS KEY $1" % [toHex(keybuffer, 2)])
+              #log(1, "HAS KEY $1" % [toHex(keybuffer, 2)])
               spi_rx_buf[dev] = keybuffer
               has_key = false
           else:
@@ -206,8 +206,8 @@ proc ins_ld_do(o: int, a: int) =
       var reg = address and 0xf
       case reg:
         of 1:   # rx
-          if spi_rx_buf[dev] != 0xff:
-              echo "READ"
+          #if spi_rx_buf[dev] != 0xff:
+          #    echo "READ"
           reg_write(o, spi_rx_buf[dev])
         of 3:   # status
           case dev:
@@ -431,7 +431,7 @@ proc exec() {.cdecl.} =
         let e = evt.key()
         keybuffer = getKeyFromScancode(e.keysym.scancode)
         has_key = true
-        writeln(stdout, "key")
+        #writeln(stdout, "key")
       else:
         discard
 
@@ -441,12 +441,12 @@ else:
   var ins_ctr = 0
   var start = cpuTime()
   while not atend:
-    ins_ctr += 1
     exec()
-    if ins_ctr mod 1000000 == 0:
+    ins_ctr += 1
+    if ins_ctr mod 100000 == 0:
       ins_ctr = 0
       var elapsed = cpuTime() - start
-      log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/1000000, ffDecimal, 2))
+      log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/10000000, ffDecimal, 2))
       start = cpuTime()
   while true:
       discard

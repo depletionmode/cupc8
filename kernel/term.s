@@ -5,6 +5,13 @@ term_basic_prog_buf: resb 256
 term_line_buf: resb 40
 
 term_do:
+	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n\n"
+	mov r0, #>[term_s_info]
+	mov r1, #<[term_s_info]
+	push pch
+	push pcl
+	b str_printstr
+
 .loop:
 	push pch
 	push pcl
@@ -117,6 +124,13 @@ term_prompt:
 	push pch
 	push pcl
 	b read_string
+
+	term_s_cr db "\n"
+	mov r0, #>[term_s_cr]
+	mov r1, #<[term_s_cr]
+	push pch
+	push pcl
+	b str_printstr
 
 .done:
 	pop pcl
@@ -231,13 +245,14 @@ term_cmd_basicline:
 	push pch
 	push pcl
 	b str_len
+	push r0
 	push pch
 	push pcl
 	b mem_cpy
-	st $f000, r0
+
 	ld r1, [term_basic_prog_buf_idx]
+	pop r0
 	add r1, r0
-	add r1, #1
 	st [term_basic_prog_buf_idx], r1
 
 .done:
@@ -247,7 +262,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nAvailable commands:\n==================\n"NEW - clear uBASIC prog mem\n"RUN - execute program currently in uBASIC prog mem\n\n"
+	term_s_help_buf db "\nNEW RUN CLEAR\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch
@@ -260,12 +275,6 @@ term_cmd_help:
 
 term_cmd_run:
 	; run program in BASIC program buffer
-
-	mov r0, #>[term_basic_prog_buf]
-	mov r1, #<[term_basic_prog_buf]
-	push pch
-	push pcl
-	b str_printstr
 
 	mov r0, #>[term_basic_prog_buf]
 	mov r1, #<[term_basic_prog_buf]

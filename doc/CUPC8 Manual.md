@@ -117,6 +117,19 @@ After configuration of the SPI device, a typical transaction might look as follo
 
 
 #### Instruction Set
+The **CUPC/8** instruction set contains of 38 8-bit instructions.
+Each instruction consists of an 5-bit/6-bit operation code (*opcode*) followed by register bits and zero, one or two bytes as defined by the instruction *format*.
+
+###### Register Format
+Instructions of the **Register** format act on registers only and are 8-bit in length. The 5 most significant bits 7..3 denote the operation, bit 2 should always be cleared, bits 1 and 0 are registers Rb and Ra respectively (bit cleared = r0, bit set = r1).
+
+	 -----------------------------
+	[   ins   |  0  |  Rb  |  Ra  ]
+	 -----------------------------
+	   {7..3}   {2}    {1}   {0}
+
+###### Immediate Format
+Instructions of the **Immediate** format are used when operations are performed on immediate 8-bit values.
 
 Mneumonic | Opcode | Format | Syntax | Operation
 :--- | :--- | :--- | :--- | :---
@@ -125,7 +138,7 @@ MOVr|88|R|MOV Ra, Rb|Ra <= Rb
 MOVi|8c|I|MOV Ra, #imm|Ra <= imm
 PUSHr|90|R|PUSH Rb|[SP] <= Rb; SP <= SP + 1
 PUSHi|94|I|PUSH #imm|[SP] <= imm; SP <= SP + 1
-POP|98|R|POP Ra|Ra <= [SP]; SP <= SP - 1
+POP|98|R|POP Ra|Ra <= [SP]; SP <= SP - 1 *(; PC <= PCH\|\|PCL on Ra = PCH)*
 LD|a0|M|LD Ra, $addr|Ra <= [addr]
 LDind|a4|M|LD Ra, $addr+Rb|Ra <= [addr + Rb]
 ST|a8|M|ST $addr, Rb|[addr] <= Rb
