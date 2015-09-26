@@ -116,12 +116,14 @@ After configuration of the SPI device, a typical transaction might look as follo
 		ld r0, $f101	; read RX buffer
 
 
-#### Instruction Set
+#### Instruction Set Architecture
 The **CUPC/8** instruction set contains of 38 8-bit instructions.
 Each instruction consists of an 5-bit/6-bit operation code (*opcode*) followed by register bits and zero, one or two bytes as defined by the instruction *format*.
 
 ###### Register Format
-Instructions of the **Register** format act on registers only and are 8-bit in length. The 5 most significant bits 7..3 denote the operation, bit 2 should always be cleared, bits 1 and 0 are registers Rb and Ra respectively (bit cleared = r0, bit set = r1).
+Instructions of the **register** format act on registers only and are 8-bit in length. The 5 most significant bits 7..3 denote the operation, bit 2 should always be cleared, bits 1 and 0 are registers Rb and Ra respectively (bit cleared = **r0**, bit set = **r1**).
+
+The CPU performs only a single *fetch* operation for instructions of this formations are the fastest to execute.
 
 	 -----------------------------
 	[   ins   |  0  |  Rb  |  Ra  ]
@@ -129,8 +131,36 @@ Instructions of the **Register** format act on registers only and are 8-bit in l
 	   {7..3}   {2}    {1}   {0}
 
 ###### Immediate Format
-Instructions of the **Immediate** format are used when operations are performed on immediate 8-bit values.
+Instructions of the **immediate** format are used when operations are performed on immediate 8-bit values. The most significant 5 bits denote the operation. Bit 10 must always be set. Bit 9 is ignored. Bit 8 denotes register Ra (bit cleared = **r0**, bit set = **r1**). The final 8 bit value is the immediate value.
 
+The CPU performs two *fetch* operation for instructions of this format.
+
+	 --------------------------------    -------
+	[    ins    |   1   |  ?  |  Ra  ]  [  IMM  ]
+	 --------------------------------    -------
+	   {15..11}   {10}    {9}    {8}      {7..0}
+
+###### Memory Format
+Instructions of the **memory** format are used to store and load values via the MMU. The 5 most significant bits denote the operation. The next bit is ignored. Bits 17 and 16 are the Rb and Ra registers respectively. The final 16 bits denote the address of the memory operation.
+
+The CPU performs three *fetch* operation for instructions of this format. These, together with the **flow** format instructions, are the slowest instructions to execute.
+
+	 -------------------------------------    ----------
+	[    ins    |   ?   |   Rb   |   Ra   ]  [   ADDR   ]
+	 -------------------------------------    ----------
+	   {23..19}   {18}     {17}     {16}       {15..0}
+
+###### Flow Format
+Instructions of the **flow** format are used to modify program execution flow (such as by modification of the program counter). The most significant 5 bits denote the operation. The next 3 bits are ignored. The final 16 bit value holds the target address for the program flow change operation.
+
+The CPU performs three *fetch* operation for instructions of this format. These, together with the **memory** format instructions, are the slowest to execute.
+
+	 -----------------------    ----------
+	[    ins    |     ?     ]  [   ADDR   ]
+	 -----------------------    ----------
+	   {23..19}   {18..16}        {15..0}
+
+###### Instructions
 Mneumonic | Opcode | Format | Syntax | Operation
 :--- | :--- | :--- | :--- | :---
 NOP|80|R|NOP
