@@ -5,7 +5,7 @@ term_basic_prog_buf: resb 256
 term_line_buf: resb 40
 
 term_do:
-	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n\n"
+	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n"
 	mov r0, #>[term_s_info]
 	mov r1, #<[term_s_info]
 	push pch
