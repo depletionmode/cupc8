@@ -50,8 +50,12 @@ proc display_transact*(b) =
             if (rect_bitmask and 12) == 12:
                 state = "NOSTATE"
         of "COLOR_A":
+            var c : uint8 = (uint8)v
+            render.setDrawColor c,c,c,c
             state = "COLOR_B"
         of "COLOR_B":
+            render.fillRect r
+            should_render = true
             state = "NOSTATE"
         else:
             case v:
@@ -67,7 +71,5 @@ proc display_transact*(b) =
                     r.h = 0
                 of 44:
                     state = "COLOR_A"
-                    render.fillRect r
-                    should_render = true
                 else:
                     discard
