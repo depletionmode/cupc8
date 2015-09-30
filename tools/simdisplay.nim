@@ -6,6 +6,7 @@ discard sdl2.init(INIT_EVERYTHING)
 var
     win: WindowPtr
     render: RendererPtr
+    should_render: bool = false
 
 win = createWindow("CUPCake Simulator", 100, 100, 256, 256, SDL_WINDOW_SHOWN)
 when defined(emscripten):
@@ -18,6 +19,11 @@ render.clear
 render.present
 
 render.setDrawColor 255,255,255,255 # always use white for now
+
+proc display_render*() = 
+    if (should_render):
+        render.present
+        should_render = false
 
 var r : Rect
 var state = "NOSTATE"
@@ -62,6 +68,6 @@ proc display_transact*(b) =
                 of 44:
                     state = "COLOR_A"
                     render.fillRect r
-                    render.present
+                    should_render = true
                 else:
                     discard

@@ -443,8 +443,11 @@ else:
   while not atend:
     exec()
     ins_ctr += 1
+    # render after every 150,000 instructions (> 30 fps when running @ ~ 5MHz)
+    if ins_ctr mod 150000 == 0:
+      display_render()
     if ins_ctr mod 100000 == 0:
-      ins_ctr = 0
+      #ins_ctr = 0
       var elapsed = cpuTime() - start
       log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/10000000, ffDecimal, 2))
       start = cpuTime()
