@@ -342,6 +342,29 @@ proc ins_bzf(o: int) =
 proc ins_halt(o: int) =
   HF = true
 
+proc ins_tmr0(o: int) = 
+  # ra - interrupt vector entry in ivt
+  # rb - trigger every ra x 1000 cycles
+  var tup = get_imm(o)
+  var imm = tup[0]
+  var rb = tup[1]
+  if not imm:
+    rb = reg_read(o, false)
+  var ra = reg_read(o, true)
+  # to timer
+
+proc ins_tmr1(o: int) = 
+  # ra - interrupt vector entry in ivt
+  # rb - trigger every ra x 1000 cycles
+  var tup = get_imm(o)
+  var imm = tup[0]
+  var rb = tup[1]
+  if not imm:
+    rb = reg_read(o, false)
+  var ra = reg_read(o, true)
+  # to timer
+
+
 proc decode() =
   var op = fetch()
   #log(4, "decode: $1" % toBin(op, 8))
@@ -370,6 +393,8 @@ proc decode() =
     of 0x48: ins_sub(r)
     of 0x60: ins_shl(r)
     of 0x68: ins_shr(r)
+    of 0xe0: ins_tmr0(r)
+    of 0xe8: ins_tmr1(r)
     of 0xf8: ins_halt(r)
     else:
       discard

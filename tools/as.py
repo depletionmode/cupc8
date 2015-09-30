@@ -8,7 +8,7 @@ opcodes = {
             'add':0x40,     'sub' :0x48,
             'shl':0x60,     'shr' :0x68,
             'ldd':0x70,     'std' :0x78,
-            'halt':0xf8
+            'halt':0xf8,    'tmr0' :0xe0,   'tmr1' :0xe8
           }
 
 registers = [ 'r0', 'r1' ]
