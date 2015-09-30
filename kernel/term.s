@@ -34,13 +34,16 @@ term_get_token:
 	push r0
 
 	; copy line into token buffer
-	mov r0, #>[term_token_buf]
 	mov r1, #<[term_token_buf]
-	push pch
-	push pcl
-	b str_cpy_set
-	mov r0, #>[term_line_buf]
+	push r1
+	mov r1, #>[term_token_buf]
+	push r1
+
 	mov r1, #<[term_line_buf]
+	push r1
+	mov r1, #>[term_line_buf]
+	push r1
+
 	push pch
 	push pcl
 	b str_cpy
@@ -79,12 +82,13 @@ term_get_token:
 
 .not_at_token:
 	; cut token from token buffer
-	mov r0, #>[term_token_buf]
-	mov r1, #<[term_token_buf]
-	push pch
-	push pcl
-	b str_cpy_set
 	pop r0
+
+	mov r1, #<[term_token_buf]
+	push r1
+	mov r1, #>[term_token_buf]
+	push r1
+
 	mov r1, #<[term_line_buf]
 	add r1, r0
 	lt r1, r0
@@ -94,6 +98,10 @@ term_get_token:
 .carry:
 	add r0, #1
 .nocarry:
+	push r1
+	push r0
+
+
 	push pch
 	push pcl
 	b str_cpy
@@ -255,26 +263,19 @@ term_cmd_basicline:
 .nocarry:
 	ld r0, [term_basic_prog_ptr+1]
 	ld r1, [term_basic_prog_ptr]
-	push pch
-	push pcl
-	b mem_cpy_set0
-	mov r0, #>[term_line_buf]
-	mov r1, #<[term_line_buf]
-	push pch
-	push pcl
-	b mem_cpy_set1
-	mov r0, #>[term_line_buf]
-	mov r1, #<[term_line_buf]
-	push pch
-	push pcl
-	b str_len
+	push r1
 	push r0
+
+	mov r0, #>[term_line_buf]
+	mov r1, #<[term_line_buf]
+	push r1
+	push r0
+
 	push pch
 	push pcl
-	b mem_cpy
 
+	b str_cpy
 	ld r1, [term_basic_prog_buf_idx]
-	pop r0
 	add r1, r0
 	st [term_basic_prog_buf_idx], r1
 

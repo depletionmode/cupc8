@@ -132,7 +132,6 @@ st7735_set_color:
     ; - color idx
 
 	st [st7735_set_color_color], r0
-st $f000, r0
 
     ; save return pc
     pop r0

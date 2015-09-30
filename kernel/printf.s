@@ -693,25 +693,56 @@ str_cmp:
 	pop pcl
 	pop pch
 
-str_cpy_set:
-	st [mem_p_dst], r1
-	st [mem_p_dst+1], r0
-	pop pcl
-	pop pch
-
+str_cpy_pc: resb 2
+str_cpy_len: resb 1
 str_cpy:
-	st [mem_p_src], r1
+	; args on stack:
+	;  src >> 8
+    ;  src
+	;  dst >> 8
+	;  dst
+	pop r0
+	pop r1
+	st [str_cpy_pc], r0
+	st [str_cpy_pc+1], r1
+
+	pop r0
 	st [mem_p_src+1], r0
+	pop r1
+	st [mem_p_src], r1
+	pop r0
+	st [mem_p_dst+1], r0
+	pop r1
+	st [mem_p_dst], r1
+
+	ld r1, [mem_p_dst]
+	push r1
+	ld r0, [mem_p_dst+1]
+	push r0
+
+	ld r1, [mem_p_src]
+	push r1
+	ld r0, [mem_p_src+1]
+	push r0
+
 	push pch
 	push pcl
 	b str_len
-  push r0
+	st [str_cpy_len], r0
+
 	push pch
 	push pcl
 	b mem_cpy
+
   xor r0, r0
-  pop r1
+	ld r1, [str_cpy_len]
   std [mem_p_dst]+r1, r0
+.done:
+	ld r0, [str_cpy_pc]
+	ld r1, [str_cpy_pc+1]
+	push r1
+	push r0
+	ld r0, [str_cpy_len]	; return length of string copied
 	pop pcl
 	pop pch
 
@@ -749,19 +780,31 @@ mem_cmp:
   pop pcl
   pop pch
 
-mem_cpy_set0:
-	st [mem_p_dst], r1
-	st [mem_p_dst+1], r0
-	pop pcl
-	pop pch
-
-mem_cpy_set1:
-	st [mem_p_src], r1
-	st [mem_p_src+1], r0
-	pop pcl
-	pop pch
-
+mem_cpy_pc: resb 2
 mem_cpy:
+	; length in r0
+	; args on stack:
+	;  src >> 8
+    ;  src
+	;  dst >> 8
+	;  dst
+
+	; save pc
+	pop r1
+	st [mem_cpy_pc], r1
+	pop r1
+	st [mem_cpy_pc+1], r1
+
+	pop r1
+	st [mem_p_src+1], r1
+	pop r1
+	st [mem_p_src], r1
+
+	pop r1
+	st [mem_p_dst+1], r1
+	pop r1
+	st [mem_p_dst], r1
+
 	push r0
 .loop:
 	pop r0
@@ -778,6 +821,12 @@ mem_cpy:
 	b .loop
 
 .done:
+	; restore pc
+	ld r1, [mem_cpy_pc+1]
+	push r1
+	ld r1, [mem_cpy_pc]
+	push r1
+
 	pop pcl
 	pop pch
 

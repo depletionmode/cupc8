@@ -818,16 +818,25 @@ ubasic_tokenizer_string:
 ;.arg_len:
 ;	st [ub_tok_str_len], r0
 ;.next:
-	mov r0, #>[ub_string]
-	mov r1, #<[ub_string]
-	push pch
-	push pcl
-	b mem_cpy_set0
 	pop r1
 	pop r0
-	push pch
-	push pcl
-	b mem_cpy_set1
+
+	push r0
+	push r1
+
+	mov r0, #>[ub_string]
+	mov r1, #<[ub_string]
+	push r1
+	push r0
+
+;	push pch
+;	push pcl
+;	b mem_cpy_set0
+;	pop r1
+;	pop r0
+;	push pch
+;	push pcl
+;	b mem_cpy_set1
 	ld r0, [ub_tok_str_len]
 	push r0
 	push pch
