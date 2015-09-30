@@ -185,11 +185,26 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .num
+	bzf .clr
 	push pch
 	push pcl
 	b term_cmd_run
 	b .done
+
+.clr:
+	term_s_clr db "clr"
+	mov r0, #>[term_s_clr]
+	mov r1, #<[term_s_clr]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .num
+	push pch
+	push pcl
+	b term_cmd_clr
+	b .done
+
 
 .num:
 	mov r0, #>[term_token_buf]
@@ -210,6 +225,14 @@ term_parse:
 	push pcl
 	b str_printstr
 
+.done:
+	pop pcl
+	pop pch
+
+term_cmd_clr:
+	push pch
+	push pcl
+	b clr_screen
 .done:
 	pop pcl
 	pop pch
@@ -262,7 +285,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLEAR\n"
+	term_s_help_buf db "\nNEW RUN CLR\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch

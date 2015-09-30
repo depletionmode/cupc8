@@ -125,10 +125,14 @@ st7735_set_addr_window:
     pop pch
 
 st7735_pc_2: resb 2
+st7735_set_color_color: resb 1
 
 st7735_set_color:
     ; arg in r0:
     ; - color idx
+
+	st [st7735_set_color_color], r0
+st $f000, r0
 
     ; save return pc
     pop r0
@@ -136,9 +140,7 @@ st7735_set_color:
     pop r0
     st [st7735_pc_2+1], r0
 
-    ; todo write actual color
-    ; temporarily set colour to white
-    mov r0, #255
+	ld r0, [st7735_set_color_color]
 
     ; write high byte
 	xor r1, r1
@@ -245,7 +247,7 @@ st7735_fill_rect:
     b st7735_set_addr_window
 
     ; write color
-    pop r0
+	pop r0
     push pch
     push pcl
     b st7735_set_color
