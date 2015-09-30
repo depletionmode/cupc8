@@ -283,15 +283,13 @@ ubasic_get_next_token:
 .else0:
 	ld r0, [ub_ptr+1]
 	ld r1, [ub_ptr]
-	push pch
-	push pcl
-	b mem_cmp_set0
+	push r1
+	push r0
 
 	mov r0, #>[ub_s_let]
 	mov r1, #<[ub_s_let]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #3	; strlen
 	push pch
@@ -306,11 +304,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_LET
 	b .done
 .n0:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_print]
 	mov r1, #<[ub_s_print]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #5	; strlen
 	push pch
@@ -325,11 +326,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_PRINT
 	b .done
 .n1:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_if]
 	mov r1, #<[ub_s_if]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #2	; strlen
 	push pch
@@ -344,11 +348,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_IF
 	b .done
 .n2:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_then]
 	mov r1, #<[ub_s_then]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -363,11 +370,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_THEN
 	b .done
 .n3:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_else]
 	mov r1, #<[ub_s_else]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -382,11 +392,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_ELSE
 	b .done
 .n4:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_for]
 	mov r1, #<[ub_s_for]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #3	; strlen
 	push pch
@@ -401,11 +414,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_FOR
 	b .done
 .n5:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_to]
 	mov r1, #<[ub_s_to]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #2	; strlen
 	push pch
@@ -420,11 +436,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_TO
 	b .done
 .n6:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_next]
 	mov r1, #<[ub_s_next]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -439,11 +458,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_NEXT
 	b .done
 .n7:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_goto]
 	mov r1, #<[ub_s_goto]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -458,11 +480,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_GOTO
 	b .done
 .n8:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_gosub]
 	mov r1, #<[ub_s_gosub]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #5	; strlen
 	push pch
@@ -477,11 +502,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_GOSUB
 	b .done
 .n9:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_return]
 	mov r1, #<[ub_s_return]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #6	; strlen
 	push pch
@@ -496,11 +524,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_RETURN
 	b .done
 .n10:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_call]
 	mov r1, #<[ub_s_call]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -515,11 +546,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_CALL
 	b .done
 .n11:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_rem]
 	mov r1, #<[ub_s_rem]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #3	; strlen
 	push pch
@@ -534,11 +568,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_REM
 	b .done
 .n12:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_peek]
 	mov r1, #<[ub_s_peek]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -553,11 +590,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_PEEK
 	b .done
 .n13:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_poke]
 	mov r1, #<[ub_s_poke]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #4	; strlen
 	push pch
@@ -572,11 +612,14 @@ ubasic_get_next_token:
 	mov r0, TOKENIZER_POKE
 	b .done
 .n14:
+	ld r0, [ub_ptr+1]
+	ld r1, [ub_ptr]
+	push r1
+	push r0
 	mov r0, #>[ub_s_end]
 	mov r1, #<[ub_s_end]
-	push pch
-	push pcl
-	b mem_cmp_set1
+	push r1
+	push r0
 
 	mov r0, #3	; strlen
 	push pch
@@ -610,10 +653,13 @@ ubasic_get_next_token:
 	b .done
 
 .error:
+	ub_s_tokenizer_error db "BASIC: TOKENIZER ERROR!\n"
+	mov r0, #>[ub_s_tokenizer_error]
+	mov r1, #<[ub_s_tokenizer_error]
+	push pch
+	push pcl
+	b str_printstr
 	mov r0, TOKENIZER_ERROR
-	mov r0, #254
-	st $f000, r0
-	halt
 
 .done:
 	pop pcl

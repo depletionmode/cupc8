@@ -758,8 +758,32 @@ mem_cmp_set1:
 	pop pcl
 	pop pch
 
+mem_cmp_pc: resb 2
 mem_cmp_val: resb 1
 mem_cmp:
+	; length in r0
+	; args on stack:
+	;  src >> 8
+    ;  src
+	;  dst >> 8
+	;  dst
+
+	; save pc
+	pop r1
+	st [mem_cmp_pc], r1
+	pop r1
+	st [mem_cmp_pc+1], r1
+
+	pop r1
+	st [mem_p_src+1], r1
+	pop r1
+	st [mem_p_src], r1
+
+	pop r1
+	st [mem_p_dst+1], r1
+	pop r1
+	st [mem_p_dst], r1
+
   xor r1, r1
 .loop:
   eq r1, r0
@@ -776,7 +800,14 @@ mem_cmp:
   b .loop
 
 .done:
+	; restore pc
+	ld r1, [mem_cmp_pc+1]
+	push r1
+	ld r1, [mem_cmp_pc]
+	push r1
+
   ld r0, [mem_cmp_val]
+
   pop pcl
   pop pch
 

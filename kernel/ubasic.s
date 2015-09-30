@@ -1157,9 +1157,15 @@ ubasic_get_variable:
 	pop pch
 
 ubasic_fatal:
-	mov r0, #253
-	st $f000, r0
-halt
+	ub_fatal_error db "BASIC: FATAL ERROR!\n"
+	mov r0, #>[ub_fatal_error]
+	mov r1, #<[ub_fatal_error]
+	push pch
+	push pcl
+	b str_printstr
+.done:
+	mov r0, #1
+	st [ended], r0
 	pop pcl
 	pop pch
 
