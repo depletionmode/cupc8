@@ -153,6 +153,7 @@ proc ins_st_do(o: int, a: int) =
     of 0xf0:
       if (address and 0xff) == 0: #gpo
         log(1, "GPO: $1 $2" % [toBin(mem[address], 8), toHex(mem[address], 2)])
+      display_set_dc(mem[address] and 1)
     of 0xf1:    # spi
       var dev = address shr 4 and 0xf
       if dev == 0:  # display
