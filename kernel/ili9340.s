@@ -34,6 +34,10 @@
 ; dc ('data/command') pin set to GPO0
 ; rst pin set to GPO1
 
+; cupc/8 colors
+%define COLOR_WHITE 0xff
+%define COLOR_BLACK 0x00
+
 %define ILI9340_TFTWIDTH  240
 %define ILI9340_TFTHEIGHT 320
 
@@ -143,7 +147,7 @@ ili9340_writedata:
 	pop pcl
 	pop pch
 
-ili9340_begin:
+ili9340_init:
 .reset:
 	; todo add delays
 	ld r0, $f000
@@ -593,6 +597,122 @@ ili9340_set_addr_window:
 	ld r0, [ili9340_pc0+1]
 	push r0
 	ld r0, [ili9340_pc0]
+	push r0
+
+	pop pcl
+	pop pch
+
+ili9340_decode_color:
+	; r0 - cupc/8 color code
+.black:
+	gt r0, #COLOR_BLACK
+	bzf .white
+	xor r0, r0
+	xor r1, r1
+	b .done
+
+.white:		;default color
+	mov r0, #0xff
+	mov r1, #0xff
+
+.done:
+	pop pcl
+	pop pch
+
+ili9340_pc1: resb 2
+ili9340_x: resb 1
+ili9340_y: resb 1
+ili9340_w: resb 1
+ili9340_h: resb 1
+ili9340_color: resb 2
+ili9340_fill_rect:
+    ; args on stack:
+    ; - x
+    ; - y
+    ; - width
+    ; - height
+    ; - color
+
+    ; save return pc
+    pop r0
+    st [ili9340_pc1], r0
+    pop r0
+    st [ili9340_pc1+1], r0
+
+	pop r0
+	st [ili9340_x], r0
+	pop r0
+	st [ili9340_y], r0
+	pop r0
+	st [ili9340_w], r0
+	pop r0
+	st [ili9340_h], r0
+
+.decode_color:
+	pop r0
+	push pch
+	push pcl
+	b ili9340_decode_color
+	st [ili9340_color+1], r0
+	st [ili9340_color], r1
+
+.window:
+	ld r0, [ili9340_y]
+	ld r1, [ili9340_h]
+	add r1, r0
+	push r1
+	push r0
+	ld r0, [ili9340_x]
+	ld r1, [ili9340_w]
+	add r1, r0
+	push r1
+	push r0
+	push pch
+	push pcl
+	b ili9340_set_addr_window
+
+.set_dc:
+	ld r1, $f000
+	or r1, #1
+	st $f000, r1
+
+	ld r0, [ili9340_h]
+	push r0
+.loop_w:
+	ld r0, [ili9340_w]
+	eq r0, #0
+	bzf .done
+	sub r0, #1
+	st [ili9340_w], r0
+	pop r0
+	push r0
+	st [ili9340_h], r0
+.loop_h:
+	ld r0, [ili9340_h]
+	eq r0, #0
+	bzf .loop_w
+	sub r0, #1
+	st [ili9340_h], r0
+	; write color
+	ld r0, [ili9340_color+1]
+	xor r1, r1
+	push pch
+	push pcl
+	b spi_write
+	ld r0, [ili9340_color]
+	xor r1, r1
+	push pch
+	push pcl
+	b spi_write
+	b .loop_h
+
+.done:
+	pop r0
+
+	; restore pc
+	ld r0, [ili9340_pc1+1]
+	push r0
+	ld r0, [ili9340_pc1]
 	push r0
 
 	pop pcl
