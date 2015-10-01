@@ -510,7 +510,8 @@ print_char:
 
     push pch
     push pcl
-    b st7735_fill_rect
+    ;b st7735_fill_rect
+    b ili9340_fill_rect
 .draw_done:
     ld r0, [i0]
     add r0, #1  ; i++
@@ -545,59 +546,60 @@ print_char:
     pop pcl
     pop pch
 
-cd_end: resb 1
-fill_screen_pixels:
-    ; [testing routine]
-    ; fill screen with pixels (slow)
-
-    xor r1, r1
-    st [posx], r1
-    st [posy], r1
-.draw_pixel:
-    push #255
-
-    ld r1, [posy]
-    push r1     ; y
-
-    ld r1, [posx]
-    push r1     ; x
-
-    push pch
-    push pcl
-    b st7735_draw_pixel
-
-    ld r1, [posx]
-    add r1, #1
-    st [posx], r1
-    eq r1, #0   ; 256
-    bzf .next
-    b .draw_pixel
-.next:
-    xor r1, r1
-    st [posx], r1
-
-    ld r1, [posy]
-    add r1, #1
-    st [posy], r1
-    eq r1, #255
-    bzf .done
-    b .draw_pixel
-.done:
-    pop pcl
-    pop pch
-
+;cd_end: resb 1
+;fill_screen_pixels:
+;    ; [testing routine]
+;    ; fill screen with pixels (slow)
+;
+;    xor r1, r1
+;    st [posx], r1
+;    st [posy], r1
+;.draw_pixel:
+;    push #255
+;
+;    ld r1, [posy]
+;    push r1     ; y
+;
+;    ld r1, [posx]
+;    push r1     ; x
+;
+;    push pch
+;    push pcl
+;    b st7735_draw_pixel
+;
+;    ld r1, [posx]
+;    add r1, #1
+;    st [posx], r1
+;    eq r1, #0   ; 256
+;    bzf .next
+;    b .draw_pixel
+;.next:
+;    xor r1, r1
+;    st [posx], r1
+;
+;    ld r1, [posy]
+;    add r1, #1
+;    st [posy], r1
+;    eq r1, #255
+;    bzf .done
+;    b .draw_pixel
+;.done:
+;    pop pcl
+;    pop pch
+;
 clr_screen:
     xor r0, r0
     st [posx], r0
     st [posy], r0
-    push #0     ; color
+    push #0
     push #255
     push #255
     push #0
     push #0
     push pch
     push pcl
-    b st7735_fill_rect
+    ;b st7735_fill_rect
+    b ili9340_fill_rect
     pop pcl
     pop pch
 
