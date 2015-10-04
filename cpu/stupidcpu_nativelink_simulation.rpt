@@ -5,8 +5,8 @@ Info: NativeLink has detected VHDL design -- VHDL simulation models will be used
 
 Sim Mode              :  RTL
 Family                :  cycloneiii
-Quartus root          :  /home/depmod/fpga/altera/13.1/quartus/linux/
-Quartus sim root      :  /home/depmod/fpga/altera/13.1/quartus/eda/sim_lib
+Quartus root          :  /mnt/storage_hdd_red/quartus/13.1/quartus/linux/
+Quartus sim root      :  /mnt/storage_hdd_red/quartus/13.1/quartus/eda/sim_lib
 Simulation Tool       :  modelsim-altera
 Simulation Language   :  vhdl
 Version               :  93
@@ -18,6 +18,6 @@ Sim dir               :  simulation/modelsim
 =======================================================
 
 Info: Starting NativeLink simulation with ModelSim-Altera software
-Sourced NativeLink script /home/depmod/fpga/altera/13.1/quartus/common/tcl/internal/nativelink/modelsim.tcl
+Sourced NativeLink script /mnt/storage_hdd_red/quartus/13.1/quartus/common/tcl/internal/nativelink/modelsim.tcl
 Warning: File stupidcpu_run_msim_rtl_vhdl.do already exists - backing up current file as stupidcpu_run_msim_rtl_vhdl.do.bak11
 Info: Spawning ModelSim-Altera Simulation software 

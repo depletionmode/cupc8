@@ -14,9 +14,9 @@ var
 
 loadExtensions()
 discard glSetAttribute(SDL_GL_DOUBLEBUFFER, 1)
-win = createWindow("CUPCake Simulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 256, 256, SDL_WINDOW_OPENGL or SDL_WINDOW_SHOWN)
+win = createWindow("CUPCake Simulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 320, 240, SDL_WINDOW_OPENGL or SDL_WINDOW_SHOWN)
 gl = glCreateContext(win)
-glOrtho(0.0, 256.0, 256.0, 0.0, -1.0, 1.0)
+glOrtho(0.0, 320.0, 240.0, 0.0, -1.0, 1.0)
 
 glClear(GL_COLOR_BUFFER_BIT)
 

@@ -21,7 +21,6 @@ BEGIN
     -- Instantiate the Unit Under Test (UUT)
    uut: entity work.cpu PORT MAP (
 			but => but,
-			n_srst => n_srst,
 			n_hrst => n_hrst,
          clk => clk,
 			spi_miso => spi_miso

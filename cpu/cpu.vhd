@@ -8,7 +8,6 @@ entity cpu is
 				
 			but:			in std_logic;
 			clk: 			in std_logic;
-			n_srst:		in std_logic;
 			n_hrst:		in std_logic;
 			halt:			out std_logic; -- high on catastrophic failure
 			
@@ -20,7 +19,12 @@ entity cpu is
 			
 			-- gpio
 			gpo:			out std_logic_vector(7 downto 0);
-			o: out std_logic
+			o: 			out std_logic;
+			
+			-- physical connections
+			ram_we:			out std_logic;
+			ram_addr:		out std_logic_vector(15 downto 0);
+			ram_data:		inout std_logic_vector(7 downto 0)
 		);
 end entity;
 
@@ -100,22 +104,26 @@ component mmu
 			
 			addr:		in std_logic_vector(15 downto 0);
 			data:		inout std_logic_vector(7 downto 0);
-			n_wr:		in std_logic;	
+			n_wr:		in std_logic := '1';
 			
 			spi_ss:			out std_logic_vector(3 downto 0);
 			spi_sck:			out std_logic;
 			spi_mosi:		out std_logic;
 			spi_miso:		in std_logic;
 			
-			gpo:		out std_logic_vector(7 downto 0)
+			gpo:		out std_logic_vector(7 downto 0) := x"00";
+			
+			ram_we:			out std_logic;
+			ram_addr:		out std_logic_vector(15 downto 0);
+			ram_data:		inout std_logic_vector(7 downto 0)
 		);
-end component;	
+end component;
 signal imm_fetched: std_logic;
 
 shared variable rwb: unsigned(7 downto 0) := x"aa";
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
-mmu1: mmu port map(clk, mem_addr, mem_data, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo);
+mmu1: mmu port map(clk, mem_addr, mem_data, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo, ram_we, ram_addr, ram_data);
 
     seg1: SEG7
         port map (num_1, seg7_1);
@@ -137,8 +145,8 @@ begin
    if (rising_edge(clk)) then
 		if n_hrst = '0' then
 			stage <= reset;
-		elsif but_de ='0' then
-		--else
+		--elsif but_de ='0' then
+		else
 			case stage is
 				when fetch =>
 					mem_data <= (others => 'Z');
@@ -252,7 +260,7 @@ begin
 					if ram_ld = '1' then
 						stage <= waitonram;
 					else
-					stage <= writeback;
+						stage <= writeback;
 					end if;
 				when writeback =>
 				
@@ -329,14 +337,14 @@ begin
 					-- mem delay > 70ns
 					-- 4 cycles should be sufficient (80ns)
 					-- one added for good measure
-					if ram_delay < 2 then 
+					if ram_delay < 5 then 
 						ram_delay := ram_delay + 1;
 					else
 						ram_delay := 0;
 						if ram_ld ='1' then
 							stage <= writeback;
 							ram_ld := '0';
-						else
+						else 
 							stage <= fetch;
 							ram_st := '0';
 						end if;
