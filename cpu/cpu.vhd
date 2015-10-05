@@ -132,12 +132,12 @@ but1: DEBOUNCE port map (clk, but, but_de);
 
 f <= "000" & alu_zf;
 
--- slow down clock
+-- slow down clock (for testing)
 process (clk)
 variable clk_delay: integer range 0 to 50000000 := 0;
 begin
    if (rising_edge(clk)) then
-		if (clk_delay < 10000000) then
+		if (clk_delay < 500000) then
 			clk_delay := clk_delay + 1;
 			new_clk <= '0';
 		else

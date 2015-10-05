@@ -16,7 +16,7 @@ architecture behavioural of rom is
 	type rom_type is array (0 to 9) of std_logic_vector(7 downto 0);
 	-- rom code
 	constant rom : rom_type :=
-            (x"8c", x"00", x"44", x"01", x"a8", x"00", x"f0", x"b0", x"02", x"e0");
+            (x"8d", x"01", x"30", x"42", x"a8", x"00", x"f0", x"b0", x"03", x"e0");
 begin
 
 addr_int <= address(11 downto 0);
