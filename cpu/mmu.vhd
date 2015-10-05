@@ -70,6 +70,13 @@ signal	ram_en:			std_logic;-- := '1';
 --  );
 --end component;
 
+component rom is
+  port (
+    address : in  std_logic_vector;
+    data  : inout  std_logic_vector
+  );
+end component;
+
 -- spi output mux
 signal	mux_x0:		std_logic_vector(9 downto 0);
 signal	mux_x1:		std_logic_vector(9 downto 0);
@@ -121,6 +128,8 @@ component spi
 		);
 end component;	
 signal gpo_int: std_logic_vector(7 downto 0) := x"00";
+signal rom_addr:  std_logic_vector(15 downto 0) := x"1000";
+signal rom_data: std_logic_vector(7 downto 0);
 begin
 --mux0: mux4x10 port map(mux_x0, mux_x1, mux_x2, mux_x3, mux_out, mux_s);
 spi0: spi port map(spi_ss(0), mux_x0(9), spi_mosi, spi_miso, clk, spi_clk_div(0), spi_cont(0), spi_cpol(0), spi_cpha(0), spi_tx_data, mux_x0(7 downto 0), mux_x0(8), spi_transfer(0));
@@ -128,13 +137,15 @@ spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1)
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
 spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3), spi_cont(3), spi_cpol(3), spi_cpha(3), spi_tx_data, mux_x3(7 downto 0), mux_x3(8), spi_transfer(3));
 
---ram0: simpleram port map(ram_en, ram_we, ram_addr, ram_data);
+rom0: rom port map(rom_addr, rom_data);
 
 spi_sck <= mux_out(9);
 
 --ram_en <= '1';
 ram_addr <= addr;
 ram_en <= n_wr;
+
+rom_addr <= addr;
 
 process(clk, ram_data, data, addr)
 begin
@@ -144,49 +155,9 @@ begin
 			--ram_we <= '1';
 			ram_data <= (others=>'Z');
 			case addr(15 downto 12) is
-				when x"1" => -- fake stuff!!!
-					case addr(11 downto 0) is					
-						-- gpo testcat gp	
-				
-						when x"000" => data <= x"8c";
-						when x"001" => data <= x"00";
-						when x"002" => data <= x"a8";
-						when x"003" => data <= x"00";
-						when x"004" => data <= x"f0";
-						when x"005" => data <= x"a0";
-						when x"006" => data <= x"01";
-						when x"007" => data <= x"00";
-						when x"008" => data <= x"a8";
-						when x"009" => data <= x"00";
-						when x"00a" => data <= x"f0";
-						when x"00b" => data <= x"a0";
-						when x"00c" => data <= x"02";
-						when x"00d" => data <= x"00";
-						when x"00e" => data <= x"a8";
-						when x"00f" => data <= x"00";
-						when x"010" => data <= x"f0";
-						
-						when x"011" => data <= x"8c";
-						when x"012" => data <= x"aa";
-						when x"013" => data <= x"a8";
-						when x"014" => data <= x"00";
-						when x"015" => data <= x"50";
-						when x"016" => data <= x"a0";
-						when x"017" => data <= x"00";
-						when x"018" => data <= x"50";
-						when x"019" => data <= x"a8";
-						when x"01a" => data <= x"00";
-						when x"01b" => data <= x"f0";
-						
-						when x"01c" => data <= x"b0";
-						when x"01d" => data <= x"1c";
-						when x"01e" => data <= x"10";
-						
-											
-											
-						when others =>	data <= "10000000"; -- nops
-					end case;
-				when others => data <= ram_data; -- read from ram (with bram, 32k block repeated)
+				when x"e" => -- on-fpga rom read
+				   data <= rom_data;
+				when others => data <= ram_data; -- read from ram
 			end case;
 		else
 			--ram_we <= '0';

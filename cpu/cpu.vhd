@@ -355,7 +355,7 @@ begin
 					r1 <= x"00";
 					sp <= x"0100";
 					sp_next := x"0100";
-					pc <= x"1000";
+					pc <= x"e000";
 					mem_wr <= '1';
 					mem_addr <= x"ffff";
 					imm_fetched <= '0';
