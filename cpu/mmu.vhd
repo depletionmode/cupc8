@@ -2,39 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- mmu
--- $0000	= $00ff	: interrupt vector table
--- $0100 			: stack
--- $1000 			: reset vector
--- $f000 - $ffff	: i/o
-
--- ivt
--- 2-byte vector address entries
--- $XX00				: cpu interrupt
--- $XX02				: timer 0
--- $XX04				: timer 1
--- $XX06				: i/o 0
--- $XX08				: i/o 1
-
--- i/o
--- $f000				: gpo (8 pin)
--- $f100 - $f10f	: spi 0 (master)
--- $f110 - $f11f	: spi 1 (master)
--- $f120 - $f12f	: spi 2 (master)
--- $f130 - $f13f	: spi 3 (master)
-
--- spi
--- $XXX0	: tx_data
--- $XXX1 : rx_data
--- $XXX2 : transact
--- #XXX3 : ready
--- $XXXf : config 00000000
---                |   ||||
---                 --- || - continuous
---                  |  | -- cpol
---                  |   --- cpha
---                   ------ clk_div
-
 entity mmu is
 	port(
 			clk:		in std_logic;
@@ -55,20 +22,12 @@ entity mmu is
 			ram_data:		inout std_logic_vector(7 downto 0)
 		);
 end entity;
+
 architecture behavioural of mmu is
--- simple internal ram for testing/stack?
-signal	ram_en:			std_logic;-- := '1';
---signal	ram_we:			std_logic;
---signal 	ram_addr:		std_logic_vector(15 downto 0);
---signal	ram_data:		std_logic_vector(7 downto 0);
---component simpleram is
---  port (
---    en   	: in  std_logic;
---    we      : in  std_logic;
---    address : in  std_logic_vector;
---    data  : inout  std_logic_vector
---  );
---end component;
+signal	ram_en:			std_logic;
+signal	data_out: std_logic_vector(7 downto 0) := x"00";
+
+signal gpo_int: std_logic_vector(7 downto 0) := x"00";
 
 component rom is
   port (
@@ -76,39 +35,9 @@ component rom is
     data  : inout  std_logic_vector
   );
 end component;
+signal rom_addr:  std_logic_vector(15 downto 0);
+signal rom_data: std_logic_vector(7 downto 0);
 
--- spi output mux
-signal	mux_x0:		std_logic_vector(9 downto 0);
-signal	mux_x1:		std_logic_vector(9 downto 0);
-signal	mux_x2:		std_logic_vector(9 downto 0);
-signal	mux_x3:		std_logic_vector(9 downto 0);
-signal	mux_out:		std_logic_vector(9 downto 0);
-signal 	mux_s:		std_logic_vector(1 downto 0);
-component mux4x10
-	port(
-			x0:		in std_logic_vector(9 downto 0);
-			x1:		in std_logic_vector(9 downto 0);
-			x2:		in std_logic_vector(9 downto 0);
-			x3:		in std_logic_vector(9 downto 0);
-			f:			out std_logic_vector(9 downto 0);
-			sel:		std_logic_vector(1 downto 0)
-		);
-end component;
-
-signal			data_out: std_logic_vector(7 downto 0) := x"00";
-
--- spi
-type int_array is array(0 to 3) of integer;
---signal			spi_clk:			std_logic;
-signal			spi_clk_div:	int_array;
-signal			spi_cont:		std_logic_vector(3 downto 0);
-signal			spi_cpol:		std_logic_vector(3 downto 0);
-signal			spi_cpha:		std_logic_vector(3 downto 0);
-signal			spi_tx_data:	std_logic_vector(7 downto 0);
---signal			spi_rx_data:	std_logic_vector(7 downto 0);
---signal			spi_rdy:			std_logic;
-signal			spi_transfer:	std_logic_vector(3 downto 0);
-shared variable spi_device: integer;
 component spi
 	port(
 			ss:		out std_logic;
@@ -126,22 +55,47 @@ component spi
 			n_rdy:		out std_logic;
 			n_transfer:	in std_logic
 		);
-end component;	
-signal gpo_int: std_logic_vector(7 downto 0) := x"00";
-signal rom_addr:  std_logic_vector(15 downto 0) := x"1000";
-signal rom_data: std_logic_vector(7 downto 0);
+end component;
+type int_array is array(0 to 3) of integer;
+--signal			spi_clk:			std_logic;
+signal			spi_clk_div:	int_array;
+signal			spi_cont:		std_logic_vector(3 downto 0);
+signal			spi_cpol:		std_logic_vector(3 downto 0);
+signal			spi_cpha:		std_logic_vector(3 downto 0);
+signal			spi_tx_data:	std_logic_vector(7 downto 0);
+--signal			spi_rx_data:	std_logic_vector(7 downto 0);
+--signal			spi_rdy:			std_logic;
+signal			spi_transfer:	std_logic_vector(3 downto 0);
+shared variable spi_device: integer;
+
+-- spi output mux
+component mux4x10
+	port(
+			x0:		in std_logic_vector(9 downto 0);
+			x1:		in std_logic_vector(9 downto 0);
+			x2:		in std_logic_vector(9 downto 0);
+			x3:		in std_logic_vector(9 downto 0);
+			f:			out std_logic_vector(9 downto 0);
+			sel:		std_logic_vector(1 downto 0)
+		);
+end component;
+signal	mux_x0:		std_logic_vector(9 downto 0);
+signal	mux_x1:		std_logic_vector(9 downto 0);
+signal	mux_x2:		std_logic_vector(9 downto 0);
+signal	mux_x3:		std_logic_vector(9 downto 0);
+signal	mux_out:		std_logic_vector(9 downto 0);
+signal 	mux_s:		std_logic_vector(1 downto 0);
+
 begin
 --mux0: mux4x10 port map(mux_x0, mux_x1, mux_x2, mux_x3, mux_out, mux_s);
 spi0: spi port map(spi_ss(0), mux_x0(9), spi_mosi, spi_miso, clk, spi_clk_div(0), spi_cont(0), spi_cpol(0), spi_cpha(0), spi_tx_data, mux_x0(7 downto 0), mux_x0(8), spi_transfer(0));
 spi1: spi port map(spi_ss(1), mux_x1(9), spi_mosi, spi_miso, clk, spi_clk_div(1), spi_cont(1), spi_cpol(1), spi_cpha(1), spi_tx_data, mux_x1(7 downto 0), mux_x1(8), spi_transfer(1));
 spi2: spi port map(spi_ss(2), mux_x2(9), spi_mosi, spi_miso, clk, spi_clk_div(2), spi_cont(2), spi_cpol(2), spi_cpha(2), spi_tx_data, mux_x2(7 downto 0), mux_x2(8), spi_transfer(2));
 spi3: spi port map(spi_ss(3), mux_x3(9), spi_mosi, spi_miso, clk, spi_clk_div(3), spi_cont(3), spi_cpol(3), spi_cpha(3), spi_tx_data, mux_x3(7 downto 0), mux_x3(8), spi_transfer(3));
+spi_sck <= mux_out(9);
 
 rom0: rom port map(rom_addr, rom_data);
 
-spi_sck <= mux_out(9);
-
---ram_en <= '1';
 ram_addr <= addr;
 ram_en <= n_wr;
 
