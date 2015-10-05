@@ -120,7 +120,8 @@ component mmu
 end component;
 signal imm_fetched: std_logic;
 
-shared variable rwb: unsigned(7 downto 0) := x"aa";
+signal new_clk: std_logic := '0';
+
 begin
 alu1: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
 mmu1: mmu port map(clk, mem_addr, mem_data, mem_wr, spi_ss, spi_sck, spi_mosi, spi_miso, gpo, ram_we, ram_addr, ram_data);
@@ -130,8 +131,23 @@ mmu1: mmu port map(clk, mem_addr, mem_data, mem_wr, spi_ss, spi_sck, spi_mosi, s
 but1: DEBOUNCE port map (clk, but, but_de);
 
 f <= "000" & alu_zf;
+
+-- slow down clock
+process (clk)
+variable clk_delay: integer range 0 to 50000000 := 0;
+begin
+   if (rising_edge(clk)) then
+		if (clk_delay < 10000000) then
+			clk_delay := clk_delay + 1;
+			new_clk <= '0';
+		else
+			clk_delay := 0;
+			new_clk <= '1';
+		end if;
+	end if;
+end process;
 		
-process(clk, n_hrst)
+process(new_clk, n_hrst)
 variable addr2_fetched: bit;
 variable rtmp: unsigned(7 downto 0);
 variable ra, rb: unsigned(7 downto 0);
@@ -142,7 +158,7 @@ variable ram_delay: integer range 0 to 10 := 0;
 variable ram_ld, ram_st: bit := '0';
 begin
 	halt <= n_hrst;
-   if (rising_edge(clk)) then
+   if (rising_edge(new_clk)) then
 		if n_hrst = '0' then
 			stage <= reset;
 		--elsif but_de ='0' then
@@ -337,7 +353,7 @@ begin
 					-- mem delay > 70ns
 					-- 4 cycles should be sufficient (80ns)
 					-- one added for good measure
-					if ram_delay < 5 then 
+					if ram_delay < 3 then 
 						ram_delay := ram_delay + 1;
 					else
 						ram_delay := 0;
