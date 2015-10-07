@@ -1,3 +1,5 @@
+# ili9340
+
 import strutils
 import opengl
 import sdl2, sdl2/gfx
@@ -54,51 +56,83 @@ proc display_render*() =
 var r : Rect
 var state = "NOSTATE"
 var rect_bitmask = 0
+var is_color_high = true
+var is_drawn = false
+var dc: bool = false
+
+proc display_set_dc*(b : int) =
+    if b == 1:
+        dc = true
+    else:
+        dc = false
+
 proc display_transact*(b) =
     var v : cint = (cint)b
-    case state:
-        of "CASET":
-            if (rect_bitmask and 1) == 0:
-                r.x = v
-                rect_bitmask = rect_bitmask or 1
-            elif (rect_bitmask and 2) == 0:
-                r.w = (v - r.x) and 0xff
-                rect_bitmask = rect_bitmask or 2
-            if (rect_bitmask and 3) == 3:
+    if not dc:
+        case v:
+            of 0x2a:
+                state = "CASET"
+                rect_bitmask = 0
+                r.x = 0
+                r.w = 0
+            of 0x2b:
+                state = "PASET"
+                rect_bitmask = 0
+                r.y = 0
+                r.h = 0
+            of 0x2c:
+                state = "RAMWR"
+                is_drawn = false
+            else:
                 state = "NOSTATE"
-        of "RASET":
-            if (rect_bitmask and 4) == 0:
-                r.y = v
-                rect_bitmask = rect_bitmask or 4
-            elif (rect_bitmask and 8) == 0:
-                r.h = (v - r.y) and 0xff
-                rect_bitmask = rect_bitmask or 8
-            if (rect_bitmask and 12) == 12:
-                state = "NOSTATE"
-        of "COLOR_A":
-            #var c : uint8 = (uint8)v
-            #render.setDrawColor c,c,c,c
-            var c : GLfloat = (GLfloat)v
-            glColor3f(c, c, c)
-            state = "COLOR_B"
-        of "COLOR_B":
-            #render.fillRect r
-            glRecti(r.x, r.y, r.w+r.x, r.h+r.y)
-            should_render = true
-            state = "NOSTATE"
-        else:
-            case v:
-                of 42:
-                    state = "CASET"
-                    rect_bitmask = rect_bitmask and 12
-                    r.x = 0
-                    r.w = 0
-                of 43:
-                    state = "RASET"
-                    rect_bitmask = rect_bitmask and 3
-                    r.y = 0
-                    r.h = 0
-                of 44:
-                    state = "COLOR_A"
+    else: 
+        case state:
+            of "NOSTATE":
+                discard
+            of "CASET":
+                if (rect_bitmask and 1) == 0:
+                    rect_bitmask = rect_bitmask or 1
+                elif (rect_bitmask and 2) == 0:
+                    r.x = v
+                    rect_bitmask = rect_bitmask or 2
+                elif (rect_bitmask and 4) == 0:
+                    rect_bitmask = rect_bitmask or 4
                 else:
-                    discard
+                    r.w = (v - r.x) and 0xff
+                    state = "NOSTATE"
+            of "PASET":
+                if (rect_bitmask and 1) == 0:
+                    rect_bitmask = rect_bitmask or 1
+                elif (rect_bitmask and 2) == 0:
+                    r.y = v
+                    rect_bitmask = rect_bitmask or 2
+                elif (rect_bitmask and 4) == 0:
+                    rect_bitmask = rect_bitmask or 4
+                else:
+                    r.h = (v - r.y) and 0xff
+                    state = "NOSTATE"
+            of "RAMWR":
+                # this doesn't correspond to actual ili9340 module
+                # where there each pixel color is stored in memory
+                # here we just draw the rectangle witht he first color
+                # as kernel driver only supports single color per rectangle anyway
+                if not is_drawn:
+                    if is_color_high:
+                        is_color_high = false
+                    else:
+                        is_color_high = true
+                        var c : GLfloat = (GLfloat)v
+                        glColor3f(c, c, c,)
+                        glRecti(r.x, r.y, r.w+r.x, r.h+r.y)
+                        should_render = true
+                        is_drawn = true
+                
+            #of "COLOR_A":
+            #    #var c : uint8 = (uint8)v
+            #    #render.setDrawColor c,c,c,c
+            #    var c : GLfloat = (GLfloat)v
+            #    glColor3f(c, c, c)
+            #    state = "COLOR_B"
+            #of "COLOR_B":
+            #    #render.fillRect r
+            #    glRecti(r.x, r.y, r.w+r.x, r.h+r.y)

@@ -8,7 +8,7 @@ opcodes = {
             'add':0x40,     'sub' :0x48,
             'shl':0x60,     'shr' :0x68,
             'ldd':0x70,     'std' :0x78,
-            'halt':0xf8
+            'halt':0xf8,    'tmr0' :0xe0,   'tmr1' :0xe8
           }
 
 registers = [ 'r0', 'r1' ]
@@ -80,6 +80,9 @@ def __convert_assembly_ins(ins):
                     imm = int(op1[3:], 16) & 0xff
                 elif op1[1] == '>':
                     imm = int(op1[3:], 16) >> 8
+                # check if hex format
+                elif len(op1) > 2 and op1[2] == 'x':
+                    imm = int(op1[3:], 16)
                 else:
                     imm = int(op1[1:])
                 if imm > 0xff:
@@ -126,6 +129,9 @@ def __convert_assembly_ins(ins):
                         imm = int(op2[3:], 16) & 0xff
                     elif op2[1] == '>':
                         imm = int(op2[3:], 16) >> 8
+                    # check if hex format
+                    elif len(op2) > 2 and op2[2] == 'x':
+                        imm = int(op2[3:], 16)
                     else:
                         imm = int(op2[1:])
                     if imm > 0xff:
