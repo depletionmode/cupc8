@@ -121,8 +121,8 @@ begin
 						when x"2" => -- i2c
 							case addr(3 downto 0) is
 								when x"f" => -- read
-									i2c_go <= '1';
 									i2c_stop <= '0';
+									i2c_go <= '1';
 									data <= i2c_rx_data;
 								when others => NULL;
 							end case;

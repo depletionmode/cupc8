@@ -24,8 +24,7 @@ entity soc is
 			ram_n_we:	out std_logic;
 			
 			-- testing signals
-         seg7_o:		out std_logic_vector(6 downto 0);
-			o: 			out std_logic
+			seg7_o:		out std_logic_vector(6 downto 0)
 		);
 end entity;
 
@@ -41,8 +40,7 @@ component cpu
 			mem_n_we:	out std_logic;
 			
 			-- testing
-			o: 			out std_logic;
-         seg7_val:	out std_logic_vector(3 downto 0)
+			seg7_val:	out std_logic_vector(3 downto 0)
 		);
 end component;
 		
@@ -118,7 +116,7 @@ end component;
 signal slow_clk: std_logic := '0';
 
 begin
-cpu0: cpu port map(slow_clk, n_hrst, halt, mem_addr, mem_data, mem_n_we, o, seg7_val);
+cpu0: cpu port map(slow_clk, n_hrst, halt, mem_addr, mem_data, mem_n_we, seg7_val);
 mmu0: mmu port map(clk, mem_addr, mem_data, mem_n_we, spi_ss, spi_sck, spi_mosi, spi_miso, i2c_tx, i2c_rx, i2c_go, i2c_stop, gpo, ram_addr, ram_data, ram_n_we);
 i2c0: i2c port map(clk, i2c_sda, i2c_scl, i2c_tx, i2c_rx, i2c_go, i2c_stop);
 

@@ -50,6 +50,7 @@ set_global_assignment -name NOMINAL_CORE_SUPPLY_VOLTAGE 1.2V
 set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim-Altera (VHDL)"
 set_global_assignment -name EDA_OUTPUT_DATA_FORMAT VHDL -section_id eda_simulation
 set_global_assignment -name VHDL_FILE soc.vhd
+set_global_assignment -name VHDL_FILE i2c.vhd
 set_global_assignment -name VHDL_FILE cpu.vhd
 set_global_assignment -name VHDL_FILE alu.vhd
 set_global_assignment -name VHDL_FILE rom.vhd
@@ -73,7 +74,6 @@ set_location_assignment PIN_J2 -to gpo[1]
 set_location_assignment PIN_J1 -to gpo[0]
 set_location_assignment PIN_B1 -to halt
 set_location_assignment PIN_J6 -to n_hrst
-set_location_assignment PIN_B2 -to o
 set_location_assignment PIN_W10 -to ram_addr[15]
 set_location_assignment PIN_V8 -to ram_addr[14]
 set_location_assignment PIN_V12 -to ram_addr[13]
@@ -120,7 +120,6 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to gpo[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to gpo[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to halt
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to n_hrst
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ram_addr[15]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ram_addr[14]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ram_addr[13]

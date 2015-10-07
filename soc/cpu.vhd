@@ -13,8 +13,7 @@ entity cpu is
 			mem_n_we:	out std_logic;
 			
 			-- testing
-			o: 			out std_logic;
-         seg7_val:	out std_logic_vector(3 downto 0)
+			seg7_val:	out std_logic_vector(3 downto 0)
 		);
 end entity;
 
