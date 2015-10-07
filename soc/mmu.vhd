@@ -15,6 +15,12 @@ entity mmu is
 			spi_mosi:		out std_logic;
 			spi_miso:		in std_logic;
 			
+			i2c_tx_data	: out std_logic_vector(7 downto 0);
+			i2c_rx_data : in std_logic_vector(7 downto 0);
+
+			i2c_go		: out std_logic;
+			i2c_stop	: out std_logic;
+
 			gpo:		out std_logic_vector(7 downto 0) := x"00";
 			
 			ram_addr:		out std_logic_vector(15 downto 0);
@@ -24,7 +30,6 @@ entity mmu is
 end entity;
 
 architecture behavioural of mmu is
-signal	ram_en:			std_logic;
 signal	data_out: std_logic_vector(7 downto 0) := x"00";
 
 signal gpo_int: std_logic_vector(7 downto 0) := x"00";
@@ -97,7 +102,7 @@ spi_sck <= mux_out(9);
 rom0: rom port map(rom_addr, rom_data);
 
 ram_addr <= addr;
-ram_en <= n_we;
+ram_n_we <= n_we;
 
 rom_addr <= addr;
 
@@ -111,6 +116,18 @@ begin
 			case addr(15 downto 12) is
 				when x"e" => -- on-fpga rom read
 				   data <= rom_data;
+				when x"f" => -- i/o
+					case addr(11 downto 8) is
+						when x"2" => -- i2c
+							case addr(3 downto 0) is
+								when x"f" => -- read
+									i2c_go <= '1';
+									i2c_stop <= '0';
+									data <= i2c_rx_data;
+								when others => NULL;
+							end case;
+						when others => NULL;
+					end case;
 				when others => data <= ram_data; -- read from ram
 			end case;
 		else
@@ -121,7 +138,21 @@ begin
 				when x"f" => -- i/o
 					case addr(11 downto 8) is
 						when x"0" => -- gpo
-								gpo <= data;
+							gpo <= data;
+						when x"2" => -- i2c
+							i2c_tx_data <= data;
+							case addr(3 downto 0) is
+								when x"0" => -- start transaction by providing device address
+									i2c_stop <= '0';
+									i2c_go <= '1';
+								when x"1" => -- end transaction
+									i2c_go <= '0';
+									i2c_stop <= '1';
+								when x"f" => -- write
+									i2c_go <= '1';
+									i2c_stop <= '0';
+								when others => NULL;
+							end case;
 						when others => NULL;
 					end case;
 				when others =>

@@ -8,7 +8,7 @@ mul:
     st [mul_v], r0
     st [mul_n], r1
     mov r1, #1  ; i=1
-mul_loop:
+.mul_loop:
     push r0
     ld r0, [mul_n]
     eq r0, r1
@@ -20,7 +20,7 @@ mul_loop:
     pop r1
     add r1, #1  ; i++
     b .mul_loop
-mul_done:
+.mul_done:
     pop pcl
     pop pch 
 
@@ -30,5 +30,5 @@ main:
     mov r1, #3
     push pch
     push pcl
-    b .mul
+    b mul
     st GPO, r0
