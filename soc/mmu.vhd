@@ -63,7 +63,7 @@ signal spi_enable:		std_logic;
 signal spi_cpol:			std_logic := '1';
 signal spi_cpha:			std_logic := '1';
 signal spi_cont:			std_logic := '0';
-signal spi_clk_div:		integer := 25;
+signal spi_clk_div:		integer := 50;
 signal spi_addr:			integer;
 signal spi_tx_data:		std_logic_vector(7 downto 0);
 --signal spi_miso:			std_logic;
@@ -82,72 +82,67 @@ ram_n_we <= n_we;
 
 rom_addr <= addr;
 
--- spi enable signal for once clock cycle only
-process (clk)
-variable clk_count: integer range 0 to 50000000 := 0;
-begin
-   if (rising_edge(clk)) then
-		if (spi_enable = '1') then
-			--spi_enable <= '0';
-		end if;
-	end if;
-end process;
 
 process(clk, ram_data, data, addr)
 begin
    if falling_edge(clk) then
-		if n_we = '1' then
-			-- read
-			--ram_n_we <= '1';
-			ram_data <= (others=>'Z');
-			case addr(15 downto 12) is
-				when x"e" => -- on-fpga rom read
-				   data <= rom_data;
-				when x"f" => -- i/o
-					case addr(11 downto 8) is
-						when x"1" => -- spi
-							spi_addr <= to_integer(unsigned(addr(7 downto 4)));	-- device selection
-							case addr(3 downto 0) is
-								when x"1" =>
-									data_out <= spi_rx_data;
-								when x"3" => 
-									data_out <= "0000000" & not spi_busy; -- '1' when done
-								when x"f" =>
-									data_out <= "00000000"; -- todo implement config read
-								when others => data_out <= "00000000";
-							end case;
-						when others => data_out <= "00000000";
-					end case;
-				when others => data <= ram_data; -- read from ram
-			end case;
+		if (spi_enable = '1') then
+			-- spi enable signal for once clock cycle only
+			spi_enable <= '0';
 		else
-			--ram_n_we <= '0';
-			-- write
-			data <= (others=>'Z');
-			case addr(15 downto 12) is
-				when x"f" => -- i/o
-					case addr(11 downto 8) is
-						when x"0" => -- gpo
-							gpo <= data;
-						when x"1" => -- spi
-							spi_addr <= to_integer(unsigned(addr(7 downto 4)));
-							case addr(3 downto 0) is
-								when x"0" =>
-									spi_tx_data <= data;
-								when x"2" =>
-									spi_enable <= '1';
-								when x"f" =>
-									spi_clk_div <= to_integer(unsigned(data(7 downto 3)));
-									spi_cont <= data(0);
-									spi_cpol <= data(1);
-									spi_cpha <= data(2);
-								when others => NULL;
-							end case;
-						when others => NULL;
-					end case;
-				when others =>
-					ram_data <= data;
-			end case;
+			if n_we = '1' then
+				-- read
+				--ram_n_we <= '1';
+				ram_data <= (others=>'Z');
+				case addr(15 downto 12) is
+					when x"e" => -- on-fpga rom read
+						data <= rom_data;
+					when x"f" => -- i/o
+						case addr(11 downto 8) is
+							when x"1" => -- spi
+								spi_addr <= to_integer(unsigned(addr(7 downto 4)));	-- device selection
+								case addr(3 downto 0) is
+									when x"1" =>
+										data_out <= spi_rx_data;
+									when x"3" =>
+										data <= "0000000" & not spi_busy; -- '1' when done
+									when x"f" =>
+										data <= "00000000"; -- todo implement config read
+									when others => data <= "00000000";
+								end case;
+							when others => data <= "00000000";
+						end case;
+					when others => data <= ram_data; -- read from ram
+				end case;
+			else
+				--ram_n_we <= '0';
+				-- write
+				data <= (others=>'Z');
+				case addr(15 downto 12) is
+					when x"f" => -- i/o
+						case addr(11 downto 8) is
+							when x"0" => -- gpo
+								gpo <= data;
+							when x"1" => -- spi
+								spi_addr <= to_integer(unsigned(addr(7 downto 4)));
+								case addr(3 downto 0) is
+									when x"0" =>
+										spi_tx_data <= data;
+									when x"2" =>
+										spi_enable <= '1';
+									when x"f" =>
+										spi_clk_div <= to_integer(unsigned(data(7 downto 3)));
+										spi_cont <= data(0);
+										spi_cpol <= data(1);
+										spi_cpha <= data(2);
+									when others => NULL;
+								end case;
+							when others => NULL;
+						end case;
+					when others =>
+						ram_data <= data;
+				end case;
+			end if;
 		end if;
 	end if;
 end process;
