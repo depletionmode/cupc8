@@ -41,7 +41,7 @@ main:
 	eq r0, #0
 	bzf .wait3
 
-	mov r1, #50
+	mov r1, #255
 .loop0:
 	mov r0, #255
 	st $f100, r0	; write 0xff
@@ -53,7 +53,7 @@ main:
 	;st $1000+r1, r0 ; todo - implement hw support for this!! 
 	sub r1, #1
 	st $f000, r1
-	gt r1, #0	; todo - work out why EQ is screwey
+	gt r1, #0	; todo - work out why EQ (and probably other logical comparisons) is screwey with r1 I suspect writeback issues with r1 as first operand...
 	bzf .loop0
 
 .read_done:

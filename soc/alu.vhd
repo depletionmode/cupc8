@@ -98,7 +98,7 @@ begin
 				rres <= shift_left(ra, to_integer(rb));
 			when "1101" =>
 				rres <= shift_right(ra, to_integer(rb));
-			when others => rres <= ra;
+			when others => NULL;
 		end case;
 	end if;
 end process;
