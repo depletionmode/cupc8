@@ -19,13 +19,14 @@ entity mmu is
 			
 			ram_addr:		out std_logic_vector(15 downto 0);
 			ram_data:		inout std_logic_vector(7 downto 0);
-			ram_n_we:		out std_logic
+			ram_n_we:		out std_logic;
+			
+			test_spi_ready: out std_logic;
+			test_spi_busy: out std_logic
 		);
 end entity;
 
 architecture behavioural of mmu is
-signal	data_out: std_logic_vector(7 downto 0) := x"00";
-
 signal gpo_int: std_logic_vector(7 downto 0) := x"00";
 
 component rom is
@@ -60,8 +61,8 @@ end component;
 type int_array is array(0 to 3) of integer;
 signal spi_reset_n:		std_logic := '1';
 signal spi_enable:		std_logic;
-signal spi_cpol:			std_logic := '1';
-signal spi_cpha:			std_logic := '1';
+signal spi_cpol:			std_logic := '0';
+signal spi_cpha:			std_logic := '0';
 signal spi_cont:			std_logic := '0';
 signal spi_clk_div:		integer := 50;
 signal spi_addr:			integer;
@@ -70,9 +71,9 @@ signal spi_tx_data:		std_logic_vector(7 downto 0);
 --signal spi_sclk:			std_logic;
 --signal spi_ss_n:			std_logic_vector(3 downto 0);
 --signal spi_mosi:			std_logic;
-signal spi_busy:			std_logic;
+signal spi_busy:			std_logic := '1';
 signal spi_rx_data:		std_logic_vector(7 downto 0);
-
+signal spi_ready:			std_logic := '0';
 begin
 spi0: spi port map(clk, spi_reset_n, spi_enable, spi_cpol, spi_cpha, spi_cont, spi_clk_div, spi_addr, spi_tx_data, spi_miso, spi_sclk, spi_ss_n, spi_mosi, spi_busy, spi_rx_data);
 rom0: rom port map(rom_addr, rom_data);
@@ -82,6 +83,31 @@ ram_n_we <= n_we;
 
 rom_addr <= addr;
 
+test_spi_ready <= spi_ready;
+test_spi_busy <= spi_busy;
+
+-- extend the spi_busy signal so that we can catch it on a mem read
+-- (it's only a single system clk wide and cpu can take multiple clk cycles to perform a read)
+process(clk, spi_busy, spi_ready)
+variable spi_ready_delay: integer range 0 to 50000000 := 0;
+begin
+	if rising_edge(clk) then
+		if spi_busy = '0' then
+			spi_ready <= '1';
+		end if;
+		-- select sufficient clock cycles so that the CPU doesn't miss this
+		-- but not too many that the signal becomes meaningless
+		-- basically the ready flag should live for as long as a read takes and not much more
+		if spi_ready = '1' then 
+			if spi_ready_delay < 30 then	
+				spi_ready_delay := spi_ready_delay + 1;
+			else
+				spi_ready_delay := 0;
+				spi_ready <= not spi_busy;
+			end if;
+		end if;
+	end if;
+end process;
 
 process(clk, ram_data, data, addr)
 begin
@@ -103,9 +129,9 @@ begin
 								spi_addr <= to_integer(unsigned(addr(7 downto 4)));	-- device selection
 								case addr(3 downto 0) is
 									when x"1" =>
-										data_out <= spi_rx_data;
+										data <= spi_rx_data;
 									when x"3" =>
-										data <= "0000000" & not spi_busy; -- '1' when done
+										data <= "0000000" & spi_ready; -- '1' when done
 									when x"f" =>
 										data <= "00000000"; -- todo implement config read
 									when others => data <= "00000000";
@@ -131,7 +157,7 @@ begin
 									when x"2" =>
 										spi_enable <= '1';
 									when x"f" =>
-										spi_clk_div <= to_integer(unsigned(data(7 downto 3)));
+										spi_clk_div <= to_integer(unsigned(data(7 downto 3)))*4;
 										spi_cont <= data(0);
 										spi_cpol <= data(1);
 										spi_cpha <= data(2);

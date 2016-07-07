@@ -256,7 +256,7 @@ begin
 					-- mem delay > 70ns
 					-- 4 cycles should be sufficient (80ns)
 					-- one added for good measure
-					if ram_delay < 20 then 
+					if ram_delay < 4 then 
 						ram_delay := ram_delay + 1;
 					else
 						ram_delay := 0;

@@ -12,20 +12,34 @@ end entity rom;
 architecture behavioural of rom is
 	signal dataout : std_logic_vector(7 downto 0);
 	signal addr_int : std_logic_vector(11 downto 0);
-	type rom_type is array (0 to 29) of std_logic_vector(7 downto 0);
+	type rom_type is array (0 to 127) of std_logic_vector(7 downto 0);
 	-- rom code
 	constant rom : rom_type :=
+	-- rom bootloader
+	-- loads 256 bytes to address $1000 and jumps into that vector
+	(
+
+x"b0", x"03", x"e0", x"8c", x"00", x"a8", x"00", x"f0", x"8c", x"f9", x"a8", x"0f", x"f1", x"8c", x"03", x"a8",                                                                                                                              
+x"00", x"f1", x"aa", x"02", x"f1", x"a1", x"03", x"f1", x"05", x"00", x"b8", x"15", x"e0", x"8c", x"01", x"a8",                                                                                                                              
+x"00", x"f1", x"a1", x"03", x"f1", x"05", x"00", x"b8", x"22", x"e0", x"8c", x"02", x"a8", x"00", x"f1", x"a1",                                                                                                                              
+x"03", x"f1", x"05", x"00", x"b8", x"2f", x"e0", x"8d", x"04", x"aa", x"00", x"f0", x"8c", x"ff", x"8d", x"ff",                                                                                                                              
+x"a8", x"00", x"f1", x"a0", x"03", x"f1", x"04", x"00", x"b8", x"43", x"e0", x"a0", x"01", x"f1", x"4d", x"01",                                                                                                                              
+x"aa", x"00", x"f0", x"05", x"00", x"b8", x"5b", x"e0", x"b0", x"40", x"e0", x"8c", x"f8", x"a8", x"0f", x"f1",                                                                                                                              
+x"8c", x"ff", x"a8", x"00", x"f0", x"b0", x"65", x"e0", x"b0", x"00", x"01", x"00", x"00", x"00", x"00", x"00",                                                                                                                              
+x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00"
+
+	);
 	-- spi test
-            (x"8c", x"00", x"a8", x"00", x"f0", x"8c", x"81", x"a8", x"00", x"f0",
-			 x"8c", x"a0",				-- mov r0, #0xa0	; device address - write
-			 x"a8", x"00", x"f1",		-- st $f100, r0		; write tx buffer
-			 x"8c", x"01",				-- mov r0, #1
-			 x"a8", x"02", x"f1",		-- st $f102, r0		; start transaction
-			 x"30",						-- xor r0, r0
-			 x"a0", x"03", x"f1",		-- ld $f103, r0		; check busy
-			 x"a8", x"00", x"f0",		-- st $f000, r0		; gpo
-			 x"b0", x"14", x"e0");
-	
+--            (x"8c", x"00", x"a8", x"00", x"f0", x"8c", x"81", x"a8", x"00", x"f0",
+--			 x"8c", x"aa",				-- mov r0, #0xaa
+--			 x"a8", x"00", x"f1",		-- st $f100, r0		; write tx buffer
+--			 x"8c", x"01",				-- mov r0, #1
+--			 x"a8", x"02", x"f1",		-- st $f102, r0		; start transaction
+--			 x"30",						-- xor r0, r0
+--			 x"a0", x"03", x"f1",		-- ld $f103, r0		; check busy
+--			 x"a8", x"00", x"f0",		-- st $f000, r0		; gpo
+--			 x"b0", x"1b", x"e0");
+--	
 
 ---- ram test (passed)
 --	(x"8c", x"00", x"a8", x"00", x"f0", x"8c", x"ff", x"a8", x"00", x"f0",

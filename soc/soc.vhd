@@ -19,9 +19,11 @@ entity soc is
 			ram_addr:	out std_logic_vector(15 downto 0);
 			ram_data:	inout std_logic_vector(7 downto 0);
 			ram_n_we:	out std_logic;
-			
+
 			-- testing signals
-			seg7_o:		out std_logic_vector(6 downto 0)
+			seg7_o:		out std_logic_vector(6 downto 0);
+			test_spi_ready: out std_logic;
+			test_spi_busy: out std_logic
 		);
 end entity;
 
@@ -61,7 +63,10 @@ component mmu
 			
 			ram_addr:		out std_logic_vector(15 downto 0);
 			ram_data:		inout std_logic_vector(7 downto 0);
-			ram_n_we:		out std_logic
+			ram_n_we:		out std_logic;
+			
+			test_spi_ready: out std_logic;
+			test_spi_busy: out std_logic
 		);
 end component;
 		
@@ -89,7 +94,7 @@ signal slow_clk: std_logic := '0';
 
 begin
 cpu0: cpu port map(slow_clk, n_hrst, halt, mem_addr, mem_data, mem_n_we, seg7_val);
-mmu0: mmu port map(clk, mem_addr, mem_data, mem_n_we, spi_ss_n, spi_sclk, spi_mosi, spi_miso,gpo, ram_addr, ram_data, ram_n_we);
+mmu0: mmu port map(slow_clk, mem_addr, mem_data, mem_n_we, spi_ss_n, spi_sclk, spi_mosi, spi_miso,gpo, ram_addr, ram_data, ram_n_we, test_spi_ready, test_spi_busy);
 
 -- testing
 seg0: seg7 port map (seg7_val, seg7_o);
@@ -100,7 +105,7 @@ process (clk)
 variable clk_delay: integer range 0 to 50000000 := 0;
 begin
    if (rising_edge(clk)) then
-		if (clk_delay < 500000) then
+		if (clk_delay < 100) then
 			clk_delay := clk_delay + 1;
 			slow_clk <= '0';
 		else

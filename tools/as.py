@@ -269,6 +269,9 @@ def __assemble(filename):
             #  start of new label
             if l.find(':') > 0 and l.find(': resb') < 0:
                 label = l[:l.find(':')]
+                # sanity
+                if label.find(' ') > -1:
+                    raise Exception("Labelling error. Labels cannot have spaces! [{}:{}]".format(line_num, file_name))
                 if label[0] == '.':
                     label = current_label + label
                 else:
@@ -287,11 +290,20 @@ def __assemble(filename):
 
 if __name__ == "__main__":
     global file_name
+    global base
     import sys
     args = sys.argv[1:]
 
     if len(args) < 1:
         raise Exception('Invalid input/output files')
+
+    outf = '{}.o'.format(file_name.split('.')[0])
+    if len(args) >= 2: outf = args[1]
+    if len(args) == 3:
+        bases = args[2].split(',')
+        base = int(bases[0], 0)
+        data_base= int(bases[1], 0)
+        bss_base = int(bases[2], 0)
 
     file_name = args[0]
 
@@ -303,9 +315,6 @@ if __name__ == "__main__":
     entry_point = 'main'
     if not entry_point in labels:
         raise Exception('No entry point found')
-
-    outf = '{}.o'.format(file_name.split('.')[0])
-    if len(args) == 2: outf = args[1]
 
 #    for k,v in labels.items():
 #        print(k, v)
