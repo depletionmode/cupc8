@@ -1,5 +1,5 @@
 ; rom0 code
-; 256 byte constraint
+; 128 byte constraint
 ; responsible for loading the rom off the flash into ram
 ; situated at $0000 on the flash device
 ; rom0 base address - $e000
@@ -8,11 +8,12 @@ main:
 	mov r0, #255	; gpo - indicate bootloader start
 	st $f000, r0
 
-	mov r0, #207	; div=25, mode=1,1, cont=1
+	mov r0, #241	; div=30, mode=0,0, cont=0
 	st $f10f, r0	; configure spi device
 
 	mov r0, #3
 	st $f100, r0	; write flash READ cmd
+	st $f102, r1	; start transaction
 .wait0:
 	ld r1, $f103	; read status
 	eq r1, #0
@@ -30,10 +31,10 @@ main:
 	eq r1, #0
 	bzf .wait2
 
-	mov r1, #255
+	mov r1, #10
 .loop0:
 	ld r0, $f101	; read byte
-	st $0100+r1, r0
+	st $1000+r1, r0
 .wait3:
 	ld r0, $f103	; read status
 	eq r0, #0
