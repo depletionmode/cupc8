@@ -50,22 +50,23 @@ architecture behavioural of rom is
 			 x"a8", x"0f", x"f2",		-- st $f20f, r0		; write address low
 			 x"8c", x"aa",				-- mov r0, #0xaa
 			 x"a8", x"0f", x"f2",		-- st $f20f, r0		; write data
-			 x"a8", x"01", x"f2",		-- st $f200, r0		; end transaction
+			 x"a8", x"01", x"f2",		-- st $f201, r0		; end transaction
 			 x"8c", x"a0",				-- mov r0, #0xa0	; device address - write
 			 x"a8", x"00", x"f2",		-- st $f200, r0		; start transaction
 			 x"8c", x"00",				-- mov r0, #0
 			 x"a8", x"0f", x"f2",		-- st $f20f, r0		; write address high
 			 x"a8", x"0f", x"f2",		-- st $f20f, r0		; write address low
-			 x"a8", x"01", x"f2",		-- st $f200, r0		; end transaction
+			 x"a8", x"01", x"f2",		-- st $f201, r0		; end transaction
 			 x"8c", x"a1",				-- mov r0, #0xa1	; device address - read
 			 x"a8", x"00", x"f2",		-- st $f200, r0		; start transaction
 			 x"8c", x"03",				-- mov r0, #3
 			 x"a0", x"0f", x"f2",		-- ld r0, $f20f		; read data
-			 x"a8", x"01", x"f2",		-- st $f200, r0		; end transaction
-			 x"a8", x"00", x"f0",
+			 x"a8", x"01", x"f2",		-- st $f201, r0		; end transaction
+			 x"a8", x"00", x"f0",		-- st $f000, r0		; gpo`
 			 --x"90",						-- push r0
              --x"8c", x"00", x"a8", x"00", x"f0", x"98", x"a8", x"00", x"f0",
-			 x"b0", x"3f", x"e0");
+			 --x"b0", x"3f", x"e0");
+			 x"b0", x"00", x"e0");
 				
 begin
 addr_int <= address(11 downto 0);

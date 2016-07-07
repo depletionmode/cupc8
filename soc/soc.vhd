@@ -9,14 +9,11 @@ entity soc is
 			n_hrst:		in std_logic;
 			halt:			out std_logic; -- high on catastrophic failure
 			
-			spi_ss:		out std_logic_vector(3 downto 0);
-			spi_sck:		out std_logic;
+			spi_ss_n:	out std_logic_vector(3 downto 0);
+			spi_sclk:	out std_logic;
 			spi_mosi:	out std_logic;
 			spi_miso:	in std_logic;
 			
-			i2c_sda: inout std_logic;
-			i2c_scl: out std_logic;
-
 			gpo:			out std_logic_vector(7 downto 0);
 			
 			ram_addr:	out std_logic_vector(15 downto 0);
@@ -55,41 +52,16 @@ component mmu
 			data:		inout std_logic_vector(7 downto 0);
 			n_we:		in std_logic;
 			
-			spi_ss:			out std_logic_vector(3 downto 0);
-			spi_sck:			out std_logic;
+			spi_ss_n:		out std_logic_vector(3 downto 0);
+			spi_sclk:		out std_logic;
 			spi_mosi:		out std_logic;
 			spi_miso:		in std_logic;
 			
-			i2c_tx_data	: out std_logic_vector(7 downto 0);
-			i2c_rx_data : in std_logic_vector(7 downto 0);
-
-			i2c_go		: out std_logic;
-			i2c_stop	: out std_logic;
-
 			gpo:		out std_logic_vector(7 downto 0);
 			
 			ram_addr:		out std_logic_vector(15 downto 0);
 			ram_data:		inout std_logic_vector(7 downto 0);
 			ram_n_we:		out std_logic
-		);
-end component;
-
-signal	i2c_tx:		std_logic_vector(7 downto 0);
-signal	i2c_rx:		std_logic_vector(7 downto 0);
-signal	i2c_go:		std_logic := '0';
-signal	i2c_stop:		std_logic := '0';
-component i2c is
-	port(
-			clk		: in std_logic;
-
-			sda		: inout std_logic;
-			scl		: out std_logic;
-
-			tx_data	: in std_logic_vector(7 downto 0);
-			rx_data : out std_logic_vector(7 downto 0);
-
-			go		: in std_logic;
-			stop	: in std_logic
 		);
 end component;
 		
@@ -117,8 +89,7 @@ signal slow_clk: std_logic := '0';
 
 begin
 cpu0: cpu port map(slow_clk, n_hrst, halt, mem_addr, mem_data, mem_n_we, seg7_val);
-mmu0: mmu port map(clk, mem_addr, mem_data, mem_n_we, spi_ss, spi_sck, spi_mosi, spi_miso, i2c_tx, i2c_rx, i2c_go, i2c_stop, gpo, ram_addr, ram_data, ram_n_we);
-i2c0: i2c port map(clk, i2c_sda, i2c_scl, i2c_tx, i2c_rx, i2c_go, i2c_stop);
+mmu0: mmu port map(clk, mem_addr, mem_data, mem_n_we, spi_ss_n, spi_sclk, spi_mosi, spi_miso,gpo, ram_addr, ram_data, ram_n_we);
 
 -- testing
 seg0: seg7 port map (seg7_val, seg7_o);

@@ -57,7 +57,7 @@ variable ra, rb: unsigned(7 downto 0);
 variable sp_next: unsigned(15 downto 0);
 variable tmp16: unsigned (15 downto 0);
 variable tmp16_2: unsigned (15 downto 0);
-variable ram_delay: integer range 0 to 10 := 0;
+variable ram_delay: integer range 0 to 1000 := 0;
 variable ram_ld, ram_st: bit := '0';
 begin
 	halt <= n_hrst;
@@ -256,7 +256,7 @@ begin
 					-- mem delay > 70ns
 					-- 4 cycles should be sufficient (80ns)
 					-- one added for good measure
-					if ram_delay < 3 then 
+					if ram_delay < 20 then 
 						ram_delay := ram_delay + 1;
 					else
 						ram_delay := 0;
