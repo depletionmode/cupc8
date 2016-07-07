@@ -105,7 +105,7 @@ process (clk)
 variable clk_delay: integer range 0 to 50000000 := 0;
 begin
    if (rising_edge(clk)) then
-		if (clk_delay < 100) then
+		if (clk_delay < 2000) then
 			clk_delay := clk_delay + 1;
 			slow_clk <= '0';
 		else

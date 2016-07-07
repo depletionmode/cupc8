@@ -20,46 +20,50 @@ main:
 	eq r1, #0
 	bzf .wait0
 
-	mov r0, #1
+	mov r0, #0
 	st $f100, r0
 .wait1:
 	ld r1, $f103	; read status
 	eq r1, #0
 	bzf .wait1
-	mov r0, #2
+	mov r0, #0
 	st $f100, r0	; write flash address $0000
 .wait2:
 	ld r1, $f103	; read status
 	eq r1, #0
 	bzf .wait2
 ;
-	mov r1, #4
-	st $f000, r1
-
+.ignore_byte:
 	mov r0, #255
-	mov r1, #255
-.loop0:
 	st $f100, r0	; write 0xff
 .wait3:
 	ld r0, $f103	; read status
 	eq r0, #0
 	bzf .wait3
+
+	mov r1, #50
+.loop0:
+	mov r0, #255
+	st $f100, r0	; write 0xff
+.wait4:
+	ld r0, $f103	; read status
+	eq r0, #0
+	bzf .wait4
 	ld r0, $f101	; read byte
-	;st $1000+r1, r0
+	;st $1000+r1, r0 ; todo - implement hw support for this!! 
 	sub r1, #1
 	st $f000, r1
-	eq r1, #0
-	bzf .read_done
-	b .loop0
+	gt r1, #0	; todo - work out why EQ is screwey
+	bzf .loop0
 
 .read_done:
 	mov r0, #248
 	st $f10f, r0	; disable cont mode
 
-	mov r0, #255	; gpo - indicate bootloader end
-	st $f000, r0
+	;mov r0, #255	
+	st $f000, r0	; gpo - indicate bootloader end
 
 .test_loop:
 	b .test_loop
 
-	b $0100			; jump to kernel start vector
+	b $1000			; jump to kernel start vector
