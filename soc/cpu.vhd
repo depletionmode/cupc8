@@ -44,6 +44,7 @@ type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr,
 signal stage, stage_nxt: stages := reset;
 signal data: unsigned(7 downto 0) := "10000000";
 signal imm_fetched: std_logic;
+signal addr_reg_offset: std_logic;
 
 begin
 alu0: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
@@ -97,6 +98,19 @@ begin
 					seg7_val <= "0011";
 					pc <= std_logic_vector(unsigned(pc) + 1);
 					
+					
+					-- addressed instructions can have register value offsets		
+					-- this is marked by bit2 set
+					case ins(6 downto 3) is
+						when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
+							if ins(2) = '1' then
+								addr_reg_offset <= '1';
+							else
+								addr_reg_offset <= '0';
+							end if;
+						when others => addr_reg_offset <='0';
+					end case;
+							
 					-- fetch imm
 					if(ins(2) = '1' and ins(1) = '0' and imm_fetched = '0') then
 						-- fetch imm
@@ -105,7 +119,7 @@ begin
 					else
 						-- register decode
 						if ins(0) = '0' then ra := r0; else ra := r1; end if;
-						if ins(2) = '1' and ins(1) = '1' then
+						if ins(2) = '1' and ins(1) = '1' and addr_reg_offset = '0' then
 							-- use pc
 							if ins(0) = '0' then
 								tmp16 := unsigned(pc) + 5; -- offset 5 ops
@@ -133,7 +147,16 @@ begin
 									if addr2_fetched = '0' then
 										stage <= fetch_addr;
 									else
-										addr_value <= unsigned(mem_data) & addr_value(7 downto 0);
+										if addr_reg_offset = '1' then
+											if ins(0) = '0' then
+												rtmp := r0;
+											else
+												rtmp := r1;
+											end if;
+										else
+												rtmp := to_unsigned(0, rtmp'length);
+										end if;
+										addr_value <= unsigned(mem_data) & addr_value(7 downto 0) + rtmp;
 										stage <= execute;
 									end if;
 								when others => stage <= execute;
