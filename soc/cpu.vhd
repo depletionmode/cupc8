@@ -18,13 +18,14 @@ entity cpu is
 end entity;
 
 architecture behavioural of cpu is
-signal			alu_en:		std_logic;
+signal			alu_en:		std_logic := '0';
 signal			alu_ra:		unsigned(7 downto 0);
 signal			alu_rb:		unsigned(7 downto 0);
 signal			alu_res:		unsigned(7 downto 0);
-signal			alu_zf:		unsigned(0 downto 0);
+signal			alu_zf:		unsigned(0 downto 0) := "0";
 component alu
    port(
+			clk:		in std_logic;
 			n_en:		in std_logic;
 			op:		in std_logic_vector(3 downto 0);
 			a, b:		in unsigned(7 downto 0);
@@ -33,24 +34,24 @@ component alu
 		);
 end component;
 
-signal r0, r1:	unsigned(7 downto 0);
+signal r0, r1:	unsigned(7 downto 0) := x"00";
 signal pc:	std_logic_vector(15 downto 0) := x"0000";
 signal sp:	unsigned(15 downto 0) := x"0000";
 signal f: unsigned(3 downto 0) := x"0";
-signal ins: unsigned(7 downto 0);
-signal imm_value: unsigned(7 downto 0);
-signal addr_value: unsigned(15 downto 0);
+signal ins: unsigned(7 downto 0) := x"00";
+signal imm_value: unsigned(7 downto 0) := x"00";
+signal addr_value: unsigned(15 downto 0) := x"0000";
 type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2, waitonram);
 signal stage, stage_nxt: stages := reset;
 signal data: unsigned(7 downto 0) := "10000000";
-signal imm_fetched: std_logic;
-signal addr_reg_offset: std_logic;
+signal imm_fetched: std_logic := '0';
+signal addr_reg_offset: std_logic := '0';
 
 begin
-alu0: alu port map(alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
+alu0: alu port map(clk, alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
 
 f <= "000" & alu_zf;
-		
+
 process(clk, n_hrst)
 variable addr2_fetched: bit;
 variable rtmp: unsigned(7 downto 0);
@@ -70,12 +71,12 @@ begin
 			case stage is
 				when fetch =>
 					mem_data <= (others => 'Z');
-					seg7_val <= "0001";
+					seg7_val <= x"1";
 					mem_n_we <= '1';
 					mem_addr <= std_logic_vector(pc);
 					stage <= fetch2;
 				when fetch2 => -- dirty dirty hack!
-					seg7_val <= "0010";
+					seg7_val <= x"2";
 					mem_n_we <= '1';
 					ins <= unsigned(mem_data);
 					stage <= decode;
@@ -95,14 +96,14 @@ begin
 					addr2_fetched := '1';
 					stage <= decode;
 				when decode =>	
-					seg7_val <= "0011";
+					seg7_val <= x"3";
 					pc <= std_logic_vector(unsigned(pc) + 1);
 					
 					
 					-- addressed instructions can have register value offsets		
 					-- this is marked by bit2 set
 					case ins(6 downto 3) is
-						when "0100"|"0101"|"0110"|"0111" => -- LD|ST|B|BNE
+						when "0100"|"0101" => -- LD|ST
 							if ins(2) = '1' then
 								addr_reg_offset <= '1';
 							else
@@ -112,13 +113,14 @@ begin
 					end case;
 							
 					-- fetch imm
-					if(ins(2) = '1' and ins(1) = '0' and imm_fetched = '0') then
+					if addr_reg_offset = '0' and ins(2 downto 1) = "10" and imm_fetched = '0' then
 						-- fetch imm
 						imm_fetched <= '1';
 						stage <= fetch_imm;
 					else
 						-- register decode
 						if ins(0) = '0' then ra := r0; else ra := r1; end if;
+						if ins(1) = '0' then rb := r0; else rb := r1; end if;
 						if ins(2) = '1' and ins(1) = '1' and addr_reg_offset = '0' then
 							-- use pc
 							if ins(0) = '0' then
@@ -128,10 +130,10 @@ begin
 								tmp16 := unsigned(pc) + 4; -- offset 4 ops
 								rb := tmp16(7 downto 0);
 							end if;
-						elsif ins(1) = '0' then
-							rb := r0;
-						else
-							rb := r1;
+--						elsif ins(1) = '0' then
+--							rb := r0;
+--						else
+--							rb := r1;
 						end if;
 						--ra := r0 when ins(0)='0' else r1;
 						
@@ -148,10 +150,10 @@ begin
 										stage <= fetch_addr;
 									else
 										if addr_reg_offset = '1' then
-											if ins(0) = '0' then
-												rtmp := r0;
+											if ins(6 downto 3) = "0100" then	-- LD
+												rtmp := rb;
 											else
-												rtmp := r1;
+												rtmp := ra;
 											end if;
 										else
 												rtmp := to_unsigned(0, rtmp'length);
@@ -209,7 +211,6 @@ begin
 					seg7_val <= x"5";
 					-- get result from alu
 					if(ins(7)='0') then
-							alu_en <= '1';
 							rtmp := alu_res;
 							-- write back into register
 							if(ins(0) = '0') then
@@ -217,6 +218,7 @@ begin
 							else
 								r1 <= rtmp;
 							end if;
+							alu_en <= '1';
 					end if;
 					
 					case ins(6 downto 3) is
