@@ -66,7 +66,7 @@ proc display_set_dc*(b : int) =
     else:
         dc = false
 
-proc display_transact*(b) =
+proc display_transact*(b : int) =
     var v : cint = (cint)b
     if not dc:
         case v:

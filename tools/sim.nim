@@ -14,7 +14,7 @@ discard sdl2.init(INIT_EVERYTHING)
 system.addQuitProc(resetAttributes)
 
 var log_mask = 9
-proc log(lvl, msg) =
+proc log(lvl : int, msg : string) =
   if (lvl and log_mask) > 0:
     when defined(emscripten):
       echo msg
