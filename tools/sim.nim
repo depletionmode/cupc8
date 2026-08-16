@@ -14,7 +14,7 @@ when isMainModule:
   import parseopt
   import std/exitprocs
 
-var log_mask = 9
+var log_mask* = 9
 var last_gpo*: string = ""
 var ins_retired*: int = 0
 
@@ -46,9 +46,27 @@ var
   R1*: int = 0
   ZF*: bool = false
   HF*: bool = false
-  pcl: int = 0
+  pcl*: int = 0
   mem*: array[0..0x10000, int]
-  eof: int = 0
+  imageEnd*: int = 0
+
+type
+  StepResult* = enum
+    sOk, sHalted, sPastImage
+  MemAccessKind* = enum
+    maRead, maWrite
+  MemHook* = proc(kind: MemAccessKind; address, value, oldValue: int)
+  RunExit* = enum
+    reCount, reBreak, reStop, reHalted, rePastImage
+
+var
+  memHook*: MemHook = nil
+  stopRequest*: bool = false
+  stepOutArmed*: bool = false
+  stepOutSP*: int = 0
+  breakSet: array[0x10000, bool]
+  breakCount: int = 0
+  resumeBreak: int = -1
 
 var
   spi_tx_buf: array[0..4, int]
@@ -58,6 +76,12 @@ var
 
 var
   display_active: bool = false
+
+proc pushKey*(k: int) =
+  keybuffer = k and 0xff
+  has_key = true
+
+proc keyPending*(): bool = has_key
 
 proc fetch(): int =
   result = mem[PC] and 0xff
@@ -137,7 +161,10 @@ proc ins_st_do(o: int, a: int) =
   if (o and 4) == 4:
     var ra = reg_read(o, true)
     address += ra
-  mem[address] = reg_read(o, false)
+  let
+    value = reg_read(o, false)
+    oldValue = mem[address]
+  mem[address] = value
   case address shr 8:
     of 0xf0:
       if (address and 0xff) == 0: #gpo
@@ -152,7 +179,7 @@ proc ins_st_do(o: int, a: int) =
       var reg = address and 0xf
       case reg:
         of 0:   # tx
-          spi_tx_buf[dev] = reg_read(o, false)
+          spi_tx_buf[dev] = value
         of 2:   # transact
           case dev:
           of 0:
@@ -171,6 +198,8 @@ proc ins_st_do(o: int, a: int) =
           discard
     else:
       discard
+  if not memHook.isNil:
+    memHook(maWrite, address, value, oldValue)
 
 proc ins_st(o: int) =
   var address = fetch() or (fetch() shl 8)
@@ -186,31 +215,35 @@ proc ins_ld_do(o: int, a: int) =
   if (o and 4) == 4:
     var rb = reg_read(o, false)
     address += rb
-  reg_write(o, mem[address])
+  let oldValue = mem[address]
+  var value = oldValue
   case address shr 8:
     of 0xf1:    #spi
       var dev = address shr 4 and 0xf
       var reg = address and 0xf
       case reg:
         of 1:   # rx
-          reg_write(o, spi_rx_buf[dev])
+          value = spi_rx_buf[dev]
         of 3:   # status
           case dev:
             of 0: #display
-              reg_write(o, 1)
+              value = 1
             of 2: #keyboard
               if has_key:
-                reg_write(o, 1)
+                value = 1
               else:
-                reg_write(o, 0)
+                value = 0
             of 1: #sd
-              reg_write(o, sd_isready())
+              value = sd_isready()
             else:
               discard
         else:
           discard
     else:
       discard
+  reg_write(o, value)
+  if not memHook.isNil:
+    memHook(maRead, address, value, oldValue)
 
 proc ins_ld(o: int) =
   var address = fetch() or (fetch() shl 8)
@@ -305,6 +338,9 @@ proc ins_pop(o: int) =
     pcl = mem[SP]
   elif (o and 6) == 6:
     PC = pcl or (mem[SP] shl 8)
+    if stepOutArmed and SP <= stepOutSP:
+      stepOutArmed = false
+      stopRequest = true
   else:
     reg_write(o, mem[SP])
 
@@ -381,12 +417,16 @@ proc cpuReset*() =
   ZF = false
   HF = false
   pcl = 0
-  eof = 0
+  imageEnd = 0
   ins_retired = 0
   last_gpo = ""
   display_active = false
   has_key = false
   keybuffer = 0xff
+  stopRequest = false
+  stepOutArmed = false
+  stepOutSP = 0
+  resumeBreak = -1
   for i in 0..mem.high:
     mem[i] = 0
   for i in 0..spi_tx_buf.high:
@@ -399,18 +439,68 @@ proc cpuLoadImage*(code: string) =
   while i < code.len:
     mem[0x1000+i] = int(code[i])
     i += 1
-  eof = 0x1000 + i
+  imageEnd = 0x1000 + i
 
 proc cpuLoadFile*(path: string) =
   cpuLoadImage(readFile(path))
 
-proc cpuStep*(): bool =
-  ## Fetch/decode/execute one instruction. Returns false if halted or past image.
-  if PC >= eof or HF:
-    return false
+proc cpuStep*(): StepResult =
+  ## Fetch/decode/execute one instruction and report why execution stopped.
+  # A direct step consumes the resume allowance from a prior breakpoint hit.
+  resumeBreak = -1
+  if HF:
+    return sHalted
+  if PC >= imageEnd:
+    return sPastImage
   decode()
   ins_retired += 1
-  return not HF
+  if HF: sHalted else: sOk
+
+proc setBreak*(a: int) =
+  let address = a and 0xffff
+  if not breakSet[address]:
+    breakSet[address] = true
+    inc breakCount
+
+proc clearBreak*(a: int) =
+  let address = a and 0xffff
+  if breakSet[address]:
+    breakSet[address] = false
+    dec breakCount
+  if resumeBreak == address:
+    resumeBreak = -1
+
+proc hasBreak*(a: int): bool = breakSet[a and 0xffff]
+
+proc clearAllBreaks*() =
+  resumeBreak = -1
+  if breakCount == 0:
+    return
+  for i in 0..breakSet.high:
+    breakSet[i] = false
+  breakCount = 0
+
+proc cpuRun*(maxSteps: int): RunExit =
+  ## Run a batch. Breakpoints stop before the marked instruction. After a hit,
+  ## the next run skips that same breakpoint once so execution can resume.
+  for i in 0..<maxSteps:
+    if HF:
+      return reHalted
+    if PC >= imageEnd:
+      return rePastImage
+    let address = PC and 0xffff
+    if breakCount > 0 and breakSet[address] and address != resumeBreak:
+      resumeBreak = address
+      return reBreak
+    resumeBreak = -1
+    decode()
+    inc ins_retired
+    if HF:
+      return reHalted
+    if stopRequest:
+      stopRequest = false
+      return reStop
+  reCount
 
 proc cpuStatusLine*(): string =
   "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6" % [
@@ -481,10 +571,6 @@ when isMainModule:
   var atend = false
   var evt = defaultEvent
 
-  proc pushKey(k: int) =
-    keybuffer = k and 0xff
-    has_key = true
-
   proc pumpInput() =
     while pollEvent(evt):
       case evt.kind:
@@ -510,7 +596,7 @@ when isMainModule:
           discard
 
   proc exec() {.cdecl.} =
-    if PC >= eof or HF:
+    if PC >= imageEnd or HF:
       echo "HALT!"
       when defined(emscripten):
         emscripten_cancel_main_loop()
@@ -522,11 +608,11 @@ when isMainModule:
 
     when defined(emscripten):
       for i in 0..10000:
-        if not cpuStep():
+        if cpuStep() != sOk:
           atend = true
           break
     else:
-      if not cpuStep():
+      if cpuStep() != sOk:
         atend = true
         return
 

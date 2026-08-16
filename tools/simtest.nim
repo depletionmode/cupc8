@@ -4,8 +4,12 @@
 import os
 import osproc
 import strutils
+import tables
 import sim
 import simdisplay
+import disasm
+import symbols
+import tui
 
 let
   toolsDir = currentSourcePath().parentDir
@@ -51,12 +55,12 @@ proc loadProgram(src: string; boot = true) =
   cpuReset()
   cpuLoadFile(dest)
   if boot:
-    doAssert cpuStep()
+    doAssert cpuStep() == sOk
 
 proc runToHalt(maxSteps = 20000): int =
   var n = 0
   while n < maxSteps:
-    if not cpuStep():
+    if cpuStep() != sOk:
       break
     inc n
   if not HF:
@@ -87,19 +91,19 @@ proc testTinyProgram() =
   doAssert PC == 0x1000
   doAssert mem[0x1000] == 0xb0
 
-  doAssert cpuStep()
+  doAssert cpuStep() == sOk
   if PC != entry:
     fail("after boot B, pc=$# expected $#" % [toHex(PC, 4), toHex(entry, 4)])
   else:
     ok("boot B landed at main $" & toHex(PC, 4))
 
-  doAssert cpuStep()  # mov r0, #0x42
+  doAssert cpuStep() == sOk  # mov r0, #0x42
   if R0 != 0x42:
     fail("after mov, r0=$# expected 42" % [toHex(R0, 2)])
   else:
     ok("mov r0, #0x42")
 
-  doAssert cpuStep()  # st $2000, r0
+  doAssert cpuStep() == sOk  # st $2000, r0
   if mem[0x2000] != 0x42:
     fail("after st, mem[2000]=$# expected 42" % [toHex(mem[0x2000], 2)])
   else:
@@ -137,7 +141,7 @@ proc testKernelBoot() =
     return
   ok("kernel image B $" & toHex(mainAddr, 4))
 
-  doAssert cpuStep()
+  doAssert cpuStep() == sOk
   if PC != mainAddr:
     fail("pc stayed at $# after boot B (wanted main $" & toHex(mainAddr, 4) & ")" %
          [toHex(PC, 4)])
@@ -156,9 +160,9 @@ proc testKernelBoot() =
     fail("third main insn is not B")
     return
   let initAddr = mem[PC+3] or (mem[PC+4] shl 8)
-  doAssert cpuStep()
-  doAssert cpuStep()
-  doAssert cpuStep()
+  doAssert cpuStep() == sOk
+  doAssert cpuStep() == sOk
+  doAssert cpuStep() == sOk
   if PC != initAddr:
     fail("after main's first calls, pc=$# expected ili9340_init $" &
          toHex(initAddr, 4) % [toHex(PC, 4)])
@@ -167,7 +171,7 @@ proc testKernelBoot() =
 
   var steps = 0
   while steps < 40 and last_gpo.len == 0:
-    if not cpuStep():
+    if cpuStep() != sOk:
       break
     inc steps
   if last_gpo.len == 0:
@@ -209,6 +213,133 @@ proc testAssemblerEncodings() =
   expect("b dest hi", mem[0x1015], 0x10)
   expect("bzf", mem[0x1016], 0xb8)
   expect("halt", mem[0x1019], 0xf8)
+
+proc testAssemblerMap() =
+  echo "== assembler map =="
+  let
+    src = testdata / "movst.s"
+    dest = testdata / "movst.o"
+    mapPath = testdata / "movst.map"
+  if fileExists(dest): removeFile(dest)
+  if fileExists(mapPath): removeFile(mapPath)
+  let command = "python3 " & quoteShell(asPy) & " " & quoteShell(src) &
+                " " & quoteShell(dest) & " --map"
+  let assembled = execCmdEx(command)
+  if assembled.exitCode != 0 or not fileExists(mapPath):
+    fail("assembler did not emit default map: " & assembled.output)
+    return
+  let
+    blob = readFile(dest)
+    expectedEntry = blob[1].ord or (blob[2].ord shl 8)
+    lines = readFile(mapPath).splitLines()
+  expectTrue("map version header", lines.len > 0 and lines[0] == "CUPC8MAP 1")
+  var
+    mappedEntry = -1
+    sawMain = false
+    firstLineAddress = -1
+  for line in lines:
+    let fields = line.splitWhitespace()
+    if fields.len >= 3 and fields[0] == "entry":
+      mappedEntry = parseHexInt(fields[1])
+    elif fields.len >= 3 and fields[0] == "sym" and fields[2] == "main":
+      sawMain = true
+    elif fields.len >= 4 and fields[0] == "line" and firstLineAddress < 0:
+      firstLineAddress = parseHexInt(fields[1])
+  expect("map entry matches image", mappedEntry, expectedEntry, 4)
+  expectTrue("map contains main symbol", sawMain)
+  expect("first mapped instruction", firstLineAddress, 0x1003, 4)
+  let explicitMap = testdata / "movst.explicit.map"
+  if fileExists(explicitMap): removeFile(explicitMap)
+  let explicit = execCmdEx(command.replace("--map", "--map=" & quoteShell(explicitMap)))
+  expectTrue("explicit map path", explicit.exitCode == 0 and fileExists(explicitMap))
+
+proc testDisassembler() =
+  echo "== disassembler =="
+  loadProgram(testdata / "encode.s", boot = false)
+  let expected = [
+    (0x1003, 1, "nop"),
+    (0x1004, 2, "mov r0, #0x42"),
+    (0x1006, 1, "mov r1, r0"),
+    (0x1007, 1, "push r0"),
+    (0x1008, 1, "pop r1"),
+    (0x1009, 2, "eq r0, #0x01"),
+    (0x100b, 2, "add r0, #0x01"),
+    (0x100d, 3, "ld r0, $2000"),
+    (0x1010, 3, "st $2000, r1"),
+    (0x1013, 3, "b $1003"),
+    (0x1016, 3, "bzf $1003"),
+    (0x1019, 1, "halt")]
+  for (address, length, text) in expected:
+    let decoded = disasm(mem, address)
+    expectTrue("decode " & text,
+               decoded.valid and decoded.len == length and decoded.text == text)
+
+  let callBytes = [0x96, 0x97, 0xb0, 0x34, 0x12]
+  let call = disasm(callBytes, 0)
+  expectTrue("collapse call idiom",
+             call.valid and call.isCall and call.isBranch and call.len == 5 and
+             call.target == 0x1234 and call.text == "call $1234")
+  let invalid = disasm([0xc8], 0)
+  expectTrue("unknown opcode is data",
+             not invalid.valid and invalid.len == 1 and invalid.text == "db 0xC8")
+
+proc testSymbolsAndKernelDecode() =
+  echo "== symbols and kernel instruction boundaries =="
+  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath},
+                            workingDir = kernelDir)
+  if assembled.exitCode != 0:
+    fail("kernel assembly for symbol test failed: " & assembled.output)
+    return
+  var table = loadMap(kernelDir / "kernel.map")
+  expectTrue("kernel map loaded", table.loaded)
+  let termAddress = table.resolve("term_do")
+  expectTrue("resolve term_do", termAddress >= 0x1000)
+  expect("resolve data symbol", table.resolve("term_s_info"), 0x4012, 4)
+  expect("resolve bss symbol", table.resolve("term_line_buf"), 0x515c, 4)
+  expectTrue("data symbols retained", table.dataSyms.len > 0)
+  expectTrue("exact symbolization", table.symbolize(termAddress) == "term_do")
+  expectTrue("symbol plus offset",
+             table.symbolize(termAddress + 2).startsWith("term_do+0x"))
+  expectTrue("source address mapping",
+             table.lineFor.hasKey(termAddress) and
+             table.lineFor[termAddress].file == "term.s")
+  let source = table.sourceLines("term.s")
+  expectTrue("source loader", source.len > 8 and source[6].strip == "term_do:")
+  expectTrue("previous instruction anchor",
+             table.prevInsAddr(termAddress + 2, 1) == termAddress)
+
+  cpuReset()
+  cpuLoadFile(kernelDir / "kernel.o")
+  var mismatch = ""
+  for i in 0..<(table.insAddrs.len - 1):
+    let
+      address = table.insAddrs[i]
+      nextAddress = table.insAddrs[i + 1]
+      decoded = disasm(mem, address, collapseCalls = false)
+    if not decoded.valid or decoded.len != nextAddress - address:
+      mismatch = "$1: '$2' len $3, next delta $4" % [
+        toHex(address, 4), decoded.text, $decoded.len, $(nextAddress - address)]
+      break
+  expectTrue("kernel map boundaries match decoder", mismatch.len == 0)
+  if mismatch.len > 0: echo "  ", mismatch
+
+proc testTuiDiff() =
+  echo "== TUI diff renderer =="
+  var output = ""
+  let sink: SinkProc = proc(data: string) = output.add(data)
+  tuiInit(sink, width = 4, height = 2)
+  defer: tuiShutdown()
+  discard present()
+  output.setLen(0)
+  discard present()
+  expectTrue("identical frame emits nothing", output.len == 0)
+  putStr(2, 1, "X", 0x01112233'u32)
+  discard present()
+  expectTrue("single cell emits one compact run",
+             output == "\e[2;3H\e[0;38;2;17;34;51;49mX")
+  output.setLen(0)
+  discard present()
+  expectTrue("settled changed frame emits nothing", output.len == 0)
 
 proc testAssemblerRejects() =
   echo "== assembler rejects bad input =="
@@ -363,6 +494,102 @@ proc testDefine() =
   expect("define MAGIC", mem[0x2000], 0x33)
 
 # ---------------------------------------------------------------------------
+# debugger-facing simulator API
+# ---------------------------------------------------------------------------
+
+proc testStepResult() =
+  echo "== cpuStep result states =="
+  let dest = testdata / "nohalt.o"
+  assemble(testdata / "nohalt.s", dest)
+  cpuReset()
+  cpuLoadFile(dest)
+  var result = sOk
+  var steps = 0
+  while result == sOk and steps < 10000:
+    result = cpuStep()
+    inc steps
+  expectTrue("non-halting image reaches end", result == sPastImage)
+  expect("PC at image end", PC, imageEnd, 4)
+
+  cpuReset()
+  cpuLoadImage($char(0xf8))
+  expectTrue("halt instruction returns sHalted", cpuStep() == sHalted)
+  expectTrue("already halted returns sHalted", cpuStep() == sHalted)
+
+proc testMemHook() =
+  echo "== memory access hook =="
+  type Access = tuple[kind: MemAccessKind; address, value, oldValue: int]
+  var accesses: seq[Access]
+  memHook = proc(kind: MemAccessKind; address, value, oldValue: int) =
+    accesses.add((kind, address, value, oldValue))
+  defer: memHook = nil
+
+  discard runFile(testdata / "memops.s")
+  var sawWrite = false
+  for access in accesses:
+    if access == (maWrite, 0x2100, 0xab, 0):
+      sawWrite = true
+  expectTrue("hook records write value and old value", sawWrite)
+
+  accesses.setLen(0)
+  discard runFile(testdata / "spi_status.s")
+  var sawDeliveredRead = false
+  for access in accesses:
+    if access == (maRead, 0xf103, 1, 0):
+      sawDeliveredRead = true
+  expectTrue("hook records delivered SPI status", sawDeliveredRead)
+
+proc testCpuRunBreak() =
+  echo "== batched run and breakpoint =="
+  let dest = testdata / "callret.o"
+  assemble(testdata / "callret.s", dest)
+  cpuReset()
+  clearAllBreaks()
+  cpuLoadFile(dest)
+  doAssert cpuStep() == sOk
+  let
+    mainAddr = PC
+    funcAddr = mem[mainAddr + 7] or (mem[mainAddr + 8] shl 8)
+  setBreak(mainAddr)
+  let retiredBeforeBreak = ins_retired
+  expectTrue("current-PC breakpoint stops before execution",
+             cpuRun(100_000) == reBreak)
+  expect("current-PC breakpoint leaves PC parked", PC, mainAddr, 4)
+  expect("current-PC breakpoint retires nothing", ins_retired,
+         retiredBeforeBreak)
+  expectTrue("continue bypasses hit breakpoint once", cpuRun(1) == reCount)
+  expect("continue executed marked instruction", PC, mainAddr + 2, 4)
+  clearBreak(mainAddr)
+  setBreak(funcAddr)
+  expectTrue("cpuRun stops at breakpoint", cpuRun(100_000) == reBreak)
+  expect("PC parked at breakpoint", PC, funcAddr, 4)
+  clearBreak(funcAddr)
+  expectTrue("cpuRun reaches halt after clear", cpuRun(100_000) == reHalted)
+  clearAllBreaks()
+
+proc testStepOut() =
+  echo "== step out =="
+  let dest = testdata / "callret.o"
+  assemble(testdata / "callret.s", dest)
+  cpuReset()
+  clearAllBreaks()
+  cpuLoadFile(dest)
+  doAssert cpuStep() == sOk
+  let
+    mainAddr = PC
+    funcAddr = mem[mainAddr + 7] or (mem[mainAddr + 8] shl 8)
+  setBreak(funcAddr)
+  doAssert cpuRun(100_000) == reBreak
+  clearBreak(funcAddr)
+  stepOutSP = SP
+  stepOutArmed = true
+  expectTrue("return requests stop", cpuRun(100_000) == reStop)
+  expect("step out return PC", PC, mainAddr + 9, 4)
+  expect("step out restores SP", SP, 0x0100, 4)
+  expectTrue("step out disarmed", not stepOutArmed)
+  clearAllBreaks()
+
+# ---------------------------------------------------------------------------
 # older programs under test/
 # ---------------------------------------------------------------------------
 
@@ -395,7 +622,7 @@ proc testLegacyMath() =
   loadProgram(testDir / "math-test.s")
   var n = 0
   while n < 2000 and last_gpo.len == 0:
-    if not cpuStep():
+    if cpuStep() != sOk:
       break
     inc n
   expect("legacy math 3*3", R0, 9)
@@ -425,6 +652,10 @@ proc testResetState() =
 
 testTinyProgram()
 testAssemblerEncodings()
+testAssemblerMap()
+testDisassembler()
+testSymbolsAndKernelDecode()
+testTuiDiff()
 testAssemblerRejects()
 testAluImm()
 testAluReg()
@@ -441,6 +672,10 @@ testZfSurvive()
 testAddrSplit()
 testBssData()
 testDefine()
+testStepResult()
+testMemHook()
+testCpuRunBreak()
+testStepOut()
 testLegacyAlu()
 testLegacyStack()
 testLegacyGpo()
@@ -463,7 +698,7 @@ proc testDisplayRect() =
   cpuReset()
   cpuLoadFile(dest)
   var n = 0
-  while n < 400 and cpuStep():
+  while n < 400 and cpuStep() == sOk:
     inc n
   if not HF:
     fail("fillrect program did not halt")

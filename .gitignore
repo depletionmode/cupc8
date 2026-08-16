@@ -1,9 +1,12 @@
 # assembler / simulator build outputs
 kernel/kernel.o
+kernel/kernel.map
 kernel/merged.ss
 tools/sim
 tools/simtest
+tools/simtui
 tools/testdata/*.o
+tools/testdata/*.map
 nimcache/
 tools/nimcache/
 *.exe

@@ -86,10 +86,11 @@ proc display_dumpPpm*(path: string) =
       discard f.writeBuffer(addr pix[0], 3)
   f.close()
 
-proc display_init*(): bool =
+proc display_init*(resetFramebuffer = true): bool =
   if display_inited:
     return true
-  display_reset()
+  if resetFramebuffer:
+    display_reset()
   if sdl2.init(INIT_VIDEO) != SdlSuccess:
     display_init_error = "sdl2.init: " & $getError()
     return false
@@ -117,6 +118,11 @@ proc display_init*(): bool =
   display_inited = true
   display_dirty = true
   return true
+
+proc display_setVisible*(visible: bool) =
+  if win.isNil: return
+  if visible: win.show()
+  else: win.hide()
 
 proc display_render*() =
   if not display_inited:

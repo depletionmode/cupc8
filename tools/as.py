@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import os
+
 opcodes = {
             'nop':0x80,     'mov' :0x88,     'push':0x90,     'pop':0x98,
             'ld' :0xa0,     'st'  :0xa8,     'b'   :0xb0,     'bzf':0xb8,
@@ -28,6 +30,9 @@ bss_base = 0x5000
 
 line_num = 0
 file_name = ''
+src_file = ''
+src_line = 0
+line_records = []
 
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
@@ -171,6 +176,7 @@ def __assemble(filename):
     global first_pass
     global bss,data
     global data_buf
+    global src_file, src_line, line_records
     mach_code = bytearray(3)
     offset = 3 #leave 3 bytes for branch to entry point
     bss = {}
@@ -178,6 +184,9 @@ def __assemble(filename):
     data_offset = data_base
     bss_offset = bss_base
     data_buf = bytearray()
+    line_records = []
+    src_file = os.path.basename(filename)
+    src_line = 0
     first = True
 
     with open(filename, 'r') as f:
@@ -187,6 +196,14 @@ def __assemble(filename):
         for l in f.readlines():
             line_num += 1
             l = l.lstrip()
+
+            # Source markers are comments to older assembler consumers. They
+            # let a merged input retain the original basename and line number.
+            if l.startswith('; @file '):
+                src_file = os.path.basename(l[len('; @file '):].strip())
+                src_line = 0
+                continue
+            src_line += 1
             #print(l)
 
             #deal with blank lines
@@ -282,6 +299,8 @@ def __assemble(filename):
                 continue
 
             code = __convert_assembly_ins(l[:l.find(';')])
+            if not first_pass and len(code) > 0:
+                line_records.append((base + offset, src_file, src_line))
             mach_code += code
             offset += len(code)
 
@@ -290,7 +309,20 @@ def __assemble(filename):
 
 if __name__ == "__main__":
     import sys
-    args = sys.argv[1:]
+    raw_args = sys.argv[1:]
+    args = []
+    want_map = False
+    map_path = None
+    for arg in raw_args:
+        if arg == '--map':
+            want_map = True
+        elif arg.startswith('--map='):
+            want_map = True
+            map_path = arg.split('=', 1)[1]
+            if len(map_path) == 0:
+                raise Exception('Map path cannot be empty')
+        else:
+            args.append(arg)
 
     if len(args) < 1:
         raise Exception('Invalid input/output files')
@@ -325,5 +357,27 @@ if __name__ == "__main__":
         padding = bytearray(data_base - len(mach_code) - base)
         buf = mach_code + padding + data_buf
         f.write(buf)
+
+    if want_map:
+        if map_path is None:
+            map_path = os.path.splitext(outf)[0] + '.map'
+        with open(map_path, 'w', encoding='utf-8') as f:
+            f.write('CUPC8MAP 1\n')
+            f.write('base {:#x} data {:#x} bss {:#x}\n'.format(
+                base, data_base, bss_base))
+            f.write('entry {:#x} {}\n'.format(labels[entry_point] + base,
+                                               entry_point))
+            for name, address in sorted(labels.items(),
+                                        key=lambda item: (item[1], item[0])):
+                f.write('sym {:#x} {}\n'.format(address + base, name))
+            for name, (address, value) in sorted(data.items(),
+                                                  key=lambda item: item[1][0]):
+                f.write('data {:#x} {} {}\n'.format(address, len(value), name))
+            for name, (address, size) in sorted(bss.items(),
+                                                key=lambda item: item[1][0]):
+                f.write('bss {:#x} {} {}\n'.format(address, size, name))
+            for address, source, source_line in line_records:
+                f.write('line {:#x} {} {}\n'.format(
+                    address, source, source_line))
 
     print('{} -> {} - {} bytes'.format(args[0], outf, len(buf)))
