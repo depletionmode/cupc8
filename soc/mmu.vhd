@@ -20,6 +20,11 @@ entity mmu is
 			ram_addr:		out std_logic_vector(15 downto 0);
 			ram_data:		inout std_logic_vector(7 downto 0);
 			ram_n_we:		out std_logic;
+
+			tmr0_irq:	in std_logic := '0';
+			tmr1_irq:	in std_logic := '0';
+			keyb_irq:	in std_logic := '0';
+			irq:			out std_logic_vector(3 downto 0);
 			
 			test_spi_ready: out std_logic;
 			test_spi_busy: out std_logic
@@ -74,6 +79,11 @@ signal spi_tx_data:		std_logic_vector(7 downto 0);
 signal spi_busy:			std_logic := '1';
 signal spi_rx_data:		std_logic_vector(7 downto 0);
 signal spi_ready:			std_logic := '0';
+signal irq_pending:		std_logic_vector(3 downto 0) := "0000";
+signal irq_mask:			std_logic_vector(3 downto 0) := "0000";
+signal tmr0_irq_d:		std_logic := '0';
+signal tmr1_irq_d:		std_logic := '0';
+signal keyb_irq_d:		std_logic := '0';
 begin
 spi0: spi port map(clk, spi_reset_n, spi_enable, spi_cpol, spi_cpha, spi_cont, spi_clk_div, spi_addr, spi_tx_data, spi_miso, spi_sclk, spi_ss_n, spi_mosi, spi_busy, spi_rx_data);
 rom0: rom port map(rom_addr, rom_data);
@@ -85,6 +95,7 @@ rom_addr <= addr;
 
 test_spi_ready <= spi_ready;
 test_spi_busy <= spi_busy;
+irq <= irq_pending and irq_mask;
 
 -- extend the spi_busy signal so that we can catch it on a mem read
 -- (it's only a single system clk wide and cpu can take multiple clk cycles to perform a read)
@@ -112,6 +123,19 @@ end process;
 process(clk, ram_data, data, addr)
 begin
    if falling_edge(clk) then
+		if tmr0_irq = '1' and tmr0_irq_d = '0' then
+			irq_pending(1) <= '1';
+		end if;
+		if tmr1_irq = '1' and tmr1_irq_d = '0' then
+			irq_pending(2) <= '1';
+		end if;
+		if keyb_irq = '1' and keyb_irq_d = '0' then
+			irq_pending(0) <= '1';
+		end if;
+		tmr0_irq_d <= tmr0_irq;
+		tmr1_irq_d <= tmr1_irq;
+		keyb_irq_d <= keyb_irq;
+
 		if (spi_enable = '1') then
 			-- spi enable signal for once clock cycle only
 			spi_enable <= '0';
@@ -136,6 +160,14 @@ begin
 										data <= "00000000"; -- todo implement config read
 									when others => data <= "00000000";
 								end case;
+							when x"2" => -- irq
+								case addr(3 downto 0) is
+									when x"0" =>
+										data <= "0000" & irq_pending;
+									when x"1" =>
+										data <= "0000" & irq_mask;
+									when others => data <= "00000000";
+								end case;
 							when others => data <= "00000000";
 						end case;
 					when others => data <= ram_data; -- read from ram
@@ -156,11 +188,20 @@ begin
 										spi_tx_data <= data;
 									when x"2" =>
 										spi_enable <= '1';
+										irq_pending(3) <= '1';
 									when x"f" =>
 										spi_clk_div <= to_integer(unsigned(data(7 downto 3)))*4;
 										spi_cont <= data(0);
 										spi_cpol <= data(1);
 										spi_cpha <= data(2);
+									when others => NULL;
+								end case;
+							when x"2" => -- irq
+								case addr(3 downto 0) is
+									when x"0" =>
+										irq_pending <= irq_pending and not data(3 downto 0);
+									when x"1" =>
+										irq_mask <= data(3 downto 0);
 									when others => NULL;
 								end case;
 							when others => NULL;

@@ -1,5 +1,9 @@
 ; kernel entry point
 main:
+	push pch
+	push pcl
+	b irq_init
+
 	; init drivers
 	push pch
 	push pcl
@@ -19,5 +23,5 @@ main:
 ;	b clr_screen
 
 kernel_loop:
-    nop
+    wai
     b kernel_loop

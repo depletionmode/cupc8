@@ -36,11 +36,11 @@ There is no compiler available for the CUPC/8 ISA. Development tools are cross-p
 
 The **CUPC/8** has two 8-bit General Purpose Reigsters (GPRs), **r0** and **r1**. These are available for use by arithmetic operations and *LOAD*/*STORE* operations.
 
-A status register exists which provides the internal logic with flags that are set due to operations. The only flag currenty is the **Z** (*zero*) flag which is set during comparison operations (*EQ*/*GT*/*LT*) and allows the CPU to perform decisions based on the **Z** flag value (for example, *BZF* - which branches if the flag is not set).
+A status register **f** exists which provides the internal logic with flags that are set due to operations. Bit 0 is the **Z** (*zero*) flag, set during comparison operations (*EQ*/*GT*/*LT*) and used by *BZF*. Bit 1 is the **I** (*interrupt enable*) flag. *CLI* clears **I**, *STI* sets it. **f** can be restored from the stack with *POP f* (the same *POP* opcode used for **r0**/**r1**/**pcl**/**pch**).
 
 Two internal 16-bit address registers are provided for program flow; the **pc** (program counter) and **sp** (stack pointer) registers. The **pc** register holds the address of the next instruction awaiting execution. The **sp** register points to the address of the next free chunk of the stack memory region. Neither of these two registers can be acted upon directly and are modified through program flow and stack operations only.
 
-There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high' program counter registers). These registers can be acted upon through the use of stack operations (i.e. *PUSH*/*POP*) only. The **pch** register is special in that upon receiving a value though a stack *POP* operation, the 8-bit values of the **pcl** and **pch** registers are copied into the **pc** register such that _**pc** := **pch**||**pcl**_ and program flow jumps immediately to the new **pc** address. This is used to return from functions (as there is currently no dedicated *RET* instruction).
+There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high' program counter registers). These registers can be acted upon through the use of stack operations (i.e. *PUSH*/*POP*) only. The **pch** register is special in that upon receiving a value though a stack *POP* operation, the 8-bit values of the **pcl** and **pch** registers are copied into the **pc** register such that _**pc** := **pch**||**pcl**_ and program flow jumps immediately to the new **pc** address. This is used to return from functions and from interrupts (there is no dedicated *RET* or *IRET* instruction).
 
 #### 3.2. Memory layout
 
@@ -57,7 +57,31 @@ There are two special 8-bit registers, **pcl** and **pch** (the 'low' and 'high'
 On boot, the CPU will start executing from the Hard Reset Vector, *$f000* (i.e. _**pc** := $1000_) and **sp** will be reset to the bottom of the stack (_**sp** := $0100_). A configurable SRV can be set at *$0000*. Even if unused this vector should be set to *$1000* as soon as possible after boot.
 
 ###### Interrupt Vector Table (IVT) Region
-The kernel is responsible for setting up the IVT to handle interrupts that may occur from external sources (such as peripherals). *[TODO]*
+Four 16-bit little-endian vectors sit at the bottom of the reserved IVT. The rest of *$0018*-*$00ff* is reserved.
+
+IRQ | Vector | Source
+:--- | :---: | :---
+0 | *$0010* | Keyboard character ready
+1 | *$0012* | Timer 0 expired
+2 | *$0014* | Timer 1 expired
+3 | *$0016* | SPI transaction complete
+
+After an instruction finishes, if **I** is set and a pending unmasked source exists, the CPU takes the lowest numbered IRQ:
+
+1. Push **pch**, then **pcl** (same order as a call).
+2. Push **f** (bit 0 = **Z**, bit 1 = **I**).
+3. Clear **I**.
+4. Load **pc** from the vector.
+
+Return is the same as a call return plus one extra pop for the flags:
+
+	pop f
+	pop pcl
+	pop pch
+
+Sources are latched. *$f200* is the pending register (write-1-to-clear). *$f201* is the mask (1 = enabled). Reset leaves **I** and the mask clear; the kernel plants the vectors and *STI*s when it is ready.
+
+*WAI* stops fetching until an IRQ is accepted. If **I** is clear it is a *NOP*. *HALT* still means stop forever.
 
 ###### Stack Region
 The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. The architecture does not support addressing off the stack pointer (there is no way to access something like _[**sp** + $10]_ for example) or block allocation of stack regions (there are no base/frame pointers). *Warning: Overflowing the stack is completely possible and the CPU will not care - so **don't do this!***
@@ -66,7 +90,7 @@ The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. Th
 This is where the code goes. The CPU will start executing from *$1000* and the **CUPC/8** kernel places a jump to the kernel initialization function vector at this address.
 
 ###### Input/Output Region
-The MMU is responsible for mapping peripherals to the memory space. Currently this region is used for the General Purpose Output (GPO) pins (8-bit mapped to *$f000*) and the SPI bus (mapped at *$f1XX*).
+The MMU is responsible for mapping peripherals to the memory space. Currently this region is used for the General Purpose Output (GPO) pins (8-bit mapped to *$f000*), the SPI bus (mapped at *$f1XX*), and the interrupt controller (*$f200*, *$f201*).
 
 
 #### 3.3. Input/Output
@@ -115,9 +139,17 @@ After configuration of the SPI device, a typical transaction might look as follo
 	.transaction_done:
 		ld r0, $f101	; read RX buffer
 
+###### Interrupts
+Address | Operation | Description
+:--- | :--- | :---
+*$f200* | LOAD | Pending bits (bit *n* = IRQ *n*)
+*$f200* | STORE | Write-1-to-clear pending bits
+*$f201* | LOAD/STORE | Mask (1 = enabled)
+
+*TMR0* / *TMR1* load an 8-bit countdown (immediate or register). The value decrements after every retired instruction, including *WAI* waits. Crossing zero latches the matching timer IRQ. Writing 0 stops the timer without firing.
 
 #### 3.4. Instruction Set Architecture
-The **CUPC/8** instruction set contains of 38 8-bit instructions.
+The **CUPC/8** instruction set contains of 38 8-bit instructions plus a handful of later additions (*HALT*, *CLI*, *STI*, *WAI*, *TMR0*, *TMR1*, and *POP f*).
 Each instruction consists of an 5-bit/6-bit operation code (*opcode*) followed by register bits and zero, one or two bytes as defined by the instruction *format*.
 
 ###### Register Format
@@ -168,7 +200,7 @@ MOVr|88|R|MOV Ra, Rb|Ra <= Rb
 MOVi|8c|I|MOV Ra, #imm|Ra <= imm
 PUSHr|90|R|PUSH Rb|[SP] <= Rb; SP <= SP + 1
 PUSHi|94|I|PUSH #imm|[SP] <= imm; SP <= SP + 1
-POP|98|R|POP Ra|Ra <= [SP]; SP <= SP - 1 *(; PC <= PCH\|\|PCL on Ra = PCH)*
+POP|98|R|POP Ra|Ra <= [SP]; SP <= SP - 1 *(; PC <= PCH\|\|PCL on Ra = PCH; f <= [SP] on Ra = f)*
 LD|a0|M|LD Ra, $addr|Ra <= [addr]
 LDind|a4|M|LD Ra, $addr+Rb|Ra <= [addr + Rb]
 ST|a8|M|ST $addr, Rb|[addr] <= Rb
@@ -201,3 +233,9 @@ SHLr|60|R|SHL Ra, Rb|Ra <= Ra << Rb
 SHLi|64|I|SHL Ra, #imm|Ra <= Ra << imm
 SHRr|68|R|SHR Ra, Rb|Ra <= Ra >> Rb
 SHRi|6c|I|SHR Ra, #imm|Ra <= Ra >> imm
+CLI|c0|R|CLI|I <= 0
+STI|c8|R|STI|I <= 1
+WAI|f0|R|WAI|wait until an IRQ is accepted (NOP if I = 0)
+HALT|f8|R|HALT|stop
+TMR0|e0|R/I|TMR0 Rb / TMR0 #imm|timer0 <= value
+TMR1|e8|R/I|TMR1 Rb / TMR1 #imm|timer1 <= value

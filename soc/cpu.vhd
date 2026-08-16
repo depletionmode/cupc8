@@ -11,6 +11,10 @@ entity cpu is
 			mem_addr:	out std_logic_vector(15 downto 0);
 			mem_data:	inout std_logic_vector(7 downto 0);
 			mem_n_we:	out std_logic;
+
+			irq:			in std_logic_vector(3 downto 0) := "0000";
+			tmr0_irq:	out std_logic;
+			tmr1_irq:	out std_logic;
 			
 			-- testing
 			seg7_val:	out std_logic_vector(3 downto 0)
@@ -41,8 +45,17 @@ signal f: unsigned(3 downto 0) := x"0";
 signal ins: unsigned(7 downto 0) := x"00";
 signal imm_value: unsigned(7 downto 0) := x"00";
 signal addr_value: unsigned(15 downto 0) := x"0000";
-type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2, waitonram);
+type stages is (fetch, decode, execute, writeback, reset, fetch_imm, fetch_addr, fetch_addr2, fetch2, waitonram,
+	check_irq, irq_push_h, irq_push_l, irq_push_f, irq_vec, irq_vec2, irq_vec3, halt_st, wai_st);
 signal stage, stage_nxt: stages := reset;
+signal i_flag: std_logic := '0';
+signal z_flag: std_logic := '0';
+signal waiting: std_logic := '0';
+signal tmr0_cnt: unsigned(7 downto 0) := x"00";
+signal tmr1_cnt: unsigned(7 downto 0) := x"00";
+signal tmr0_irq_r: std_logic := '0';
+signal tmr1_irq_r: std_logic := '0';
+signal irq_n: integer range 0 to 3 := 0;
 signal data: unsigned(7 downto 0) := "10000000";
 signal imm_fetched: std_logic := '0';
 signal addr_reg_offset: std_logic := '0';
@@ -50,7 +63,9 @@ signal addr_reg_offset: std_logic := '0';
 begin
 alu0: alu port map(clk, alu_en, std_logic_vector(ins(6 downto 3)), alu_ra, alu_rb, alu_res, alu_zf);
 
-f <= "000" & alu_zf;
+f <= "00" & i_flag & z_flag;
+tmr0_irq <= tmr0_irq_r;
+tmr1_irq <= tmr1_irq_r;
 
 process(clk, n_hrst)
 variable addr2_fetched: bit;
@@ -179,7 +194,7 @@ begin
 						alu_en <= '0';
 					else
 						case ins(6 downto 3) is
-							when "0010"|"1100"|"1101" => -- PUSH|PUSH.PC1|PUSH.PC2
+							when "0010" => -- PUSH
 								mem_addr <= std_logic_vector(sp);
 								sp_next := sp + 1;
 							when "0011" => -- POP
@@ -194,9 +209,19 @@ begin
 							when "0110" => -- B
 								pc <= std_logic_vector(addr_value);
 							when "0111" => -- BNE
-								if f(0) = '1' then
+								if z_flag = '1' then
 									pc <= std_logic_vector(addr_value);
 								end if;
+							when "1000" => -- CLI
+								null;
+							when "1001" => -- STI
+								null;
+							when "1100"|"1101" => -- TMR0|TMR1
+								null;
+							when "1110" => -- WAI
+								null;
+							when "1111" => -- HALT
+								null;
 							when others => NULL;
 						end case;
 					end if;
@@ -219,6 +244,11 @@ begin
 								r1 <= rtmp;
 							end if;
 							alu_en <= '1';
+							case ins(6 downto 3) is
+								when "0000"|"0001"|"0010" => -- EQ|GT|LT
+									z_flag <= alu_zf(0);
+								when others => null;
+							end case;
 					end if;
 					
 					case ins(6 downto 3) is
@@ -235,7 +265,10 @@ begin
 							mem_n_we <= '0';
 							ram_st := '1';
 						when "0011" => -- POP
-							if ins(2) = '0' then
+							if ins(2 downto 0) = "100" then -- pop f
+								z_flag <= mem_data(0);
+								i_flag <= mem_data(1);
+							elsif ins(2) = '0' then
 								-- write back into register
 								if ins(0) = '0' then
 									r0 <= unsigned(mem_data);
@@ -250,6 +283,20 @@ begin
 									pc <= std_logic_vector(tmp16_2);
 								end if;
 							end if;
+						when "1000" => -- CLI
+							i_flag <= '0';
+						when "1001" => -- STI
+							i_flag <= '1';
+						when "1100" => -- TMR0
+							tmr0_cnt <= rtmp;
+						when "1101" => -- TMR1
+							tmr1_cnt <= rtmp;
+						when "1110" => -- WAI
+							if i_flag = '1' then
+								waiting <= '1';
+							end if;
+						when "1111" => -- HALT
+							null;
 						when "0100" => -- LD
 							-- write back into register
 							if(ins(0) = '0') then
@@ -272,10 +319,12 @@ begin
 					imm_fetched <= '0';
 					addr2_fetched := '0';
 					
-					if ram_st = '1' then
+					if ins(7 downto 3) = "11111" then -- HALT
+						stage <= halt_st;
+					elsif ram_st = '1' then
 						stage <= waitonram;
 					else
-						stage <= fetch;
+						stage <= check_irq;
 					end if;
 				when waitonram =>
 					-- mem delay > 70ns
@@ -289,9 +338,97 @@ begin
 							stage <= writeback;
 							ram_ld := '0';
 						else 
-							stage <= fetch;
+							stage <= check_irq;
 							ram_st := '0';
 						end if;
+					end if;
+				when check_irq =>
+					mem_n_we <= '1';
+					mem_data <= (others => 'Z');
+					tmr0_irq_r <= '0';
+					tmr1_irq_r <= '0';
+					if tmr0_cnt > 0 then
+						if tmr0_cnt = 1 then
+							tmr0_irq_r <= '1';
+						end if;
+						tmr0_cnt <= tmr0_cnt - 1;
+					end if;
+					if tmr1_cnt > 0 then
+						if tmr1_cnt = 1 then
+							tmr1_irq_r <= '1';
+						end if;
+						tmr1_cnt <= tmr1_cnt - 1;
+					end if;
+					if i_flag = '1' and irq /= "0000" then
+						waiting <= '0';
+						if irq(0) = '1' then
+							irq_n <= 0;
+						elsif irq(1) = '1' then
+							irq_n <= 1;
+						elsif irq(2) = '1' then
+							irq_n <= 2;
+						else
+							irq_n <= 3;
+						end if;
+						stage <= irq_push_h;
+					elsif waiting = '1' then
+						stage <= wai_st;
+					else
+						stage <= fetch;
+					end if;
+				when irq_push_h =>
+					mem_addr <= std_logic_vector(sp);
+					mem_data <= pc(15 downto 8);
+					mem_n_we <= '0';
+					sp <= sp + 1;
+					sp_next := sp + 1;
+					stage <= irq_push_l;
+				when irq_push_l =>
+					mem_addr <= std_logic_vector(sp);
+					mem_data <= pc(7 downto 0);
+					mem_n_we <= '0';
+					sp <= sp + 1;
+					sp_next := sp + 1;
+					stage <= irq_push_f;
+				when irq_push_f =>
+					mem_addr <= std_logic_vector(sp);
+					mem_data <= "000000" & i_flag & z_flag;
+					mem_n_we <= '0';
+					sp <= sp + 1;
+					sp_next := sp + 1;
+					i_flag <= '0';
+					stage <= irq_vec;
+				when irq_vec =>
+					mem_n_we <= '1';
+					mem_data <= (others => 'Z');
+					mem_addr <= std_logic_vector(to_unsigned(16#0010# + irq_n * 2, 16));
+					stage <= irq_vec2;
+				when irq_vec2 =>
+					addr_value <= x"00" & unsigned(mem_data);
+					mem_addr <= std_logic_vector(to_unsigned(16#0011# + irq_n * 2, 16));
+					stage <= irq_vec3;
+				when irq_vec3 =>
+					pc <= mem_data & std_logic_vector(addr_value(7 downto 0));
+					stage <= fetch;
+				when halt_st =>
+					mem_n_we <= '1';
+					stage <= halt_st;
+				when wai_st =>
+					mem_n_we <= '1';
+					if i_flag = '1' and irq /= "0000" then
+						waiting <= '0';
+						if irq(0) = '1' then
+							irq_n <= 0;
+						elsif irq(1) = '1' then
+							irq_n <= 1;
+						elsif irq(2) = '1' then
+							irq_n <= 2;
+						else
+							irq_n <= 3;
+						end if;
+						stage <= irq_push_h;
+					else
+						stage <= wai_st;
 					end if;
 				when reset =>
 					seg7_val <= "0000";
@@ -304,6 +441,13 @@ begin
 					mem_addr <= x"ffff";
 					imm_fetched <= '0';
 					addr2_fetched := '0';
+					i_flag <= '0';
+					z_flag <= '0';
+					waiting <= '0';
+					tmr0_cnt <= x"00";
+					tmr1_cnt <= x"00";
+					tmr0_irq_r <= '0';
+					tmr1_irq_r <= '0';
 					stage <= fetch;
 				when others => stage <= reset;
 			end case;

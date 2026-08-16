@@ -616,7 +616,9 @@ proc drawRegs(rect: Rect) =
     "PC " & formatAddress(PC) & " " & symtab.symbolize(PC),
     "SP " & formatAddress(SP),
     "R0 $" & toHex(R0, 2) & " " & $R0 & "   R1 $" & toHex(R1, 2) & " " & $R1,
-    "ZF" & (if ZF: "*" else: ".") & "  HF" & (if HF: "*" else: ".") &
+    "ZF" & (if ZF: "*" else: ".") & "  IF" & (if IF: "*" else: ".") &
+      "  HF" & (if HF: "*" else: ".") &
+      (if waiting: "  WAI" else: "") &
       "  " & (if running: "RUNNING" else: "PAUSED"),
     "end " & formatAddress(imageEnd),
     "keys " & $keyFifo.len & (if keyPending(): "+guest" else: "")]

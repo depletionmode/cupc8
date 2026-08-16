@@ -50,6 +50,15 @@ proc disasm*(m: openArray[int]; a: int; collapseCalls = true): DisIns =
   of 0xf8:
     result.valid = true
     result.text = "halt"
+  of 0xc0:
+    result.valid = true
+    result.text = "cli"
+  of 0xc8:
+    result.valid = true
+    result.text = "sti"
+  of 0xf0:
+    result.valid = true
+    result.text = "wai"
   of 0xb0, 0xb8:
     if not need(3):
       result.text = "db " & hexByte(op)
@@ -104,6 +113,8 @@ proc disasm*(m: openArray[int]; a: int; collapseCalls = true): DisIns =
       result.text = "pop pch"
     elif operands == 7:
       result.text = "pop pcl"
+    elif operands == 4:
+      result.text = "pop f"
     else:
       result.len = if immediate: 2 else: 1
       if not need(result.len):

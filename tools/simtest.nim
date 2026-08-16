@@ -170,7 +170,7 @@ proc testKernelBoot() =
     ok("first kernel calls: pc now ili9340_init $" & toHex(PC, 4))
 
   var steps = 0
-  while steps < 40 and last_gpo.len == 0:
+  while steps < 200 and last_gpo.len == 0:
     if cpuStep() != sOk:
       break
     inc steps
@@ -279,9 +279,9 @@ proc testDisassembler() =
   expectTrue("collapse call idiom",
              call.valid and call.isCall and call.isBranch and call.len == 5 and
              call.target == 0x1234 and call.text == "call $1234")
-  let invalid = disasm([0xc8], 0)
+  let invalid = disasm([0xd8], 0)
   expectTrue("unknown opcode is data",
-             not invalid.valid and invalid.len == 1 and invalid.text == "db 0xC8")
+             not invalid.valid and invalid.len == 1 and invalid.text == "db 0xD8")
 
 proc testSymbolsAndKernelDecode() =
   echo "== symbols and kernel instruction boundaries =="
@@ -645,6 +645,9 @@ proc testResetState() =
   expect("reset R1", R1, 0)
   expectTrue("reset ZF", not ZF)
   expectTrue("reset HF", not HF)
+  expectTrue("reset IF", not IF)
+  expectTrue("reset waiting", not waiting)
+  expect("reset irq pending", irqPending, 0)
   expect("reset mem", mem[0x1234], 0)
   expectTrue("reset last_gpo", last_gpo.len == 0)
 
@@ -683,6 +686,74 @@ testLegacyMem()
 testLegacyMath()
 testResetState()
 testKernelBoot()
+
+proc testIrqOps() =
+  echo "== irq opcodes =="
+  loadProgram(testdata / "irq_ops.s", boot = false)
+  expect("cli", mem[0x1003], 0xc0)
+  expect("sti", mem[0x1004], 0xc8)
+  expect("pop f", mem[0x1005], 0x9c)
+  expect("wai", mem[0x1006], 0xf0)
+  expect("tmr0 #imm", mem[0x1007], 0xe4)
+  expect("tmr0 imm 3", mem[0x1008], 0x03)
+  expect("tmr1 r0", mem[0x1009], 0xe8)
+  expect("halt after tmr", mem[0x100a], 0xf8)
+  let
+    cliDec = disasm(mem, 0x1003)
+    stiDec = disasm(mem, 0x1004)
+    popfDec = disasm(mem, 0x1005)
+    waiDec = disasm(mem, 0x1006)
+  expectTrue("disasm cli", cliDec.valid and cliDec.text == "cli")
+  expectTrue("disasm sti", stiDec.valid and stiDec.text == "sti")
+  expectTrue("disasm pop f", popfDec.valid and popfDec.text == "pop f")
+  expectTrue("disasm wai", waiDec.valid and waiDec.text == "wai")
+
+proc testIrqTimer() =
+  echo "== timer interrupt =="
+  discard runFile(testdata / "irq_timer.s")
+  expect("timer handler wrote $aa", mem[0x2000], 0xaa)
+
+proc testIrqFlags() =
+  echo "== pop f restores Z =="
+  discard runFile(testdata / "irq_flags.s")
+  expect("Z survived handler", mem[0x2000], 0xaa)
+  expectTrue("I set after pop f", IF)
+
+proc testIrqCli() =
+  echo "== cli blocks take =="
+  discard runFile(testdata / "irq_cli.s")
+  expect("pending latched under cli", mem[0x2000], 2)
+  expectTrue("did not enter handler", mem[0x2000] != 0xee)
+
+proc testIrqKeyb() =
+  echo "== keyboard wai =="
+  loadProgram(testdata / "irq_keyb.s")
+  var n = 0
+  while n < 200 and not waiting and not HF:
+    if cpuStep() != sOk:
+      break
+    inc n
+  expectTrue("parked in wai", waiting)
+  pushKey(0x41)
+  discard runToHalt()
+  expect("read key after irq", mem[0x2000], 0x41)
+
+proc testIrqMaskMmio() =
+  echo "== irq mmio =="
+  cpuReset()
+  cpuLoadImage($char(0x8c) & $char(0x05) & $char(0xa8) & $char(0x01) &
+               $char(0xf2) & $char(0xf8))
+  # mov r0, #5 / st $f201, r0 / halt  — image at $1000
+  discard runToHalt()
+  expect("mask register", irqMask, 5)
+  expect("mask readable", mem[0xf201], 5)
+
+testIrqOps()
+testIrqTimer()
+testIrqFlags()
+testIrqCli()
+testIrqKeyb()
+testIrqMaskMmio()
 
 proc testDisplayRect() =
   echo "== display framebuffer via shipped CPU SPI =="

@@ -37,6 +37,10 @@ component cpu
 			mem_addr:	out std_logic_vector(15 downto 0);
 			mem_data:	inout std_logic_vector(7 downto 0);
 			mem_n_we:	out std_logic;
+
+			irq:			in std_logic_vector(3 downto 0);
+			tmr0_irq:	out std_logic;
+			tmr1_irq:	out std_logic;
 			
 			-- testing
 			seg7_val:	out std_logic_vector(3 downto 0)
@@ -64,6 +68,11 @@ component mmu
 			ram_addr:		out std_logic_vector(15 downto 0);
 			ram_data:		inout std_logic_vector(7 downto 0);
 			ram_n_we:		out std_logic;
+
+			tmr0_irq:	in std_logic;
+			tmr1_irq:	in std_logic;
+			keyb_irq:	in std_logic;
+			irq:			out std_logic_vector(3 downto 0);
 			
 			test_spi_ready: out std_logic;
 			test_spi_busy: out std_logic
@@ -82,6 +91,9 @@ end component;
 
 -- testing
 signal	seg7_val:	std_logic_vector(3 downto 0);
+signal	irq_bits:	std_logic_vector(3 downto 0) := "0000";
+signal	tmr0_irq:	std_logic := '0';
+signal	tmr1_irq:	std_logic := '0';
 component seg7
   port (
 			 i_dig:  in std_logic_vector(3 downto 0);
@@ -93,8 +105,8 @@ end component;
 signal slow_clk: std_logic := '0';
 
 begin
-cpu0: cpu port map(slow_clk, n_hrst, halt, mem_addr, mem_data, mem_n_we, seg7_val);
-mmu0: mmu port map(slow_clk, mem_addr, mem_data, mem_n_we, spi_ss_n, spi_sclk, spi_mosi, spi_miso,gpo, ram_addr, ram_data, ram_n_we, test_spi_ready, test_spi_busy);
+cpu0: cpu port map(slow_clk, n_hrst, halt, mem_addr, mem_data, mem_n_we, irq_bits, tmr0_irq, tmr1_irq, seg7_val);
+mmu0: mmu port map(slow_clk, mem_addr, mem_data, mem_n_we, spi_ss_n, spi_sclk, spi_mosi, spi_miso,gpo, ram_addr, ram_data, ram_n_we, tmr0_irq, tmr1_irq, '0', irq_bits, test_spi_ready, test_spi_busy);
 
 -- testing
 seg0: seg7 port map (seg7_val, seg7_o);

@@ -10,7 +10,8 @@ opcodes = {
             'add':0x40,     'sub' :0x48,
             'shl':0x60,     'shr' :0x68,
             'ldd':0x70,     'std' :0x78,
-            'halt':0xf8,    'tmr0' :0xe0,   'tmr1' :0xe8
+            'halt':0xf8,    'tmr0' :0xe0,   'tmr1' :0xe8,
+            'cli':0xc0,     'sti'  :0xc8,   'wai':0xf0
           }
 
 registers = [ 'r0', 'r1' ]
@@ -43,11 +44,31 @@ def __ins_hacks(ins):
     else:
         return ins
 
+def __imm_from_hash(token):
+    # #<label  #>label  #<$hex  #>$hex  #n  #0xnn
+    if len(token) > 1 and token[1] in '<>':
+        rest = token[2:]
+        if len(rest) > 0 and rest[0] == '$':
+            val = int(rest[1:], 16)
+        elif rest in labels:
+            val = labels[rest] + base
+        elif first_pass:
+            val = 0
+        else:
+            raise Exception('Label {} not found'.format(rest))
+        if token[1] == '<':
+            return val & 0xff
+        return (val >> 8) & 0xff
+    if len(token) > 2 and token[2] == 'x':
+        return int(token[3:], 16)
+    return int(token[1:])
+
 def __get_reg_value(reg, second_op=False):
     if reg == 'r0': return 0
     elif reg == 'r1':
         if second_op: return 2
         else: return 1
+    elif reg == 'f': return 4
     elif reg == 'pch': return 6
     elif reg == 'pcl': return 7
     else: raise Exception("Invalid operand register [{}:{}]".format(line_num, file_name))
@@ -80,16 +101,7 @@ def __convert_assembly_ins(ins):
                 pass
             elif op1[0] == '#':
                 ins |= 1 << 2
-                # check if need to resolve high/low part of address
-                if op1[1] == '<':
-                    imm = int(op1[3:], 16) & 0xff
-                elif op1[1] == '>':
-                    imm = int(op1[3:], 16) >> 8
-                # check if hex format
-                elif len(op1) > 2 and op1[2] == 'x':
-                    imm = int(op1[3:], 16)
-                else:
-                    imm = int(op1[1:])
+                imm = __imm_from_hash(op1)
                 if imm > 0xff:
                     raise Exception("Imm out of range")
                 mach_code.append(imm)
@@ -129,16 +141,7 @@ def __convert_assembly_ins(ins):
                 # 0p2 - reg/imm/addr
                 if op2[0] == '#':
                     ins |= 1 << 2;
-                    # check if need to resolve high/low part of address
-                    if op2[1] == '<':
-                        imm = int(op2[3:], 16) & 0xff
-                    elif op2[1] == '>':
-                        imm = int(op2[3:], 16) >> 8
-                    # check if hex format
-                    elif len(op2) > 2 and op2[2] == 'x':
-                        imm = int(op2[3:], 16)
-                    else:
-                        imm = int(op2[1:])
+                    imm = __imm_from_hash(op2)
                     if imm > 0xff:
                         raise Exception("Imm out of range [{}:{}]".format(line_num, file_name))
                     mach_code.append(imm)

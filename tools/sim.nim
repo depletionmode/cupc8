@@ -46,9 +46,15 @@ var
   R1*: int = 0
   ZF*: bool = false
   HF*: bool = false
+  IF*: bool = false
+  waiting*: bool = false
   pcl*: int = 0
   mem*: array[0..0x10000, int]
   imageEnd*: int = 0
+  irqPending*: int = 0
+  irqMask*: int = 0
+  tmr0*: int = 0
+  tmr1*: int = 0
 
 type
   StepResult* = enum
@@ -77,9 +83,14 @@ var
 var
   display_active: bool = false
 
+proc raiseIrq*(bit: int) =
+  irqPending = (irqPending or (1 shl bit)) and 0x0f
+  mem[0xf200] = irqPending
+
 proc pushKey*(k: int) =
   keybuffer = k and 0xff
   has_key = true
+  raiseIrq(0)
 
 proc keyPending*(): bool = has_key
 
@@ -171,6 +182,16 @@ proc ins_st_do(o: int, a: int) =
         last_gpo = "GPO: $1 $2" % [toBin(mem[address], 8), toHex(mem[address], 2)]
         log(1, last_gpo)
       display_set_dc(mem[address] and 1)
+    of 0xf2:    # irq
+      case address and 0xff:
+        of 0:
+          irqPending = irqPending and not value
+          mem[address] = irqPending
+        of 1:
+          irqMask = value and 0xff
+          mem[address] = irqMask
+        else:
+          discard
     of 0xf1:    # spi
       var dev = address shr 4 and 0xf
       if dev == 0:  # display
@@ -194,6 +215,7 @@ proc ins_st_do(o: int, a: int) =
               has_key = false
           else:
             discard
+          raiseIrq(3)
         else:
           discard
     else:
@@ -218,6 +240,14 @@ proc ins_ld_do(o: int, a: int) =
   let oldValue = mem[address]
   var value = oldValue
   case address shr 8:
+    of 0xf2:    # irq
+      case address and 0xff:
+        of 0:
+          value = irqPending
+        of 1:
+          value = irqMask
+        else:
+          discard
     of 0xf1:    #spi
       var dev = address shr 4 and 0xf
       var reg = address and 0xf
@@ -333,6 +363,13 @@ proc ins_push(o: int) =
   SP += 1
   mem[SP] = rb
 
+proc flagsNibble(): int =
+  (if ZF: 1 else: 0) or (if IF: 2 else: 0)
+
+proc setFlags(n: int) =
+  ZF = (n and 1) != 0
+  IF = (n and 2) != 0
+
 proc ins_pop(o: int) =
   if (o and 7) == 7:
     pcl = mem[SP]
@@ -341,6 +378,8 @@ proc ins_pop(o: int) =
     if stepOutArmed and SP <= stepOutSP:
       stepOutArmed = false
       stopRequest = true
+  elif (o and 7) == 4:
+    setFlags(mem[SP])
   else:
     reg_write(o, mem[SP])
 
@@ -356,26 +395,75 @@ proc ins_bzf(o: int) =
 
 proc ins_halt(o: int) =
   HF = true
+  waiting = false
+
+proc timerOperand(o: int): int =
+  var tup = get_imm(o)
+  if tup[0]:
+    tup[1]
+  else:
+    reg_read(o, false)
 
 proc ins_tmr0(o: int) =
-  var tup = get_imm(o)
-  var imm = tup[0]
-  var rb = tup[1]
-  if not imm:
-    rb = reg_read(o, false)
-  var ra = reg_read(o, true)
-  discard ra
-  discard rb
+  tmr0 = timerOperand(o) and 0xff
 
 proc ins_tmr1(o: int) =
-  var tup = get_imm(o)
-  var imm = tup[0]
-  var rb = tup[1]
-  if not imm:
-    rb = reg_read(o, false)
-  var ra = reg_read(o, true)
-  discard ra
-  discard rb
+  tmr1 = timerOperand(o) and 0xff
+
+proc ins_cli(o: int) =
+  IF = false
+
+proc ins_sti(o: int) =
+  IF = true
+
+proc ins_wai(o: int) =
+  if IF:
+    waiting = true
+
+proc pushByte(v: int) =
+  SP += 1
+  let
+    value = v and 0xff
+    oldValue = mem[SP]
+  mem[SP] = value
+  if not memHook.isNil:
+    memHook(maWrite, SP, value, oldValue)
+
+proc irqReady(): int =
+  let bits = irqPending and irqMask
+  if bits == 0:
+    return -1
+  for i in 0..3:
+    if (bits and (1 shl i)) != 0:
+      return i
+  -1
+
+proc takeIrq(n: int) =
+  waiting = false
+  let ret = PC and 0xffff
+  pushByte(ret shr 8)
+  pushByte(ret and 0xff)
+  pushByte(flagsNibble())
+  IF = false
+  let va = 0x0010 + n * 2
+  PC = (mem[va] and 0xff) or ((mem[va + 1] and 0xff) shl 8)
+
+proc tickTimers() =
+  if tmr0 > 0:
+    dec tmr0
+    if tmr0 == 0:
+      raiseIrq(1)
+  if tmr1 > 0:
+    dec tmr1
+    if tmr1 == 0:
+      raiseIrq(2)
+
+proc serviceIrq() =
+  if not IF:
+    return
+  let n = irqReady()
+  if n >= 0:
+    takeIrq(n)
 
 proc decode() =
   var op = fetch()
@@ -405,6 +493,9 @@ proc decode() =
     of 0x68: ins_shr(r)
     of 0xe0: ins_tmr0(r)
     of 0xe8: ins_tmr1(r)
+    of 0xc0: ins_cli(r)
+    of 0xc8: ins_sti(r)
+    of 0xf0: ins_wai(r)
     of 0xf8: ins_halt(r)
     else:
       discard
@@ -416,6 +507,8 @@ proc cpuReset*() =
   R1 = 0
   ZF = false
   HF = false
+  IF = false
+  waiting = false
   pcl = 0
   imageEnd = 0
   ins_retired = 0
@@ -423,6 +516,10 @@ proc cpuReset*() =
   display_active = false
   has_key = false
   keybuffer = 0xff
+  irqPending = 0
+  irqMask = 0
+  tmr0 = 0
+  tmr1 = 0
   stopRequest = false
   stepOutArmed = false
   stepOutSP = 0
@@ -450,11 +547,20 @@ proc cpuStep*(): StepResult =
   resumeBreak = -1
   if HF:
     return sHalted
+  if waiting:
+    tickTimers()
+    inc ins_retired
+    serviceIrq()
+    return sOk
   if PC >= imageEnd:
     return sPastImage
   decode()
   ins_retired += 1
-  if HF: sHalted else: sOk
+  tickTimers()
+  if HF:
+    return sHalted
+  serviceIrq()
+  sOk
 
 proc setBreak*(a: int) =
   let address = a and 0xffff
@@ -486,25 +592,32 @@ proc cpuRun*(maxSteps: int): RunExit =
   for i in 0..<maxSteps:
     if HF:
       return reHalted
-    if PC >= imageEnd:
+    if waiting:
+      tickTimers()
+      inc ins_retired
+      serviceIrq()
+    elif PC >= imageEnd:
       return rePastImage
-    let address = PC and 0xffff
-    if breakCount > 0 and breakSet[address] and address != resumeBreak:
-      resumeBreak = address
-      return reBreak
-    resumeBreak = -1
-    decode()
-    inc ins_retired
-    if HF:
-      return reHalted
+    else:
+      let address = PC and 0xffff
+      if breakCount > 0 and breakSet[address] and address != resumeBreak:
+        resumeBreak = address
+        return reBreak
+      resumeBreak = -1
+      decode()
+      inc ins_retired
+      tickTimers()
+      if HF:
+        return reHalted
+      serviceIrq()
     if stopRequest:
       stopRequest = false
       return reStop
   reCount
 
 proc cpuStatusLine*(): string =
-  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6" % [
-    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF]
+  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7" % [
+    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF]
 
 when defined(emscripten):
   proc emscripten_set_main_loop(fun: proc() {.cdecl.}, fps,

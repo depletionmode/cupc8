@@ -19,8 +19,12 @@ keyb_read_char:
 	push pcl
 	b spi_read
 	eq r0, #255
-	bzf .loop
-	
+	bzf .idle
+	b .done
+.idle:
+	wai
+	b .loop
+
 .done:
 	pop r1
 	pop pcl
