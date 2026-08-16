@@ -106,14 +106,22 @@ proc putCell(x, y: int; cell: Cell) =
     cells[y * screenWidth + x] = cell
 
 proc putStr*(x, y: int; value: string; fg: uint32 = 0; bg: uint32 = 0;
-             attrs: set[CellAttr] = {}) =
+             attrs: set[CellAttr] = {}; maxCols = -1) =
   var column = x
+  let limit = if maxCols < 0: screenWidth else: min(screenWidth, x + max(0, maxCols))
+  let cellFg = if fg == 0: defaultFg else: fg
+  let cellBg = if bg == 0: defaultBg else: bg
   for rune in value.runes:
-    if column >= screenWidth: break
+    if column >= limit: break
+    if rune.int32 == 0x09:
+      let stop = x + (((column - x) div 8) + 1) * 8
+      while column < stop and column < limit:
+        if column >= 0:
+          putCell(column, y, Cell(grapheme: " ", fg: cellFg, bg: cellBg, attrs: attrs))
+        inc column
+      continue
     if column >= 0:
-      putCell(column, y, Cell(grapheme: $rune,
-        fg: (if fg == 0: defaultFg else: fg),
-        bg: (if bg == 0: defaultBg else: bg), attrs: attrs))
+      putCell(column, y, Cell(grapheme: $rune, fg: cellFg, bg: cellBg, attrs: attrs))
     inc column
 
 proc fillRect*(x, y, width, height: int; glyph = " "; fg: uint32 = 0;
@@ -124,6 +132,23 @@ proc fillRect*(x, y, width, height: int; glyph = " "; fg: uint32 = 0;
   for row in max(0, y)..<min(screenHeight, y + max(0, height)):
     for column in max(0, x)..<min(screenWidth, x + max(0, width)):
       putCell(column, row, cell)
+
+proc putLine*(x, y, width: int; value: string; fg: uint32 = 0; bg: uint32 = 0;
+              attrs: set[CellAttr] = {}) =
+  ## Write a row clipped to `width` and pad the rest so neighboring panes
+  ## cannot leak leftover glyphs.
+  let w = max(0, width)
+  if w == 0: return
+  putStr(x, y, value, fg, bg, attrs, maxCols = w)
+  var used = 0
+  for rune in value.runes:
+    if rune.int32 == 0x09:
+      used = ((used div 8) + 1) * 8
+    else:
+      inc used
+    if used >= w: return
+  if used < w:
+    fillRect(x + used, y, w - used, 1, fg = fg, bg = bg, attrs = attrs)
 
 proc drawBox*(x, y, width, height: int; title = ""; focused = false) =
   if width < 2 or height < 2: return

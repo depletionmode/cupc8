@@ -664,11 +664,11 @@ proc drawDisassembly(rect: Rect) =
       text = text.replace(formatAddress(instruction.target), symtab.symbolize(instruction.target))
     let
       marker = (if address == disCursor: ">" else: " ") &
-               (if userBreaks[address and 0xffff]: "●" else: " ")
+               (if userBreaks[address and 0xffff]: "*" else: " ")
       line = marker & " " & toHex(address, 4) & " " & bytes & " " & text
       color = if address == PC: Green elif not instruction.valid: Red else: White
-    putStr(rect.x+1, rect.y+1+row, line, color,
-           attrs = if address == disCursor: {caReverse} else: {})
+    putLine(rect.x+1, rect.y+1+row, max(0, rect.w-2), line, color,
+            attrs = if address == disCursor: {caReverse} else: {})
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
            actCursor, pDisasm, address)
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 2, h: 1),
@@ -692,7 +692,8 @@ proc drawRegs(rect: Rect) =
     "end " & formatAddress(imageEnd),
     "keys " & $keyFifo.len & (if keyPending(): "+guest" else: "")]
   for i in 0..<min(lines.len, max(0, rect.h-2)):
-    putStr(rect.x+1, rect.y+1+i, lines[i], if i == 0: Green else: White)
+    putLine(rect.x+1, rect.y+1+i, max(0, rect.w-2), lines[i],
+            if i == 0: Green else: White)
     addAddressHits(lines[i], rect.x+1, rect.y+1+i, pRegs)
 
 proc drawStack(rect: Rect; merged = false) =
@@ -709,7 +710,7 @@ proc drawStack(rect: Rect; merged = false) =
       line.add("  ret " & formatAddress(returnAddress) & " " & symtab.symbolize(returnAddress))
       addHit(Rect(x: rect.x+12, y: startY+row, w: max(0, rect.w-13), h: 1),
              actAddress, pStack, returnAddress)
-    putStr(rect.x+1, startY+row, line, White)
+    putLine(rect.x+1, startY+row, max(0, rect.w-2), line, White)
 
 proc drawDisplay(rect: Rect) =
   drawPaneFrame(pDisplay, rect)
@@ -731,7 +732,7 @@ proc drawMemory(rect: Rect) =
       let value = mem[(address+column) and 0xffff] and 0xff
       line.add(if value >= 32 and value < 127: char(value) else: '.')
     line.add('|')
-    putStr(rect.x+1, rect.y+1+row, line, White)
+    putLine(rect.x+1, rect.y+1+row, max(0, rect.w-2), line, White)
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
            actCursor, pMemory, address)
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 4, h: 1),
@@ -749,7 +750,7 @@ proc drawLog(rect: Rect) =
     let index = first + row
     if index >= eventLog.len or index >= eventLog.len-logScroll: break
     let line = eventLog[index]
-    putStr(rect.x+1, rect.y+1+row, line, Gray)
+    putLine(rect.x+1, rect.y+1+row, max(0, rect.w-2), line, Gray)
     addAddressHits(line, rect.x+1, rect.y+1+row, pLog)
 
 proc syncSourceToPc() =
@@ -774,11 +775,11 @@ proc drawSource(rect: Rect) =
     let address = symtab.addrFor.getOrDefault((sourceFile, lineNo), -1)
     sourceRows.add((lineNo, address))
     let marker = (if lineNo == sourceCursor: ">" else: " ") &
-                 (if address >= 0 and userBreaks[address]: "●" else: " ")
+                 (if address >= 0 and userBreaks[address]: "*" else: " ")
     let text = marker & align($lineNo, 4) & " " & lines[lineNo-1]
-    putStr(rect.x+1, rect.y+1+row, text,
-           if address == PC: Green else: White,
-           attrs = if lineNo == sourceCursor: {caReverse} else: {})
+    putLine(rect.x+1, rect.y+1+row, max(0, rect.w-2), text,
+            if address == (PC and 0xffff): Green else: White,
+            attrs = if lineNo == sourceCursor: {caReverse} else: {})
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
            actCursor, pSource, lineNo)
     if address >= 0:
@@ -811,9 +812,9 @@ proc drawFuncs(rect: Rect) =
                (if userBreaks[fn.address]: "*" else: " ")
       name = if fn.name.len > nameW: fn.name[0..<nameW] else: fn.name
       text = marker & name
-    putStr(rect.x+1, rect.y+1+row, text,
-           if index == current: Green else: White,
-           attrs = if index == funcCursor: {caReverse} else: {})
+    putLine(rect.x+1, rect.y+1+row, max(0, rect.w-2), text,
+            if index == current: Green else: White,
+            attrs = if index == funcCursor: {caReverse} else: {})
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
            actCursor, pFuncs, index)
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 2, h: 1),
@@ -838,9 +839,9 @@ proc drawBreaks(rect: Rect) =
       marker = if index == breakCursor: ">" else: " "
       label = formatAddress(address) & " " & symtab.symbolize(address)
       text = marker & (if label.len > nameW: label[0..<nameW] else: label)
-    putStr(rect.x+1, rect.y+1+row, text,
-           if address == (PC and 0xffff): Green else: Yellow,
-           attrs = if index == breakCursor: {caReverse} else: {})
+    putLine(rect.x+1, rect.y+1+row, max(0, rect.w-2), text,
+            if address == (PC and 0xffff): Green else: Yellow,
+            attrs = if index == breakCursor: {caReverse} else: {})
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
            actCursor, pBreaks, index)
     addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 2, h: 1),
@@ -1400,6 +1401,7 @@ proc handleNormal(event: tui.Event): bool =
 proc handleEvent(event: tui.Event): bool =
   if event.kind == evResize:
     resizeBuf(event.x, event.y)
+    forceRedraw()
     resetKittyImage()
     dirty = true
     return true
