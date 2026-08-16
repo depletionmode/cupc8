@@ -392,6 +392,7 @@ proc cpuReset*() =
   for i in 0..spi_tx_buf.high:
     spi_tx_buf[i] = 0
     spi_rx_buf[i] = 0
+  display_reset()
 
 proc cpuLoadImage*(code: string) =
   var i = 0
@@ -431,6 +432,7 @@ when isMainModule:
   var headless = false
   var doTrace = false
   var wantDisplay = true
+  var dumpFb = ""
 
   var p = initOptParser()
   for kind, key, val in p.getopt():
@@ -448,8 +450,12 @@ when isMainModule:
         doTrace = true
       of "log-mask":
         log_mask = parseInt(val)
+      of "scale":
+        display_setScale(parseInt(val))
+      of "dump-fb":
+        dumpFb = val
       of "help", "h":
-        echo "usage: sim [--headless] [--max-ins:N] [--trace] <kernel.o>"
+        echo "usage: sim [--headless] [--max-ins:N] [--scale:N] [--dump-fb:path] [--trace] <kernel.o>"
         quit(0)
       else:
         echo "unknown option: ", key
@@ -475,6 +481,34 @@ when isMainModule:
   var atend = false
   var evt = defaultEvent
 
+  proc pushKey(k: int) =
+    keybuffer = k and 0xff
+    has_key = true
+
+  proc pumpInput() =
+    while pollEvent(evt):
+      case evt.kind:
+        of QuitEvent:
+          atend = true
+          break
+        of TextInput:
+          let t = evt.text()
+          if t.text[0] != '\0':
+            pushKey(ord(t.text[0]))
+        of KeyDown:
+          let e = evt.key()
+          if e.repeat:
+            continue
+          case e.keysym.sym:
+            of K_RETURN, K_KP_ENTER:
+              pushKey(13)
+            of K_BACKSPACE:
+              pushKey(8)
+            else:
+              discard
+        else:
+          discard
+
   proc exec() {.cdecl.} =
     if PC >= eof or HF:
       echo "HALT!"
@@ -496,23 +530,15 @@ when isMainModule:
         atend = true
         return
 
-    if not headless:
-      while pollEvent(evt):
-        case evt.kind:
-          of QuitEvent:
-            atend = true
-            break
-          of KeyDown:
-            let e = evt.key()
-            keybuffer = getKeyFromScancode(e.keysym.scancode)
-            has_key = true
-          else:
-            discard
-
   when defined(emscripten):
     emscripten_set_main_loop(exec, 0, 0)
   else:
     var start = cpuTime()
+    var lastPresent = start
+    var lastMhz = start
+    var lastMhzIns = 0
+    if wantDisplay:
+      display_render()
     while not atend:
       exec()
       if maxIns > 0 and ins_retired >= maxIns:
@@ -520,12 +546,24 @@ when isMainModule:
         if last_gpo.len > 0:
           echo last_gpo
         break
-      if not headless and ins_retired mod 100000 == 0 and ins_retired > 0:
-        display_render()
-        var elapsed = cpuTime() - start
-        log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/10000000, ffDecimal, 2))
-        start = cpuTime()
+      if not headless:
+        if (ins_retired and 0x1ff) == 0:
+          pumpInput()
+          let now = cpuTime()
+          if now - lastPresent >= 0.016:
+            display_render()
+            lastPresent = now
+          if now - lastMhz >= 1.0:
+            let dt = now - lastMhz
+            log(8, "$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / dt / 1_000_000, ffDecimal, 2))
+            lastMhz = now
+            lastMhzIns = ins_retired
+    if dumpFb.len > 0:
+      display_dumpPpm(dumpFb)
+      echo "wrote framebuffer ", dumpFb
     if maxIns == 0:
       echo cpuStatusLine()
-      while true:
-        discard
+      while not atend:
+        pumpInput()
+        display_render()
+        sleep(16)

@@ -3,7 +3,7 @@ kernel/kernel.o
 kernel/merged.ss
 tools/sim
 tools/simtest
-tools/testdata/movst.o
+tools/testdata/*.o
 nimcache/
 tools/nimcache/
 *.exe
