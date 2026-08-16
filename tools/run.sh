@@ -7,5 +7,5 @@ shift
 if [ ! -f sim ]; then
 	nim c -d:release sim.nim
 fi
-./sim $outf $@
+./sim "$outf" "$@"
 

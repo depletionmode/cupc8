@@ -1,56 +1,41 @@
-# ili9340
+# ili9340 display — window is created only by display_init()
 
-import strutils
 import opengl
-import sdl2, sdl2/gfx
-import sdl2/ttf
-
-discard sdl2.init(INIT_EVERYTHING)
+import sdl2
 
 var
     win: WindowPtr
-    render: RendererPtr
     gl: GlContextPtr
     should_render: bool = false
-    glClear: pointer
+    display_inited*: bool = false
+    display_init_error*: string = ""
 
-loadExtensions()
-discard glSetAttribute(SDL_GL_DOUBLEBUFFER, 1)
-win = createWindow("CUPCake Simulator", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 320, 240, SDL_WINDOW_OPENGL or SDL_WINDOW_SHOWN)
-gl = glCreateContext(win)
-glOrtho(0.0, 320.0, 240.0, 0.0, -1.0, 1.0)
+proc display_init*(): bool =
+    if display_inited:
+        return true
+    if sdl2.init(INIT_VIDEO) != SdlSuccess:
+        display_init_error = "sdl2.init: " & $getError()
+        return false
+    discard glSetAttribute(SDL_GL_DOUBLEBUFFER, 1)
+    win = createWindow("CUPCake Simulator",
+                       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                       320, 240, SDL_WINDOW_OPENGL or SDL_WINDOW_SHOWN)
+    if win.isNil:
+        display_init_error = "createWindow: " & $getError()
+        return false
+    gl = glCreateContext(win)
+    if gl.isNil:
+        display_init_error = "glCreateContext: " & $getError()
+        return false
+    loadExtensions()
+    glOrtho(0.0, 320.0, 240.0, 0.0, -1.0, 1.0)
+    glClear(GL_COLOR_BUFFER_BIT)
+    display_inited = true
+    return true
 
-glClear(GL_COLOR_BUFFER_BIT)
-
-#when defined(emscripten):
-#  render = createRenderer(win, -1, Renderer_Software)
-#else:
-#  render = createRenderer(win, -1, Renderer_Accelerated)
-#
-#
-#render.setDrawColor 0,0,0,255 # black background
-#render.clear
-#render.present
-
-proc display_speed*(speed: int) =
-    var text_font = openFont("/usr/share/wine/fonts/tahoma.ttf", 50)
-    var text_color = color(255, 40, 20, 100)
-    var text_surface = renderTextSolid(text_font, "AAAAAAAAAAAAAAAAAAA", text_color)
-    var text_texture = createTextureFromSurface(render, text_surface)
-    var text_quad: Rect
-    text_quad.x = 0
-    text_quad.y = 0
-    text_quad.w = 256
-    text_quad.h = 256
-    render.copy(text_texture, nil, addr text_quad)
-    freeSurface(text_surface)
-    destroyTexture(text_texture)
-
-proc display_render*() = 
-    if (should_render):
+proc display_render*() =
+    if display_inited and should_render:
         glSwapWindow(win)
-        #render.present
-        #display_speed(10)
         should_render = false
 
 var r : Rect
@@ -85,7 +70,7 @@ proc display_transact*(b : int) =
                 is_drawn = false
             else:
                 state = "NOSTATE"
-    else: 
+    else:
         case state:
             of "NOSTATE":
                 discard
@@ -112,27 +97,14 @@ proc display_transact*(b : int) =
                     r.h = (v - r.y) and 0xff
                     state = "NOSTATE"
             of "RAMWR":
-                # this doesn't correspond to actual ili9340 module
-                # where there each pixel color is stored in memory
-                # here we just draw the rectangle witht he first color
-                # as kernel driver only supports single color per rectangle anyway
                 if not is_drawn:
                     if is_color_high:
                         is_color_high = false
                     else:
                         is_color_high = true
-                        var c : GLfloat = (GLfloat)v
-                        glColor3f(c, c, c,)
-                        glRecti(r.x, r.y, r.w+r.x, r.h+r.y)
+                        if display_inited:
+                            var c : GLfloat = (GLfloat)v
+                            glColor3f(c, c, c)
+                            glRecti(r.x, r.y, r.w+r.x, r.h+r.y)
                         should_render = true
                         is_drawn = true
-                
-            #of "COLOR_A":
-            #    #var c : uint8 = (uint8)v
-            #    #render.setDrawColor c,c,c,c
-            #    var c : GLfloat = (GLfloat)v
-            #    glColor3f(c, c, c)
-            #    state = "COLOR_B"
-            #of "COLOR_B":
-            #    #render.fillRect r
-            #    glRecti(r.x, r.y, r.w+r.x, r.h+r.y)

@@ -1,0 +1,9 @@
+# assembler / simulator build outputs
+kernel/kernel.o
+kernel/merged.ss
+tools/sim
+tools/simtest
+tools/testdata/movst.o
+nimcache/
+tools/nimcache/
+*.exe

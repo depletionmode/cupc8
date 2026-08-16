@@ -2,18 +2,22 @@
 # cupcake simulator - nim edition!
 
 import strutils
-import times
 import terminal
-import sdl2, sdl2/gfx
+import sdl2
 
 import simdisplay
 import simsd
 
-discard sdl2.init(INIT_EVERYTHING)
-
-system.addQuitProc(resetAttributes)
+when isMainModule:
+  import times
+  import os
+  import parseopt
+  import std/exitprocs
 
 var log_mask = 9
+var last_gpo*: string = ""
+var ins_retired*: int = 0
+
 proc log(lvl : int, msg : string) =
   if (lvl and log_mask) > 0:
     when defined(emscripten):
@@ -32,18 +36,18 @@ proc log(lvl : int, msg : string) =
                 setStyle({styleDim})
             else:
                 discard
-        writeln(stdout, msg)
+        writeLine(stdout, msg)
         resetAttributes()
 
 var
-  PC: int = 0x1000
-  SP: int = 0x0100
-  R0: int = 0
-  R1: int = 0
-  ZF: bool = false
-  HF: bool = false
+  PC*: int = 0x1000
+  SP*: int = 0x0100
+  R0*: int = 0
+  R1*: int = 0
+  ZF*: bool = false
+  HF*: bool = false
   pcl: int = 0
-  mem: array[0..0x10000, int]
+  mem*: array[0..0x10000, int]
   eof: int = 0
 
 var
@@ -57,7 +61,6 @@ var
 
 proc fetch(): int =
   result = mem[PC] and 0xff
-  #log(4, "fetch(): $1 $2" % [toHex(PC, 4), toHex(mem[PC], 2)])
   PC += 1
 
 proc reg_write(operands, val: int) =
@@ -73,28 +76,16 @@ proc reg_read(operands: int, dst_doreg: bool): int =
   if (operands and bit) == bit:
     result = R1 and 0xff
   else:
-    result = R0 and 0xff 
+    result = R0 and 0xff
 
 proc get_imm(operands: int): tuple[has_imm: bool, val: int] =
   if (operands and 4) == 4:
-    #log(4, "get_imm(): $1" % $operands)
     var imm = fetch()
     result = (true, imm)
   else:
     result = (false, 0)
 
-type fop = (proc(operands: int))
-
-proc do_alu(o: int, v: int) =
-  var tup = get_imm(o)
-  var imm = tup[0]
-  var rb = tup[1]
-  if not imm:
-    rb = reg_read(o, false)
-  var ra = reg_read(o, true)
-  reg_write(o, v)
-
-proc ins_nop(o: int) = 
+proc ins_nop(o: int) =
   discard
 
 proc ins_eq(o: int) =
@@ -115,7 +106,7 @@ proc ins_or(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra or rb)
 
-proc ins_add(o: int) = 
+proc ins_add(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -124,7 +115,7 @@ proc ins_add(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra + rb)
 
-proc ins_shl(o: int) = 
+proc ins_shl(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -133,7 +124,7 @@ proc ins_shl(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra shl rb)
 
-proc ins_mov(o: int) = 
+proc ins_mov(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -147,19 +138,17 @@ proc ins_st_do(o: int, a: int) =
     var ra = reg_read(o, true)
     address += ra
   mem[address] = reg_read(o, false)
-  # todo -mmu
-  # mmu
   case address shr 8:
     of 0xf0:
       if (address and 0xff) == 0: #gpo
-        log(1, "GPO: $1 $2" % [toBin(mem[address], 8), toHex(mem[address], 2)])
+        last_gpo = "GPO: $1 $2" % [toBin(mem[address], 8), toHex(mem[address], 2)]
+        log(1, last_gpo)
       display_set_dc(mem[address] and 1)
     of 0xf1:    # spi
       var dev = address shr 4 and 0xf
       if dev == 0:  # display
         if not display_active:
           display_active = true
-          # simdisplay.init()
       var reg = address and 0xf
       case reg:
         of 0:   # tx
@@ -174,7 +163,6 @@ proc ins_st_do(o: int, a: int) =
             if not has_key:
               spi_rx_buf[dev] = 0xff
             else:
-              #log(1, "HAS KEY $1" % [toHex(keybuffer, 2)])
               spi_rx_buf[dev] = keybuffer
               has_key = false
           else:
@@ -199,27 +187,22 @@ proc ins_ld_do(o: int, a: int) =
     var rb = reg_read(o, false)
     address += rb
   reg_write(o, mem[address])
-  # todo -mmu
-  # mmu
   case address shr 8:
     of 0xf1:    #spi
       var dev = address shr 4 and 0xf
       var reg = address and 0xf
       case reg:
         of 1:   # rx
-          #if spi_rx_buf[dev] != 0xff:
-          #    echo "READ"
           reg_write(o, spi_rx_buf[dev])
         of 3:   # status
           case dev:
             of 0: #display
-              reg_write(o, 1) # always return 1 for now (TODO)
+              reg_write(o, 1)
             of 2: #keyboard
-              # TODO THIS BLOCKING HACK WONT WORK ON REAL HARDWARE!!! :( :(
               if has_key:
-                reg_write(o, 1) # always return 1 for now (TODO)
+                reg_write(o, 1)
               else:
-                reg_write(o, 0) # always return 1 for now (TODO)
+                reg_write(o, 0)
             of 1: #sd
               reg_write(o, sd_isready())
             else:
@@ -238,7 +221,7 @@ proc ins_ldd(o: int) =
   var address_d = mem[address] or (mem[address+1] shl 8)
   ins_ld_do(o, address_d)
 
-proc ins_gt(o: int) = 
+proc ins_gt(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -247,7 +230,7 @@ proc ins_gt(o: int) =
   var ra = reg_read(o, true)
   ZF = ra > rb
 
-proc ins_lt(o: int) = 
+proc ins_lt(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -256,11 +239,7 @@ proc ins_lt(o: int) =
   var ra = reg_read(o, true)
   ZF = ra < rb
 
-proc ins_not(o: int) = 
-  var ra = reg_read(o, true)
-  reg_write(o, not ra)
-
-proc ins_sub(o: int) = 
+proc ins_sub(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -269,7 +248,7 @@ proc ins_sub(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra - rb)
 
-proc ins_shr(o: int) = 
+proc ins_shr(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -278,7 +257,7 @@ proc ins_shr(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra shr rb)
 
-proc ins_and(o: int) = 
+proc ins_and(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -287,7 +266,7 @@ proc ins_and(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra and rb)
 
-proc ins_xor(o: int) = 
+proc ins_xor(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -296,7 +275,7 @@ proc ins_xor(o: int) =
   var ra = reg_read(o, true)
   reg_write(o, ra xor rb)
 
-proc ins_nor(o: int) = 
+proc ins_nor(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
@@ -320,7 +299,6 @@ proc ins_push(o: int) =
 
   SP += 1
   mem[SP] = rb
-  #log(4, "stack push($1): $2" % [toHex(SP, 4), toHex(mem[SP], 2)])
 
 proc ins_pop(o: int) =
   if (o and 7) == 7:
@@ -343,34 +321,29 @@ proc ins_bzf(o: int) =
 proc ins_halt(o: int) =
   HF = true
 
-proc ins_tmr0(o: int) = 
-  # ra - interrupt vector entry in ivt
-  # rb - trigger every ra x 1000 cycles
+proc ins_tmr0(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
   if not imm:
     rb = reg_read(o, false)
   var ra = reg_read(o, true)
-  # to timer
+  discard ra
+  discard rb
 
-proc ins_tmr1(o: int) = 
-  # ra - interrupt vector entry in ivt
-  # rb - trigger every ra x 1000 cycles
+proc ins_tmr1(o: int) =
   var tup = get_imm(o)
   var imm = tup[0]
   var rb = tup[1]
   if not imm:
     rb = reg_read(o, false)
   var ra = reg_read(o, true)
-  # to timer
-
+  discard ra
+  discard rb
 
 proc decode() =
   var op = fetch()
-  #log(4, "decode: $1" % toBin(op, 8))
   var ins = op and 0xf8
-  ## todo - call function table1
   var r = op and 7
   case ins:
     of 0x80: ins_nop(r)
@@ -399,25 +372,48 @@ proc decode() =
     of 0xf8: ins_halt(r)
     else:
       discard
-      #log(1, "Unsupported op = $1!" % toHex(ins, 2))
-  #log(2, "  r0 = $1" % toHex(R0, 2))
-  #log(2, "  r1 = $1" % toHex(R1, 2))
-  #log(2, "  pc = $1" % toHex(PC, 4))
-  #log(2, "  sp = $1" % toHex(SP, 4))
-  #log(2, "  zf = $1" % ZF)
 
-import os
-proc loadcode() =
-  when defined(emscripten):
-    let code = readFile "kernel.o"
-  else:
-    let code = if paramCount() > 0: readFile paramStr(1)
-               else: readAll stdin
+proc cpuReset*() =
+  PC = 0x1000
+  SP = 0x0100
+  R0 = 0
+  R1 = 0
+  ZF = false
+  HF = false
+  pcl = 0
+  eof = 0
+  ins_retired = 0
+  last_gpo = ""
+  display_active = false
+  has_key = false
+  keybuffer = 0xff
+  for i in 0..mem.high:
+    mem[i] = 0
+  for i in 0..spi_tx_buf.high:
+    spi_tx_buf[i] = 0
+    spi_rx_buf[i] = 0
+
+proc cpuLoadImage*(code: string) =
   var i = 0
   while i < code.len:
     mem[0x1000+i] = int(code[i])
     i += 1
-  eof = PC + i 
+  eof = 0x1000 + i
+
+proc cpuLoadFile*(path: string) =
+  cpuLoadImage(readFile(path))
+
+proc cpuStep*(): bool =
+  ## Fetch/decode/execute one instruction. Returns false if halted or past image.
+  if PC >= eof or HF:
+    return false
+  decode()
+  ins_retired += 1
+  return not HF
+
+proc cpuStatusLine*(): string =
+  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6" % [
+    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF]
 
 when defined(emscripten):
   proc emscripten_set_main_loop(fun: proc() {.cdecl.}, fps,
@@ -427,56 +423,109 @@ when defined(emscripten):
 
   proc emscripten_set_main_loop_timing(mode: cint, value: cint) {.header: "<emscripten.h>".}
 
-loadcode()
+when isMainModule:
+  addExitProc(resetAttributes)
 
-var atend = false
-var evt = defaultEvent
+  var binPath = ""
+  var maxIns = 0
+  var headless = false
+  var doTrace = false
+  var wantDisplay = true
 
-proc exec() {.cdecl.} =
-  if PC >= eof or HF:
-    echo "HALT!"
-    when defined(emscripten):
-      emscripten_cancel_main_loop()
-    atend = true
-    return
-
-  when defined(emscripten):
-    # run multiple loops per frame
-    for i in 0..10000:
-      decode()
-  else:
-    # native so run as fast as possible
-    decode()
-  
-  while pollEvent(evt):
-    case evt.kind:
-      of QuitEvent:
-        atend = true
-        break
-      of KeyDown:
-        let e = evt.key()
-        keybuffer = getKeyFromScancode(e.keysym.scancode)
-        has_key = true
-        #writeln(stdout, "key")
+  var p = initOptParser()
+  for kind, key, val in p.getopt():
+    case kind
+    of cmdArgument:
+      binPath = key
+    of cmdLongOption, cmdShortOption:
+      case key
+      of "max-ins", "n":
+        maxIns = parseInt(val)
+      of "headless":
+        headless = true
+        wantDisplay = false
+      of "trace":
+        doTrace = true
+      of "log-mask":
+        log_mask = parseInt(val)
+      of "help", "h":
+        echo "usage: sim [--headless] [--max-ins:N] [--trace] <kernel.o>"
+        quit(0)
       else:
-        discard
-
-when defined(emscripten):
-  emscripten_set_main_loop(exec, 0, 0)
-else:
-  var ins_ctr = 0
-  var start = cpuTime()
-  while not atend:
-    exec()
-    ins_ctr += 1
-    # render after every 150,000 instructions (> 30 fps when running @ ~ 5MHz)
-    if ins_ctr mod 100000 == 0:
-      display_render()
-    if ins_ctr mod 100000 == 0:
-      #ins_ctr = 0
-      var elapsed = cpuTime() - start
-      log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/10000000, ffDecimal, 2))
-      start = cpuTime()
-  while true:
+        echo "unknown option: ", key
+        quit(1)
+    of cmdEnd:
       discard
 
+  if binPath.len == 0:
+    if paramCount() > 0:
+      binPath = paramStr(1)
+    else:
+      cpuLoadImage(readAll(stdin))
+  else:
+    cpuLoadFile(binPath)
+
+  if wantDisplay:
+    if not display_init():
+      stderr.writeLine("display init failed: " & display_init_error)
+      quit(2)
+
+  discard sd_try_init()
+
+  var atend = false
+  var evt = defaultEvent
+
+  proc exec() {.cdecl.} =
+    if PC >= eof or HF:
+      echo "HALT!"
+      when defined(emscripten):
+        emscripten_cancel_main_loop()
+      atend = true
+      return
+
+    if doTrace:
+      echo "TRACE pc=$1 op=$2" % [toHex(PC, 4), toHex(mem[PC], 2)]
+
+    when defined(emscripten):
+      for i in 0..10000:
+        if not cpuStep():
+          atend = true
+          break
+    else:
+      if not cpuStep():
+        atend = true
+        return
+
+    if not headless:
+      while pollEvent(evt):
+        case evt.kind:
+          of QuitEvent:
+            atend = true
+            break
+          of KeyDown:
+            let e = evt.key()
+            keybuffer = getKeyFromScancode(e.keysym.scancode)
+            has_key = true
+          else:
+            discard
+
+  when defined(emscripten):
+    emscripten_set_main_loop(exec, 0, 0)
+  else:
+    var start = cpuTime()
+    while not atend:
+      exec()
+      if maxIns > 0 and ins_retired >= maxIns:
+        echo cpuStatusLine()
+        if last_gpo.len > 0:
+          echo last_gpo
+        break
+      if not headless and ins_retired mod 100000 == 0 and ins_retired > 0:
+        display_render()
+        var elapsed = cpuTime() - start
+        log(8, "$1 MHz" % formatFloat(1000000*4/elapsed/10000000, ffDecimal, 2))
+        start = cpuTime()
+    if maxIns == 0:
+      echo cpuStatusLine()
+      while true:
+        discard

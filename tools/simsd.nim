@@ -1,4 +1,3 @@
-import strutils
 import os
 
 let SD_IMG = "./disk.img"
@@ -120,75 +119,9 @@ proc sd_isready*(): int =
   return
 
 
-sd_init(SD_IMG)
-
-var a = sd_transact(64 + 0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(1)
-writeln(stdout, "r1: $1" % toHex(sd_transact(0xff), 2))
-
-a = sd_transact(64 + 1)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(1)
-writeln(stdout, "r1: $1" % toHex(sd_transact(0xff), 2))
-
-a = sd_transact(64 + 16)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(2)
-a = sd_transact(0)
-a = sd_transact(1)
-writeln(stdout, "r1: $1" % toHex(sd_transact(0xff), 2))
-
-a = sd_transact(64 + 17)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(1)
-writeln(stdout, "r1: $1" % toHex(sd_transact(0xff), 2))
-a = sd_transact(0xff)
-for i in 0..511:
-  a = sd_transact(0xff)
-#  echo a
-a = sd_transact(0xff)
-a = sd_transact(0xff)
-
-a = sd_transact(64 + 24)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(1)
-writeln(stdout, "r1: $1" % toHex(sd_transact(0xff), 2))
-a = sd_transact(1)
-for i in 0..511:
-  if i == 8:
-    a = sd_transact(0x40)
-  else:
-    a = sd_transact(mem[i])
-  #a = sd_transact(i mod 256)
-a = sd_transact(0)
-a = sd_transact(0)
-writeln(stdout, "data response: $1" % toHex(sd_transact(0xff), 2))
-
-a = sd_transact(64 + 17)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(0)
-a = sd_transact(1)
-writeln(stdout, "r1: $1" % toHex(sd_transact(0xff), 2))
-a = sd_transact(0xff)
-for i in 0..511:
-  a = sd_transact(0xff)
-#  echo a
-a = sd_transact(0xff)
-a = sd_transact(0xff)
+proc sd_try_init*(filename: string = SD_IMG): bool =
+  if not fileExists(filename):
+    return false
+  sd_init(filename)
+  return true
 

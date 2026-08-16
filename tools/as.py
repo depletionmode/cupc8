@@ -289,14 +289,13 @@ def __assemble(filename):
     return offset, mach_code
 
 if __name__ == "__main__":
-    global file_name
-    global base
     import sys
     args = sys.argv[1:]
 
     if len(args) < 1:
         raise Exception('Invalid input/output files')
 
+    file_name = args[0]
     outf = '{}.o'.format(file_name.split('.')[0])
     if len(args) >= 2: outf = args[1]
     if len(args) == 3:
@@ -304,8 +303,6 @@ if __name__ == "__main__":
         base = int(bases[0], 0)
         data_base= int(bases[1], 0)
         bss_base = int(bases[2], 0)
-
-    file_name = args[0]
 
     #print('1st pass')
     offset, mach_code = __assemble(file_name)
