@@ -755,6 +755,26 @@ testIrqCli()
 testIrqKeyb()
 testIrqMaskMmio()
 
+proc testKernelKeybWaits() =
+  echo "== kernel keyb parks on wai =="
+  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath},
+                            workingDir = kernelDir)
+  if assembled.exitCode != 0:
+    fail("kernel assemble failed: " & assembled.output)
+    return
+  cpuReset()
+  cpuLoadFile(kernelDir / "kernel.o")
+  var n = 0
+  while n < 2_000_000 and not waiting and not HF:
+    if cpuStep() != sOk:
+      break
+    inc n
+  expectTrue("kernel waiting for key", waiting)
+  expectTrue("I enabled while waiting", IF)
+  expect("only keyboard unmasked", irqMask, 1)
+
+testKernelKeybWaits()
+
 proc testDisplayRect() =
   echo "== display framebuffer via shipped CPU SPI =="
   if DispWidth != 320 or DispHeight != 240:

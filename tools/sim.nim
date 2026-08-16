@@ -215,7 +215,8 @@ proc ins_st_do(o: int, a: int) =
               has_key = false
           else:
             discard
-          raiseIrq(3)
+          if dev != 2:
+            raiseIrq(3)
         else:
           discard
     else:
@@ -589,13 +590,17 @@ proc clearAllBreaks*() =
 proc cpuRun*(maxSteps: int): RunExit =
   ## Run a batch. Breakpoints stop before the marked instruction. After a hit,
   ## the next run skips that same breakpoint once so execution can resume.
+  ## A parked WAI ticks the timers once and returns so the host can sleep.
+  if waiting:
+    tickTimers()
+    serviceIrq()
+    if waiting:
+      return reCount
   for i in 0..<maxSteps:
     if HF:
       return reHalted
     if waiting:
-      tickTimers()
-      inc ins_retired
-      serviceIrq()
+      return reCount
     elif PC >= imageEnd:
       return rePastImage
     else:
@@ -725,6 +730,9 @@ when isMainModule:
           atend = true
           break
     else:
+      if waiting:
+        pumpInput()
+        sleep(1)
       if cpuStep() != sOk:
         atend = true
         return

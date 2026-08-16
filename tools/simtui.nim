@@ -18,16 +18,15 @@ import symbols
 import tui
 
 type
-  PaneId = enum pDisasm, pRegs, pStack, pDisplay, pMemory, pLog, pSource
+  PaneId = enum pDisasm, pRegs, pStack, pDisplay, pMemory, pLog, pSource, pFuncs, pBreaks
   Mode = enum mNormal, mInput, mEx
   GfxMode = enum gfxAuto, gfxKitty, gfxHalf
   DisplayMode = enum displayEmbedded, displayWindow
   ThemeMode = enum themeAuto, themeDark, themeLight
   DividerKind = enum
-    dividerNone, dividerTopBottom, dividerSmallColumns,
-    dividerStandardLeft, dividerStandardRight,
-    dividerWideLeft, dividerWideCenter, dividerWideRight,
-    dividerRegsStack, dividerMemoryLog
+    dividerNone, dividerTopBottom, dividerNavCode, dividerCodeCpu,
+    dividerCpuDisplay, dividerFuncsBreaks, dividerRegsStack, dividerMemoryLog,
+    dividerDisasmSource
   RunGoal = enum goalNone, goalStepOver, goalUntil, goalStepOut
   ConfirmAction = enum confirmNone, confirmReset, confirmQuit
   Watch = object
@@ -97,7 +96,15 @@ var
   sourceCursor = 1
   sourceFile = ""
   sourceSwap = false
+  funcSwap = false
+  breakSwap = false
   displaySwap = false
+  funcList: seq[tuple[address: int, name: string]]
+  funcTop = 0
+  funcCursor = 0
+  breakList: seq[int]
+  breakTop = 0
+  breakCursor = 0
   bottomLog = false
   logGpo = true
   logSpi0 = false
@@ -105,15 +112,14 @@ var
   logSd = true
   lastHookStop = ""
   dragDivider = dividerNone
-  topSplitPercent = 67
-  smallColumnPercent = 60
-  standardLeftPercent = 33
-  standardRightPercent = 57
-  wideLeftPercent = 27
-  wideCenterPercent = 50
-  wideRightPercent = 70
-  regsSplitPercent = 50
-  memorySplitPercent = 55
+  topSplitPercent = 68
+  navPercent = 18
+  cpuPercent = 22
+  displayPercent = 26
+  codeSourceSplitPercent = 58
+  regsSplitPercent = 48
+  memorySplitPercent = 56
+  funcsBreaksSplitPercent = 62
 
 proc contains(rect: Rect; x, y: int): bool =
   rect.w > 0 and rect.h > 0 and x >= rect.x and y >= rect.y and
@@ -232,6 +238,14 @@ proc pause(reason: string; cancelGoal = true) =
   if cancelGoal: cleanupTempBreak()
   dirty = true
 
+proc rebuildBreakList() =
+  breakList.setLen(0)
+  for address in 0..userBreaks.high:
+    if userBreaks[address]: breakList.add(address)
+  if breakCursor >= breakList.len:
+    breakCursor = max(0, breakList.high)
+  if breakTop > breakCursor: breakTop = max(0, breakCursor)
+
 proc setTempBreak(address: int; goal: RunGoal) =
   cleanupTempBreak()
   tempBreak = address and 0xffff
@@ -247,6 +261,7 @@ proc toggleBreakpoint(address: int) =
   else:
     if tempBreak != a: clearBreak(a)
     appendLog("RUN", "breakpoint cleared at " & symtab.symbolize(a))
+  rebuildBreakList()
   dirty = true
 
 proc rebuildWatchMask() =
@@ -285,6 +300,30 @@ proc installMemoryHook() =
           (if kind == maRead: "read" else: "write"), $(a and 0xf),
           toHex(value, 2)])
 
+proc rebuildFuncList() =
+  funcList.setLen(0)
+  funcTop = 0
+  funcCursor = 0
+  if not symtab.loaded: return
+  var dataNames = initTable[string, bool]()
+  for item in symtab.dataSyms:
+    dataNames[item.name] = true
+  for (address, name) in symtab.sortedSyms:
+    if '.' in name or dataNames.hasKey(name): continue
+    if address < 0x1000 or address >= 0xf000: continue
+    funcList.add((address, name))
+
+proc funcIndexAt(address: int): int =
+  result = -1
+  for i, fn in funcList:
+    if fn.address <= (address and 0xffff): result = i
+    else: break
+
+proc syncFuncsToPc() =
+  let index = funcIndexAt(PC)
+  if index < 0: return
+  funcCursor = index
+
 proc loadSymbols(path: string) =
   mapPath = path
   if path.len > 0 and fileExists(path):
@@ -296,6 +335,7 @@ proc loadSymbols(path: string) =
       appendLog("RUN", error.msg)
   else:
     symtab = loadMap("")
+  rebuildFuncList()
 
 proc loadImage(path, explicitMap: string) =
   if not fileExists(path):
@@ -397,142 +437,169 @@ proc resetCpu() =
   appendLog("RUN", "reset")
   dirty = true
 
+proc splitH(rect: Rect; leftW, minRight: int): tuple[left, right: Rect] =
+  let w = max(0, min(leftW, rect.w - minRight))
+  result.left = Rect(x: rect.x, y: rect.y, w: w, h: rect.h)
+  result.right = Rect(x: rect.x + w, y: rect.y, w: rect.w - w, h: rect.h)
+
+proc splitHRight(rect: Rect; rightW, minLeft: int): tuple[left, right: Rect] =
+  let w = max(0, min(rightW, rect.w - minLeft))
+  result.left = Rect(x: rect.x, y: rect.y, w: rect.w - w, h: rect.h)
+  result.right = Rect(x: rect.x + rect.w - w, y: rect.y, w: w, h: rect.h)
+
+proc splitV(rect: Rect; topH, minBot: int): tuple[top, bot: Rect] =
+  let h = max(0, min(topH, rect.h - minBot))
+  result.top = Rect(x: rect.x, y: rect.y, w: rect.w, h: h)
+  result.bot = Rect(x: rect.x, y: rect.y + h, w: rect.w, h: rect.h - h)
+
 proc layoutFor(width, height: int): Layout =
+  ## One column model for every size:
+  ##   [ nav: funcs/breaks | code: disasm(/source) | cpu: regs/stack | display ]
+  ##   [ memory                              | log                            ]
   result.tooSmall = width < 80 or height < 24
   if result.tooSmall: return
+  var work = Rect(x: 0, y: 1, w: width, h: height - 2)
+
+  if height >= 28:
+    let topH = max(10, min(work.h - 6, work.h * topSplitPercent div 100))
+    let parts = splitV(work, topH, 6)
+    work = parts.top
+    if width >= 100:
+      let bottom = splitH(parts.bot, max(24, width * memorySplitPercent div 100), 18)
+      result.panes[pMemory] = bottom.left
+      result.panes[pLog] = bottom.right
+    elif bottomLog:
+      result.panes[pLog] = parts.bot
+    else:
+      result.panes[pMemory] = parts.bot
+
   let
-    topY = 1
-    contentH = height - 2
-    topH = if height < 30: contentH - 5
-           else: max(8, min(contentH-7, contentH*topSplitPercent div 100))
-    bottomH = contentH - topH
+    wantNav = (symtab.loaded or breakList.len > 0) and width >= 110
+    wantDisplay = displayMode == displayEmbedded and width >= 124
+    wantSourceUnder = symtab.loaded and height >= 34 and not sourceSwap
+  var
+    navW = if wantNav: max(16, min(28, width * navPercent div 100)) else: 0
+    cpuW = max(22, min(32, width * cpuPercent div 100))
+    dispW = if wantDisplay: max(22, min(40, width * displayPercent div 100)) else: 0
+  if work.w < navW + cpuW + dispW + 28:
+    dispW = 0
+  if work.w < navW + cpuW + 28:
+    navW = 0
+
   if width < 100:
-    let leftW = max(24, min(width-24, width*smallColumnPercent div 100))
-    result.panes[pDisasm] = Rect(x: 0, y: topY, w: leftW, h: topH)
-    result.panes[pRegs] = Rect(x: leftW, y: topY, w: width-leftW, h: topH)
-    if bottomLog:
-      result.panes[pLog] = Rect(x: 0, y: topY+topH, w: width, h: bottomH)
-    else:
-      result.panes[pMemory] = Rect(x: 0, y: topY+topH, w: width, h: bottomH)
+    let cols = splitH(work, max(24, width * 58 div 100), 20)
+    result.panes[pRegs] = cols.right
     if displaySwap:
-      result.panes[pDisplay] = result.panes[pDisasm]
-      result.panes[pDisasm] = Rect()
+      result.panes[pDisplay] = cols.left
     elif sourceSwap and symtab.loaded:
-      result.panes[pSource] = result.panes[pDisasm]
-      result.panes[pDisasm] = Rect()
-  elif width >= 170 and symtab.loaded:
-    let
-      firstX = max(24, min(width-60, width*wideLeftPercent div 100))
-      secondX = max(firstX+24, min(width-36, width*wideCenterPercent div 100))
-      thirdX = if displayMode == displayWindow: width
-               else: max(secondX+22, min(width-24, width*wideRightPercent div 100))
-      regsH = max(4, min(topH-4, topH*regsSplitPercent div 100))
-    result.panes[pDisasm] = Rect(x: 0, y: topY, w: firstX, h: topH)
-    result.panes[pSource] = Rect(x: firstX, y: topY, w: secondX-firstX, h: topH)
-    result.panes[pRegs] = Rect(x: secondX, y: topY, w: thirdX-secondX, h: regsH)
-    result.panes[pStack] = Rect(x: secondX, y: topY+regsH,
-                                w: thirdX-secondX, h: topH-regsH)
-    if displayMode == displayEmbedded:
-      result.panes[pDisplay] = Rect(x: thirdX, y: topY, w: width-thirdX, h: topH)
-  else:
-    let
-      firstX = max(24, min(width-36, width*standardLeftPercent div 100))
-      secondX = if displayMode == displayWindow: width
-                else: max(firstX+22, min(width-24,
-                                         width*standardRightPercent div 100))
-      regsH = max(4, min(topH-4, topH*regsSplitPercent div 100))
-    result.panes[pDisasm] = Rect(x: 0, y: topY, w: firstX, h: topH)
-    result.panes[pRegs] = Rect(x: firstX, y: topY, w: secondX-firstX, h: regsH)
-    result.panes[pStack] = Rect(x: firstX, y: topY+regsH,
-                                w: secondX-firstX, h: topH-regsH)
-    if displayMode == displayEmbedded:
-      result.panes[pDisplay] = Rect(x: secondX, y: topY, w: width-secondX, h: topH)
-    if sourceSwap and symtab.loaded:
-      result.panes[pSource] = result.panes[pDisasm]
-      result.panes[pDisasm] = Rect()
-  if width >= 100:
-    if height < 30:
-      if bottomLog:
-        result.panes[pLog] = Rect(x: 0, y: topY+topH, w: width, h: bottomH)
-      else:
-        result.panes[pMemory] = Rect(x: 0, y: topY+topH, w: width, h: bottomH)
+      result.panes[pSource] = cols.left
+    elif funcSwap:
+      result.panes[pFuncs] = cols.left
+    elif breakSwap:
+      result.panes[pBreaks] = cols.left
     else:
-      let memoryW = max(24, min(width-24, width*memorySplitPercent div 100))
-      result.panes[pMemory] = Rect(x: 0, y: topY+topH, w: memoryW, h: bottomH)
-      result.panes[pLog] = Rect(x: memoryW, y: topY+topH, w: width-memoryW, h: bottomH)
+      result.panes[pDisasm] = cols.left
+    return
+
+  if navW > 0:
+    let navSplit = splitH(work, navW, cpuW + dispW + 28)
+    let navParts = splitV(navSplit.left,
+                          max(5, navSplit.left.h * funcsBreaksSplitPercent div 100), 5)
+    result.panes[pFuncs] = navParts.top
+    result.panes[pBreaks] = navParts.bot
+    work = navSplit.right
+  if dispW > 0:
+    let dispSplit = splitHRight(work, dispW, cpuW + 28)
+    result.panes[pDisplay] = dispSplit.right
+    work = dispSplit.left
+  block:
+    let cpuSplit = splitHRight(work, cpuW, 28)
+    let cpuParts = splitV(cpuSplit.right,
+                          max(5, cpuSplit.right.h * regsSplitPercent div 100), 5)
+    result.panes[pRegs] = cpuParts.top
+    result.panes[pStack] = cpuParts.bot
+    work = cpuSplit.left
+
+  if sourceSwap and symtab.loaded:
+    result.panes[pSource] = work
+  elif wantSourceUnder and work.h >= 16:
+    let codeParts = splitV(work,
+                           max(8, work.h * codeSourceSplitPercent div 100), 6)
+    result.panes[pDisasm] = codeParts.top
+    result.panes[pSource] = codeParts.bot
+  else:
+    result.panes[pDisasm] = work
 
 proc addDividerHits(layout: Layout; width, height: int) =
   if layout.tooSmall: return
-  let bottom = if layout.panes[pMemory].h > 0: layout.panes[pMemory]
-               else: layout.panes[pLog]
-  if bottom.h > 0:
-    addHit(Rect(x: 0, y: max(1, bottom.y-1), w: width, h: 2),
+  let
+    mem = layout.panes[pMemory]
+    log = layout.panes[pLog]
+    dis = layout.panes[pDisasm]
+    src = layout.panes[pSource]
+    codeX = if dis.w > 0: dis.x elif src.w > 0: src.x else: -1
+    codeH = max(dis.h + (if dis.w > 0 and src.w > 0 and src.x == dis.x: src.h else: 0),
+                max(dis.h, src.h))
+  if mem.h > 0 or log.h > 0:
+    let y = if mem.h > 0: mem.y else: log.y
+    addHit(Rect(x: 0, y: max(1, y-1), w: width, h: 2),
            actDivider, value = ord(dividerTopBottom))
-  if layout.panes[pMemory].w > 0 and layout.panes[pLog].w > 0:
-    let x = layout.panes[pLog].x
-    addHit(Rect(x: max(0, x-1), y: layout.panes[pLog].y, w: 2,
-                h: layout.panes[pLog].h), actDivider,
-           value = ord(dividerMemoryLog))
-  if width < 100:
-    let x = layout.panes[pRegs].x
-    addHit(Rect(x: max(0, x-1), y: 1, w: 2,
-                h: max(1, bottom.y-1)), actDivider,
-           value = ord(dividerSmallColumns))
-    return
-  let regs = layout.panes[pRegs]
-  if regs.w > 0:
-    addHit(Rect(x: max(0, regs.x-1), y: 1, w: 2, h: max(1, bottom.y-1)),
-           actDivider, value = ord(if width >= 170 and symtab.loaded:
-                                      dividerWideCenter
-                                    else:
-                                      dividerStandardLeft))
-  let stack = layout.panes[pStack]
-  if stack.h > 0:
-    addHit(Rect(x: stack.x, y: max(1, stack.y-1), w: stack.w, h: 2),
+  if mem.w > 0 and log.w > 0:
+    addHit(Rect(x: max(0, log.x-1), y: log.y, w: 2, h: log.h),
+           actDivider, value = ord(dividerMemoryLog))
+  if layout.panes[pFuncs].w > 0 and codeX > 0:
+    addHit(Rect(x: max(0, codeX-1), y: 1, w: 2, h: max(1, codeH)),
+           actDivider, value = ord(dividerNavCode))
+  if layout.panes[pFuncs].w > 0 and layout.panes[pBreaks].h > 0:
+    addHit(Rect(x: layout.panes[pBreaks].x, y: max(1, layout.panes[pBreaks].y-1),
+                w: layout.panes[pBreaks].w, h: 2),
+           actDivider, value = ord(dividerFuncsBreaks))
+  if layout.panes[pRegs].w > 0 and codeX >= 0:
+    addHit(Rect(x: max(0, layout.panes[pRegs].x-1), y: 1, w: 2,
+                h: max(1, layout.panes[pRegs].h + layout.panes[pStack].h)),
+           actDivider, value = ord(dividerCodeCpu))
+  if layout.panes[pStack].h > 0:
+    addHit(Rect(x: layout.panes[pStack].x, y: max(1, layout.panes[pStack].y-1),
+                w: layout.panes[pStack].w, h: 2),
            actDivider, value = ord(dividerRegsStack))
-  if width >= 170 and symtab.loaded:
-    let source = layout.panes[pSource]
-    addHit(Rect(x: max(0, source.x-1), y: 1, w: 2, h: max(1, bottom.y-1)),
-           actDivider, value = ord(dividerWideLeft))
-    if layout.panes[pDisplay].w > 0:
-      let x = layout.panes[pDisplay].x
-      addHit(Rect(x: max(0, x-1), y: 1, w: 2, h: max(1, bottom.y-1)),
-             actDivider, value = ord(dividerWideRight))
-  elif layout.panes[pDisplay].w > 0:
-    let x = layout.panes[pDisplay].x
-    addHit(Rect(x: max(0, x-1), y: 1, w: 2, h: max(1, bottom.y-1)),
-           actDivider, value = ord(dividerStandardRight))
+  if layout.panes[pDisplay].w > 0 and layout.panes[pRegs].w > 0:
+    addHit(Rect(x: max(0, layout.panes[pDisplay].x-1), y: 1, w: 2,
+                h: layout.panes[pDisplay].h),
+           actDivider, value = ord(dividerCpuDisplay))
+  if layout.panes[pDisasm].w > 0 and layout.panes[pSource].w > 0 and
+      layout.panes[pSource].x == layout.panes[pDisasm].x:
+    addHit(Rect(x: layout.panes[pSource].x, y: max(1, layout.panes[pSource].y-1),
+                w: layout.panes[pSource].w, h: 2),
+           actDivider, value = ord(dividerDisasmSource))
 
 proc updateDivider(kind: DividerKind; x, y: int) =
   let size = tuiSize()
   case kind
   of dividerTopBottom:
-    topSplitPercent = max(30, min(85, (y-1)*100 div max(1, size.h-2)))
-  of dividerSmallColumns:
-    smallColumnPercent = max(30, min(75, x*100 div max(1, size.w)))
-  of dividerStandardLeft:
-    let limit = if displayMode == displayWindow: 80 else: standardRightPercent-15
-    standardLeftPercent = max(18, min(limit, x*100 div max(1, size.w)))
-  of dividerStandardRight:
-    standardRightPercent = max(standardLeftPercent+15,
-                               min(85, x*100 div max(1, size.w)))
-  of dividerWideLeft:
-    wideLeftPercent = max(15, min(wideCenterPercent-12,
-                                  x*100 div max(1, size.w)))
-  of dividerWideCenter:
-    let limit = if displayMode == displayWindow: 85 else: wideRightPercent-12
-    wideCenterPercent = max(wideLeftPercent+12,
-                            min(limit, x*100 div max(1, size.w)))
-  of dividerWideRight:
-    wideRightPercent = max(wideCenterPercent+12,
-                           min(88, x*100 div max(1, size.w)))
+    topSplitPercent = max(35, min(82, (y-1)*100 div max(1, size.h-2)))
+  of dividerNavCode:
+    navPercent = max(12, min(28, x*100 div max(1, size.w)))
+  of dividerCodeCpu:
+    cpuPercent = max(16, min(36, (size.w-x)*100 div max(1, size.w)))
+  of dividerCpuDisplay:
+    displayPercent = max(16, min(40, (size.w-x)*100 div max(1, size.w)))
   of dividerRegsStack:
     let layout = layoutFor(size.w, size.h)
     let regs = layout.panes[pRegs]
     let total = regs.h + layout.panes[pStack].h
     regsSplitPercent = max(25, min(75, (y-regs.y)*100 div max(1, total)))
   of dividerMemoryLog:
-    memorySplitPercent = max(25, min(75, x*100 div max(1, size.w)))
+    memorySplitPercent = max(28, min(75, x*100 div max(1, size.w)))
+  of dividerFuncsBreaks:
+    let layout = layoutFor(size.w, size.h)
+    let funcs = layout.panes[pFuncs]
+    let total = funcs.h + layout.panes[pBreaks].h
+    funcsBreaksSplitPercent = max(30, min(80, (y-funcs.y)*100 div max(1, total)))
+  of dividerDisasmSource:
+    let layout = layoutFor(size.w, size.h)
+    let dis = layout.panes[pDisasm]
+    let total = dis.h + layout.panes[pSource].h
+    codeSourceSplitPercent = max(35, min(80, (y-dis.y)*100 div max(1, total)))
   of dividerNone: discard
   dirty = true
 
@@ -545,6 +612,8 @@ proc paneTitle(pane: PaneId): string =
   of pMemory: "5 Memory " & formatAddress(memoryTop)
   of pLog: "6 Log"
   of pSource: "7 Source"
+  of pFuncs: "8 Funcs"
+  of pBreaks: "9 Breaks"
 
 proc drawPaneFrame(pane: PaneId; rect: Rect) =
   drawBox(rect.x, rect.y, rect.w, rect.h, paneTitle(pane), focus == pane)
@@ -716,6 +785,67 @@ proc drawSource(rect: Rect) =
       addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 2, h: 1),
              actToggleBreak, pSource, address)
 
+proc drawFuncs(rect: Rect) =
+  drawPaneFrame(pFuncs, rect)
+  if funcList.len == 0:
+    putStr(rect.x+2, rect.y+2, "no functions", Gray)
+    return
+  if followPc: syncFuncsToPc()
+  let
+    rows = max(0, rect.h-2)
+    current = funcIndexAt(PC)
+  if funcCursor < 0 or funcCursor >= funcList.len:
+    funcCursor = max(0, current)
+  if funcCursor < funcTop: funcTop = funcCursor
+  if funcCursor >= funcTop+rows: funcTop = max(0, funcCursor-rows+1)
+  if current >= 0 and followPc:
+    if current < funcTop: funcTop = current
+    if current >= funcTop+rows: funcTop = max(0, current-rows+1)
+  let nameW = max(4, rect.w-10)
+  for row in 0..<rows:
+    let index = funcTop + row
+    if index >= funcList.len: break
+    let
+      fn = funcList[index]
+      marker = (if index == funcCursor: ">" else: " ") &
+               (if userBreaks[fn.address]: "*" else: " ")
+      name = if fn.name.len > nameW: fn.name[0..<nameW] else: fn.name
+      text = marker & name
+    putStr(rect.x+1, rect.y+1+row, text,
+           if index == current: Green else: White,
+           attrs = if index == funcCursor: {caReverse} else: {})
+    addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
+           actCursor, pFuncs, index)
+    addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 2, h: 1),
+           actToggleBreak, pFuncs, fn.address)
+
+proc drawBreaks(rect: Rect) =
+  drawPaneFrame(pBreaks, rect)
+  if breakList.len == 0:
+    putStr(rect.x+2, rect.y+2, "no breakpoints", Gray)
+    return
+  let rows = max(0, rect.h-2)
+  if breakCursor < 0 or breakCursor >= breakList.len:
+    breakCursor = 0
+  if breakCursor < breakTop: breakTop = breakCursor
+  if breakCursor >= breakTop+rows: breakTop = max(0, breakCursor-rows+1)
+  let nameW = max(4, rect.w-4)
+  for row in 0..<rows:
+    let index = breakTop + row
+    if index >= breakList.len: break
+    let
+      address = breakList[index]
+      marker = if index == breakCursor: ">" else: " "
+      label = formatAddress(address) & " " & symtab.symbolize(address)
+      text = marker & (if label.len > nameW: label[0..<nameW] else: label)
+    putStr(rect.x+1, rect.y+1+row, text,
+           if address == (PC and 0xffff): Green else: Yellow,
+           attrs = if index == breakCursor: {caReverse} else: {})
+    addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: max(0, rect.w-2), h: 1),
+           actCursor, pBreaks, index)
+    addHit(Rect(x: rect.x+1, y: rect.y+1+row, w: 2, h: 1),
+           actToggleBreak, pBreaks, address)
+
 proc drawToolbar(width: int) =
   fillRect(0, 0, width, 1, bg = BarBackground)
   let buttons = [
@@ -765,7 +895,10 @@ proc drawHelp(width, height: int) =
     "s step in   n/F10 step over   f step out   c/F5 continue",
     "Space run/pause   p pause   u run to cursor   r reset",
     "b/F9 breakpoint   i guest input   : command   q quit",
-    "Tab/Shift-Tab or 1..7 focus panes; arrows/PgUp/PgDn scroll",
+    "Tab/Shift-Tab or 1..9 focus panes; arrows/PgUp/PgDn scroll",
+    "Layout: funcs/breaks | disasm + source | regs/stack | display",
+    "Memory and log share the bottom row. Drag any shared border to resize.",
+    "8/9 open a function or breakpoint; b/F9 toggles. :b <sym>  :bc clears.",
     "g re-sync to PC; Enter follows targets; Backspace navigates back",
     "Memory: x/Enter edits a byte while paused. Display: +/- zoom.",
     "Mouse: click panes/addresses/gutters; wheel scrolls; drag borders to resize.",
@@ -803,6 +936,8 @@ proc renderFrame() =
       of pMemory: drawMemory(rect)
       of pLog: drawLog(rect)
       of pSource: drawSource(rect)
+      of pFuncs: drawFuncs(rect)
+      of pBreaks: drawBreaks(rect)
     addDividerHits(layout, size.w, size.h)
   drawBottomBar(size.w, size.h)
   if helpVisible: drawHelp(size.w, size.h)
@@ -836,6 +971,12 @@ proc cursorAddress(): int =
   of pDisasm: disCursor
   of pSource: symtab.addrFor.getOrDefault((sourceFile, sourceCursor), -1)
   of pMemory: memoryCursor
+  of pFuncs:
+    if funcCursor >= 0 and funcCursor < funcList.len: funcList[funcCursor].address
+    else: -1
+  of pBreaks:
+    if breakCursor >= 0 and breakCursor < breakList.len: breakList[breakCursor]
+    else: -1
   else: -1
 
 proc executeCommand(commandLine: string): bool =
@@ -853,6 +994,7 @@ proc executeCommand(commandLine: string): bool =
     for address in 0..userBreaks.high: userBreaks[address] = false
     clearAllBreaks()
     if tempBreak >= 0: setBreak(tempBreak)
+    rebuildBreakList()
     stopReason = "breakpoints cleared"
   of "w":
     if fields.len < 2:
@@ -975,6 +1117,18 @@ proc scrollPane(pane: PaneId; amount: int) =
     sourceTop = max(1, sourceTop+amount)
     sourceCursor = max(1, sourceCursor+amount)
     followPc = false
+  of pFuncs:
+    followPc = false
+    if funcList.len == 0: return
+    funcCursor = max(0, min(funcList.len-1, funcCursor+amount))
+    let rows = 12
+    if funcCursor < funcTop: funcTop = funcCursor
+    if funcCursor >= funcTop+rows: funcTop = max(0, funcCursor-rows+1)
+  of pBreaks:
+    if breakList.len == 0: return
+    breakCursor = max(0, min(breakList.len-1, breakCursor+amount))
+    if breakCursor < breakTop: breakTop = breakCursor
+    if breakCursor >= breakTop+8: breakTop = max(0, breakCursor-7)
   of pStack: discard
   of pRegs: discard
   of pDisplay: setDisplayZoom(displayZoom + (if amount < 0: 1 else: -1))
@@ -1004,6 +1158,17 @@ proc activate(action: HitRect) =
     of pSource:
       sourceCursor = action.value
       followPc = false
+    of pFuncs:
+      if action.value >= 0 and action.value < funcList.len:
+        funcCursor = action.value
+        followPc = false
+        gotoAddress(funcList[funcCursor].address)
+        focus = pFuncs
+    of pBreaks:
+      if action.value >= 0 and action.value < breakList.len:
+        breakCursor = action.value
+        gotoAddress(breakList[breakCursor])
+        focus = pBreaks
     else: discard
   of actDivider:
     dragDivider = DividerKind(action.value)
@@ -1031,8 +1196,8 @@ proc handleMouse(event: tui.Event) =
         activate(hitRects[i])
         return
 
-proc focusOrder(): array[7, PaneId] =
-  [pDisasm, pRegs, pDisplay, pStack, pMemory, pLog, pSource]
+proc focusOrder(): array[9, PaneId] =
+  [pFuncs, pBreaks, pDisasm, pRegs, pDisplay, pStack, pMemory, pLog, pSource]
 
 proc cycleFocus(backward: bool) =
   let
@@ -1051,32 +1216,56 @@ proc cycleFocus(backward: bool) =
   dirty = true
 
 proc selectPane(pane: PaneId) =
-  let size = tuiSize()
+  let
+    size = tuiSize()
+    preview = layoutFor(size.w, size.h)
+  proc visible(id: PaneId): bool = preview.panes[id].w > 0
   case pane
   of pDisasm:
     focus = pDisasm
     displaySwap = false
     sourceSwap = false
+    funcSwap = false
+    breakSwap = false
   of pDisplay:
     if displayMode == displayEmbedded:
       focus = pDisplay
-      if size.w < 100:
+      if not visible(pDisplay):
         displaySwap = true
         sourceSwap = false
+        funcSwap = false
+        breakSwap = false
   of pSource:
     if symtab.loaded:
       focus = pSource
-      if size.w < 170:
+      if not visible(pSource):
         sourceSwap = true
         displaySwap = false
+        funcSwap = false
+        breakSwap = false
+  of pFuncs:
+    if funcList.len > 0 or symtab.loaded:
+      focus = pFuncs
+      if not visible(pFuncs):
+        funcSwap = true
+        breakSwap = false
+        sourceSwap = false
+        displaySwap = false
+  of pBreaks:
+    focus = pBreaks
+    if not visible(pBreaks):
+      breakSwap = true
+      funcSwap = false
+      sourceSwap = false
+      displaySwap = false
   of pStack:
-    focus = if size.w < 100: pRegs else: pStack
+    focus = if visible(pStack): pStack else: pRegs
   of pMemory:
     focus = pMemory
-    if size.h < 30: bottomLog = false
+    if size.h < 28: bottomLog = false
   of pLog:
     focus = pLog
-    if size.h < 30: bottomLog = true
+    if size.h < 28: bottomLog = true
   of pRegs: focus = pRegs
   dirty = true
 
@@ -1127,10 +1316,18 @@ proc handleNormal(event: tui.Event): bool =
     if focus == pMemory: memoryTop = 0; memoryCursor = 0
     elif focus == pDisasm: disTop = 0x1000; disCursor = disTop; followPc = false
     elif focus == pSource: sourceTop = 1; sourceCursor = 1; followPc = false
+    elif focus == pFuncs and funcList.len > 0:
+      funcCursor = 0; funcTop = 0; followPc = false
+    elif focus == pBreaks and breakList.len > 0:
+      breakCursor = 0; breakTop = 0
     dirty = true
   of keyEnd:
     if focus == pMemory: memoryTop = 0xfff0; memoryCursor = 0xffff
     elif focus == pDisasm: disTop = imageEnd and 0xffff; disCursor = disTop; followPc = false
+    elif focus == pFuncs and funcList.len > 0:
+      funcCursor = funcList.len-1; followPc = false
+    elif focus == pBreaks and breakList.len > 0:
+      breakCursor = breakList.len-1
     dirty = true
   of keyLeft:
     if focus == pMemory: memoryCursor = (memoryCursor-1) and 0xffff; dirty = true
@@ -1141,6 +1338,12 @@ proc handleNormal(event: tui.Event): bool =
       let instruction = disasm(mem, disCursor)
       if instruction.target >= 0: gotoAddress(instruction.target)
     elif focus == pSource:
+      let address = cursorAddress()
+      if address >= 0: gotoAddress(address)
+    elif focus == pFuncs:
+      let address = cursorAddress()
+      if address >= 0: gotoAddress(address)
+    elif focus == pBreaks:
       let address = cursorAddress()
       if address >= 0: gotoAddress(address)
     elif focus == pMemory and not running:
@@ -1172,7 +1375,7 @@ proc handleNormal(event: tui.Event): bool =
       if running: confirm = confirmQuit; dirty = true
       else: return false
     of "g":
-      if focus in {pDisasm, pSource}:
+      if focus in {pDisasm, pSource, pFuncs}:
         followPc = true; disCursor = PC; dirty = true
       elif focus == pMemory:
         mode = mEx; exBuffer = "g "; dirty = true
@@ -1188,6 +1391,8 @@ proc handleNormal(event: tui.Event): bool =
     of "5": selectPane(pMemory)
     of "6": selectPane(pLog)
     of "7": selectPane(pSource)
+    of "8": selectPane(pFuncs)
+    of "9": selectPane(pBreaks)
     else: discard
   else: discard
   true
@@ -1276,7 +1481,7 @@ proc runApplication() =
     batch = 100_000
   while active:
     pumpWindowEvents()
-    let event = pollEvent(if running: 0 else: 30)
+    let event = pollEvent(if running and not waiting: 0 else: 30)
     if event.kind != evNone: active = handleEvent(event)
     if not active: break
     if keyFifo.len > 0 and not keyPending(): pushKey(keyFifo.popFirst())

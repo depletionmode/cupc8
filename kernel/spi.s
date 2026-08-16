@@ -35,21 +35,22 @@ spi_write:
     ld r0, $f103  ;read status
     eq r0, #1
     bzf .end
+    wai
     b .wait_0
 .wait_1:
     ld r0, $f113  ;read status
     eq r0, #1
     bzf .end
+    wai
     b .wait_1
 .wait_2:
-    ld r0, $f123  ;read status
-    eq r0, #1
-    bzf .end
-    b .wait_2
+    ; keyboard status is "char ready", not SPI done
+    b .end
 .wait_3:
     ld r0, $f133  ;read status
     eq r0, #1
     bzf .end
+    wai
     b .wait_3
 .end:
     pop pcl
@@ -71,9 +72,13 @@ spi_read:
     st $f100, r0  ;fill tx buffer
     mov r0, #1
     st $f102, r0  ;transact
+.spin_0:
     ld r0, $f103  ;read status
-    eq r0, #0
-    bzf .wait_0
+    eq r0, #1
+    bzf .rx_0
+    wai
+    b .spin_0
+.rx_0:
     ld r0, $f101  ;read rx buffer
     b .end
 .wait_1:
@@ -81,9 +86,13 @@ spi_read:
     st $f110, r0  ;fill tx buffer
     mov r0, #1
     st $f112, r0  ;transact
+.spin_1:
     ld r0, $f113  ;read status
-    eq r0, #0
-    bzf .wait_1
+    eq r0, #1
+    bzf .rx_1
+    wai
+    b .spin_1
+.rx_1:
     ld r0, $f111  ;read rx buffer
     b .end
 .wait_2:
@@ -91,20 +100,20 @@ spi_read:
     st $f120, r0  ;fill tx buffer
     mov r0, #1
     st $f122, r0  ;transact
-    ;ld r0, $f123  ;read status
-    ;eq r0, #0
-    ;bzf .wait_2
     ld r0, $f121  ;read rx buffer
-	eq r0, #255
     b .end
 .wait_3:
     mov r0, #255
     st $f130, r0  ;fill tx buffer
     mov r0, #1
     st $f132, r0  ;transact
+.spin_3:
     ld r0, $f133  ;read status
-    eq r0, #0
-    bzf .wait_3
+    eq r0, #1
+    bzf .rx_3
+    wai
+    b .spin_3
+.rx_3:
     ld r0, $f131  ;read rx buffer
     b .end
 .end:

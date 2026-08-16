@@ -18,7 +18,7 @@ irq_init:
 	st $0016, r0
 	mov r0, #>irq_spi
 	st $0017, r0
-	mov r0, #1
+	mov r0, #9
 	st $f201, r0
 	sti
 	pop pcl

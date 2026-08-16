@@ -4,17 +4,11 @@
 %define		SD_SPI_DEVICE		#2
 
 keyb_read_char:
-	; SoC returns 0xff if no new char in buffer
-	; this call blocks until valid char returned
+	; poll once; if empty, wait for IRQ0 only (not our own SPI irq)
 	push r1
-
 	mov r1, SD_SPI_DEVICE
-	mov r0, #255
 
 .loop:
-	push pch
-	push pcl
-	b spi_write
 	push pch
 	push pcl
 	b spi_read
@@ -22,7 +16,11 @@ keyb_read_char:
 	bzf .idle
 	b .done
 .idle:
+	mov r0, #1
+	st $f201, r0
 	wai
+	mov r0, #9
+	st $f201, r0
 	b .loop
 
 .done:
