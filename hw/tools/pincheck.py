@@ -4,7 +4,8 @@
 Checks, without needing the boards to exist yet:
   1. the generated files are up to date (hw/tools/genpins.py --check)
   2. no GPIO is used twice on an MCU, and every GPIO exists on that part
-  3. the CPU bus and slot signal lists match the connector tables in the docs
+  3. the CPU bus, slot and system-slot signal lists match the connector
+     tables in the docs
   4. the two sides of the CPU bus agree (every signal, opposite directions)
   5. the firmware's pin macros match the ones the firmware source uses
   6. FPGA pin counts fit the package, with the config pins left free
@@ -68,9 +69,11 @@ def pinout_table(path):
 # connector pin name in the docs -> signal name in pins.yaml (any device)
 CPU_SOCKET_MAP = {"RW": "CPU_RW", "/STB": "CPU_nSTB", "/RDY": "CPU_nRDY", "SYNC": "CPU_SYNC",
                   "HALTED": "CPU_HALTED", "WAITING": "CPU_WAITING", "CPU_CLK": "CPU_CLK",
-                  "/CPU_RST": "CPU_nRST", "CFG_SCK": "SYS_SCK", "CFG_MOSI": "SYS_MOSI",
-                  "CFG_SS_n": "nCS_CPUCARD_CFG", "CRESET_n": "CPUCARD_nCRESET",
-                  "CDONE": "CPUCARD_CDONE", "PRSNT1_n": "CPU_PRESENT", "PRSNT2_n": "CPU_PRESENT"}
+                  "/CPU_RST": "CPU_nRST", "FL1_SCK": "FL1_SCK", "FL1_MOSI": "FL1_MOSI",
+                  "FL1_MISO": "FL1_MISO", "FL1_nCS": "FL1_nCS", "CRESET_n": "CPUCARD_nCRESET",
+                  "CDONE": "CPU_CDONE"}
+# CPU socket pins wired to sysctl's expander U1 (or the presence loop), not an FPGA
+CPU_SOCKET_EXPANDER = {"PRSNT1_n", "PRSNT2_n", "CARD_ID0", "CARD_ID1"}
 for _i in range(16):
     CPU_SOCKET_MAP["A%d" % _i] = "CPU_A[%d]" % _i
 for _i in range(8):
@@ -79,7 +82,6 @@ for _i in range(4):
     CPU_SOCKET_MAP["IRQ%d" % _i] = "CPU_IRQ[%d]" % _i
 for _i in range(2):
     CPU_SOCKET_MAP["TMR_EXP%d" % _i] = "CPU_TMR_EXP[%d]" % _i
-    CPU_SOCKET_MAP["CARD_ID%d" % _i] = "CPU_CARD_ID[%d]" % _i
 
 # slot pins: the chipset drives the SPI, sysctl drives the programming port,
 # and the I2C expanders drive the rest (so those have no FPGA/MCU pin)
@@ -87,6 +89,14 @@ SLOT_MAP = {"SCK": "SPI_SCK", "MOSI": "SPI_MOSI", "MISO": "SPI_MISO",
             "CS_n": "SPI_nCS[0]", "IRQ_n": "SLOT_nIRQ[0]",
             "SWCLK": "PROG_CLK", "SWDIO": "PROG_IO"}
 SLOT_EXPANDER = {"CARD_RST_n", "PROG_n", "PRSNT1_n", "PRSNT2_n"}
+
+
+# system slot pins -> sysctl signals (doc/hardware/system-slot.md); the
+# presence loop is wired on the connectors only
+SYSTEM_SLOT_MAP = {"CC1": "CC1_SENSE", "CC2": "CC2_SENSE"}
+for _i in range(3):
+    SYSTEM_SLOT_MAP["MUX_SEL%d" % _i] = "MUX_SEL[%d]" % _i
+SYSTEM_SLOT_LOOP = {"PRSNT1_n", "PRSNT2_n"}
 
 
 def check_generated():
@@ -155,6 +165,8 @@ def check_docs(pins):
     all_names = {n for dev in pins["devices"].values() for _, n, _, _ in flat(dev)}
 
     for doc_name in pinout_table("cpu-bus.md"):
+        if doc_name in CPU_SOCKET_EXPANDER:
+            continue
         mapped = CPU_SOCKET_MAP.get(doc_name)
         if mapped is None:
             err("cpu-bus.md pinout lists %s, which the checker does not know" % doc_name)
@@ -176,6 +188,20 @@ def check_docs(pins):
     for doc_name in set(SLOT_MAP) | SLOT_EXPANDER:
         if doc_name not in slot_pins:
             err("the slot.md pinout is missing %s" % doc_name)
+
+    # the system slot carries all of sysctl's signals except its own UART and LED
+    sysctl = {n for _, n, _, _ in flat(pins["devices"]["sysctl"])}
+    on_card_only = {"DBG_UART_TX", "DBG_UART_RX", "LED_STATUS"}
+    listed = set()
+    for doc_name in pinout_table("system-slot.md"):
+        if doc_name in SYSTEM_SLOT_LOOP:
+            continue
+        mapped = SYSTEM_SLOT_MAP.get(doc_name, doc_name)
+        listed.add(mapped)
+        if mapped not in sysctl:
+            err("system-slot.md lists %s (%s), which sysctl does not have" % (doc_name, mapped))
+    for name in sysctl - on_card_only - listed:
+        err("sysctl has %s, but the system-slot.md pinout does not carry it" % name)
 
     # one chip select and one IRQ line per slot
     chipset = {n for _, n, _, _ in flat(pins["devices"]["chipset"])}

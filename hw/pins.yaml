@@ -14,7 +14,7 @@
 
 meta:
   clock_mhz: 12
-  boards: [mainboard, cpu-card, gpu-card, io-card, wifi-card]
+  boards: [mainboard, cpu-card, system-card, gpu-card, io-card, wifi-card]
 
 devices:
 
@@ -69,11 +69,11 @@ devices:
       misc:
         signals:
           - {name: CLK12, dir: in, role: gbin}
-          - {name: nPOR, dir: in}
+          - {name: nPOR, dir: in, note: from the reset supervisor}
           - {name: GPO, width: 8, dir: out, note: LEDs D1-D8}
           - {name: CPU_nRST, dir: out}
-          - {name: CPU_PRESENT, dir: in}
-          - {name: CPU_CARD_ID, width: 2, dir: in}
+          - {name: PWR_HI, dir: in, note: USB-C source >= 1.5 A (CC comparator)}
+          - {name: CPU_CDONE, dir: in, note: CPU card configured; pulled up (doc/hardware/cpu-bus.md)}
 
   cpu_fpga:
     board: cpu-card
@@ -98,48 +98,60 @@ devices:
           - {name: CPU_nRST, dir: in}
 
   sysctl:
-    board: mainboard
+    board: system-card
     part: RP2040
     lcsc: C2040
     package: QFN-56
-    note: 23 of 30 GPIO used
+    note: >
+      all 30 GPIO used. The two flash buses share SPI1 on its two pin sets
+      (only one flash is programmed at a time); every bus pin is an input
+      unless sysctl holds that FPGA's CRESET_n low (doc/hardware/system-slot.md)
     groups:
-      spi:
-        note: one bus, separate chip selects (flash, chipset config, CPU card config, bridge)
+      bridge:
+        note: SPI0 to the chipset's bus bridge
         signals:
-          - {name: SYS_SCK, gpio: 2, dir: out}
-          - {name: SYS_MOSI, gpio: 3, dir: out}
-          - {name: SYS_MISO, gpio: 4, dir: in}
-          - {name: nCS_FLASH, gpio: 5, dir: out}
-          - {name: nCS_CHIPSET_CFG, gpio: 6, dir: out}
-          - {name: nCS_CPUCARD_CFG, gpio: 7, dir: out}
-          - {name: nCS_BRIDGE, gpio: 8, dir: out}
-      fpga_config:
+          - {name: BR_SCK, gpio: 2, dir: out}
+          - {name: BR_MOSI, gpio: 3, dir: out}
+          - {name: BR_MISO, gpio: 4, dir: in}
+          - {name: BR_nCS, gpio: 5, dir: out}
+      chipset_flash:
+        note: SPI1 (GPIO 10-13) to the chipset's W25Q config flash
         signals:
-          - {name: CHIPSET_nCRESET, gpio: 9, dir: out}
-          - {name: CHIPSET_CDONE, gpio: 10, dir: in}
-          - {name: CPUCARD_nCRESET, gpio: 11, dir: out}
-          - {name: CPUCARD_CDONE, gpio: 12, dir: in}
+          - {name: FL0_SCK, gpio: 10, dir: out}
+          - {name: FL0_MOSI, gpio: 11, dir: out}
+          - {name: FL0_MISO, gpio: 12, dir: in}
+          - {name: FL0_nCS, gpio: 13, dir: out}
+          - {name: CHIPSET_nCRESET, gpio: 6, dir: out, note: open drain}
+          - {name: CHIPSET_CDONE, gpio: 7, dir: in}
+      cpucard_flash:
+        note: SPI1 (GPIO 14, 15, 8, 9) to the CPU card's W25Q, through the CPU socket
+        signals:
+          - {name: FL1_SCK, gpio: 14, dir: out}
+          - {name: FL1_MOSI, gpio: 15, dir: out}
+          - {name: FL1_MISO, gpio: 8, dir: in}
+          - {name: FL1_nCS, gpio: 9, dir: out}
+          - {name: CPUCARD_nCRESET, gpio: 16, dir: out, note: open drain}
+          - {name: CPUCARD_CDONE, gpio: 17, dir: in}
       cards:
         note: one programming port muxed to the slots (SWD for RP2040, UART for ESP32)
         signals:
-          - {name: PROG_CLK, gpio: 13, dir: inout}
-          - {name: PROG_IO, gpio: 14, dir: inout}
-          - {name: MUX_SEL, width: 3, gpio: [15, 16, 17], dir: out}
+          - {name: PROG_CLK, gpio: 18, dir: inout}
+          - {name: PROG_IO, gpio: 19, dir: inout}
+          - {name: MUX_SEL, width: 3, gpio: [20, 21, 22], dir: out}
       i2c:
-        note: two TCA9555 expanders drive CARD_RST_n, PROG_n and read PRSNT
+        note: I2C0 to two TCA9555 expanders (CARD_RST_n, PROG_n, presence)
         signals:
-          - {name: I2C_SDA, gpio: 18, dir: inout}
-          - {name: I2C_SCL, gpio: 19, dir: out}
+          - {name: I2C_SDA, gpio: 24, dir: inout}
+          - {name: I2C_SCL, gpio: 25, dir: out}
       misc:
         signals:
-          - {name: CLK12_OUT, gpio: 21, dir: out, note: 12 MHz to both FPGAs}
-          - {name: nPOR_OUT, gpio: 20, dir: out}
+          - {name: SYS_nRST, gpio: 23, dir: out, note: open drain onto the reset supervisor output}
           - {name: DBG_UART_TX, gpio: 0, dir: out}
           - {name: DBG_UART_RX, gpio: 1, dir: in}
           - {name: CC1_SENSE, gpio: 26, dir: adc}
           - {name: CC2_SENSE, gpio: 27, dir: adc}
           - {name: V1V2_SENSE, gpio: 28, dir: adc}
+          - {name: LED_STATUS, gpio: 29, dir: out}
 
   gpu_mcu:
     board: gpu-card
@@ -220,6 +232,10 @@ connectors:
     type: PCIe x8 card edge, 98 contacts
     lcsc: C404111
     pins_file: doc/hardware/cpu-bus.md
+  system_slot:
+    type: PCIe x4 card edge, 64 contacts
+    lcsc: C19188869
+    pins_file: doc/hardware/system-slot.md
   slot:
     type: PCIe x1 card edge, 36 contacts
     lcsc: C404113

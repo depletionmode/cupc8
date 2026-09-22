@@ -35,7 +35,7 @@ discrete-logic CPU card must both pass the same conformance testbench
 | Signal | Driver | Meaning |
 |---|---|---|
 | CPU_CLK | chipset | Bus clock |
-| /CPU_RST | chipset | Active-low reset. It is asserted for ≥ 16 CPU_CLK edges at power-up, by sysctl, and by the reset button. While it is low the card must drive /STB high and must not drive D. |
+| /CPU_RST | chipset | Active-low reset. The chipset holds it from power-on until CDONE is high, then for 16 more CPU_CLK edges. The system card can assert it through the bridge (`CPU_CTL` bit 6), and so does the reset button (through the board's reset supervisor). While it is low the card must drive /STB high and must not drive D. |
 | A[15:0] | card | Address, valid while /STB is low |
 | RW | card | 1 = read, 0 = write, valid while /STB is low |
 | D[7:0] | both | Data. The card drives it only during write cycles. The chipset drives it only during read cycles, and only in the clock where it asserts /RDY. |
@@ -46,7 +46,7 @@ discrete-logic CPU card must both pass the same conformance testbench
 | TMR_EXP[1:0] | card | A one-clock high pulse when timer 0/1 crosses to zero. The chipset latches it into IRQ_PEND bits 1/2. |
 | HALTED | card | High after `HALT` executes, until reset |
 | WAITING | card | High while `WAI` is waiting for an IRQ |
-| CRESET_n, CDONE, CFG_SCK, CFG_MOSI, CFG_SS_n | sysctl ↔ card | FPGA-card configuration only. A card without an FPGA leaves these unconnected. |
+| CRESET_n, CDONE, FL1_SCK, FL1_MOSI, FL1_MISO, FL1_nCS | card ↔ system card | The FPGA card's own configuration flash: the FPGA boots from it by itself (SPI master mode). The system card, when fitted, holds CRESET_n low and reprograms the flash through these lines. CDONE also goes to the chipset, which keeps the CPU in reset until it is high. The main board pulls CRESET_n and CDONE up and FL1_nCS up. A card without an FPGA leaves them all unconnected, so it reads as configured. |
 | CARD_ID[1:0] | card | Card type, set by straps to GND: `11` = none (pull-ups), `10` = FPGA CPU card, `01` = discrete CPU card, `00` = reserved |
 | PRSNT1_n / PRSNT2_n | card | A1 is GND on the main board. The card joins A1 to B49 (PRSNT2_n). The main board sees PRSNT2_n low only when the card is fully seated. |
 
@@ -165,7 +165,7 @@ budget.
   - 5× +5V and 3× +3V3, about 1 A per contact.
   - 34× GND. Every bus signal has a GND on at least one neighbour, and
     CPU_CLK has GND on both neighbours and opposite.
-  - 10 reserved pins for M2 (for example microcode-step debug on a discrete
+  - 9 reserved pins for M2 (for example microcode-step debug on a discrete
     card).
 - **Unused pins:** RSVD pins are left unconnected on both sides. The main
   board routes them to test pads.
@@ -179,9 +179,9 @@ budget.
 | 5 | +3V3 | CRESET_n |
 | 6 | +3V3 | CDONE |
 | 7 | +3V3 | GND |
-| 8 | GND | CFG_SCK |
-| 9 | CARD_ID0 | CFG_MOSI |
-| 10 | CARD_ID1 | CFG_SS_n |
+| 8 | GND | FL1_SCK |
+| 9 | CARD_ID0 | FL1_MOSI |
+| 10 | CARD_ID1 | FL1_nCS |
 | 11 | GND | GND |
 | — | *key* | *key* |
 | 12 | GND | GND |
@@ -210,7 +210,7 @@ budget.
 | 35 | IRQ0 | A14 |
 | 36 | GND | GND |
 | 37 | IRQ1 | A15 |
-| 38 | IRQ2 | RSVD_A1 |
+| 38 | IRQ2 | FL1_MISO |
 | 39 | GND | GND |
 | 40 | IRQ3 | RSVD_A2 |
 | 41 | TMR_EXP0 | RSVD_A3 |

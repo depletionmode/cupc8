@@ -375,6 +375,15 @@ cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chips
 # ============================================================================
 # SYN / FML: synthesis-level checks on both FPGA designs
 # ============================================================================
+
+[[test]]
+id = "RST-001"
+title = "CPU reset follows the CPU card's CDONE"
+checks = "no sysctl needed: /CPU_RST held from power-on until the CPU card's CDONE plus 16 clocks, reported in bridge STATUS bit 7; CDONE dropping (a reconfiguration, or a glitch) resets the CPU again"
+method = "tb_chipset section RST-001, plus start-up checks in every section"
+kind = "sim"
+vrow = "1.5"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=RST-001"
 [[test]]
 id = "SYN-001"
 title = "Post-synthesis lockstep (Verilator netlist)"
@@ -629,26 +638,29 @@ vrow = "2.6"
 [[test]]
 id = "SYS-001"
 title = "USB command protocol"
-checks = "every cupc8.py command, including malformed ones"
-method = "host tests on fw/sysctl/core"
+checks = "every USB command and its argument checks, framing, CRC, resync after noise, stale-frame drop, and commands refused while the chipset is down or a flash is not held"
+method = "fw/test/test_sysctl.c against the machine models in fw/test/sysmodels.c"
 kind = "sim"
 vrow = "2.7"
+cmd = "make -s -C fw test_sysctl"
 
 [[test]]
 id = "SYS-002"
 title = "FPGA configuration"
-checks = "flash programming and CRAM load for both FPGAs; CDONE handling; failure reporting"
-method = "host tests with an iCE40 configuration model"
+checks = "both FPGAs: hold, erase, program, read back, reboot to CDONE; never touching a flash its FPGA owns; a wrong image and a stuck flash bit are reported; the machine then boots with no system card"
+method = "fw/test/test_sysctl.c: W25Q and self-booting iCE40 models"
 kind = "sim"
 vrow = "2.7"
+cmd = "make -s -C fw test_sysctl"
 
 [[test]]
 id = "SYS-003"
 title = "ROM programming flow"
-checks = "erase, program, verify and retry through the bridge; interruption recovers"
-method = "host tests against the bridge + SST39 model"
+checks = "ROM ID, sector and chip erase, program with DQ7 polling and read-back ($F0 data included), verify failures with their address, CPU stopped while writing and restored after, recovery after an interrupted write, erase timeout"
+method = "fw/test/test_sysctl.c: bridge (byte-exact to bridge.vhd) + SST39 models"
 kind = "sim"
 vrow = "2.7"
+cmd = "make -s -C fw test_sysctl"
 
 [[test]]
 id = "SYS-004"
@@ -661,14 +673,16 @@ vrow = "2.7"
 [[test]]
 id = "SYS-005"
 title = "Power policy"
-checks = "CC voltage → advertised current; Wi-Fi card held in reset on a weak source; the --force override"
-method = "host tests"
+checks = "CC voltage to USB-C source class at every boundary; sysctl drives no card line at start-up, and holding one card in reset drives only that line"
+method = "fw/test/test_sysctl.c; the power policy itself is KRN-004 (kernel refuses net under 1.5 A)"
 kind = "sim"
 vrow = "2.7"
 
 # ============================================================================
 # HOST: host tools
 # ============================================================================
+cmd = "make -s -C fw test_sysctl"
+
 [[test]]
 id = "HOST-001"
 title = "jlcparts.py"

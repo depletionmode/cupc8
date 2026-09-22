@@ -1,6 +1,5 @@
 /*
- * The USB command protocol and the power-up sequence
- * (doc/hardware/sysctl.md, "USB protocol" and "Power-up sequence").
+ * The USB command protocol (doc/hardware/sysctl.md, "USB protocol").
  */
 #include "sysctl.h"
 
@@ -10,16 +9,16 @@
 #define FRAME_MS     100                  /* a frame older than this is dropped */
 #define ROM_SIZE     0x80000u
 #define FLASH_SIZE   0x400000u
-#define SLOT_TABLE   0x0002
+#define RESET_MS     10                   /* SYS_nRST pulse */
 
 enum {
 	C_PING = 0x00, C_STATUS = 0x01,
 	C_RAM_READ = 0x10, C_RAM_WRITE = 0x11,
 	C_ROM_READ = 0x20, C_ROM_ERASE = 0x21, C_ROM_PROGRAM = 0x22, C_ROM_ID = 0x23,
-	C_CPU_CTL = 0x30, C_TRACE = 0x31,
-	C_FLASH_READ = 0x40, C_FLASH_ERASE = 0x41, C_FLASH_PROGRAM = 0x42,
-	C_FPGA_BOOT = 0x43, C_FPGA_LOAD = 0x44,
-	C_POWER = 0x50, C_POWER_FORCE = 0x51, C_CARD_RESET = 0x52,
+	C_CPU_CTL = 0x30, C_TRACE = 0x31, C_RESET = 0x32,
+	C_FLASH_READ = 0x40, C_FLASH_ERASE = 0x41, C_FLASH_PROGRAM = 0x42, C_FLASH_ID = 0x43,
+	C_FPGA_HOLD = 0x44, C_FPGA_BOOT = 0x45,
+	C_POWER = 0x50, C_CARD_RESET = 0x52,
 };
 
 static uint8_t reply_buf[4 + SYS_MAX_PAYLOAD + 1];
@@ -49,16 +48,23 @@ static void reply(sysctl_t *s, uint8_t status, int n)
 	s->hal->usb_write(s->ctx, reply_buf, 5 + n);
 }
 
-static int power_payload(sysctl_t *s, uint8_t *out)
+static int cc_mv(sysctl_t *s)
 {
 	int cc1 = s->hal->adc_mv(s->ctx, ADC_CC1), cc2 = s->hal->adc_mv(s->ctx, ADC_CC2);
-	int cc = cc1 > cc2 ? cc1 : cc2;
-	out[0] = s->power_class;
-	out[1] = (uint8_t)cc;
-	out[2] = (uint8_t)(cc >> 8);
-	out[3] = s->held_slots;
-	out[4] = s->power_forced;
-	return 5;
+	return cc1 > cc2 ? cc1 : cc2;
+}
+
+/* the bridge is chipset logic: it answers only while the chipset runs */
+static bool chipset_up(sysctl_t *s)
+{
+	return !(s->held & (1u << FPGA_CHIPSET)) && fpga_done(s, FPGA_CHIPSET);
+}
+
+static int flash_target(sysctl_t *s, uint8_t t)
+{
+	if (t > FPGA_CPUCARD)
+		return ST_ARG;
+	return s->held & (1u << t) ? ST_OK : ST_NOTHELD;   /* else the FPGA owns the bus */
 }
 
 /* one request; returns the status, with the reply payload length in *rn */
@@ -69,6 +75,7 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 	*rn = 0;
 
 	switch (cmd) {
+	/* ---- no hardware needed */
 	case C_PING: {
 		static const char id[] = "CUPC8 sysctl " SYSCTL_VERSION;
 		if (n != 0)
@@ -80,137 +87,155 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 	case C_STATUS: {
 		if (n != 0)
 			return ST_ARG;
-		int v12 = s->hal->adc_mv(s->ctx, ADC_V1V2);
-		uint8_t pw[5];
-		power_payload(s, pw);
-		out[0] = br_status(s);
-		out[1] = br_gpo(s);
-		out[2] = s->cdone;
-		out[3] = pw[0];
-		out[4] = pw[1];
-		out[5] = pw[2];
-		out[6] = (uint8_t)v12;
-		out[7] = (uint8_t)(v12 >> 8);
-		out[8] = s->held_slots;
-		out[9] = s->boot_status;
-		*rn = 10;
+		bool up = chipset_up(s);
+		int cc = cc_mv(s), v12 = s->hal->adc_mv(s->ctx, ADC_V1V2);
+		out[0] = up ? br_status(s) : 0;
+		out[1] = up ? br_gpo(s) : 0;
+		out[2] = (uint8_t)(fpga_done(s, FPGA_CHIPSET) | fpga_done(s, FPGA_CPUCARD) << 1);
+		out[3] = s->held;
+		out[4] = power_class_of(cc, cc);
+		out[5] = (uint8_t)cc;
+		out[6] = (uint8_t)(cc >> 8);
+		out[7] = (uint8_t)v12;
+		out[8] = (uint8_t)(v12 >> 8);
+		out[9] = s->reset_slots;
+		out[10] = cpu_card_present(s);
+		*rn = 11;
 		return ST_OK;
 	}
-	case C_RAM_READ: {
-		if (n != 4)
-			return ST_ARG;
-		uint32_t len = le16(p + 2);
-		if (len == 0 || len > SYS_MAX_PAYLOAD)
-			return ST_ARG;
-		br_ram_read(s, (uint16_t)le16(p), out, (int)len);
-		*rn = (int)len;
-		return ST_OK;
-	}
-	case C_RAM_WRITE:
-		if (n < 3)
-			return ST_ARG;
-		br_ram_write(s, (uint16_t)le16(p), p + 2, n - 2);
-		return ST_OK;
-	case C_ROM_READ: {
-		if (n != 5)
-			return ST_ARG;
-		uint32_t addr = le24(p), len = le16(p + 3);
-		if (len == 0 || len > SYS_MAX_PAYLOAD || addr + len > ROM_SIZE)
-			return ST_ARG;
-		br_rom_read(s, addr, out, (int)len);
-		*rn = (int)len;
-		return ST_OK;
-	}
-	case C_ROM_ERASE: {
-		if (n != 6)
-			return ST_ARG;
-		uint32_t addr = le24(p), len = le24(p + 3);
-		if (addr + len > ROM_SIZE)
-			return ST_ARG;
-		return rom_erase(s, addr, len);
-	}
-	case C_ROM_PROGRAM: {
-		if (n < 4 || le24(p) + (uint32_t)(n - 3) > ROM_SIZE)
-			return ST_ARG;
-		r = rom_program(s, le24(p), p + 3, n - 3, &bad);
-		break;
-	}
-	case C_ROM_ID:
+	case C_POWER: {
 		if (n != 0)
 			return ST_ARG;
-		*rn = 2;
-		return rom_id(s, &out[0], &out[1]);
-	case C_CPU_CTL:
-		if (n != 1)
-			return ST_ARG;
-		br_cpu_ctl(s, p[0]);
-		out[0] = br_status(s);
-		*rn = 1;
-		return ST_OK;
-	case C_TRACE:
-		if (n != 0)
-			return ST_ARG;
-		*rn = br_trace(s, out);
-		return ST_OK;
-	case C_FLASH_READ: {
-		if (n != 5)
-			return ST_ARG;
-		uint32_t addr = le24(p), len = le16(p + 3);
-		if (len == 0 || len > SYS_MAX_PAYLOAD || addr + len > FLASH_SIZE)
-			return ST_ARG;
-		fl_read(s, addr, out, (int)len);
-		*rn = (int)len;
+		int cc = cc_mv(s);
+		out[0] = power_class_of(cc, cc);
+		out[1] = (uint8_t)cc;
+		out[2] = (uint8_t)(cc >> 8);
+		*rn = 3;
 		return ST_OK;
 	}
-	case C_FLASH_ERASE: {
-		if (n != 6)
-			return ST_ARG;
-		uint32_t addr = le24(p), len = le24(p + 3);
-		if (len == 0 || addr + len > FLASH_SIZE)
-			return ST_ARG;
-		return fl_erase(s, addr, len);
-	}
-	case C_FLASH_PROGRAM:
-		if (n < 4 || le24(p) + (uint32_t)(n - 3) > FLASH_SIZE)
-			return ST_ARG;
-		r = fl_program(s, le24(p), p + 3, n - 3, &bad);
-		break;
-	case C_FPGA_BOOT:
-		if (n != 1 || p[0] > 1)
-			return ST_ARG;
-		return fpga_boot(s, p[0]);
-	case C_FPGA_LOAD:
-		if (n < 2 || p[0] > 1)
-			return ST_ARG;
-		if (p[1] == 0 && n == 2) {
-			s->load_target = p[0];
-			fpga_load_begin(s, p[0]);
-			return ST_OK;
-		}
-		if (s->load_target != p[0])
-			return ST_ARG;                    /* data or end without a begin */
-		if (p[1] == 1)
-			return fpga_load_data(s, p[0], p + 2, n - 2);
-		if (p[1] == 2 && n == 2) {
-			s->load_target = -1;
-			return fpga_load_end(s, p[0]);
-		}
-		return ST_ARG;
-	case C_POWER:
-		if (n != 0)
-			return ST_ARG;
-		*rn = power_payload(s, out);
-		return ST_OK;
-	case C_POWER_FORCE:
-		if (n != 1)
-			return ST_ARG;
-		power_force(s, p[0] != 0);
-		*rn = power_payload(s, out);
-		return ST_OK;
 	case C_CARD_RESET:
 		if (n != 2)
 			return ST_ARG;
 		return card_reset(s, p[0], p[1] != 0);
+	case C_RESET:
+		if (n != 0)
+			return ST_ARG;
+		s->hal->pin_write(s->ctx, HAL_SYS_NRST, false);
+		s->hal->delay_us(s->ctx, RESET_MS * 1000);
+		s->hal->pin_write(s->ctx, HAL_SYS_NRST, true);
+		return ST_OK;
+
+	/* ---- FPGAs and their flash */
+	case C_FPGA_HOLD:
+		if (n != 1 || p[0] > FPGA_CPUCARD)
+			return ST_ARG;
+		fpga_hold(s, p[0]);
+		return ST_OK;
+	case C_FPGA_BOOT:
+		if (n != 1 || p[0] > FPGA_CPUCARD)
+			return ST_ARG;
+		return fpga_boot(s, p[0]);
+	case C_FLASH_ID:
+		if (n != 1)
+			return ST_ARG;
+		if ((r = flash_target(s, p[0])) != ST_OK)
+			return r;
+		fl_id(s, p[0], out);
+		*rn = 3;
+		return ST_OK;
+	case C_FLASH_READ: {
+		if (n != 6)
+			return ST_ARG;
+		uint32_t addr = le24(p + 1), len = le16(p + 4);
+		if (len == 0 || len > SYS_MAX_PAYLOAD || addr + len > FLASH_SIZE)
+			return ST_ARG;
+		if ((r = flash_target(s, p[0])) != ST_OK)
+			return r;
+		fl_read(s, p[0], addr, out, (int)len);
+		*rn = (int)len;
+		return ST_OK;
+	}
+	case C_FLASH_ERASE: {
+		if (n != 7)
+			return ST_ARG;
+		uint32_t addr = le24(p + 1), len = le24(p + 4);
+		if (len == 0 || addr + len > FLASH_SIZE)
+			return ST_ARG;
+		if ((r = flash_target(s, p[0])) != ST_OK)
+			return r;
+		return fl_erase(s, p[0], addr, len);
+	}
+	case C_FLASH_PROGRAM:
+		if (n < 5 || le24(p + 1) + (uint32_t)(n - 4) > FLASH_SIZE)
+			return ST_ARG;
+		if ((r = flash_target(s, p[0])) != ST_OK)
+			return r;
+		r = fl_program(s, p[0], le24(p + 1), p + 4, n - 4, &bad);
+		break;
+
+	/* ---- through the chipset's bridge */
+	case C_RAM_READ: case C_RAM_WRITE: case C_ROM_READ: case C_ROM_ERASE:
+	case C_ROM_PROGRAM: case C_ROM_ID: case C_CPU_CTL: case C_TRACE:
+		if (!chipset_up(s))
+			return ST_NOCHIPSET;
+		switch (cmd) {
+		case C_RAM_READ: {
+			if (n != 4)
+				return ST_ARG;
+			uint32_t len = le16(p + 2);
+			if (len == 0 || len > SYS_MAX_PAYLOAD)
+				return ST_ARG;
+			br_ram_read(s, (uint16_t)le16(p), out, (int)len);
+			*rn = (int)len;
+			return ST_OK;
+		}
+		case C_RAM_WRITE:
+			if (n < 3)
+				return ST_ARG;
+			br_ram_write(s, (uint16_t)le16(p), p + 2, n - 2);
+			return ST_OK;
+		case C_ROM_READ: {
+			if (n != 5)
+				return ST_ARG;
+			uint32_t addr = le24(p), len = le16(p + 3);
+			if (len == 0 || len > SYS_MAX_PAYLOAD || addr + len > ROM_SIZE)
+				return ST_ARG;
+			br_rom_read(s, addr, out, (int)len);
+			*rn = (int)len;
+			return ST_OK;
+		}
+		case C_ROM_ERASE: {
+			if (n != 6)
+				return ST_ARG;
+			uint32_t addr = le24(p), len = le24(p + 3);
+			if (addr + len > ROM_SIZE)
+				return ST_ARG;
+			return rom_erase(s, addr, len);
+		}
+		case C_ROM_PROGRAM:
+			if (n < 4 || le24(p) + (uint32_t)(n - 3) > ROM_SIZE)
+				return ST_ARG;
+			r = rom_program(s, le24(p), p + 3, n - 3, &bad);
+			break;
+		case C_ROM_ID:
+			if (n != 0)
+				return ST_ARG;
+			*rn = 2;
+			return rom_id(s, &out[0], &out[1]);
+		case C_CPU_CTL:
+			if (n != 1)
+				return ST_ARG;
+			br_cpu_ctl(s, p[0]);
+			out[0] = br_status(s);
+			*rn = 1;
+			return ST_OK;
+		default: /* C_TRACE */
+			if (n != 0)
+				return ST_ARG;
+			*rn = br_trace(s, out);
+			return ST_OK;
+		}
+		break;
 	default:
 		return ST_CMD;
 	}
@@ -263,61 +288,8 @@ void sysctl_poll(sysctl_t *s)
 
 void sysctl_init(sysctl_t *s, const sysctl_hal *hal, void *ctx)
 {
+	/* touches nothing on the machine: it runs whether or not sysctl is here */
 	memset(s, 0, sizeof *s);
 	s->hal = hal;
 	s->ctx = ctx;
-	s->load_target = -1;
-}
-
-int sysctl_boot(sysctl_t *s)
-{
-	const sysctl_hal *h = s->hal;
-	int r;
-
-	/* every card in reset until the FPGAs are up */
-	s->reset_slots = 0x3F;
-	expander_apply(s);
-
-	uint32_t start = h->now_ms(s->ctx);
-	for (;;) {
-		int mv = h->adc_mv(s->ctx, ADC_V1V2);
-		if (mv >= 1140 && mv <= 1260)
-			break;
-		if (h->now_ms(s->ctx) - start > 100)
-			return s->boot_status = ST_TIMEOUT;
-		h->delay_us(s->ctx, 1000);
-	}
-
-	if ((r = fpga_boot(s, 0)) != ST_OK)
-		return s->boot_status = (uint8_t)r;
-	br_cpu_ctl(s, 0x40);                      /* /CPU_RST */
-	bool cpu = cpu_card_present(s);
-	if (cpu && (r = fpga_boot(s, 1)) != ST_OK)
-		return s->boot_status = (uint8_t)r;
-
-	s->reset_slots = 0;
-	expander_apply(s);
-	br_cpu_ctl(s, 0x00);
-	if (!cpu) {
-		/* no CPU card: no boot ROM run and no slot table, but sysctl, the
-		 * chipset and ROM/RAM programming all work */
-		power_update(s);
-		return s->boot_status = ST_OK;
-	}
-
-	/* the boot ROM's slot probe is done once POST passes $04 */
-	start = h->now_ms(s->ctx);
-	for (;;) {
-		uint8_t gpo = br_gpo(s);
-		if (gpo >= 0x08 && gpo <= 0x80)
-			break;
-		if (h->now_ms(s->ctx) - start > 2000) {
-			power_update(s);                  /* no slot table: no card is held */
-			return s->boot_status = ST_TIMEOUT;
-		}
-		h->delay_us(s->ctx, 1000);
-	}
-	br_ram_read(s, SLOT_TABLE, s->slot_types, 6);
-	power_update(s);
-	return s->boot_status = ST_OK;
 }

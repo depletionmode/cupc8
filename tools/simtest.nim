@@ -1122,6 +1122,41 @@ proc testKernelNetwork() =
 
 run testKernelNetwork
 
+proc testKernelNetWeakPower() =
+  ## KRN-004: on a USB source under 1.5 A (SYSCTL.PWR_HI = 0) the "net"
+  ## command refuses to start the radio, and says why.
+  echo "== kernel networking on a weak USB source =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo, CardWifi])
+  cpuReset()
+  pwrHi = false
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+  var n = 0
+  while n < 6_000_000 and not waiting:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("kernel ready for input", waiting)
+  for ch in "net" & "\r":
+    pushKey(ord(ch))
+    var m = 0
+    while m < 400_000 and not waiting:
+      if cpuStep() != sOk: break
+      inc m
+    if waiting:
+      discard cpuStep()
+  n = 0
+  while n < 400_000 and gpuFind(g, "net off") < 0:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("weak source refused with a message", gpuFind(g, "USB power under 1.5A: net off") >= 0)
+  expectTrue("no network timeout (the radio was never used)", gpuFind(g, "net timeout") < 0)
+  pwrHi = true
+  ioModel = imLegacy
+
+run testKernelNetWeakPower
+
 if failures > 0:
   echo "FAILED ", failures, " check(s)"
   quit(1)

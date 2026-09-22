@@ -14,7 +14,7 @@ use ieee.numeric_std.all;
 entity chipset is
 	port(
 		clk:			in std_logic;
-		n_por:			in std_logic;						-- power-on reset (sysctl)
+		n_por:			in std_logic;						-- power-on reset (the board's supervisor)
 
 		-- CPU bus
 		cpu_a:			in std_logic_vector(15 downto 0);
@@ -30,8 +30,8 @@ entity chipset is
 		cpu_halted:		in std_logic;
 		cpu_waiting:	in std_logic;
 		cpu_n_rst:		out std_logic;
-		cpu_present:	in std_logic;						-- PRSNT2_n inverted
-		cpu_card_id:	in std_logic_vector(1 downto 0);
+		cpu_cdone:		in std_logic;						-- CPU card configured (pulled up: a
+															-- discrete card or no card reads '1')
 
 		-- memory bus (SRAM + ROM chip)
 		mem_a:			out std_logic_vector(18 downto 0);
@@ -51,6 +51,7 @@ entity chipset is
 		slot_n_irq:		in std_logic_vector(5 downto 0);
 
 		gpo:			out std_logic_vector(7 downto 0);
+		pwr_hi:			in std_logic;						-- USB-C source advertises >= 1.5 A
 
 		-- bridge (sysctl)
 		br_sck:			in std_logic;
@@ -63,6 +64,10 @@ end entity;
 architecture rtl of chipset is
 	signal rst: std_logic := '1';
 	signal por_cnt: unsigned(4 downto 0) := (others => '0');
+	signal cdone_s: std_logic_vector(1 downto 0) := "00";
+	signal pwr_s: std_logic_vector(1 downto 0) := "00";
+	signal cdone_cnt: unsigned(4 downto 0) := (others => '0');
+	signal cpu_hold: std_logic := '1';			-- until the CPU card is configured
 
 	-- CPU front-end
 	signal cyc_busy: std_logic := '0';
@@ -120,7 +125,7 @@ begin
 	cpu_d_out <= dout_r;
 	cpu_d_oe <= '1' when rdy_r = '0' and cyc_rw = '1' else '0';
 	cpu_irq <= pending and mask;
-	cpu_n_rst <= '0' when rst = '1' or br_ctl(6) = '1' else '1';
+	cpu_n_rst <= '0' when rst = '1' or cpu_hold = '1' or br_ctl(6) = '1' else '1';
 
 	mem_a <= std_logic_vector(ma_r);
 	mem_d_out <= md_r;
@@ -133,7 +138,8 @@ begin
 	gpo <= gpo_r;
 	spi_n_cs <= spi_cs8(6 downto 0);
 
-	br_status <= rst & (cpu_present and not cpu_n_stb) & cpu_card_id & cpu_present &
+	-- CPU card presence and ID are on sysctl's expander, not here: bits 5:3 read 0
+	br_status <= (rst or cpu_hold or br_ctl(6)) & (not cpu_n_stb) & "000" &
 				 cpu_waiting & cpu_halted &
 				 (br_ctl(0) and not step_instr and not step_cycle);
 
@@ -178,6 +184,20 @@ begin
 				rst <= '1';
 			else
 				rst <= '0';
+			end if;
+
+			-- the machine boots without sysctl: the CPU stays in reset until the
+			-- CPU card's FPGA reports CDONE, then 16 more clocks for its start-up
+			cdone_s <= cdone_s(0) & cpu_cdone;
+			pwr_s <= pwr_s(0) & pwr_hi;
+			if rst = '1' or cdone_s(1) = '0' then
+				cdone_cnt <= (others => '0');
+				cpu_hold <= '1';
+			elsif cdone_cnt /= 16 then
+				cdone_cnt <= cdone_cnt + 1;
+				cpu_hold <= '1';
+			else
+				cpu_hold <= '0';
 			end if;
 
 			spi_start <= '0';
@@ -319,7 +339,7 @@ begin
 								when x"02" =>
 									rd := "00" & slot_s2;
 								when x"03" =>
-									rd := "0000000" & rom_off;
+									rd := "000000" & pwr_s(1) & rom_off;
 									if cpu_rw = '0' then rom_off <= cpu_d_in(0); end if;
 								when x"04" =>
 									rd := rom_bank;

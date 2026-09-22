@@ -29,6 +29,7 @@ net_f_close db 23, 0
 
 net_s_timeout db "\nnet timeout\n"
 net_s_nocard db "\nno wifi card\n"
+net_s_weak db "\nUSB power under 1.5A: net off\n"
 
 net_spi: resb 1
 net_tmp: resb 1
@@ -168,6 +169,11 @@ net_cmd:
 	ld r0, [net_spi]
 	eq r0, #0xff
 	bzf .no_card
+	; the radio's bursts need a 1.5 A source (SYSCTL bit 1, doc/hardware/power.md)
+	ld r0, $f203
+	and r0, #2
+	eq r0, #0
+	bzf .weak
 
 	; join
 	mov r0, #<[net_f_join]
@@ -363,6 +369,13 @@ net_cmd:
 .timeout:
 	mov r0, #>[net_s_timeout]
 	mov r1, #<[net_s_timeout]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.weak:
+	mov r0, #>[net_s_weak]
+	mov r1, #<[net_s_weak]
 	push pch
 	push pcl
 	b str_printstr

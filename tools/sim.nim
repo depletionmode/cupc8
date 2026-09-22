@@ -97,6 +97,7 @@ var
   slots*: array[6, SimCard]      # slot n = SPI device n; nil = empty
   rom*: seq[uint8]               # the ROM chip (512 KB)
   romOff*: bool = false
+  pwrHi*: bool = true            # USB-C source >= 1.5 A (a board input, kept across reset)
   romBank*: int = 0
   spiTxR, spiRxR, spiCfgR: array[8, int]
   spiHold*: int = -1             # device selected by SPI_CS, -1 = none
@@ -350,7 +351,7 @@ proc cardsLoad(address: int): int =
     of 0: irqPending
     of 1: irqMask
     of 2: slotIrqBits()
-    of 3: (if romOff: 1 else: 0)
+    of 3: (if romOff: 1 else: 0) or (if pwrHi: 2 else: 0)
     of 4: romBank
     else: 0
   else: 0

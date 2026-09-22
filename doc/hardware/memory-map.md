@@ -38,7 +38,7 @@ in the SRAM but are never selected.
 | $f200 | R/W1C | IRQ_PEND | pending IRQ bits 3:0; bits 7:4 read 0 |
 | $f201 | R/W | IRQ_MASK | bits 3:0, 1 = enabled; bits 7:4 read 0 |
 | $f202 | R | **SLOT_IRQ** (new) | bit n = SPI dev n (slots 1–6 → bits 0–5) is currently asserting IRQ_n (level, live). Bits 7:6 read 0. |
-| $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bits 7:1 reserved, read 0. |
+| $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bit 1 `PWR_HI`, read-only: the USB-C source advertises at least 1.5 A (a comparator on CC, so it works without the system card). The kernel's `net` command refuses to start the radio when it is 0. Bits 7:2 reserved, read 0. |
 | $f204 | R/W | **ROM_BANK** (new) | Bank for the $e800 window, 0–255 (reset 0) |
 
 ### SPI devices
@@ -137,7 +137,7 @@ type from `IDENT` (`$00` = empty). It lives in the reserved $0002–$000f area.
 ## In-system programming (bus bridge)
 
 The chipset FPGA contains an SPI-slave **bus bridge** connected to the sysctl
-RP2040. The chipset sits in-line between the CPU card and memory, so the CPU
+RP2040 on the system card. The chipset sits in-line between the CPU card and memory, so the CPU
 never drives the memory bus. While the bridge is active, the chipset stalls any
 CPU cycle by withholding /RDY. sysctl can also hold /CPU_RST, and the bridge
 works with no CPU card fitted.
@@ -158,7 +158,7 @@ period.
 | $02 RAM_RD | addr16, len8, dummy, → data × (len+1) | read `len+1` bytes from SRAM |
 | $03 ROM_RD | addr24, len8, dummy, → data × (len+1) | read from the ROM chip (19-bit address) |
 | $04 ROM_BUSW | addr24, data8 | one raw bus write cycle to the ROM (/CE_ROM, /WE). sysctl builds the JEDEC erase and program sequences from these. |
-| $05 STATUS | dummy, → status | bit0 CPU stopped (bridge or step), bit1 HALTED, bit2 WAITING, bit3 CPU card present (PRSNT2_n), bits5:4 CARD_ID, bit6 CPU cycle pending (/STB low), bit7 /CPU_RST asserted |
+| $05 STATUS | dummy, → status | bit0 CPU stopped (bridge or step), bit1 HALTED, bit2 WAITING, bits5:3 reserved (0; CPU card presence and ID are on sysctl's expander U1), bit6 CPU cycle pending (/STB low), bit7 /CPU_RST asserted (power-on, waiting for the CPU card's CDONE, or `CPU_CTL` bit 6) |
 | $06 GPO_RD | dummy, → gpo | current GPO value |
 | $07 CPU_CTL | ctl8 | see `cpu-bus.md` |
 | $08 TRACE_RD | dummy, → count16, → count × {addr16, data8, flags8} | Drain the trace ring, oldest first. count bits 9:0 = entries; bit 15 = entries were lost (ring full) since the previous drain. flags: bit0 RW, bit1 SYNC. |

@@ -26,17 +26,17 @@
 
 | Area | Decision |
 |---|---|
-| CPU | Plug-in **CPU card** in a PCIe x8 card-edge socket. M1 card: the existing `cpu.vhd` on an iCE40HX4K-TQ144 (the same part as the chipset), configured by sysctl. The M2 discrete CPU card uses the same socket. |
-| Chipset | **iCE40HX4K-TQ144** on the main board: MMU, SPI master, IRQ controller, ROM windows, in-system programming bridge. It sits in-line between the CPU bus and memory. |
-| System controller | **RP2040** on the main board. It owns USB-C and programs everything in-system: the FPGA config flash, the CPU-card FPGA, the ROM, and the card MCUs over SWD. It can also stop, step and trace the CPU. |
+| CPU | Plug-in **CPU card** in a PCIe x8 card-edge socket. M1 card: the existing `cpu.vhd` on an iCE40HX4K-TQ144 (the same part as the chipset), booting from its own configuration flash. The M2 discrete CPU card uses the same socket. |
+| Chipset | **iCE40HX4K-TQ144** on the main board, booting from its own configuration flash: MMU, SPI master, IRQ controller, ROM windows, in-system programming bridge. It sits in-line between the CPU bus and memory, and holds the CPU in reset until the CPU card is configured. |
+| System controller | **RP2040** on a removable **system card** in its own keyed PCIe x4 slot, with its own USB port ([system-slot.md](hardware/system-slot.md)). It programs everything in-system: both FPGAs' flash, the ROM, and the card MCUs. It can also stop, step and trace the CPU. **Once programmed, the machine works fully without it.** Each FPGA boots itself, the main board has its own oscillator and reset supervisor, cards run by default, and the USB-C power policy is a main-board comparator the kernel reads. |
 | RAM | External SRAM IS62WV5128EBLL-45 (512K×8, 45 ns), 64 KB used |
 | ROM | **SST39VF040** 512 KB parallel NOR on the chipset's memory bus: boot ROM + kernel, soldered, programmed in-system |
-| Slots | 6× **PCIe x1 card-edge** (36-pin) sockets with a custom pinout: SPI, IRQ, power, and a programming port (SWD or UART bootloader). 3 are used by M1 cards, and 3 are free. |
+| Slots | 6× identical **PCIe x1 card-edge** (36-pin) I/O slots with a custom pinout: SPI, IRQ, power, and a programming port (SWD or UART bootloader). Any I/O card works in any I/O slot. 3 are used by M1 cards, and 3 are free. The system card has its own keyed slot. |
 | IO card | RP2040 as a USB host for a HID keyboard, SPI slave to the CPU |
 | Wi-Fi card | ESP32-C3-MINI-1U module (external antenna) running the network stack on-card (DHCP/DNS/TCP/UDP/TLS), exposed to the CPU as 4 sockets over SPI |
 | Graphics card | RP2040 + PicoDVI, 640×480 DVI on an HDMI connector, driven by a **custom 8-bit-friendly command set** over SPI |
+| Board thickness | Every card that plugs into a socket (the CPU card, the system card and the I/O cards) is **1.6 mm** thick. The PCIe CEM card-edge spec is 1.57 ± 0.13 mm; that's JLC's standard thickness, and also the thickness of its 4-layer JLC04161H-7628 stackup. Their edge fingers are hard gold with a 45° chamfer, laid out to the PCIe CEM finger dimensions. The fab-package check fails any card whose thickness, finger finish or chamfer is missing or different. |
 | Branding | Every board carries the **Kaplan Labs logo** on its top silkscreen, generated from `~/.config/omarchy/branding/kaplan-labs.svg` by `hw/tools/logo.py`. At least 10 mm wide, because smaller loses detail below JLC's 0.15 mm silkscreen minimum. |
-| System controller placement | Moving sysctl onto a removable **system card** in a keyed slot, so the computer runs without it. Decided 2026-09-22; the rework of the specs, pins and sysctl core is pending. |
 | Verification | **Everything is simulated and tested before hardware is ordered.** There is no hardware prototype. The full matrix is [verification.md](hardware/verification.md): HDL lockstep and formal proofs, real firmware binaries in emulators, a co-simulation wired from the KiCad netlists, power, SI, thermal and mechanical checks. Nothing is ordered until `make verify` is green and `fab-readiness.md` is signed off. |
 
 ## Specifications
@@ -44,6 +44,8 @@
 - [Memory map and boot chain](hardware/memory-map.md)
 - [CPU bus and CPU socket](hardware/cpu-bus.md)
 - [Slot connector](hardware/slot.md)
+- [System slot and system card](hardware/system-slot.md)
+- [System controller firmware and USB protocol](hardware/sysctl.md)
 - [GPU protocol](hardware/gpu-protocol.md)
 - [IO card protocol](hardware/io-card.md)
 - [Wi-Fi card protocol](hardware/wifi-card.md)
@@ -57,4 +59,12 @@
 The assembled boards, powered only from USB-C, boot through the boot ROM to
 the BASIC prompt on an HDMI monitor, and you can type on a USB keyboard. The
 Wi-Fi card joins a network and fetches a page over TCP. Every
-device was programmed through the single USB-C port.
+device was programmed through the system card's USB port, and the machine still
+boots and runs with the system card removed.
+
+## Final step before sign-off
+
+When everything else is done (specs, implementation, the tests all green, and
+the fab packages), run `codex-p` with the astra model at medium reasoning to
+critique the whole design. Consider every comment. Fix anything that is a bug;
+other suggestions are optional, and each gets a recorded yes/no with a reason.

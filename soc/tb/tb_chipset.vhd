@@ -58,6 +58,8 @@ architecture sim of tb_chipset is
 	-- bridge
 	signal br_sck, br_mosi: std_logic := '0';
 	signal br_n_cs: std_logic := '1';
+	signal cpu_cdone: std_logic := '0';			-- the CPU card's FPGA configures later
+	signal pwr_hi: std_logic := '0';			-- a default-current USB source
 	signal br_miso: std_logic;
 
 	function rom_pattern(i: natural) return std_logic_vector is
@@ -76,12 +78,12 @@ begin
 		cpu_a => cpu_a, cpu_d_in => cpu_dw, cpu_d_out => cpu_dr, cpu_d_oe => cpu_d_oe,
 		cpu_rw => cpu_rw, cpu_n_stb => cpu_n_stb, cpu_n_rdy => cpu_n_rdy, cpu_sync => cpu_sync,
 		cpu_irq => cpu_irq, cpu_tmr_exp => cpu_tmr_exp, cpu_halted => '0', cpu_waiting => '0',
-		cpu_n_rst => cpu_n_rst, cpu_present => '1', cpu_card_id => "10",
+		cpu_n_rst => cpu_n_rst, cpu_cdone => cpu_cdone,
 		mem_a => mem_a, mem_d_in => mem_d, mem_d_out => mem_d_out, mem_d_oe => mem_d_oe,
 		mem_n_oe => mem_n_oe, mem_n_we => mem_n_we, mem_n_ce_ram => mem_n_ce_ram,
 		mem_n_ce_rom => mem_n_ce_rom,
 		spi_sck => spi_sck, spi_mosi => spi_mosi, spi_miso => spi_miso, spi_n_cs => spi_n_cs,
-		slot_n_irq => slot_n_irq, gpo => gpo,
+		slot_n_irq => slot_n_irq, gpo => gpo, pwr_hi => pwr_hi,
 		br_sck => br_sck, br_mosi => br_mosi, br_miso => br_miso, br_n_cs => br_n_cs);
 
 	mem_d <= mem_d_out when mem_d_oe = '1' else (others => 'Z');
@@ -289,8 +291,45 @@ begin
 	begin
 		wait for 5 * T;
 		n_por <= '1';
+		-- no sysctl: the CPU waits for its card's CDONE, then 16 clocks more
 		wait for 30 * T;
-		check(cpu_n_rst = '1', "CPU held in reset after power-on");
+		check(cpu_n_rst = '0', "CPU released before the CPU card was configured");
+		br_simple(x"05", d);
+		check(d(7) = '1', "bridge status does not show /CPU_RST before CDONE: $" & to_hstring(d));
+		cpu_cdone <= '1';
+		wait for 10 * T;
+		check(cpu_n_rst = '0', "CPU released without its start-up delay after CDONE");
+		wait for 20 * T;
+		check(cpu_n_rst = '1', "CPU still in reset 30 clocks after CDONE");
+		br_simple(x"05", d);
+		check(d(7) = '0', "bridge status still shows /CPU_RST: $" & to_hstring(d));
+
+		---------------------------------------------------------------- RST-001
+		if run("RST-001") then
+			-- the CPU card being reconfigured drops CDONE: the CPU goes back to reset
+			cpu_cdone <= '0';
+			wait for 4 * T;
+			check(cpu_n_rst = '0', "CDONE low did not reset the CPU");
+			cpu_cdone <= '1';
+			wait for 30 * T;
+			check(cpu_n_rst = '1', "CPU not released after CDONE came back");
+			-- a pulse shorter than the synchroniser still restarts the start-up delay
+			cpu_cdone <= '0';
+			wait for 3 * T;
+			cpu_cdone <= '1';
+			wait for 5 * T;
+			check(cpu_n_rst = '0', "a CDONE glitch did not hold the CPU in reset");
+			wait for 30 * T;
+			check(cpu_n_rst = '1', "CPU not released after the glitch");
+			-- $f203 bit 1 reports the USB-C source class (the kernel reads it)
+			rd(16#f203#, d);
+			check(d(1) = '0', "SYSCTL shows a 1.5 A source with PWR_HI low: $" & to_hstring(d));
+			pwr_hi <= '1';
+			wait for 4 * T;
+			rd(16#f203#, d);
+			check(d(1) = '1' and d(0) = '0', "SYSCTL with PWR_HI high: $" & to_hstring(d));
+			models_clean("RST-001");
+		end if;
 
 		---------------------------------------------------------------- MMU-001
 		if run("MMU-001") then
@@ -468,7 +507,8 @@ begin
 				end if;
 			end loop;
 			br_simple(x"05", s);
-			check(s(3) = '1' and s(5 downto 4) = "10", "STATUS present/card id: $" & to_hstring(s));
+			-- CPU card presence and ID come from sysctl's expander; here they are reserved
+			check(s(5 downto 3) = "000", "STATUS reserved bits 5:3 not 0: $" & to_hstring(s));
 			models_clean("BRG-001");
 		end if;
 
@@ -499,6 +539,12 @@ begin
 			for i in 0 to 15 loop
 				check(buf(i) = b8(i * 17), "programmed byte " & integer'image(i) & " = $" & to_hstring(buf(i)));
 			end loop;
+			-- $F0 as program data is a byte to write, not the ID-exit command
+			rom_busw(16#5555#, x"aa"); rom_busw(16#2aaa#, x"55"); rom_busw(16#5555#, x"a0");
+			rom_busw(16#2010#, x"f0");
+			rom_wait_ready;
+			br_read(x"03", 16#2010#, 1);
+			check(buf(0) = x"f0", "programmed $F0 reads $" & to_hstring(buf(0)));
 			-- and the CPU sees it through the banked window (bank 4 = $2000)
 			wr(16#f204#, x"04");
 			expect(16#e805#, b8(5 * 17), "programmed byte via CPU window");

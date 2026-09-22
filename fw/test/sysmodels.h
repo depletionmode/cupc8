@@ -4,7 +4,7 @@
  *
  *   sst39   SST39VF040 ROM chip, mirroring soc/tb/models/sst39_model.vhd
  *   w25q    W25Q32 configuration flash
- *   ice40   iCE40 SPI-slave configuration port (TN1248 timing checked)
+ *   ice40   an iCE40 booting itself from its W25Q (SPI master mode)
  *   bridge  the chipset's bus bridge, byte for byte as soc/bridge.vhd
  *   tca     TCA9555 I²C expander
  */
@@ -52,29 +52,24 @@ void w25q_select(w25q_t *m, bool sel, uint64_t now);
 uint8_t w25q_byte(w25q_t *m, uint8_t mosi, uint64_t now);
 
 typedef struct {
+	w25q_t *flash;                        /* its own configuration flash */
 	const uint8_t *expect;                /* the bitstream that configures it */
 	int expect_len;
-	bool creset, ss_low, cdone;
-	uint64_t t_creset_low, t_release;
-	bool slave, dummy_seen;
-	uint8_t *got;
-	int got_len, got_cap;
-	int clocks_after;                     /* SCK clocks since SS rose after data */
-	int violations;
+	bool creset, cdone, booting;
+	uint64_t t_release;
+	uint64_t boot_us;                     /* time to read the image */
 	int loads;                            /* completed configurations */
 } ice40_t;
 
-void ice40_init(ice40_t *m, const uint8_t *expect, int len);
+void ice40_init(ice40_t *m, w25q_t *flash, const uint8_t *expect, int len);
 void ice40_creset(ice40_t *m, bool level, uint64_t now);
-void ice40_select(ice40_t *m, bool sel);
-void ice40_clock_byte(ice40_t *m, uint8_t mosi, uint64_t now);  /* any 8 SCK clocks */
+void ice40_tick(ice40_t *m, uint64_t now);
 
 typedef struct {
 	uint8_t ram[65536];
 	sst39_t *rom;
 	bool configured;                      /* the chipset has CDONE */
 	uint8_t gpo, ctl;
-	bool cpu_present;
 	uint32_t trace[512];
 	int trace_head, trace_count;
 	bool trace_lost;

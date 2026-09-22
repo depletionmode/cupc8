@@ -124,8 +124,10 @@ begin
 				wa := to_integer(unsigned(a(ABITS - 1 downto 0)));
 				wd := d;
 				low15 := a(14 downto 0);
-				if wd = x"F0" and step /= 2 then
-					id_mode := false;			-- single-cycle exit
+				-- single-cycle ID exit, except as the data of a program sequence
+				-- (step 3), where $F0 is just a byte to program
+				if wd = x"F0" and step /= 2 and step /= 3 then
+					id_mode := false;
 					step := 0;
 				else
 					case step is

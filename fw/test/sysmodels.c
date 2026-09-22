@@ -35,8 +35,10 @@ void sst39_write(sst39_t *m, uint32_t addr, uint8_t d, uint64_t now)
 	m->writes++;
 	if (now < m->busy_until)
 		return;                           /* writes while busy are ignored */
-	if (d == 0xF0 && m->step != 2) {
-		m->id_mode = false;               /* single-cycle ID exit */
+	/* single-cycle ID exit, except as the data of a program sequence (step 3),
+	 * where $F0 is just a byte to program */
+	if (d == 0xF0 && m->step != 2 && m->step != 3) {
+		m->id_mode = false;
 		m->step = 0;
 		return;
 	}
@@ -166,75 +168,39 @@ uint8_t w25q_byte(w25q_t *m, uint8_t mosi, uint64_t now)
 	return out;
 }
 
-/* ------------------------------------------------------ iCE40 config port */
+/* ------------------------------------------- iCE40 booting from its flash */
 
-void ice40_init(ice40_t *m, const uint8_t *expect, int len)
+void ice40_init(ice40_t *m, w25q_t *flash, const uint8_t *expect, int len)
 {
-	free(m->got);
 	memset(m, 0, sizeof *m);
+	m->flash = flash;
 	m->expect = expect;
 	m->expect_len = len;
 	m->creset = true;
-	m->got_cap = len + 64;
-	m->got = malloc((size_t)m->got_cap);
-	m->clocks_after = -1;
+	m->booting = true;                    /* powered up: boots straight away */
+	m->boot_us = 200000;
 }
 
 void ice40_creset(ice40_t *m, bool level, uint64_t now)
 {
-	if (!level && m->creset) {
-		m->t_creset_low = now;
+	if (!level) {
 		m->cdone = false;
-		m->slave = false;
-		m->dummy_seen = false;
-		m->got_len = 0;
-		m->clocks_after = -1;
-	} else if (level && !m->creset) {
-		if (now - m->t_creset_low < 1) {
-			fprintf(stderr, "ice40: CRESET_B low for under 1 µs\n");
-			m->violations++;
-		}
-		m->slave = m->ss_low;             /* SS low at release selects slave mode */
+		m->booting = false;
+	} else if (!m->creset) {
+		m->booting = true;                /* released: read the flash again */
 		m->t_release = now;
 	}
 	m->creset = level;
 }
 
-void ice40_select(ice40_t *m, bool sel)
+void ice40_tick(ice40_t *m, uint64_t now)
 {
-	if (!sel && m->ss_low && m->slave && m->got_len > 0)
-		m->clocks_after = 0;
-	m->ss_low = sel;
-}
-
-void ice40_clock_byte(ice40_t *m, uint8_t mosi, uint64_t now)
-{
-	if (!m->creset || !m->slave || m->cdone)
+	if (!m->booting || now - m->t_release < m->boot_us)
 		return;
-	if (m->ss_low) {
-		if (now - m->t_release < 1200) {
-			fprintf(stderr, "ice40: data %llu µs after CRESET_B (< 1200)\n",
-			        (unsigned long long)(now - m->t_release));
-			m->violations++;
-		}
-		if (!m->dummy_seen) {
-			fprintf(stderr, "ice40: no dummy clocks with SS high before the bitstream\n");
-			m->violations++;
-			m->dummy_seen = true;
-		}
-		if (m->got_len < m->got_cap)
-			m->got[m->got_len++] = mosi;
-		m->clocks_after = -1;
-	} else if (m->got_len == 0) {
-		m->dummy_seen = true;
-	} else if (m->clocks_after >= 0) {
-		m->clocks_after += 8;
-		if (m->clocks_after >= 100 && m->got_len == m->expect_len &&
-		    memcmp(m->got, m->expect, (size_t)m->expect_len) == 0) {
-			m->cdone = true;
-			m->loads++;
-		}
-	}
+	m->booting = false;
+	m->cdone = memcmp(m->flash->mem, m->expect, (size_t)m->expect_len) == 0;
+	if (m->cdone)
+		m->loads++;
 }
 
 /* ----------------------------------------------------------------- bridge */
@@ -259,8 +225,8 @@ void bridge_select(bridge_t *m, bool sel)
 
 static uint8_t bridge_status(bridge_t *m)
 {
-	return (uint8_t)((m->ctl & 0x01) | (m->cpu_present ? 0x08 | 0x10 : 0) |
-	                 (m->ctl & 0x40 ? 0x80 : 0));
+	/* bits 5:3 are reserved: presence and ID are on sysctl's expander */
+	return (uint8_t)((m->ctl & 0x01) | (m->ctl & 0x40 ? 0x80 : 0));
 }
 
 static uint8_t mem_rd(bridge_t *m, uint64_t now)

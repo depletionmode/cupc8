@@ -30,6 +30,7 @@ architecture sim of tb_mainboard is
 	signal clk: std_logic := '0';
 	signal done: boolean := false;
 	signal n_por: std_logic := '0';
+	signal cpu_cdone: std_logic := '1';		-- the CPU card is configured
 
 	-- CPU bus
 	signal a: std_logic_vector(15 downto 0);
@@ -90,11 +91,11 @@ begin
 		cpu_a => a, cpu_d_in => d, cpu_d_out => cs_dout, cpu_d_oe => cs_doe, cpu_rw => rw,
 		cpu_n_stb => n_stb, cpu_n_rdy => n_rdy, cpu_sync => sync, cpu_irq => irq,
 		cpu_tmr_exp => tmr_exp, cpu_halted => halted, cpu_waiting => waiting, cpu_n_rst => n_rst,
-		cpu_present => '1', cpu_card_id => "10",
+		cpu_cdone => cpu_cdone,
 		mem_a => mem_a, mem_d_in => mem_d, mem_d_out => mem_dout, mem_d_oe => mem_doe,
 		mem_n_oe => mem_n_oe, mem_n_we => mem_n_we, mem_n_ce_ram => n_ce_ram, mem_n_ce_rom => n_ce_rom,
 		spi_sck => spi_sck, spi_mosi => spi_mosi, spi_miso => 'H', spi_n_cs => spi_n_cs,
-		slot_n_irq => "111111", gpo => gpo,
+		slot_n_irq => "111111", gpo => gpo, pwr_hi => '1',
 		br_sck => br_sck, br_mosi => br_mosi, br_miso => br_miso, br_n_cs => br_n_cs);
 
 	-- the CPU bus data lines, driven by whichever side has D enabled
