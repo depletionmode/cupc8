@@ -4,11 +4,13 @@ import strutils
 import sdl2
 
 const
-  DispWidth* = 320
-  DispHeight* = 240
   DispScaleDefault* = 3
 
 var
+  # the framebuffer size follows the card in the slot: 320x240 for the
+  # legacy ILI9340 model, 640x480 for the GPU card
+  DispWidth* = 320
+  DispHeight* = 240
   win: WindowPtr
   ren: RendererPtr
   tex: TexturePtr
@@ -18,7 +20,7 @@ var
   display_dirty*: bool = false
 
   # RGB888 packed 0x00RRGGBB
-  fb: array[DispWidth * DispHeight, uint32]
+  fb: seq[uint32] = newSeq[uint32](320 * 240)
 
   dc: bool = false
   state = "NOSTATE"
@@ -36,6 +38,26 @@ proc display_pixel*(x, y: int): uint32 =
   if x < 0 or y < 0 or x >= DispWidth or y >= DispHeight:
     return 0
   result = fb[y * DispWidth + x]
+
+proc display_setSize*(w, h: int) =
+  ## Resize the framebuffer (and the window, if it is already open).
+  if w == DispWidth and h == DispHeight:
+    return
+  DispWidth = w
+  DispHeight = h
+  fb = newSeq[uint32](w * h)
+  display_dirty = true
+  if display_inited:
+    tex = createTexture(ren, SDL_PIXELFORMAT_ARGB8888.uint32,
+                        SDL_TEXTUREACCESS_STREAMING.cint, w.cint, h.cint)
+    win.setSize(cint(w * dispScale), cint(h * dispScale))
+
+proc display_blit*(src: ptr uint32) =
+  ## Copy a full frame of 0x00RRGGBB pixels into the framebuffer.
+  let p = cast[ptr UncheckedArray[uint32]](src)
+  for i in 0..fb.high:
+    fb[i] = 0xFF000000'u32 or p[i]
+  display_dirty = true
 
 proc display_reset*() =
   for i in 0..fb.high:

@@ -7,6 +7,7 @@ import strutils
 import tables
 import sim
 import simdisplay
+import simcards
 import disasm
 import symbols
 import tui
@@ -810,6 +811,61 @@ proc testDisplayRect() =
     ok("CASET/PASET/RAMWR painted 2x1 white at (10,20)")
 
 testDisplayRect()
+
+proc testCardsMode() =
+  ## SIM-004: the Milestone 1 machine model: ROM windows, the new registers,
+  ## and slot cards running the real firmware cores.
+  echo "== cards mode (M1 machine) =="
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+
+  # the ROM chip through its windows
+  for i in 0..rom.high:
+    rom[i] = uint8((i * 7 + i div 2048) and 0xff)
+  expect("fixed window $e000", cardsLoadTest(0xe000), int(rom[0]))
+  expect("fixed window $e7ff", cardsLoadTest(0xe7ff), int(rom[0x7ff]))
+  romBank = 3
+  expect("banked window $e800", cardsLoadTest(0xe800), int(rom[3 * 2048]))
+  expect("banked window $efff", cardsLoadTest(0xefff), int(rom[3 * 2048 + 0x7ff]))
+  romBank = 0
+  romOff = true
+  mem[0xe000] = 0x5a
+  expect("ROM_OFF gives RAM", cardsLoadTest(0xe000), 0x5a)
+  romOff = false
+
+  # a guest program drives both cards
+  let dest = testdata / "cards_gpu.o"
+  assemble(testdata / "cards_gpu.s", dest)
+  cpuReset()
+  cpuLoadFile(dest)
+  expect("slot table from the boot ROM", mem[0x0002], CardGpu)
+  expect("slot table slot 2", mem[0x0003], CardIo)
+  pushKey(ord('A'))
+  var n = 0
+  while n < 4000 and cpuStep() == sOk:
+    inc n
+  expectTrue("cards program halted", HF)
+  let g = gpuCard()
+  expectTrue("graphics card present", not g.isNil)
+  expect("GPU cell 0,0", int(simcard_gpu_cell(g, 0, 0)) and 0xff, ord('H'))
+  expect("GPU cell 1,0", int(simcard_gpu_cell(g, 1, 0)) and 0xff, ord('i'))
+  expect("IO card RESP_LEN", mem[0x2000], 1)
+  expect("key read through the IO card", mem[0x2001], ord('A'))
+
+  # the rendered picture reaches the display
+  gpuPresent()
+  expectTrue("display resized for the GPU card", DispWidth == 640 and DispHeight == 480)
+  var lit = 0
+  for y in 0..15:
+    for x in 0..7:
+      if display_pixel(x, y) != 0xFF000000'u32:
+        inc lit
+  expectTrue("the H glyph is rendered", lit > 10)
+
+  ioModel = imLegacy
+  display_setSize(320, 240)
+
+testCardsMode()
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

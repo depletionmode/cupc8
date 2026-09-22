@@ -7,6 +7,7 @@ import sdl2
 
 import simdisplay
 import simsd
+import simcards
 
 when isMainModule:
   import times
@@ -83,20 +84,124 @@ var
 var
   display_active: bool = false
 
+# ---------------------------------------------------------------------------
+# I/O model. imLegacy: the original devices (ILI9340 on SPI 0, SD on 1,
+# keyboard on 2, D/C on GPO bit 0). imCards: the Milestone 1 machine
+# (doc/hardware/memory-map.md): the ROM chip with its windows, SYSCTL,
+# ROM_BANK, SLOT_IRQ, per-device SPI registers with SPI_CS, and slot cards
+# running the real firmware cores (tools/simcards.nim).
+type IoModel* = enum imLegacy, imCards
+
+var
+  ioModel*: IoModel = imLegacy
+  slots*: array[6, SimCard]      # slot n = SPI device n; nil = empty
+  rom*: seq[uint8]               # the ROM chip (512 KB)
+  romOff*: bool = false
+  romBank*: int = 0
+  spiTxR, spiRxR, spiCfgR: array[8, int]
+  spiHold*: int = -1             # device selected by SPI_CS, -1 = none
+  slotIrqAny: bool = false
+  lastCardTick: int = 0
+
+proc simMillis*(): uint32 =
+  ## Guest time: about one instruction per microsecond at 12 MHz.
+  uint32(ins_retired div 1000)
+
+proc slotIrqBits*(): int =
+  for i in 0..5:
+    if not slots[i].isNil and simcard_irq(slots[i]) != 0:
+      result = result or (1 shl i)
+
+proc machineCards*(cards: openArray[int]) =
+  ## Cards mode with the given card types in slots 1.. (0 = empty).
+  ioModel = imCards
+  for i in 0..5:
+    if not slots[i].isNil:
+      simcard_free(slots[i])
+      slots[i] = SimCard(nil)
+    if i < cards.len and cards[i] != 0:
+      slots[i] = simcard_new(cint(cards[i]))
+  if rom.len == 0:
+    rom = newSeq[uint8](512 * 1024)
+    for i in 0..rom.high: rom[i] = 0xff
+
+proc cpuLoadRom*(path: string) =
+  let data = readFile(path)
+  rom = newSeq[uint8](512 * 1024)
+  for i in 0..rom.high:
+    rom[i] = if i < data.len: uint8(data[i]) else: 0xff'u8
+
 proc raiseIrq*(bit: int) =
   irqPending = (irqPending or (1 shl bit)) and 0x0f
   mem[0xf200] = irqPending
 
+proc cardsTick*() =
+  ## Let the cards do background work, and latch IRQ0 on a new slot IRQ.
+  let now = simMillis()
+  for c in slots:
+    if not c.isNil:
+      simcard_tick(c, now)
+  let anyIrq = slotIrqBits() != 0
+  if anyIrq and not slotIrqAny:
+    raiseIrq(0)
+  slotIrqAny = anyIrq
+  lastCardTick = ins_retired
+
+proc ioCard(): SimCard =
+  for c in slots:
+    if not c.isNil and simcard_type(c) == CardIo:
+      return c
+  SimCard(nil)
+
+proc gpuCard*(): SimCard =
+  for c in slots:
+    if not c.isNil and simcard_type(c) == CardGpu:
+      return c
+  SimCard(nil)
+
+var gpuFrame: seq[uint32] = @[]
+
+proc gpuPresent*() =
+  ## Render the GPU card's picture into the simulator display.
+  let c = gpuCard()
+  if c.isNil:
+    return
+  if gpuFrame.len == 0:
+    gpuFrame = newSeq[uint32](GpuOutW * GpuOutH)
+  display_setSize(GpuOutW, GpuOutH)
+  simcard_render(c, addr gpuFrame[0])
+  display_blit(addr gpuFrame[0])
+
 proc pushKey*(k: int) =
+  if ioModel == imCards:
+    let c = ioCard()
+    if not c.isNil:
+      simcard_type_ascii(c, uint8(k and 0xff), simMillis())
+      cardsTick()
+    return
   keybuffer = k and 0xff
   has_key = true
   raiseIrq(0)
 
 proc keyPending*(): bool = has_key
 
+proc romWindow(a: int): int =
+  ## ROM chip offset for CPU address a, or -1 if a is not in a ROM window.
+  if ioModel != imCards or romOff or a < 0xe000 or a > 0xefff:
+    return -1
+  if a < 0xe800: a and 0x7ff
+  else: (romBank shl 11) or (a and 0x7ff)
+
+proc memRead(a: int): int =
+  let a = a and 0xffff
+  let r = romWindow(a)
+  if r >= 0:
+    return int(rom[r mod rom.len])
+  mem[a] and 0xff
+
 proc fetch(): int =
-  result = mem[PC] and 0xff
-  PC += 1
+  result = memRead(PC)
+  PC = (PC + 1) and 0xffff
 
 proc reg_write(operands, val: int) =
   if (operands and 1) == 1:
@@ -168,14 +273,104 @@ proc ins_mov(o: int) =
     rb = reg_read(o, false)
   reg_write(o, rb)
 
+proc spiSelect(dev: int, on: bool) =
+  if dev >= 0 and dev < 6 and not slots[dev].isNil:
+    simcard_select(slots[dev], cint(on))
+
+proc spiExchange(dev: int, tx: int): int =
+  ## One byte on device dev (CS already low). Empty slots read the pull-up.
+  if dev >= 0 and dev < 6 and not slots[dev].isNil:
+    result = int(simcard_miso(slots[dev]))
+    simcard_mosi(slots[dev], uint8(tx and 0xff))
+  else:
+    result = 0xff
+
+proc cardsStore(address, value: int) =
+  let v = value and 0xff
+  if address >= 0xe000 and address <= 0xefff and not romOff:
+    return                                   # CPU writes to the ROM windows are ignored
+  if address < 0xf000:
+    mem[address] = v
+    return
+  case (address shr 8) and 0xf
+  of 0x0:
+    if (address and 0xff) == 0:
+      mem[0xf000] = v
+      last_gpo = "GPO: $1 $2" % [toBin(v, 8), toHex(v, 2)]
+      log(1, last_gpo)
+  of 0x1:
+    let dev = (address shr 4) and 0xf
+    if dev < 8:
+      case address and 0xf
+      of 0x0: spiTxR[dev] = v
+      of 0x2:
+        let held = spiHold == dev
+        if not held: spiSelect(dev, true)
+        spiRxR[dev] = spiExchange(dev, spiTxR[dev])
+        if not held: spiSelect(dev, false)
+        raiseIrq(3)
+      of 0x4:
+        if (v and 1) == 1:
+          if spiHold != dev:
+            spiSelect(spiHold, false)
+            spiHold = dev
+            spiSelect(dev, true)
+        elif spiHold == dev:
+          spiSelect(dev, false)
+          spiHold = -1
+      of 0xf: spiCfgR[dev] = v
+      else: discard
+      cardsTick()
+  of 0x2:
+    case address and 0xff
+    of 0: irqPending = irqPending and not v and 0x0f
+    of 1: irqMask = v and 0x0f
+    of 3: romOff = (v and 1) == 1
+    of 4: romBank = v
+    else: discard
+  else:
+    discard
+
+proc cardsLoad(address: int): int =
+  if address < 0xf000:
+    return memRead(address)
+  case (address shr 8) and 0xf
+  of 0x0:
+    if (address and 0xff) == 0: mem[0xf000] and 0xff else: 0
+  of 0x1:
+    let dev = (address shr 4) and 0xf
+    if dev >= 8: return 0
+    case address and 0xf
+    of 0x1: spiRxR[dev]
+    of 0x3: 1
+    of 0x4: (if spiHold == dev: 1 else: 0)
+    else: 0
+  of 0x2:
+    case address and 0xff
+    of 0: irqPending
+    of 1: irqMask
+    of 2: slotIrqBits()
+    of 3: (if romOff: 1 else: 0)
+    of 4: romBank
+    else: 0
+  else: 0
+
+proc cardsLoadTest*(address: int): int = cardsLoad(address)
+
 proc ins_st_do(o: int, a: int) =
   var address = a
   if (o and 4) == 4:
     var ra = reg_read(o, true)
     address += ra
+  address = address and 0xffff
   let
     value = reg_read(o, false)
     oldValue = mem[address]
+  if ioModel == imCards:
+    cardsStore(address, value)
+    if not memHook.isNil:
+      memHook(maWrite, address, value, oldValue)
+    return
   mem[address] = value
   case address shr 8:
     of 0xf0:
@@ -231,7 +426,7 @@ proc ins_st(o: int) =
 
 proc ins_std(o: int) =
   var address = fetch() or (fetch() shl 8)
-  var address_d = mem[address] or (mem[address+1] shl 8)
+  var address_d = memRead(address) or (memRead(address + 1) shl 8)
   ins_st_do(o, address_d)
 
 proc ins_ld_do(o: int, a: int) =
@@ -239,6 +434,13 @@ proc ins_ld_do(o: int, a: int) =
   if (o and 4) == 4:
     var rb = reg_read(o, false)
     address += rb
+  address = address and 0xffff
+  if ioModel == imCards:
+    let value = cardsLoad(address)
+    reg_write(o, value)
+    if not memHook.isNil:
+      memHook(maRead, address, value, mem[address])
+    return
   let oldValue = mem[address]
   var value = oldValue
   case address shr 8:
@@ -283,7 +485,7 @@ proc ins_ld(o: int) =
 
 proc ins_ldd(o: int) =
   var address = fetch() or (fetch() shl 8)
-  var address_d = mem[address] or (mem[address+1] shl 8)
+  var address_d = memRead(address) or (memRead(address + 1) shl 8)
   ins_ld_do(o, address_d)
 
 proc ins_gt(o: int) =
@@ -537,13 +739,35 @@ proc cpuReset*() =
     spi_tx_buf[i] = 0
     spi_rx_buf[i] = 0
   display_reset()
+  # cards-mode chipset state (the cards themselves keep their own state)
+  spiSelect(spiHold, false)
+  spiHold = -1
+  for i in 0..7:
+    spiTxR[i] = 0
+    spiRxR[i] = 0
+    spiCfgR[i] = 0
+  romOff = false
+  romBank = 0
+  slotIrqAny = false
+  lastCardTick = 0
 
 proc cpuLoadImage*(code: string) =
+  ## Fast start: the image at $1000 and PC = $1000 (no boot ROM). In cards
+  ## mode the slot table the boot ROM would have left at $0002-$0007 is
+  ## filled in, and the ROM is switched off as the kernel would.
   var i = 0
   while i < code.len:
     mem[0x1000+i] = int(code[i])
     i += 1
   imageEnd = 0x1000 + i
+  if ioModel == imCards:
+    for s in 0..5:
+      mem[0x0002 + s] = if slots[s].isNil: 0 else: int(simcard_type(slots[s]))
+
+proc cpuBootRom*() =
+  ## Hardware reset in cards mode: execute the boot ROM from $e000.
+  PC = 0xe000
+  imageEnd = 0x10000
 
 proc cpuLoadFile*(path: string) =
   cpuLoadImage(readFile(path))
@@ -554,6 +778,8 @@ proc cpuStep*(): StepResult =
   resumeBreak = -1
   if HF:
     return sHalted
+  if ioModel == imCards and ins_retired - lastCardTick >= 64:
+    cardsTick()
   if waiting:
     tickTimers()
     inc ins_retired
@@ -598,11 +824,15 @@ proc cpuRun*(maxSteps: int): RunExit =
   ## the next run skips that same breakpoint once so execution can resume.
   ## A parked WAI ticks the timers once and returns so the host can sleep.
   if waiting:
+    if ioModel == imCards:
+      cardsTick()
     tickTimers()
     serviceIrq()
     if waiting:
       return reCount
   for i in 0..<maxSteps:
+    if ioModel == imCards and ins_retired - lastCardTick >= 64:
+      cardsTick()
     if HF:
       return reHalted
     if waiting:
