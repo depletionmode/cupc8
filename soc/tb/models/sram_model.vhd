@@ -8,6 +8,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use std.textio.all;
 
 entity sram_model is
 	generic(
@@ -15,7 +16,9 @@ entity sram_model is
 		T_OE:	time := 20 ns;
 		T_WP:	time := 35 ns;
 		T_DS:	time := 25 ns;
-		ABITS:	natural := 19
+		ABITS:	natural := 19;
+		INIT_FILE:	string := "";		-- optional: one hex byte per line, loaded at INIT_BASE
+		INIT_BASE:	natural := 0
 	);
 	port(
 		a:		in std_logic_vector(ABITS - 1 downto 0);
@@ -38,7 +41,28 @@ begin
 		variable t_addr, t_ce, when_oe, t_we_fall, t_d: time := 0 ns;
 		variable ready_at: time;
 		variable v: natural := 0;
+		variable loaded: boolean := false;
+		file f: text;
+		variable l: line;
+		variable b: std_logic_vector(7 downto 0);
+		variable ld: natural;
 	begin
+		if not loaded then
+			loaded := true;
+			if INIT_FILE /= "" then
+				ld := INIT_BASE;
+				file_open(f, INIT_FILE, read_mode);
+				while not endfile(f) loop
+					readline(f, l);
+					if l /= null and l'length > 0 then
+						hread(l, b);
+						mem(ld) := b;
+						ld := ld + 1;
+					end if;
+				end loop;
+				file_close(f);
+			end if;
+		end if;
 		if a'event then
 			t_addr := now;
 			if n_ce = '0' and n_we = '0' then

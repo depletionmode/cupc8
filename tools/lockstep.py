@@ -9,6 +9,7 @@ soc/tb/tb_cpu_trace.vhd, and diffs the traces. Verification row 1.2.
   lockstep.py --waits N       every bus cycle gets N wait states
   lockstep.py --waits -1 --seed S   random 0..15 wait states per cycle
   lockstep.py --engine verilator    run the synthesised netlist instead of RTL
+  lockstep.py --engine mainboard [--noise]   CPU + chipset + memory models
 
 Programs that touch SPI ($f1xx) are skipped: the SPI devices live in the
 chipset, which this CPU-only testbench does not model.
@@ -76,6 +77,24 @@ def _build():
 
 
 VERILATOR = os.path.join(BUILD, "verilator")
+MAINBOARD = os.path.join(BUILD, "mainboard")
+MAINBOARD_VHDL = ["soc/alu.vhd", "soc/cpu.vhd", "soc/spi_master.vhd", "soc/bridge.vhd",
+                  "soc/chipset.vhd", "soc/tb/models/sram_model.vhd",
+                  "soc/tb/models/sst39_model.vhd", "soc/tb/tb_mainboard.vhd"]
+
+
+def build_mainboard():
+    """The CPU + chipset + memory models (tb_mainboard) under GHDL."""
+    with build_lock():
+        if up_to_date(os.path.join(MAINBOARD, "tb_mainboard"), MAINBOARD_VHDL):
+            return
+        os.makedirs(MAINBOARD, exist_ok=True)
+        ghdl = os.path.join(OSS, "ghdl")
+        for step in (["-a", "--std=08", "-fsynopsys"] + [os.path.join(ROOT, f) for f in MAINBOARD_VHDL],
+                     ["-e", "--std=08", "-fsynopsys", "tb_mainboard"]):
+            r = run([ghdl] + step, cwd=MAINBOARD)
+            if r.returncode:
+                sys.exit("ghdl %s failed:\n%s%s" % (step[0], r.stdout, r.stderr))
 
 
 def build_verilator():
@@ -107,23 +126,23 @@ def trace_lines(text):
     return [l for l in text.splitlines() if l[:2] in ("S ", "W ", "E ")]
 
 
-def check(src, waits, seed, engine):
+def check(src, waits, seed, engine, noise=False):
     name = os.path.splitext(os.path.basename(src))[0]
     with open(src) as f:
         if SPI_RE.search(f.read()):
             return "skip", "uses SPI (needs the chipset model)"
     # each (engine, waits, seed) combination gets its own directory, so
     # concurrent runs (test/run.py -j) never share files
-    progs = os.path.join(PROGS, "%s-w%d-s%d" % (engine, waits, seed))
+    progs = os.path.join(PROGS, "%s-w%d-s%d%s" % (engine, waits, seed, "-noise" if noise else ""))
     os.makedirs(progs, exist_ok=True)
     obj = os.path.join(progs, name + ".o")
     r = run(["python3", os.path.join(ROOT, "tools", "as.py"), src, obj])
     if r.returncode or not os.path.exists(obj):
         return "skip", "does not assemble"
-    return compare_image(obj, waits, seed, engine=engine)
+    return compare_image(obj, waits, seed, engine=engine, noise=noise)
 
 
-def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl"):
+def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=False):
     """Run a binary image (loaded at $1000) on both models and diff the traces.
     Returns (status, message); the traces are left next to the image."""
     base = os.path.splitext(obj)[0]
@@ -133,7 +152,15 @@ def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl"):
         f.write("\n".join("%02x" % b for b in image) + "\n")
 
     ref = trace_lines(run([os.path.join(BUILD, "simtrace"), obj, str(max_steps)]).stdout)
-    if engine == "verilator":
+    if engine == "mainboard":
+        romf = base + ".rom.hex"
+        with open(romf, "w") as f:
+            f.write("b0\n00\n10\n")              # b $1000 at the reset vector
+        r = run([os.path.join(MAINBOARD, "tb_mainboard"), "-gIMAGE=" + hexf,
+                 "-gIMAGE_LEN=%d" % len(image), "-gROM_IMAGE=" + romf,
+                 "-gNOISE=%s" % ("true" if noise else "false"), "--ieee-asserts=disable"],
+                timeout=3600)
+    elif engine == "verilator":
         r = run([os.path.join(VERILATOR, "obj_dir", "cpu_trace"), obj, str(waits), str(seed)],
                 timeout=1200)
     else:
@@ -171,17 +198,22 @@ def main():
     ap.add_argument("--waits", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("-j", type=int, default=os.cpu_count(), help="parallel jobs")
-    ap.add_argument("--engine", choices=["ghdl", "verilator"], default="ghdl",
-                    help="ghdl: RTL; verilator: the synthesised netlist (SYN-001)")
+    ap.add_argument("--engine", choices=["ghdl", "verilator", "mainboard"], default="ghdl",
+                    help="ghdl: CPU RTL; verilator: the synthesised CPU netlist (SYN-001); "
+                         "mainboard: CPU + chipset + memory models")
+    ap.add_argument("--noise", action="store_true",
+                    help="mainboard only: bridge traffic to SRAM during the run (BRG-003)")
     args = ap.parse_args()
     files = args.files or sorted(glob.glob(os.path.join(ROOT, "tools", "testdata", "*.s")) +
                                  glob.glob(os.path.join(ROOT, "test", "*.s")))
     build()
     if args.engine == "verilator":
         build_verilator()
+    if args.engine == "mainboard":
+        build_mainboard()
     counts = {"ok": 0, "FAIL": 0, "skip": 0}
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.j) as pool:
-        jobs = [pool.submit(check, os.path.abspath(src), args.waits, args.seed, args.engine)
+        jobs = [pool.submit(check, os.path.abspath(src), args.waits, args.seed, args.engine, args.noise)
                 for src in files]
         for src, job in zip(files, jobs):
             status, msg = job.result()

@@ -75,6 +75,15 @@ cmd = "python3 tools/cpufuzz.py --engine ghdl --programs 64 --seed 200"
 
 
 [[test]]
+id = "CPU-009"
+title = "Random-program fuzzer on the whole main board model"
+checks = "the CPU-002 generator on the real CPU + chipset + SRAM/ROM timing models: zero divergences from sim.nim, zero memory timing violations"
+method = "tools/cpufuzz.py --engine mainboard (tb_mainboard)"
+kind = "sim"
+vrow = "3.2"
+cmd = "python3 tools/cpufuzz.py --engine mainboard --programs 48 --seed 300"
+
+[[test]]
 id = "CPU-003"
 title = "Opcode × format coverage"
 checks = "100% of opcode × format × Ra/Rb combinations are executed by CPU-001 + CPU-002"
@@ -146,6 +155,8 @@ checks = "A/RW/write data stable while /STB is low and /RDY is high; D driven on
 method = "a protocol monitor that runs in every CPU-card simulation"
 kind = "sim"
 vrow = "1.3"
+cmd = "python3 tools/lockstep.py --engine mainboard"
+
 
 [[test]]
 id = "BUS-003"
@@ -339,6 +350,8 @@ checks = "bridge access while the CPU runs stalls it through /RDY and resumes cl
 method = "GHDL testbench + lockstep programs"
 kind = "sim"
 vrow = "1.1"
+cmd = "python3 tools/cpufuzz.py --engine mainboard --noise --programs 24 --seed 9 && python3 tools/lockstep.py --engine mainboard --noise"
+
 
 [[test]]
 id = "DBG-001"

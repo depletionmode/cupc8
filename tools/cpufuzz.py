@@ -177,7 +177,7 @@ def executed_opcodes(obj):
     return seen
 
 
-def run_one(i, pseed, units, engine, outdir):
+def run_one(i, pseed, units, engine, outdir, noise=False):
     """Generate, run and compare program i; returns (status, msg, obj, instrs, coverage)."""
     img = Gen(random.Random(pseed)).program(units, 0xF8 + i % 8)   # every halt encoding
     assert BASE + len(img) <= DATA, "generated code overlaps the data area"
@@ -185,7 +185,7 @@ def run_one(i, pseed, units, engine, outdir):
     with open(obj, "wb") as f:
         f.write(img)
     status, msg = lockstep.compare_image(obj, waits=-1, seed=pseed % 65535 + 1,
-                                         max_steps=200000, engine=engine)
+                                         max_steps=200000, engine=engine, noise=noise)
     if status != "ok":
         return status, msg, obj, 0, set()
     cov = executed_opcodes(obj)
@@ -200,8 +200,10 @@ def main():
     ap.add_argument("--units", type=int, default=1500)
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("-j", type=int, default=os.cpu_count(), help="parallel jobs")
-    ap.add_argument("--engine", choices=["ghdl", "verilator"], default="verilator",
-                    help="verilator (synthesised netlist, fast) or ghdl (RTL)")
+    ap.add_argument("--engine", choices=["ghdl", "verilator", "mainboard"], default="verilator",
+                    help="verilator (synthesised CPU netlist, fast), ghdl (CPU RTL), or "
+                         "mainboard (CPU + chipset + memory models)")
+    ap.add_argument("--noise", action="store_true", help="mainboard: bridge traffic during runs")
     ap.add_argument("--min-instructions", type=int, default=0,
                     help="fail unless at least this many instructions ran")
     args = ap.parse_args()
@@ -211,13 +213,15 @@ def main():
     lockstep.build()
     if args.engine == "verilator":
         lockstep.build_verilator()
-    outdir = os.path.join(FUZZ, "%s-s%d" % (args.engine, seed))     # private to this run
+    if args.engine == "mainboard":
+        lockstep.build_mainboard()
+    outdir = os.path.join(FUZZ, "%s-s%d%s" % (args.engine, seed, "-noise" if args.noise else ""))
     os.makedirs(outdir, exist_ok=True)
     rng = random.Random(seed)
     seeds = [rng.randrange(1 << 30) for _ in range(args.programs)]
     coverage, total, hung = set(), 0, 0
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.j) as pool:
-        jobs = [pool.submit(run_one, i, ps, args.units, args.engine, outdir) for i, ps in enumerate(seeds)]
+        jobs = [pool.submit(run_one, i, ps, args.units, args.engine, outdir, args.noise) for i, ps in enumerate(seeds)]
         for i, job in enumerate(jobs):
             status, msg, obj, n, cov = job.result()
             if status != "ok":

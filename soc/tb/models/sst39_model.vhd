@@ -15,6 +15,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use std.textio.all;
 
 entity sst39_model is
 	generic(
@@ -27,7 +28,8 @@ entity sst39_model is
 		T_BP:		time := 20 us;
 		T_SE:		time := 25 ms;
 		T_SCE:		time := 100 ms;
-		PATTERN:	boolean := false		-- start filled with rom_pattern() instead of erased
+		PATTERN:	boolean := false;		-- start filled with rom_pattern() instead of erased
+		INIT_FILE:	string := ""			-- optional ROM image: one hex byte per line from 0
 	);
 	port(
 		a:		in std_logic_vector(18 downto 0);	-- A18..A17 ignored on the VF010
@@ -67,11 +69,26 @@ begin
 		variable rv: std_logic_vector(7 downto 0);
 		variable ai: natural;
 		variable loaded: boolean := false;
+		file f: text;
+		variable l: line;
 	begin
 		if not loaded then
 			loaded := true;
 			if PATTERN then
 				for i in mem'range loop mem(i) := rom_pattern(i); end loop;
+			end if;
+			if INIT_FILE /= "" then
+				ai := 0;
+				file_open(f, INIT_FILE, read_mode);
+				while not endfile(f) loop
+					readline(f, l);
+					if l /= null and l'length > 0 then
+						hread(l, rv);
+						mem(ai) := rv;
+						ai := ai + 1;
+					end if;
+				end loop;
+				file_close(f);
 			end if;
 		end if;
 		if a'event then
