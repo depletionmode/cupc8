@@ -10,6 +10,7 @@ Boards are built with the pcbnew API from the netlist that kicad-cli exports
 from the schematic, so the board can only contain what the schematic says.
 """
 
+import math
 import os
 import re
 import subprocess
@@ -126,24 +127,95 @@ def load_symbol(lib_id):
     return sym
 
 
-def symbol_pins(sym, unit=1):
-    """{number: (x, y, angle, name, type)} for one unit (style 1)."""
-    pins = {}
+# --------------------------------------------------------------- schematic
+#
+# Layout rules, enforced by Schematic.check() on every write:
+#   - no text touches other text, a symbol body, a pin or a wire
+#   - no two symbol bodies overlap, and no wire crosses another part's body
+#   - everything is inside the page frame and clear of the title block
+# Reference and Value are placed by Schematic.write in the first free spot
+# beside the symbol, so the checker is the only judge of "looks right".
+
+TEXT = 1.27                              # field and label text size
+CHAR_W = 0.9                             # stroke-font character width / size (a little generous)
+MARGIN = 0.25                            # clearance kept around text
+PAGES = {"A4": (297, 210), "A3": (420, 297), "A2": (594, 420)}
+FRAME = 10                               # page border
+TITLE_BLOCK = (112, 36)                  # bottom-right, width x height
+
+
+def text_box(x, y, s, angle=0, hj="center", vj="center", size=TEXT):
+    """Axis-aligned box of a text item, angle 0 (horizontal) or 90 (reading up)."""
+    w, h = len(s) * size * CHAR_W, size * 1.1
+    a0 = {"left": 0, "right": -w, "center": -w / 2}[hj]
+    b0 = {"bottom": -h, "top": 0, "center": -h / 2}[vj]
+    if angle % 180 == 0:
+        return (x + a0, y + b0, x + a0 + w, y + b0 + h)
+    # rotated 90: the text runs up the page, its bottom faces +x
+    return (x + b0, y - a0 - w, x + b0 + h, y - a0)
+
+
+def overlap(a, b, margin=0.0):
+    return a[0] < b[2] + margin and b[0] < a[2] + margin and a[1] < b[3] + margin and b[1] < a[3] + margin
+
+
+def seg_box(x0, y0, x1, y1, width=0.15):
+    return (min(x0, x1) - width / 2, min(y0, y1) - width / 2, max(x0, x1) + width / 2, max(y0, y1) + width / 2)
+
+
+def union(boxes):
+    boxes = list(boxes)
+    return (min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
+def _units(sym, unit):
     base = str(sym[1]).split(":")[-1]
     for sub in find(sym, "symbol"):
         m = re.match(re.escape(base) + r"_(\d+)_(\d+)$", str(sub[1]))
-        if not m or int(m.group(1)) not in (0, unit) or int(m.group(2)) not in (0, 1):
-            continue
+        if m and int(m.group(1)) in (0, unit) and int(m.group(2)) in (0, 1):
+            yield sub
+
+
+def symbol_graphics(sym, unit=1):
+    """Points of the body outline (symbol coordinates, Y up)."""
+    pts = []
+    for sub in _units(sym, unit):
+        for e in sub:
+            if not isinstance(e, list):
+                continue
+            if e[0] == "rectangle":
+                for k in ("start", "end"):
+                    p = find1(e, k)
+                    pts.append((float(p[1]), float(p[2])))
+            elif e[0] in ("polyline", "bezier"):
+                pts += [(float(p[1]), float(p[2])) for p in find(find1(e, "pts"), "xy")]
+            elif e[0] == "arc":
+                pts += [(float(find1(e, k)[1]), float(find1(e, k)[2])) for k in ("start", "mid", "end")]
+            elif e[0] == "circle":
+                c, r = find1(e, "center"), float(find1(e, "radius")[1])
+                pts += [(float(c[1]) - r, float(c[2]) - r), (float(c[1]) + r, float(c[2]) + r)]
+    return pts
+
+
+def symbol_pins(sym, unit=1):
+    """{number: (x, y, angle, name, type, length)} for one unit (style 1)."""
+    pins = {}
+    for sub in _units(sym, unit):
         for p in find(sub, "pin"):
             at = find1(p, "at")
-            num = find1(p, "number")[1]
-            name = find1(p, "name")[1]
-            pins[str(num)] = (float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0,
-                              str(name), str(p[1]))
+            ln = find1(p, "length")
+            pins[str(find1(p, "number")[1])] = (
+                float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0,
+                str(find1(p, "name")[1]), str(p[1]), float(ln[1]) if ln else 2.54)
     return pins
 
 
-# --------------------------------------------------------------- schematic
+def _hidden(prop):
+    if find1(prop, "hide"):
+        return find1(prop, "hide")[1] == "yes"
+    eff = find1(prop, "effects") or []
+    return any(e == "hide" or (isinstance(e, list) and e[0] == "hide" and e[-1] != "no") for e in eff)
+
 
 class Part:
     def __init__(self, sch, lib_id, ref, value, footprint, at, rot, fields, unit):
@@ -152,7 +224,10 @@ class Part:
         self.uuid = uid()
         self.sym = sch._symbol(lib_id)
         self.pins = symbol_pins(self.sym, unit)
-        self.used = set()
+        self.used = {}                   # pin number -> net (None for no-connect)
+        props = {str(p[1]): p for p in find(self.sym, "property")}
+        self.show = {k: k in props and not _hidden(props[k]) for k in ("Reference", "Value")}
+        self.field_at = {}               # field -> (x, y), set by Schematic.write
 
     def pin(self, key):
         """A pin by number, or by name if the name is unique."""
@@ -164,16 +239,44 @@ class Part:
             raise KeyError("%s: no single pin %r (have %s)" % (self.ref, key, sorted(self.pins)))
         return hits[0]
 
-    def pin_xy(self, num):
-        """Schematic position of a pin's connection point, and its outward direction."""
-        x, y, ang, _, _ = self.pins[num]
-        # symbol Y is up, schematic Y is down; then rotate by the placement
+    def xf(self, x, y):
+        """Symbol coordinates (Y up) to the sheet (Y down), with the part's rotation."""
         r = self.rot % 360
         rx, ry = {0: (x, -y), 90: (-y, -x), 180: (-x, y), 270: (y, x)}[r]
+        return self.at[0] + rx, self.at[1] + ry
+
+    def pin_xy(self, num):
+        """Sheet position of a pin's connection point, and its outward direction."""
+        x, y, ang = self.pins[num][:3]
         # a pin points from its connection point into the body at `ang`
-        out = (ang + 180 + r) % 360
+        out = (ang + 180 + self.rot) % 360
         dx, dy = {0: (1, 0), 90: (0, -1), 180: (-1, 0), 270: (0, 1)}[round(out) % 360]
-        return (self.at[0] + rx, self.at[1] + ry), (dx, dy)
+        return self.xf(x, y), (dx, dy)
+
+    def body_box(self):
+        pts = [self.xf(x, y) for x, y in symbol_graphics(self.sym, self.unit)]
+        return union((x, y, x, y) for x, y in pts) if pts else None
+
+    def pin_boxes(self):
+        out = []
+        for n, (x, y, ang, _, _, ln) in self.pins.items():
+            a = math.radians(ang)
+            ex, ey = x + ln * math.cos(a), y + ln * math.sin(a)
+            (x0, y0), (x1, y1) = self.xf(x, y), self.xf(ex, ey)
+            out.append(seg_box(x0, y0, x1, y1))
+        return out
+
+    def extent(self):
+        boxes = self.pin_boxes() + ([self.body_box()] if self.body_box() else [])
+        return union(boxes)
+
+    def field_boxes(self):
+        """Boxes of the visible Reference/Value texts, once placed."""
+        out = []
+        for k, text in (("Reference", self.ref), ("Value", self.value)):
+            if self.show[k] and k in self.field_at:
+                out.append(text_box(*self.field_at[k], text))
+        return out
 
 
 class Schematic:
@@ -183,6 +286,8 @@ class Schematic:
         self.parts = []
         self.syms = {}
         self.items = []
+        self.wires = []                  # (x0, y0, x1, y1, part)
+        self.labels = []                 # (box, text, part)
 
     def _symbol(self, lib_id):
         if lib_id not in self.syms:
@@ -194,38 +299,136 @@ class Schematic:
         self.parts.append(p)
         return p
 
+    def _stacked(self, part, num):
+        """Pins of `part` at the same point as `num` (stacked pins, one connection)."""
+        here = part.pin_xy(num)[0]
+        return [n for n in part.pins if part.pin_xy(n)[0] == here]
+
     def connect(self, part, pin, net, stub=2 * GRID):
         num = part.pin(pin)
         if num in part.used:
-            raise ValueError("%s pin %s connected twice" % (part.ref, num))
-        part.used.add(num)
+            if part.used[num] != net:
+                raise ValueError("%s pin %s is on %s, not %s" % (part.ref, num, part.used[num], net))
+            return                       # a stacked pin already drawn
+        for n in self._stacked(part, num):
+            part.used[n] = net
         (x, y), (dx, dy) = part.pin_xy(num)
         ex, ey = round(x + dx * stub, 4), round(y + dy * stub, 4)
         self.items.append(["wire", ["pts", ["xy", x, y], ["xy", ex, ey]],
                            ["stroke", ["width", 0], ["type", "default"]], ["uuid", uid()]])
+        self.wires.append((x, y, ex, ey, part))
         angle = {(1, 0): 0, (0, -1): 90, (-1, 0): 180, (0, 1): 270}[(dx, dy)]
         justify = {0: "left", 90: "left", 180: "right", 270: "right"}[angle]
         self.items.append(["label", Q(net), ["at", ex, ey, angle % 180],
                            ["fields_autoplaced", "yes"],
-                           ["effects", ["font", ["size", 1.27, 1.27]], ["justify", justify, "bottom"]],
+                           ["effects", ["font", ["size", TEXT, TEXT]], ["justify", justify, "bottom"]],
                            ["uuid", uid()]])
+        # the text sits just off the wire, running away from the pin
+        box = text_box(ex, ey, net, angle % 180, justify, "bottom")
+        off = 0.3                        # KiCad lifts label text off the wire
+        box = (box[0], box[1] - off, box[2], box[3] - off) if angle % 180 == 0 else \
+              (box[0] - off, box[1], box[2] - off, box[3])
+        self.labels.append((box, net, part))
 
     def nc(self, part, pin):
         num = part.pin(pin)
-        part.used.add(num)
+        for n in self._stacked(part, num):
+            part.used[n] = None
         (x, y), _ = part.pin_xy(num)
         self.items.append(["no_connect", ["at", x, y], ["uuid", uid()]])
 
     def unconnected(self):
         return [(p.ref, n) for p in self.parts for n in p.pins if n not in p.used]
 
+    # ---- layout
+
+    def _page(self):
+        w, h = PAGES[self.paper]
+        drawable = (FRAME, FRAME, w - FRAME, h - FRAME)
+        title = (w - FRAME - TITLE_BLOCK[0], h - FRAME - TITLE_BLOCK[1], w - FRAME, h - FRAME)
+        return drawable, title
+
+    def _obstacles(self, skip_fields_of=None):
+        """(box, kind, part) for everything drawn."""
+        obs = []
+        for p in self.parts:
+            b = p.body_box()
+            if b:
+                obs.append((b, "body", p))
+            obs += [(pb, "pin", p) for pb in p.pin_boxes()]
+            if p is not skip_fields_of:
+                obs += [(fb, "text", p) for fb in p.field_boxes()]
+        obs += [(seg_box(*w[:4]), "wire", w[4]) for w in self.wires]
+        obs += [(box, "text", part) for box, _, part in self.labels]
+        return obs
+
+    def _place_fields(self, p):
+        texts = [(k, t) for k, t in (("Reference", p.ref), ("Value", p.value)) if p.show[k]]
+        if not texts:
+            return
+        pitch = TEXT * 1.6
+        w = max(len(t) for _, t in texts) * TEXT * CHAR_W
+        h = pitch * len(texts)
+        x0, y0, x1, y1 = p.extent()
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        gap = 1.0
+        spots = []
+        for shift in (0, GRID, -GRID, 2 * GRID, -2 * GRID, 3 * GRID, -3 * GRID):
+            spots += [(x1 + gap + w / 2, cy + shift), (x0 - gap - w / 2, cy + shift),
+                      (cx + shift, y0 - gap - h / 2), (cx + shift, y1 + gap + h / 2)]
+        drawable, title = self._page()
+        obs = [b for b, _, q in self._obstacles(skip_fields_of=p)]
+        for sx, sy in spots:
+            at = {k: (sx, sy + (i - (len(texts) - 1) / 2) * pitch) for i, (k, _) in enumerate(texts)}
+            boxes = [text_box(*at[k], t) for k, t in texts]
+            if all(not overlap(b, o, MARGIN) for b in boxes for o in obs) and \
+               all(drawable[0] <= b[0] and b[2] <= drawable[2] and drawable[1] <= b[1] and b[3] <= drawable[3]
+                   and not overlap(b, title) for b in boxes):
+                p.field_at = {k: (round(v[0], 3), round(v[1], 3)) for k, v in at.items()}
+                return
+        raise ValueError("%s: no free spot for its reference and value; move it" % p.ref)
+
+    def check(self):
+        """Every layout rule; returns a list of problems (empty = clean)."""
+        bad = []
+        obs = self._obstacles()
+        drawable, title = self._page()
+        texts = [(b, p) for b, k, p in obs if k == "text"]
+        for i, (a, pa) in enumerate(texts):
+            for b, pb in texts[i + 1:]:
+                if overlap(a, b):
+                    bad.append("text overlaps text near (%.1f, %.1f) [%s/%s]" % (a[0], a[1], pa.ref, pb.ref))
+            for b, kind, q in obs:
+                if kind in ("body", "pin", "wire") and overlap(a, b, -0.02):
+                    bad.append("text of %s overlaps a %s of %s near (%.1f, %.1f)" % (pa.ref, kind, q.ref, a[0], a[1]))
+        bodies = [(b, p) for b, k, p in obs if k == "body"]
+        for i, (a, pa) in enumerate(bodies):
+            for b, pb in bodies[i + 1:]:
+                if overlap(a, b):
+                    bad.append("bodies of %s and %s overlap" % (pa.ref, pb.ref))
+        for w in self.wires:
+            for b, pb in bodies:
+                if pb is not w[4] and overlap(seg_box(*w[:4]), b):
+                    bad.append("wire from %s crosses the body of %s" % (w[4].ref, pb.ref))
+        for b, kind, p in obs:
+            if not (drawable[0] <= b[0] and b[2] <= drawable[2] and drawable[1] <= b[1] and b[3] <= drawable[3]):
+                bad.append("%s of %s is outside the page frame" % (kind, p.ref))
+            elif overlap(b, title):
+                bad.append("%s of %s is on the title block" % (kind, p.ref))
+        return sorted(set(bad))
+
     def _instance(self, p):
         props = []
         fields = [("Reference", p.ref), ("Value", p.value), ("Footprint", p.footprint)]
         fields += list(p.fields.items())
-        for i, (k, v) in enumerate(fields):
-            props.append(["property", Q(k), Q(v), ["at", p.at[0], p.at[1] - 5 - 2 * i if i < 2 else p.at[1], 0],
-                          ["effects", ["font", ["size", 1.27, 1.27]]] + ([] if i < 2 else [["hide", "yes"]])])
+        # KiCad draws a field's angle relative to the symbol: 90 on a quarter-
+        # turned part is horizontal on the sheet
+        fa = 90 if p.rot % 180 else 0
+        for k, v in fields:
+            x, y = p.field_at.get(k, p.at)
+            shown = k in p.field_at and p.show.get(k, False)
+            props.append(["property", Q(k), Q(v), ["at", x, y, fa],
+                          ["effects", ["font", ["size", TEXT, TEXT]]] + ([] if shown else [["hide", "yes"]])])
         return (["symbol", ["lib_id", Q(p.lib_id)], ["at", p.at[0], p.at[1], p.rot], ["unit", p.unit],
                  ["exclude_from_sim", "no"], ["in_bom", "yes"], ["on_board", "yes"], ["dnp", "no"],
                  ["uuid", p.uuid]] + props +
@@ -250,7 +453,13 @@ class Schematic:
                            ["options", Q("")], ["descr", Q("")]] for n in fps]) + "\n")
 
     def write(self, path, footprint_libs=()):
-        """footprint_libs: extra libraries the board uses (logos and such)."""
+        """Place the fields, check the layout, and write the sheet.
+        footprint_libs: extra libraries the board uses (logos and such)."""
+        for p in self.parts:
+            self._place_fields(p)
+        bad = self.check()
+        if bad:
+            raise ValueError("schematic layout:\n  " + "\n  ".join(bad))
         self.write_lib_tables(os.path.dirname(os.path.abspath(path)), footprint_libs)
         doc = (["kicad_sch", ["version", SCH_VERSION], ["generator", Q("cupc8-kicadgen")],
                 ["uuid", self.uuid], ["paper", Q(self.paper)],

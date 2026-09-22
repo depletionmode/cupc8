@@ -37,7 +37,7 @@ def schematic(path):
                fields={"LCSC": "C15849"})
     r3 = s.add("Device:R", "R3", "1k", "Resistor_SMD:R_0603_1608Metric", at=(80 * G, 30 * G),
                fields={"LCSC": "C21190"})
-    d1 = s.add("Device:LED", "D1", "green", "LED_SMD:LED_0603_1608Metric", at=(80 * G, 38 * G),
+    d1 = s.add("Device:LED", "D1", "green", "LED_SMD:LED_0603_1608Metric", at=(80 * G, 46 * G),
                rot=90, fields={"LCSC": "C72043"})
     j2 = s.add("Connector_Generic:Conn_01x02", "J2", "3V3 out",
                "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", at=(92 * G, 30 * G))
@@ -147,7 +147,7 @@ def main():
     def drc():
         rpt = os.path.join(out, "drc.json")
         kg.run(["kicad-cli", "pcb", "drc", "--format", "json", "--schematic-parity",
-                "--severity-error", "--exit-code-violations", "-o", rpt, pcb])
+                "--severity-all", "--exit-code-violations", "-o", rpt, pcb])
     step("DRC + schematic parity", drc)
 
     fab = os.path.join(out, "fab")
