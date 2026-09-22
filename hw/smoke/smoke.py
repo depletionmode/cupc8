@@ -22,9 +22,11 @@ G = kg.GRID
 
 def schematic(path):
     s = kg.Schematic("smoke", "CUPC/8 KiCad pipeline smoke test")
-    j1 = s.add("Connector:USB_C_Receptacle_PowerOnly_6P", "J1", "USB-C power",
-               "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal",
-               at=(20 * G, 30 * G))
+    # KiCad's footprint for this exact part is drawn from the maker's datasheet
+    # and has a matching 3D model; EasyEDA's model for it is 2.5 mm out
+    j1 = s.add("Connector:USB_C_Receptacle_USB2.0_16P", "J1", "HRO TYPE-C-31-M-12",
+               "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+               at=(20 * G, 30 * G), fields={"LCSC": "C165948"})
     r1 = s.add("Device:R", "R1", "5.1k", "Resistor_SMD:R_0603_1608Metric", at=(40 * G, 24 * G),
                fields={"LCSC": "C23186"})
     r2 = s.add("Device:R", "R2", "5.1k", "Resistor_SMD:R_0603_1608Metric", at=(44 * G, 24 * G),
@@ -44,12 +46,13 @@ def schematic(path):
     f1 = s.add("power:PWR_FLAG", "#FLG01", "PWR_FLAG", at=(30 * G, 44 * G))
     f2 = s.add("power:PWR_FLAG", "#FLG02", "PWR_FLAG", at=(36 * G, 44 * G))
 
-    for p in ("A9", "B9"):
-        s.connect(j1, p, "VBUS")
-    for p in ("A12", "B12", "SH"):
-        s.connect(j1, p, "GND")
+    s.connect(j1, "A4", "VBUS")            # A9, B4, B9 are stacked on it
+    s.connect(j1, "A1", "GND")             # A12, B1, B12 likewise
+    s.connect(j1, "SH", "GND")
     s.connect(j1, "A5", "CC1")
     s.connect(j1, "B5", "CC2")
+    for p in ("A6", "A7", "B6", "B7", "A8", "B8"):   # power only: no data
+        s.nc(j1, p)
     s.connect(r1, 1, "CC1")
     s.connect(r1, 2, "GND")
     s.connect(r2, 1, "CC2")
@@ -79,7 +82,10 @@ def schematic(path):
 
 
 PLACEMENT = {
-    "J1": (4, 15, 270),
+    # the maker's recommended layout puts the board edge 5.79 mm from the
+    # locating pegs (y = -2.6), i.e. at y = 3.19; the shell overhangs it by
+    # 0.51 mm (hw/datasheets/C165948_HRO_TYPE-C-31-M-12.pdf)
+    "J1": (3.19, 15, 270),
     "R1": (12, 9, 0),
     "R2": (12, 21, 0),
     "C1": (18, 15, 90),
@@ -143,6 +149,12 @@ def main():
         kg.fill_zones(board["b"])
         pcbnew.SaveBoard(pcb, board["b"])
     step("zones + save", fill)
+
+    def silk():
+        bad = kg.check_silk(board["b"]) + kg.check_models()
+        if bad:
+            raise SystemExit("silkscreen:\n  " + "\n  ".join(bad))
+    step("silkscreen, 3D models", silk)
 
     def drc():
         rpt = os.path.join(out, "drc.json")

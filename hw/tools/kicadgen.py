@@ -19,7 +19,24 @@ import uuid as uuidlib
 KICAD_SYMBOLS = os.environ.get("KICAD_SYMBOL_DIR", "/usr/share/kicad/symbols")
 KICAD_FOOTPRINTS = os.environ.get("KICAD_FOOTPRINT_DIR", "/usr/share/kicad/footprints")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PROJECT_FOOTPRINTS = {"cupc8": os.path.join(ROOT, "hw", "lib", "cupc8.pretty")}
+HW_LIB = os.path.join(ROOT, "hw", "lib")
+PROJECT_FOOTPRINTS = {"cupc8": os.path.join(HW_LIB, "cupc8.pretty"), "jlc": os.path.join(HW_LIB, "jlc.pretty")}
+PROJECT_SYMBOLS = {"jlc": os.path.join(HW_LIB, "jlc.kicad_sym")}   # imported by hw/tools/jlcimport.py
+
+# 3D models for stock footprints whose model KiCad does not ship, placed from
+# the maker's drawing: footprint -> (model under hw/lib/models, offset mm
+# (x, y up, z), rotation deg (x, y, z)). check_models() verifies the fit.
+MODEL_OVERRIDES = {
+    # EasyEDA's model of C165948 (8.94 x 3.25 mm, as the HRO drawing). Its
+    # opening is at model y = +2.85; KiCad's footprint has it at y = +3.7
+    # facing +y, hence the half turn and the 0.85 mm shift.
+    "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
+        ("HRO_TYPE-C-31-M-12.wrl", (0, -0.85, 0), (0, 0, 180)),
+}
+
+
+def symbol_path(lib):
+    return PROJECT_SYMBOLS.get(lib) or os.path.join(KICAD_SYMBOLS, lib + ".kicad_sym")
 
 
 def footprint_dir(lib):
@@ -96,7 +113,7 @@ _libs = {}
 
 def _library(name):
     if name not in _libs:
-        with open(os.path.join(KICAD_SYMBOLS, name + ".kicad_sym")) as f:
+        with open(symbol_path(name)) as f:
             lib = parse(f.read())
         _libs[name] = {s[1]: s for s in find(lib, "symbol")}
     return _libs[name]
@@ -137,16 +154,31 @@ def load_symbol(lib_id):
 # beside the symbol, so the checker is the only judge of "looks right".
 
 TEXT = 1.27                              # field and label text size
-CHAR_W = 0.9                             # stroke-font character width / size (a little generous)
 MARGIN = 0.25                            # clearance kept around text
 PAGES = {"A4": (297, 210), "A3": (420, 297), "A2": (594, 420)}
 FRAME = 10                               # page border
 TITLE_BLOCK = (112, 36)                  # bottom-right, width x height
 
 
+_extents = {}
+
+
+def text_extent(s, size=TEXT):
+    """(width, height) in mm of `s` in KiCad's stroke font, measured by KiCad."""
+    if (s, size) not in _extents:
+        import pcbnew
+        t = pcbnew.PCB_TEXT(pcbnew.BOARD())
+        t.SetText(s)
+        t.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(size), pcbnew.FromMM(size)))
+        t.SetTextThickness(pcbnew.FromMM(size * 0.12))
+        bb = t.GetBoundingBox()
+        _extents[s, size] = (pcbnew.ToMM(bb.GetWidth()), pcbnew.ToMM(bb.GetHeight()))
+    return _extents[s, size]
+
+
 def text_box(x, y, s, angle=0, hj="center", vj="center", size=TEXT):
     """Axis-aligned box of a text item, angle 0 (horizontal) or 90 (reading up)."""
-    w, h = len(s) * size * CHAR_W, size * 1.1
+    w, h = text_extent(s, size)
     a0 = {"left": 0, "right": -w, "center": -w / 2}[hj]
     b0 = {"bottom": -h, "top": 0, "center": -h / 2}[vj]
     if angle % 180 == 0:
@@ -198,7 +230,7 @@ def symbol_graphics(sym, unit=1):
 
 
 def symbol_pins(sym, unit=1):
-    """{number: (x, y, angle, name, type, length)} for one unit (style 1)."""
+    """{number: (x, y, angle, name, type, length, hidden)} for one unit (style 1)."""
     pins = {}
     for sub in _units(sym, unit):
         for p in find(sub, "pin"):
@@ -206,7 +238,8 @@ def symbol_pins(sym, unit=1):
             ln = find1(p, "length")
             pins[str(find1(p, "number")[1])] = (
                 float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0,
-                str(find1(p, "name")[1]), str(p[1]), float(ln[1]) if ln else 2.54)
+                str(find1(p, "name")[1]), str(p[1]), float(ln[1]) if ln else 2.54,
+                "hide" in p or (find1(p, "hide") or [None, "no"])[1] == "yes")
     return pins
 
 
@@ -259,11 +292,30 @@ class Part:
 
     def pin_boxes(self):
         out = []
-        for n, (x, y, ang, _, _, ln) in self.pins.items():
+        for n, (x, y, ang, _, _, ln, hidden) in self.pins.items():
+            if hidden:
+                continue
             a = math.radians(ang)
             ex, ey = x + ln * math.cos(a), y + ln * math.sin(a)
             (x0, y0), (x1, y1) = self.xf(x, y), self.xf(ex, ey)
             out.append(seg_box(x0, y0, x1, y1))
+        return out
+
+    def number_boxes(self):
+        """Pin-number texts: centred along the pin, just above (or left of) it."""
+        if find1(self.sym, "pin_numbers") and "hide" in str(find1(self.sym, "pin_numbers")):
+            return []
+        out = []
+        for n, (x, y, ang, _, _, ln, hidden) in self.pins.items():
+            if hidden:
+                continue
+            a = math.radians(ang)
+            (x0, y0), (x1, y1) = self.xf(x, y), self.xf(x + ln * math.cos(a), y + ln * math.sin(a))
+            mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            if abs(y0 - y1) < 1e-6:          # horizontal pin: number above it
+                out.append((text_box(mx, my - 0.25, n, 0, "center", "bottom"), n))
+            else:                            # vertical: reads up, left of the pin
+                out.append((text_box(mx - 0.25, my, n, 90, "center", "bottom"), n))
         return out
 
     def extent(self):
@@ -288,6 +340,7 @@ class Schematic:
         self.items = []
         self.wires = []                  # (x0, y0, x1, y1, part)
         self.labels = []                 # (box, text, part)
+        self.ncs = []                    # (box, part): no-connect crosses
 
     def _symbol(self, lib_id):
         if lib_id not in self.syms:
@@ -336,6 +389,7 @@ class Schematic:
             part.used[n] = None
         (x, y), _ = part.pin_xy(num)
         self.items.append(["no_connect", ["at", x, y], ["uuid", uid()]])
+        self.ncs.append(((x - 0.65, y - 0.65, x + 0.65, y + 0.65), part))
 
     def unconnected(self):
         return [(p.ref, n) for p in self.parts for n in p.pins if n not in p.used]
@@ -358,24 +412,33 @@ class Schematic:
             obs += [(pb, "pin", p) for pb in p.pin_boxes()]
             if p is not skip_fields_of:
                 obs += [(fb, "text", p) for fb in p.field_boxes()]
+            obs += [(nb, "number", p) for nb, _ in p.number_boxes()]
         obs += [(seg_box(*w[:4]), "wire", w[4]) for w in self.wires]
         obs += [(box, "text", part) for box, _, part in self.labels]
+        obs += [(box, "nc", part) for box, part in self.ncs]
         return obs
 
     def _place_fields(self, p):
         texts = [(k, t) for k, t in (("Reference", p.ref), ("Value", p.value)) if p.show[k]]
         if not texts:
             return
-        pitch = TEXT * 1.6
-        w = max(len(t) for _, t in texts) * TEXT * CHAR_W
+        pitch = text_extent("X")[1] + 0.2
+        w = max(text_extent(t)[0] for _, t in texts)
         h = pitch * len(texts)
         x0, y0, x1, y1 = p.extent()
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-        gap = 1.0
+        gap = GRID / 2
+        # sides with no pins first: text there never crowds wiring
+        pin_sides = {p.pin_xy(n)[1] for n, pin in p.pins.items() if not pin[6]}
+        sides = [(1, 0), (0, -1), (-1, 0), (0, 1)]          # right, above, left, below
+        sides = [d for d in sides if d not in pin_sides] + [d for d in sides if d in pin_sides]
         spots = []
-        for shift in (0, GRID, -GRID, 2 * GRID, -2 * GRID, 3 * GRID, -3 * GRID):
-            spots += [(x1 + gap + w / 2, cy + shift), (x0 - gap - w / 2, cy + shift),
-                      (cx + shift, y0 - gap - h / 2), (cx + shift, y1 + gap + h / 2)]
+        for dx, dy in sides:
+            for shift in (0, GRID, -GRID, 2 * GRID, -2 * GRID, 3 * GRID, -3 * GRID):
+                if dx:
+                    spots.append((x1 + gap + w / 2 if dx > 0 else x0 - gap - w / 2, cy + shift))
+                else:
+                    spots.append((cx + shift, y0 - gap - h / 2 if dy < 0 else y1 + gap + h / 2))
         drawable, title = self._page()
         obs = [b for b, _, q in self._obstacles(skip_fields_of=p)]
         for sx, sy in spots:
@@ -399,8 +462,18 @@ class Schematic:
                 if overlap(a, b):
                     bad.append("text overlaps text near (%.1f, %.1f) [%s/%s]" % (a[0], a[1], pa.ref, pb.ref))
             for b, kind, q in obs:
-                if kind in ("body", "pin", "wire") and overlap(a, b, -0.02):
+                if kind in ("body", "pin", "wire", "nc", "number") and overlap(a, b, -0.02):
                     bad.append("text of %s overlaps a %s of %s near (%.1f, %.1f)" % (pa.ref, kind, q.ref, a[0], a[1]))
+        # a pin number must fit along its pin (not run into the body) and
+        # clear everything else drawn
+        for p in self.parts:
+            body = p.body_box()
+            for nb, n in p.number_boxes():
+                if body and overlap(nb, body, -0.02):
+                    bad.append("pin number %s of %s runs into its body (pin too short)" % (n, p.ref))
+                for b, kind, q in obs:
+                    if kind in ("text", "nc", "wire") and overlap(nb, b, -0.02) and not (kind == "wire" and q is p):
+                        bad.append("pin number %s of %s overlaps a %s of %s" % (n, p.ref, kind, q.ref))
         bodies = [(b, p) for b, k, p in obs if k == "body"]
         for i, (a, pa) in enumerate(bodies):
             for b, pb in bodies[i + 1:]:
@@ -444,7 +517,7 @@ class Schematic:
         with open(os.path.join(outdir, "sym-lib-table"), "w") as f:
             f.write(dump(["sym_lib_table", ["version", 7]] +
                          [["lib", ["name", Q(n)], ["type", Q("KiCad")],
-                           ["uri", Q(os.path.join(KICAD_SYMBOLS, n + ".kicad_sym"))],
+                           ["uri", Q(symbol_path(n))],
                            ["options", Q("")], ["descr", Q("")]] for n in syms]) + "\n")
         with open(os.path.join(outdir, "fp-lib-table"), "w") as f:
             f.write(dump(["fp_lib_table", ["version", 7]] +
@@ -532,7 +605,13 @@ def write_project(path, power_nets=(), rules=None):
                 "schematic_color": "rgba(0, 0, 0, 0.000)", "priority": 2147483647 if n == "Default" else 0}
                for n, w, c, vd, vdr in NET_CLASSES]
     pro = {
-        "board": {"design_settings": {"rules": dict(JLC_RULES, **(rules or {}))}},
+        "board": {"design_settings": {
+            "rules": dict(JLC_RULES, **(rules or {})),
+            # boards are regenerated from the libraries on every run, so they
+            # cannot drift from them; the only differences are the deliberate
+            # edits here (designators placed, silkscreen trimmed to the edge)
+            "rule_severities": {"lib_footprint_mismatch": "ignore"},
+        }},
         "net_settings": {"classes": classes, "meta": {"version": 4},
                          "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets]},
         "meta": {"filename": os.path.basename(path), "version": 3},
@@ -574,6 +653,17 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         fp = pcbnew.FootprintLoad(footprint_dir(lib), name)
         if fp is None:
             raise KeyError("%s: footprint %s not found" % (ref, c["footprint"]))
+        override = MODEL_OVERRIDES.get(c["footprint"])
+        if override:
+            m = pcbnew.FP_3DMODEL()
+            m.m_Filename = os.path.join(HW_LIB, "models", override[0])
+            m.m_Offset = pcbnew.VECTOR3D(*override[1])
+            m.m_Rotation = pcbnew.VECTOR3D(*override[2])
+            fp.Models().clear()
+            fp.Models().push_back(m)
+        models = fp.Models()                 # index it: iterating yields copies
+        for i in range(len(models)):         # imported parts: ${CUPC8_LIB}/jlc.3dshapes/...
+            models[i].m_Filename = models[i].m_Filename.replace("${CUPC8_LIB}", HW_LIB)
         fp.SetReference(ref)
         fp.SetValue(c["value"])
         fp.SetFPID(pcbnew.LIB_ID(lib, name))
@@ -616,6 +706,9 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         seg.SetWidth(mm(0.1))
         board.Add(seg)
 
+    clip_silk_to_board(board, outline)
+    place_designators(board, outline)
+
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     for net in zones:
         for layer in copper:
@@ -631,6 +724,171 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
                 ol.Append(mm(px), mm(py))
             board.Add(z)
     return board
+
+
+def clip_silk_to_board(board, outline, gap=0.15):
+    """Trim footprint silkscreen to the board: a connector that overhangs the
+    edge (as its maker intends) has outline lines that cannot be printed.
+    Segments are clipped `gap` inside the edge; any other silk shape that
+    leaves the board is an error, so nothing is dropped silently."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    x0, y0, x1, y1 = outline
+    for fp in board.GetFootprints():
+        gi = fp.GraphicalItems()          # indexed: iterating it breaks on Python 3.14
+        for g in [gi[i].Cast() for i in range(len(gi))]:
+            if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
+                continue
+            w = to(g.GetWidth()) / 2 + gap
+            lo_x, lo_y, hi_x, hi_y = x0 + w, y0 + w, x1 - w, y1 - w
+            if not (isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT):
+                b = g.GetBoundingBox()
+                if to(b.GetLeft()) < lo_x or to(b.GetTop()) < lo_y or to(b.GetRight()) > hi_x or to(b.GetBottom()) > hi_y:
+                    raise ValueError("%s: silkscreen shape leaves the board" % fp.GetReference())
+                continue
+            ax, ay, bx, by = to(g.GetStart().x), to(g.GetStart().y), to(g.GetEnd().x), to(g.GetEnd().y)
+            # Liang-Barsky
+            t0, t1, dx, dy = 0.0, 1.0, bx - ax, by - ay
+            for p, q in ((-dx, ax - lo_x), (dx, hi_x - ax), (-dy, ay - lo_y), (dy, hi_y - ay)):
+                if p == 0:
+                    if q < 0:
+                        t0, t1 = 1, 0
+                elif p < 0:
+                    t0 = max(t0, q / p)
+                else:
+                    t1 = min(t1, q / p)
+            if t1 - t0 <= 1e-9 or math.hypot(dx, dy) * (t1 - t0) < 0.2:
+                fp.Remove(g)
+                continue
+            g.SetStart(pcbnew.VECTOR2I(mm(ax + dx * t0), mm(ay + dy * t0)))
+            g.SetEnd(pcbnew.VECTOR2I(mm(ax + dx * t1), mm(ay + dy * t1)))
+
+
+SILK_TEXT = (1.0, 0.15)                 # designator height and stroke (JLC minimum stroke)
+
+
+def place_designators(board, outline, gap=0.3):
+    """Put every reference designator horizontal, in the first spot around its
+    part that clears all pads, every other part's courtyard, the other
+    designators, board-only graphics (logos) and the board edge."""
+    import pcbnew
+    mm = pcbnew.FromMM
+
+    def box(bb, grow=0.0):
+        return (pcbnew.ToMM(bb.GetLeft()) - grow, pcbnew.ToMM(bb.GetTop()) - grow,
+                pcbnew.ToMM(bb.GetRight()) + grow, pcbnew.ToMM(bb.GetBottom()) + grow)
+
+    def courtyard(fp):
+        cy = fp.GetCourtyard(pcbnew.F_CrtYd if not fp.IsFlipped() else pcbnew.B_CrtYd)
+        return box(cy.BBox()) if cy.OutlineCount() else box(fp.GetBoundingBox(False))
+
+    fps = list(board.GetFootprints())
+    pads = [box(p.GetBoundingBox(), 0.15) for fp in fps for p in fp.Pads()]
+    courts = {fp.GetReference(): courtyard(fp) for fp in fps}
+    x0, y0, x1, y1 = outline
+    inside = (x0 + 0.3, y0 + 0.3, x1 - 0.3, y1 - 0.3)
+    placed = []
+    for fp in sorted(fps, key=lambda f: f.GetReference()):
+        ref = fp.Reference()
+        if not ref.IsVisible() or fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
+            continue
+        ref.SetTextSize(pcbnew.VECTOR2I(mm(SILK_TEXT[0]), mm(SILK_TEXT[0])))
+        ref.SetTextThickness(mm(SILK_TEXT[1]))
+        ref.SetTextAngleDegrees(0)
+        ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
+        ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
+        cx0, cy0, cx1, cy1 = courts[fp.GetReference()]
+        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+        others = [c for r, c in courts.items() if r != fp.GetReference()]
+        spots = []
+        for shift in (0, 1, -1, 2, -2, 3, -3):
+            spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
+                      (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
+        for sx, sy in spots:
+            ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
+            t = box(ref.GetBoundingBox())
+            if t[0] < inside[0] or t[1] < inside[1] or t[2] > inside[2] or t[3] > inside[3]:
+                continue
+            if any(overlap(t, o, 0.1) for o in pads + others + placed):
+                continue
+            placed.append(t)
+            break
+        else:
+            raise ValueError("%s: no room for its designator; move parts apart" % fp.GetReference())
+
+
+def check_silk(board, clearance=0.1):
+    """Silkscreen lines and texts that touch a pad (KiCad's DRC does not check
+    a footprint's silkscreen against its own pads). Returns problems."""
+    import pcbnew
+    mm = pcbnew.FromMM
+    pads = []
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            bb = pad.GetBoundingBox()
+            bb.Inflate(mm(clearance))
+            pads.append((fp.GetReference(), pad.GetNumber(), pad.IsOnLayer(pcbnew.F_Cu),
+                         pad.IsOnLayer(pcbnew.B_Cu), bb))
+    bad = []
+    for fp in board.GetFootprints():
+        gi = fp.GraphicalItems()          # indexed: iterating it breaks on Python 3.14
+        graphics = [gi[i].Cast() for i in range(len(gi))]
+        items = [(g, g.GetLayer()) for g in graphics if g.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS)]
+        items += [(t, t.GetLayer()) for t in (fp.Reference(), fp.Value())
+                  if t.IsVisible() and t.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS)]
+        for g, layer in items:
+            front = layer == pcbnew.F_SilkS
+            if isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT:
+                a, b = g.GetStart(), g.GetEnd()
+                steps = max(2, int(pcbnew.ToMM((b - a).EuclideanNorm()) / 0.02))
+                probes = [pcbnew.VECTOR2I(int(a.x + (b.x - a.x) * k / steps), int(a.y + (b.y - a.y) * k / steps))
+                          for k in range(steps + 1)]
+                hit = lambda bb: any(bb.Contains(pt) for pt in probes)   # noqa: E731
+            else:
+                gb = g.GetBoundingBox()
+                hit = lambda bb, gb=gb: bb.Intersects(gb)                # noqa: E731
+            for ref, num, on_f, on_b, bb in pads:
+                if (on_f if front else on_b) and hit(bb):
+                    bad.append("silkscreen of %s touches pad %s of %s" % (fp.GetReference(), num, ref))
+    return sorted(set(bad))
+
+
+def wrl_box(path, offset, rotation):
+    """XY box (footprint coordinates, Y down) of a VRML model's parts at or
+    above the board surface, placed with KiCad's offset and Z rotation."""
+    xs, ys = [], []
+    for block in re.findall(r'point\s*\[([^\]]*)\]', open(path).read()):
+        n = [float(v) * 2.54 for v in re.findall(r'-?[\d.]+(?:e-?\d+)?', block)]   # VRML unit: 0.1"
+        for x, y, z in zip(n[0::3], n[1::3], n[2::3]):
+            if z < 0:
+                continue                             # legs through the board
+            a = math.radians(rotation[2])
+            x, y = x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a)
+            xs.append(x + offset[0])
+            ys.append(-(y + offset[1]))              # model Y is up, the footprint's down
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def check_models(tolerance=0.6):
+    """Every MODEL_OVERRIDES model sits on its footprint's F.Fab outline: the
+    box centres agree within `tolerance` and so do the widths."""
+    import pcbnew
+    bad = []
+    for fpid, (model, offset, rotation) in MODEL_OVERRIDES.items():
+        lib, name = fpid.split(":")
+        fp = pcbnew.FootprintLoad(footprint_dir(lib), name)
+        gi = fp.GraphicalItems()
+        fab = [gi[i].Cast().GetBoundingBox() for i in range(len(gi)) if gi[i].GetLayer() == pcbnew.F_Fab
+               and gi[i].Cast().GetClass() == "PCB_SHAPE"]
+        f = (min(pcbnew.ToMM(b.GetLeft()) for b in fab), min(pcbnew.ToMM(b.GetTop()) for b in fab),
+             max(pcbnew.ToMM(b.GetRight()) for b in fab), max(pcbnew.ToMM(b.GetBottom()) for b in fab))
+        m = wrl_box(os.path.join(HW_LIB, "models", model), offset, rotation)
+        dc = math.hypot((m[0] + m[2] - f[0] - f[2]) / 2, (m[1] + m[3] - f[1] - f[3]) / 2)
+        dw = abs((m[2] - m[0]) - (f[2] - f[0]))
+        if dc > tolerance or dw > tolerance:
+            bad.append("%s: model %s is %.2f mm off the fab outline (width differs %.2f mm)"
+                       % (fpid, model, dc, dw))
+    return bad
 
 
 def autoroute(board, workdir, passes=40):
