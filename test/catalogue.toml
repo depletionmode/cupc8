@@ -601,14 +601,18 @@ checks = "every opcode; socket state machine; event queue ordering and overflow"
 method = "host unit tests on fw/wifi/core"
 kind = "sim"
 vrow = "2.6"
+cmd = "make -s -C fw test_wifi"
+
 
 [[test]]
 id = "WIFI-002"
 title = "Network stack on the host"
-checks = "DHCP, DNS, TCP connect/send/recv/close, UDP, LISTEN/ACCEPT, and TLS with a test CA (a bad certificate is rejected)"
+checks = "DNS, TCP connect/send/recv/close, peer close, UDP and LISTEN over real sockets on the host. TLS needs mbedTLS and is covered by WIFI-003 in QEMU."
 method = "core + lwIP Unix port on TAP against local servers"
 kind = "sim"
 vrow = "2.6"
+cmd = "make -s -C fw test_wifi"
+
 
 [[test]]
 id = "WIFI-003"
