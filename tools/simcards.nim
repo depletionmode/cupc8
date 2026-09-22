@@ -5,11 +5,14 @@ import os
 
 const fwDir = currentSourcePath().parentDir & "/../fw"
 
-{.passC: "-I" & fwDir & "/common -I" & fwDir & "/gpu/core -I" & fwDir & "/io/core -I" & fwDir & "/sim".}
+{.passC: "-I" & fwDir & "/common -I" & fwDir & "/gpu/core -I" & fwDir & "/io/core -I" & fwDir & "/wifi/core -I" & fwDir & "/wifi/host -I" & fwDir & "/sim".}
+{.passC: "-D_GNU_SOURCE".}
 {.compile: fwDir & "/common/cardproto.c".}
 {.compile: fwDir & "/common/font8x8_cp437.c".}
 {.compile: fwDir & "/gpu/core/gpu.c".}
 {.compile: fwDir & "/io/core/iocard.c".}
+{.compile: fwDir & "/wifi/core/wifi.c".}
+{.compile: fwDir & "/wifi/host/netposix.c".}
 {.compile: fwDir & "/sim/simcards.c".}
 
 const

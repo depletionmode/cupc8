@@ -207,10 +207,24 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .num
+	bzf .net
 	push pch
 	push pcl
 	b term_cmd_clr
+	b .done
+
+.net:
+	term_s_net db "net"
+	mov r0, #>[term_s_net]
+	mov r1, #<[term_s_net]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .num
+	push pch
+	push pcl
+	b net_cmd
 	b .done
 
 
@@ -286,7 +300,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR\n"
+	term_s_help_buf db "\nNEW RUN CLR NET\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch

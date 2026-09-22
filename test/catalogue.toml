@@ -478,9 +478,10 @@ vrow = "2.3"
 id = "KRN-004"
 title = "Networking"
 checks = "join, resolve and TCP fetch through the Wi-Fi card model; output matches"
-method = "sim.nim with the Wi-Fi core on the host (lwIP + TAP)"
+method = "tools/simtest.nim testKernelNetwork: the kernel's net command, Wi-Fi core on host sockets, server on 127.0.0.1:8088"
 kind = "sim"
 vrow = "2.3"
+cmd = "tools/run_tests.sh"
 
 [[test]]
 id = "KRN-005"

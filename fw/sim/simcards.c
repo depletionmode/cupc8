@@ -6,12 +6,15 @@
 #include "cardproto.h"
 #include "gpu.h"
 #include "iocard.h"
+#include "netposix.h"
+#include "wifi.h"
 
 struct simcard {
 	int type;
 	card_t *card;
 	gpu_t *gpu;
 	iocard_t *io;
+	wifi_t *wifi;
 	uint32_t last_vsync_ms;
 };
 
@@ -30,6 +33,10 @@ simcard_t *simcard_new(int type)
 		io_init(c->io);
 		io_connected(c->io, 1);
 		c->card = &c->io->card;
+	} else if (type == CARD_TYPE_WIFI) {
+		c->wifi = malloc(sizeof *c->wifi);
+		wifi_init(c->wifi, &netposix_ops, netposix_new());
+		c->card = &c->wifi->card;
 	} else {
 		free(c);
 		return 0;
@@ -43,6 +50,7 @@ void simcard_free(simcard_t *c)
 		return;
 	free(c->gpu);
 	free(c->io);
+	free(c->wifi);
 	free(c);
 }
 
@@ -68,6 +76,8 @@ void simcard_tick(simcard_t *c, uint32_t now_ms)
 	}
 	if (c->io)
 		io_poll(c->io, now_ms);
+	if (c->wifi)
+		wifi_poll(c->wifi);
 }
 
 void simcard_render(simcard_t *c, uint32_t *rgb)

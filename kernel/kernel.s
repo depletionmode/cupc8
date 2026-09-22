@@ -18,6 +18,10 @@ main:
 
 	push pch
 	push pcl
+	b net_init
+
+	push pch
+	push pcl
 	b irq_init
 
 	; run terminal

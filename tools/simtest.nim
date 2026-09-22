@@ -3,6 +3,9 @@
 
 import os
 import osproc
+import net
+import selectors
+import nativesockets
 import strutils
 import tables
 import sim
@@ -28,6 +31,13 @@ proc fail(msg: string) =
 
 proc ok(msg: string) =
   echo "ok: ", msg
+
+# `simtest [name ...]` runs only the named tests; no arguments runs them all.
+let onlyTests = commandLineParams()
+
+template run(test: untyped) =
+  if onlyTests.len == 0 or astToStr(test) in onlyTests:
+    test()
 
 proc expect(name: string, got, want: int, width = 2) =
   if got != want:
@@ -651,39 +661,39 @@ proc testResetState() =
 
 # ---------------------------------------------------------------------------
 
-testTinyProgram()
-testAssemblerEncodings()
-testAssemblerMap()
-testDisassembler()
-testSymbolsAndKernelDecode()
-testTuiDiff()
-testAssemblerRejects()
-testAluImm()
-testAluReg()
-testCmp()
-testStack()
-testCallRet()
-testMem()
-testIndirect()
-testFlow()
-testGpo()
-testSpiStatus()
-testMulDiv()
-testZfSurvive()
-testAddrSplit()
-testBssData()
-testDefine()
-testStepResult()
-testMemHook()
-testCpuRunBreak()
-testStepOut()
-testLegacyAlu()
-testLegacyStack()
-testLegacyGpo()
-testLegacyMem()
-testLegacyMath()
-testResetState()
-testKernelBoot()
+run testTinyProgram
+run testAssemblerEncodings
+run testAssemblerMap
+run testDisassembler
+run testSymbolsAndKernelDecode
+run testTuiDiff
+run testAssemblerRejects
+run testAluImm
+run testAluReg
+run testCmp
+run testStack
+run testCallRet
+run testMem
+run testIndirect
+run testFlow
+run testGpo
+run testSpiStatus
+run testMulDiv
+run testZfSurvive
+run testAddrSplit
+run testBssData
+run testDefine
+run testStepResult
+run testMemHook
+run testCpuRunBreak
+run testStepOut
+run testLegacyAlu
+run testLegacyStack
+run testLegacyGpo
+run testLegacyMem
+run testLegacyMath
+run testResetState
+run testKernelBoot
 
 proc testIrqOps() =
   echo "== irq opcodes =="
@@ -746,12 +756,12 @@ proc testIrqMaskMmio() =
   expect("mask register", irqMask, 5)
   expect("mask readable", mem[0xf201], 5)
 
-testIrqOps()
-testIrqTimer()
-testIrqFlags()
-testIrqCli()
-testIrqKeyb()
-testIrqMaskMmio()
+run testIrqOps
+run testIrqTimer
+run testIrqFlags
+run testIrqCli
+run testIrqKeyb
+run testIrqMaskMmio
 
 proc testKernelKeybWaits() =
   echo "== kernel keyb parks on wai =="
@@ -771,7 +781,7 @@ proc testKernelKeybWaits() =
   expectTrue("I enabled while waiting", IF)
   expect("slot and SPI IRQs unmasked", irqMask, 9)
 
-testKernelKeybWaits()
+run testKernelKeybWaits
 
 proc testDisplayRect() =
   echo "== display framebuffer via shipped CPU SPI =="
@@ -806,7 +816,7 @@ proc testDisplayRect() =
   else:
     ok("CASET/PASET/RAMWR painted 2x1 white at (10,20)")
 
-testDisplayRect()
+run testDisplayRect
 
 proc testCardsMode() =
   ## SIM-004: the Milestone 1 machine model: ROM windows, the new registers,
@@ -861,7 +871,7 @@ proc testCardsMode() =
   ioModel = imLegacy
   display_setSize(320, 240)
 
-testCardsMode()
+run testCardsMode
 
 proc buildRom(kernelSrc: string): string =
   ## Assemble the boot ROM and a kernel, then build a ROM image.
@@ -906,7 +916,7 @@ proc testBootChain() =
   expect("kernel read a key", mem[0x2001], ord('A'))
   ioModel = imLegacy
 
-testBootChain()
+run testBootChain
 
 proc runBootWithRom(path: string; maxSteps = 3_000_000): int =
   ## Boot from the given ROM image; returns the final GPO value.
@@ -965,7 +975,7 @@ proc testBootFailures() =
   expect("slot table empty", mem[0x0002], 0)
   ioModel = imLegacy
 
-testBootFailures()
+run testBootFailures
 
 proc gpuLine(g: SimCard; row: int; len = 80): string =
   ## Read one row of text off the graphics card.
@@ -981,10 +991,8 @@ proc gpuFind(g: SimCard; want: string): int =
       return row
   -1
 
-proc testKernelOnCards() =
-  ## KRN-001: the real kernel, booted from ROM, reaches the BASIC prompt on
-  ## the graphics card and answers a typed command from the IO card.
-  echo "== kernel on the M1 machine =="
+proc buildKernelRom(): string =
+  ## Assemble the real kernel and the boot ROM into build/rom/kernel.rom.
   let outDir = rootDir / "build" / "rom"
   createDir(outDir)
   var r = execCmdEx("cd " & quoteShell(kernelDir) & " && bash assemble.sh")
@@ -997,10 +1005,16 @@ proc testKernelOnCards() =
                 quoteShell(outDir / "boot.bin") & " " & quoteShell(kernelDir / "kernel.o") &
                 " -o " & quoteShell(outDir / "kernel.rom"))
   if r.exitCode != 0: raise newException(IOError, "mkrom: " & r.output)
+  outDir / "kernel.rom"
 
+proc testKernelOnCards() =
+  ## KRN-001: the real kernel, booted from ROM, reaches the BASIC prompt on
+  ## the graphics card and answers a typed command from the IO card.
+  echo "== kernel on the M1 machine =="
+  let rom = buildKernelRom()
   machineCards([CardGpu, CardIo])
   cpuReset()
-  cpuLoadRom(outDir / "kernel.rom")
+  cpuLoadRom(rom)
   cpuBootRom()
   let g = gpuCard()
 
@@ -1030,7 +1044,83 @@ proc testKernelOnCards() =
   expectTrue("help output", gpuFind(g, "NEW RUN CLR") >= 0)
   ioModel = imLegacy
 
-testKernelOnCards()
+run testKernelOnCards
+
+proc testKernelNetwork() =
+  ## KRN-004: the kernel's "net" command joins through the Wi-Fi card,
+  ## connects to a server running in this process and prints the reply.
+  echo "== kernel networking =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo, CardWifi])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+
+  # a server on port 8088, which the kernel's net command connects to
+  var server = newSocket()
+  server.setSockOpt(OptReuseAddr, true)
+  try:
+    server.bindAddr(Port(8088), "127.0.0.1")
+  except OSError:
+    fail("port 8088 is busy; skipping the network test")
+    ioModel = imLegacy
+    return
+  server.listen()
+
+  var n = 0
+  while n < 6_000_000 and not waiting:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("kernel ready for input", waiting)
+
+  for ch in "net" & "\r":
+    pushKey(ord(ch))
+    var m = 0
+    while m < 400_000 and not waiting:
+      if cpuStep() != sOk: break
+      inc m
+    if waiting:
+      discard cpuStep()
+
+  # serve the request while the machine keeps running (never block: the CPU
+  # only advances in this loop)
+  var client: Socket
+  var accepted = false
+  var served = false
+  n = 0
+  while n < 8_000_000:
+    if cpuStep() != sOk: break
+    inc n
+    if (n mod 1000) == 0:
+      # scanning the screen is costly, so only between socket polls
+      if gpuFind(g, "CUPC8-OK") >= 0 or gpuFind(g, "net timeout") >= 0:
+        break
+      if not accepted:
+        var readable = @[server.getFd]
+        if selectRead(readable, 0) > 0:
+          client = newSocket()
+          server.accept(client)
+          client.getFd.setBlocking(false)
+          accepted = true
+      elif not served:
+        var buf = newString(64)
+        let got = client.getFd.recv(addr buf[0], 64, 0)
+        if got > 0:
+          client.send("CUPC8-OK\r\n")
+          served = true
+  expectTrue("server saw the request", served)
+  if gpuFind(g, "CUPC8-OK") < 0:
+    echo "screen:"
+    for row in 0..12:
+      let line = gpuLine(g, row)
+      if line.len > 0: echo "  |" & line
+  expectTrue("reply printed on screen", gpuFind(g, "CUPC8-OK") >= 0)
+  if served: client.close()
+  server.close()
+  ioModel = imLegacy
+
+run testKernelNetwork
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"
