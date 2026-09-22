@@ -157,7 +157,8 @@ proc ins_shl(o: int) =
   if not imm:
     rb = reg_read(o, false)
   var ra = reg_read(o, true)
-  reg_write(o, ra shl rb)
+  # shifts of 8 or more give 0 (a native shift by >= 64 is undefined in C)
+  reg_write(o, if rb > 7: 0 else: ra shl rb)
 
 proc ins_mov(o: int) =
   var tup = get_imm(o)
@@ -188,7 +189,7 @@ proc ins_st_do(o: int, a: int) =
           irqPending = irqPending and not value
           mem[address] = irqPending
         of 1:
-          irqMask = value and 0xff
+          irqMask = value and 0x0f      # 4 IRQs; bits 7:4 read 0 (memory-map.md)
           mem[address] = irqMask
         else:
           discard
@@ -319,7 +320,8 @@ proc ins_shr(o: int) =
   if not imm:
     rb = reg_read(o, false)
   var ra = reg_read(o, true)
-  reg_write(o, ra shr rb)
+  # shifts of 8 or more give 0 (a native shift by >= 64 is undefined in C)
+  reg_write(o, if rb > 7: 0 else: ra shr rb)
 
 proc ins_and(o: int) =
   var tup = get_imm(o)
@@ -361,8 +363,13 @@ proc ins_push(o: int) =
     if not imm:
       rb = reg_read(o, false)
 
+  # Manual 3.1/3.2: SP points to the next free byte ([SP] <= Rb; SP <= SP + 1),
+  # matching cpu.vhd.
+  let oldValue = mem[SP]
+  mem[SP] = rb and 0xff
+  if not memHook.isNil:
+    memHook(maWrite, SP, rb and 0xff, oldValue)
   SP += 1
-  mem[SP] = rb
 
 proc flagsNibble(): int =
   (if ZF: 1 else: 0) or (if IF: 2 else: 0)
@@ -372,6 +379,7 @@ proc setFlags(n: int) =
   IF = (n and 2) != 0
 
 proc ins_pop(o: int) =
+  SP -= 1
   if (o and 7) == 7:
     pcl = mem[SP]
   elif (o and 6) == 6:
@@ -383,8 +391,6 @@ proc ins_pop(o: int) =
     setFlags(mem[SP])
   else:
     reg_write(o, mem[SP])
-
-  SP -= 1
 
 proc ins_b(o: int) =
   PC = fetch() or (fetch() shl 8)
@@ -422,13 +428,13 @@ proc ins_wai(o: int) =
     waiting = true
 
 proc pushByte(v: int) =
-  SP += 1
   let
     value = v and 0xff
     oldValue = mem[SP]
   mem[SP] = value
   if not memHook.isNil:
     memHook(maWrite, SP, value, oldValue)
+  SP += 1
 
 proc irqReady(): int =
   let bits = irqPending and irqMask

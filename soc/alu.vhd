@@ -1,111 +1,56 @@
+-- CUPC/8 ALU (combinational). `op` is the instruction's opcode bits 7..3.
+-- Semantics follow the manual's instruction table (and tools/sim.nim):
+--   EQ/GT/LT set Z and leave the register alone; the others write Ra and
+--   leave Z alone. Shifts by 8 or more give 0.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity alu is
-    port(
-				clk:		in std_logic;
-            n_en:		in std_logic;
-				op:		in std_logic_vector(3 downto 0);
-				a, b:		in unsigned(7 downto 0);
-				r:			out unsigned(7 downto 0);
-				zf:		out unsigned(0 downto 0)
-         );
-end alu;
+	port(
+		op:			in std_logic_vector(4 downto 0);
+		a, b:		in unsigned(7 downto 0);
+		r:			out unsigned(7 downto 0);
+		z:			out std_logic;
+		writes_r:	out std_logic;		-- op writes its result to Ra
+		writes_z:	out std_logic		-- op sets Z
+	);
+end entity;
 
-architecture behavioural of alu is
-signal ra, rb: unsigned(7 downto 0);
-signal rres: unsigned(7 downto 0);
-signal z: unsigned(0 downto 0) := "0";
+architecture rtl of alu is
 begin
-
-ra <= a;
-rb <= b;
-r <= rres;
-zf <= z;
-
---- OPERATIONS
--- 0000 EQ
--- 0001 GT
--- 0010 LT
--- 0011 AND
--- 0100 OR
--- 0101 NOT
--- 0110 XOR
--- 0111 NOR
--- 1000 ADD
--- 1001 SUB
--- 1010 INC
--- 1011 DEC
--- 1100 SHL
--- 1101 SHR
-
-process(clk, n_en)
-begin
-	if falling_edge(clk) then
-		if(n_en = '0') then
-			
-			--z <= 	'1' when op = ("0000" and ra = rb) or (op = "0001" and ra > rb) or (op = "0010" and ra > rb) else
-			--		(others=>'0');
-					
-			--rres <= 	(ra and rb) when op = "0011" else
-			--			(ra or rb) when op = "0100" else
-			--			(ra not rb) when op = "0101" else
-			--			(ra xor rb) when op = "0110" else
-			--			(ra nor rb) when op = "0111" else
-			--			(ra + rb) when op = "1000" else
-			--			(ra - rb) when op = "1001" else
-			--			(ra + 1) when op = "1010" else
-			--			(ra - 1) when op = "1011" else
-			--			(others=>rres);
-			
-			case op is
-				when "0000" =>
-					if (ra = rb) then
-						z <= "1";
-					else
-						z <= "0";
-					end if;
-					rres <= ra;
-				when "0001" =>
-					if (ra > rb) then
-						z <= "1";
-					else
-						z <= "0";
-					end if;
-					rres <= ra;
-				when "0010" =>
-					if (ra < rb) then
-						z <= "1";
-					else
-						z <= "0";
-					end if;
-					rres <= ra;
-				when "0011" =>
-					rres <= ra and rb;
-				when "0100" =>
-					rres <= ra or rb;
-				when "0101" =>
-					rres <= not ra;
-				when "0110" =>
-					rres <= ra xor rb;
-				when "0111" =>
-					rres <= ra nor rb;
-				when "1000" =>
-					rres <= ra + rb;
-				when "1001" =>
-					rres <= ra - rb;
-				when "1010" =>
-					rres <= ra + 1;
-				when "1011" =>
-					rres <= ra - 1;
-				when "1100" =>
-					rres <= shift_left(ra, to_integer(rb));
-				when "1101" =>
-					rres <= shift_right(ra, to_integer(rb));
-				when others => NULL;
-			end case;
+	process(op, a, b)
+		variable sh: natural;
+	begin
+		r <= a;
+		z <= '0';
+		writes_r <= '1';
+		writes_z <= '0';
+		if b > 7 then
+			sh := 8;
+		else
+			sh := to_integer(b);
 		end if;
-	end if;
-end process;
+		case op is
+			when "00000" =>		-- EQ
+				writes_r <= '0'; writes_z <= '1';
+				if a = b then z <= '1'; end if;
+			when "00001" =>		-- GT
+				writes_r <= '0'; writes_z <= '1';
+				if a > b then z <= '1'; end if;
+			when "00010" =>		-- LT
+				writes_r <= '0'; writes_z <= '1';
+				if a < b then z <= '1'; end if;
+			when "00011" => r <= a and b;				-- AND
+			when "00100" => r <= a or b;				-- OR
+			when "00110" => r <= a xor b;				-- XOR
+			when "00111" => r <= not (a or b);			-- NOR
+			when "01000" => r <= a + b;					-- ADD
+			when "01001" => r <= a - b;					-- SUB
+			when "01100" => r <= shift_left(a, sh);		-- SHL
+			when "01101" => r <= shift_right(a, sh);	-- SHR
+			when others => writes_r <= '0';				-- not an ALU op
+		end case;
+	end process;
 end architecture;

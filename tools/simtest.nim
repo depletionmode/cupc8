@@ -406,8 +406,9 @@ proc testStack() =
 
   discard runFile(testdata / "stack_depth.s")
   expect("SP after two pushes", SP, 0x0102, 4)
-  expect("stack[0101]", mem[0x0101], 1)
-  expect("stack[0102]", mem[0x0102], 2)
+  # SP points to the next free byte (manual 3.2), so the pushes land at $0100/$0101
+  expect("stack[0100]", mem[0x0100], 1)
+  expect("stack[0101]", mem[0x0101], 2)
 
 proc testCallRet() =
   echo "== call/return via pch/pcl =="

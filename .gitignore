@@ -10,3 +10,7 @@ tools/testdata/*.map
 nimcache/
 tools/nimcache/
 *.exe
+
+# verification build outputs
+build/
+__pycache__/
