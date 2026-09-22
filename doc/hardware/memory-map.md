@@ -142,7 +142,8 @@ never drives the memory bus. While the bridge is active, the chipset stalls any
 CPU cycle by withholding /RDY. sysctl can also hold /CPU_RST, and the bridge
 works with no CPU card fitted.
 
-Bridge frames (sysctl is the master, SPI mode 0, ≤ 8 MHz, framed by BR_CS_n):
+Bridge frames (sysctl is the master, SPI mode 0, ≤ 2 MHz, framed by BR_CS_n). The
+chipset oversamples SCK with its 12 MHz clock, which needs a clock at least 6× the SPI rate:
 
 | Cmd | Bytes after cmd | Action |
 |---|---|---|

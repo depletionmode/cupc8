@@ -47,7 +47,7 @@ vrow = "2.8"
 # ============================================================================
 [[test]]
 id = "CPU-001"
-title = "Lockstep vs sim.nim on all test programs"
+title = "Lockstep vs sim.nim on all test programs (GHDL RTL)"
 checks = "identical S/W/E traces (registers, flags, SP, PC and every memory write at every instruction boundary)"
 method = "tools/lockstep.py: GHDL tb_cpu_trace vs tools/simtrace"
 kind = "sim"
@@ -56,11 +56,23 @@ cmd = "python3 tools/lockstep.py"
 
 [[test]]
 id = "CPU-002"
-title = "Lockstep random-program fuzzer"
+title = "Random-program fuzzer, 10^6 instructions (Verilator netlist)"
 checks = "≥ 10⁶ constrained-random instructions (all opcodes, IRQs, WAI, timers, stack and indirect addressing) with zero divergence"
 method = "generator → assembler → lockstep, fixed seeds in CI plus one random seed per run (seed logged)"
 kind = "sim"
 vrow = "1.2"
+cmd = "python3 tools/cpufuzz.py --engine verilator --programs 300 --seed 100 --min-instructions 1000000"
+
+
+[[test]]
+id = "CPU-008"
+title = "Random-program fuzzer on the RTL (GHDL)"
+checks = "the same generator as CPU-002 on the VHDL RTL, with random wait states: zero divergences"
+method = "tools/cpufuzz.py --engine ghdl (slower, so fewer programs)"
+kind = "sim"
+vrow = "1.2"
+cmd = "python3 tools/cpufuzz.py --engine ghdl --programs 64 --seed 200"
+
 
 [[test]]
 id = "CPU-003"
@@ -69,6 +81,7 @@ checks = "100% of opcode × format × Ra/Rb combinations are executed by CPU-001
 method = "coverage counters in the lockstep harness"
 kind = "sim"
 vrow = "1.2"
+cmd = "python3 tools/cpufuzz.py --engine verilator --programs 64 --seed 7"
 
 [[test]]
 id = "CPU-004"
@@ -112,6 +125,7 @@ checks = "every op × every a × every b (256×256) gives the manual's result an
 method = "GHDL testbench against a VHDL reference function, generated from the manual's table"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_alu soc/alu.vhd soc/tb/tb_alu.vhd"
 
 # ============================================================================
 # BUS: CPU bus / CPU socket protocol (doc/hardware/cpu-bus.md)
@@ -123,6 +137,7 @@ checks = "lockstep traces unchanged with 0, 1..7 fixed, and random 0..15 wait st
 method = "conformance testbench wrapping the CPU card top; chipset model inserts wait states"
 kind = "sim"
 vrow = "1.3"
+cmd = "python3 tools/lockstep.py --waits 3 && python3 tools/lockstep.py --waits -1 --seed 11"
 
 [[test]]
 id = "BUS-002"
@@ -228,6 +243,8 @@ checks = "all CPOL/CPHA × clk_div 1..31 produce correct waveforms and data, bot
 method = "GHDL testbench with an SPI slave model checking every edge"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_spi_master soc/spi_master.vhd soc/tb/tb_spi_master.vhd"
+
 
 [[test]]
 id = "SPI-002"
@@ -236,6 +253,8 @@ checks = "SPI_CS holds CS_n across bytes for dev 0–7; auto-CS per byte when SP
 method = "GHDL testbench"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_spi_master soc/spi_master.vhd soc/tb/tb_spi_master.vhd"
+
 
 [[test]]
 id = "SPI-003"
@@ -312,11 +331,12 @@ vrow = "1.1"
 # ============================================================================
 [[test]]
 id = "SYN-001"
-title = "Post-synthesis lockstep"
+title = "Post-synthesis lockstep (Verilator netlist)"
 checks = "CPU-001/002 and BUS-001..003 give identical results on the yosys netlist in Verilator"
 method = "ghdl synth → yosys → Verilator"
 kind = "sim"
 vrow = "1.5"
+cmd = "python3 tools/lockstep.py --engine verilator && python3 tools/lockstep.py --engine verilator --waits -1 --seed 11"
 
 [[test]]
 id = "SYN-002"

@@ -6,11 +6,13 @@
   test/run.py --list          list tests and their status, run nothing
   test/run.py --gate          fab gate: also fail while any non-hw test is pending
   test/run.py --kind hw ...   hw tests are skipped unless asked for by kind
+  test/run.py -j 4            run up to 4 tests at once (default: 1)
 
 Logs go to build/test/<id>.log and a summary to build/test/results.json
 (which fab-readiness.md is generated from).
 """
 import argparse
+import concurrent.futures
 import json
 import os
 import subprocess
@@ -44,6 +46,7 @@ def main():
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--gate", action="store_true", help="pending non-hw tests fail the run")
     ap.add_argument("--kind", action="append", choices=["sim", "static", "formal", "hw"])
+    ap.add_argument("-j", type=int, default=1, help="tests to run at once")
     args = ap.parse_args()
 
     kinds = set(args.kind or ["sim", "static", "formal"])
@@ -59,21 +62,33 @@ def main():
         return 0
 
     os.makedirs(OUT, exist_ok=True)
-    results = []
-    for t in tests:
-        if "cmd" not in t:
-            results.append({"id": t["id"], "status": "pending", "title": t["title"]})
-            continue
-        print("%-9s %s ... " % (t["id"], t["title"]), end="", flush=True)
+
+    def execute(cmd, log):
         start = time.time()
-        log = os.path.join(OUT, t["id"] + ".log")
         with open(log, "w") as f:
-            rc = subprocess.run(t["cmd"], shell=True, cwd=ROOT, stdout=f,
+            rc = subprocess.run(cmd, shell=True, cwd=ROOT, stdout=f,
                                 stderr=subprocess.STDOUT).returncode
-        secs = time.time() - start
-        status = "pass" if rc == 0 else "FAIL"
-        print("%s (%.0fs)%s" % (status, secs, "" if rc == 0 else "  log: " + os.path.relpath(log, ROOT)))
-        results.append({"id": t["id"], "status": status, "title": t["title"], "seconds": round(secs, 1)})
+        return rc, time.time() - start
+
+    # tests with an identical command run it once and share the result
+    runnable = [t for t in tests if "cmd" in t]
+    first = {}
+    for t in runnable:
+        first.setdefault(t["cmd"], t["id"])
+    outcome = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.j)) as pool:
+        jobs = {cmd: pool.submit(execute, cmd, os.path.join(OUT, tid + ".log"))
+                for cmd, tid in first.items()}
+        for t in runnable:
+            rc, secs = jobs[t["cmd"]].result()
+            status = "pass" if rc == 0 else "FAIL"
+            log = os.path.join(OUT, first[t["cmd"]] + ".log")
+            print("%-9s %-58s %s (%.0fs)%s" % (t["id"], t["title"][:58], status, secs,
+                                               "" if rc == 0 else "  log: " + os.path.relpath(log, ROOT)))
+            outcome[t["id"]] = {"id": t["id"], "status": status, "title": t["title"],
+                                "seconds": round(secs, 1)}
+    results = [outcome.get(t["id"], {"id": t["id"], "status": "pending", "title": t["title"]})
+               for t in tests]
 
     counts = {s: sum(r["status"] == s for r in results) for s in ("pass", "FAIL", "pending")}
     with open(os.path.join(OUT, "results.json"), "w") as f:
