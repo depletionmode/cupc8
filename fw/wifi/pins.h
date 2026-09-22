@@ -1,0 +1,16 @@
+/* Generated from hw/pins.yaml by hw/tools/genpins.py. Do not edit. */
+#ifndef WIFI_PINS_H
+#define WIFI_PINS_H
+
+#define PIN_SLOT_SCK           6
+#define PIN_SLOT_MOSI          7
+#define PIN_SLOT_MISO          2
+#define PIN_SLOT_NCS           10
+/* slot: open drain */
+#define PIN_SLOT_NIRQ          3
+#define PIN_U0RXD              20
+#define PIN_U0TXD              21
+#define PIN_BOOT_STRAP         9
+#define PIN_LED_LINK           4
+
+#endif

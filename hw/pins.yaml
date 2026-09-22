@@ -1,0 +1,227 @@
+# CUPC/8 Milestone 1 pin map: the single source of truth.
+#
+# Generators (hw/tools/genpins.py) produce from this file:
+#   - the iCE40 .pcf constraints for the chipset and the CPU card
+#   - firmware pin headers (fw/*/pins.h)
+#   - the net names used by the schematic generator
+#   - the pinout tables in the docs
+# and hw/tools/pincheck.py verifies the generated files, the KiCad netlists and
+# the Lattice pinout CSVs agree.
+#
+# FPGA pin numbers are filled in during schematic capture, when the package
+# pinout and the layout fan-out are known; `pin: TBD` means "not yet assigned".
+# Roles: in, out, inout, power, gnd, nc.
+
+meta:
+  clock_mhz: 12
+  boards: [mainboard, cpu-card, gpu-card, io-card, wifi-card]
+
+devices:
+
+  chipset:
+    board: mainboard
+    part: ICE40HX4K-TQ144
+    lcsc: C1521989
+    package: TQFP-144
+    note: >
+      95 of 107 I/O used. Bank assignment and pin numbers are set during
+      layout; every pin here must land on a normal I/O (the config pins
+      SPI_SS_B, SPI_SCK, SPI_SI, SPI_SO and CRESET_B/CDONE are reserved for
+      configuration).
+    groups:
+      cpu_bus:
+        note: CPU socket, doc/hardware/cpu-bus.md
+        signals:
+          - {name: CPU_A, width: 16, dir: in}
+          - {name: CPU_D, width: 8, dir: inout}
+          - {name: CPU_RW, dir: in}
+          - {name: CPU_nSTB, dir: in}
+          - {name: CPU_nRDY, dir: out}
+          - {name: CPU_SYNC, dir: in}
+          - {name: CPU_IRQ, width: 4, dir: out}
+          - {name: CPU_TMR_EXP, width: 2, dir: in}
+          - {name: CPU_HALTED, dir: in}
+          - {name: CPU_WAITING, dir: in}
+      memory_bus:
+        note: SRAM IS62WV5128 + ROM SST39VF040 on one bus
+        signals:
+          - {name: MEM_A, width: 19, dir: out}
+          - {name: MEM_D, width: 8, dir: inout}
+          - {name: MEM_nOE, dir: out}
+          - {name: MEM_nWE, dir: out}
+          - {name: MEM_nCE_RAM, dir: out}
+          - {name: MEM_nCE_ROM, dir: out}
+      slots:
+        note: SPI to slots 1-6 (dev 0-5) and the aux header (dev 6)
+        signals:
+          - {name: SPI_SCK, dir: out}
+          - {name: SPI_MOSI, dir: out}
+          - {name: SPI_MISO, dir: in}
+          - {name: SPI_nCS, width: 7, dir: out}
+          - {name: SLOT_nIRQ, width: 6, dir: in}
+      bridge:
+        note: SPI slave to sysctl
+        signals:
+          - {name: BR_SCK, dir: in}
+          - {name: BR_MOSI, dir: in}
+          - {name: BR_MISO, dir: out}
+          - {name: BR_nCS, dir: in}
+      misc:
+        signals:
+          - {name: CLK12, dir: in, role: gbin}
+          - {name: nPOR, dir: in}
+          - {name: GPO, width: 8, dir: out, note: LEDs D1-D8}
+          - {name: CPU_nRST, dir: out}
+          - {name: CPU_PRESENT, dir: in}
+          - {name: CPU_CARD_ID, width: 2, dir: in}
+
+  cpu_fpga:
+    board: cpu-card
+    part: ICE40HX4K-TQ144
+    lcsc: C1521989
+    package: TQFP-144
+    note: the same part as the chipset, so one footprint and one stock pool
+    groups:
+      cpu_bus:
+        signals:
+          - {name: CPU_A, width: 16, dir: out}
+          - {name: CPU_D, width: 8, dir: inout}
+          - {name: CPU_RW, dir: out}
+          - {name: CPU_nSTB, dir: out}
+          - {name: CPU_nRDY, dir: in}
+          - {name: CPU_SYNC, dir: out}
+          - {name: CPU_IRQ, width: 4, dir: in}
+          - {name: CPU_TMR_EXP, width: 2, dir: out}
+          - {name: CPU_HALTED, dir: out}
+          - {name: CPU_WAITING, dir: out}
+          - {name: CPU_CLK, dir: in, role: gbin}
+          - {name: CPU_nRST, dir: in}
+
+  sysctl:
+    board: mainboard
+    part: RP2040
+    lcsc: C2040
+    package: QFN-56
+    note: 23 of 30 GPIO used
+    groups:
+      spi:
+        note: one bus, separate chip selects (flash, chipset config, CPU card config, bridge)
+        signals:
+          - {name: SYS_SCK, gpio: 2, dir: out}
+          - {name: SYS_MOSI, gpio: 3, dir: out}
+          - {name: SYS_MISO, gpio: 4, dir: in}
+          - {name: nCS_FLASH, gpio: 5, dir: out}
+          - {name: nCS_CHIPSET_CFG, gpio: 6, dir: out}
+          - {name: nCS_CPUCARD_CFG, gpio: 7, dir: out}
+          - {name: nCS_BRIDGE, gpio: 8, dir: out}
+      fpga_config:
+        signals:
+          - {name: CHIPSET_nCRESET, gpio: 9, dir: out}
+          - {name: CHIPSET_CDONE, gpio: 10, dir: in}
+          - {name: CPUCARD_nCRESET, gpio: 11, dir: out}
+          - {name: CPUCARD_CDONE, gpio: 12, dir: in}
+      cards:
+        note: one programming port muxed to the slots (SWD for RP2040, UART for ESP32)
+        signals:
+          - {name: PROG_CLK, gpio: 13, dir: inout}
+          - {name: PROG_IO, gpio: 14, dir: inout}
+          - {name: MUX_SEL, width: 3, gpio: [15, 16, 17], dir: out}
+      i2c:
+        note: two TCA9555 expanders drive CARD_RST_n, PROG_n and read PRSNT
+        signals:
+          - {name: I2C_SDA, gpio: 18, dir: inout}
+          - {name: I2C_SCL, gpio: 19, dir: out}
+      misc:
+        signals:
+          - {name: CLK12_OUT, gpio: 21, dir: out, note: 12 MHz to both FPGAs}
+          - {name: nPOR_OUT, gpio: 20, dir: out}
+          - {name: DBG_UART_TX, gpio: 0, dir: out}
+          - {name: DBG_UART_RX, gpio: 1, dir: in}
+          - {name: CC1_SENSE, gpio: 26, dir: adc}
+          - {name: CC2_SENSE, gpio: 27, dir: adc}
+          - {name: V1V2_SENSE, gpio: 28, dir: adc}
+
+  gpu_mcu:
+    board: gpu-card
+    part: RP2040
+    lcsc: C2040
+    note: TMDS pin order follows the Pico DVI Sock reference so PicoDVI's stock config works
+    groups:
+      dvi:
+        signals:
+          - {name: TMDS_D0, width: 2, gpio: [12, 13], dir: out, note: blue pair}
+          - {name: TMDS_D1, width: 2, gpio: [10, 11], dir: out, note: green pair}
+          - {name: TMDS_D2, width: 2, gpio: [16, 17], dir: out, note: red pair}
+          - {name: TMDS_CLK, width: 2, gpio: [14, 15], dir: out}
+          - {name: HDMI_HPD, gpio: 18, dir: in}
+          - {name: HDMI_SCL, gpio: 19, dir: inout}
+          - {name: HDMI_SDA, gpio: 20, dir: inout}
+      slot:
+        signals:
+          - {name: SLOT_SCK, gpio: 2, dir: in}
+          - {name: SLOT_MOSI, gpio: 3, dir: in}
+          - {name: SLOT_MISO, gpio: 4, dir: out}
+          - {name: SLOT_nCS, gpio: 5, dir: in}
+          - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
+      debug:
+        signals:
+          - {name: LED_ACT, gpio: 25, dir: out}
+          - {name: UART_TX, gpio: 0, dir: out}
+
+  io_mcu:
+    board: io-card
+    part: RP2040
+    lcsc: C2040
+    groups:
+      usb_host:
+        signals:
+          - {name: USB_DP, gpio: 0, dir: inout, note: native USB host port}
+          - {name: VBUS_EN, gpio: 7, dir: out}
+          - {name: VBUS_nFAULT, gpio: 8, dir: in}
+      slot:
+        signals:
+          - {name: SLOT_SCK, gpio: 2, dir: in}
+          - {name: SLOT_MOSI, gpio: 3, dir: in}
+          - {name: SLOT_MISO, gpio: 4, dir: out}
+          - {name: SLOT_nCS, gpio: 5, dir: in}
+          - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
+      debug:
+        signals:
+          - {name: LED_KBD, gpio: 25, dir: out}
+          - {name: UART_TX, gpio: 16, dir: out}
+
+  wifi_mcu:
+    board: wifi-card
+    part: ESP32-C3-MINI-1U-N4
+    lcsc: C2911374
+    groups:
+      slot:
+        note: GPSPI2 through the GPIO matrix
+        signals:
+          - {name: SLOT_SCK, gpio: 6, dir: in}
+          - {name: SLOT_MOSI, gpio: 7, dir: in}
+          - {name: SLOT_MISO, gpio: 2, dir: out}
+          - {name: SLOT_nCS, gpio: 10, dir: in}
+          - {name: SLOT_nIRQ, gpio: 3, dir: out, note: open drain}
+      program:
+        note: the slot's programming port speaks UART to the ESP ROM bootloader
+        signals:
+          - {name: U0RXD, gpio: 20, dir: in, from: SWCLK}
+          - {name: U0TXD, gpio: 21, dir: out, to: SWDIO}
+          - {name: BOOT_STRAP, gpio: 9, dir: in, from: PROG_n}
+      debug:
+        signals:
+          - {name: LED_LINK, gpio: 4, dir: out}
+
+# Connector pinouts (doc/hardware/cpu-bus.md, doc/hardware/slot.md). The
+# checker compares these against the docs and the KiCad netlists.
+connectors:
+  cpu_socket:
+    type: PCIe x8 card edge, 98 contacts
+    lcsc: C404111
+    pins_file: doc/hardware/cpu-bus.md
+  slot:
+    type: PCIe x1 card edge, 36 contacts
+    lcsc: C404113
+    count: 6
+    pins_file: doc/hardware/slot.md

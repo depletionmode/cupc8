@@ -730,6 +730,8 @@ checks = "pins.yaml = .pcf = pins.h = KiCad netlists; iCE40 pin roles match the 
 method = "hw/tools/pincheck.py"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/pincheck.py"
+
 
 # ============================================================================
 # Board tests. Every board gets the same static set (-0xx), board-specific
