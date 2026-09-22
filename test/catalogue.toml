@@ -479,6 +479,8 @@ checks = "status bit 7 = 0; READ frame and RESP_LEN rules; resync on CS rising; 
 method = "one shared host test suite run against each card core (GPU, IO, Wi-Fi)"
 kind = "sim"
 vrow = "2.4"
+cmd = "make -s -C fw test_cardproto"
+
 
 # ============================================================================
 # GPU: graphics card firmware
@@ -490,6 +492,8 @@ checks = "every opcode with valid, boundary and malformed arguments; the error c
 method = "host unit tests on fw/gpu/core"
 kind = "sim"
 vrow = "2.4"
+cmd = "make -s -C fw test_gpu"
+
 
 [[test]]
 id = "GPU-002"
@@ -498,6 +502,8 @@ checks = "TEXT (fonts, attributes, cursor, scroll, control codes) and GFX (every
 method = "host tests"
 kind = "sim"
 vrow = "2.4"
+cmd = "make -s -C fw test_gpu"
+
 
 [[test]]
 id = "GPU-003"
@@ -506,6 +512,8 @@ checks = "the FREE guarantee holds; a frame refused at FREE=0 is discarded; no o
 method = "host tests"
 kind = "sim"
 vrow = "2.4"
+cmd = "make -s -C fw test_gpu"
+
 
 [[test]]
 id = "GPU-004"
@@ -533,6 +541,8 @@ checks = "every HID usage × modifier/lock state maps as in io-card.md"
 method = "host tests, table-driven"
 kind = "sim"
 vrow = "2.5"
+cmd = "make -s -C fw test_iocard"
+
 
 [[test]]
 id = "IOC-002"
@@ -549,6 +559,8 @@ checks = "typematic timing, 6-key rollover, and the FIFO overflow flag"
 method = "host tests"
 kind = "sim"
 vrow = "2.5"
+cmd = "make -s -C fw test_iocard"
+
 
 [[test]]
 id = "IOC-004"

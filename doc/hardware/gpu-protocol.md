@@ -52,7 +52,7 @@ bit 6:0  FREE — command FIFO free space in 64-byte units, capped at 127
 
 ## Commands
 
-Notation: `x16` is a 16-bit LE X coordinate (0–319 GFX, 0–79 TEXT uses `x8`),
+Notation: `x16` is a signed 16-bit LE X coordinate (0–319 on screen; TEXT uses `x8`),
 `y8` is an 8-bit Y coordinate, and `c` is a palette index. → marks response
 bytes, which the host collects with a READ frame (`$FE`, see `slot.md`).
 
@@ -81,7 +81,7 @@ is fg.
 | $11 | PUTS | len, ch × len | Same as PUTC for each byte. `len` is 1–255. |
 | $12 | GOTOXY | x8, y8 | Move the cursor (clamped to 79, 29) |
 | $13 | ATTR | a | Set the current attribute |
-| $14 | CURSOR | mode | 0 off, 1 underline, 2 block. Blinks at 2 Hz. |
+| $14 | CURSOR | mode | 0 off, 1 underline (power-on default), 2 block. Blinks at 2 Hz (on for 15 frames, off for 15). |
 | $15 | SCROLL | n | Scroll up `n` lines. New lines take `attr`. |
 | $16 | CLEOL | — | Clear from the cursor to end of line with `attr` |
 | $17 | POKE | x8, y8, ch, a | Write a raw cell. No control-code handling, cursor unchanged. |
@@ -94,7 +94,7 @@ PUTC control codes:
 |---|---|
 | `$08` BS | cursor left, stopping at column 0 |
 | `$09` TAB | to the next multiple of 8 |
-| `$0A` LF | next line |
+| `$0A` LF | next line, column 0 |
 | `$0D` CR | column 0 |
 | `$0C` FF | CLS with `attr` |
 | everything else | printed as a glyph |
@@ -114,7 +114,7 @@ All drawing is clipped to 320×240. Arguments outside the screen are legal.
 | $24 | BLIT8 | x16, y8, w8, h8, then w×h bytes | 8 bpp, row-major. w and h must be ≥ 1, and the frame must be ≤ 8128 bytes. |
 | $25 | BLIT1 | x16, y8, w8, h8, fg, bg, then ⌈w/8⌉×h bytes | 1 bpp, MSB = left pixel. `bg = $FF` means transparent. |
 | $26 | TEXT8 | x16, y8, fg, bg, len, ch × len | 8×8 glyphs left to right, no wrapping. `bg = $FF` means transparent. |
-| $27 | VSCROLL | dy (signed 8), c | Scroll the bitmap vertically by `dy` rows and fill the exposed rows with `c` |
+| $27 | VSCROLL | dy (signed 8), c | Scroll the bitmap up by `dy` rows (down if negative) and fill the exposed rows with `c` |
 | $28 | GETPIXEL | x16, y8 → c | Reads back after all earlier commands have executed. This can exceed the 5 ms response deadline, so keep polling READ while RESP_LEN is 0. |
 | $29 | DEFCHAR8 | ch, 8 bytes | Redefine a TEXT8 glyph |
 

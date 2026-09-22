@@ -25,8 +25,12 @@ common SPI framing in `slot.md`.
   Hubs and composite devices are best-effort, not required.
 - **FIFO:** key reports become bytes in a **64-byte FIFO**. If it overflows,
   the newest byte is dropped and `OVERFLOW` is set.
-- **Typematic repeat:** done on the card. The default is a 500 ms delay and a
-  33 ms rate.
+- **Typematic repeat:** done on the card, for the most recently pressed key
+  while it is held. The default is a 500 ms delay and a 30 ms rate
+  (`SETREPEAT 50, 3`).
+- **Rollover:** a boot report signalling ErrorRollOver (usage $01) is ignored,
+  and the previous key state is kept.
+- **Num Lock** is on at power-up.
 - **Lock keys:** Caps Lock and Num Lock are handled on the card, which also
   drives the keyboard's LEDs.
 - **IRQ_n:** asserted while the FIFO is non-empty (if `IRQ_EN`).
