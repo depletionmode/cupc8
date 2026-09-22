@@ -48,6 +48,7 @@
 - [Power budget](hardware/power.md)
 - [Key parts and JLC stock](hardware/parts.md)
 - [Verification contract](hardware/verification.md)
+- [Debugging the hardware](hardware/debugging.md)
 
 ## Done when
 
