@@ -737,6 +737,15 @@ kind = "static"
 vrow = "3.4"
 cmd = "python3 hw/tools/pincheck.py"
 
+[[test]]
+id = "E2E-006"
+title = "KiCad pipeline smoke test"
+checks = "a generated board passes schematic generation, ERC, netlist, board build, Freerouting, zone fill, DRC with schematic parity, Gerbers/drill, BOM/CPL and 3D render"
+method = "hw/smoke/smoke.py on a USB-C + LDO + LED board"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/smoke/smoke.py"
+
 
 # ============================================================================
 # Board tests. Every board gets the same static set (-0xx), board-specific

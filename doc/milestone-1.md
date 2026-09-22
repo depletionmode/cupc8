@@ -35,6 +35,8 @@
 | IO card | RP2040 as a USB host for a HID keyboard, SPI slave to the CPU |
 | Wi-Fi card | ESP32-C3-MINI-1U module (external antenna) running the network stack on-card (DHCP/DNS/TCP/UDP/TLS), exposed to the CPU as 4 sockets over SPI |
 | Graphics card | RP2040 + PicoDVI, 640×480 DVI on an HDMI connector, driven by a **custom 8-bit-friendly command set** over SPI |
+| Branding | Every board carries the **Kaplan Labs logo** on its top silkscreen, generated from `~/.config/omarchy/branding/kaplan-labs.svg` by `hw/tools/logo.py`. At least 10 mm wide, because smaller loses detail below JLC's 0.15 mm silkscreen minimum. |
+| System controller placement | Moving sysctl onto a removable **system card** in a keyed slot, so the computer runs without it. Decided 2026-09-22; the rework of the specs, pins and sysctl core is pending. |
 | Verification | **Everything is simulated and tested before hardware is ordered.** There is no hardware prototype. The full matrix is [verification.md](hardware/verification.md): HDL lockstep and formal proofs, real firmware binaries in emulators, a co-simulation wired from the KiCad netlists, power, SI, thermal and mechanical checks. Nothing is ordered until `make verify` is green and `fab-readiness.md` is signed off. |
 
 ## Specifications
