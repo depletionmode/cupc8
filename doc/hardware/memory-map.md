@@ -118,7 +118,7 @@ is `$ff`, the erased state, so a partial program leaves the rest erased.
    | GPO | Stage | On failure |
    |---|---|---|
    | $01 | Boot ROM entered | — |
-   | $02 | RAM test $0100–$dfff (walking bits + address-in-address) | halt showing `$82`, alternating with the failing address high byte |
+   | $02 | RAM test: walking bits over the stack page $0100–$01ff (done with no subroutine calls, since the stack lives there), then address-in-address at stride 16 over $0200–$0eff and $1000–$dfff. The boot ROM's own variables sit at $0f00–$0f1f. | halt showing `$82` |
    | $04 | Slot probe (`IDENT` on dev 0–5). Result stored at $0002–$0007. | — (empty slots are fine) |
    | $08 | Console: if a GPU card was found, set TEXT mode and print the banner and POST result | — |
    | $10 | Kernel header check | halt `$90` (bad magic/version/header sum) or `$91` (too large) |

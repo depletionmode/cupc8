@@ -410,6 +410,8 @@ checks = "POST codes $01→$80 in order, banner printed, kernel copied and enter
 method = "sim.nim --boot:rom with a mkrom image; the co-sim repeats it"
 kind = "sim"
 vrow = "2.2"
+cmd = "tools/run_tests.sh"
+
 
 [[test]]
 id = "BOOT-002"
@@ -418,6 +420,8 @@ checks = "RAM fault, bad magic, bad version, bad header sum, oversize, bad body 
 method = "fault injection in sim.nim and the co-sim"
 kind = "sim"
 vrow = "2.2"
+cmd = "tools/run_tests.sh"
+
 
 [[test]]
 id = "BOOT-003"
@@ -426,6 +430,8 @@ checks = "every combination of 0–6 cards (GPU/IO/Wi-Fi/empty) in any slot give
 method = "sim.nim card models"
 kind = "sim"
 vrow = "2.2"
+cmd = "tools/run_tests.sh"
+
 
 [[test]]
 id = "BOOT-004"
@@ -434,6 +440,8 @@ checks = "mkrom.py header fields, checksums, erased padding; round-trips; reject
 method = "pytest"
 kind = "sim"
 vrow = "2.8"
+cmd = "python3 tools/mkrom.py build/rom/boot.bin build/rom/kernel.o -o build/rom/test.rom && python3 tools/mkrom.py --info build/rom/test.rom"
+
 
 # ============================================================================
 # KRN: kernel

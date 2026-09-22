@@ -867,6 +867,110 @@ proc testCardsMode() =
 
 testCardsMode()
 
+proc buildRom(kernelSrc: string): string =
+  ## Assemble the boot ROM and a kernel, then build a ROM image.
+  let outDir = rootDir / "build" / "rom"
+  createDir(outDir)
+  let boot = outDir / "boot.bin"
+  let kernel = outDir / "kernel.o"
+  let rom = outDir / "test.rom"
+  var r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "as.py") & " " &
+                    quoteShell(rootDir / "rom" / "boot.s") & " " & quoteShell(boot) &
+                    " 0xe000,0xe600,0x0f00")
+  if r.exitCode != 0: raise newException(IOError, "boot ROM: " & r.output)
+  assemble(kernelSrc, kernel)
+  r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "mkrom.py") & " " &
+                quoteShell(boot) & " " & quoteShell(kernel) & " -o " & quoteShell(rom))
+  if r.exitCode != 0: raise newException(IOError, "mkrom: " & r.output)
+  rom
+
+proc testBootChain() =
+  ## BOOT-001: reset into the boot ROM, POST, banner, kernel copy, and go.
+  echo "== boot ROM chain =="
+  let rom = buildRom(testdata / "cards_gpu.s")
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  pushKey(ord('A'))
+  var n = 0
+  var sawPost: set[uint8] = {}
+  while n < 3_000_000 and cpuStep() == sOk:
+    sawPost.incl(uint8(mem[0xf000] and 0xff))
+    inc n
+  expectTrue("boot chain halted (kernel ran)", HF)
+  for code in [0x01u8, 0x02u8, 0x04u8, 0x08u8, 0x10u8, 0x20u8, 0x40u8, 0x80u8]:
+    expectTrue("POST code $" & toHex(int(code), 2), code in sawPost)
+  expect("slot table from the real boot ROM", mem[0x0002], CardGpu)
+  expect("slot table slot 2", mem[0x0003], CardIo)
+  let g = gpuCard()
+  expect("banner on the console", int(simcard_gpu_cell(g, 0, 0)) and 0xff, ord('C'))
+  expect("banner 'U'", int(simcard_gpu_cell(g, 1, 0)) and 0xff, ord('U'))
+  expect("kernel output after the banner", int(simcard_gpu_cell(g, 0, 1)) and 0xff, ord('H'))
+  expect("kernel read a key", mem[0x2001], ord('A'))
+  ioModel = imLegacy
+
+testBootChain()
+
+proc runBootWithRom(path: string; maxSteps = 3_000_000): int =
+  ## Boot from the given ROM image; returns the final GPO value.
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(path)
+  cpuBootRom()
+  var n = 0
+  while n < maxSteps and cpuStep() == sOk:
+    inc n
+  result = mem[0xf000] and 0xff
+  ioModel = imLegacy
+
+proc corruptRom(src, dest: string; offset: int; value: uint8; fixHeaderSum = false) =
+  ## Patch one ROM byte. With fixHeaderSum the header checksum is recomputed,
+  ## so the boot ROM reaches the check the test is actually aiming at.
+  var data = readFile(src)
+  data[offset] = char(value)
+  if fixHeaderSum:
+    var sum = 0
+    for i in 0x800..0x80c:
+      sum += int(uint8(data[i]))
+    data[0x80d] = char(uint8((-sum) and 0xff))
+  writeFile(dest, data)
+
+proc testBootFailures() =
+  ## BOOT-002: each failure path halts with its specified LED code.
+  echo "== boot ROM failure paths =="
+  let good = rootDir / "build" / "rom" / "test.rom"
+  let bad = rootDir / "build" / "rom" / "bad.rom"
+
+  corruptRom(good, bad, 0x800, uint8(ord('X')))          # magic
+  expect("bad magic halts with $90", runBootWithRom(bad), 0x90)
+
+  corruptRom(good, bad, 0x804, 9)                        # header version
+  expect("bad version halts with $90", runBootWithRom(bad), 0x90)
+
+  corruptRom(good, bad, 0x80d, 0x00)                     # header checksum
+  expect("bad header checksum halts with $90", runBootWithRom(bad), 0x90)
+
+  corruptRom(good, bad, 0x809, 0xd0, fixHeaderSum = true)   # length high byte: too big
+  expect("oversized kernel halts with $91", runBootWithRom(bad), 0x91)
+
+  corruptRom(good, bad, 0x80c, 0x01, fixHeaderSum = true)   # body checksum
+  expect("bad body checksum halts with $a0", runBootWithRom(bad), 0xa0)
+
+  # a card-less machine still boots (no console, no banner)
+  machineCards([])
+  cpuReset()
+  cpuLoadRom(good)
+  cpuBootRom()
+  var n = 0
+  while n < 3_000_000 and cpuStep() == sOk:
+    inc n
+  expectTrue("boots with no cards fitted", HF)
+  expect("slot table empty", mem[0x0002], 0)
+  ioModel = imLegacy
+
+testBootFailures()
+
 if failures > 0:
   echo "FAILED ", failures, " check(s)"
   quit(1)
