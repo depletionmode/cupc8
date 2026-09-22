@@ -142,17 +142,29 @@ never drives the memory bus. While the bridge is active, the chipset stalls any
 CPU cycle by withholding /RDY. sysctl can also hold /CPU_RST, and the bridge
 works with no CPU card fitted.
 
-Bridge frames (sysctl is the master, SPI mode 0, ≤ 2 MHz, framed by BR_CS_n). The
-chipset oversamples SCK with its 12 MHz clock, which needs a clock at least 6× the SPI rate:
+Bridge frames (sysctl is the master, SPI mode 0, **≤ 1 MHz**, framed by
+BR_CS_n). The chipset oversamples SCK with its 12 MHz clock, so the rate is
+bounded by the synchroniser latency (~250 ns), which must fit in half an SPI
+period.
+
+- Multi-byte fields are little-endian.
+- **Every response is preceded by one dummy byte.** The chipset needs a whole
+  byte-time to fetch the first data.
+- Bytes marked → are clocked out by the host sending `$00`.
 
 | Cmd | Bytes after cmd | Action |
 |---|---|---|
-| $01 RAM_WR | addr16 len8 data… | write `len+1` bytes to SRAM |
-| $02 RAM_RD | addr16 len8 → data… | read `len+1` bytes from SRAM (one dummy byte first) |
-| $03 ROM_RD | addr24 len8 → data… | read from the ROM chip (full 19-bit address) |
-| $04 ROM_BUSW | addr24 data8 | a single raw bus write cycle to the ROM (/CE_ROM, /WE). sysctl builds the JEDEC erase and program sequences from these. |
-| $05 STATUS | → byte | bit0 CPU stopped (bridge or step), bit1 HALTED, bit2 WAITING, bit3 CPU card present (PRSNT2_n), bits5:4 CARD_ID, bit6 CPU cycle pending (/STB low) |
-| $06 GPO_RD | → byte | current GPO value |
+| $01 RAM_WR | addr16, len8, data × (len+1) | write `len+1` bytes to SRAM |
+| $02 RAM_RD | addr16, len8, dummy, → data × (len+1) | read `len+1` bytes from SRAM |
+| $03 ROM_RD | addr24, len8, dummy, → data × (len+1) | read from the ROM chip (19-bit address) |
+| $04 ROM_BUSW | addr24, data8 | one raw bus write cycle to the ROM (/CE_ROM, /WE). sysctl builds the JEDEC erase and program sequences from these. |
+| $05 STATUS | dummy, → status | bit0 CPU stopped (bridge or step), bit1 HALTED, bit2 WAITING, bit3 CPU card present (PRSNT2_n), bits5:4 CARD_ID, bit6 CPU cycle pending (/STB low), bit7 /CPU_RST asserted |
+| $06 GPO_RD | dummy, → gpo | current GPO value |
+| $07 CPU_CTL | ctl8 | see `cpu-bus.md` |
+| $08 TRACE_RD | dummy, → count16, → count × {addr16, data8, flags8} | Drain the trace ring, oldest first. count bits 9:0 = entries; bit 15 = entries were lost (ring full) since the previous drain. flags: bit0 RW, bit1 SYNC. |
+
+Every memory access by the bridge stalls any CPU cycle (by withholding /RDY)
+until it is done.
 
 Program flow in sysctl firmware (`cupc8.py rom write rom.bin`):
 1. Stall the CPU (or hold /CPU_RST).

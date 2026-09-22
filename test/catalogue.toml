@@ -181,6 +181,8 @@ checks = "RAM $0000–$dfff, ROM windows / RAM at $e000–$efff per ROM_OFF, I/O
 method = "GHDL testbench sweeping all 64K addresses for read and write"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=MMU-001"
+
 
 [[test]]
 id = "MMU-002"
@@ -189,6 +191,8 @@ checks = "/CE_RAM, /OE, /WE, address and data meet IS62WV5128 tAA/tOE/tWP/tDS/tD
 method = "GHDL testbench with a timing-checking SRAM model"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=all"
+
 
 [[test]]
 id = "MMU-003"
@@ -197,6 +201,8 @@ checks = "write/readback of all 256 values; pins follow"
 method = "GHDL testbench"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=MMU-003"
+
 
 [[test]]
 id = "MMU-004"
@@ -216,6 +222,8 @@ checks = "the fixed window maps $e000 → ROM 0; the banked window maps {ROM_BAN
 method = "GHDL testbench with an SST39VF040 behavioural model"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=ROM-001"
+
 
 [[test]]
 id = "ROM-002"
@@ -224,6 +232,8 @@ checks = "70 ns tACC/tOE met with the specified wait state at 12 MHz"
 method = "GHDL testbench with a timing-checking SST39 model"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=ROM-001"
+
 
 [[test]]
 id = "ROM-003"
@@ -232,6 +242,8 @@ checks = "with the 128 KB part fitted, bank bits 7:6 alias harmlessly and the ch
 method = "GHDL testbench with the VF010 model"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=ROM-001 -gROM_ID=213 -gROM_ABITS=17 && soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=BRG-002 -gROM_ID=213 -gROM_ABITS=17"
+
 
 # ============================================================================
 # SPI: chipset SPI master
@@ -263,6 +275,8 @@ checks = "SPI_STAT busy/done timing; IRQ3 latched on completion"
 method = "GHDL testbench"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=SPI-003"
+
 
 [[test]]
 id = "SPI-004"
@@ -282,6 +296,8 @@ checks = "sources latch on edges; W1C clears only the written bits; the mask gat
 method = "GHDL testbench"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-001"
+
 
 [[test]]
 id = "IRQ-002"
@@ -290,6 +306,8 @@ checks = "SLOT_IRQ reflects all 6 IRQ_n lines live; IRQ0 latches on the rising e
 method = "GHDL testbench plus a kernel handler run in the simulator"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-001"
+
 
 # ============================================================================
 # BRG / DBG: bus bridge, stop/step/trace (sysctl ↔ chipset)
@@ -301,6 +319,8 @@ checks = "RAM_WR/RAM_RD of every length 1–256 at random addresses, with and wi
 method = "GHDL testbench driving the bridge SPI"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=BRG-001"
+
 
 [[test]]
 id = "BRG-002"
@@ -309,6 +329,8 @@ checks = "ROM_BUSW JEDEC sequences erase and program the SST39 model; DQ6/DQ7 po
 method = "GHDL testbench + SST39 behavioural model"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=BRG-002"
+
 
 [[test]]
 id = "BRG-003"
@@ -325,6 +347,8 @@ checks = "CPU_CTL stop/step-instruction/step-cycle behave as specified; TRACE_RD
 method = "GHDL testbench; trace compared with sim.nim"
 kind = "sim"
 vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=DBG-001"
+
 
 # ============================================================================
 # SYN / FML: synthesis-level checks on both FPGA designs

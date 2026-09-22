@@ -132,7 +132,7 @@ Bridge commands, in addition to those in `memory-map.md`. CPU state is read with
 | Cmd | Bytes after cmd | Action |
 |---|---|---|
 | $07 CPU_CTL | ctl8 | bit0 stop, bit1 step-instruction, bit2 step-cycle, bits 5:3 reserved (0), bit6 assert /CPU_RST |
-| $08 TRACE_RD | → count16, then count × {A16, D8, flags8} | Drain the trace ring. flags: bit0 RW, bit1 SYNC, bit7 overflowed since last read. |
+| $08 TRACE_RD | dummy, → count16, then count × {A16, D8, flags8} | Drain the trace ring, oldest first. count bit 15 = entries were lost since the previous drain. flags: bit0 RW, bit1 SYNC. |
 
 ## Timing budget (12 MHz, 83.3 ns period)
 
