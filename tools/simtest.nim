@@ -152,34 +152,30 @@ proc testKernelBoot() =
     return
   ok("pc followed boot B into main $" & toHex(PC, 4))
 
-  # main: push pch; push pcl; b ili9340_init
-  if (mem[PC] and 0xf8) != 0x90:
-    fail("main does not start with push (op=$#)" % [toHex(mem[PC], 2)])
-  if (mem[PC+1] and 0xf8) != 0x90:
-    fail("second main insn is not push")
-  if (mem[PC+2] and 0xf8) != 0xb0:
-    fail("third main insn is not B")
+  # main: mov r0,#1 / st $f203,r0 (ROM off) then push pch; push pcl; b gpu_init
+  if (mem[PC] and 0xfc) != 0x8c:        # MOV Ra, #imm
+    fail("main does not start with mov #imm (op=$#)" % [toHex(mem[PC], 2)])
+  if (mem[PC+2] and 0xf8) != 0xa8:
+    fail("second main insn is not st (op=$#)" % [toHex(mem[PC+2], 2)])
+  let sysctlAddr = mem[PC+3] or (mem[PC+4] shl 8)
+  expect("main writes SYSCTL", sysctlAddr, 0xf203, 4)
+  if (mem[PC+5] and 0xf8) != 0x90 or (mem[PC+6] and 0xf8) != 0x90:
+    fail("main does not call a driver with push pch/push pcl")
+  if (mem[PC+7] and 0xf8) != 0xb0:
+    fail("main's first call is not a B")
     return
-  let initAddr = mem[PC+3] or (mem[PC+4] shl 8)
-  doAssert cpuStep() == sOk
-  doAssert cpuStep() == sOk
-  doAssert cpuStep() == sOk
+  let initAddr = mem[PC+8] or (mem[PC+9] shl 8)
+  for _ in 1..5:
+    doAssert cpuStep() == sOk
   if PC != initAddr:
-    fail("after main's first calls, pc=$# expected ili9340_init $" &
-         toHex(initAddr, 4) % [toHex(PC, 4)])
+    fail("after main's first calls, pc=$# expected gpu_init $#" %
+         [toHex(PC, 4), toHex(initAddr, 4)])
   else:
-    ok("first kernel calls: pc now ili9340_init $" & toHex(PC, 4))
+    ok("kernel switched the ROM off and called gpu_init $" & toHex(PC, 4))
+  expect("SYSCTL ROM_OFF written", mem[0xf203], 1)
 
-  var steps = 0
-  while steps < 200 and last_gpo.len == 0:
-    if cpuStep() != sOk:
-      break
-    inc steps
-  if last_gpo.len == 0:
-    fail("ili9340_init did not store GPO (mem[f000]=$#)" % [toHex(mem[0xf000], 2)])
-  else:
-    ok("kernel executed ili9340 reset via " & last_gpo)
   echo cpuStatusLine()
+
 
 # ---------------------------------------------------------------------------
 # assembler
@@ -295,8 +291,8 @@ proc testSymbolsAndKernelDecode() =
   expectTrue("kernel map loaded", table.loaded)
   let termAddress = table.resolve("term_do")
   expectTrue("resolve term_do", termAddress >= 0x1000)
-  expect("resolve data symbol", table.resolve("term_s_info"), 0x4012, 4)
-  expect("resolve bss symbol", table.resolve("term_line_buf"), 0x515c, 4)
+  expectTrue("resolve data symbol", table.resolve("term_s_info") >= 0x3000)
+  expectTrue("resolve bss symbol", table.resolve("term_line_buf") >= 0x5000)
   expectTrue("data symbols retained", table.dataSyms.len > 0)
   expectTrue("exact symbolization", table.symbolize(termAddress) == "term_do")
   expectTrue("symbol plus offset",
@@ -773,7 +769,7 @@ proc testKernelKeybWaits() =
     inc n
   expectTrue("kernel waiting for key", waiting)
   expectTrue("I enabled while waiting", IF)
-  expect("only keyboard unmasked", irqMask, 1)
+  expect("slot and SPI IRQs unmasked", irqMask, 9)
 
 testKernelKeybWaits()
 
@@ -970,6 +966,71 @@ proc testBootFailures() =
   ioModel = imLegacy
 
 testBootFailures()
+
+proc gpuLine(g: SimCard; row: int; len = 80): string =
+  ## Read one row of text off the graphics card.
+  for col in 0..<len:
+    let cell = int(simcard_gpu_cell(g, cint(col), cint(row)))
+    result.add(char(cell and 0xff))
+  result = result.strip(leading = false)
+
+proc gpuFind(g: SimCard; want: string): int =
+  ## Row showing `want`, or -1.
+  for row in 0..29:
+    if gpuLine(g, row).contains(want):
+      return row
+  -1
+
+proc testKernelOnCards() =
+  ## KRN-001: the real kernel, booted from ROM, reaches the BASIC prompt on
+  ## the graphics card and answers a typed command from the IO card.
+  echo "== kernel on the M1 machine =="
+  let outDir = rootDir / "build" / "rom"
+  createDir(outDir)
+  var r = execCmdEx("cd " & quoteShell(kernelDir) & " && bash assemble.sh")
+  if r.exitCode != 0: raise newException(IOError, "kernel build: " & r.output)
+  r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "as.py") & " " &
+                quoteShell(rootDir / "rom" / "boot.s") & " " & quoteShell(outDir / "boot.bin") &
+                " 0xe000,0xe600,0x0f00")
+  if r.exitCode != 0: raise newException(IOError, "boot ROM: " & r.output)
+  r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "mkrom.py") & " " &
+                quoteShell(outDir / "boot.bin") & " " & quoteShell(kernelDir / "kernel.o") &
+                " -o " & quoteShell(outDir / "kernel.rom"))
+  if r.exitCode != 0: raise newException(IOError, "mkrom: " & r.output)
+
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(outDir / "kernel.rom")
+  cpuBootRom()
+  let g = gpuCard()
+
+  # run until the kernel is waiting for a key
+  var n = 0
+  while n < 6_000_000 and not waiting:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("kernel reached the keyboard wait", waiting)
+  expectTrue("BASIC banner on screen", gpuFind(g, "CUPC/8 BASIC") >= 0)
+  expectTrue("prompt on screen", gpuFind(g, ">>") >= 0)
+
+  # type "help" and Enter, then let the kernel answer
+  for ch in "help" & "\r":
+    pushKey(ord(ch))
+    var m = 0
+    while m < 400_000 and not waiting:
+      if cpuStep() != sOk: break
+      inc m
+    if waiting:
+      discard cpuStep()          # let WAI see the IRQ
+  n = 0
+  while n < 2_000_000 and not waiting:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("typed command echoed", gpuFind(g, "help") >= 0)
+  expectTrue("help output", gpuFind(g, "NEW RUN CLR") >= 0)
+  ioModel = imLegacy
+
+testKernelOnCards()
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

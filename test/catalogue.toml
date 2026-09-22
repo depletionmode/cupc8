@@ -453,6 +453,8 @@ checks = "terminal output matches the golden transcript and frame"
 method = "sim.nim scenario test"
 kind = "sim"
 vrow = "2.3"
+cmd = "tools/run_tests.sh"
+
 
 [[test]]
 id = "KRN-002"
@@ -461,6 +463,8 @@ checks = "keys injected into the IO card model appear in the terminal, via both 
 method = "sim.nim scenario test"
 kind = "sim"
 vrow = "2.3"
+cmd = "tools/run_tests.sh"
+
 
 [[test]]
 id = "KRN-003"

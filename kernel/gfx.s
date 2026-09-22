@@ -1,6 +1,6 @@
 ; graphics primitives provided by kernel
 
-%define gfx_fillrect ili9340_fill_rect
+%define gfx_fillrect gpu_fill_rect
 
 ; globals
 gfx_x: resb 1

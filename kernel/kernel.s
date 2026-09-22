@@ -1,26 +1,29 @@
 ; kernel entry point
+;
+; The boot ROM has copied us here and left the slot table at $0002-$0007.
+
 main:
+	; switch the ROM windows off so $e000-$efff is RAM again
+	mov r0, #1
+	st $f203, r0
+
+	; card drivers
+	push pch
+	push pcl
+	b gpu_init
+
+	push pch
+	push pcl
+	b keyb_init
+
 	push pch
 	push pcl
 	b irq_init
-
-	; init drivers
-	push pch
-	push pcl
-	b ili9340_init		; display driver
 
 	; run terminal
 	push pch
 	push pcl
 	b term_do
-
-;    push pch
-;    push pcl
-;    b dump_char_rom
-
-;	push pch
-;	push pcl
-;	b clr_screen
 
 kernel_loop:
     wai

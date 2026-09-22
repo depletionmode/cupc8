@@ -1,29 +1,140 @@
-; simple keyboard driver
-; ps/2->spi taken care of by SoC
+; Keyboard driver: the IO card (doc/hardware/io-card.md).
+;
+; The card holds a FIFO of keys and pulls IRQ_n low while it is not empty, so
+; the kernel sleeps in WAI instead of spinning. Keys are ASCII, with $ff
+; meaning "nothing waiting".
 
-%define		SD_SPI_DEVICE		#2
+%define SLOT_TABLE $0002
+%define KEYB_CFG_DIV2 16
 
-keyb_read_char:
-	; poll once; if empty, wait for IRQ0 only (not our own SPI irq)
-	push r1
-	mov r1, SD_SPI_DEVICE
+keyb_spi: resb 1
+keyb_tmp: resb 1
 
-.loop:
+keyb_init:
+	mov r0, #0xff
+	st [keyb_spi], r0
+	xor r0, r0
+	st [keyb_tmp], r0
+.scan:
+	ld r0, [keyb_tmp]
+	ld r1, SLOT_TABLE+r0
+	eq r1, #2				; card type 2 is the IO card
+	bzf .found
+	ld r0, [keyb_tmp]
+	add r0, #1
+	st [keyb_tmp], r0
+	lt r0, #6
+	bzf .scan
+	b .done					; no keyboard fitted
+.found:
+	ld r0, [keyb_tmp]
+	shl r0, #4
+	st [keyb_spi], r0
+	mov r1, #KEYB_CFG_DIV2
+	st $f10f+r0, r1
+
+	; let the card raise IRQ_n while it has keys
 	push pch
 	push pcl
-	b spi_read
-	eq r0, #255
-	bzf .idle
-	b .done
-.idle:
+	b keyb_cs_on
+	mov r0, #0xf2			; IRQ_EN
+	push pch
+	push pcl
+	b keyb_send
 	mov r0, #1
-	st $f201, r0
-	wai
-	mov r0, #9
-	st $f201, r0
-	b .loop
-
+	push pch
+	push pcl
+	b keyb_send
+	push pch
+	push pcl
+	b keyb_cs_off
 .done:
-	pop r1
+	pop pcl
+	pop pch
+
+keyb_send:
+	st [keyb_tmp], r0
+	ld r0, [keyb_spi]
+	ld r1, [keyb_tmp]
+	st $f100+r0, r1
+	mov r1, #1
+	st $f102+r0, r1
+	ld r1, $f101+r0
+	st [keyb_tmp], r1
+	ld r0, [keyb_tmp]
+	pop pcl
+	pop pch
+
+keyb_cs_on:
+	ld r0, [keyb_spi]
+	mov r1, #1
+	st $f104+r0, r1
+	pop pcl
+	pop pch
+
+keyb_cs_off:
+	ld r0, [keyb_spi]
+	mov r1, #0
+	st $f104+r0, r1
+	pop pcl
+	pop pch
+
+; r0 = the next key, or $ff when the FIFO is empty
+keyb_poll:
+	ld r0, [keyb_spi]
+	eq r0, #0xff
+	bzf .none
+
+	push pch				; GETKEY
+	push pcl
+	b keyb_cs_on
+	mov r0, #0x00
+	push pch
+	push pcl
+	b keyb_send
+	push pch
+	push pcl
+	b keyb_cs_off
+
+	push pch				; READ frame - status, RESP_LEN, then the key
+	push pcl
+	b keyb_cs_on
+	mov r0, #0xfe
+	push pch
+	push pcl
+	b keyb_send
+	mov r0, #0
+	push pch
+	push pcl
+	b keyb_send
+	mov r0, #0
+	push pch
+	push pcl
+	b keyb_send
+	st [keyb_tmp], r0
+	push pch
+	push pcl
+	b keyb_cs_off
+	ld r0, [keyb_tmp]
+	b .done
+.none:
+	mov r0, #0xff
+.done:
+	pop pcl
+	pop pch
+
+; wait for a key and return it in r0
+keyb_read_char:
+	push pch
+	push pcl
+	b keyb_poll
+	eq r0, #0xff
+	bzf .wait
+	b .done
+.wait:
+	; sleep until a card raises IRQ_n (the IO card does so while it has keys)
+	wai
+	b keyb_read_char
+.done:
 	pop pcl
 	pop pch
