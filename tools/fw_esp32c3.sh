@@ -15,6 +15,7 @@ OUT=$ROOT/build/esp32c3-$VARIANT
 DEFAULTS="$SRC/sdkconfig.defaults"
 [ "$VARIANT" = qemu ] && DEFAULTS="$DEFAULTS;$SRC/sdkconfig.qemu"
 LOG=$OUT.log
+mkdir -p "$ROOT/build"
 if ! idf.py -C "$SRC" -B "$OUT" -D SDKCONFIG="$OUT/sdkconfig" -D SDKCONFIG_DEFAULTS="$DEFAULTS" build > "$LOG" 2>&1; then
 	grep -E "error|Error|FAILED" "$LOG" | head -30
 	exit 1

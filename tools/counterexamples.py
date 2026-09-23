@@ -49,6 +49,9 @@ def main():
                 print("FAIL %s: %s" % (bug["name"],
                       "the test PASSES with the bug back" if r.returncode == 0 else
                       "not failing on: " + ", ".join(missing)))
+                if r.returncode:
+                    # it failed, but not as expected: show why
+                    print("\n".join("     | " + l for l in out.strip().splitlines()[-15:]))
             else:
                 print("ok   %s (fixed in %s)" % (bug["name"], bug["fixed_in"]))
         finally:
