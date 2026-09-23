@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Generate hw/lib/cupc8.kicad_sym: the card-edge connector symbols, with the
 pin names from the pinout tables in the docs, so a schematic shows our
-signals and not the PCIe names. The drawing and pin numbers (A1..., B1...)
-come from KiCad's Bus_PCI_Express_* symbol with the same contact count,
-which also matches KiCad's BUS_PCIexpress_* footprints.
+signals and not the PCIe names. Pin numbers (A1..., B1...) match KiCad's
+BUS_PCIexpress_* footprints.
 
     python3 hw/tools/edgesym.py            write the library
     python3 hw/tools/edgesym.py --check    fail if it is out of date
 """
 
+import math
 import os
 import re
 import sys
@@ -40,38 +40,38 @@ def pinout(doc):
 
 
 def symbol(name, base, doc, footprint):
-    sym = kg.load_symbol("Connector:" + base)
+    """Drawn here, not copied from KiCad's PCIe symbol: that one stacks pins
+    that share a PCIe name (B1/B2/A2/A3 are all +12V), which would join
+    contacts our pinout gives different signals. Side B is down the left,
+    side A down the right, one row per contact."""
     names = pinout(doc)
-    seen = set()
-
-    def walk(node):
-        for e in node:
-            if not isinstance(e, list):
+    rows = max(int(k[1:]) for k in names)
+    G = kg.GRID
+    text = max(kg.text_extent(n)[0] for n in names.values())
+    half = math.ceil((text + 1.5) / G) * G          # a name each side, a gap between
+    top = math.ceil(rows / 2) * G
+    body = [["rectangle", ["start", -half, top + G], ["end", half, top - rows * G],
+             ["stroke", ["width", 0.254], ["type", "default"]], ["fill", ["type", "background"]]]]
+    pins = []
+    for side, x, ang in (("B", -half - 2 * G, 0), ("A", half + 2 * G, 180)):
+        for i in range(1, rows + 1):
+            num = side + str(i)
+            if num not in names:
                 continue
-            if e and e[0] == "pin":
-                num = str(kg.find1(e, "number")[1])
-                if num not in names:
-                    raise SystemExit("%s: pin %s is not in %s" % (name, num, doc))
-                seen.add(num)
-                e[1] = "passive"          # the nets decide; a connector's pins are passive
-                kg.find1(e, "name")[1] = kg.Q(names[num])
-            elif e and e[0] == "symbol":
-                e[1] = kg.Q(name + str(e[1])[len(base):])
-                walk(e)
-    walk(sym)
-    if seen != set(names):
-        raise SystemExit("%s: %s has pins the symbol lacks: %s" % (name, doc, sorted(set(names) - seen)))
-    sym[1] = kg.Q(name)
-    for p in kg.find(sym, "property"):
-        if p[1] == "Value":
-            p[2] = kg.Q(name)
-        elif p[1] == "Footprint":
-            p[2] = kg.Q(footprint)
-        elif p[1] == "Description":
-            p[2] = kg.Q("CUPC/8 card edge, pinout in " + doc)
-        elif p[1] == "Datasheet":
-            p[2] = kg.Q("")
-    return sym
+            font = ["effects", ["font", ["size", 1.27, 1.27]]]
+            pins.append(["pin", "passive", "line", ["at", x, top - (i - 1) * G, ang], ["length", 2 * G],
+                         ["name", kg.Q(names[num]), font], ["number", kg.Q(num), font]])
+
+    def prop(key, value, y, hide=False):
+        eff = ["effects", ["font", ["size", 1.27, 1.27]]] + ([["hide", "yes"]] if hide else [])
+        return ["property", kg.Q(key), kg.Q(value), ["at", 0, y, 0], eff]
+    return (["symbol", kg.Q(name), ["exclude_from_sim", "no"], ["in_bom", "yes"], ["on_board", "yes"],
+             prop("Reference", "J", top + 2.5 * G), prop("Value", name, top - rows * G - 1.5 * G),
+             prop("Footprint", footprint, 0, True), prop("Datasheet", "", 0, True),
+             prop("Description", "CUPC/8 card edge (%s contacts, like %s), pinout in %s" % (len(names), base, doc),
+                  0, True),
+             ["symbol", kg.Q(name + "_0_1")] + body,
+             ["symbol", kg.Q(name + "_1_1")] + pins])
 
 
 def generate():
