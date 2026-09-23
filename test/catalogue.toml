@@ -438,17 +438,19 @@ cmd = "python3 tools/lockstep.py --engine verilator && python3 tools/lockstep.py
 id = "SYN-002"
 title = "Timing closure"
 checks = "both designs meet 12 MHz with ≥ 30% slack on every path after place-and-route"
-method = "nextpnr-ice40 --hx8k --package tq144:4k with the real .pcf"
+method = "tools/fpga.py: yosys synth_ice40, then nextpnr-ice40 --hx8k --package tq144:4k with the .pcf generated from hw/pins.yaml; fmax >= 17.1 MHz on both, then icepack"
 kind = "static"
 vrow = "1.6"
+cmd = "python3 tools/fpga.py"
 
 [[test]]
 id = "SYN-003"
 title = "Synthesis hygiene"
-checks = "no inferred latches, no multiple drivers, no unintended tri-states, no combinational loops"
-method = "yosys check on both designs"
+checks = "no inferred latches, no multiple drivers, no combinational loops, on both designs before and after synthesis; the check itself rejects a latch, a doubly driven net and a loop"
+method = "tools/fpga.py (GHDL import, yosys select for latches, check -assert); tools/fpga.py --selftest for the broken designs"
 kind = "static"
 vrow = "1.5"
+cmd = "python3 tools/fpga.py && python3 tools/fpga.py --selftest"
 
 # ============================================================================
 # BOOT: boot ROM (rom/boot.s)

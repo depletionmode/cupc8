@@ -32,48 +32,48 @@ devices:
       cpu_bus:
         note: CPU socket, doc/hardware/cpu-bus.md
         signals:
-          - {name: CPU_A, width: 16, dir: in}
-          - {name: CPU_D, width: 8, dir: inout}
-          - {name: CPU_RW, dir: in}
-          - {name: CPU_nSTB, dir: in}
-          - {name: CPU_nRDY, dir: out}
-          - {name: CPU_SYNC, dir: in}
-          - {name: CPU_IRQ, width: 4, dir: out}
-          - {name: CPU_TMR_EXP, width: 2, dir: in}
-          - {name: CPU_HALTED, dir: in}
-          - {name: CPU_WAITING, dir: in}
+          - {name: CPU_A, width: 16, dir: in, pin: [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20]}
+          - {name: CPU_D, width: 8, dir: inout, pin: [22, 23, 24, 25, 26, 28, 29, 31]}
+          - {name: CPU_RW, dir: in, pin: 32}
+          - {name: CPU_nSTB, dir: in, pin: 33}
+          - {name: CPU_nRDY, dir: out, pin: 34}
+          - {name: CPU_SYNC, dir: in, pin: 37}
+          - {name: CPU_IRQ, width: 4, dir: out, pin: [38, 39, 41, 42]}
+          - {name: CPU_TMR_EXP, width: 2, dir: in, pin: [43, 44]}
+          - {name: CPU_HALTED, dir: in, pin: 45}
+          - {name: CPU_WAITING, dir: in, pin: 47}
       memory_bus:
         note: SRAM IS62WV5128 + ROM SST39VF040 on one bus
         signals:
-          - {name: MEM_A, width: 19, dir: out}
-          - {name: MEM_D, width: 8, dir: inout}
-          - {name: MEM_nOE, dir: out}
-          - {name: MEM_nWE, dir: out}
-          - {name: MEM_nCE_RAM, dir: out}
-          - {name: MEM_nCE_ROM, dir: out}
+          - {name: MEM_A, width: 19, dir: out, pin: [110, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 124, 125, 128, 129, 130, 134, 135]}
+          - {name: MEM_D, width: 8, dir: inout, pin: [136, 137, 138, 139, 141, 142, 143, 144]}
+          - {name: MEM_nOE, dir: out, pin: 73}
+          - {name: MEM_nWE, dir: out, pin: 74}
+          - {name: MEM_nCE_RAM, dir: out, pin: 75}
+          - {name: MEM_nCE_ROM, dir: out, pin: 76}
       slots:
         note: SPI to slots 1-6 (dev 0-5) and the aux header (dev 6)
         signals:
-          - {name: SPI_SCK, dir: out}
-          - {name: SPI_MOSI, dir: out}
-          - {name: SPI_MISO, dir: in}
-          - {name: SPI_nCS, width: 7, dir: out}
-          - {name: SLOT_nIRQ, width: 6, dir: in}
+          - {name: SPI_SCK, dir: out, pin: 78}
+          - {name: SPI_MOSI, dir: out, pin: 79}
+          - {name: SPI_MISO, dir: in, pin: 80}
+          - {name: SPI_nCS, width: 7, dir: out, pin: [81, 82, 83, 84, 85, 87, 88]}
+          - {name: SLOT_nIRQ, width: 6, dir: in, pin: [90, 91, 93, 94, 95, 96]}
       bridge:
         note: SPI slave to sysctl
         signals:
-          - {name: BR_SCK, dir: in}
-          - {name: BR_MOSI, dir: in}
-          - {name: BR_MISO, dir: out}
-          - {name: BR_nCS, dir: in}
+          - {name: BR_SCK, dir: in, pin: 97}
+          - {name: BR_MOSI, dir: in, pin: 98}
+          - {name: BR_MISO, dir: out, pin: 99}
+          - {name: BR_nCS, dir: in, pin: 101}
       misc:
         signals:
-          - {name: CLK12, dir: in, role: gbin}
-          - {name: nPOR, dir: in, note: from the reset supervisor}
-          - {name: GPO, width: 8, dir: out, note: LEDs D1-D8}
-          - {name: CPU_nRST, dir: out}
-          - {name: PWR_HI, dir: in, note: USB-C source >= 1.5 A (CC comparator)}
-          - {name: CPU_CDONE, dir: in, note: CPU card configured; pulled up (doc/hardware/cpu-bus.md)}
+          - {name: CLK12, dir: in, role: gbin, pin: 21}
+          - {name: nPOR, dir: in, note: from the reset supervisor, pin: 102}
+          - {name: GPO, width: 8, dir: out, note: LEDs D1-D8, pin: [52, 55, 56, 60, 61, 62, 63, 64]}
+          - {name: CPU_nRST, dir: out, pin: 48}
+          - {name: PWR_HI, dir: in, note: USB-C source >= 1.5 A (CC comparator), pin: 104}
+          - {name: CPU_CDONE, dir: in, note: CPU card configured; pulled up (doc/hardware/cpu-bus.md), pin: 49}
 
   cpu_fpga:
     board: cpu-card
@@ -84,18 +84,18 @@ devices:
     groups:
       cpu_bus:
         signals:
-          - {name: CPU_A, width: 16, dir: out}
-          - {name: CPU_D, width: 8, dir: inout}
-          - {name: CPU_RW, dir: out}
-          - {name: CPU_nSTB, dir: out}
-          - {name: CPU_nRDY, dir: in}
-          - {name: CPU_SYNC, dir: out}
-          - {name: CPU_IRQ, width: 4, dir: in}
-          - {name: CPU_TMR_EXP, width: 2, dir: out}
-          - {name: CPU_HALTED, dir: out}
-          - {name: CPU_WAITING, dir: out}
-          - {name: CPU_CLK, dir: in, role: gbin}
-          - {name: CPU_nRST, dir: in}
+          - {name: CPU_A, width: 16, dir: out, pin: [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20]}
+          - {name: CPU_D, width: 8, dir: inout, pin: [37, 38, 39, 41, 42, 43, 44, 45]}
+          - {name: CPU_RW, dir: out, pin: 47}
+          - {name: CPU_nSTB, dir: out, pin: 48}
+          - {name: CPU_nRDY, dir: in, pin: 52}
+          - {name: CPU_SYNC, dir: out, pin: 55}
+          - {name: CPU_IRQ, width: 4, dir: in, pin: [21, 22, 23, 24]}
+          - {name: CPU_TMR_EXP, width: 2, dir: out, pin: [62, 63]}
+          - {name: CPU_HALTED, dir: out, pin: 60}
+          - {name: CPU_WAITING, dir: out, pin: 61}
+          - {name: CPU_CLK, dir: in, role: gbin, pin: 49}
+          - {name: CPU_nRST, dir: in, pin: 56}
 
   sysctl:
     board: system-card

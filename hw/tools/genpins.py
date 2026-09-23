@@ -51,10 +51,11 @@ def pcf(dev, name):
     lines = ["# %s constraints, generated from hw/pins.yaml" % name,
              "# Pin numbers are assigned during layout; unassigned pins are listed as TODO."]
     for gname, sig in signals(dev):
-        for sname, _ in expand(sig):
-            pin = sig.get("pin")
+        pins = sig.get("pin")
+        for i, (sname, _) in enumerate(expand(sig)):
+            pin = pins[i] if isinstance(pins, list) else pins
             if pin:
-                lines.append("set_io %-16s %s" % (sname.replace("[", "[").replace("]", "]"), pin))
+                lines.append("set_io %-16s %s" % (sname, pin))
             else:
                 lines.append("# TODO set_io %-16s   (%s)" % (sname, gname))
     return "\n".join(lines) + "\n"
