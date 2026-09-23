@@ -118,3 +118,11 @@ before = "61af3a1"
 files = ["hw/pins.yaml"]
 cmd = "python3 hw/tools/pincheck.py"
 must_fail = ["USB_DP must be on the RP2040's dedicated USB_DP pin"]
+
+[[bug]]
+name = "slot SPI slave: a preload refresh racing a frame's start shifted the frame by two bits"
+fixed_in = "29cfa8f"
+before = "d7f6145"
+files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
+cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
+must_fail = ["FAIL full-speed: typed \"Hello\""]
