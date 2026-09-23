@@ -25,6 +25,9 @@ DOCS = os.path.join(ROOT, "doc", "hardware")
 # usable I/O per package (Lattice iCE40 datasheet), and RP2040/ESP32-C3 GPIO
 IO_BUDGET = {"ICE40HX4K-TQ144": 107, "RP2040": 30, "ESP32-C3-MINI-1U-N4": 22}
 RP2040_ADC = {26, 27, 28, 29}
+# ESP32-C3 strapping pins: sampled at reset, so nothing driven from outside
+# the card may sit on them; only the boot-mode strap belongs on GPIO9
+ESP32C3_STRAPS = {2: None, 8: None, 9: "BOOT_STRAP"}
 
 errors = []
 
@@ -162,6 +165,8 @@ def check_gpios(pins):
                 err("%s: %s uses GPIO %d, beyond %s" % (dname, name, gpio, part))
             if part == "RP2040" and sig.get("dir") == "adc" and gpio not in RP2040_ADC:
                 err("%s: %s is an ADC input but GPIO %d has no ADC" % (dname, name, gpio))
+            if part.startswith("ESP32-C3") and gpio in ESP32C3_STRAPS and ESP32C3_STRAPS[gpio] != name:
+                err("%s: %s is on GPIO %d, an ESP32-C3 strapping pin" % (dname, name, gpio))
             if part == "RP2040" and name in ("USB_DP", "USB_DM"):
                 err("%s: %s is on GPIO %d, but the RP2040's USB port has its own pins" % (dname, name, gpio))
         if part in IO_BUDGET and part.startswith("ICE40"):

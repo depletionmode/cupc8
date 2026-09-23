@@ -4,7 +4,8 @@
 
 #define PIN_SLOT_SCK           6
 #define PIN_SLOT_MOSI          7
-#define PIN_SLOT_MISO          2
+/* slot: not GPIO2: that is a strapping pin, and the shared MISO line can be low while this card resets */
+#define PIN_SLOT_MISO          5
 #define PIN_SLOT_NCS           10
 /* slot: open drain */
 #define PIN_SLOT_NIRQ          3

@@ -213,7 +213,7 @@ devices:
         signals:
           - {name: SLOT_SCK, gpio: 6, dir: in}
           - {name: SLOT_MOSI, gpio: 7, dir: in}
-          - {name: SLOT_MISO, gpio: 2, dir: out}
+          - {name: SLOT_MISO, gpio: 5, dir: out, note: "not GPIO2: that is a strapping pin, and the shared MISO line can be low while this card resets"}
           - {name: SLOT_nCS, gpio: 10, dir: in}
           - {name: SLOT_nIRQ, gpio: 3, dir: out, note: open drain}
       program:

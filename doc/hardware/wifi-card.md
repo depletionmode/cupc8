@@ -28,7 +28,10 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   | CARD_RST_n | EN | RC 10 kΩ / 1 µF, per Espressif |
   | PROG_n | GPIO9 | boot strap. Card pull-up 10 kΩ, so it boots normally when PROG_n is released. |
 
-  GPIO8 and GPIO2 are strapped high, per the datasheet.
+  GPIO8 and GPIO2 are strapped high (10 kΩ), per the datasheet, and carry
+  nothing else: a strapping pin is sampled at reset, and a signal from the
+  slot (the shared MISO line, say) could be low at that moment. So the SPI
+  slave's MISO is on GPIO5, not GPIO2.
 - **Antenna:** a 2.4 GHz adhesive FPC antenna with a U.FL lead (e.g.
   KH-FPC2.4G-1.13IPEX, LCSC C4943394). It is ordered loose and plugged in by
   hand, because JLC doesn't assemble cable antennas. It mounts on the case or
