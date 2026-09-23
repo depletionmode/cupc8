@@ -71,3 +71,42 @@ before = "80c23a6"
 files = ["kernel/ubasic.s"]
 cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
 must_fail = ["BASIC poke/peek", "BASIC poke expr", "GPO after poke 240, 0, 165"]
+
+[[bug]]
+name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (the build rejects it)"
+fixed_in = "5da685c"
+revert = [
+  ["fw/gpu/core/gpu.c", """	int n = 0;
+	while (n < max_frames && fifo_used(g) >= 2) {
+		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
+		for (uint32_t i = 0; i < len; i++)
+			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
+	uint8_t frame[2 + CARD_FRAME_MAX];
+	while (n < max_frames && fifo_used(g) >= 2) {
+		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
+		for (uint32_t i = 0; i < len; i++)
+			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
+  ["fw/gpu/core/gpu.c", "execute(g, g->cmd, (int)len, g->exec_seq == g->frame_seq);", "execute(g, frame, (int)len, g->exec_seq == g->frame_seq);"],
+]
+cmd = "tools/fw_rp2040.sh gpu"
+must_fail = ["stack usage"]
+
+[[bug]]
+name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (the card test catches it)"
+fixed_in = "5da685c"
+revert = [
+  ["fw/gpu/core/gpu.c", """	int n = 0;
+	while (n < max_frames && fifo_used(g) >= 2) {
+		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
+		for (uint32_t i = 0; i < len; i++)
+			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
+	uint8_t frame[2 + CARD_FRAME_MAX];
+	while (n < max_frames && fifo_used(g) >= 2) {
+		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
+		for (uint32_t i = 0; i < len; i++)
+			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
+  ["fw/gpu/core/gpu.c", "execute(g, g->cmd, (int)len, g->exec_seq == g->frame_seq);", "execute(g, frame, (int)len, g->exec_seq == g->frame_seq);"],
+  ["fw/rp2040/CMakeLists.txt", ";-Wstack-usage=512", ""],
+]
+cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-004"
+must_fail = ["FAIL the card"]
