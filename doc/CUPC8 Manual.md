@@ -30,6 +30,14 @@ In addition to drivers and system functions, the kernel provides a 'terminal' in
 
 The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1-255, one-letter variables `a`-`z`, and a 256-byte program buffer (a line that does not fit is refused with `PROGRAM FULL`; a typed line is at most 78 characters). Statements: `let`, `print` (`,` prints a space, `;` nothing), `if ... then ... else`, `for ... to ... next`, `goto`, `gosub`/`return`, `rem`, `end`, and, because an 8-bit number cannot hold an address, `poke hi, lo, value` and `peek hi, lo, var` (the address is hi*256+lo; `poke 240, 0, n` sets the LEDs at $f000). Operators: `+ - * / % & |`, `< > =`, parentheses. Dividing by 0 gives 0.
 
+Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen) and `net`, for the Wi-Fi card:
+
+- `net join SSID PASSWORD` joins that network, keeps the credentials on the card (it joins them again at power-up) and prints the address it was given.
+- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. A name that doesn't resolve or a refused connection prints `connect failed`.
+- `net` on its own shows whether the link is up, and the address.
+
+`net` refuses to start the radio on a USB source under 1.5 A (see the power budget).
+
 There is no compiler available for the CUPC/8 ISA. Development tools are cross-platform and consist of an assembler and a simulator which provides 1-to-1 simulation of the full computer (including display and input). The simulator can be executed natively or compiled to JavaScript (using emscripten) and run through a web browser.
 
 ## 3. Central Processing Unit
