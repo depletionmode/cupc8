@@ -54,6 +54,8 @@ architecture sim of tb_chipset is
 	signal b_wdata, b_rdata: std_logic_vector(7 downto 0) := x"00";
 	signal b_rw, b_sync: std_logic := '1';
 	signal b_bad_oe: natural := 0;
+	signal b_bad_rdy: natural := 0;				-- /RDY while /STB is high (never allowed)
+	signal b_aborts: natural := 0;				-- cycles cut short by /CPU_RST
 
 	-- bridge
 	signal br_sck, br_mosi: std_logic := '0';
@@ -121,11 +123,16 @@ begin
 		end if;
 	end process;
 
-	-- count completed CPU cycles (/RDY is a one-clock pulse the BFM can miss)
+	-- count completed CPU cycles (/RDY is a one-clock pulse the BFM can miss),
+	-- and catch a /RDY for a request the CPU is no longer making
 	count_rdy: process(clk)
 	begin
 		if rising_edge(clk) and cpu_n_rdy = '0' then
 			completions <= completions + 1;
+			if cpu_n_stb = '1' then
+				report "/RDY while /STB is high" severity error;
+				b_bad_rdy <= b_bad_rdy + 1;
+			end if;
 		end if;
 	end process;
 
@@ -136,6 +143,11 @@ begin
 		cpu_a <= b_addr; cpu_rw <= b_rw; cpu_dw <= b_wdata; cpu_sync <= b_sync; cpu_n_stb <= '0';
 		loop
 			wait until rising_edge(clk);
+			if cpu_n_rst = '0' then
+				-- like the card: reset is synchronous, the request is dropped
+				b_aborts <= b_aborts + 1;
+				exit;
+			end if;
 			if cpu_n_rdy = '0' then
 				b_rdata <= cpu_dr;
 				if b_rw = '1' and cpu_d_oe /= '1' then b_bad_oe <= b_bad_oe + 1; end if;
@@ -329,6 +341,38 @@ begin
 			rd(16#f203#, d);
 			check(d(1) = '1' and d(0) = '0', "SYSCTL with PWR_HI high: $" & to_hstring(d));
 			models_clean("RST-001");
+		end if;
+
+		---------------------------------------------------------------- RST-002
+		if run("RST-002") then
+			-- a CPU cycle, and the CPU card losing CDONE (so /CPU_RST) k clocks
+			-- into it: the chipset must drop the cycle, never /RDY it after the
+			-- card has let go (the race BUS-004 found; the monitor above
+			-- counts any /RDY with /STB high)
+			-- a RAM read (the memory controller) and an I/O read (answered at
+			-- once), each started at every clock offset around the moment
+			-- /CPU_RST asserts (about 3 clocks after CDONE falls, through the
+			-- synchroniser): before it, on the very clock it asserts (the case
+			-- the formal counterexample found), and after it
+			n := b_aborts;
+			for kind in 0 to 1 loop
+				for d in 0 to 8 loop
+					cpu_cdone <= '0';
+					for i in 1 to d loop wait until rising_edge(clk); end loop;
+					if kind = 0 then b_addr <= x"1000"; else b_addr <= x"f000"; end if;
+					b_rw <= '1'; b_wdata <= x"00"; b_sync <= '0';
+					b_go <= not b_go;
+					wait on b_done for 100 * T;
+					cpu_cdone <= '1';
+					wait for 40 * T;
+					check(cpu_n_rst = '1', "CPU not released after CDONE returned (d=" & integer'image(d) & ")");
+				end loop;
+			end loop;
+			check(b_aborts > n, "no cycle was cut short by the reset: the race was not exercised");
+			-- the machine still works afterwards
+			wr(16#2000#, x"5a");
+			expect(16#2000#, x"5a", "RAM after the resets");
+			models_clean("RST-002");
 		end if;
 
 		---------------------------------------------------------------- MMU-001
@@ -617,6 +661,7 @@ begin
 		end if;
 
 		check(b_bad_oe = 0, "chipset did not drive D with /RDY on " & integer'image(b_bad_oe) & " reads");
+		check(b_bad_rdy = 0, integer'image(b_bad_rdy) & " /RDY pulses while /STB was high");
 		assert errors = 0 report integer'image(errors) & " chipset errors" severity failure;
 		report "tb_chipset (" & ONLY & "): 0 errors";
 		finished <= true;

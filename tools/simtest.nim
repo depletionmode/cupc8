@@ -7,6 +7,7 @@ import net
 import selectors
 import nativesockets
 import strutils
+import sequtils
 import tables
 import sim
 import simdisplay
@@ -1135,6 +1136,23 @@ proc testBasicPrograms() =
   ioModel = imLegacy
 
 run testBasicPrograms
+
+proc testProgramFull() =
+  ## KRN-003: the 256-byte program buffer refuses a line that does not fit
+  ## ("PROGRAM FULL") instead of overwriting memory, and keeps working. Each
+  ## line below is 31 characters plus CR: 7 fit, the 8th does not.
+  echo "== BASIC program buffer full =="
+  let rom = buildKernelRom()
+  var prog: seq[string]
+  for i in 1..8:
+    prog.add($(i * 10) & " print \"" & "a".repeat(20) & "\"")
+  let got = basicRun(rom, prog)
+  let g = gpuCard()
+  expectTrue("the 8th line was refused", gpuFind(g, "PROGRAM FULL") >= 0)
+  expectTrue("the 7 lines that fit ran", got == newSeqWith(7, "a".repeat(20)))
+  ioModel = imLegacy
+
+run testProgramFull
 
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another

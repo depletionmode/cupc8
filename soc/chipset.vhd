@@ -68,6 +68,7 @@ architecture rtl of chipset is
 	signal pwr_s: std_logic_vector(1 downto 0) := "00";
 	signal cdone_cnt: unsigned(4 downto 0) := (others => '0');
 	signal cpu_hold: std_logic := '1';			-- until the CPU card is configured
+	signal cpu_rst_i: std_logic;				-- /CPU_RST asserted (any cause)
 
 	-- CPU front-end
 	signal cyc_busy: std_logic := '0';
@@ -125,7 +126,8 @@ begin
 	cpu_d_out <= dout_r;
 	cpu_d_oe <= '1' when rdy_r = '0' and cyc_rw = '1' else '0';
 	cpu_irq <= pending and mask;
-	cpu_n_rst <= '0' when rst = '1' or cpu_hold = '1' or br_ctl(6) = '1' else '1';
+	cpu_rst_i <= rst or cpu_hold or br_ctl(6);
+	cpu_n_rst <= not cpu_rst_i;
 
 	mem_a <= std_logic_vector(ma_r);
 	mem_d_out <= md_r;
@@ -139,7 +141,7 @@ begin
 	spi_n_cs <= spi_cs8(6 downto 0);
 
 	-- CPU card presence and ID are on sysctl's expander, not here: bits 5:3 read 0
-	br_status <= (rst or cpu_hold or br_ctl(6)) & (not cpu_n_stb) & "000" &
+	br_status <= cpu_rst_i & (not cpu_n_stb) & "000" &
 				 cpu_waiting & cpu_halted &
 				 (br_ctl(0) and not step_instr and not step_cycle);
 
@@ -236,7 +238,13 @@ begin
 				end if;
 
 				------------------------------------------------------------ CPU front-end
-				if rdy_r = '0' then
+				if cpu_rst_i = '1' then
+					-- the CPU is in reset: drop any cycle it had asked for and take
+					-- none, so no /RDY can reach it for a request it abandoned
+					-- (BUS-004 found this: a stale /RDY could meet its first fetch)
+					cyc_busy <= '0';
+					rdy_r <= '1';
+				elsif rdy_r = '0' then
 					-- the CPU samples /RDY at this edge: the cycle completes; trace it
 					rdy_r <= '1';
 					cyc_busy <= '0';
@@ -394,7 +402,7 @@ begin
 					if m_owner_br = '1' then
 						br_rdata <= mem_d_in;
 						br_ack <= '1';
-					else
+					elsif cyc_busy = '1' and cpu_rst_i = '0' then	-- the cycle is still wanted
 						dout_r <= mem_d_in;
 						rdy_r <= '0';
 					end if;

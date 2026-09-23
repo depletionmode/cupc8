@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# yosys with the ghdl plugin loaded. OSS CAD Suite's plugin was linked
+# against libghdl-6_0_0_dev.so but the suite ships libghdl-6_0_0.so, so a
+# symlink under the expected name goes on the library path.
+set -euo pipefail
+S=/opt/oss-cad-suite
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+fix="$ROOT/build/formal/libfix"
+mkdir -p "$fix"
+[ -e "$fix/libghdl-6_0_0_dev.so" ] || ln -sf "$S/lib/libghdl-6_0_0.so" "$fix/libghdl-6_0_0_dev.so"
+export GHDL_PREFIX="$S/lib/ghdl"
+export PATH="$S/bin:$PATH"
+exec "$S/lib/ld-linux-x86-64.so.2" --inhibit-cache --inhibit-rpath "" \
+	--library-path "$fix:$S/lib" "$S/libexec/yosys" -m ghdl "$@"

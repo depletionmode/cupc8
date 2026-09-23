@@ -66,5 +66,10 @@ boots and runs with the system card removed.
 
 When everything else is done (specs, implementation, the tests all green, and
 the fab packages), run `codex-p` with the astra model at medium reasoning to
-critique the whole design. Consider every comment. Fix anything that is a bug;
-other suggestions are optional, and each gets a recorded yes/no with a reason.
+critique the whole design, and to propose further tests for every part of the
+machine. Consider every comment. Fix anything that is a bug; other suggestions
+are optional, and each gets a recorded yes/no with a reason. Worthwhile proposed
+tests go into the catalogue and are implemented.
+
+Every bug fixed anywhere gets a test that fails on the bug (a counterexample)
+and passes on the fix, so it cannot come back.

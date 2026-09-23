@@ -188,9 +188,10 @@ cmd = "python3 tools/lockstep.py --waits -1 --stall 200 --seed 5 && python3 tool
 id = "BUS-004"
 title = "CPU bus formal properties"
 checks = "one D driver; /RDY only while /STB is low; /RDY exactly one clock wide; no bridge and CPU cycle granted together"
-method = "SymbiYosys on the chipset bus front-end"
+method = "SymbiYosys unbounded proof (k-induction, bitwuzla) of soc/formal/chipset_props.vhd, PSL bound to chipset.vhd; tools/formal.py runs it with the ghdl-enabled yosys"
 kind = "formal"
 vrow = "1.4"
+cmd = "python3 tools/formal.py chipset prove"
 
 [[test]]
 id = "BUS-005"
@@ -237,13 +238,15 @@ cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chips
 id = "MMU-004"
 title = "Memory-bus formal properties"
 checks = "/CE_RAM and /CE_ROM never both low; the FPGA never drives D while /OE is low; /WE never low during an address change"
-method = "SymbiYosys"
+method = "SymbiYosys unbounded proof (k-induction, bitwuzla) of soc/formal/chipset_props.vhd, PSL bound to chipset.vhd; tools/formal.py runs it with the ghdl-enabled yosys"
 kind = "formal"
 vrow = "1.4"
 
 # ============================================================================
 # ROM: ROM chip windows and banking
 # ============================================================================
+cmd = "python3 tools/formal.py chipset prove"
+
 [[test]]
 id = "ROM-001"
 title = "ROM windows and banking"
@@ -311,13 +314,15 @@ cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chips
 id = "SPI-004"
 title = "Chip-select formal"
 checks = "CS lines one-hot or idle at all times"
-method = "SymbiYosys"
+method = "SymbiYosys unbounded proof (k-induction, bitwuzla) of soc/formal/chipset_props.vhd, PSL bound to chipset.vhd; tools/formal.py runs it with the ghdl-enabled yosys"
 kind = "formal"
 vrow = "1.4"
 
 # ============================================================================
 # IRQ: interrupt controller
 # ============================================================================
+cmd = "python3 tools/formal.py chipset prove"
+
 [[test]]
 id = "IRQ-001"
 title = "Pending, mask, W1C"
@@ -393,6 +398,24 @@ method = "tb_chipset section RST-001, plus start-up checks in every section"
 kind = "sim"
 vrow = "1.5"
 cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=RST-001"
+
+[[test]]
+id = "RST-002"
+title = "No /RDY for a cycle abandoned by reset"
+checks = "a RAM read and an I/O read started at every clock around /CPU_RST asserting: the chipset never pulses /RDY while /STB is high (the race BUS-004 found); a monitor checks this in every tb_chipset section"
+method = "tb_chipset section RST-002; the bus model drops its request on reset, as the card does"
+kind = "sim"
+vrow = "1.5"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=RST-002"
+
+[[test]]
+id = "MUT-001"
+title = "Counterexamples: fixed bugs stay caught"
+checks = "each mutant puts a fixed bug (or a property's target fault) back into a copy of the RTL; its formal property and its simulation test must then fail"
+method = "tools/formal.py --mutants (the reset race: bus_rdy_in_cycle and RST-002; RAM+ROM enabled together; a two-clock /RDY)"
+kind = "formal"
+vrow = "1.4"
+cmd = "python3 tools/formal.py --mutants"
 [[test]]
 id = "SYN-001"
 title = "Post-synthesis lockstep (Verilator netlist)"
