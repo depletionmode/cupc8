@@ -43,3 +43,24 @@ fi
 if [ ! -d "$SDK/rp2040js/dist" ]; then
 	(cd "$SDK/rp2040js" && npm run --silent build)
 fi
+
+# ESP-IDF for the Wi-Fi card (ESP32-C3), with its RISC-V toolchain and
+# Espressif's QEMU; tools under $SDK/espressif, not ~/.espressif
+if [ "${CUPC8_SKIP_IDF:-0}" != 1 ]; then
+	IDF_VERSION=v5.5.5
+	if [ ! -d "$SDK/esp-idf/.git" ]; then
+		git clone --quiet --depth 1 --branch $IDF_VERSION https://github.com/espressif/esp-idf.git "$SDK/esp-idf"
+	fi
+	[ "$(git -C "$SDK/esp-idf" describe --tags)" = $IDF_VERSION ] || { echo "esp-idf is not $IDF_VERSION" >&2; exit 1; }
+	echo "esp-idf @ $IDF_VERSION"
+	if [ ! -f "$SDK/esp-idf/.cupc8-submodules" ]; then
+		git -C "$SDK/esp-idf" submodule update --quiet --init --recursive --depth 1
+		touch "$SDK/esp-idf/.cupc8-submodules"
+	fi
+	export IDF_TOOLS_PATH=$SDK/espressif
+	if [ ! -f "$IDF_TOOLS_PATH/.cupc8-tools" ]; then
+		(cd "$SDK/esp-idf" && ./install.sh esp32c3 >/dev/null)
+		python3 "$SDK/esp-idf/tools/idf_tools.py" install qemu-riscv32 >/dev/null
+		touch "$IDF_TOOLS_PATH/.cupc8-tools"
+	fi
+fi

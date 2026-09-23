@@ -152,9 +152,11 @@ static void command(card_t *c, const uint8_t *f, int len)
 		n = f[p++];
 		if (n > 64 || p + n > len) { c->errors++; break; }
 		memcpy(psk, f + p, (size_t)n);
+		p += n;
+		bool save = p < len && f[p];
 		w->busy = true;
 		w->link = WIFI_LINK_JOINING;
-		if (w->net->join(w->ctx, ssid, psk) < 0) {
+		if (w->net->join(w->ctx, ssid, psk, save) < 0) {
 			w->busy = false;
 			w->link = WIFI_LINK_FAILED;
 			event(w, WIFI_EV_JOIN_FAILED, 0);

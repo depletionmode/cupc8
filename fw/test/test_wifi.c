@@ -16,6 +16,13 @@ static wifi_t w;
 /* the host backend, noting the SNI each connect is given */
 static wifi_net_ops spy_ops;
 static char last_sni[64];
+static int last_save = -1;
+
+static int spy_join(void *ctx, const char *ssid, const char *psk, bool save)
+{
+	last_save = save;
+	return netposix_ops.join(ctx, ssid, psk, save);
+}
 
 static int spy_connect(void *ctx, int h, const uint8_t ip[4], uint16_t port, const char *sni)
 {
@@ -77,6 +84,8 @@ static void test_link(void)
 	send_frame(join, sizeof join);
 	CHECK(status() & 0x20, "BUSY while joining");
 	CHECK(wait_event(WIFI_EV_JOINED, 0), "no JOINED event");
+	/* doc: JOIN's save = 1 stores the credentials for auto-join at power-up */
+	CHECK(last_save == 1, "JOIN save=1 reached the backend as %d", last_save);
 	CHECK(status() & 0x40, "LINK not up after joining");
 
 	SEND(0x01);                                        /* NET_STATUS */
@@ -212,6 +221,7 @@ int main(void)
 {
 	spy_ops = netposix_ops;
 	spy_ops.connect = spy_connect;
+	spy_ops.join = spy_join;
 	wifi_init(&w, &spy_ops, netposix_new());
 	test_link();
 	test_sockets();

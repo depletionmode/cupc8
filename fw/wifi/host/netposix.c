@@ -43,10 +43,11 @@ static void set_nonblock(int fd)
 	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 }
 
-static int h_join(void *ctx, const char *ssid, const char *psk)
+static int h_join(void *ctx, const char *ssid, const char *psk, bool save)
 {
 	netposix_t *n = ctx;
 	(void)psk;
+	(void)save;                           /* the host has nothing to store */
 	if (!ssid[0])
 		return -1;                        /* no SSID: fail, so tests can see it */
 	snprintf(n->ssid, sizeof n->ssid, "%s", ssid);

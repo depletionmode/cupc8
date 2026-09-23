@@ -38,7 +38,8 @@ typedef struct wifi wifi_t;
 
 typedef struct {
 	/* link */
-	int (*join)(void *ctx, const char *ssid, const char *psk);
+	/* save: keep the credentials (NVS) and join them again at power-up */
+	int (*join)(void *ctx, const char *ssid, const char *psk, bool save);
 	int (*link_state)(void *ctx, uint8_t *rssi, uint8_t ip[4], uint8_t gw[4], uint8_t dns[4]);
 	void (*leave)(void *ctx, bool forget);
 	int (*scan_start)(void *ctx);

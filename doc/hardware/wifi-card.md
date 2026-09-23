@@ -17,7 +17,11 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   the slot's +3V3 is limited to 300 mA. The regulator is followed by the
   bulk capacitance Espressif recommends (22 µF + 0.1 µF at the module).
 - **SPI slave:** ESP32-C3 GPSPI2 routed to SCK/MOSI/MISO/CS_n through the GPIO
-  matrix. MISO is tri-stated when CS_n is high.
+  matrix. MISO reaches the slot through a **74LVC1G125** tri-state buffer
+  whose /OE is CS_n, so this card releases the shared MISO line whenever it
+  isn't selected. That is guaranteed by the buffer, not by how GPSPI2 drives
+  its output enable, which nothing before hardware can check (QEMU has no
+  SPI slave).
 - **IRQ_n:** open-drain GPIO.
 - **Programming** (in-system, via the slot programming port, see `slot.md`):
 

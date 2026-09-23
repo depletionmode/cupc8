@@ -1,0 +1,13 @@
+menu "CUPC/8 Wi-Fi card"
+
+config CUPC8_QEMU
+	bool "Build for Espressif QEMU (the emulated tests)"
+	default n
+	select ETH_USE_OPENETH
+	help
+		QEMU has no radio and no SPI slave. This build joins "networks" by
+		bringing up QEMU's OpenCores Ethernet with DHCP, and carries the
+		card frames over UART1 instead of the slot SPI. Everything between
+		the frames and lwIP is the same code as the card's own build.
+
+endmenu
