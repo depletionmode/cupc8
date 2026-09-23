@@ -134,3 +134,11 @@ before = "78b4e49"
 files = ["fw/wifi/core/wifi.c"]
 cmd = "make -C fw test_wifi"
 must_fail = ["CONNECT_HOST gave the backend SNI '(none)'"]
+
+[[bug]]
+name = "pins: the Wi-Fi card's MISO was on GPIO2, an ESP32-C3 strapping pin"
+fixed_in = "4b2a9c3"
+before = "98809b5"
+files = ["hw/pins.yaml"]
+cmd = "python3 hw/tools/pincheck.py"
+must_fail = ["SLOT_MISO is on GPIO 2, an ESP32-C3 strapping pin"]
