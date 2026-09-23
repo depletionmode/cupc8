@@ -187,7 +187,8 @@ devices:
     groups:
       usb_host:
         signals:
-          - {name: USB_DP, gpio: 0, dir: inout, note: native USB host port}
+          - {name: USB_DP, pin: USB_DP, dir: inout, note: "native USB host port: a dedicated RP2040 pin, not a GPIO"}
+          - {name: USB_DM, pin: USB_DM, dir: inout, note: "native USB host port: a dedicated RP2040 pin, not a GPIO"}
           - {name: VBUS_EN, gpio: 7, dir: out}
           - {name: VBUS_nFAULT, gpio: 8, dir: in}
       slot:

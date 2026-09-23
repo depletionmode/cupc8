@@ -2,8 +2,8 @@
 #ifndef IO_PINS_H
 #define IO_PINS_H
 
-/* usb_host: native USB host port */
-#define PIN_USB_DP             0
+/* usb_host: native USB host port: a dedicated RP2040 pin, not a GPIO */
+/* usb_host: native USB host port: a dedicated RP2040 pin, not a GPIO */
 #define PIN_VBUS_EN            7
 #define PIN_VBUS_NFAULT        8
 #define PIN_SLOT_SCK           2

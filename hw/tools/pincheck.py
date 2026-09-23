@@ -150,6 +150,8 @@ def check_gpios(pins):
         part = dev["part"]
         used = {}
         for gname, name, sig, gpio in flat(dev):
+            if part == "RP2040" and name in ("USB_DP", "USB_DM") and sig.get("pin") != name:
+                err("%s: %s must be on the RP2040's dedicated %s pin" % (dname, name, name))
             if gpio is None:
                 continue
             if gpio in used:
@@ -160,6 +162,8 @@ def check_gpios(pins):
                 err("%s: %s uses GPIO %d, beyond %s" % (dname, name, gpio, part))
             if part == "RP2040" and sig.get("dir") == "adc" and gpio not in RP2040_ADC:
                 err("%s: %s is an ADC input but GPIO %d has no ADC" % (dname, name, gpio))
+            if part == "RP2040" and name in ("USB_DP", "USB_DM"):
+                err("%s: %s is on GPIO %d, but the RP2040's USB port has its own pins" % (dname, name, gpio))
         if part in IO_BUDGET and part.startswith("ICE40"):
             count = sum(1 for _ in flat(dev))
             if count > IO_BUDGET[part] - 6:          # leave the config pins free
