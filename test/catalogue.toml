@@ -687,8 +687,9 @@ cmd = "make -s -C fw test_wifi"
 [[test]]
 id = "WIFI-003"
 title = "Real binary in QEMU"
-checks = "WIFI-002 scenarios pass on the real ESP-IDF image"
-method = "Espressif QEMU esp32c3 with OpenCores Ethernet"
+checks = "the real ESP-IDF image (core, lwIP, esp-tls, DNS task, frame engine with the SPI slave's preload rules): IDENT, SCAN, JOIN with DHCP (10.0.2.15, gw, dns), LINK and RXREADY in the status byte, failed RESOLVE, TCP client both ways with PEER_CLOSED, LISTEN/ACCEPTED, UDP_SENDTO, CONNECT_HOST to an unresolvable name, and TLS refusing a self-signed certificate after a real handshake. Optional (CUPC8_ONLINE=1, not yet passing): verified TLS and an HTTPS GET to example.com"
+method = "Espressif QEMU 9.2.2 esp32c3, OpenCores Ethernet on user-mode NAT, frames over UART1 (QEMU has no SPI slave); tools/fw_esp32c3.sh qemu"
+cmd = "tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
 kind = "sim"
 vrow = "2.6"
 

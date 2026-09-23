@@ -6,6 +6,7 @@
 
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
+#include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_tls.h"
 #include "freertos/FreeRTOS.h"
@@ -21,6 +22,8 @@
 #endif
 
 #define MAXS 8
+
+static const char *TAG = "net";
 #define SCAN_MAX 16
 
 typedef struct {
@@ -301,6 +304,8 @@ static int n_send(void *ctx, int h, const uint8_t *data, int len)
 		int n = (int)esp_tls_conn_write(s->tls, data, (size_t)len);
 		if (n == ESP_TLS_ERR_SSL_WANT_READ || n == ESP_TLS_ERR_SSL_WANT_WRITE)
 			return 0;
+		if (n < 0)
+			ESP_LOGW(TAG, "TLS write: -0x%x", -n);
 		return n < 0 ? -1 : n;
 	}
 	int n = (int)send(s->fd, data, (size_t)len, 0);
@@ -336,9 +341,16 @@ static int n_status(void *ctx, int h, int *rx_avail, int *tx_free)
 	if (!s)
 		return WIFI_CLOSED;
 	if (s->type == WIFI_TLS) {
+		if (!s->tls)
+			return WIFI_CLOSED;         /* not connected yet (CONNECT_HOST still resolving) */
 		if (s->connecting) {
 			int r = tls_step(s);
 			if (r < 0) {
+				int code = 0, flags = 0;
+				esp_tls_error_handle_t e = NULL;
+				if (esp_tls_get_error_handle(s->tls, &e) == ESP_OK)
+					esp_tls_get_and_clear_last_error(e, &code, &flags);
+				ESP_LOGW(TAG, "TLS to %s failed: -0x%x, verify flags 0x%x", s->host, -code, flags);
 				s->connecting = false;
 				return WIFI_CLOSED;     /* includes a failed certificate check */
 			}
@@ -347,7 +359,8 @@ static int n_status(void *ctx, int h, int *rx_avail, int *tx_free)
 			s->connecting = false;
 		}
 		int fd = -1, pending = 0;
-		*rx_avail = (int)esp_tls_get_bytes_avail(s->tls);
+		ssize_t avail = esp_tls_get_bytes_avail(s->tls);
+		*rx_avail = avail > 0 ? (int)avail : 0;
 		/* encrypted bytes waiting: say so, and let RECV decrypt them */
 		if (!*rx_avail && esp_tls_get_conn_sockfd(s->tls, &fd) == ESP_OK &&
 		    ioctl(fd, FIONREAD, &pending) == 0 && pending > 0)
