@@ -27,12 +27,16 @@ import tty
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "test", "io", "recordings")
 
+# (prompt, expected bytes or None). None: what the terminal received is the
+# truth. The Caps Lock prompt has fixed text: desktops remap Caps Lock (the
+# first recording's terminal lost "HELLO W"), and the card does its own.
+CAPS_PROMPT = "Press Caps Lock, type hello, press Caps Lock again, then type World"
 PROMPTS = [
-    "The quick brown fox jumps over the lazy dog.",
-    "Sphinx of black quartz, judge my vow? 1234567890 [a-b] 'ok' (x=y+z)",
-    "Press Caps Lock, type hello, press Caps Lock again, then type World",
-    "Type asdf jkl; five times as fast as you can, rolling your fingers",
-    "Shift-type ALL CAPS then lower case: TESTING testing 42!",
+    ("The quick brown fox jumps over the lazy dog.", None),
+    ("Sphinx of black quartz, judge my vow? 1234567890 [a-b] 'ok' (x=y+z)", None),
+    (CAPS_PROMPT, b"HELLOWorld\r"),
+    ("Type asdf jkl; five times as fast as you can, rolling your fingers", None),
+    ("Shift-type ALL CAPS then lower case: TESTING testing 42!", None),
 ]
 
 
@@ -222,7 +226,7 @@ def main():
     try:
         tty.setraw(sys.stdin.fileno())
         print("Recording %s. Type each prompt and press Enter. Ctrl-C redoes a prompt.\r" % name)
-        for prompt in PROMPTS:
+        for prompt, fixed in PROMPTS:
             got = None
             while got is None:
                 got = record_prompt(fds, prompt)
@@ -230,7 +234,7 @@ def main():
             conv = BootConverter()
             state = [(0, set(), False)] * len(ifaces)     # per interface
             lines.append("prompt " + prompt)
-            lines.append("expect " + typed.hex())
+            lines.append("expect " + (fixed or typed).hex())
             for ms, i, rep in raw:
                 state[i] = pressed(ifaces[i][4], rep)
                 mods = 0
