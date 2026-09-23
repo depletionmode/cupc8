@@ -126,7 +126,7 @@ def trace_lines(text):
     return [l for l in text.splitlines() if l[:2] in ("S ", "W ", "E ")]
 
 
-def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0):
+def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0, inject=0):
     name = os.path.splitext(os.path.basename(src))[0]
     with open(src) as f:
         if SPI_RE.search(f.read()):
@@ -141,10 +141,12 @@ def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0):
     r = run(["python3", os.path.join(ROOT, "tools", "as.py"), src, obj])
     if r.returncode or not os.path.exists(obj):
         return "skip", "does not assemble"
-    return compare_image(obj, waits, seed, engine=engine, noise=noise, stall=stall, reset_at=reset_at)
+    return compare_image(obj, waits, seed, engine=engine, noise=noise, stall=stall, reset_at=reset_at,
+                         inject=inject)
 
 
-def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=False, stall=0, reset_at=0):
+def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=False, stall=0, reset_at=0,
+                  inject=0):
     """Run a binary image (loaded at $1000) on both models and diff the traces.
     Returns (status, message); the traces are left next to the image."""
     base = os.path.splitext(obj)[0]
@@ -173,6 +175,10 @@ def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=F
     if r.returncode:
         return "FAIL", "testbench error: " + (r.stdout + r.stderr).strip().splitlines()[-1]
     dut = trace_lines(r.stdout)
+    if 0 < inject <= len(dut):
+        # HOST-003: corrupt one line, to prove a divergence is caught there
+        t = dut[inject - 1]
+        dut[inject - 1] = t[:-1] + ("0" if t[-1] != "0" else "1")
     with open(base + ".sim.trace", "w") as f:
         f.write("\n".join(ref) + "\n")
     with open(base + "." + engine + ".trace", "w") as f:
@@ -208,6 +214,8 @@ def main():
                     help="mainboard only: bridge traffic to SRAM during the run (BRG-003)")
     ap.add_argument("--stall", type=int, default=0,
                     help="ghdl only: one cycle in eight stalls up to N extra clocks (BUS-003)")
+    ap.add_argument("--inject", type=int, default=0,
+                    help="self-test: corrupt line N of the DUT trace (HOST-003)")
     ap.add_argument("--reset-at", type=int, default=0,
                     help="ghdl only: reset mid-cycle once at cycle N (or at HALT), then compare the rerun (BUS-003)")
     args = ap.parse_args()
@@ -222,7 +230,7 @@ def main():
     counts = {"ok": 0, "FAIL": 0, "skip": 0}
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.j) as pool:
         jobs = [pool.submit(check, os.path.abspath(src), args.waits, args.seed, args.engine, args.noise,
-                            args.stall, args.reset_at)
+                            args.stall, args.reset_at, args.inject)
                 for src in files]
         for src, job in zip(files, jobs):
             status, msg = job.result()

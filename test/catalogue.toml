@@ -699,9 +699,10 @@ cmd = "make -s -C fw test_sysctl"
 id = "HOST-001"
 title = "jlcparts.py"
 checks = "search/check parse the API correctly; a missing part exits non-zero"
-method = "pytest with recorded API responses"
+method = "test/host/test_jlcparts.py on API responses recorded in test/host/jlc_recorded (basic/extended, stock, missing and short parts, search)"
 kind = "sim"
 vrow = "2.8"
+cmd = "python3 test/host/test_jlcparts.py"
 
 [[test]]
 id = "HOST-002"
@@ -715,13 +716,15 @@ vrow = "2.8"
 id = "HOST-003"
 title = "lockstep harness self-test"
 checks = "an injected divergence is detected and reported at the right line"
-method = "pytest mutating a trace"
+method = "test/host/test_lockstep.py: lockstep.py --inject corrupts one DUT trace line (a state line and a write line); the report must name that line"
 kind = "sim"
 vrow = "1.2"
 
 # ============================================================================
 # E2E: whole system (co-sim wired from the KiCad netlists)
 # ============================================================================
+cmd = "python3 test/host/test_lockstep.py"
+
 [[test]]
 id = "E2E-001"
 title = "Netlist-generated co-sim builds"
