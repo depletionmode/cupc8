@@ -13,6 +13,16 @@
 
 static wifi_t w;
 
+/* the host backend, noting the SNI each connect is given */
+static wifi_net_ops spy_ops;
+static char last_sni[64];
+
+static int spy_connect(void *ctx, int h, const uint8_t ip[4], uint16_t port, const char *sni)
+{
+	snprintf(last_sni, sizeof last_sni, "%s", sni ? sni : "(none)");
+	return netposix_ops.connect(ctx, h, ip, port, sni);
+}
+
 static void send_frame(const uint8_t *f, int len)
 {
 	card_frame(&w.card, f, 0, len);
@@ -131,6 +141,8 @@ static void test_sockets(void)
 	CHECK(fd >= 0, "server did not see the connection");
 	CHECK(wait_event(WIFI_EV_CONNECTED, &sock), "no CONNECTED event");
 	CHECK_EQ(sock, 0);
+	/* doc: CONNECT_HOST's host is TLS's SNI and certificate name */
+	CHECK(!strcmp(last_sni, "localhost"), "CONNECT_HOST gave the backend SNI '%s', not the host name", last_sni);
 
 	/* SEND from the card, read on the server */
 	uint8_t msg[] = {0x14, 0, 5, 'h', 'e', 'l', 'l', 'o'};
@@ -198,7 +210,9 @@ static void test_errors(void)
 
 int main(void)
 {
-	wifi_init(&w, &netposix_ops, netposix_new());
+	spy_ops = netposix_ops;
+	spy_ops.connect = spy_connect;
+	wifi_init(&w, &spy_ops, netposix_new());
 	test_link();
 	test_sockets();
 	test_errors();

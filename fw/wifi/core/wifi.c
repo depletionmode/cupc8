@@ -46,13 +46,16 @@ void wifi_poll(wifi_t *w)
 	if (w->pending_host[0]) {
 		int r = w->net->resolve(w->ctx, w->pending_host, w->resolve_ip);
 		if (r != 0) {
+			/* the name is also TLS's SNI and certificate name (CONNECT_HOST) */
+			char host[sizeof w->pending_host];
+			memcpy(host, w->pending_host, sizeof host);
 			w->resolve_ok = r > 0;
 			w->pending_host[0] = 0;
 			w->busy = false;
 			if (w->pending_sock >= 0) {
 				wifi_socket_t *s = sock_of(w, (uint8_t)w->pending_sock);
 				if (!s || !w->resolve_ok ||
-				    w->net->connect(w->ctx, s->handle, w->resolve_ip, w->pending_port, 0) < 0) {
+				    w->net->connect(w->ctx, s->handle, w->resolve_ip, w->pending_port, host) < 0) {
 					event(w, WIFI_EV_CONN_FAILED, (uint8_t)w->pending_sock);
 					if (s)
 						s->state = WIFI_CLOSED;
