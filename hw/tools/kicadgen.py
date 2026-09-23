@@ -21,7 +21,8 @@ KICAD_FOOTPRINTS = os.environ.get("KICAD_FOOTPRINT_DIR", "/usr/share/kicad/footp
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HW_LIB = os.path.join(ROOT, "hw", "lib")
 PROJECT_FOOTPRINTS = {"cupc8": os.path.join(HW_LIB, "cupc8.pretty"), "jlc": os.path.join(HW_LIB, "jlc.pretty")}
-PROJECT_SYMBOLS = {"jlc": os.path.join(HW_LIB, "jlc.kicad_sym")}   # imported by hw/tools/jlcimport.py
+PROJECT_SYMBOLS = {"jlc": os.path.join(HW_LIB, "jlc.kicad_sym"),       # imported by hw/tools/jlcimport.py
+                   "cupc8": os.path.join(HW_LIB, "cupc8.kicad_sym")}   # hw/tools/edgesym.py
 
 # 3D models for stock footprints whose model KiCad does not ship, placed from
 # the maker's drawing: footprint -> (model under hw/lib/models, offset mm
@@ -629,12 +630,16 @@ def run(cmd, **kw):
     return r
 
 
-def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=()):
+def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
     outline:   (x0, y0, x1, y1) in mm
     graphics:  board-only footprints such as logos: ("lib:name", x, y, rot)
+    edge:      Edge.Cuts as an open polyline [(x, y), ...] in place of the
+               outline rectangle - for a card whose edge-connector footprint
+               draws its own tab. Silk, designators and zones still keep
+               inside `outline`, the card body.
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -697,7 +702,8 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         fp.SetOrientationDegrees(rot)
 
     x0, y0, x1, y1 = outline
-    for a, b in (((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))):
+    corners = edge or [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]
+    for a, b in zip(corners, corners[1:]):
         seg = pcbnew.PCB_SHAPE(board)
         seg.SetShape(pcbnew.SHAPE_T_SEGMENT)
         seg.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
@@ -911,3 +917,117 @@ def autoroute(board, workdir, passes=40):
 def fill_zones(board):
     import pcbnew
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+
+
+# ---------------------------------------------------------------- pipeline
+
+# footprints that are not parts: nothing to buy, nothing for JLC to place
+NOT_PARTS = ("Connector_PCBEdge:", "cupc8:KaplanLabs_Logo", "TestPoint:")
+
+
+def jlc_fab(sch, pcb, comps, fab):
+    """JLC's assembly files: bom.csv (Comment, Designator, Footprint, LCSC Part #)
+    and cpl.csv (Designator, Mid X, Mid Y, Layer, Rotation). Every part must
+    carry an LCSC number, because nothing is fitted by hand."""
+    import csv
+
+    def lcsc(c):                          # our field, or the one easyeda2kicad writes
+        return c.get("fields", {}).get("LCSC") or c.get("fields", {}).get("LCSC Part")
+    missing = sorted(r for r, c in comps.items() if not lcsc(c) and not c["footprint"].startswith(NOT_PARTS))
+    if missing:
+        raise SystemExit("parts without an LCSC number: %s" % ", ".join(missing))
+    placed = {r: c for r, c in comps.items() if lcsc(c)}
+    groups = {}
+    for r, c in placed.items():
+        groups.setdefault((c["value"], c["footprint"], lcsc(c)), []).append(r)
+    with open(os.path.join(fab, "bom.csv"), "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["Comment", "Designator", "Footprint", "LCSC Part #"])
+        for (val, fp, lcsc), refs in sorted(groups.items(), key=lambda g: g[1][0]):
+            w.writerow([val, ",".join(sorted(refs)), fp.split(":")[1], lcsc])
+    raw = os.path.join(fab, "kicad-pos.csv")
+    run(["kicad-cli", "pcb", "export", "pos", "--format", "csv", "--units", "mm", "--side", "both",
+         "-o", raw, pcb])
+    with open(raw) as f, open(os.path.join(fab, "cpl.csv"), "w", newline="") as g:
+        w = csv.writer(g)
+        w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
+        for row in csv.DictReader(f):
+            if row["Ref"] in placed:
+                w.writerow([row["Ref"], row["PosX"] + "mm", row["PosY"] + "mm",
+                            "Top" if row["Side"] == "top" else "Bottom", row["Rot"]])
+    os.remove(raw)
+    return sorted({k[2] for k in groups})
+
+
+def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
+             graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40):
+    """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
+    3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
+    CPL -> 3D renders. `schematic(path)` writes the sheet. Returns the LCSC
+    numbers used, for the stock check."""
+    import pcbnew
+    out = os.path.abspath(out or os.path.join(ROOT, "build", "hw", name))
+    os.makedirs(out, exist_ok=True)
+    sch, pcb, pro = (os.path.join(out, name + e) for e in (".kicad_sch", ".kicad_pcb", ".kicad_pro"))
+    state = {}
+
+    def step(label, fn):
+        print("%-28s" % label, end=" ", flush=True)
+        r = fn()
+        print("ok" + (" (%s)" % r if r else ""))
+
+    step("schematic", lambda: schematic(sch))
+    step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
+                             "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
+
+    def netlist():
+        c, n = export_netlist(sch, os.path.join(out, name + ".net"))
+        state["c"] = {r: v for r, v in c.items() if not r.startswith("#")}
+        state["n"] = n
+        return "%d parts, %d nets" % (len(state["c"]), len(n))
+    step("netlist", netlist)
+
+    def build():
+        b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
+                        graphics=graphics, edge=edge)
+        write_project(pro, power_nets=power_nets)
+        pcbnew.SaveBoard(pcb, b, True)
+        state["b"] = pcbnew.LoadBoard(pcb)
+    step("board", build)
+    step("autoroute", lambda: autoroute(state["b"], out, passes))
+
+    def fill():
+        fill_zones(state["b"])
+        pcbnew.SaveBoard(pcb, state["b"])
+    step("zones + save", fill)
+
+    def silk():
+        bad = check_silk(state["b"]) + check_models()
+        if bad:
+            raise SystemExit("silkscreen / 3D models:\n  " + "\n  ".join(bad))
+    step("silkscreen, 3D models", silk)
+    step("DRC + schematic parity", lambda: run(
+        ["kicad-cli", "pcb", "drc", "--format", "json", "--schematic-parity", "--severity-all",
+         "--exit-code-violations", "-o", os.path.join(out, "drc.json"), pcb]) and None)
+
+    fab = os.path.join(out, "fab")
+    os.makedirs(fab, exist_ok=True)
+
+    def gerbers():
+        run(["kicad-cli", "pcb", "export", "gerbers", "-o", fab + "/", pcb])
+        run(["kicad-cli", "pcb", "export", "drill", "-o", fab + "/", pcb])
+        return "%d files" % len(os.listdir(fab))
+    step("gerbers + drill", gerbers)
+
+    def bom():
+        state["lcsc"] = jlc_fab(sch, pcb, state["c"], fab)
+        return "%d distinct parts" % len(state["lcsc"])
+    step("JLC BOM + CPL", bom)
+
+    def render():
+        for side in ("top", "bottom"):
+            run(["kicad-cli", "pcb", "render", "--width", "1200", "--height", "800", "--quality", "high",
+                 "--side", side, "-o", os.path.join(out, "%s-%s.png" % (name, side)), pcb])
+    step("3D render", render)
+    print("all steps passed; outputs in", out)
+    return state["lcsc"]

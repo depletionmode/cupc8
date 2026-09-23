@@ -171,10 +171,32 @@ def clear_silk_of_pads(text):
                   r'\(layer F\.SilkS\) \(width ([\d.]+)\)\)', circle, text)
 
 
+# footprints whose repeated pad number the symbol spreads over several pins:
+# {footprint: (pad, [numbers for the second and later copies])}
+PAD_RENUMBER = {
+    # ESP32-C3-MINI-1U (C2911374): nine exposed GND pads, all "49" in the
+    # footprint but 49 and 54-61 in the symbol
+    "WIFIM-SMD_61P-L13.2-W12.5-P0.80": ("49", [str(n) for n in range(54, 62)]),
+}
+
+
+def renumber_pads(text, pad, numbers):
+    it = iter(numbers)
+    seen = []
+
+    def fix(m):
+        seen.append(1)
+        return m.group(0) if len(seen) == 1 else "(pad %s " % next(it)
+    return re.sub(r'\(pad "?%s"? ' % pad, fix, text)
+
+
 def fix_footprint(path):
     with open(path) as f:
         text = f.read()
     orig = text
+    name = os.path.splitext(os.path.basename(path))[0]
+    if name in PAD_RENUMBER:
+        text = renumber_pads(text, *PAD_RENUMBER[name])
     text = rect_pads(text)
     text = clear_silk_of_pads(text)
 
