@@ -29,7 +29,7 @@ $(OUT)/test_wifi: test/test_wifi.c wifi/core/wifi.c wifi/host/netposix.c $(COMMO
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
 SYSCTL  := $(wildcard sysctl/core/*.c)
-$(OUT)/test_sysctl: test/test_sysctl.c test/sysmodels.c $(SYSCTL) | $(OUT)
+$(OUT)/test_sysctl: test/test_sysctl.c test/sysmodels.c test/swdtarget.c $(SYSCTL) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
 # IOC-002: recordings of real keyboards (tools/kbdrecord.py) through the IO core

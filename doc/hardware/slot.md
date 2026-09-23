@@ -143,15 +143,18 @@ For each dev 0–5:
 
 ## In-system programming of card firmware
 
-sysctl selects the slot on the programming-port mux. It then uses one of two
-engines, both implemented in PIO on the same two sysctl pins. The host command
-is `cupc8.py card flash <slot> firmware.{elf,bin}`.
+sysctl selects the slot on the programming-port mux, then moves raw SWD
+transfers or UART bytes on the same two pins (`sysctl.md`, "The card
+programming port"). The protocols run in the host command,
+`cupc8.py card flash <slot> firmware.{elf,bin}`.
 
-- **SWD** (RP2040 cards): the Raspberry Pi `debugprobe` engine.
+- **SWD** (RP2040 cards): the RP2040's multi-drop SWD, then the boot ROM's
+  flash routines, as a debugger uses them.
 - **UART bootloader** (ESP32 cards):
   1. Hold PROG_n low.
   2. Pulse CARD_RST_n.
-  3. Flash with Espressif's `esp-serial-flasher` protocol at 921600 baud.
+  3. Flash with Espressif's `esptool`, at 115200 baud, through sysctl's UART
+     tunnel.
 
 `cupc8.py card flash` tries SWD first. If no debug port answers, it tries the
 ESP ROM bootloader sync.

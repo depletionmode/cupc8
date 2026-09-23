@@ -11,11 +11,15 @@
  *   SYS-003  the ROM chip through the bridge: ID, erase, program, verify,
  *            failure reporting, recovery after an interrupted write
  *   SYS-005  USB-C source class; cards run unless deliberately held
+ *   SYS-004  the card programming port: the slot mux, SWD against a bit-level
+ *            RP2040 target (wake-up, multi-drop, power-up, posted reads,
+ *            WAIT, FAULT), and the UART tunnel
  */
 #include <string.h>
 
 #include "check.h"
 #include "sysctl.h"
+#include "swdtarget.h"
 #include "sysmodels.h"
 
 #define IMG_LEN 135100                    /* an HX4K bitstream */
@@ -34,7 +38,14 @@ static struct {
 	int contention;                       /* flash accessed while its FPGA owns it */
 	uint8_t usb[8 + SYS_MAX_PAYLOAD];
 	int usb_n;
+	int prog_slot;                        /* the mux: -1 released (channel 7) */
+	swdt_t *card[6];                      /* RP2040 cards on the programming port */
+	uint32_t uart_baud;
+	uint8_t uart[256];                    /* the UART's far end: a loopback */
+	int uart_n;
 } M;
+
+static swdt_t card2;                      /* an RP2040 card in slot 3 */
 
 static uint8_t img_chip[IMG_LEN], img_cpu[IMG_LEN];
 static sysctl_t S;
@@ -142,9 +153,48 @@ static void h_usb_write(void *ctx, const uint8_t *d, int n)
 	M.usb_n += n;
 }
 
+static void h_prog_select(void *ctx, int slot) { (void)ctx; M.prog_slot = slot; }
+
+static void h_swd_io(void *ctx, bool out, uint32_t *bits, int n)
+{
+	(void)ctx;
+	swdt_t *t = M.prog_slot >= 0 ? M.card[M.prog_slot] : 0;
+	if (!out)
+		*bits = 0;
+	for (int i = 0; i < n; i++) {
+		if (out) {
+			if (t)
+				swdt_out(t, (int)(*bits >> i & 1));
+		} else {
+			*bits |= (uint32_t)(t ? swdt_in(t) : 1) << i;   /* nothing there: the pull-up */
+		}
+	}
+	M.now += (uint64_t)n;                 /* ~1 MHz */
+}
+
+static void h_uart_open(void *ctx, uint32_t baud) { (void)ctx; M.uart_baud = baud; M.uart_n = 0; }
+
+static void h_uart_write(void *ctx, const uint8_t *d, int n)
+{
+	(void)ctx;
+	for (int i = 0; i < n && M.uart_baud && M.uart_n < (int)sizeof M.uart; i++)
+		M.uart[M.uart_n++] = d[i];
+}
+
+static int h_uart_read(void *ctx, uint8_t *d, int max)
+{
+	(void)ctx;
+	int n = M.uart_n < max ? M.uart_n : max;
+	memcpy(d, M.uart, (size_t)n);
+	memmove(M.uart, M.uart + n, (size_t)(M.uart_n - n));
+	M.uart_n -= n;
+	return n;
+}
+
 static const sysctl_hal hal = {
 	h_spi_select, h_spi_xfer, h_pin_write, h_pin_read, h_adc,
 	h_i2c_write, h_i2c_read, h_delay, h_now_ms, h_usb_write,
+	h_prog_select, h_swd_io, h_uart_open, h_uart_write, h_uart_read,
 };
 
 /* --------------------------------------------------------------- machine */
@@ -165,6 +215,9 @@ static void power_on(bool chip_flashed, bool cpu_flashed)
 	memset(&M, 0, sizeof M);
 	M.bus = SPI_NONE;
 	M.sys_nrst = true;
+	M.prog_slot = -1;
+	swdt_init(&card2);
+	M.card[2] = &card2;
 	sst39_init(&M.rom);
 	M.rom.t_se = 2000;                    /* shortened: the algorithm, not the wait, is under test */
 	M.rom.t_sce = 5000;
@@ -547,11 +600,144 @@ static void sys005_power_and_cards(void)
 	CHECK_EQ(resp[10], 0);
 }
 
+/* ------------------------------------------------------------ SYS-004 */
+
+static uint8_t swd_req(bool ap, bool read, int a)
+{
+	int p = ap ^ read ^ (a >> 2 & 1) ^ (a >> 3 & 1);
+	return (uint8_t)(1 | ap << 1 | read << 2 | (a >> 2 & 1) << 3 | (a >> 3 & 1) << 4 | p << 5 | 1 << 7);
+}
+
+/* one transfer through SWD_XFER: returns the ack, *v in/out */
+static int xfer(bool ap, bool read, int a, uint32_t *v)
+{
+	uint8_t p[5] = { swd_req(ap, read, a) };
+	int n = 1;
+	if (!read) {
+		for (int i = 0; i < 4; i++)
+			p[1 + i] = (uint8_t)(*v >> (8 * i));
+		n = 5;
+	}
+	if (req(0x55, p, n) != 0 || resp_n < 1)
+		return -1;
+	if (read && resp[0] == 1 && resp_n == 5)
+		*v = resp[1] | (uint32_t)resp[2] << 8 | (uint32_t)resp[3] << 16 | (uint32_t)resp[4] << 24;
+	return resp[0];
+}
+
+static void seq(const uint8_t *bits, int nbits)
+{
+	uint8_t p[2 + 64] = { (uint8_t)nbits, (uint8_t)(nbits >> 8) };
+	memcpy(p + 2, bits, (size_t)(nbits + 7) / 8);
+	CHECK_EQ(req(0x54, p, 2 + (nbits + 7) / 8), 0);
+}
+
+static const uint8_t line_reset[8] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00 };   /* 56 ones, 8 idle */
+static const uint8_t wake[] = { 0xff, 0x92, 0xf3, 0x09, 0x62, 0x95, 0x2d, 0x85, 0x86,
+                                0xe9, 0xaf, 0xdd, 0xe3, 0xa2, 0x0e, 0xbc, 0x19, 0xa0, 0x01 };
+
+static int targetsel(uint32_t id)
+{
+	uint8_t p[5] = { 0x99, (uint8_t)id, (uint8_t)(id >> 8), (uint8_t)(id >> 16), (uint8_t)(id >> 24) };
+	return req(0x55, p, 5) == 0 ? resp[0] : -1;
+}
+
+static void sys004_progport(void)
+{
+	power_on(true, true);
+	uint32_t v = 0;
+
+	/* the mux: nothing selected until asked; an empty slot answers nothing */
+	CHECK_EQ(M.prog_slot, -1);
+	uint8_t s3 = 3;
+	CHECK_EQ(req(0x53, &s3, 1), 0);
+	CHECK_EQ(M.prog_slot, 3);
+	CHECK_EQ(xfer(false, true, 0, &v), 7);
+	uint8_t bad = 6;
+	CHECK_EQ(req(0x53, &bad, 1), ST_ARG);
+
+	/* slot 3's RP2040 starts dormant: a line reset alone gets no answer */
+	uint8_t s2 = 2;
+	CHECK_EQ(req(0x53, &s2, 1), 0);
+	seq(line_reset, 64);
+	CHECK_EQ(xfer(false, true, 0, &v), 7);
+
+	/* the dormant-to-SWD wake-up, a line reset, TARGETSEL core 0: DPIDR */
+	seq(wake, 148);
+	seq(line_reset, 64);
+	CHECK_EQ(targetsel(0x01002927), 1);
+	v = 0;
+	CHECK_EQ(xfer(false, true, 0, &v), 1);
+	CHECK(v == 0x0BC12477, "DPIDR %08x", v);
+
+	/* a TARGETSEL for another core deselects it */
+	seq(line_reset, 64);
+	CHECK_EQ(targetsel(0x11002927), 1);
+	CHECK_EQ(xfer(false, true, 0, &v), 7);
+	seq(line_reset, 64);
+	CHECK_EQ(targetsel(0x01002927), 1);
+
+	/* an AP access before power-up faults; ABORT clears it; power up */
+	CHECK_EQ(xfer(true, true, 0xC, &v), 4);
+	v = 0x1E;
+	CHECK_EQ(xfer(false, false, 0, &v), 1);
+	v = 0x50000000;
+	CHECK_EQ(xfer(false, false, 4, &v), 1);
+	CHECK_EQ(xfer(false, true, 4, &v), 1);
+	CHECK(v & 0xA0000000, "CTRL/STAT acks power-up: %08x", v);
+
+	/* memory through the AHB-AP: CSW word + increment, TAR, DRW; reads are posted */
+	v = 0;
+	CHECK_EQ(xfer(false, false, 8, &v), 1);          /* SELECT AP 0 bank 0 */
+	v = 0x23000012;
+	CHECK_EQ(xfer(true, false, 0, &v), 1);
+	v = 0x20001000;
+	CHECK_EQ(xfer(true, false, 4, &v), 1);
+	for (uint32_t i = 0; i < 4; i++) {
+		v = 0xC0DE0000 + i;
+		CHECK_EQ(xfer(true, false, 0xC, &v), 1);
+	}
+	CHECK(card2.ram[0x1000] == 0x00 && card2.ram[0x1002] == 0xDE && card2.ram[0x100C] == 0x03, "RAM written");
+	v = 0x20001000;
+	xfer(true, false, 4, &v);
+	CHECK_EQ(xfer(true, true, 0xC, &v), 1);          /* posted: the value comes next */
+	CHECK_EQ(xfer(true, true, 0xC, &v), 1);
+	CHECK(v == 0xC0DE0000, "first read, delivered by the second: %08x", v);
+	CHECK_EQ(xfer(false, true, 0xC, &v), 1);         /* RDBUFF */
+	CHECK(v == 0xC0DE0001, "RDBUFF %08x", v);
+
+	/* WAIT: the engine retries until the access goes through */
+	card2.wait_every = 2;
+	v = 0x20001000;
+	CHECK_EQ(xfer(true, false, 4, &v), 1);
+	v = 0x12345678;
+	CHECK_EQ(xfer(true, false, 0xC, &v), 1);
+	CHECK(card2.ram[0x1000] == 0x78, "written through WAITs");
+	card2.wait_every = 0;
+
+	/* several transfers in one frame; it stops at the first failure */
+	uint8_t many[] = { swd_req(false, true, 0), swd_req(false, true, 4), swd_req(true, true, 0xC) };
+	CHECK_EQ(req(0x55, many, 3), 0);
+	CHECK(resp_n == 15 && resp[0] == 1 && resp[5] == 1 && resp[10] == 1, "three reads in one frame (%d bytes)", resp_n);
+
+	/* the UART tunnel */
+	uint8_t baud[4] = { 0x00, 0xC2, 0x01, 0x00 };    /* 115200 */
+	CHECK_EQ(req(0x56, baud, 4), 0);
+	CHECK_EQ(M.uart_baud, 115200);
+	CHECK_EQ(req(0x57, (const uint8_t *)"ÀsyncÀ", 6), 0);
+	CHECK(resp_n == 6 && !memcmp(resp, "ÀsyncÀ", 6), "UART_XFER round trip (%d)", resp_n);
+
+	uint8_t none = 0xFF;
+	CHECK_EQ(req(0x53, &none, 1), 0);
+	CHECK_EQ(M.prog_slot, -1);
+}
+
 int main(void)
 {
+	sys004_progport();
 	sys001_protocol();
 	sys002_fpga_flash();
 	sys003_rom();
 	sys005_power_and_cards();
-	return check_report("SYS-001/002/003/005 sysctl core");
+	return check_report("SYS-001..005 sysctl core");
 }

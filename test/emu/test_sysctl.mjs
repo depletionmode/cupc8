@@ -218,5 +218,88 @@ pending.push(0xc8, 0x00, 0, 0, 0x55);                             // PING with a
 emu.runUntil(() => rxBytes.length >= 5, 1e9);
 expect(rxBytes[0] === 0xc8 && rxBytes[1] === 1, `a bad CRC is answered with status 1 (${rxBytes.slice(0, 5)})`);
 
+// ------------------------------------------------------------ programming port
+const MUX = [20, 21, 22], CLK = 18, IO = 19;
+const muxSlot = () => (MUX.every((n) => !driven(n)) ? -1 : MUX.reduce((v, n, i) => v | ((gpio[n].outputValue ? 1 : 0) << i), 0));
+expect(muxSlot() === -1, 'the mux is released (channel 7) until a slot is selected');
+expect(request(0x53, [5]).status === 0 && muxSlot() === 5, `PROG_SELECT 5 drives MUX_SEL = 5 (${muxSlot()})`);
+expect(request(0x53, [0xff]).status === 0 && muxSlot() === -1, 'PROG_SELECT $FF releases it');
+
+// UART: PROG_CLK (TX) wired back to PROG_IO (RX)
+const loop = () => gpio[IO].setInputValue(driven(CLK) ? gpio[CLK].outputValue : true);
+const unloop = gpio[CLK].addListener(loop);
+loop();
+expect(request(0x56, [0x00, 0xc2, 0x01, 0x00]).status === 0, 'UART_OPEN 115200');
+const first = request(0x57, [...Buffer.from('\xc0hello esp\xc0', 'latin1')]);   // returns what came back so far
+emu.runUntil(() => false, 2e6);                                     // 12 bytes at 115200: ~1 ms
+const rest = request(0x57, []);
+const echo = Buffer.from([...(first?.data ?? []), ...(rest?.data ?? [])]).toString('latin1');
+expect(echo === '\xc0hello esp\xc0', `UART loopback across two UART_XFERs: ${JSON.stringify(echo)}`);
+request(0x56, [0, 0, 0, 0]);
+unloop();
+
+// SWD at pin level: a minimal SW-DP (wake-up, line reset, TARGETSEL, DPIDR)
+// sampling SWDIO on SWCLK's rising edge and driving its bits after it
+const alert = [0x92, 0xf3, 0x09, 0x62, 0x95, 0x2d, 0x85, 0x86, 0xe9, 0xaf, 0xdd, 0xe3, 0xa2, 0x0e, 0xbc, 0x19];
+const alertBits = alert.flatMap((b) => [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (b >> i) & 1)).join('');
+const dp = { hist: '', awake: false, ones: 0, selected: false, phase: 0, bits: [], out: [], lastClk: false, dpidrReads: 0 };
+function dpBit(b) {
+  dp.hist = (dp.hist + b).slice(-160);
+  dp.ones = b ? dp.ones + 1 : 0;
+  if (!dp.awake) {
+    const i = dp.hist.lastIndexOf(alertBits);
+    if (i >= 0 && dp.hist.length - i - 128 === 12 && dp.hist.slice(i + 128, i + 132) === '0000' && dp.hist.slice(i + 132) === '01011000') dp.awake = true;
+    return;
+  }
+  if (dp.ones >= 50) { dp.phase = 0; dp.selected = false; return; }
+  dp.bits.push(b);
+  if (dp.phase === 0) { if (!b) dp.bits = []; else dp.phase = 1; return; }
+  if (dp.phase === 1 && dp.bits.length === 8) {
+    const r = dp.bits.reduce((v, x, i) => v | (x << i), 0);
+    dp.bits = [];
+    dp.phase = 0;
+    if (r === 0x99) { dp.phase = 3; return; }                          // TARGETSEL: 5 undriven, then 33 bits
+    if (r === 0xa5 && dp.selected) {                                  // DPIDR read
+      const v = 0x0bc12477, bits = [1, 0, 0];
+      for (let i = 0; i < 32; i++) bits.push((v >>> i) & 1);
+      bits.push([...v.toString(2)].filter((c) => c === '1').length & 1);
+      dp.out = bits;
+      dp.dpidrReads++;
+    }
+    return;
+  }
+  if (dp.phase === 3 && dp.bits.length === 33) {
+    const v = dp.bits.slice(0, 32).reduce((a, x, i) => a + x * 2 ** i, 0);
+    dp.selected = v === 0x01002927;
+    dp.bits = [];
+    dp.phase = 0;
+  }
+}
+gpio[CLK].addListener(() => {
+  const clk = driven(CLK) && gpio[CLK].outputValue;
+  if (clk && !dp.lastClk) {
+    if (driven(IO)) {
+      dpBit(gpio[IO].outputValue ? 1 : 0);
+      gpio[IO].setInputValue(true);
+    } else {
+      gpio[IO].setInputValue(dp.out.length ? dp.out.shift() === 1 : true);   // our next bit, or released
+    }
+  }
+  dp.lastClk = clk;
+});
+gpio[IO].setInputValue(true);
+request(0x53, [1]);
+const bitsOf = (bytes, n) => [n & 0xff, n >> 8, ...bytes];
+request(0x54, bitsOf([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00], 64));
+request(0x54, bitsOf([0xff, ...alert, 0xa0, 0x01], 148));
+request(0x54, bitsOf([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00], 64));
+expect(dp.awake, 'the dormant-to-SWD sequence arrives bit-exact on the pins');
+const ts = request(0x55, [0x99, 0x27, 0x29, 0x00, 0x01]);
+expect(ts && ts.data[0] === 1 && dp.selected, `TARGETSEL core 0 selects the DP (${ts && ts.data})`);
+const idr = request(0x55, [0xa5]);
+const v = idr && idr.data.length === 5 ? (idr.data[1] | (idr.data[2] << 8) | (idr.data[3] << 16) | (idr.data[4] << 24)) >>> 0 : 0;
+expect(idr && idr.data[0] === 1 && v === 0x0bc12477, `DPIDR read at pin level: ack ${idr && idr.data[0]}, ${v.toString(16)}`);
+request(0x53, [0xff]);
+
 console.log(`SYS-006: real sysctl.elf on the emulated RP2040 over USB, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

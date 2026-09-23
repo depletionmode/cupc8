@@ -19,6 +19,7 @@ enum {
 	C_FLASH_READ = 0x40, C_FLASH_ERASE = 0x41, C_FLASH_PROGRAM = 0x42, C_FLASH_ID = 0x43,
 	C_FPGA_HOLD = 0x44, C_FPGA_BOOT = 0x45,
 	C_POWER = 0x50, C_CARD_RESET = 0x52,
+	C_PROG_SELECT = 0x53, C_SWD_SEQ = 0x54, C_SWD_XFER = 0x55, C_UART_OPEN = 0x56, C_UART_XFER = 0x57,
 };
 
 static uint8_t reply_buf[4 + SYS_MAX_PAYLOAD + 1];
@@ -123,6 +124,56 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 		s->hal->pin_write(s->ctx, HAL_SYS_NRST, false);
 		s->hal->delay_us(s->ctx, RESET_MS * 1000);
 		s->hal->pin_write(s->ctx, HAL_SYS_NRST, true);
+		return ST_OK;
+
+	/* ---- the card programming port */
+	case C_PROG_SELECT:
+		if (n != 1)
+			return ST_ARG;
+		return prog_select(s, p[0] == 0xFF ? -1 : p[0]);
+	case C_SWD_SEQ: {
+		if (n < 2)
+			return ST_ARG;
+		int nbits = (int)le16(p);
+		if (nbits > (n - 2) * 8)
+			return ST_ARG;
+		swd_seq(s, p + 2, nbits);
+		return ST_OK;
+	}
+	case C_SWD_XFER: {
+		int i = 0;
+		while (i < n) {
+			uint8_t req = p[i++];
+			bool read = req & 0x04;
+			uint32_t d = 0;
+			if (!read) {
+				if (i + 4 > n)
+					return ST_ARG;
+				d = p[i] | (uint32_t)p[i + 1] << 8 | (uint32_t)p[i + 2] << 16 | (uint32_t)p[i + 3] << 24;
+				i += 4;
+			}
+			if (*rn + 5 > SYS_MAX_PAYLOAD)
+				return ST_ARG;
+			int ack = swd_xfer(s, req, &d);
+			out[(*rn)++] = (uint8_t)ack;
+			if (read && ack == SWD_OK) {
+				for (int b = 0; b < 4; b++)
+					out[(*rn)++] = (uint8_t)(d >> (8 * b));
+			}
+			if (ack != SWD_OK)
+				break;
+		}
+		return ST_OK;
+	}
+	case C_UART_OPEN:
+		if (n != 4)
+			return ST_ARG;
+		s->hal->uart_open(s->ctx, p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24);
+		return ST_OK;
+	case C_UART_XFER:
+		if (n)
+			s->hal->uart_write(s->ctx, p, n);
+		*rn = s->hal->uart_read(s->ctx, out, SYS_MAX_PAYLOAD);
 		return ST_OK;
 
 	/* ---- FPGAs and their flash */

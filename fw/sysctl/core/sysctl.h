@@ -49,6 +49,15 @@ typedef struct {
 	void (*delay_us)(void *ctx, uint32_t us);
 	uint32_t (*now_ms)(void *ctx);
 	void (*usb_write)(void *ctx, const uint8_t *data, int n);
+
+	/* the card programming port (doc/hardware/sysctl.md) */
+	void (*prog_select)(void *ctx, int slot);            /* 0-5, or -1: released (channel 7) */
+	/* SWD: clock n bits (LSB first); out: drive SWDIO with *bits, else sample
+	 * SWDIO into *bits. Changing direction includes the turnaround cycle. */
+	void (*swd_io)(void *ctx, bool out, uint32_t *bits, int n);
+	void (*uart_open)(void *ctx, uint32_t baud);          /* 0 closes: pins released */
+	void (*uart_write)(void *ctx, const uint8_t *data, int n);
+	int (*uart_read)(void *ctx, uint8_t *data, int max);  /* what has arrived, up to max */
 } sysctl_hal;
 
 typedef struct {
@@ -99,5 +108,12 @@ uint8_t power_class_of(int cc1_mv, int cc2_mv);
 int card_reset(sysctl_t *s, int slot, bool hold);
 void expander_apply(sysctl_t *s);
 bool cpu_card_present(sysctl_t *s);
+
+/* progport.c: the card programming port */
+enum { SWD_OK = 1, SWD_WAIT = 2, SWD_FAULT = 4, SWD_NONE = 7, SWD_PARITY = 8 };
+int prog_select(sysctl_t *s, int slot);
+void swd_seq(sysctl_t *s, const uint8_t *bits, int nbits);
+/* one ADIv5 transfer: returns the ack; *data is written or read */
+int swd_xfer(sysctl_t *s, uint8_t request, uint32_t *data);
 
 #endif

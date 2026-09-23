@@ -81,8 +81,36 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 | $45 FPGA_BOOT | t | – : CRESET_n released (pulsed if it was not held), then CDONE awaited |
 | $50 POWER | – | USB-C class, CC mV (16) |
 | $52 CARD_RESET | slot (0–5), hold8 | – |
+| $53 PROG_SELECT | slot (0–5, or $FF) | – : points the programming-port mux at that slot. $FF releases MUX_SEL2..0 to the board's pull-ups, which select the unconnected channel 7. |
+| $54 SWD_SEQ | nbits16, bits (LSB first) | – : clocks raw bits out on SWDIO: line resets, the dormant-to-SWD wake-up |
+| $55 SWD_XFER | n × (request8 [, data32 for a write]) | n × (ack8 [, data32 for a read]) : stops after the first ack that isn't OK |
+| $56 UART_OPEN | baud32 (0 closes) | – : the port becomes a UART, SWCLK = card RX, SWDIO = card TX |
+| $57 UART_XFER | bytes to send | the bytes received since the previous UART_XFER |
 
-$00 PING, $01 STATUS, $32, $4x and $5x work with the chipset down. $1x, $2x,
+$00 PING, $01 STATUS, $32, $4x and $5x work with the chipset down.
+
+### The card programming port
+
+The port is two wires, SWCLK and SWDIO, switched to one slot by the mux
+(`slot.md`). sysctl only moves bits and bytes; the protocols live in
+`cupc8.py card flash`, so the firmware stays small and the same core runs in
+`sysctl_sim`:
+
+- **RP2040 cards, SWD.** `SWD_SEQ` sends the dormant-to-SWD wake-up and line
+  resets; `SWD_XFER` runs ADIv5 transfers. The request byte is the host's
+  (start, APnDP, RnW, A[3:2], parity, stop, park). For each transfer sysctl
+  clocks the request, a turnaround, and the 3-bit ack; it retries WAIT up to
+  100 times, and on OK clocks the data (with parity, checked on reads) and a
+  turnaround. The ack byte is 1 OK, 2 WAIT, 4 FAULT, 7 no answer, or $08 for
+  read data with bad parity. A write with request `$99` (TARGETSEL) has no
+  ack phase, as SWD multi-drop requires. `cupc8.py` then does what a
+  debugger does: power up the debug port, halt the core, and call the boot
+  ROM's flash routines (`IF`, `EX`, `RE`, `RP`, `FC`, `CX`) with the image
+  staged in RAM, then verify through XIP and reset the card.
+- **ESP32 cards, the ROM bootloader.** `cupc8.py` holds PROG_n low and pulses
+  CARD_RST_n (`CARD_RESET`, and the expander bit), opens the UART at
+  115200 baud, and runs Espressif's `esptool` through a local socket that
+  forwards to `UART_XFER`. Then it releases PROG_n and resets the card. $1x, $2x,
 $30 and $31 go through the bridge and return $07 while it is down.
 
 ### The ROM (SST39VF040) through the bridge

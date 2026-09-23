@@ -1,0 +1,23 @@
+; 8N1 UART on the card programming port (doc/hardware/sysctl.md): TX on
+; PROG_CLK (the card's RX), RX on PROG_IO (the card's TX). 8 PIO cycles a bit.
+
+.program port_uart_tx
+.side_set 1 opt
+    pull       side 1 [7]       ; idle high; stop bit
+    set x, 7   side 0 [7]       ; start bit
+bits:
+    out pins, 1
+    jmp x-- bits       [6]
+
+.program port_uart_rx
+start:
+    wait 0 pin 0                ; the start bit's falling edge
+    set x, 7           [10]     ; to the middle of bit 0
+bits:
+    in pins, 1
+    jmp x-- bits       [6]
+    jmp pin stop                ; a valid stop bit
+    wait 1 pin 0                ; framing error: skip to idle
+    jmp start
+stop:
+    push

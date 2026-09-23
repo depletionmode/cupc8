@@ -8,11 +8,15 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
+#include "hardware/dma.h"
 #include "hardware/spi.h"
 #include "pico/stdlib.h"
 #include "pins.h"
 #include "sysctl.h"
 #include "tusb.h"
+#include "uart.pio.h"
 
 #define BRIDGE_HZ 1000000       /* the chipset oversamples SCK: <= 1 MHz (memory-map.md) */
 #define FLASH_HZ  10000000      /* W25Q; FL1 runs through the CPU socket */
@@ -138,10 +142,161 @@ static void h_usb_write(void *ctx, const uint8_t *data, int n)
 	}
 }
 
+/* ---------------------------------------------------- the programming port */
+
+static const uint8_t mux_pins[3] = { PIN_MUX_SEL0, PIN_MUX_SEL1, PIN_MUX_SEL2 };
+
+/* a slot: MUX_SEL driven; -1: released, and the board's pull-ups pick the
+ * unconnected channel 7 */
+static void h_prog_select(void *ctx, int slot)
+{
+	(void)ctx;
+	for (int i = 0; i < 3; i++) {
+		gpio_put(mux_pins[i], slot >= 0 && (slot >> i & 1));
+		gpio_set_dir(mux_pins[i], slot >= 0);
+	}
+}
+
+#define SWD_HALF_US 1           /* ~500 kHz: slow enough for the mux and 33 ohm */
+static bool swdio_out;
+
+static void swd_clock(void)
+{
+	sleep_us(SWD_HALF_US);
+	gpio_put(PIN_PROG_CLK, 1);
+	sleep_us(SWD_HALF_US);
+	gpio_put(PIN_PROG_CLK, 0);
+}
+
+/* SWDIO changes while SWCLK is low; the target samples on the rising edge
+ * and drives its bits after it, so the host samples just before the next one */
+static void h_swd_io(void *ctx, bool out, uint32_t *bits, int n)
+{
+	(void)ctx;
+	gpio_set_dir(PIN_PROG_CLK, true);
+	if (out != swdio_out) {
+		/* turnaround: one clock with nobody driving SWDIO */
+		gpio_set_dir(PIN_PROG_IO, false);
+		swd_clock();
+		gpio_set_dir(PIN_PROG_IO, out);
+		swdio_out = out;
+	}
+	if (!out)
+		*bits = 0;
+	for (int i = 0; i < n; i++) {
+		if (out) {
+			gpio_put(PIN_PROG_IO, *bits >> i & 1);
+			swd_clock();
+		} else {
+			sleep_us(SWD_HALF_US);
+			*bits |= (uint32_t)gpio_get(PIN_PROG_IO) << i;
+			gpio_put(PIN_PROG_CLK, 1);
+			sleep_us(SWD_HALF_US);
+			gpio_put(PIN_PROG_CLK, 0);
+		}
+	}
+}
+
+static PIO uart_pio = pio0;
+static uint uart_tx_sm, uart_rx_sm, uart_tx_prog, uart_rx_prog;
+static bool uart_on;
+
+/* received bytes stream into a ring by DMA: the PIO FIFO holds 8, and the
+ * host polls about once a millisecond, when 11 can arrive at 115200 */
+#define RX_RING_BITS 12
+static uint8_t rx_ring[1u << RX_RING_BITS] __attribute__((aligned(1u << RX_RING_BITS)));
+static int rx_dma = -1;
+static uint32_t rx_tail;                       /* free-running */
+
+static uint32_t rx_head(void)
+{
+	return 0xffffffffu - dma_channel_hw_addr((uint)rx_dma)->transfer_count;
+}
+
+static void port_release(void)
+{
+	gpio_set_function(PIN_PROG_CLK, GPIO_FUNC_SIO);
+	gpio_set_function(PIN_PROG_IO, GPIO_FUNC_SIO);
+	gpio_set_dir(PIN_PROG_CLK, false);
+	gpio_set_dir(PIN_PROG_IO, false);
+	gpio_put(PIN_PROG_CLK, 0);
+	swdio_out = false;
+}
+
+static void h_uart_open(void *ctx, uint32_t baud)
+{
+	(void)ctx;
+	if (uart_on) {
+		pio_sm_set_enabled(uart_pio, uart_tx_sm, false);
+		pio_sm_set_enabled(uart_pio, uart_rx_sm, false);
+		dma_channel_abort((uint)rx_dma);
+		uart_on = false;
+	}
+	port_release();
+	if (!baud)
+		return;
+	float div = (float)clock_get_hz(clk_sys) / (8.0f * (float)baud);
+	/* TX on PROG_CLK */
+	pio_sm_config c = port_uart_tx_program_get_default_config(uart_tx_prog);
+	sm_config_set_out_shift(&c, true, false, 32);
+	sm_config_set_out_pins(&c, PIN_PROG_CLK, 1);
+	sm_config_set_sideset_pins(&c, PIN_PROG_CLK);
+	sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+	sm_config_set_clkdiv(&c, div);
+	pio_sm_set_pins_with_mask(uart_pio, uart_tx_sm, 1u << PIN_PROG_CLK, 1u << PIN_PROG_CLK);
+	pio_sm_set_pindirs_with_mask(uart_pio, uart_tx_sm, 1u << PIN_PROG_CLK, 1u << PIN_PROG_CLK);
+	pio_gpio_init(uart_pio, PIN_PROG_CLK);
+	pio_sm_init(uart_pio, uart_tx_sm, uart_tx_prog, &c);
+	/* RX on PROG_IO */
+	c = port_uart_rx_program_get_default_config(uart_rx_prog);
+	sm_config_set_in_pins(&c, PIN_PROG_IO);
+	sm_config_set_jmp_pin(&c, PIN_PROG_IO);
+	sm_config_set_in_shift(&c, true, false, 32);
+	sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+	sm_config_set_clkdiv(&c, div);
+	gpio_pull_up(PIN_PROG_IO);
+	pio_sm_init(uart_pio, uart_rx_sm, uart_rx_prog, &c);
+	/* the byte is in bits 31:24 of the RX FIFO word: DMA its top byte */
+	dma_channel_config d = dma_channel_get_default_config((uint)rx_dma);
+	channel_config_set_transfer_data_size(&d, DMA_SIZE_8);
+	channel_config_set_read_increment(&d, false);
+	channel_config_set_write_increment(&d, true);
+	channel_config_set_ring(&d, true, RX_RING_BITS);
+	channel_config_set_dreq(&d, pio_get_dreq(uart_pio, uart_rx_sm, false));
+	dma_channel_configure((uint)rx_dma, &d, rx_ring, (const uint8_t *)&uart_pio->rxf[uart_rx_sm] + 3, 0xffffffffu, true);
+	rx_tail = 0;
+	pio_sm_set_enabled(uart_pio, uart_tx_sm, true);
+	pio_sm_set_enabled(uart_pio, uart_rx_sm, true);
+	uart_on = true;
+}
+
+static void h_uart_write(void *ctx, const uint8_t *d, int n)
+{
+	(void)ctx;
+	for (int i = 0; i < n && uart_on; i++)
+		pio_sm_put_blocking(uart_pio, uart_tx_sm, d[i]);
+}
+
+static int h_uart_read(void *ctx, uint8_t *d, int max)
+{
+	(void)ctx;
+	int n = 0;
+	if (!uart_on)
+		return 0;
+	uint32_t head = rx_head();
+	if (head - rx_tail > sizeof rx_ring)
+		rx_tail = head - sizeof rx_ring;      /* overrun: keep the newest */
+	while (n < max && rx_tail != head)
+		d[n++] = rx_ring[rx_tail++ % sizeof rx_ring];
+	return n;
+}
+
 static const sysctl_hal hal = {
 	.spi_select = h_spi_select, .spi_xfer = h_spi_xfer, .pin_write = h_pin_write, .pin_read = h_pin_read,
 	.adc_mv = h_adc_mv, .i2c_write = h_i2c_write, .i2c_read = h_i2c_read, .delay_us = h_delay_us,
 	.now_ms = h_now_ms, .usb_write = h_usb_write,
+	.prog_select = h_prog_select, .swd_io = h_swd_io,
+	.uart_open = h_uart_open, .uart_write = h_uart_write, .uart_read = h_uart_read,
 };
 
 int main(void)
@@ -166,6 +321,16 @@ int main(void)
 	adc_gpio_init(PIN_CC1_SENSE);
 	adc_gpio_init(PIN_CC2_SENSE);
 	adc_gpio_init(PIN_V1V2_SENSE);
+	for (int i = 0; i < 3; i++)
+		gpio_init(mux_pins[i]);             /* inputs: the mux parks on channel 7 */
+	gpio_init(PIN_PROG_CLK);
+	gpio_init(PIN_PROG_IO);
+	port_release();
+	uart_tx_prog = pio_add_program(uart_pio, &port_uart_tx_program);
+	uart_rx_prog = pio_add_program(uart_pio, &port_uart_rx_program);
+	uart_tx_sm = (uint)pio_claim_unused_sm(uart_pio, true);
+	uart_rx_sm = (uint)pio_claim_unused_sm(uart_pio, true);
+	rx_dma = dma_claim_unused_channel(true);
 	gpio_init(PIN_LED_STATUS);
 	gpio_set_dir(PIN_LED_STATUS, true);
 

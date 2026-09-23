@@ -44,7 +44,7 @@ index 24014c9..444035a 100644
      }
      // WFI
 diff --git i/src/peripherals/pio.ts w/src/peripherals/pio.ts
-index 8d9ef35..a5b85e5 100644
+index 8d9ef35..d2b70e8 100644
 --- i/src/peripherals/pio.ts
 +++ w/src/peripherals/pio.ts
 @@ -64,6 +64,8 @@ const SHIFTCTRL_AUTOPUSH = 1 << 16;
@@ -56,7 +56,37 @@ index 8d9ef35..a5b85e5 100644
  
  // EXECCTRL bits
  const EXECCTRL_STATUS_SEL = 1 << 4;
-@@ -812,9 +814,21 @@ export class StateMachine {
+@@ -138,6 +140,10 @@ export class StateMachine {
+ 
+   clockDivInt: number = 1;
+   clockDivFrac: number = 0;
++  /** system cycles (in 1/256ths) owed to this machine by its clock divider */
++  private divPhase = 0;
++  /** delay cycles ([n]) still to run after the last instruction */
++  private delayLeft = 0;
+   execCtrl = 0x1f << 12;
+   shiftCtrl = 0b11 << 18;
+   pinCtrl = 0x5 << 26;
+@@ -672,6 +678,7 @@ export class StateMachine {
+       this.checkWait();
+     } else {
+       this.cycles += delay;
++      this.delayLeft = delay;
+     }
+   }
+ 
+@@ -693,6 +700,10 @@ export class StateMachine {
+   }
+ 
+   step() {
++    if (this.delayLeft > 0) {
++      this.delayLeft--;
++      return;
++    }
+     if (this.waiting) {
+       this.checkWait();
+       if (this.waiting) {
+@@ -812,9 +823,21 @@ export class StateMachine {
        case SM0_EXECCTRL:
          this.execCtrl = ((value & 0x7fffffff) | (this.execCtrl & 0x80000000)) >>> 0;
          break;
@@ -80,6 +110,54 @@ index 8d9ef35..a5b85e5 100644
        case SM0_ADDR:
          /* read-only */
          break;
+@@ -843,6 +866,7 @@ export class StateMachine {
+ 
+   restart() {
+     this.cycles = 0;
++    this.delayLeft = 0;
+     this.inputShiftCount = 0;
+     this.outputShiftCount = 32;
+     this.inputShiftReg = 0;
+@@ -851,7 +875,20 @@ export class StateMachine {
+   }
+ 
+   clkDivRestart() {
+-    this.pio.warn('clkDivRestart not implemented');
++    this.divPhase = 0;
++  }
++
++  /** One system clock: the machine runs if enabled, at INT.FRAC (INT 0 = 65536). */
++  clockTick() {
++    if (!this.enabled) {
++      return;
++    }
++    const div = (this.clockDivInt || 65536) * 256 + this.clockDivFrac;
++    this.divPhase += 256;
++    if (this.divPhase >= div) {
++      this.divPhase -= div;
++      this.step();
++    }
+   }
+ 
+   checkWait() {
+@@ -916,6 +953,8 @@ export class StateMachine {
+     if (!this.waiting) {
+       this.nextPC();
+       this.cycles += this.waitDelay;
++      // a stalled instruction's delay starts once it completes
++      this.delayLeft = Math.max(0, this.waitDelay);
+       this.execCtrl &= ~EXECCTRL_EXEC_STALLED;
+     }
+   }
+@@ -1198,7 +1237,7 @@ export class RPPIO extends BasePeripheral implements Peripheral {
+ 
+   step() {
+     for (const machine of this.machines) {
+-      machine.step();
++      machine.clockTick();
+     }
+     this.checkChangedPins();
+   }
 diff --git i/src/peripherals/psm.ts w/src/peripherals/psm.ts
 new file mode 100644
 index 0000000..2d401c4
