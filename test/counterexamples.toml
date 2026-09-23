@@ -142,3 +142,10 @@ before = "98809b5"
 files = ["hw/pins.yaml"]
 cmd = "python3 hw/tools/pincheck.py"
 must_fail = ["SLOT_MISO is on GPIO 2, an ESP32-C3 strapping pin"]
+
+[[bug]]
+name = "wifi core: JOIN's save byte was ignored, so credentials were never kept for power-up"
+fixed_in = "3375762"
+revert = [["fw/wifi/core/wifi.c", "bool save = p < len && f[p];", "bool save = false;"]]
+cmd = "make -C fw test_wifi"
+must_fail = ["JOIN save=1 reached the backend as 0"]
