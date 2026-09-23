@@ -636,8 +636,9 @@ cmd = "make -s -C fw test_iocard"
 [[test]]
 id = "IOC-002"
 title = "Real keyboards (recorded)"
-checks = "report streams recorded from ≥ 5 keyboards give the expected text"
-method = "host tests with committed recordings"
+checks = "real keyboards' HID reports, recorded while a person typed five prompts (shift, punctuation, digits, Caps Lock, fast rollover), converted to boot reports with each keyboard's own report descriptor, give through the IO core exactly the bytes the terminal received"
+method = "tools/kbdrecord.py records (needs root and a person); fw/test/test_recorded.c replays test/io/recordings/*.rec"
+cmd = "make -C fw test_recorded"
 kind = "sim"
 vrow = "2.5"
 

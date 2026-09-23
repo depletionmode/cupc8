@@ -32,6 +32,13 @@ SYSCTL  := $(wildcard sysctl/core/*.c)
 $(OUT)/test_sysctl: test/test_sysctl.c test/sysmodels.c $(SYSCTL) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
+# IOC-002: recordings of real keyboards (tools/kbdrecord.py) through the IO core
+$(OUT)/test_recorded: test/test_recorded.c io/core/iocard.c $(COMMON) | $(OUT)
+	$(CC) $(CFLAGS) $(INC) -o $@ $^
+test_recorded: $(OUT)/test_recorded
+	cd .. && build/fw/test_recorded
+.PHONY: test_recorded
+
 # the golden frames for the emulated graphics card tests (test/emu/test_gpu.mjs)
 $(OUT)/gpu_golden: test/gpu_golden.c gpu/core/gpu.c $(COMMON) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
