@@ -339,7 +339,7 @@ class Schematic:
         self.parts = []
         self.syms = {}
         self.items = []
-        self.wires = []                  # (x0, y0, x1, y1, part)
+        self.wires = []                  # (x0, y0, x1, y1, part, net)
         self.labels = []                 # (box, text, part)
         self.ncs = []                    # (box, part): no-connect crosses
 
@@ -370,7 +370,7 @@ class Schematic:
         ex, ey = round(x + dx * stub, 4), round(y + dy * stub, 4)
         self.items.append(["wire", ["pts", ["xy", x, y], ["xy", ex, ey]],
                            ["stroke", ["width", 0], ["type", "default"]], ["uuid", uid()]])
-        self.wires.append((x, y, ex, ey, part))
+        self.wires.append((x, y, ex, ey, part, net))
         angle = {(1, 0): 0, (0, -1): 90, (-1, 0): 180, (0, 1): 270}[(dx, dy)]
         justify = {0: "left", 90: "left", 180: "right", 270: "right"}[angle]
         self.items.append(["label", Q(net), ["at", ex, ey, angle % 180],
@@ -480,6 +480,11 @@ class Schematic:
             for b, pb in bodies[i + 1:]:
                 if overlap(a, b):
                     bad.append("bodies of %s and %s overlap" % (pa.ref, pb.ref))
+        # KiCad joins wires that touch, so two nets' stubs must never meet
+        for i, w in enumerate(self.wires):
+            for v in self.wires[i + 1:]:
+                if w[5] != v[5] and overlap(seg_box(*w[:4], width=0), seg_box(*v[:4], width=0), 0.01):
+                    bad.append("wires of %s (%s) and %s (%s) touch: a short" % (w[4].ref, w[5], v[4].ref, v[5]))
         for w in self.wires:
             for b, pb in bodies:
                 if pb is not w[4] and overlap(seg_box(*w[:4]), b):
@@ -1000,7 +1005,10 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         r = fn()
         print("ok" + (" (%s)" % r if r else ""))
 
-    step("schematic", lambda: schematic(sch, footprint_libs))
+    def sheet():
+        schematic(sch, footprint_libs)
+        write_project(pro, power_nets=power_nets)   # before ERC: it carries the library tables
+    step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
 
@@ -1014,7 +1022,6 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge)
-        write_project(pro, power_nets=power_nets)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
     step("board", build)
