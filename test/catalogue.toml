@@ -724,6 +724,15 @@ vrow = "2.7"
 cmd = "make -s -C fw test_sysctl"
 
 [[test]]
+id = "SYS-006"
+title = "Real binary: sysctl over USB"
+checks = "the real sysctl.elf: drives no machine pin at start-up; enumerates as USB CDC; PING, POWER (CC 0.9 V gives class 2), bridge commands refused with the chipset down; FLASH_* refused until FPGA_HOLD, then ID, erase, program and read back 1500 bytes into the right flash only, the other untouched; FPGA_BOOT releases CRESET_n and sees CDONE, times out on a flash without a bitstream, and lets go of the flash lines; CARD_RESET drives only that slot's expander bit; a bad CRC gets status 1"
+method = "test/emu/test_sysctl.mjs: rp2040js USB CDC host, W25Q and iCE40 CDONE models on SPI1 and the CS/CRESET pins, TCA9555 models on I2C0"
+kind = "sim"
+vrow = "2.7"
+cmd = "tools/fw_rp2040.sh sysctl && node test/emu/test_sysctl.mjs"
+
+[[test]]
 id = "SYS-004"
 title = "Card programming"
 checks = "SWD flash of an RP2040 target model; ESP ROM-bootloader flash against the reference protocol; mux/expander sequencing per slot"

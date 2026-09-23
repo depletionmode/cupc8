@@ -49,7 +49,7 @@ void br_ram_write(sysctl_t *s, uint16_t addr, const uint8_t *data, int n)
 
 void br_ram_read(sysctl_t *s, uint16_t addr, uint8_t *data, int n)
 {
-	uint8_t tx[5 + 256] = {0}, rx[5 + 256];
+	static uint8_t tx[5 + 256], rx[5 + 256];     /* not on the RP2040's 2 KB stack */
 	while (n > 0) {
 		int k = n > 256 ? 256 : n;
 		/* a frame may wrap past $ffff; the bridge's address does too */
@@ -68,7 +68,7 @@ void br_ram_read(sysctl_t *s, uint16_t addr, uint8_t *data, int n)
 
 void br_rom_read(sysctl_t *s, uint32_t addr, uint8_t *data, int n)
 {
-	uint8_t tx[6 + 256] = {0}, rx[6 + 256];
+	static uint8_t tx[6 + 256], rx[6 + 256];
 	while (n > 0) {
 		int k = n > 256 ? 256 : n;
 		tx[0] = 0x03;

@@ -60,3 +60,11 @@ target_include_directories(io PRIVATE io ${FW}/io ${FW}/io/core)
 target_compile_definitions(io PRIVATE PICO_DEFAULT_UART_TX_PIN=16 PICO_DEFAULT_UART_RX_PIN=17)
 target_link_libraries(io pico_stdlib tinyusb_host slotspi)
 pico_enable_stdio_uart(io 1)
+
+# system card: the sysctl core on the RP2040, USB CDC device
+file(GLOB SYSCTL_CORE ${FW}/sysctl/core/*.c)
+add_executable(sysctl sysctl/main.c sysctl/usb_descriptors.c ${SYSCTL_CORE})
+cupc8_strict(sysctl/main.c ${SYSCTL_CORE})
+target_include_directories(sysctl PRIVATE sysctl ${FW}/sysctl ${FW}/sysctl/core)
+target_compile_definitions(sysctl PRIVATE PICO_DEFAULT_UART_TX_PIN=0 PICO_DEFAULT_UART_RX_PIN=1)
+target_link_libraries(sysctl pico_stdlib pico_unique_id tinyusb_device hardware_spi hardware_i2c hardware_adc)
