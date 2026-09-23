@@ -156,3 +156,24 @@ fixed_in = "4d501f7"
 revert = [["fw/wifi/port/esp32c3/sdkconfig.defaults", "CONFIG_LWIP_SO_RCVBUF=y", "# CONFIG_LWIP_SO_RCVBUF is not set"]]
 cmd = "rm -rf build/esp32c3-qemu && tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
 must_fail = ["FAIL the status byte's RXREADY bit"]
+
+[[bug]]
+name = "sysctl firmware: the programming-port UART kept only the PIO FIFO's 8 bytes between polls"
+fixed_in = "2ee644d"
+revert = [["fw/rp2040/sysctl/main.c", """	int n = 0;
+	if (!uart_on)
+		return 0;
+	uint32_t head = rx_head();
+	if (head - rx_tail > sizeof rx_ring)
+		rx_tail = head - sizeof rx_ring;      /* overrun: keep the newest */
+	while (n < max && rx_tail != head)
+		d[n++] = rx_ring[rx_tail++ % sizeof rx_ring];
+	return n;""", """	int n = 0;
+	(void)rx_head;
+	(void)rx_ring;
+	while (uart_on && n < max && !pio_sm_is_rx_fifo_empty(uart_pio, uart_rx_sm))
+		d[n++] = (uint8_t)(pio_sm_get(uart_pio, uart_rx_sm) >> 24);
+	return n;"""],
+  ["fw/rp2040/sysctl/main.c", "	channel_config_set_dreq(&d, pio_get_dreq(uart_pio, uart_rx_sm, false));\n	dma_channel_configure((uint)rx_dma, &d, rx_ring, (const uint8_t *)&uart_pio->rxf[uart_rx_sm] + 3, 0xffffffffu, true);", "	(void)d;"]]
+cmd = "tools/fw_rp2040.sh sysctl && node test/emu/test_sysctl.mjs"
+must_fail = ["FAIL UART loopback across two UART_XFERs"]
