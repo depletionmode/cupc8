@@ -37,6 +37,14 @@ static uint32_t rgb888(uint16_t c)
 	return ((r * 255 / 31) << 16) | ((gr * 255 / 63) << 8) | (b * 255 / 31);
 }
 
+/* TEXT shows its 16 colours at RGB222, as the card's 2bpp font encoder does
+ * (exact for the VGA defaults) */
+static uint32_t rgb222(uint16_t c)
+{
+	uint32_t r = (c >> 14) & 3, gr = (c >> 9) & 3, b = (c >> 3) & 3;
+	return ((r * 0x55) << 16) | ((gr * 0x55) << 8) | (b * 0x55);
+}
+
 /* ------------------------------------------------------------------ text */
 
 static void text_clear_rows(gpu_t *g, int from, int to, uint8_t attr)
@@ -336,15 +344,14 @@ static void execute(gpu_t *g, const uint8_t *f, int len, bool respond)
 int gpu_run(gpu_t *g, int max_frames)
 {
 	int n = 0;
-	uint8_t frame[2 + CARD_FRAME_MAX];
 	while (n < max_frames && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
-			frame[i] = fifo_at(g, g->tail + 2 + i);
+			g->cmd[i] = fifo_at(g, g->tail + 2 + i);
 		g->tail += 2 + len;
 		g->exec_seq++;
 		/* only the most recent command's response is kept (slot.md) */
-		execute(g, frame, (int)len, g->exec_seq == g->frame_seq);
+		execute(g, g->cmd, (int)len, g->exec_seq == g->frame_seq);
 		n++;
 	}
 	return n;
@@ -424,8 +431,8 @@ void gpu_render(const gpu_t *g, uint32_t *rgb)
 	for (int row = 0; row < GPU_TEXT_ROWS; row++)
 		for (int col = 0; col < GPU_TEXT_COLS; col++) {
 			gpu_cell_t cell = g->text[row][col];
-			uint32_t fg = rgb888(g->palette[cell.attr & 0x0F]);
-			uint32_t bg = rgb888(g->palette[cell.attr >> 4]);
+			uint32_t fg = rgb222(g->palette[cell.attr & 0x0F]);
+			uint32_t bg = rgb222(g->palette[cell.attr >> 4]);
 			bool here = cursor_on && row == g->cy && col == g->cx;
 			for (int r = 0; r < 16; r++) {
 				uint8_t bits = g->font16[cell.ch][r];

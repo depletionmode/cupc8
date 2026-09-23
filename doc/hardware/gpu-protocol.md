@@ -27,7 +27,9 @@ M1, because of the TMDS encode time at 252 MHz.
 - Both fonts can be redefined per glyph.
 
 **Palette:**
-- Entries 0–15 are the standard VGA 16 colours. TEXT mode uses these same 16.
+- Entries 0–15 are the standard VGA 16 colours. TEXT mode uses these same 16,
+  shown at RGB222 (2 bits per channel, the card's text encoder). That is exact
+  for the VGA colours; a redefined entry shows its top 2 bits per channel.
 - Entries 16–231 are a 6×6×6 RGB cube.
 - Entries 232–255 are a 24-step grey ramp. This is the xterm-256 layout.
 - `PALETTE` changes any entry. Colours are stored as RGB565.

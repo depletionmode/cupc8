@@ -605,18 +605,20 @@ cmd = "tools/fw_rp2040.sh emu_selftest && node test/emu/run_selftest.mjs"
 [[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
-checks = "the PIO SPI slave accepts CUPC/8-timed frames at every clk_div"
-method = "rp2040js running the real .elf"
+checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
+method = "test/emu/test_gpu.mjs on the dual-core rp2040js (EMU-001), pin-level host test/emu/slothost.mjs"
 kind = "sim"
 vrow = "2.4"
+cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-004"
 
 [[test]]
 id = "GPU-005"
 title = "Real binary: TMDS output"
-checks = "captured TMDS decoded back to pixels equals the golden frame; correct 640×480@60 timing"
-method = "rp2040js + a TMDS decoder"
+checks = "every line 800 symbols with a 96-symbol hsync and 640 active from symbol 144, 525 lines and a 2-line vsync per frame, 16.667 ms frames; TEXT (all 256 fg/bg pairs, PUTS with control codes, a redefined glyph), the block cursor, and GFX (all 256 palette entries, a redefined entry, every drawing command) decoded from the three TMDS lanes equal gpu_render()'s golden frames at the card's precision (RGB222 text, RGB565 graphics); core 1 runs 15% slower than silicon, so every scanline has that much to spare"
+method = "test/emu/test_gpu.mjs: test/emu/tmds.mjs captures the serialisers' symbols; fw/test/gpu_golden.c renders the same command stream"
 kind = "sim"
 vrow = "2.4"
+cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
 
 # ============================================================================
 # IOC: IO card firmware

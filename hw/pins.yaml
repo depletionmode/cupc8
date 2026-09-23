@@ -157,7 +157,7 @@ devices:
     board: gpu-card
     part: RP2040
     lcsc: C2040
-    note: TMDS pin order follows the Pico DVI Sock reference so PicoDVI's stock config works
+    note: "TMDS pairs are GPIO n (P) and n+1 (N), as on the Pico DVI Sock, but green is on 10/11 (the Sock uses 18/19), so the firmware has its own PicoDVI serialiser config: lanes {12, 10, 16}, clock 14, not inverted"
     groups:
       dvi:
         signals:

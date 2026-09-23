@@ -35,7 +35,7 @@ typedef struct gpu {
 	uint8_t mode;
 	gpu_cell_t text[GPU_TEXT_ROWS][GPU_TEXT_COLS];
 	uint8_t cx, cy, attr, cursor;
-	uint8_t gfx[GPU_GFX_H][GPU_GFX_W];
+	uint8_t gfx[GPU_GFX_H][GPU_GFX_W] __attribute__((aligned(4)));   /* word reads on the card */
 	uint16_t palette[256];                 /* RGB565 */
 	uint8_t font16[256][16];               /* TEXT glyphs */
 	uint8_t font8[256][8];                 /* TEXT8 glyphs */
@@ -46,6 +46,8 @@ typedef struct gpu {
 	uint32_t cur_start, cur_len;           /* frame being received */
 	bool cur_bad;
 	uint32_t frame_seq, exec_seq;          /* commands received / executed */
+	uint8_t cmd[CARD_FRAME_MAX];           /* the command gpu_run() is executing (not on
+	                                          the stack: the RP2040's is 2 KB) */
 
 	uint8_t fence_tag;
 	bool fence_irq;

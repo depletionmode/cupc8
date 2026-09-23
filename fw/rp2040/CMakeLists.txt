@@ -14,9 +14,41 @@ set(CMAKE_C_STANDARD 11)
 pico_sdk_init()
 
 set(FW ${CMAKE_CURRENT_LIST_DIR}/..)
-add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter)
+# strict warnings on our sources only (the SDKs have their own opinions).
+# -Wstack-usage: the main stack is 2 KB and core 1's 1 KB, and an overflow
+# silently overwrites SCRATCH_X code (an 8 KB local in gpu_run() did)
+function(cupc8_strict)
+	set_source_files_properties(${ARGN} PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror;-Wno-unused-parameter;-Wstack-usage=512")
+endfunction()
 
 # emulator acceptance: the dual-core features the card firmware relies on
 add_executable(emu_selftest selftest/selftest.c)
+cupc8_strict(selftest/selftest.c)
 target_link_libraries(emu_selftest pico_stdlib pico_multicore)
 pico_enable_stdio_uart(emu_selftest 1)
+
+# the slot SPI slave shared by the RP2040 cards (each card's pins.h is on its
+# include path)
+add_library(slotspi INTERFACE)
+target_sources(slotspi INTERFACE common/slotspi.c ${FW}/common/cardproto.c)
+cupc8_strict(common/slotspi.c ${FW}/common/cardproto.c)
+target_include_directories(slotspi INTERFACE common ${FW}/common)
+pico_generate_pio_header(slotspi ${CMAKE_CURRENT_LIST_DIR}/common/slotspi.pio)
+target_link_libraries(slotspi INTERFACE pico_stdlib hardware_pio hardware_dma)
+
+# graphics card: PicoDVI (pinned by tools/fetch_sdks.sh)
+set(PICODVI ${PICO_SDK_PATH}/../PicoDVI/software)
+add_subdirectory(${PICODVI}/libdvi libdvi)
+add_executable(gpu gpu/main.c ${FW}/gpu/core/gpu.c ${FW}/common/font8x8_cp437.c
+	${PICODVI}/apps/colour_terminal/tmds_encode_font_2bpp.S)
+cupc8_strict(gpu/main.c ${FW}/gpu/core/gpu.c)
+target_include_directories(gpu PRIVATE ${FW}/gpu ${FW}/gpu/core ${PICODVI}/apps/colour_terminal)
+# 5 TMDS buffers: PicoDVI frees one two lines after it is shown, so with 3
+# core 1 could never work ahead of the beam (GFX lines alternate encode, copy)
+target_compile_definitions(gpu PRIVATE DVI_VERTICAL_REPEAT=1 DVI_N_TMDS_BUFFERS=5 DVI_SYMBOLS_PER_WORD=2
+	# core 1 only runs the scanline loop and the DVI IRQ; its stack shares
+	# SCRATCH_X with PicoDVI's encode loops
+	PICO_CORE1_STACK_SIZE=0x400)
+target_link_libraries(gpu pico_stdlib pico_multicore libdvi slotspi)
+# everything the scanline loop touches must not wait on flash
+pico_set_binary_type(gpu copy_to_ram)

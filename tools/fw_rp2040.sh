@@ -5,4 +5,9 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 "$ROOT/tools/fetch_sdks.sh" >/dev/null
 cmake -S "$ROOT/fw/rp2040" -B "$ROOT/build/rp2040" -G Ninja >/dev/null
-ninja -C "$ROOT/build/rp2040" "$@" | tail -1
+LOG=$ROOT/build/rp2040/ninja.log
+if ! ninja -C "$ROOT/build/rp2040" "$@" > "$LOG" 2>&1; then
+	grep -v '^\[' "$LOG"
+	exit 1
+fi
+tail -1 "$LOG"

@@ -46,6 +46,13 @@ static uint32_t pal(int i)
 	return ((r * 255 / 31) << 16) | ((g * 255 / 63) << 8) | (b * 255 / 31);
 }
 
+/* TEXT mode shows palette entries at RGB222 */
+static uint32_t tpal(int i)
+{
+	uint16_t c = gpu.palette[i];
+	return (((c >> 14) & 3) * 0x55u) << 16 | (((c >> 9) & 3) * 0x55u) << 8 | ((c >> 3) & 3) * 0x55u;
+}
+
 static void dump(const char *name)
 {
 	char path[256];
@@ -67,7 +74,7 @@ static bool cell_shows(int col, int row, uint8_t ch, uint8_t attr)
 	for (int r = 0; r < 16; r++)
 		for (int b = 0; b < 8; b++) {
 			bool on = font8x8_cp437[ch][r / 2] & (0x80 >> b);
-			uint32_t want = on ? pal(attr & 15) : pal(attr >> 4);
+			uint32_t want = on ? tpal(attr & 15) : tpal(attr >> 4);
 			if (frame[(row * 16 + r) * GPU_OUT_W + col * 8 + b] != want)
 				return false;
 		}
@@ -149,13 +156,13 @@ static void test_text(void)
 	SEND(0x14, 1);
 	gpu.vsync_count = 0;
 	gpu_render(&gpu, frame);
-	CHECK(frame[14 * GPU_OUT_W] == pal(7) && frame[13 * GPU_OUT_W] == pal(0), "underline cursor");
+	CHECK(frame[14 * GPU_OUT_W] == tpal(7) && frame[13 * GPU_OUT_W] == tpal(0), "underline cursor");
 	SEND(0x14, 2);
 	gpu_render(&gpu, frame);
-	CHECK(frame[0] == pal(7), "block cursor");
+	CHECK(frame[0] == tpal(7), "block cursor");
 	gpu.vsync_count = 15;
 	gpu_render(&gpu, frame);
-	CHECK(frame[0] == pal(0), "cursor blinks off");
+	CHECK(frame[0] == tpal(0), "cursor blinks off");
 
 	/* DEFCHAR16 */
 	uint8_t def[18] = {0x19, 'Z'};
@@ -164,7 +171,7 @@ static void test_text(void)
 	SEND(0x14, 0);
 	SEND(0x17, 0, 0, 'Z', 0x07);
 	gpu_render(&gpu, frame);
-	CHECK(frame[0] == pal(0) && frame[GPU_OUT_W] == pal(7), "custom glyph rows");
+	CHECK(frame[0] == tpal(0) && frame[GPU_OUT_W] == tpal(7), "custom glyph rows");
 
 	SEND(0x0C);
 	dump("gpu_text");

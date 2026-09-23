@@ -1,0 +1,21 @@
+; CUPC/8 slot SPI slave: mode 0, MSB first (doc/hardware/slot.md).
+; SCK = GPIO 2, MOSI = GPIO 3 (in base), MISO = GPIO 4 (out/set base),
+; CS_n = GPIO 5, the same on every RP2040 card (slotspi.c checks pins.h).
+; In: shift left, autopush at 8 bits. Out: shift left; X = 0, so `pull
+; noblock` on an empty TX FIFO sends $00. The CPU restarts the machine at
+; `start` when CS_n rises.
+
+.program slotspi
+public start:
+    wait 0 gpio 5           ; CS_n low: a frame starts
+    set pindirs, 1          ; drive MISO only while selected
+byte:
+    pull noblock            ; the next MISO byte (in bits 31:24), or $00
+    set y, 7
+bit:
+    out pins, 1             ; MISO changes while SCK is low
+    wait 1 gpio 2           ; rising edge: sample MOSI
+    in pins, 1
+    wait 0 gpio 2
+    jmp y-- bit
+    jmp byte

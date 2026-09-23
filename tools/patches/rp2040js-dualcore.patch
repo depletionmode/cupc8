@@ -43,6 +43,43 @@ index 24014c9..444035a 100644
        }
      }
      // WFI
+diff --git i/src/peripherals/pio.ts w/src/peripherals/pio.ts
+index 8d9ef35..a5b85e5 100644
+--- i/src/peripherals/pio.ts
++++ w/src/peripherals/pio.ts
+@@ -64,6 +64,8 @@ const SHIFTCTRL_AUTOPUSH = 1 << 16;
+ const SHIFTCTRL_AUTOPULL = 1 << 17;
+ const SHIFTCTRL_IN_SHIFTDIR = 1 << 18; // 1 = shift input shift register to right (data enters from left). 0 = to left
+ const SHIFTCTRL_OUT_SHIFTDIR = 1 << 19; // 1 = shift out of output shift register to right. 0 = to left
++const SHIFTCTRL_FJOIN_TX = 1 << 30;
++const SHIFTCTRL_FJOIN_RX = 1 << 31;
+ 
+ // EXECCTRL bits
+ const EXECCTRL_STATUS_SEL = 1 << 4;
+@@ -812,9 +814,21 @@ export class StateMachine {
+       case SM0_EXECCTRL:
+         this.execCtrl = ((value & 0x7fffffff) | (this.execCtrl & 0x80000000)) >>> 0;
+         break;
+-      case SM0_SHIFTCTRL:
+-        this.shiftCtrl = value;
++      case SM0_SHIFTCTRL: {
++        // Changing either join bit flushes both FIFOs (pio_sm_clear_fifos
++        // relies on this); joining gives one FIFO all 8 entries.
++        const join = SHIFTCTRL_FJOIN_TX | SHIFTCTRL_FJOIN_RX;
++        if ((value ^ this.shiftCtrl) & join) {
++          const tx = value & SHIFTCTRL_FJOIN_TX ? 8 : value & SHIFTCTRL_FJOIN_RX ? 0 : 4;
++          const rx = value & SHIFTCTRL_FJOIN_RX ? 8 : value & SHIFTCTRL_FJOIN_TX ? 0 : 4;
++          this.txFIFO.resize(tx);
++          this.rxFIFO.resize(rx);
++          this.updateDMATx();
++          this.updateDMARx();
++        }
++        this.shiftCtrl = value >>> 0;
+         break;
++      }
+       case SM0_ADDR:
+         /* read-only */
+         break;
 diff --git i/src/peripherals/psm.ts w/src/peripherals/psm.ts
 new file mode 100644
 index 0000000..2d401c4
@@ -100,7 +137,7 @@ index 0000000..2d401c4
 +  }
 +}
 diff --git i/src/rp2040.ts w/src/rp2040.ts
-index 0b49915..57094f2 100644
+index 0b49915..c0341bc 100644
 --- i/src/rp2040.ts
 +++ w/src/rp2040.ts
 @@ -26,6 +26,7 @@ import { RPUART } from './peripherals/uart.js';
@@ -121,8 +158,8 @@ index 0b49915..57094f2 100644
 +  readonly cores = [this.core0, this.core1];
 +  /** the core executing the current instruction (0 outside step()) */
 +  coreIndex = 0;
-+  /** PSM FRCE_OFF holds core 1 off */
-+  core1Held = false;
++  /** PSM FRCE_OFF holds core 1 off; so does having no bootrom for it to wait in */
++  core1Held = true;
 +  get core() {
 +    return this.cores[this.coreIndex];
 +  }
@@ -138,7 +175,12 @@ index 0b49915..57094f2 100644
      0x40014: new RPIO(this, 'IO_BANK0_BASE'),
      0x40018: new UnimplementedPeripheral(this, 'IO_QSPI_BASE'),
      0x4001c: new RPPADS(this, 'PADS_BANK0_BASE', 'bank0'),
-@@ -187,7 +197,8 @@ export class RP2040 {
+@@ -183,11 +193,13 @@ export class RP2040 {
+ 
+   loadBootrom(bootromData: Uint32Array) {
+     this.bootrom.set(bootromData);
++    this.core1Held = false;
+     this.reset();
    }
  
    reset() {
@@ -148,7 +190,7 @@ index 0b49915..57094f2 100644
      this.pwm.reset();
      this.flash.fill(0xff);
    }
-@@ -355,7 +366,37 @@ export class RP2040 {
+@@ -355,7 +367,37 @@ export class RP2040 {
    }
  
    setInterrupt(irq: number, value: boolean) {
@@ -187,26 +229,54 @@ index 0b49915..57094f2 100644
    }
  
    updateIOInterrupt() {
-@@ -368,7 +409,24 @@ export class RP2040 {
+@@ -368,7 +410,52 @@ export class RP2040 {
      this.setInterrupt(IRQ.IO_BANK0, interruptValue);
    }
  
-+  /** One instruction on each running core; returns the cycles that took. */
++  // Each core keeps its own cycle count; step() runs whichever running core is
++  // behind, so both run at full speed whatever their instruction mix, and the
++  // chip's time is the earliest running core's.
++  private coreTime = [0, 0];
++  private now = 0;
++
++  private running(i: number) {
++    return !this.cores[i].waiting && !(i === 1 && this.core1Held);
++  }
++
++  /** One instruction on the core that is behind; returns the cycles by which the chip's time advanced (may be 0). */
    step() {
 -    this.core.executeInstruction();
-+    let cycles = 0;
-+    for (let i = 0; i < 2; i++) {
-+      const core = this.cores[i];
-+      if (core.waiting || (i === 1 && this.core1Held)) {
-+        continue;
-+      }
-+      this.coreIndex = i;
-+      this.sio.selectCore(i);
-+      cycles = Math.max(cycles, core.executeInstruction());
++    const run0 = this.running(0),
++      run1 = this.running(1);
++    if (!run0 && !run1) {
++      return 0;
 +    }
++    const i = run0 && run1 ? (this.coreTime[0] <= this.coreTime[1] ? 0 : 1) : run0 ? 0 : 1;
++    if (this.coreTime[i] < this.now) {
++      this.coreTime[i] = this.now; // it was asleep: it starts from now
++    }
++    this.coreIndex = i;
++    this.sio.selectCore(i);
++    this.coreTime[i] += this.cores[i].executeInstruction();
 +    this.coreIndex = 0;
 +    this.sio.selectCore(0);
-+    return cycles;
++    let t = Infinity;
++    for (let c = 0; c < 2; c++) {
++      if (this.running(c)) {
++        t = Math.min(t, this.coreTime[c]);
++      }
++    }
++    if (t === Infinity) {
++      t = this.coreTime[i];
++    }
++    const delta = Math.max(0, t - this.now);
++    this.now += delta;
++    return delta;
++  }
++
++  /** Both cores asleep: the chip's time moves on by `cycles`. */
++  idle(cycles: number) {
++    this.now += cycles;
 +  }
 +
 +  get waiting() {
@@ -214,10 +284,10 @@ index 0b49915..57094f2 100644
    }
  }
 diff --git i/src/simulator.ts w/src/simulator.ts
-index da3da5b..1c1d311 100644
+index da3da5b..22b556b 100644
 --- i/src/simulator.ts
 +++ w/src/simulator.ts
-@@ -19,12 +19,12 @@ export class Simulator implements IGDBTarget {
+@@ -19,12 +19,13 @@ export class Simulator implements IGDBTarget {
      this.stopped = false;
      const cycleNanos = 1e9 / 125_000_000; // 125 MHz
      for (let i = 0; i < 1000000 && !this.stopped; i++) {
@@ -225,6 +295,7 @@ index da3da5b..1c1d311 100644
 +      if (rp2040.waiting) {
          const { nanosToNextAlarm } = clock;
          clock.tick(nanosToNextAlarm);
++        rp2040.idle(nanosToNextAlarm / cycleNanos);
          i += nanosToNextAlarm / cycleNanos;
        } else {
 -        const cycles = rp2040.core.executeInstruction();
@@ -337,3 +408,28 @@ index f0b14ae..5503438 100644
        case DIV_UDIVIDEND:
          this.divDividend = value;
          this.updateHardwareDivider(false);
+diff --git i/src/utils/fifo.ts w/src/utils/fifo.ts
+index cf345f6..afeb3d4 100644
+--- i/src/utils/fifo.ts
++++ w/src/utils/fifo.ts
+@@ -1,5 +1,5 @@
+ export class FIFO {
+-  readonly buffer: Uint32Array;
++  buffer: Uint32Array;
+ 
+   private start = 0;
+   private used = 0;
+@@ -44,6 +44,13 @@ export class FIFO {
+     this.used = 0;
+   }
+ 
++  /** New depth (PIO FIFO join); empties the FIFO */
++  resize(size: number) {
++    this.buffer = new Uint32Array(size);
++    this.start = 0;
++    this.used = 0;
++  }
++
+   get empty() {
+     return this.used == 0;
+   }

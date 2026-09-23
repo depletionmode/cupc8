@@ -32,5 +32,11 @@ SYSCTL  := $(wildcard sysctl/core/*.c)
 $(OUT)/test_sysctl: test/test_sysctl.c test/sysmodels.c $(SYSCTL) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
+# the golden frames for the emulated graphics card tests (test/emu/test_gpu.mjs)
+$(OUT)/gpu_golden: test/gpu_golden.c gpu/core/gpu.c $(COMMON) | $(OUT)
+	$(CC) $(CFLAGS) $(INC) -o $@ $^
+gpu_golden: $(OUT)/gpu_golden
+.PHONY: gpu_golden
+
 $(TESTS): %: $(OUT)/%
 	OUT=$(OUT) $(OUT)/$@

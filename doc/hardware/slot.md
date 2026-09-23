@@ -79,7 +79,10 @@ chipset) is always the master.
   Its meaning is card-specific, but **bit 7 is always 0**, so an empty slot
   (MISO pulled up) reads as `$FF`.
 - **Responses come in a separate READ frame.** A command frame carries only
-  the opcode and arguments, and the card returns `$00` after the status byte.
+  the opcode and arguments. The MISO bytes after the status byte in a command
+  frame mean nothing, and the host ignores them. A card preloads a whole
+  frame's MISO before CS_n falls, so it may already be offering its current
+  response there.
   If the command has a response, the host collects it with a **READ frame**:
   1. Send `$FE`, and receive the status byte in return.
   2. The next byte returned is **RESP_LEN**, the number of response bytes that

@@ -36,11 +36,14 @@ function loadElf(file, mcu) {
 }
 
 export class Emu {
-  static async load(elf, { mhz = 125 } = {}) {
-    return new Emu(elf, mhz);
+  // core1Slow: charge core 1 this many times the cycles each instruction
+  // takes, to show real-time code has margin (bus contention, cycle-count
+  // error) rather than just fitting in the emulator
+  static async load(elf, { mhz = 125, core1Slow = 1 } = {}) {
+    return new Emu(elf, mhz, core1Slow);
   }
 
-  constructor(elf, mhz) {
+  constructor(elf, mhz, core1Slow) {
     this.clock = new SimulationClock();
     this.mcu = new rp.RP2040(this.clock);
     this.mcu.logger = new rp.ConsoleLogger(rp.LogLevel.Error);
@@ -53,13 +56,24 @@ export class Emu {
     this.uart = '';
     this.mcu.uart[0].onByte = (b) => (this.uart += String.fromCharCode(b));
     this.onCycle = null; // per-cycle hook: (emu) => void (pin-level test benches)
+    if (core1Slow !== 1) {
+      const core1 = this.mcu.core1, exec = core1.executeInstruction.bind(core1);
+      let owed = 0;
+      core1.executeInstruction = () => {
+        owed += exec() * core1Slow;
+        const n = Math.floor(owed);
+        owed -= n;
+        return n;
+      };
+    }
   }
 
   get ns() {
     return this.clock.nanos;
   }
 
-  // one step: an instruction on each running core, and the PIO cycles it took
+  // one step: an instruction on the core that is behind, and the PIO cycles
+  // by which that moved the chip's time on
   step() {
     const { mcu, clock } = this;
     if (mcu.waiting) {
@@ -67,10 +81,12 @@ export class Emu {
       // one microsecond so PIO and the test bench still see time pass
       const ns = Math.min(clock.nanosToNextAlarm, 1000);
       const cycles = Math.max(1, Math.round(ns / this.nsPerCycle));
+      mcu.idle(cycles);
       this.cycles(cycles);
       return;
     }
-    this.cycles(mcu.step() || 1);
+    const cycles = mcu.step(); // 0 when the core that ran is still behind the other
+    if (cycles) this.cycles(cycles);
   }
 
   cycles(n) {
