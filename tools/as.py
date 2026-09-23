@@ -37,7 +37,8 @@ line_records = []
 
 def __ins_hacks(ins):
     # need to hack syntax to allow decoding to work properly
-    dst_ops = ['push']
+    # single-operand instructions whose register is Rb (bit 1), not Ra
+    dst_ops = ['push', 'tmr0', 'tmr1']
     tokens = ins.split(' ')
     if tokens[0] in dst_ops:
         return '{} ?, {}'.format(tokens[0], tokens[1])

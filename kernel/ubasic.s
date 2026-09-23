@@ -44,7 +44,7 @@ ub_string: resb 40
 
 ; index offsets in chunk (not pointers like original uBASIC code)
 ub_line_index_current: resb 2
-ub_line_index_chunk: resb 300	; support for 100 lines
+ub_line_index_chunk: resb 255	; 3 bytes a line (number, lo, hi): up to 84 lines
 ub_for_stack_index: resb 1
 ub_for_stack: resb 12 ; MAX_FOR_STACK_DEPTH = 4
 ub_gosub_stack_index: resb 1
@@ -62,12 +62,13 @@ ubasic_init:
 
 	xor r0, r0
 	xor r1, r1
-.clear_gosub_stack:
 	st [ub_gosub_stack_index], r0
+.clear_gosub_stack:
 	gt r1, #9
 	bzf .done_clear_gosub_stack
 	st [ub_gosub_stack]+r1, r0
 	add r1, #1
+	b .clear_gosub_stack
 .done_clear_gosub_stack:
 
 	st [ended], r0
@@ -192,8 +193,15 @@ ubasic_factor:
 
 f1: resb 1
 f2: resb 1
-op: resb 1
+top: resb 1
 ubasic_term:
+	ld r1, [f1]
+	push r1
+	ld r1, [f2]
+	push r1
+	ld r1, [top]
+	push r1
+
 	push pch
 	push pcl
 	b ubasic_factor
@@ -202,10 +210,10 @@ ubasic_term:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
-	st [op], r0
+	st [top], r0
 
 .loop:
-	ld r0, [op]
+	ld r0, [top]
 	eq r0, TOKENIZER_ASTR
 	bzf .next
 	eq r0, TOKENIZER_SLASH
@@ -224,7 +232,7 @@ ubasic_term:
 	b ubasic_factor
 	st [f2], r0
 
-	ld r0, [op]
+	ld r0, [top]
 	eq r0, TOKENIZER_ASTR
 	bzf .astr
 	eq r0, TOKENIZER_SLASH
@@ -264,18 +272,32 @@ ubasic_term:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
-	st [op], r0
+	st [top], r0
 
 	b .loop
 
 .end:
 	ld r0, [f1]
+	pop r1
+	st [top], r1
+	pop r1
+	st [f2], r1
+	pop r1
+	st [f1], r1
 	pop pcl
 	pop pch
 
 t1: resb 1
 t2: resb 1
+eop: resb 1
 ubasic_expr:
+	ld r1, [t1]
+	push r1
+	ld r1, [t2]
+	push r1
+	ld r1, [eop]
+	push r1
+
 	push pch
 	push pcl
 	b ubasic_term
@@ -284,10 +306,10 @@ ubasic_expr:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
-	st [op], r0
+	st [eop], r0
 
 .loop:
-	ld r0, [op]
+	ld r0, [eop]
 	eq r0, TOKENIZER_PLUS
 	bzf .next
 	eq r0, TOKENIZER_MINUS
@@ -305,10 +327,10 @@ ubasic_expr:
 
 	push pch
 	push pcl
-	b ubasic_factor
+	b ubasic_term
 	st [t2], r0
 
-	ld r0, [op]
+	ld r0, [eop]
 	eq r0, TOKENIZER_PLUS
 	bzf .plus
 	eq r0, TOKENIZER_MINUS
@@ -351,18 +373,32 @@ ubasic_expr:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
-	st [op], r0
+	st [eop], r0
 
 	b .loop
 
 .end:
 	ld r0, [t1]
+	pop r1
+	st [eop], r1
+	pop r1
+	st [t2], r1
+	pop r1
+	st [t1], r1
 	pop pcl
 	pop pch
 
 re1: resb 1
 re2: resb 1
+rop: resb 1
 ubasic_relation:
+	ld r1, [re1]
+	push r1
+	ld r1, [re2]
+	push r1
+	ld r1, [rop]
+	push r1
+
 	push pch
 	push pcl
 	b ubasic_expr
@@ -371,10 +407,10 @@ ubasic_relation:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
-	st [op], r0
+	st [rop], r0
 
 .loop:
-	ld r0, [op]
+	ld r0, [rop]
 	eq r0, TOKENIZER_LT
 	bzf .next
 	eq r0, TOKENIZER_GT
@@ -390,15 +426,16 @@ ubasic_relation:
 
 	push pch
 	push pcl
-	b ubasic_factor
+	b ubasic_expr
 	st [re2], r0
 
-	ld r0, [op]
+	ld r0, [rop]
 	eq r0, TOKENIZER_LT
 	bzf .lt
 	eq r0, TOKENIZER_GT
 	bzf .gt
 	eq r0, TOKENIZER_EQ
+	bzf .eq
 	b .getop
 
 .lt:
@@ -444,12 +481,18 @@ ubasic_relation:
 	push pch
 	push pcl
 	b ubasic_tokenizer_token
-	st [op], r0
+	st [rop], r0
 
 	b .loop
 
 .end:
 	ld r0, [re1]
+	pop r1
+	st [rop], r1
+	pop r1
+	st [re2], r1
+	pop r1
+	st [re1], r1
 	pop pcl
 	pop pch
 
@@ -485,8 +528,13 @@ ubasic_jump_linenum_slow:
 	push pcl
 	b ubasic_tokenizer_token
 	eq r0, TOKENIZER_ENDOFINPUT
-	bzf .n0
+	bzf .missing
 	b .loop2
+.missing:
+	push pch
+	push pcl
+	b ubasic_fatal
+	b .end
 .n0:
 	push pch
 	push pcl
@@ -510,12 +558,20 @@ ubasic_jump_linenum_slow:
 	pop pcl
 	pop pch
 
+jl_hi: resb 1
+jl_lo: resb 1
 ubasic_jump_linenum:
 	st [linenum], r0
 	push pch
 	push pcl
 	b ubasic_index_find
+	st [jl_hi], r0
+	st [jl_lo], r1
+	or r0, r1
+	eq r0, #0
 	bzf .pos_null
+	ld r0, [jl_hi]
+	ld r1, [jl_lo]
 	push pch
 	push pcl
 	b ubasic_tokenizer_goto
@@ -547,7 +603,6 @@ ubasic_goto_statement:
 	pop pch
 
 ubasic_print_statement:
-	mov r0, TOKENIZER_FOR
 	mov r0, TOKENIZER_PRINT
 	push pch
 	push pcl
@@ -566,6 +621,8 @@ ubasic_print_statement:
 	eq r0, TOKENIZER_VARIABLE
 	bzf .var_or_num
 	eq r0, TOKENIZER_NUMBER
+	bzf .var_or_num
+	eq r0, TOKENIZER_LEFTPAREN
 	bzf .var_or_num
 	b .end
 
@@ -633,7 +690,31 @@ ubasic_print_statement:
 	b str_printstr
 	push pch
 	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+	pop pch
+
+ubasic_end_of_statement:
+	; a statement ends at CR (consumed), or at an ELSE or the end of the
+	; program (left for the caller); anything else is an error
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .cr
+	eq r0, TOKENIZER_ELSE
+	bzf .done
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .done
+	push pch
+	push pcl
+	b ubasic_fatal
+	b .done
+.cr:
+	push pch
+	push pcl
 	b ubasic_tokenizer_next
+.done:
 	pop pcl
 	pop pch
 
@@ -659,7 +740,24 @@ ubasic_if_statement:
 	push pch
 	push pcl
 	b ubasic_statement
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_ELSE
+	bzf .skip_else
 	b .end
+.skip_else:
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .tok_next
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .end
+	b .skip_else
 .else:
 .loop:
 	push pch
@@ -683,6 +781,7 @@ ubasic_if_statement:
 	bzf .tok_else
 	eq r0, TOKENIZER_CR
 	bzf .tok_next
+	b .end
 
 .tok_else:
 	push pch
@@ -728,10 +827,9 @@ ubasic_let_statement:
 	push pcl
 	b ubasic_set_variable
 
-	mov r0, TOKENIZER_CR
 	push pch
 	push pcl
-	b ubasic_accept
+	b ubasic_end_of_statement
 
 	pop pcl
 	pop pch
@@ -814,6 +912,10 @@ ubasic_next_statement:
 	push pcl
 	b ubasic_tokenizer_variable_num
 	push r0			; var
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
 
 .if0:
 	ld r1, [ub_for_stack_index]
@@ -882,6 +984,7 @@ ubasic_next_statement:
 	pop pch
 
 ubasic_for_statement:
+	mov r0, TOKENIZER_FOR
 	push pch
 	push pcl
 	b ubasic_accept
@@ -941,6 +1044,9 @@ ubasic_for_statement:
 	b .done
 
 .stack_depth_exceeded:
+	pop r1			; index, to and for_variable pushed above
+	pop r1
+	pop r1
 	push pch
 	push pcl
 	b ubasic_fatal
@@ -1008,6 +1114,11 @@ ubasic_statement:
 	bzf .let
 	eq r0, TOKENIZER_VARIABLE
 	bzf .variable
+	; a REM line: the tokenizer already skipped to the next line (or the end)
+	eq r0, TOKENIZER_NUMBER
+	bzf .done
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .done
 
 .invalid:
 	; err
@@ -1173,6 +1284,9 @@ ub_linenum: resb 1
 ub_cur_chunk_offset: resb 1
 ubasic_index_add:
 	st [ub_linenum], r0
+	ld r1, [ub_line_index_current]
+	gt r1, #250
+	bzf .done
 
 	push pch
 	push pcl
@@ -1195,6 +1309,8 @@ ubasic_index_add:
 	sub r1, #1
 	add r1, #3
 	st [ub_line_index_current], r1
+	xor r0, r0
+	st [ub_line_index_chunk]+r1, r0		; terminator after the new entry
 .done:
 	pop pcl
 	pop pch
@@ -1237,16 +1353,15 @@ ubasic_index_find:
 	pop pch
 
 ubasic_index_free:
+	; clear the whole table: RAM holds whatever the boot ROM's RAM test left
+	xor r0, r0
 	xor r1, r1
 .loop:
-	ld r0, [ub_line_index_chunk]+r1
-	eq r0, #0
-	bzf .done
-	xor r0, r0
 	st [ub_line_index_chunk]+r1, r0
-	add r1, #3
+	add r1, #1
+	eq r1, #255
+	bzf .done
 	b .loop
-;
 .done:
 	pop pcl
 	pop pch

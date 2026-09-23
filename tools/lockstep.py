@@ -126,23 +126,25 @@ def trace_lines(text):
     return [l for l in text.splitlines() if l[:2] in ("S ", "W ", "E ")]
 
 
-def check(src, waits, seed, engine, noise=False):
+def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0):
     name = os.path.splitext(os.path.basename(src))[0]
     with open(src) as f:
         if SPI_RE.search(f.read()):
             return "skip", "uses SPI (needs the chipset model)"
     # each (engine, waits, seed) combination gets its own directory, so
     # concurrent runs (test/run.py -j) never share files
-    progs = os.path.join(PROGS, "%s-w%d-s%d%s" % (engine, waits, seed, "-noise" if noise else ""))
+    progs = os.path.join(PROGS, "%s-w%d-s%d%s%s%s" % (engine, waits, seed, "-noise" if noise else "",
+                                                     "-st%d" % stall if stall else "",
+                                                     "-r%d" % reset_at if reset_at else ""))
     os.makedirs(progs, exist_ok=True)
     obj = os.path.join(progs, name + ".o")
     r = run(["python3", os.path.join(ROOT, "tools", "as.py"), src, obj])
     if r.returncode or not os.path.exists(obj):
         return "skip", "does not assemble"
-    return compare_image(obj, waits, seed, engine=engine, noise=noise)
+    return compare_image(obj, waits, seed, engine=engine, noise=noise, stall=stall, reset_at=reset_at)
 
 
-def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=False):
+def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=False, stall=0, reset_at=0):
     """Run a binary image (loaded at $1000) on both models and diff the traces.
     Returns (status, message); the traces are left next to the image."""
     base = os.path.splitext(obj)[0]
@@ -166,6 +168,7 @@ def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=F
     else:
         r = run([os.path.join(OSS, "ghdl"), "-r", "--std=08", "-fsynopsys", "tb_cpu_trace",
                  "-gIMAGE=" + hexf, "-gWAITS=%d" % waits, "-gSEED=%d" % seed,
+                 "-gSTALL=%d" % stall, "-gRESET_AT=%d" % reset_at,
                  "--ieee-asserts=disable"], cwd=GHDL_WORK, timeout=1200)
     if r.returncode:
         return "FAIL", "testbench error: " + (r.stdout + r.stderr).strip().splitlines()[-1]
@@ -203,9 +206,14 @@ def main():
                          "mainboard: CPU + chipset + memory models")
     ap.add_argument("--noise", action="store_true",
                     help="mainboard only: bridge traffic to SRAM during the run (BRG-003)")
+    ap.add_argument("--stall", type=int, default=0,
+                    help="ghdl only: one cycle in eight stalls up to N extra clocks (BUS-003)")
+    ap.add_argument("--reset-at", type=int, default=0,
+                    help="ghdl only: reset mid-cycle once at cycle N (or at HALT), then compare the rerun (BUS-003)")
     args = ap.parse_args()
     files = args.files or sorted(glob.glob(os.path.join(ROOT, "tools", "testdata", "*.s")) +
-                                 glob.glob(os.path.join(ROOT, "test", "*.s")))
+                                 glob.glob(os.path.join(ROOT, "test", "*.s")) +
+                                 glob.glob(os.path.join(ROOT, "test", "isa", "*.s")))
     build()
     if args.engine == "verilator":
         build_verilator()
@@ -213,7 +221,8 @@ def main():
         build_mainboard()
     counts = {"ok": 0, "FAIL": 0, "skip": 0}
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.j) as pool:
-        jobs = [pool.submit(check, os.path.abspath(src), args.waits, args.seed, args.engine, args.noise)
+        jobs = [pool.submit(check, os.path.abspath(src), args.waits, args.seed, args.engine, args.noise,
+                            args.stall, args.reset_at)
                 for src in files]
         for src, job in zip(files, jobs):
             status, msg = job.result()

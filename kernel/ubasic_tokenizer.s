@@ -34,7 +34,7 @@ ubasic_singlechar:
 	bzf .hash
 	eq r0, #60
 	bzf .lt
-	eq r0, #32
+	eq r0, #62
 	bzf .gt
 	eq r0, #61
 	bzf .eq
@@ -140,10 +140,12 @@ ubasic_set_nextptr_ptr_plus_val:
 	ld r1, [ub_ptr]
 	add r1, r0
 	st [ub_nextptr], r1
-	; check wraparound
+	ld r0, [ub_ptr+1]
+	st [ub_nextptr+1], r0
+	; carry out of the low byte: the sum is below what was added
+	ld r0, [ub_ptr]
 	lt r1, r0
 	bzf .wraparound
-.nowraparound:
 	b .done
 .wraparound:
 	ld r1, [ub_ptr+1]
@@ -203,17 +205,9 @@ ubasic_get_next_token:
 	eq r1, #0
 	bzf .else2
 	mov r0, r1
-	ld r1, [ub_ptr]
-	add r1, r0
-	st [ub_nextptr], r1
-	ld r0, [ub_ptr+1]
-	st [ub_nextptr+1], r0
-	gt r1, #0
-	bzf .nocarry0
-	ld r0, [ub_ptr+1]
-	st [ub_nextptr+1], r0
-	add r0, #1
-.nocarry0:
+	push pch
+	push pcl
+	b ubasic_set_nextptr_ptr_plus_val
 	mov r0, TOKENIZER_NUMBER
 	b .done
 .else2:
@@ -731,6 +725,7 @@ ubasic_tokenizer_next:
 	st [ub_ptr+1], r0
 .nocarry:
 	st [ub_ptr], r1
+	b .loop0
 
 .n0:
 	push pch
@@ -754,9 +749,11 @@ ubasic_tokenizer_next:
 .mark:
 	mov r1, #1
 .bb:
+	push r1			; tokenizer_finished uses r1
 	push pch
 	push pcl
 	b ubasic_tokenizer_finished
+	pop r1
 	or r0, r1
 	eq r0, #0
 	bzf .inc_nextptr0
@@ -775,7 +772,7 @@ ubasic_tokenizer_next:
 	st [ub_nextptr+1], r0
 .aftercarry1:
 	st [ub_nextptr], r1
-	b .loop0
+	b .loop1
 
 .n1:
 	ldd r0, [ub_nextptr]
@@ -817,88 +814,40 @@ ubasic_tokenizer_num:
 	pop pcl
 	pop pch
 
-ub_tok_str_len: resb 1
-ub_tok_str_end_ptr: resb 2
-ub_tok_str_len_arg: resb 1
+ub_str_src: resb 2
 ubasic_tokenizer_string:
-	st [ub_tok_str_len_arg], r0
-	;push pch
-	;push pcl
-	;b ubasic_tokenizer_token
-	;eq r0, TOKENIZER_STRING
-	;bzf .cont
-	;b .done
-
-.cont:
-	ld r0, [ub_ptr+1]
+	; the string token at ub_ptr, without its quotes, into ub_string
 	ld r1, [ub_ptr]
+	ld r0, [ub_ptr+1]
 	add r1, #1
 	eq r1, #0
 	bzf .carry
-	b .nocarry
+	b .set
 .carry:
 	add r0, #1
-.nocarry:
-	push r0
-	push r1
-	push pch
-	push pcl
-	b str_chr_set
-	mov r0, #34
-	push pch
-	push pcl
-	b str_chr
-	st [ub_tok_str_end_ptr], r1
-	st [ub_tok_str_end_ptr+1], r0
-	eq r0, #0	; it's enough to test high byte here
-	bzf .done
-	; subtract low byte only as have max length < 256
-	ld r0, [ub_ptr]
-	sub r1, r0
-	sub r1, #1
-	st [ub_tok_str_len], r1
-;	ld r0, [ub_tok_str_len_arg]
-;	lt r0, r1
-;	bzf .arg_len
-;	b .next
-;.arg_len:
-;	st [ub_tok_str_len], r0
-;.next:
-	pop r1
-	pop r0
-
-	push r0
-	push r1
-
-	mov r0, #>[ub_string]
-	mov r1, #<[ub_string]
-	push r1
-	push r0
-
-;	push pch
-;	push pcl
-;	b mem_cpy_set0
-;	pop r1
-;	pop r0
-;	push pch
-;	push pcl
-;	b mem_cpy_set1
-	ld r0, [ub_tok_str_len]
-	push r0
-	push pch
-	push pcl
-	b mem_cpy
-	pop r0
+.set:
+	st [ub_str_src], r1
+	st [ub_str_src+1], r0
 	xor r1, r1
-	st [ub_string]+r0, r1
-.done:
+.loop:
+	ldd r0, [ub_str_src]+r1
+	eq r0, #34
+	bzf .end
+	eq r0, #0
+	bzf .end
+	eq r1, #39
+	bzf .end
+	st [ub_string]+r1, r0
+	add r1, #1
+	b .loop
+.end:
+	xor r0, r0
+	st [ub_string]+r1, r0
 	pop pcl
 	pop pch
 
 ubasic_tokenizer_finished:
-	ld r1, [ub_ptr]
-	ld r0, [ub_ptr+1]
-	or r0, r1
+	ldd r0, [ub_ptr]
 	eq r0, #0
 	bzf .eoi
 	ld r1, [ub_current_token]

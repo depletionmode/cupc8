@@ -1,7 +1,9 @@
 
 div_q: resb 1
 math_div:
-	; r0 = r0 / r1
+	; r0 = r0 / r1, r1 = remainder; dividing by 0 gives 0 remainder r0
+	eq r1, #0
+	bzf .by_zero
 	push r0
 	xor r0, r0
 	st [div_q], r0
@@ -19,6 +21,11 @@ math_div:
 .done:
 	mov r1, r0	; remainder
 	ld r0, [div_q]
+	pop pcl
+	pop pch
+.by_zero:
+	mov r1, r0
+	xor r0, r0
 	pop pcl
 	pop pch
 

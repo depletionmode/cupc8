@@ -2,7 +2,7 @@
 term_basic_prog_buf_idx: resb 1
 term_basic_prog_buf: resb 256
 
-term_line_buf: resb 40
+term_line_buf: resb 80
 
 term_do:
 	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n"
@@ -28,7 +28,7 @@ term_do:
 	pop pch
 
 term_token_num: resb 1
-term_token_buf: resb 40
+term_token_buf: resb 80
 term_get_token:
 	; r0 - token number
 	push r0
@@ -261,6 +261,15 @@ term_cmd_clr:
 
 term_basic_prog_ptr: resb 2
 term_cmd_basicline:
+	; the line (rs_i characters, its CR and a 0) must fit the 256-byte buffer
+	ld r0, [rs_i]
+	add r0, #2
+	ld r1, [term_basic_prog_buf_idx]
+	add r0, r1
+	lt r0, r1			; wrapped past 255
+	bzf .full
+	eq r0, #255
+	bzf .full
 	mov r0, #>[term_basic_prog_buf]
 	st [term_basic_prog_ptr+1], r0
 	mov r1, #<[term_basic_prog_buf]
@@ -292,7 +301,14 @@ term_cmd_basicline:
 	ld r1, [term_basic_prog_buf_idx]
 	add r1, r0
 	st [term_basic_prog_buf_idx], r1
-
+	b .done
+.full:
+	term_s_full db "\nPROGRAM FULL\n"
+	mov r0, #>[term_s_full]
+	mov r1, #<[term_s_full]
+	push pch
+	push pcl
+	b str_printstr
 .done:
 	pop pcl
 	pop pch

@@ -1,4 +1,4 @@
--- Lockstep trace testbench for cpu.vhd (tests CPU-001, BUS-001).
+-- Lockstep trace testbench for cpu.vhd (tests CPU-001, BUS-001, BUS-003).
 --
 -- A chipset model answers the CPU bus (doc/hardware/cpu-bus.md): 64 KB RAM,
 -- IRQ_PEND/IRQ_MASK at $f200/$f201, TMR_EXP latching, and WAITS wait states
@@ -11,6 +11,12 @@
 --
 -- The CPU resets to $e000; a `b $1000` planted there reaches the image, and
 -- tracing starts at the first fetch from $1000 (where sim.nim starts).
+--
+-- BUS-003 options: STALL > 0 adds, to one cycle in eight, a stall of up to
+-- STALL clocks. RESET_AT > 0 pulls /CPU_RST in the middle of a bus cycle once,
+-- at that cycle count or at the HALT fetch if that comes first; memory goes
+-- back to the image and only the run after the reset is traced, so it must
+-- match sim.nim exactly.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -22,7 +28,9 @@ entity tb_cpu_trace is
 		IMAGE:		string := "image.hex";	-- one hex byte per line, loaded at $1000
 		WAITS:		integer := 0;
 		SEED:		natural := 1;
-		MAX_CYCLES:	natural := 20_000_000
+		MAX_CYCLES:	natural := 20_000_000;
+		STALL:		natural := 0;
+		RESET_AT:	natural := 0
 	);
 end entity;
 
@@ -75,14 +83,6 @@ begin
 	clk <= not clk after 5 ns when not done;
 	irq <= pending and mask;
 
-	rst: process
-	begin
-		for i in 1 to 5 loop
-			wait until rising_edge(clk);
-		end loop;
-		n_rst <= '1';
-		wait;
-	end process;
 
 	chipset: process(clk)
 		type mem_t is array(0 to 65535) of std_logic_vector(7 downto 0);
@@ -101,6 +101,9 @@ begin
 		variable b: std_logic_vector(7 downto 0);
 		variable ld: natural := 16#1000#;
 		variable op: std_logic_vector(7 downto 0);
+		variable mem_at_power_on: mem_t;		-- for RESET_AT (not "image": VHDL would take it for IMAGE)
+		variable rst_count: natural := 5;		-- clocks of /CPU_RST still to hold
+		variable reset_done: boolean := RESET_AT = 0;
 	begin
 		if not loaded then
 			loaded := true;
@@ -116,11 +119,18 @@ begin
 			end loop;
 			file_close(f);
 			image_end := ld;
+			mem_at_power_on := mem;
 		end if;
 
 		if rising_edge(clk) and not done then
 			cycles := cycles + 1;
 			p := pending;
+			if rst_count > 0 then
+				rst_count := rst_count - 1;
+				n_rst <= '0';
+			else
+				n_rst <= '1';
+			end if;
 			d_in <= (others => 'X');
 			n_rdy <= '1';
 
@@ -153,8 +163,28 @@ begin
 					lfsr := lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
 					count := to_integer(lfsr(3 downto 0));
 				end if;
-				if sync = '1' then
-					if pc = x"1000" then started := true; end if;
+				if STALL > 0 then
+					lfsr := lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
+					if lfsr(2 downto 0) = "000" then
+						count := count + to_integer(lfsr(15 downto 8)) mod (STALL + 1);
+					end if;
+				end if;
+				-- BUS-003: one reset in the middle of a cycle, then a clean rerun
+				if not reset_done and (cycles >= RESET_AT or
+				                      (sync = '1' and mem(cyc_a)(7 downto 3) = "11111")) then
+					reset_done := true;
+					emit("R reset in the cycle at $" & hx(std_logic_vector(to_unsigned(cyc_a, 16))) &
+						 ", clock " & integer'image(cycles));
+					rst_count := 3;
+					n_rst <= '0';
+					busy := false;
+					started := false;
+					mem := mem_at_power_on;
+					p := "0000";
+					mask <= "0000";
+				end if;
+				if sync = '1' and busy then
+					if pc = x"1000" and reset_done then started := true; end if;
 					if started then
 						emit("S " & hx(pc) & " " & hx(r0) & " " & hx(r1) & " " &
 							 hx("00" & fl) & " " & hx(sp));

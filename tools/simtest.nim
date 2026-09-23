@@ -1046,6 +1046,96 @@ proc testKernelOnCards() =
 
 run testKernelOnCards
 
+proc settle(limit = 2_000_000) =
+  var n = 0
+  while n < limit and not waiting:
+    if cpuStep() != sOk: break
+    inc n
+
+proc typeLine(line: string) =
+  for ch in line & "\r":
+    pushKey(ord(ch))
+    var m = 0
+    while m < 400_000 and not waiting:
+      if cpuStep() != sOk: break
+      inc m
+    if waiting:
+      discard cpuStep()          # let WAI see the IRQ
+  settle(20_000_000)
+
+proc basicRun(rom: string; prog: openArray[string]): seq[string] =
+  ## Boot, type the program and RUN it; the screen lines between "run" and
+  ## "DONE." (blank lines dropped).
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  for line in prog:
+    typeLine(line)
+  typeLine("run")
+  let g = gpuCard()
+  var rows: seq[string]
+  for row in 0..29:
+    rows.add(gpuLine(g, row))
+  var start = -1
+  for i in countdown(rows.high, 0):
+    if rows[i].endsWith(">> run"):
+      start = i
+      break
+  if start < 0:
+    return @["<no run on screen>"]
+  for i in start + 1 .. rows.high:
+    if rows[i] == "DONE.":
+      return
+    if rows[i].len > 0:
+      result.add(rows[i])
+  result.add("<no DONE.>")
+
+proc testBasicPrograms() =
+  ## KRN-003: BASIC programs typed into the real kernel give the output
+  ## worked out by hand (uBASIC semantics, 8-bit values that wrap).
+  echo "== BASIC programs =="
+  let rom = buildKernelRom()
+  let cases: seq[(string, seq[string], seq[string])] = @[
+    ("precedence", @["10 print 1+2*3"], @["7"]),
+    ("8-bit wrap", @["10 print 200+100"], @["44"]),
+    ("division", @["10 print 17/5", "20 print 20-3*4"], @["3", "8"]),
+    ("string", @["10 print \"hello\""], @["hello"]),
+    ("variables", @["10 let a = 7", "20 let b = a * 3", "30 print b - a"], @["14"]),
+    ("for/next", @["10 for i = 1 to 4", "20 print i", "30 next i"], @["1", "2", "3", "4"]),
+    ("if/then/else", @["10 let a = 7", "20 if a > 5 then print 1 else print 0",
+                       "30 if a < 5 then print 1 else print 0"], @["1", "0"]),
+    ("goto loop", @["10 let a = 0", "20 let a = a + 3", "30 if a < 9 then goto 20", "40 print a"], @["9"]),
+    ("gosub", @["10 gosub 100", "20 print 2", "30 end", "100 print 1", "110 return"], @["1", "2"]),
+    ("nested for", @["10 for i = 1 to 2", "20 for j = 1 to 2", "30 print i * 10 + j",
+                     "40 next j", "50 next i"], @["11", "12", "21", "22"]),
+    # each of these pins one fixed bug (kernel/ubasic*.s, printf.s, math.s)
+    ("parentheses", @["10 print (1+2)*(3+4)", "20 print 2*(3+(4-1))"], @["21", "12"]),
+    ("equals", @["10 if 3 = 3 then print 1 else print 0", "20 if 3 = 4 then print 1 else print 0"],
+     @["1", "0"]),
+    ("spaces", @["10 print   1  +   2"], @["3"]),
+    ("zero", @["10 print 0", "20 print 5-5"], @["0", "0"]),
+    ("rem", @["10 rem nothing here", "20 print 4"], @["4"]),
+    ("mod, divide by 0", @["10 print 17 % 5", "20 print 7 / 0"], @["2", "0"]),
+    ("separators", @["10 print \"x\", 5", "20 print 1; 2"], @["x 5", "12"]),
+    ("let in then", @["10 if 1 < 2 then let a = 5 else let a = 6", "20 print a"], @["5"]),
+    ("gosub nest", @["10 gosub 100", "20 print 3", "30 end", "100 gosub 200", "110 print 2",
+                     "120 return", "200 print 1", "210 return"], @["1", "2", "3"]),
+    ("rem last", @["10 print 6", "20 rem the end"], @["6"]),
+    ("longest line", @["10 print " & "1+".repeat(34) & "1"], @["35"]),         # 78 characters
+    ("line cut at 78", @["10 print " & "1+".repeat(38) & "1"], @["35"]),        # the rest is dropped
+  ]
+  for (name, prog, want) in cases:
+    let got = basicRun(rom, prog)
+    if got == want:
+      ok("BASIC " & name)
+    else:
+      fail("BASIC " & name & ": got " & $got & ", want " & $want)
+  ioModel = imLegacy
+
+run testBasicPrograms
+
 proc testKernelNetwork() =
   ## KRN-004: the kernel's "net" command joins through the Wi-Fi card,
   ## connects to a server running in this process and prints the reply.

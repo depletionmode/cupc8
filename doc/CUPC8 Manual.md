@@ -79,6 +79,8 @@ Return is the same as a call return plus one extra pop for the flags:
 	pop pcl
 	pop pch
 
+*POP f* restores **I**, so an IRQ still pending is taken right after it, inside the epilogue and before the return. This nests correctly: the new handler pushes the address of the *POP pcl* (three more stack bytes), and its own return lands back in the epilogue, which then completes. Interrupts can therefore nest one level per pending source; leave room on the stack for it.
+
 Sources are latched. *$f200* is the pending register (write-1-to-clear). *$f201* is the mask (1 = enabled). Reset leaves **I** and the mask clear; the kernel plants the vectors and *STI*s when it is ready.
 
 *WAI* stops fetching until an IRQ is accepted. If **I** is clear it is a *NOP*. *HALT* still means stop forever.
@@ -146,7 +148,7 @@ Address | Operation | Description
 *$f200* | STORE | Write-1-to-clear pending bits
 *$f201* | LOAD/STORE | Mask (1 = enabled)
 
-*TMR0* / *TMR1* load an 8-bit countdown (immediate or register). The value decrements after every retired instruction, including *WAI* waits. Crossing zero latches the matching timer IRQ. Writing 0 stops the timer without firing.
+*TMR0* / *TMR1* load an 8-bit countdown (immediate or register). The value decrements after every retired instruction, the *TMR* instruction itself included (so *TMR0 #1* fires as it retires, and *TMR0 #3* as the second instruction after it retires). While parked in *WAI* it keeps decrementing, once every 3 CPU clocks. Crossing zero latches the matching timer IRQ. Writing 0 stops the timer without firing.
 
 #### 3.4. Instruction Set Architecture
 The **CUPC/8** instruction set contains of 38 8-bit instructions plus a handful of later additions (*HALT*, *CLI*, *STI*, *WAI*, *TMR0*, *TMR1*, and *POP f*).
@@ -206,9 +208,9 @@ LDind|a4|M|LD Ra, $addr+Rb|Ra <= [addr + Rb]
 ST|a8|M|ST $addr, Rb|[addr] <= Rb
 STind|ac|M|ST $addr+Ra, Rb|[addr + Ra] <= Rb
 LDD|70|M|LDD Ra, $addr|Ra <= [[addr]]
-LDDind|74|M|LDD Ra, $addr+Rb|Ra <= [[addr + Rb]]
+LDDind|74|M|LDD Ra, $addr+Rb|Ra <= [[addr] + Rb] (the pointer at addr, plus Rb: 16-bit sum)
 STD|78|M|STD $addr, Rb|[[addr]] <= Rb
-STDind|7c|M|STD $addr + Ra, Rb|[[addr + Ra]] <= Rb
+STDind|7c|M|STD $addr + Ra, Rb|[[addr] + Ra] <= Rb (the pointer at addr, plus Ra: 16-bit sum)
 B|b0|F|B $addr|PC <= addr
 BZF|b8|F|BZF $addr|if ZF: PC <= addr
 EQr|00|R|EQ Ra, Rb|ZF <= Ra == Rb
@@ -216,7 +218,7 @@ EQi|04|I|EQ Ra, #imm|ZF <= Ra == imm
 GTr|08|R|GT Ra, Rb|ZF <= Ra > Rb
 GTi|0c|I|GT Ra, #imm|ZF <= Ra > imm
 LTr|10|R|LT Ra, Rb|ZF <= Ra < Rb
-LTi|14|I|LR Ra, #imm|ZF <= Ra < imm
+LTi|14|I|LT Ra, #imm|ZF <= Ra < imm
 ANDr|18|R|AND Ra, Rb|Ra <= Ra & Rb
 ANDi|1c|I|AND Ra, #imm|Ra <= Ra & imm
 ORr|20|R|OR Ra, Rb|Ra <= Ra \| Rb
@@ -228,7 +230,7 @@ NORi|3c|I|NOR Ra, #imm|Ra <= ~(Ra \| imm)
 ADDr|40|R|ADD Ra, Rb|Ra <= Ra + Rb
 ADDi|44|I|ADD Ra, #imm|Ra <= Ra + imm
 SUBr|48|R|SUB Ra, Rb|Ra <= Ra - Rb
-SUBi|6c|I|SUB Ra, #imm|Ra <= Ra - imm
+SUBi|4c|I|SUB Ra, #imm|Ra <= Ra - imm
 SHLr|60|R|SHL Ra, Rb|Ra <= Ra << Rb
 SHLi|64|I|SHL Ra, #imm|Ra <= Ra << imm
 SHRr|68|R|SHR Ra, Rb|Ra <= Ra >> Rb
@@ -239,3 +241,18 @@ WAI|f0|R|WAI|wait until an IRQ is accepted (NOP if I = 0)
 HALT|f8|R|HALT|stop
 TMR0|e0|R/I|TMR0 Rb / TMR0 #imm|timer0 <= value
 TMR1|e8|R/I|TMR1 Rb / TMR1 #imm|timer1 <= value
+
+The immediate form of an instruction is always its register opcode plus 4 (bit 2 set).
+
+###### Special register operands
+*PUSH* and *POP* also take **pch**, **pcl** and **f**. These use the low three bits of the opcode byte, which would otherwise hold bit 2 and the register bits:
+
+Instruction | Byte | Operation
+:--- | :--- | :---
+PUSH pch|96|[SP] <= high byte of (address of this instruction + 5); SP <= SP + 1
+PUSH pcl|97|[SP] <= low byte of (address of this instruction + 4); SP <= SP + 1
+POP pcl|9f|SP <= SP - 1; pcl <= [SP]
+POP pch|9e|SP <= SP - 1; PC <= [SP]\|\|pcl (the jump that returns)
+POP f|9c|SP <= SP - 1; f <= [SP] (bit 0 **Z**, bit 1 **I**)
+
+A call is `PUSH pch` / `PUSH pcl` / `B target`: both pushes name the address just after the *B*. A return is `POP pcl` / `POP pch`. *PUSH f* does not exist: its byte, 94, is *PUSHi*.

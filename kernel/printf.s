@@ -33,7 +33,10 @@ read_string:
 	bzf .done
 	eq r0, #13
 	bzf .done
+  ; buffers are 80 bytes: 78 characters, then the CR and the terminator
   ld r1, [rs_i]
+  eq r1, #78
+  bzf .loop
   std [rs_msg_addr]+r1, r0
 	; check if echo
 	ld r1, [g_echo_char]
@@ -69,6 +72,7 @@ str_printuint8:
 	bzf .gt0
 	mov r1, #48
 	st [str_uint_buf], r1
+	mov r1, #1
 	b .done
 
 .gt0:
@@ -397,7 +401,10 @@ mem_cmp:
 	pop r1
 	st [mem_p_dst], r1
 
+  ; 0 when all r0 bytes are equal, else the first difference (dst - src),
+  ; like memcmp (it used to keep only the last byte's difference)
   xor r1, r1
+  st [mem_cmp_val], r1
 .loop:
   eq r1, r0
   bzf .done
@@ -407,9 +414,13 @@ mem_cmp:
   ldd r1, [mem_p_dst]+r1
   sub r1, r0
   st [mem_cmp_val], r1
+  eq r1, #0
   pop r1
-  add r1, #1
   pop r0
+  bzf .next
+  b .done
+.next:
+  add r1, #1
   b .loop
 
 .done:
@@ -506,7 +517,7 @@ str_chr:
 	ld r0, [str_chr_offset]
 	add r0, r1
 	st [str_chr_ptr], r0
-	lt r1, r0
+	lt r0, r1
 	bzf .carry
 	b .end
 .carry:

@@ -35,7 +35,7 @@ discrete-logic CPU card must both pass the same conformance testbench
 | Signal | Driver | Meaning |
 |---|---|---|
 | CPU_CLK | chipset | Bus clock |
-| /CPU_RST | chipset | Active-low reset. The chipset holds it from power-on until CDONE is high, then for 16 more CPU_CLK edges. The system card can assert it through the bridge (`CPU_CTL` bit 6), and so does the reset button (through the board's reset supervisor). While it is low the card must drive /STB high and must not drive D. |
+| /CPU_RST | chipset | Active-low reset. The chipset holds it from power-on until CDONE is high, then for 16 more CPU_CLK edges. The system card can assert it through the bridge (`CPU_CTL` bit 6), and so does the reset button (through the board's reset supervisor). Reset is synchronous: from the first CPU_CLK edge that samples it low, the card must drive /STB high and must not drive D, for as long as it stays low. |
 | A[15:0] | card | Address, valid while /STB is low |
 | RW | card | 1 = read, 0 = write, valid while /STB is low |
 | D[7:0] | both | Data. The card drives it only during write cycles. The chipset drives it only during read cycles, and only in the clock where it asserts /RDY. |
