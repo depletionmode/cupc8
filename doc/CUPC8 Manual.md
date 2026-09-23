@@ -28,6 +28,8 @@ The software stack consists of a monolithic kernel which provides drivers for th
 
 In addition to drivers and system functions, the kernel provides a 'terminal' interface which accepts a number of commands. A limited subset of BASIC is provided which allows BASIC programs to be executed directly from the terminal (in a non-interactive fashion).
 
+The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1-255, one-letter variables `a`-`z`, and a 256-byte program buffer (a line that does not fit is refused with `PROGRAM FULL`; a typed line is at most 78 characters). Statements: `let`, `print` (`,` prints a space, `;` nothing), `if ... then ... else`, `for ... to ... next`, `goto`, `gosub`/`return`, `rem`, `end`, and, because an 8-bit number cannot hold an address, `poke hi, lo, value` and `peek hi, lo, var` (the address is hi*256+lo; `poke 240, 0, n` sets the LEDs at $f000). Operators: `+ - * / % & |`, `< > =`, parentheses. Dividing by 0 gives 0.
+
 There is no compiler available for the CUPC/8 ISA. Development tools are cross-platform and consist of an assembler and a simulator which provides 1-to-1 simulation of the full computer (including display and input). The simulator can be executed natively or compiled to JavaScript (using emscripten) and run through a web browser.
 
 ## 3. Central Processing Unit

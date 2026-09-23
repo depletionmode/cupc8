@@ -63,3 +63,11 @@ before = "3de3a8c"
 files = ["soc/tb/models/sst39_model.vhd"]
 cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=BRG-002"
 must_fail = ["programmed $F0 reads"]
+
+[[bug]]
+name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on them)"
+fixed_in = "this commit's successor of 80c23a6"
+before = "80c23a6"
+files = ["kernel/ubasic.s"]
+cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
+must_fail = ["BASIC poke/peek", "BASIC poke expr", "GPO after poke 240, 0, 165"]

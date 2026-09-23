@@ -1124,6 +1124,9 @@ proc testBasicPrograms() =
     ("gosub nest", @["10 gosub 100", "20 print 3", "30 end", "100 gosub 200", "110 print 2",
                      "120 return", "200 print 1", "210 return"], @["1", "2", "3"]),
     ("rem last", @["10 print 6", "20 rem the end"], @["6"]),
+    ("poke/peek", @["10 poke 208, 0, 77", "20 peek 208, 0, a", "30 print a"], @["77"]),
+    ("poke expr", @["10 let h = 200", "20 poke h + 8, 1 * 5, 3 * 11", "30 peek 208, 5, b",
+                    "40 print b + 1"], @["34"]),
     ("longest line", @["10 print " & "1+".repeat(34) & "1"], @["35"]),         # 78 characters
     ("line cut at 78", @["10 print " & "1+".repeat(38) & "1"], @["35"]),        # the rest is dropped
   ]
@@ -1153,6 +1156,17 @@ proc testProgramFull() =
   ioModel = imLegacy
 
 run testProgramFull
+
+proc testBasicLeds() =
+  ## KRN-003: POKE reaches the I/O space: the GPO LEDs at $f000
+  echo "== BASIC poke to the LEDs =="
+  let rom = buildKernelRom()
+  let got = basicRun(rom, @["10 poke 240, 0, 165"])
+  expectTrue("program ran", got.len == 0)
+  expect("GPO after poke 240, 0, 165", mem[0xf000], 0xa5)
+  ioModel = imLegacy
+
+run testBasicLeds
 
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another

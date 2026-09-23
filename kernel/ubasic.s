@@ -1056,19 +1056,75 @@ ubasic_for_statement:
 	pop pch
 
 ub_mem_ptr: resb 2
-ubasic_peek_statement:
-;todo - need 16 bit number support first!
-;	st [ub_mem_ptr], r1
-;	st [ub_mem_ptr+1], r0
-;
-;	ldd r0, [ub_mem_ptr]
+ub_peek_var: resb 1
+; BASIC numbers are 8-bit, so an address is given as two: high byte, low byte
+;   poke hi, lo, value        [hi*256+lo] <= value
+;   peek hi, lo, var          var <= [hi*256+lo]
+ubasic_mem_address:
+	; hi "," lo "," -> ub_mem_ptr
+	push pch
+	push pcl
+	b ubasic_expr
+	push r0						; hi
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_expr
+	st [ub_mem_ptr], r0			; lo
+	pop r0
+	st [ub_mem_ptr+1], r0
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
+	pop pcl
+	pop pch
 
+ubasic_peek_statement:
+	mov r0, TOKENIZER_PEEK
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [ub_peek_var], r0
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
+	ldd r1, [ub_mem_ptr]
+	ld r0, [ub_peek_var]
+	push pch
+	push pcl
+	b ubasic_set_variable
+	push pch
+	push pcl
+	b ubasic_end_of_statement
 	pop pcl
 	pop pch
 
 ubasic_poke_statement:
-;todo - need 16 bit number support first!
-
+	mov r0, TOKENIZER_POKE
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_expr
+	std [ub_mem_ptr], r0
+	push pch
+	push pcl
+	b ubasic_end_of_statement
 	pop pcl
 	pop pch
 
