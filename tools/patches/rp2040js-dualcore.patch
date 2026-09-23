@@ -1,0 +1,339 @@
+diff --git i/src/cortex-m0-core.ts w/src/cortex-m0-core.ts
+index 24014c9..444035a 100644
+--- i/src/cortex-m0-core.ts
++++ w/src/cortex-m0-core.ts
+@@ -56,6 +56,7 @@ export class CortexM0Core {
+ 
+   eventRegistered = false;
+   waiting = false;
++  waitingForEvent = false;
+ 
+   // APSR fields
+   public N: boolean = false;
+@@ -418,6 +419,7 @@ export class CortexM0Core {
+       this.interruptsUpdated = true;
+       if (this.waiting && this.checkForInterrupts()) {
+         this.waiting = false;
++        this.waitingForEvent = false;
+       }
+     } else if (!value) {
+       this.pendingInterrupts &= ~irqBit;
+@@ -589,6 +591,7 @@ export class CortexM0Core {
+     if (this.interruptsUpdated) {
+       if (this.checkForInterrupts()) {
+         this.waiting = false;
++        this.waitingForEvent = false;
+       }
+     }
+     // ARM Thumb instruction encoding - 16 bits / 2 bytes
+@@ -1136,7 +1139,7 @@ export class CortexM0Core {
+     }
+     // SEV
+     else if (opcode === 0b1011111101000000) {
+-      this.logger.info(LOG_NAME, 'SEV');
++      this.rp2040.sendEvent();
+     }
+     // STMIA
+     else if (opcode >> 11 === 0b11000) {
+@@ -1300,6 +1303,7 @@ export class CortexM0Core {
+         this.eventRegistered = false;
+       } else {
+         this.waiting = true;
++        this.waitingForEvent = true;
+       }
+     }
+     // WFI
+diff --git i/src/peripherals/psm.ts w/src/peripherals/psm.ts
+new file mode 100644
+index 0000000..2d401c4
+--- /dev/null
++++ w/src/peripherals/psm.ts
+@@ -0,0 +1,50 @@
++import { BasePeripheral, Peripheral } from './peripheral.js';
++
++const FRCE_ON = 0x0;
++const FRCE_OFF = 0x4;
++const WDSEL = 0x8;
++const DONE = 0xc;
++
++const PROC1 = 1 << 16;
++
++/** Power-on state machine: only what multicore_reset_core1() needs. */
++export class RPPSM extends BasePeripheral implements Peripheral {
++  frceOn = 0;
++  frceOff = 0;
++  wdsel = 0;
++
++  readUint32(offset: number) {
++    switch (offset) {
++      case FRCE_ON:
++        return this.frceOn;
++      case FRCE_OFF:
++        return this.frceOff;
++      case WDSEL:
++        return this.wdsel;
++      case DONE:
++        return 0x1ffff & ~this.frceOff;
++    }
++    return super.readUint32(offset);
++  }
++
++  writeUint32(offset: number, value: number) {
++    switch (offset) {
++      case FRCE_ON:
++        this.frceOn = value & 0x1ffff;
++        return;
++      case FRCE_OFF: {
++        const released = this.frceOff & PROC1 && !(value & PROC1);
++        this.frceOff = value & 0x1ffff;
++        this.rp2040.core1Held = !!(this.frceOff & PROC1);
++        if (released) {
++          this.rp2040.resetCore1();
++        }
++        return;
++      }
++      case WDSEL:
++        this.wdsel = value & 0x1ffff;
++        return;
++    }
++    super.writeUint32(offset, value);
++  }
++}
+diff --git i/src/rp2040.ts w/src/rp2040.ts
+index 0b49915..57094f2 100644
+--- i/src/rp2040.ts
++++ w/src/rp2040.ts
+@@ -26,6 +26,7 @@ import { RPUART } from './peripherals/uart.js';
+ import { RPUSBController } from './peripherals/usb.js';
+ import { RPWatchdog } from './peripherals/watchdog.js';
+ import { RPSIO } from './sio.js';
++import { RPPSM } from './peripherals/psm.js';
+ import { ConsoleLogger, LogLevel, Logger } from './utils/logging.js';
+ 
+ export const FLASH_START_ADDRESS = 0x10000000;
+@@ -51,7 +52,16 @@ export class RP2040 {
+   readonly usbDPRAM = new Uint8Array(4 * KB);
+   readonly usbDPRAMView = new DataView(this.usbDPRAM.buffer);
+ 
+-  readonly core = new CortexM0Core(this);
++  readonly core0 = new CortexM0Core(this);
++  readonly core1 = new CortexM0Core(this);
++  readonly cores = [this.core0, this.core1];
++  /** the core executing the current instruction (0 outside step()) */
++  coreIndex = 0;
++  /** PSM FRCE_OFF holds core 1 off */
++  core1Held = false;
++  get core() {
++    return this.cores[this.coreIndex];
++  }
+ 
+   /* Clocks */
+   clkSys = 125 * MHz;
+@@ -141,7 +151,7 @@ export class RP2040 {
+     0x40004: new RP2040SysCfg(this, 'SYSCFG'),
+     0x40008: new RPClocks(this, 'CLOCKS_BASE'),
+     0x4000c: new RPReset(this, 'RESETS_BASE'),
+-    0x40010: new UnimplementedPeripheral(this, 'PSM_BASE'),
++    0x40010: new RPPSM(this, 'PSM_BASE'),
+     0x40014: new RPIO(this, 'IO_BANK0_BASE'),
+     0x40018: new UnimplementedPeripheral(this, 'IO_QSPI_BASE'),
+     0x4001c: new RPPADS(this, 'PADS_BANK0_BASE', 'bank0'),
+@@ -187,7 +197,8 @@ export class RP2040 {
+   }
+ 
+   reset() {
+-    this.core.reset();
++    this.core0.reset();
++    this.resetCore1();
+     this.pwm.reset();
+     this.flash.fill(0xff);
+   }
+@@ -355,7 +366,37 @@ export class RP2040 {
+   }
+ 
+   setInterrupt(irq: number, value: boolean) {
+-    this.core.setInterrupt(irq, value);
++    this.core0.setInterrupt(irq, value);
++    this.core1.setInterrupt(irq, value);
++  }
++
++  /** Core 1 restarts in the bootrom, where it waits for the FIFO launch sequence. */
++  resetCore1() {
++    const core1 = this.core1;
++    core1.registers.fill(0);
++    core1.VTOR = 0;
++    core1.PM = false;
++    core1.IPSR = 0;
++    core1.pendingInterrupts = 0;
++    core1.enabledInterrupts = 0;
++    core1.waiting = false;
++    core1.eventRegistered = false;
++    const saved = this.coreIndex;
++    this.coreIndex = 1;
++    core1.reset();
++    this.coreIndex = saved;
++  }
++
++  /** SEV: signal an event to both cores. */
++  sendEvent() {
++    for (const core of this.cores) {
++      core.eventRegistered = true;
++      if (core.waitingForEvent) {
++        core.waiting = false;
++        core.waitingForEvent = false;
++        core.eventRegistered = false;
++      }
++    }
+   }
+ 
+   updateIOInterrupt() {
+@@ -368,7 +409,24 @@ export class RP2040 {
+     this.setInterrupt(IRQ.IO_BANK0, interruptValue);
+   }
+ 
++  /** One instruction on each running core; returns the cycles that took. */
+   step() {
+-    this.core.executeInstruction();
++    let cycles = 0;
++    for (let i = 0; i < 2; i++) {
++      const core = this.cores[i];
++      if (core.waiting || (i === 1 && this.core1Held)) {
++        continue;
++      }
++      this.coreIndex = i;
++      this.sio.selectCore(i);
++      cycles = Math.max(cycles, core.executeInstruction());
++    }
++    this.coreIndex = 0;
++    this.sio.selectCore(0);
++    return cycles;
++  }
++
++  get waiting() {
++    return this.core0.waiting && (this.core1.waiting || this.core1Held);
+   }
+ }
+diff --git i/src/simulator.ts w/src/simulator.ts
+index da3da5b..1c1d311 100644
+--- i/src/simulator.ts
++++ w/src/simulator.ts
+@@ -19,12 +19,12 @@ export class Simulator implements IGDBTarget {
+     this.stopped = false;
+     const cycleNanos = 1e9 / 125_000_000; // 125 MHz
+     for (let i = 0; i < 1000000 && !this.stopped; i++) {
+-      if (rp2040.core.waiting) {
++      if (rp2040.waiting) {
+         const { nanosToNextAlarm } = clock;
+         clock.tick(nanosToNextAlarm);
+         i += nanosToNextAlarm / cycleNanos;
+       } else {
+-        const cycles = rp2040.core.executeInstruction();
++        const cycles = rp2040.step();
+         clock.tick(cycles * cycleNanos);
+       }
+     }
+diff --git i/src/sio.ts w/src/sio.ts
+index f0b14ae..5503438 100644
+--- i/src/sio.ts
++++ w/src/sio.ts
+@@ -2,6 +2,10 @@ import { RP2040 } from './rp2040.js';
+ import { Interpolator } from './interpolator.js';
+ 
+ const CPUID = 0x000;
++const FIFO_ST = 0x050;
++const FIFO_WR = 0x054;
++const FIFO_RD = 0x058;
++const FIFO_DEPTH = 8;
+ 
+ // GPIO
+ const GPIO_IN = 0x004; // Input value for GPIO pins
+@@ -87,6 +91,46 @@ export class RPSIO {
+   interp0 = new Interpolator(0);
+   interp1 = new Interpolator(1);
+ 
++  // each core has its own divider and interpolators; selectCore() swaps them in
++  private banks = [
++    { div: [0, 1, 0, 0, 0], interp0: this.interp0, interp1: this.interp1 },
++    { div: [0, 1, 0, 0, 0], interp0: new Interpolator(0), interp1: new Interpolator(1) },
++  ];
++  private bank = 0;
++
++  // fifo[n] is read by core n (written by the other core)
++  readonly fifo: number[][] = [[], []];
++  private fifoErr = [0, 0]; // bit 2 WOF, bit 3 ROE
++
++  selectCore(index: number) {
++    if (index === this.bank) {
++      return;
++    }
++    const out = this.banks[this.bank];
++    out.div = [this.divDividend, this.divDivisor, this.divQuotient, this.divRemainder, this.divCSR];
++    const bank = this.banks[index];
++    [this.divDividend, this.divDivisor, this.divQuotient, this.divRemainder, this.divCSR] =
++      bank.div;
++    this.interp0 = bank.interp0;
++    this.interp1 = bank.interp1;
++    this.bank = index;
++  }
++
++  private fifoStatus(core: number) {
++    const other = this.fifo[1 - core];
++    return (
++      (this.fifo[core].length ? 1 : 0) | (other.length < FIFO_DEPTH ? 2 : 0) | this.fifoErr[core]
++    );
++  }
++
++  private updateFifoIrq() {
++    // SIO_IRQ_PROC0 goes only to core 0's NVIC, SIO_IRQ_PROC1 only to core 1's
++    for (let core = 0; core < 2; core++) {
++      const level = !!(this.fifo[core].length || this.fifoErr[core]);
++      this.rp2040.cores[core].setInterrupt(15 + core, level);
++    }
++  }
++
+   constructor(private readonly rp2040: RP2040) {}
+ 
+   updateHardwareDivider(signed: boolean) {
+@@ -151,8 +195,18 @@ export class RPSIO {
+       case GPIO_HI_OE_XOR:
+         return 0; // TODO verify with silicone
+       case CPUID:
+-        // Returns the current CPU core id (always 0 for now)
+-        return 0;
++        return this.rp2040.coreIndex;
++      case FIFO_ST:
++        return this.fifoStatus(this.rp2040.coreIndex);
++      case FIFO_RD: {
++        const core = this.rp2040.coreIndex;
++        const value = this.fifo[core].shift();
++        if (value === undefined) {
++          this.fifoErr[core] |= 8;
++        }
++        this.updateFifoIrq();
++        return value ?? 0;
++      }
+       case SPINLOCK_ST:
+         return this.spinLock;
+       case DIV_UDIVIDEND:
+@@ -310,6 +364,21 @@ export class RPSIO {
+       case GPIO_HI_OE_XOR:
+         this.qspiGpioOutputEnable ^= value & GPIO_MASK;
+         break;
++      case FIFO_ST:
++        // writing clears the sticky WOF/ROE flags
++        this.fifoErr[this.rp2040.coreIndex] = 0;
++        this.updateFifoIrq();
++        break;
++      case FIFO_WR: {
++        const other = this.fifo[1 - this.rp2040.coreIndex];
++        if (other.length < FIFO_DEPTH) {
++          other.push(value >>> 0);
++        } else {
++          this.fifoErr[this.rp2040.coreIndex] |= 4;
++        }
++        this.updateFifoIrq();
++        break;
++      }
+       case DIV_UDIVIDEND:
+         this.divDividend = value;
+         this.updateHardwareDivider(false);

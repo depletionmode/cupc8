@@ -594,6 +594,15 @@ cmd = "make -s -C fw test_gpu"
 
 
 [[test]]
+id = "EMU-001"
+title = "RP2040 emulator: dual core"
+checks = "the patched rp2040js runs a real pico-sdk binary using core 1 launch, both inter-core FIFOs and their IRQ, CPUID, the ROE flag, and a hardware divider per core, with both cores dividing at once; stock rp2040js hangs on it"
+method = "fw/rp2040/selftest on test/emu/rp2040emu.mjs (tools/patches/rp2040js-dualcore.patch)"
+kind = "sim"
+vrow = "2.4"
+cmd = "tools/fw_rp2040.sh emu_selftest && node test/emu/run_selftest.mjs"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the PIO SPI slave accepts CUPC/8-timed frames at every clk_div"
