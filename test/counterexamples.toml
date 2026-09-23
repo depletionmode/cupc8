@@ -149,3 +149,10 @@ fixed_in = "3375762"
 revert = [["fw/wifi/core/wifi.c", "bool save = p < len && f[p];", "bool save = false;"]]
 cmd = "make -C fw test_wifi"
 must_fail = ["JOIN save=1 reached the backend as 0"]
+
+[[bug]]
+name = "wifi firmware: without LWIP_SO_RCVBUF, FIONREAD never counted received TCP data"
+fixed_in = "4d501f7"
+revert = [["fw/wifi/port/esp32c3/sdkconfig.defaults", "CONFIG_LWIP_SO_RCVBUF=y", "# CONFIG_LWIP_SO_RCVBUF is not set"]]
+cmd = "rm -rf build/esp32c3-qemu && tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
+must_fail = ["FAIL the status byte's RXREADY bit"]
