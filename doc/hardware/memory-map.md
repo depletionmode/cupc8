@@ -58,16 +58,17 @@ The cards are not fixed to slots. Software identifies them with `IDENT` (see
 
 | IRQ | Vector | Source |
 |---|---|---|
-| 0 | $0010 | **Slot IRQ**: rising edge of `OR(SLOT_IRQ)` (was: keyboard). The handler reads $f202 to find the slot. |
+| 0 | $0010 | **Slot IRQ**: a new assertion on any slot's IRQ_n (was: keyboard). The handler reads $f202 to find the slot. |
 | 1 | $0012 | Timer 0 |
 | 2 | $0014 | Timer 1 |
 | 3 | $0016 | SPI transaction complete |
 
-A card holds IRQ_n low until its condition clears. Because IRQ0 is
-edge-latched on the OR, a second card asserting while the first is still low
-does not create a new edge. Before returning, the handler therefore re-reads
-$f202 and services every set bit. It only clears the pending bit once $f202
-reads 0.
+A card holds IRQ_n low until its condition clears. IRQ0 latches when any
+slot line goes from released to asserted, each line on its own, so a card
+that holds its line low (unserviced events, say) never hides another card's
+IRQ. The handler clears the pending bit and services the slots $f202 shows;
+a line still held afterwards does not re-interrupt, and a new assertion
+anywhere does.
 
 ## ROM chip
 

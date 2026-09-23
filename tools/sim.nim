@@ -101,14 +101,17 @@ var
   romBank*: int = 0
   spiTxR, spiRxR, spiCfgR: array[8, int]
   spiHold*: int = -1             # device selected by SPI_CS, -1 = none
-  slotIrqAny: bool = false
+  slotIrqPrev: int = 0
   lastCardTick: int = 0
 
 proc simMillis*(): uint32 =
   ## Guest time: about one instruction per microsecond at 12 MHz.
   uint32(ins_retired div 1000)
 
+var heldSlotIrq*: int = 0       ## test hook: slots whose IRQ_n is held low (another card's)
+
 proc slotIrqBits*(): int =
+  result = heldSlotIrq and 0x3f
   for i in 0..5:
     if not slots[i].isNil and simcard_irq(slots[i]) != 0:
       result = result or (1 shl i)
@@ -142,10 +145,12 @@ proc cardsTick*() =
   for c in slots:
     if not c.isNil:
       simcard_tick(c, now)
-  let anyIrq = slotIrqBits() != 0
-  if anyIrq and not slotIrqAny:
+  # a new assertion on any slot line latches IRQ0, even while another card
+  # is still holding its own line low
+  let bits = slotIrqBits()
+  if (bits and not slotIrqPrev) != 0:
     raiseIrq(0)
-  slotIrqAny = anyIrq
+  slotIrqPrev = bits
   lastCardTick = ins_retired
 
 proc ioCard(): SimCard =
@@ -749,7 +754,7 @@ proc cpuReset*() =
     spiCfgR[i] = 0
   romOff = false
   romBank = 0
-  slotIrqAny = false
+  slotIrqPrev = 0
   lastCardTick = 0
 
 proc cpuLoadImage*(code: string) =

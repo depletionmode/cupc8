@@ -95,7 +95,7 @@ architecture rtl of chipset is
 	signal rom_off: std_logic := '0';
 	signal rom_bank: std_logic_vector(7 downto 0) := x"00";
 	signal slot_s1, slot_s2: std_logic_vector(5 downto 0) := (others => '0');
-	signal slot_any_d: std_logic := '0';
+	signal slot_s3: std_logic_vector(5 downto 0) := (others => '0');	-- previous slot_s2
 
 	-- SPI master
 	signal spi_start, spi_busy, spi_done: std_logic := '0';
@@ -170,7 +170,6 @@ begin
 		variable accept, is_io: boolean;
 		variable phys: unsigned(18 downto 0);
 		variable rom: std_logic;
-		variable slot_any: std_logic;
 		variable entry: std_logic_vector(31 downto 0);
 		variable tr_push, tr_pop: boolean;
 	begin
@@ -217,12 +216,12 @@ begin
 				tr_ovf <= '0';
 			else
 				------------------------------------------------------------ IRQ sources
+				-- IRQ0 latches a new assertion on any slot line, so a card
+				-- holding its line low cannot hide another card's IRQ
 				slot_s1 <= not slot_n_irq;
 				slot_s2 <= slot_s1;
-				slot_any := '0';
-				for i in 0 to 5 loop slot_any := slot_any or slot_s2(i); end loop;
-				if slot_any = '1' and slot_any_d = '0' then p(0) := '1'; end if;
-				slot_any_d <= slot_any;
+				slot_s3 <= slot_s2;
+				if (slot_s2 and not slot_s3) /= "000000" then p(0) := '1'; end if;
 				if cpu_tmr_exp(0) = '1' then p(1) := '1'; end if;
 				if cpu_tmr_exp(1) = '1' then p(2) := '1'; end if;
 				if spi_done = '1' then

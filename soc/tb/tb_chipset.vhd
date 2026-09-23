@@ -466,22 +466,26 @@ begin
 			expect(16#f200#, x"00", "W1C of bit 2");
 			wr(16#f201#, x"ff");
 			expect(16#f201#, x"0f", "mask upper bits read 0");
-			-- slot IRQs: $f202 is live, IRQ0 latches on the rising edge of the OR
+			-- slot IRQs: $f202 is live; IRQ0 latches a new assertion on any line
 			slot_n_irq <= "111011";						-- slot 3 (dev 2)
 			wait for 5 * T;
 			expect(16#f202#, x"04", "SLOT_IRQ live");
 			expect(16#f200#, x"01", "IRQ0 on slot IRQ");
 			wr(16#f200#, x"01");
+			wait for 5 * T;
+			expect(16#f200#, x"00", "a line still held does not re-interrupt");
 			slot_n_irq <= "011011";						-- a second card while the first holds
 			wait for 5 * T;
 			expect(16#f202#, x"24", "SLOT_IRQ with two cards");
-			expect(16#f200#, x"00", "no new edge while another card holds IRQ");
+			expect(16#f200#, x"01", "a second card's IRQ is latched while the first holds");
+			wr(16#f200#, x"01");
 			slot_n_irq <= "111111";
 			wait for 5 * T;
 			expect(16#f202#, x"00", "SLOT_IRQ released");
+			expect(16#f200#, x"00", "releasing does not latch");
 			slot_n_irq <= "111110";
 			wait for 5 * T;
-			expect(16#f200#, x"01", "a new edge after all released");
+			expect(16#f200#, x"01", "a new assertion after all released");
 			slot_n_irq <= "111111";
 			wr(16#f200#, x"0f");
 			wr(16#f201#, x"00");

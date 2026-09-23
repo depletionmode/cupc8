@@ -1136,6 +1136,27 @@ proc testBasicPrograms() =
 
 run testBasicPrograms
 
+proc testSlotIrqShared() =
+  ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another
+  ## card's IRQ: the kernel sleeps in WAI for keys, and every key must wake it.
+  echo "== slot IRQs shared =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  expectTrue("kernel ready for input", waiting)
+  heldSlotIrq = 0x04
+  typeLine("help")
+  let g = gpuCard()
+  expectTrue("typed while slot 3 held its IRQ", gpuFind(g, ">> help") >= 0)
+  expectTrue("the command ran", gpuFind(g, "NEW RUN CLR") >= 0)
+  heldSlotIrq = 0
+  ioModel = imLegacy
+
+run testSlotIrqShared
+
 proc testKernelNetwork() =
   ## KRN-004: the kernel's "net" command joins through the Wi-Fi card,
   ## connects to a server running in this process and prints the reply.
