@@ -52,3 +52,11 @@ target_compile_definitions(gpu PRIVATE DVI_VERTICAL_REPEAT=1 DVI_N_TMDS_BUFFERS=
 target_link_libraries(gpu pico_stdlib pico_multicore libdvi slotspi)
 # everything the scanline loop touches must not wait on flash
 pico_set_binary_type(gpu copy_to_ram)
+
+# IO card: TinyUSB host (HID keyboard) on the native port
+add_executable(io io/main.c ${FW}/io/core/iocard.c)
+cupc8_strict(io/main.c ${FW}/io/core/iocard.c)
+target_include_directories(io PRIVATE io ${FW}/io ${FW}/io/core)
+target_compile_definitions(io PRIVATE PICO_DEFAULT_UART_TX_PIN=16 PICO_DEFAULT_UART_RX_PIN=17)
+target_link_libraries(io pico_stdlib tinyusb_host slotspi)
+pico_enable_stdio_uart(io 1)

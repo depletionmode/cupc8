@@ -653,11 +653,12 @@ cmd = "make -s -C fw test_iocard"
 
 [[test]]
 id = "IOC-004"
-title = "Real binary: SPI side"
-checks = "GETKEY/READ frames against the real .elf"
-method = "rp2040js"
+title = "Real binary: USB host and SPI side"
+checks = "the real io.elf: TinyUSB host enumerates a low-speed and a full-speed boot keyboard (address, configuration, SET_PROTOCOL boot), Num Lock LED on at connect; typed text arrives through GETKEYS with the FIFO count in the status byte and IRQ_n asserted then released; Caps Lock gives capitals and drives the LED; a held key repeats after 500 ms every 30 ms; unplugging clears KBD_CONNECTED; the VBUS switch fault shows as VBUS_FAULT"
+method = "test/emu/test_io.mjs: the rp2040js patch's USB host controller (usb-host.ts) with a keyboard model (test/emu/usbkbd.mjs); the CPU side at the slot pins (slothost.mjs)"
 kind = "sim"
 vrow = "2.5"
+cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 
 # ============================================================================
 # WIFI: Wi-Fi card firmware

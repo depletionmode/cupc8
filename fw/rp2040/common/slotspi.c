@@ -54,8 +54,8 @@ static void rx_start(void)
 
 /* MISO for the next frame: the status byte, then the response if one is
  * ready and nothing that could change it is still queued or running (a READ
- * frame changes nothing). The SM must be stopped; the preload is in its TX
- * FIFO before it is enabled, so the status byte is there for the first edge. */
+ * frame changes nothing). The SM's first pull blocks, so it waits for the
+ * status byte if CS_n falls while this is still loading it. */
 static void arm_tx(void)
 {
 	uint32_t queued_frames = q_head - q_tail;
@@ -74,9 +74,6 @@ static void arm_tx(void)
 	channel_config_set_write_increment(&c, false);
 	channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
 	dma_channel_configure(dma_tx, &c, &pio->txf[sm], preload, (uint)n, true);
-	uint fill = n < 4 ? (uint)n : 4;
-	while (pio_sm_get_tx_fifo_level(pio, sm) < fill)
-		tight_loop_contents();
 }
 
 static bool is_command(uint32_t start)
@@ -165,11 +162,12 @@ void slotspi_refresh(void)
 {
 	uint32_t irq = save_and_disable_interrupts();
 	if (gpio_get(PIN_SLOT_NCS)) {
-		/* no frame in progress: offer the current status and response */
+		/* No frame in progress, so the SM is parked at `wait` (or, if CS_n
+		 * has just fallen, at the blocking first pull): swap its preload
+		 * for the current status and response without stopping it. */
 		dma_channel_abort(dma_tx);
-		sm_restart();
+		pio_sm_clear_fifos(pio, sm);
 		arm_tx();
-		pio_sm_set_enabled(pio, sm, true);
 	}
 	restore_interrupts(irq);
 }

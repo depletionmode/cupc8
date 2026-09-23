@@ -107,6 +107,7 @@ export class SlotHost {
         }
       }
       yield* this.deselect();
+      this.log.push({ mosi: [0xfe], miso: [status, len, ...data] });
       if (len === 0xff) return null;                  // empty slot
       if (len) return { status, data };
       yield retryNs;

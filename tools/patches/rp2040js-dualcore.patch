@@ -136,6 +136,478 @@ index 0000000..2d401c4
 +    super.writeUint32(offset, value);
 +  }
 +}
+diff --git i/src/peripherals/usb-host.ts w/src/peripherals/usb-host.ts
+new file mode 100644
+index 0000000..cb9ed18
+--- /dev/null
++++ w/src/peripherals/usb-host.ts
+@@ -0,0 +1,304 @@
++import { IAlarm } from '../clock/clock.js';
++import { RP2040 } from '../rp2040.js';
++
++/**
++ * A USB device plugged into the RP2040's port while it is in host mode.
++ * Every call is one transaction to `addr`/`ep`; the model answers with data,
++ * or 'nak' / 'stall'.
++ */
++export interface USBHostDevice {
++  /** 1 = low speed, 2 = full speed */
++  readonly speed: 1 | 2;
++  busReset(): void;
++  setup(addr: number, packet: Uint8Array): 'ack' | 'stall';
++  in(addr: number, ep: number, maxLen: number): Uint8Array | 'nak' | 'stall';
++  out(addr: number, ep: number, data: Uint8Array): 'ack' | 'nak' | 'stall';
++}
++
++// host DPRAM layout (usb_host_dpram_t)
++const SETUP_PACKET = 0x000;
++const INT_EP_CTRL = 0x008; // + 8 * n, n = 0..14 for interrupt endpoint n + 1
++const EPX_BUF_CTRL = 0x080;
++const INT_EP_BUF_CTRL = 0x088; // + 8 * n
++const EPX_CTRL = 0x100;
++
++// buffer control (per 16-bit half)
++const BUF_FULL = 1 << 15;
++const BUF_LAST = 1 << 14;
++const BUF_AVAILABLE = 1 << 10;
++const BUF_LEN_MASK = 0x3ff;
++
++// endpoint control
++const EP_DOUBLE_BUF = 1 << 30;
++const EP_INT_PER_BUF = 1 << 29;
++const EP_INT_PER_DOUBLE_BUF = 1 << 28;
++const EP_INTERVAL_SHIFT = 16;
++const EP_INTERVAL_MASK = 0x3ff;
++const EP_BUF_ADDR_MASK = 0xffc0;
++
++// SIE_CTRL
++export const SIE_CTRL_START_TRANS = 1 << 0;
++const SIE_CTRL_SEND_SETUP = 1 << 1;
++const SIE_CTRL_RECEIVE_DATA = 1 << 3;
++export const SIE_CTRL_RESET_BUS = 1 << 13;
++
++// SIE_STATUS
++export const SIE_STATUS_SPEED_SHIFT = 8;
++export const SIE_STATUS_SPEED_MASK = 3 << 8;
++const SIE_STATUS_TRANS_COMPLETE = 1 << 18;
++const SIE_STATUS_STALL_REC = 1 << 29;
++const SIE_STATUS_ACK_REC = 1 << 30;
++const SIE_STATUS_RX_TIMEOUT = 1 << 27;
++
++// INTR bits (host)
++const INTR_HOST_CONN_DIS = 1 << 0;
++const INTR_TRANS_COMPLETE = 1 << 3;
++const INTR_BUFF_STATUS = 1 << 4;
++const INTR_ERROR_DATA_SEQ = 1 << 5;
++const INTR_ERROR_RX_TIMEOUT = 1 << 6;
++const INTR_STALL = 1 << 10;
++
++const PACKET_NANOS = 20_000; // one transaction, roughly, at 12 Mb/s with overhead
++const NAK_RETRY_NANOS = 125_000;
++const FRAME_NANOS = 1_000_000;
++
++/** The host side of RPUSBController (MAIN_CTRL.HOST_NDEVICE). */
++export class USBHostController {
++  device: USBHostDevice | null = null;
++  connChanged = false;
++  sofNumber = 0;
++  intEpCtrl = 0;
++  readonly intEpAddr = new Uint32Array(15);
++  private readonly intEpPollDue = new Uint32Array(15);
++
++  // EPX: the one non-interrupt transfer in flight
++  private epxActive = false;
++  private epxIn = false;
++  private epxBuf = 0; // which half of a double buffer comes next
++  private epxAddr = 0;
++  private epxEp = 0;
++  private readonly epxAlarm: IAlarm;
++  private readonly setupAlarm: IAlarm;
++  private setupDone: (() => void) | null = null;
++  private readonly frameAlarm: IAlarm;
++
++  constructor(
++    private readonly rp2040: RP2040,
++    private readonly regs: {
++      get addrEndp(): number;
++      sieStatus: number;
++      buffStatus: number;
++      update(): void;
++    },
++  ) {
++    this.epxAlarm = rp2040.clock.createAlarm(() => this.epxService());
++    this.setupAlarm = rp2040.clock.createAlarm(() => {
++      const done = this.setupDone;
++      this.setupDone = null;
++      done?.();
++    });
++    this.frameAlarm = rp2040.clock.createAlarm(() => this.frame());
++  }
++
++  private get dpram() {
++    return this.rp2040.usbDPRAMView;
++  }
++
++  attach(device: USBHostDevice) {
++    this.device = device;
++    this.setSpeed(device.speed);
++    this.frameAlarm.schedule(FRAME_NANOS);
++  }
++
++  detach() {
++    this.device = null;
++    this.epxActive = false;
++    this.setSpeed(0);
++  }
++
++  private setSpeed(speed: number) {
++    this.regs.sieStatus =
++      (this.regs.sieStatus & ~SIE_STATUS_SPEED_MASK) | (speed << SIE_STATUS_SPEED_SHIFT);
++    this.connChanged = true;
++    this.regs.update();
++  }
++
++  /** host-mode INTR bits */
++  get intRaw() {
++    const s = this.regs.sieStatus;
++    return (
++      (this.connChanged ? INTR_HOST_CONN_DIS : 0) |
++      (s & SIE_STATUS_TRANS_COMPLETE ? INTR_TRANS_COMPLETE : 0) |
++      (this.regs.buffStatus ? INTR_BUFF_STATUS : 0) |
++      (s & (1 << 31) ? INTR_ERROR_DATA_SEQ : 0) |
++      (s & SIE_STATUS_RX_TIMEOUT ? INTR_ERROR_RX_TIMEOUT : 0) |
++      (s & SIE_STATUS_STALL_REC ? INTR_STALL : 0)
++    );
++  }
++
++  /** SIE_CTRL written: returns the value it keeps (START_TRANS and RESET_BUS clear themselves) */
++  sieCtrlWritten(value: number) {
++    if (value & SIE_CTRL_RESET_BUS) {
++      this.device?.busReset();
++    }
++    if (value & SIE_CTRL_START_TRANS) {
++      const addr = this.regs.addrEndp & 0x7f;
++      const ep = (this.regs.addrEndp >> 16) & 0xf;
++      if (value & SIE_CTRL_SEND_SETUP) {
++        this.epxActive = false;
++        const packet = this.rp2040.usbDPRAM.slice(SETUP_PACKET, SETUP_PACKET + 8);
++        this.later(() => {
++          if (!this.device) {
++            this.status(SIE_STATUS_RX_TIMEOUT);
++          } else if (this.device.setup(addr, packet) === 'stall') {
++            this.status(SIE_STATUS_STALL_REC);
++          } else {
++            this.status(SIE_STATUS_TRANS_COMPLETE | SIE_STATUS_ACK_REC);
++          }
++        });
++      } else {
++        this.epxActive = true;
++        this.epxIn = !!(value & SIE_CTRL_RECEIVE_DATA);
++        this.epxBuf = 0;
++        this.epxAddr = addr;
++        this.epxEp = ep;
++        this.epxAlarm.schedule(PACKET_NANOS);
++      }
++    }
++    return value & ~(SIE_CTRL_START_TRANS | SIE_CTRL_RESET_BUS);
++  }
++
++  /** a DPRAM word was written */
++  dpramWritten(offset: number) {
++    if (offset === EPX_BUF_CTRL && this.epxActive) {
++      this.epxAlarm.schedule(PACKET_NANOS);
++    }
++  }
++
++  private later(fn: () => void) {
++    this.setupDone = fn;
++    this.setupAlarm.schedule(PACKET_NANOS);
++  }
++
++  private status(bits: number) {
++    this.regs.sieStatus |= bits;
++    this.regs.update();
++  }
++
++  private bufferDone(bit: number) {
++    this.regs.buffStatus |= bit;
++    this.regs.update();
++  }
++
++  // One packet on EPX, into or out of the buffer half that is available.
++  private epxService() {
++    if (!this.epxActive || !this.device) {
++      return;
++    }
++    const ctrl = this.dpram.getUint32(EPX_CTRL, true);
++    const double = !!(ctrl & EP_DOUBLE_BUF);
++    const half = double ? this.epxBuf : 0;
++    const shift = half ? 16 : 0;
++    const all = this.dpram.getUint32(EPX_BUF_CTRL, true);
++    let buf = (all >>> shift) & 0xffff;
++    if (!(buf & BUF_AVAILABLE)) {
++      return; // wait for the CPU to hand over the buffer
++    }
++    const len = buf & BUF_LEN_MASK;
++    const data = (ctrl & EP_BUF_ADDR_MASK) + half * 64;
++    let short = false;
++    if (this.epxIn) {
++      const r = this.device.in(this.epxAddr, this.epxEp, len);
++      if (r === 'nak') {
++        this.epxAlarm.schedule(NAK_RETRY_NANOS);
++        return;
++      }
++      if (r === 'stall') {
++        this.epxActive = false;
++        this.status(SIE_STATUS_STALL_REC);
++        return;
++      }
++      this.rp2040.usbDPRAM.set(r.subarray(0, len), data);
++      short = r.length < len;
++      buf = (buf & ~(BUF_AVAILABLE | BUF_LEN_MASK)) | BUF_FULL | Math.min(r.length, len);
++    } else {
++      const r = this.device.out(
++        this.epxAddr,
++        this.epxEp,
++        this.rp2040.usbDPRAM.slice(data, data + len),
++      );
++      if (r === 'nak') {
++        this.epxAlarm.schedule(NAK_RETRY_NANOS);
++        return;
++      }
++      if (r === 'stall') {
++        this.epxActive = false;
++        this.status(SIE_STATUS_STALL_REC);
++        return;
++      }
++      buf &= ~(BUF_AVAILABLE | BUF_FULL);
++    }
++    const last = !!(buf & BUF_LAST) || short;
++    const mask = 0xffff << shift;
++    this.dpram.setUint32(EPX_BUF_CTRL, ((all & ~mask) | (buf << shift)) >>> 0, true);
++    if (last) {
++      this.epxActive = false;
++    }
++    // per double buffer: one BUFF_STATUS after both halves (or a short/last first half)
++    const perDouble = double && !!(ctrl & EP_INT_PER_DOUBLE_BUF) && !(ctrl & EP_INT_PER_BUF);
++    if (!perDouble || half === 1 || last) {
++      this.bufferDone(1);
++    }
++    if (last) {
++      this.status(SIE_STATUS_TRANS_COMPLETE);
++      return;
++    }
++    if (double) {
++      this.epxBuf ^= 1;
++    }
++    this.epxAlarm.schedule(PACKET_NANOS);
++  }
++
++  // A 1 ms frame: poll the interrupt endpoints that are due.
++  private frame() {
++    if (!this.device) {
++      return;
++    }
++    this.sofNumber = (this.sofNumber + 1) & 0x7ff;
++    for (let n = 0; n < 15; n++) {
++      if (!(this.intEpCtrl & (1 << (n + 1)))) {
++        continue;
++      }
++      const ctrl = this.dpram.getUint32(INT_EP_CTRL + 8 * n, true);
++      const interval = ((ctrl >>> EP_INTERVAL_SHIFT) & EP_INTERVAL_MASK) + 1;
++      if (++this.intEpPollDue[n] < interval) {
++        continue;
++      }
++      this.intEpPollDue[n] = 0;
++      let buf = this.dpram.getUint32(INT_EP_BUF_CTRL + 8 * n, true);
++      if (!(buf & BUF_AVAILABLE)) {
++        continue;
++      }
++      const addr = this.intEpAddr[n] & 0x7f;
++      const ep = (this.intEpAddr[n] >> 16) & 0xf;
++      const out = !!(this.intEpAddr[n] & (1 << 25));
++      const len = buf & BUF_LEN_MASK;
++      const data = ctrl & EP_BUF_ADDR_MASK;
++      if (out) {
++        const r = this.device.out(addr, ep, this.rp2040.usbDPRAM.slice(data, data + len));
++        if (r !== 'ack') continue;
++        buf &= ~(BUF_AVAILABLE | BUF_FULL);
++        this.dpram.setUint32(INT_EP_BUF_CTRL + 8 * n, buf, true);
++        this.bufferDone(1 << (2 * (n + 1) + 1));
++      } else {
++        const r = this.device.in(addr, ep, len);
++        if (r === 'nak' || r === 'stall') continue;
++        this.rp2040.usbDPRAM.set(r.subarray(0, len), data);
++        buf = (buf & ~(BUF_AVAILABLE | BUF_LEN_MASK)) | BUF_FULL | Math.min(r.length, len);
++        this.dpram.setUint32(INT_EP_BUF_CTRL + 8 * n, buf, true);
++        this.bufferDone(1 << (2 * (n + 1)));
++      }
++    }
++    this.frameAlarm.schedule(FRAME_NANOS);
++  }
++}
+diff --git i/src/peripherals/usb.ts w/src/peripherals/usb.ts
+index 015f6ce..5445aca 100644
+--- i/src/peripherals/usb.ts
++++ w/src/peripherals/usb.ts
+@@ -2,6 +2,7 @@ import { IAlarm } from '../clock/clock.js';
+ import { IRQ } from '../irq.js';
+ import { RP2040 } from '../rp2040.js';
+ import { BasePeripheral } from './peripheral.js';
++import { SIE_STATUS_SPEED_MASK, USBHostController, type USBHostDevice } from './usb-host.js';
+ 
+ const ENDPOINT_COUNT = 16;
+ 
+@@ -26,7 +27,11 @@ const USB_BUF1_OFFSET = 64;
+ // USB Peripheral Register
+ const ADDR_ENDP = 0x0;
+ const MAIN_CTRL = 0x40;
++const SOF_RD = 0x48;
++const SIE_CTRL = 0x4c;
+ const SIE_STATUS = 0x50;
++const INT_EP_CTRL = 0x54;
++const USB_PWR = 0x78;
+ const BUFF_STATUS = 0x58;
+ const BUFF_CPU_SHOULD_HANDLE = 0x5c;
+ const USB_MUXING = 0x74;
+@@ -112,6 +117,11 @@ export class RPUSBController extends BasePeripheral {
+   private intForce = 0;
+   private sieStatus = 0;
+   private buffStatus = 0;
++  private sieCtrl = 0;
++  private usbPwr = 0;
++
++  /** host mode (MAIN_CTRL.HOST_NDEVICE): a device model on the port */
++  readonly host: USBHostController;
+ 
+   private readonly endpointReadAlarms: USBEndpointAlarm[];
+   private readonly endpointWriteAlarms: USBEndpointAlarm[];
+@@ -125,12 +135,48 @@ export class RPUSBController extends BasePeripheral {
+   readDelayMicroseconds = 10;
+   writeDelayMicroseconds = 10; // Determined empirically
+ 
++  get isHost() {
++    return !!(this.mainCtrl & HOST_NDEVICE);
++  }
++
+   get intStatus() {
+-    return (this.intRaw & this.intEnable) | this.intForce;
++    const raw = this.isHost ? this.host.intRaw : this.intRaw;
++    return (raw & this.intEnable) | this.intForce;
++  }
++
++  /** Plug a device into the port (host mode) */
++  attachDevice(device: USBHostDevice) {
++    this.host.attach(device);
++  }
++
++  detachDevice() {
++    this.host.detach();
+   }
+ 
+   constructor(rp2040: RP2040, name: string) {
+     super(rp2040, name);
++    // eslint-disable-next-line @typescript-eslint/no-this-alias
++    const ctl = this;
++    this.host = new USBHostController(rp2040, {
++      get addrEndp() {
++        return ctl.addrEndp;
++      },
++      get sieStatus() {
++        return ctl.sieStatus;
++      },
++      set sieStatus(v: number) {
++        ctl.sieStatus = v;
++      },
++      get buffStatus() {
++        return ctl.buffStatus;
++      },
++      set buffStatus(v: number) {
++        ctl.buffStatus = v;
++      },
++      update() {
++        ctl.checkInterrupts();
++      },
++    });
+     const clock = rp2040.clock;
+     this.endpointReadAlarms = [];
+     this.endpointWriteAlarms = [];
+@@ -163,7 +209,18 @@ export class RPUSBController extends BasePeripheral {
+   }
+ 
+   readUint32(offset: number) {
++    if (offset >= 0x04 && offset <= 0x3c) {
++      return this.host.intEpAddr[(offset >> 2) - 1];
++    }
+     switch (offset) {
++      case SOF_RD:
++        return this.host.sofNumber;
++      case SIE_CTRL:
++        return this.sieCtrl;
++      case INT_EP_CTRL:
++        return this.host.intEpCtrl;
++      case USB_PWR:
++        return this.usbPwr;
+       case ADDR_ENDP:
+         return this.addrEndp & 0b1111000000001111111;
+       case MAIN_CTRL:
+@@ -187,7 +244,20 @@ export class RPUSBController extends BasePeripheral {
+   }
+ 
+   writeUint32(offset: number, value: number) {
++    if (offset >= 0x04 && offset <= 0x3c) {
++      this.host.intEpAddr[(offset >> 2) - 1] = value;
++      return;
++    }
+     switch (offset) {
++      case SIE_CTRL:
++        this.sieCtrl = this.isHost ? this.host.sieCtrlWritten(value) : value;
++        break;
++      case INT_EP_CTRL:
++        this.host.intEpCtrl = value & 0xfffe;
++        break;
++      case USB_PWR:
++        this.usbPwr = value;
++        break;
+       case ADDR_ENDP:
+         this.addrEndp = value;
+         break;
+@@ -208,6 +278,15 @@ export class RPUSBController extends BasePeripheral {
+         }
+         break;
+       case SIE_STATUS:
++        if (this.isHost) {
++          // writing the SPEED bits acknowledges a connect/disconnect
++          if (this.rawWriteValue & SIE_STATUS_SPEED_MASK) {
++            this.host.connChanged = false;
++          }
++          this.sieStatus &= ~(this.rawWriteValue & SIE_WRITECLEAR_MASK & ~SIE_CONNECTED);
++          this.checkInterrupts();
++          break;
++        }
+         this.sieStatus &= ~(this.rawWriteValue & SIE_WRITECLEAR_MASK);
+         if (this.rawWriteValue & SIE_BUS_RESET) {
+           this.onResetReceived?.();
+@@ -243,6 +322,10 @@ export class RPUSBController extends BasePeripheral {
+   }
+ 
+   DPRAMUpdated(offset: number, value: number) {
++    if (this.isHost) {
++      this.host.dpramWritten(offset);
++      return;
++    }
+     if (
+       value & USB_BUF_CTRL_AVAILABLE &&
+       offset >= EP0_IN_BUFFER_CONTROL &&
+@@ -319,7 +402,7 @@ export class RPUSBController extends BasePeripheral {
+     this.indicateBufferReady(endpoint, true);
+   }
+ 
+-  private checkInterrupts() {
++  checkInterrupts() {
+     const { intStatus } = this;
+     this.rp2040.setInterrupt(IRQ.USBCTRL, !!intStatus);
+   }
 diff --git i/src/rp2040.ts w/src/rp2040.ts
 index 0b49915..c0341bc 100644
 --- i/src/rp2040.ts

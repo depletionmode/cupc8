@@ -3,14 +3,20 @@
 ; CS_n = GPIO 5, the same on every RP2040 card (slotspi.c checks pins.h).
 ; In: shift left, autopush at 8 bits. Out: shift left; X = 0, so `pull
 ; noblock` on an empty TX FIFO sends $00. The CPU restarts the machine at
-; `start` when CS_n rises.
+; `start` when CS_n rises. The first byte (the status byte, always preloaded)
+; is a blocking pull, so a preload the CPU is still refreshing when CS_n
+; falls is waited for (the host leaves 2 us before the first clock) instead
+; of the frame starting without it.
 
 .program slotspi
 public start:
     wait 0 gpio 5           ; CS_n low: a frame starts
     set pindirs, 1          ; drive MISO only while selected
+    pull block              ; the status byte
+    jmp first
 byte:
     pull noblock            ; the next MISO byte (in bits 31:24), or $00
+first:
     set y, 7
 bit:
     out pins, 1             ; MISO changes while SCK is low
