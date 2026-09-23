@@ -222,6 +222,10 @@ term_parse:
 	b str_cmp
 	gt r0, #0
 	bzf .num
+	mov r0, #<[term_line_buf]
+	st [net_line], r0
+	mov r0, #>[term_line_buf]
+	st [net_line+1], r0
 	push pch
 	push pcl
 	b net_cmd

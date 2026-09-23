@@ -1190,8 +1190,11 @@ proc testSlotIrqShared() =
 run testSlotIrqShared
 
 proc testKernelNetwork() =
-  ## KRN-004: the kernel's "net" command joins through the Wi-Fi card,
-  ## connects to a server running in this process and prints the reply.
+  ## KRN-004: the kernel's "net" command. "net join SSID PASSWORD" joins
+  ## through the Wi-Fi card and prints the address; "net get HOST PORT"
+  ## sends an HTTP/1.0 GET to a server running in this process and prints
+  ## the reply until the server closes; "net" shows the link; anything else
+  ## prints the usage.
   echo "== kernel networking =="
   let rom = buildKernelRom()
   machineCards([CardGpu, CardIo, CardWifi])
@@ -1200,7 +1203,6 @@ proc testKernelNetwork() =
   cpuBootRom()
   let g = gpuCard()
 
-  # a server on port 8088, which the kernel's net command connects to
   var server = newSocket()
   server.setSockOpt(OptReuseAddr, true)
   try:
@@ -1211,32 +1213,46 @@ proc testKernelNetwork() =
     return
   server.listen()
 
-  var n = 0
-  while n < 6_000_000 and not waiting:
-    if cpuStep() != sOk: break
-    inc n
+  proc runUntilShown(want: string, limit = 8_000_000): bool =
+    var n = 0
+    while n < limit:
+      if cpuStep() != sOk: break
+      inc n
+      if (n mod 5000) == 0 and gpuFind(g, want) >= 0:
+        return true
+    gpuFind(g, want) >= 0
+
+  settle(6_000_000)
   expectTrue("kernel ready for input", waiting)
 
-  for ch in "net" & "\r":
-    pushKey(ord(ch))
-    var m = 0
-    while m < 400_000 and not waiting:
-      if cpuStep() != sOk: break
-      inc m
-    if waiting:
-      discard cpuStep()
+  typeLine("net bogus")
+  expectTrue("an unknown subcommand prints the usage", runUntilShown("net join SSID PASSWORD", 400_000))
+
+  typeLine("net join cupc8 password")
+  expectTrue("net join prints the address", runUntilShown("joined, address 127.0.0.1"))
+  settle()
+  typeLine("net")
+  expectTrue("net shows the link", runUntilShown("link up, address 127.0.0.1", 2_000_000))
+  settle()
 
   # serve the request while the machine keeps running (never block: the CPU
   # only advances in this loop)
+  # everything but the Enter, which goes in below: the server must be
+  # serving while the command runs
+  for ch in "net get localhost 8088":
+    pushKey(ord(ch))
+    settle(400_000)
+    if waiting: discard cpuStep()
+  pushKey(13)
   var client: Socket
   var accepted = false
+  var request = ""
   var served = false
-  n = 0
-  while n < 8_000_000:
+  var n = 0
+  while n < 12_000_000:
     if cpuStep() != sOk: break
     inc n
     if (n mod 1000) == 0:
-      # scanning the screen is costly, so only between socket polls
       if gpuFind(g, "CUPC8-OK") >= 0 or gpuFind(g, "net timeout") >= 0:
         break
       if not accepted:
@@ -1247,19 +1263,23 @@ proc testKernelNetwork() =
           client.getFd.setBlocking(false)
           accepted = true
       elif not served:
-        var buf = newString(64)
-        let got = client.getFd.recv(addr buf[0], 64, 0)
+        var buf = newString(256)
+        let got = client.getFd.recv(addr buf[0], 256, 0)
         if got > 0:
-          client.send("CUPC8-OK\r\n")
+          request.add(buf[0 ..< got])
+        if request.endsWith("\r\n\r\n"):
+          client.send("HTTP/1.0 200 OK\r\n\r\nCUPC8-OK\r\n")
+          client.close()
           served = true
-  expectTrue("server saw the request", served)
+  expectTrue("the request is an HTTP/1.0 GET with the host", request == "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n")
+  if request.len > 0 and request != "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n":
+    echo "  request: ", request.escape
   if gpuFind(g, "CUPC8-OK") < 0:
     echo "screen:"
-    for row in 0..12:
+    for row in 0..29:
       let line = gpuLine(g, row)
       if line.len > 0: echo "  |" & line
-  expectTrue("reply printed on screen", gpuFind(g, "CUPC8-OK") >= 0)
-  if served: client.close()
+  expectTrue("the reply is printed up to the server closing", gpuFind(g, "CUPC8-OK") >= 0 and gpuFind(g, "HTTP/1.0 200 OK") >= 0)
   server.close()
   ioModel = imLegacy
 
