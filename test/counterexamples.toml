@@ -126,3 +126,11 @@ before = "d7f6145"
 files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 must_fail = ["FAIL full-speed: typed \"Hello\""]
+
+[[bug]]
+name = "wifi core: CONNECT_HOST connected with no SNI, so TLS could not check the certificate name"
+fixed_in = "3fbe93d"
+before = "78b4e49"
+files = ["fw/wifi/core/wifi.c"]
+cmd = "make -C fw test_wifi"
+must_fail = ["CONNECT_HOST gave the backend SNI '(none)'"]
