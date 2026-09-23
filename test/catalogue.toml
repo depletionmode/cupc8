@@ -197,9 +197,10 @@ cmd = "python3 tools/formal.py chipset prove"
 id = "BUS-005"
 title = "Cross-connector timing budget"
 checks = "card clock-to-out + connector + trace + chipset setup leaves ≥ 30% margin at 12 MHz, both directions"
-method = "hw/timing/cpubus_budget.py using nextpnr timing, connector data and extracted trace lengths"
+method = "hw/timing/cpubus_budget.py: nextpnr I/O delays of both placed designs, stated allowances for pads, clock insertion and minimum delays, and the trace lengths (layout limits until build/hw/cpubus_lengths.json is extracted)"
 kind = "static"
 vrow = "1.7"
+cmd = "python3 hw/timing/cpubus_budget.py"
 
 # ============================================================================
 # MMU: chipset address decode, GPO, SYSCTL, the memory bus
