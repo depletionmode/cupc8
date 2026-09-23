@@ -959,8 +959,32 @@ def jlc_fab(sch, pcb, comps, fab):
     return sorted({k[2] for k in groups})
 
 
+def order_spec(layers, card_edge):
+    """The JLC order options, written next to the Gerbers as order.json.
+    Cards (card_edge) are 1.6 mm with hard-gold fingers and a 45 degree
+    chamfer (milestone-1.md, Board thickness); check_order enforces it."""
+    spec = {"layers": layers, "thickness_mm": 1.6, "surface_finish": "ENIG", "min_hole_mm": 0.3,
+            "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
+            "gold_fingers": card_edge, "finger_finish": "hard gold" if card_edge else None,
+            "finger_chamfer_deg": 45 if card_edge else None}
+    if layers == 4:
+        spec["stackup"] = "JLC04161H-7628"
+    return spec
+
+
+def check_order(spec, card_edge):
+    bad = []
+    if spec["thickness_mm"] != 1.6:
+        bad.append("thickness %s mm, cards must be 1.6" % spec["thickness_mm"])
+    if card_edge and (not spec["gold_fingers"] or spec["finger_finish"] != "hard gold"
+                      or spec["finger_chamfer_deg"] != 45):
+        bad.append("card edge needs hard-gold fingers with a 45 degree chamfer")
+    if bad:
+        raise SystemExit("fab order: " + "; ".join(bad))
+
+
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
-             graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40):
+             graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> 3D renders. `schematic(path)` writes the sheet. Returns the LCSC
@@ -976,7 +1000,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         r = fn()
         print("ok" + (" (%s)" % r if r else ""))
 
-    step("schematic", lambda: schematic(sch))
+    step("schematic", lambda: schematic(sch, footprint_libs))
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
 
@@ -1023,6 +1047,14 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         state["lcsc"] = jlc_fab(sch, pcb, state["c"], fab)
         return "%d distinct parts" % len(state["lcsc"])
     step("JLC BOM + CPL", bom)
+
+    def order():
+        import json
+        spec = order_spec(layers, card_edge)
+        check_order(spec, card_edge)
+        with open(os.path.join(fab, "order.json"), "w") as f:
+            json.dump(spec, f, indent=2)
+    step("fab order spec", order)
 
     def render():
         for side in ("top", "bottom"):
