@@ -416,6 +416,15 @@ method = "tools/formal.py --mutants (the reset race: bus_rdy_in_cycle and RST-00
 kind = "formal"
 vrow = "1.4"
 cmd = "python3 tools/formal.py --mutants"
+
+[[test]]
+id = "MUT-002"
+title = "Counterexamples: every fixed bug fails its test when put back"
+checks = "for each entry in test/counterexamples.toml, the bug restored in a scratch worktree of HEAD makes its test fail with the expected messages"
+method = "tools/counterexamples.py (git worktree + pre-fix files or a revert of the fixed code)"
+kind = "sim"
+vrow = "4.0"
+cmd = "python3 tools/counterexamples.py"
 [[test]]
 id = "SYN-001"
 title = "Post-synthesis lockstep (Verilator netlist)"

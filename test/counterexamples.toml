@@ -1,0 +1,65 @@
+# Counterexamples: every fixed bug, put back, must make its test fail.
+#
+# tools/counterexamples.py checks out HEAD in a scratch worktree, puts the bug
+# back, runs `cmd`, and requires it to FAIL with every `must_fail` text in its
+# output. The bug goes back either as `files` restored from `before` (the
+# commit before the fix), or, where the fix came with test hooks that the old
+# file lacks, as `revert` pairs [file, fixed text, buggy text]. So each test
+# is proven to catch the bug it guards, and the bug cannot come back unseen.
+# (Bugs in the RTL are also covered by mutants: tools/formal.py --mutants.)
+
+[[bug]]
+name = "assembler: TMR0/TMR1 register in the Ra bit"
+fixed_in = "e635dbd"
+before = "f811788"
+files = ["tools/as.py"]
+cmd = "python3 test/asm/test_asm.py"
+must_fail = ["FAIL tmr0 r1"]
+
+[[bug]]
+name = "kernel BASIC: tokenizer, mem_cmp, precedence, strings, FOR/NEXT, jumps, REM, ELSE, 0, /0, long lines"
+fixed_in = "e635dbd"
+before = "f811788"
+files = ["kernel/ubasic.s", "kernel/ubasic_tokenizer.s", "kernel/printf.s", "kernel/math.s", "kernel/term.s"]
+cmd = "tools/run_tests.sh testBasicPrograms"
+must_fail = ["BASIC precedence", "BASIC string", "BASIC for/next", "BASIC if/then/else", "BASIC goto loop",
+             "BASIC gosub", "BASIC nested for", "BASIC parentheses", "BASIC equals", "BASIC zero",
+             "BASIC rem", "BASIC mod, divide by 0", "BASIC let in then", "BASIC gosub nest",
+             "BASIC longest line"]
+
+[[bug]]
+name = "kernel: the BASIC program buffer overflowed"
+fixed_in = "e635dbd"
+before = "f811788"
+files = ["kernel/term.s"]
+cmd = "tools/run_tests.sh testProgramFull"
+must_fail = ["the 8th line was refused"]
+
+[[bug]]
+name = "sim: a card holding IRQ_n hid another card's IRQ"
+fixed_in = "5d93868"
+revert = [["tools/sim.nim", """  let bits = slotIrqBits()
+  if (bits and not slotIrqPrev) != 0:
+    raiseIrq(0)
+  slotIrqPrev = bits""", """  let bits = slotIrqBits()
+  if bits != 0 and slotIrqPrev == 0:
+    raiseIrq(0)
+  slotIrqPrev = bits"""]]
+cmd = "tools/run_tests.sh testSlotIrqShared"
+must_fail = ["typed while slot 3 held its IRQ"]
+
+[[bug]]
+name = "chipset: a card holding IRQ_n hid another card's IRQ"
+fixed_in = "5d93868"
+before = "e635dbd"
+files = ["soc/chipset.vhd"]
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-002"
+must_fail = ["a second card's IRQ is latched while the first holds"]
+
+[[bug]]
+name = "ROM model: $F0 as program data taken for the ID-exit command"
+fixed_in = "f811788"
+before = "3de3a8c"
+files = ["soc/tb/models/sst39_model.vhd"]
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=BRG-002"
+must_fail = ["programmed $F0 reads"]
