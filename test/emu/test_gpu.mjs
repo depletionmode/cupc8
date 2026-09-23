@@ -272,6 +272,21 @@ if (!only || only === 'GPU-005') {
   g.push([0x25, ...u16(200), 100, 16, 2, 12, 0xff, 0xf0, 0x0f, 0xaa, 0x55]);
   send(g);
   compare('GPU-005-gfx', captureFrame(), golden(), false);
+
+  // the video survives SPI traffic at any moment: 200 frames at seeded
+  // random gaps (so some land in a porch, when PicoDVI's DMA interrupt has
+  // ~2 us to set up the next line), then the frame must still be golden
+  let seed = 12345;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  run(function* () {
+    for (let i = 0; i < 200; i++) {
+      yield 20000 + Math.floor(rnd() * 280000);
+      if (i % 2) yield* this.frame([0x00]);                       // a command: replay, refresh
+      else yield* this.read({ tries: 1 });                        // READ: the preload path
+    }
+  });
+  for (let i = 0; i < 200; i += 2) sent.push([0x00]);
+  compare('GPU-005-traffic', captureFrame(), golden(), false);
 }
 
 console.log(`${only ?? 'GPU-004/005'}: real gpu.elf on the emulated RP2040, ${checks} checks, ${bad} failures`);

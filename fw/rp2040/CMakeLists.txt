@@ -27,6 +27,11 @@ cupc8_strict(selftest/selftest.c)
 target_link_libraries(emu_selftest pico_stdlib pico_multicore)
 pico_enable_stdio_uart(emu_selftest 1)
 
+add_executable(emu_nested selftest/nested.c)
+cupc8_strict(selftest/nested.c)
+target_link_libraries(emu_nested pico_stdlib hardware_timer)
+pico_enable_stdio_uart(emu_nested 1)
+
 # the slot SPI slave shared by the RP2040 cards (each card's pins.h is on its
 # include path)
 add_library(slotspi INTERFACE)

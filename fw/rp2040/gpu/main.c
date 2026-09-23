@@ -200,6 +200,9 @@ int main(void)
 	/* the DVI DMA interrupt runs here, so core 1 only encodes: it has ~25 us
 	 * per scanline to run, and costs ~400 cycles a line */
 	dvi_register_irqs_this_core(&dvi0, DMA_IRQ_0);
+	/* the top priority: it must set up the next scanline's DMA within a
+	 * porch (~2 us), or the lanes' control blocks get mixed up */
+	irq_set_priority(DMA_IRQ_0, 0);
 	dvi_start(&dvi0);
 
 	gpio_init(PIN_LED_ACT);

@@ -149,7 +149,10 @@ void slotspi_init(card_t *c, slotspi_status_fn status)
 	sm_restart();
 	arm_tx();
 	gpio_set_irq_enabled_with_callback(PIN_SLOT_NCS, GPIO_IRQ_EDGE_RISE, true, cs_rose);
-	irq_set_priority(IO_IRQ_BANK0, 0);              /* above everything else */
+	/* high, but below the GPU's PicoDVI DMA interrupt (priority 0), which
+	 * must never wait: it has a porch interval to set up the next scanline.
+	 * This one has the host's 20 us between frames. */
+	irq_set_priority(IO_IRQ_BANK0, 0x40);
 	pio_sm_set_enabled(pio, sm, true);
 }
 
@@ -160,7 +163,9 @@ void slotspi_busy(bool b)
 
 void slotspi_refresh(void)
 {
-	uint32_t irq = save_and_disable_interrupts();
+	/* only CS_n's interrupt shares this state: mask it alone, never the
+	 * video's (see slotspi_init) */
+	irq_set_enabled(IO_IRQ_BANK0, false);
 	if (gpio_get(PIN_SLOT_NCS)) {
 		/* No frame in progress, so the SM is parked at `wait` (or, if CS_n
 		 * has just fallen, at the blocking first pull): swap its preload
@@ -169,7 +174,7 @@ void slotspi_refresh(void)
 		pio_sm_clear_fifos(pio, sm);
 		arm_tx();
 	}
-	restore_interrupts(irq);
+	irq_set_enabled(IO_IRQ_BANK0, true);
 }
 
 void slotspi_update_irq(void)
@@ -189,12 +194,12 @@ int slotspi_poll(void)
 			card_mosi(card, ring[i % RING_SIZE]);
 		}
 		card_select(card, false);
-		uint32_t irq = save_and_disable_interrupts();
+		irq_set_enabled(IO_IRQ_BANK0, false);
 		replayed_bytes += end - start;
 		q_commands -= is_command(start);
 		q_tail++;
 		busy = false;
-		restore_interrupts(irq);
+		irq_set_enabled(IO_IRQ_BANK0, true);
 		n++;
 	}
 	if (n)
