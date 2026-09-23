@@ -520,6 +520,26 @@ cs_off:
 	pop pcl
 	pop pch
 
+; busy-wait at least 5 ms (V_TMP x 256 inner loops at 12 MHz)
+wait_5ms:
+	mov r0, #24
+	st V_TMP, r0
+.outer:
+	mov r0, #0
+.inner:
+	add r0, #1
+	lt r0, #0xff
+	bzf .inner
+	ld r0, V_TMP
+	sub r0, #1
+	st V_TMP, r0
+	eq r0, #0
+	bzf .done
+	b .outer
+.done:
+	pop pcl
+	pop pch
+
 ; probe slot V_DEV - IDENT then a READ frame; fill in the slot table
 probe_slot:
 	ld r0, V_DEV
@@ -536,6 +556,9 @@ probe_slot:
 	push pch
 	push pcl
 	b cs_off
+	push pch
+	push pcl
+	b wait_5ms					; slot.md - the card needs >= 5 ms to answer
 
 	push pch
 	push pcl

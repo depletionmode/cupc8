@@ -12,7 +12,8 @@
     card reset SLOT [--hold|--release] | card flash SLOT FILE [--esp] [--addr A]
 
 The port is --port, or $CUPC8_PORT, or the first system card found on USB
-(VID:PID 1209:C8C8). tools/../build/fw/sysctl_sim serves a pseudo-terminal
+(VID:PID 1209:C8C8). tcp:HOST:PORT reaches the system card in the
+whole-machine emulator (test/emu/machine.mjs). tools/../build/fw/sysctl_sim serves a pseudo-terminal
 that stands in for the card (HOST-002, SYS-004). Slots are numbered 1-6 on
 the command line, as on the board; the protocol numbers them 0-5.
 """
@@ -73,7 +74,14 @@ class Sysctl:
     """The USB protocol: one request, one reply."""
 
     def __init__(self, port, timeout=10.0):
-        self.fd = os.open(port, os.O_RDWR | os.O_NOCTTY)
+        if port.startswith("tcp:"):
+            # the whole-machine emulator's system card (test/emu/machine.mjs)
+            host, _, p = port[4:].rpartition(":")
+            self.sock = socket.create_connection((host or "127.0.0.1", int(p)))
+            self.fd = self.sock.fileno()
+        else:
+            self.sock = None
+            self.fd = os.open(port, os.O_RDWR | os.O_NOCTTY)
         if os.isatty(self.fd):
             tty.setraw(self.fd)
             attrs = termios.tcgetattr(self.fd)
@@ -83,7 +91,10 @@ class Sysctl:
         self.buf = b""
 
     def close(self):
-        os.close(self.fd)
+        if self.sock:
+            self.sock.close()
+        else:
+            os.close(self.fd)
 
     def _read(self, n, deadline):
         while len(self.buf) < n:
@@ -98,7 +109,9 @@ class Sysctl:
         payload = bytes(payload)
         body = bytes([cmd]) + struct.pack("<H", len(payload)) + payload
         os.write(self.fd, bytes([MAGIC]) + body + bytes([crc8(body)]))
-        deadline = time.monotonic() + (timeout or self.timeout)
+        # CUPC8_TIMEOUT_SCALE: the whole-machine emulator runs slower than real time
+        scale = float(os.environ.get("CUPC8_TIMEOUT_SCALE", "1"))
+        deadline = time.monotonic() + (timeout or self.timeout) * scale
         while self._read(1, deadline)[0] != MAGIC:
             pass
         head = self._read(3, deadline)

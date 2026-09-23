@@ -39,6 +39,9 @@ def qemu(flash, strap, uart0, uart1=None):
 def main():
     bad = []
     tmp = tempfile.mkdtemp(prefix="espflash-")
+    image = os.path.join(tmp, "image.bin")          # a snapshot: the build may change meanwhile
+    with open(IMAGE, "rb") as src, open(image, "wb") as dst:
+        dst.write(src.read())
     flash = os.path.join(tmp, "flash.bin")
     with open(flash, "wb") as f:
         f.write(b"\xff" * (4 << 20))                     # a blank module from JLC
@@ -52,7 +55,7 @@ def main():
     time.sleep(1)
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "cupc8.py"), "--port", pty,
-                            "card", "flash", "5", IMAGE, "--esp", "--addr", "0", "--no-stub"],
+                            "card", "flash", "5", image, "--esp", "--addr", "0", "--no-stub"],
                            capture_output=True, text=True, timeout=1800)
         out = r.stdout + r.stderr
         if r.returncode or "ESP32 flashed" not in out:
@@ -67,7 +70,7 @@ def main():
 
     if not bad:
         written = open(flash, "rb").read()
-        img = open(IMAGE, "rb").read()
+        img = open(image, "rb").read()
         if written[:len(img)] != img:
             bad.append("the flash file doesn't hold the image")
         # boot what was written, as the card would after its reset

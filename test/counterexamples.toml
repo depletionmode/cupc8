@@ -177,3 +177,15 @@ revert = [["fw/rp2040/sysctl/main.c", """	int n = 0;
   ["fw/rp2040/sysctl/main.c", "	channel_config_set_dreq(&d, pio_get_dreq(uart_pio, uart_rx_sm, false));\n	dma_channel_configure((uint)rx_dma, &d, rx_ring, (const uint8_t *)&uart_pio->rxf[uart_rx_sm] + 3, 0xffffffffu, true);", "	(void)d;"]]
 cmd = "tools/fw_rp2040.sh sysctl && node test/emu/test_sysctl.mjs"
 must_fail = ["FAIL UART loopback across two UART_XFERs"]
+
+[[bug]]
+name = "gpu firmware: the slot SPI interrupt could delay PicoDVI's past its porch, cross-wiring the TMDS lanes"
+fixed_in = "9b4966c"
+revert = [
+  ["fw/rp2040/gpu/main.c", "	irq_set_priority(DMA_IRQ_0, 0);\n", ""],
+  ["fw/rp2040/common/slotspi.c", "	irq_set_priority(IO_IRQ_BANK0, 0x40);", "	irq_set_priority(IO_IRQ_BANK0, 0);"],
+  ["fw/rp2040/common/slotspi.c", "	irq_set_enabled(IO_IRQ_BANK0, false);\n	if (gpio_get(PIN_SLOT_NCS)) {", "	uint32_t irq = save_and_disable_interrupts();\n	if (gpio_get(PIN_SLOT_NCS)) {"],
+  ["fw/rp2040/common/slotspi.c", "		arm_tx();\n	}\n	irq_set_enabled(IO_IRQ_BANK0, true);", "		arm_tx();\n	}\n	restore_interrupts(irq);"],
+]
+cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
+must_fail = ["FAIL GPU-005-traffic"]

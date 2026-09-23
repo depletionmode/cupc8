@@ -1,7 +1,9 @@
 /* The QEMU build's stand-in for the slot SPI: frames over UART1. The host
  * sends $A5, len16 LE, then the MOSI bytes; the card answers $5A, len16, then
  * the same number of MISO bytes, which are exactly what the SPI slave would
- * have shifted out: the preload taken when the previous frame ended, then $00. */
+ * have shifted out: the preload taken when the previous frame ended, then $00.
+ * $A6 asks for that preload before a frame (the whole-machine emulator shifts
+ * it out bit by bit as the frame happens): the card answers $5B, len16, bytes. */
 #include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,7 +33,15 @@ static void uart_task(void *arg)
 	npreload = frames_preload(preload, sizeof preload);
 	for (;;) {
 		uint8_t h[3];
-		if (!read_all(h, 1) || h[0] != 0xA5 || !read_all(h + 1, 2))
+		if (!read_all(h, 1))
+			continue;
+		if (h[0] == 0xA6) {
+			uint8_t r[3] = { 0x5B, (uint8_t)npreload, (uint8_t)(npreload >> 8) };
+			uart_write_bytes(PORT, r, 3);
+			uart_write_bytes(PORT, preload, (size_t)npreload);
+			continue;
+		}
+		if (h[0] != 0xA5 || !read_all(h + 1, 2))
 			continue;
 		int len = h[1] | h[2] << 8;
 		if (len > FRAMES_MAX_LEN)
