@@ -110,3 +110,11 @@ revert = [
 ]
 cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-004"
 must_fail = ["FAIL the card"]
+
+[[bug]]
+name = "pins: the IO card's USB D+ was on GPIO 0 instead of the RP2040's USB pin"
+fixed_in = "c3b385c"
+before = "61af3a1"
+files = ["hw/pins.yaml"]
+cmd = "python3 hw/tools/pincheck.py"
+must_fail = ["USB_DP must be on the RP2040's dedicated USB_DP pin"]
