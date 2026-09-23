@@ -71,6 +71,7 @@ typedef struct {
 
 	uint8_t held;                     /* FPGAs held in reset: bit per target */
 	uint8_t reset_slots;              /* cards held in reset by CARD_RESET */
+	uint8_t prog_slots;               /* cards with PROG_n held low by CARD_PROG */
 } sysctl_t;
 
 void sysctl_init(sysctl_t *s, const sysctl_hal *hal, void *ctx);
@@ -106,6 +107,7 @@ bool fpga_done(sysctl_t *s, int target);
 /* USB-C source and the expanders (power.c) */
 uint8_t power_class_of(int cc1_mv, int cc2_mv);
 int card_reset(sysctl_t *s, int slot, bool hold);
+int card_prog(sysctl_t *s, int slot, bool low);
 void expander_apply(sysctl_t *s);
 bool cpu_card_present(sysctl_t *s);
 

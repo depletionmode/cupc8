@@ -61,6 +61,7 @@ typedef struct {
 	int loads;                            /* completed configurations */
 } ice40_t;
 
+/* expect: the one image that configures it; NULL: any image with the sync word */
 void ice40_init(ice40_t *m, w25q_t *flash, const uint8_t *expect, int len);
 void ice40_creset(ice40_t *m, bool level, uint64_t now);
 void ice40_tick(ice40_t *m, uint64_t now);

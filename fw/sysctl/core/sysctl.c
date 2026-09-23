@@ -19,7 +19,7 @@ enum {
 	C_FLASH_READ = 0x40, C_FLASH_ERASE = 0x41, C_FLASH_PROGRAM = 0x42, C_FLASH_ID = 0x43,
 	C_FPGA_HOLD = 0x44, C_FPGA_BOOT = 0x45,
 	C_POWER = 0x50, C_CARD_RESET = 0x52,
-	C_PROG_SELECT = 0x53, C_SWD_SEQ = 0x54, C_SWD_XFER = 0x55, C_UART_OPEN = 0x56, C_UART_XFER = 0x57,
+	C_CARD_PROG = 0x58, C_PROG_SELECT = 0x53, C_SWD_SEQ = 0x54, C_SWD_XFER = 0x55, C_UART_OPEN = 0x56, C_UART_XFER = 0x57,
 };
 
 static uint8_t reply_buf[4 + SYS_MAX_PAYLOAD + 1];
@@ -118,6 +118,10 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 		if (n != 2)
 			return ST_ARG;
 		return card_reset(s, p[0], p[1] != 0);
+	case C_CARD_PROG:
+		if (n != 2)
+			return ST_ARG;
+		return card_prog(s, p[0], p[1] != 0);
 	case C_RESET:
 		if (n != 0)
 			return ST_ARG;

@@ -20,6 +20,8 @@ typedef struct {
 	bool need_reset;                  /* woken: a line reset comes next */
 	bool selected;                    /* TARGETSEL named us since the last line reset */
 	int ones;                         /* consecutive 1s (line reset at 50) */
+	int since_reset;                  /* bits since the last line reset (-1: none yet) */
+	uint16_t to_dormant;              /* those bits, for the SWD-to-dormant code $E3BC */
 	uint8_t window[16];               /* the last 128 bits, for the alert */
 	int after_alert;                  /* bits seen after the alert (-1: none) */
 	uint8_t act;                      /* the activation code as it arrives */

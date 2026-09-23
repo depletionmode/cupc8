@@ -198,7 +198,15 @@ void ice40_tick(ice40_t *m, uint64_t now)
 	if (!m->booting || now - m->t_release < m->boot_us)
 		return;
 	m->booting = false;
-	m->cdone = memcmp(m->flash->mem, m->expect, (size_t)m->expect_len) == 0;
+	if (m->expect) {
+		m->cdone = memcmp(m->flash->mem, m->expect, (size_t)m->expect_len) == 0;
+	} else {
+		/* any bitstream: the iCE40 sync word near the start */
+		static const uint8_t sync[4] = { 0x7e, 0xaa, 0x99, 0x7e };
+		m->cdone = false;
+		for (int i = 0; i + 4 <= 32; i++)
+			m->cdone |= !memcmp(m->flash->mem + i, sync, 4);
+	}
 	if (m->cdone)
 		m->loads++;
 }

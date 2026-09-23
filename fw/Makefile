@@ -29,7 +29,7 @@ $(OUT)/test_wifi: test/test_wifi.c wifi/core/wifi.c wifi/host/netposix.c $(COMMO
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
 SYSCTL  := $(wildcard sysctl/core/*.c)
-$(OUT)/test_sysctl: test/test_sysctl.c test/sysmodels.c test/swdtarget.c $(SYSCTL) | $(OUT)
+$(OUT)/test_sysctl: test/test_sysctl.c test/sysmachine.c test/sysmodels.c test/swdtarget.c $(SYSCTL) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
 # IOC-002: recordings of real keyboards (tools/kbdrecord.py) through the IO core
@@ -38,6 +38,12 @@ $(OUT)/test_recorded: test/test_recorded.c io/core/iocard.c $(COMMON) | $(OUT)
 test_recorded: $(OUT)/test_recorded
 	cd .. && build/fw/test_recorded
 .PHONY: test_recorded
+
+# cupc8.py's stand-in for the system card: the sysctl core on the model machine
+$(OUT)/sysctl_sim: test/sysctl_sim.c test/sysmachine.c test/sysmodels.c test/swdtarget.c $(SYSCTL) | $(OUT)
+	$(CC) $(CFLAGS) $(INC) -o $@ $^
+sysctl_sim: $(OUT)/sysctl_sim
+.PHONY: sysctl_sim
 
 # the golden frames for the emulated graphics card tests (test/emu/test_gpu.mjs)
 $(OUT)/gpu_golden: test/gpu_golden.c gpu/core/gpu.c $(COMMON) | $(OUT)

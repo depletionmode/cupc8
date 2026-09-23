@@ -66,7 +66,7 @@ budgets and compares them with the advertised source current.
 |---|---|
 | 3.0 A Type-C current | Fully supported, with headroom for slots 4–6 |
 | 1.5 A Type-C current | Supported with the M1 cards |
-| Default USB power (500 mA USB 2 / 900 mA USB 3) | **Not enough** once the Wi-Fi card is fitted. sysctl reports "low-power source" over USB and blinks the power LED. It holds the Wi-Fi card in reset (CARD_RST_n) until you override it with `cupc8.py power --force`. |
+| Default USB power (500 mA USB 2 / 900 mA USB 3) | **Not enough** once the Wi-Fi card is fitted. The main board's comparator leaves `PWR_HI` low, and the kernel's `net` command refuses to start the radio ("USB power under 1.5A: net off"). This is the main board's policy, so it holds with or without the system card; sysctl only reports the class (`cupc8.py power`). |
 
 ## Checks (part of `make verify`, section E)
 

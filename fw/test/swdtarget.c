@@ -25,6 +25,7 @@ void swdt_init(swdt_t *t)
 	memset(t, 0, sizeof *t);
 	t->dormant = true;
 	t->after_alert = -1;
+	t->since_reset = -1;
 	memset(t->flash, 0xff, sizeof t->flash);
 	t->halted = false;                /* the card runs its firmware */
 }
@@ -344,7 +345,22 @@ void swdt_out(swdt_t *t, int bit)
 		t->selected = false;
 		t->phase = 0;
 		t->outq_n = t->outq_pos = 0;
+		t->since_reset = 0;
+		t->to_dormant = 0;
 		return;
+	}
+	/* SWD to dormant: $E3BC (LSB first) right after a line reset */
+	if (t->since_reset >= 0 && t->since_reset < 16) {
+		t->to_dormant |= (uint16_t)(bit << t->since_reset++);
+		if (t->since_reset == 16 && t->to_dormant == 0xE3BC) {
+			t->dormant = true;
+			t->need_reset = false;
+			t->selected = false;
+			t->phase = 0;
+			t->since_reset = -1;
+			memset(t->window, 0, sizeof t->window);
+			return;
+		}
 	}
 	if (t->need_reset)
 		return;

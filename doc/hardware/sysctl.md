@@ -86,6 +86,7 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 | $55 SWD_XFER | n × (request8 [, data32 for a write]) | n × (ack8 [, data32 for a read]) : stops after the first ack that isn't OK |
 | $56 UART_OPEN | baud32 (0 closes) | – : the port becomes a UART, SWCLK = card RX, SWDIO = card TX |
 | $57 UART_XFER | bytes to send | the bytes received since the previous UART_XFER |
+| $58 CARD_PROG | slot (0–5), low8 | – : drives that slot's PROG_n low (1) or releases it (0): with a CARD_RESET pulse, an ESP32 card starts in its ROM bootloader |
 
 $00 PING, $01 STATUS, $32, $4x and $5x work with the chipset down.
 

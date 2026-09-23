@@ -766,8 +766,9 @@ cmd = "python3 test/host/test_jlcparts.py"
 [[test]]
 id = "HOST-002"
 title = "cupc8.py end to end"
-checks = "every command works against the co-sim's modelled USB"
-method = "pytest + co-sim"
+checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read with wrap, CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; the results checked in the models' memory"
+method = "test/host/test_cupc8.py with build/fw/sysctl_sim --dump"
+cmd = "make -s -C fw sysctl_sim && python3 test/host/test_cupc8.py"
 kind = "sim"
 vrow = "2.8"
 

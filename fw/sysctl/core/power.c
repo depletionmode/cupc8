@@ -22,11 +22,12 @@ uint8_t power_class_of(int cc1_mv, int cc2_mv)
 
 void expander_apply(sysctl_t *s)
 {
-	/* a pin is an output (driving low) only while its card is held in reset;
-	 * otherwise it is an input and the board's pull-up runs the card */
-	uint8_t hold = s->reset_slots & 0x3F;
-	uint8_t out[3] = {0x02, (uint8_t)~hold, 0xFF};
-	uint8_t cfg[3] = {0x06, (uint8_t)~hold, 0xFF};
+	/* a pin is an output (driving low) only while its card is held in reset
+	 * (port 0) or in its bootloader (PROG_n, port 1); otherwise it is an
+	 * input and the board's pull-up runs the card */
+	uint8_t hold = s->reset_slots & 0x3F, prog = s->prog_slots & 0x3F;
+	uint8_t out[3] = {0x02, (uint8_t)~hold, (uint8_t)~prog};
+	uint8_t cfg[3] = {0x06, (uint8_t)~hold, (uint8_t)~prog};
 	s->hal->i2c_write(s->ctx, U0, out, 3);      /* output register first: no glitch */
 	s->hal->i2c_write(s->ctx, U0, cfg, 3);
 }
@@ -39,6 +40,18 @@ int card_reset(sysctl_t *s, int slot, bool hold)
 		s->reset_slots |= (uint8_t)(1u << slot);
 	else
 		s->reset_slots &= (uint8_t)~(1u << slot);
+	expander_apply(s);
+	return ST_OK;
+}
+
+int card_prog(sysctl_t *s, int slot, bool low)
+{
+	if (slot < 0 || slot > 5)
+		return ST_ARG;
+	if (low)
+		s->prog_slots |= (uint8_t)(1u << slot);
+	else
+		s->prog_slots &= (uint8_t)~(1u << slot);
 	expander_apply(s);
 	return ST_OK;
 }
