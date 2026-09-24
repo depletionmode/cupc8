@@ -1411,6 +1411,69 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     return n
 
 
+def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
+    """Pre-route a straight escape for each signal finger beside the key
+    notch: a locked track on the finger's own layer from its top to `rise` mm
+    above the tab. Those pads sit 0.2 mm from the notch's edge, which
+    Freerouting treats as a clearance violation, so it never starts a route
+    from them; it joins the track's end instead. `skip`: nets tied some other
+    way (the pour). Returns the count."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    n = 0
+    for fp in board.GetFootprints():
+        if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
+            continue
+        xs = sorted({round(to(p.GetPosition().x), 3) for p in fp.Pads()})
+        beside = {x for i, x in enumerate(xs)
+                  if (i > 0 and x - xs[i - 1] > 1.5) or (i + 1 < len(xs) and xs[i + 1] - x > 1.5)}
+        for pad in fp.Pads():
+            x = round(to(pad.GetPosition().x), 3)
+            if x not in beside or not pad.GetNetname() or pad.GetNetname() in skip \
+                    or pad.GetNetname().startswith("unconnected-"):
+                continue
+            tr = pcbnew.PCB_TRACK(board)
+            tr.SetStart(pcbnew.VECTOR2I(mm(x), mm(to(pad.GetBoundingBox().GetTop()) + width / 2)))
+            tr.SetEnd(pcbnew.VECTOR2I(mm(x), mm(tab_top - rise)))
+            tr.SetWidth(mm(width))
+            tr.SetLayer(pcbnew.F_Cu if pad.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu)
+            tr.SetNet(pad.GetNet())
+            tr.SetLocked(True)
+            board.Add(tr)
+            n += 1
+    return n
+
+
+def tab_via_keepout(board, tab_top, margin=1.0):
+    """A rule area with no vias over each card-edge footprint's finger tab,
+    from `tab_top` down past the tab's bottom: Freerouting otherwise drops
+    vias between and below the fingers, where the slot's contacts slide and
+    the bevel grinds. Tracks (the fingers' escapes) are still allowed."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    n = 0
+    for fp in board.GetFootprints():
+        if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
+            continue
+        bb = fp.GetBoundingBox(False)
+        x0, x1, y1 = to(bb.GetLeft()) - margin, to(bb.GetRight()) + margin, to(bb.GetBottom()) + margin
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowTracks(False)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        ol = z.Outline()
+        ol.NewOutline()
+        for px, py in ((x0, tab_top), (x1, tab_top), (x1, y1), (x0, y1)):
+            ol.Append(mm(px), mm(py))
+        board.Add(z)
+        n += 1
+    return n
+
+
 def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3, across=None):
     """Pre-route the presence link every card makes (PRSNT1_n on A1 joined
     to PRSNT2_n on the last B finger): up from A1 on B.Cu, across `rise` mm
@@ -1829,6 +1892,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3], across=pcbnew.In2_Cu if layers == 4 else None)
+            tab_via_keepout(b, outline[3])
+            key_escapes(b, outline[3], skip=zones)
         state["fanout"] = ground_fanout(b, zones[0])
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)

@@ -265,7 +265,7 @@ def main():
         "system", schematic, PLACEMENT, OUTLINE, out=sys.argv[1] if len(sys.argv) > 1 else None,
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
-        power_nets=(), edge=EDGE, card_edge=True, layers=4, fine_nets=FINE_NETS,
+        power_nets=(), edge=EDGE, card_edge=True, layers=4, fine_nets=FINE_NETS, passes=80,
         title="CUPC/8 system", revision=REVISION,
         # the pour reaches over the finger tops, so GND fingers join it
         zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
