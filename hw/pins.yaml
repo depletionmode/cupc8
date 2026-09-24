@@ -200,7 +200,8 @@ devices:
           - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
       debug:
         signals:
-          - {name: LED_KBD, gpio: 25, dir: out}
+          - {name: LED_KBD, gpio: 25, dir: out, note: keyboard connected}
+          - {name: LED_KEY, gpio: 24, dir: out, note: "keyboard activity: lit ~30 ms after each HID report"}
           - {name: UART_TX, gpio: 16, dir: out}
 
   wifi_mcu:
