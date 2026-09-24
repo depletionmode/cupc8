@@ -292,7 +292,7 @@ console with no ROM or kernel change. Everything they send (`MODE`, `CLS`,
 `PUTC`, `ATTR`, `FILL_RECT`) means the same on e-paper. `slot.md`'s type
 table becomes "$01 Graphics (HDMI or e-paper; `INFO` says which)".
 
-The other way is a new type **$04**, which would change the boot ROM's and
+The other way is a new type **$05** ($04 is the storage card, `storage-card.md`), which would change the boot ROM's and
 the kernel's card search (`eq r1, #1` → 1 or 4). A new type is more honest,
 but it touches the ROM for no gain that `INFO` doesn't also give. This is an
 open question.
@@ -592,7 +592,7 @@ Following the existing pattern, before anything is ordered:
    a Waveshare 7.5" HAT (about $57, cable included). Is the 5.83" (80 × 30
    exactly) or the 4.26" (sharp but tiny text) of interest, and should the
    SSD1677 driver be written up front?
-3. **Card type:** $01 with `INFO` (no ROM or kernel change), or a new $04
+3. **Card type:** $01 with `INFO` (no ROM or kernel change), or a new $05 ($04 is now the storage card)
    (a small ROM and kernel change, explicit in the slot table)?
 4. **Text geometry:** 80 × 30 centred with white margins (reuses the
    renderer; recommended), 80 columns in 10-pixel cells filling the width,
