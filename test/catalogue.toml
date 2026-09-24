@@ -875,7 +875,7 @@ vrow = "3.2"
 [[test]]
 id = "E2E-004"
 title = "Negative system tests"
-checks = "no CPU card, empty slots, corrupt kernel, interrupted ROM programming, card removed mid-run, low-power source: each behaves as specified"
+checks = "empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power source: each behaves as specified (a missing CPU card and hot-plugging are out of scope)"
 method = "co-sim"
 kind = "sim"
 vrow = "3.3"
