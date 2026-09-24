@@ -1475,6 +1475,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     os.makedirs(out, exist_ok=True)
     sch, pcb, pro = (os.path.join(out, name + e) for e in (".kicad_sch", ".kicad_pcb", ".kicad_pro"))
     state = {}
+    pour_nets = list(dict.fromkeys(z if isinstance(z, str) else z[0] for z in zones))
 
     def step(label, fn):
         print("%-28s" % label, end=" ", flush=True)
@@ -1501,13 +1502,15 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
-        state["fanout"] = ground_fanout(b, zones[0])
+        # every poured net's pads get a via: GND, and any net on a plane
+        # (build_board's (net, layers) zones), which is reached no other way
+        state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones))
+    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=pour_nets))
 
     def fill():
         x0, y0, x1, y1 = outline

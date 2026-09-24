@@ -90,7 +90,8 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   light an LED, so an MMBT3904 driven from 1V2 switches a red LED on 3V3.
   There are test pads for 1V2, 3V3 and GND.
 - **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold 45° fingers.
-  The layers are signal / GND plane / 3V3 plane / signal. With a TQ144 there
+  The layers are signal + GND pour / GND plane / 3V3 plane / signal + GND
+  pour. 1V2 is routed as tracks. With a TQ144 there
   are 16 supply pins on all four sides, plus 31 series-terminated bus lines
   and the clock. Two planes give every one of them a short via to its supply
   and a solid return path under the whole bus, without cutting up a pour. On

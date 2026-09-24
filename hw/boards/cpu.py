@@ -222,7 +222,7 @@ def schematic(path, footprint_libs):
 
     # test pads
     for i, net in enumerate(("1V2", "3V3", "GND")):
-        tp = s.add("Connector:TestPoint", "TP%d" % (i + 1), net, "TestPoint:TestPoint_Pad_D1.5mm",
+        tp = s.add("Connector:TestPoint", "TP%d" % (i + 1), net, "cupc8:TestPad_D1.0mm",
                    at=((180 + 8 * i) * G, row * G))
         s.connect(tp, 1, net)
 
@@ -253,7 +253,9 @@ W, H = 72.0, 52.0
 EDGE_X = 11.0                        # finger A1/B1 centre
 FPGA = (38.0, 22.0, 90)
 OUTLINE = (0, 0, W, H)
-EDGE = [(EDGE_X + 50.65, H), (W, H), (W, 0), (0, 0), (0, H), (EDGE_X - 0.65, H)]
+TAB = (EDGE_X - 0.65, EDGE_X + 50.65)          # where the footprint's tab meets the body
+EDGE = [(TAB[1], H), (W, H), (W, 0), (0, 0), (0, H), (TAB[0], H)]
+ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
 LOGO_MM = 12
 
 
@@ -311,11 +313,13 @@ def main():
     import logo
     logo.footprint(LOGO_MM)
     out = sys.argv[1] if len(sys.argv) > 1 else None
+    # GND poured on both outer layers (zones[0], which the pipeline ties the
+    # fingers to and stitches) and as the In1 plane; 3V3 is the In2 plane
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), OUTLINE, out=out, edge=EDGE, card_edge=True, layers=4,
-        zones=(("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",))),
-        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 45.0, 0)])
-    print("LCSC:", " ".join(lcsc))
+        zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
+        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 40.0, 0)])
+    print("LCSC:", " ".join(sorted(lcsc)))
 
 
 if __name__ == "__main__":
