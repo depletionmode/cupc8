@@ -71,6 +71,7 @@ typedef struct eink {
 	int kind;                               /* the running refresh */
 	int y0, y1, row;
 	uint32_t t0, last_panel;
+	bool t0_fresh;                          /* a command that flags BUSY went out: t0 at the next poll */
 
 	/* counters, for tests and SWD */
 	uint32_t refreshes[4];                  /* by kind */

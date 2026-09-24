@@ -21,7 +21,7 @@ void epd_cfg_default(epd_cfg_t *c, int w, int h)
 	c->fast_us = 1500000;
 	c->grey_us = 2000000;
 	c->partial_us = 300000;
-	c->busy_delay_us = 100;
+	c->busy_delay_us = 200;         /* Waveshare's driver: "200uS at least" after DRF */
 }
 
 static void logf_(epd_model_t *m, const char *fmt, ...)

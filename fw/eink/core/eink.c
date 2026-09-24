@@ -580,7 +580,7 @@ static void panel_step(eink_t *e)
 		static const uc_waveform_t wf[] = {UC_WF_PARTIAL, UC_WF_FAST, UC_WF_CLEAN, UC_WF_GREY};
 		uc8179_waveform(b, wf[e->kind]);
 		uc8179_cmd(b, UC_PON);
-		e->t0 = e->now;
+		e->t0_fresh = true;
 		e->step = S_PON_WAIT;
 		break;
 	}
@@ -622,7 +622,7 @@ static void panel_step(eink_t *e)
 		}
 		if (e->row > e->y1) {
 			uc8179_cmd(b, UC_DRF);
-			e->t0 = e->now;
+			e->t0_fresh = true;
 			e->step = S_DRF_WAIT;
 		}
 		break;
@@ -632,7 +632,7 @@ static void panel_step(eink_t *e)
 		if (e->kind == EINK_PARTIAL)
 			uc8179_cmd(b, UC_PTOUT);
 		uc8179_cmd(b, UC_POF);              /* no high voltage on the panel between refreshes */
-		e->t0 = e->now;
+		e->t0_fresh = true;
 		e->step = S_POF_WAIT;
 		break;
 	case S_POF_WAIT:
@@ -647,6 +647,14 @@ void eink_poll(eink_t *e, uint32_t now)
 	/* VSYNC_COUNT keeps counting at 60 Hz, from this clock */
 	e->vsync_acc += (now - e->now) * 60u;
 	e->now = now;
+	/* a wait for BUSY counts from here, not from this poll's start: sending
+	 * rows takes time, so `now` was stale by the time the command went out
+	 * (BUSY_N was read before it could fall, and the next command went to
+	 * a busy controller) */
+	if (e->t0_fresh) {
+		e->t0 = now;
+		e->t0_fresh = false;
+	}
 	while (e->vsync_acc >= 1000000u) {
 		e->vsync_acc -= 1000000u;
 		gpu_vsync(&e->gpu);

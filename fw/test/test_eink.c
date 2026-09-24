@@ -23,20 +23,24 @@
 
 static eink_t eink;
 static epd_model_t model;
-static uint64_t now_us;
+static uint64_t now_us, spi_ns;         /* the card's clock; SPI time within a poll */
 static bool stuck_busy;                 /* a panel that never releases BUSY */
 static const char *golden_dir = "../test/eink/golden";
 static uint8_t pic[EINK_MAX_W * EINK_H], ref[EINK_MAX_W * EINK_H];
 
 /* ------------------------------------------------------------------ the bus */
 
-static uint64_t ns(void) { return now_us * 1000; }
-static void bus_command(void *ctx, uint8_t c) { (void)ctx; epd_byte(&model, ns(), false, c); }
+/* the panel's time: SPI bytes take 0.8 us each (10 MHz), so a picture
+ * sent in one poll ends later than the poll began, as on the card */
+static uint64_t ns(void) { return now_us * 1000 + spi_ns; }
+static void bus_command(void *ctx, uint8_t c) { (void)ctx; spi_ns += 800; epd_byte(&model, ns(), false, c); }
 static void bus_data(void *ctx, const uint8_t *p, int n)
 {
 	(void)ctx;
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < n; i++) {
+		spi_ns += 800;
 		epd_byte(&model, ns(), true, p[i]);
+	}
 }
 static void bus_pin(void *ctx, int pin, bool v)
 {
@@ -68,6 +72,9 @@ static void setup(const eink_panel_t *panel, double scale)
 		epd_free(&model);
 	epd_cfg_default(&cfg, panel->w, panel->h);
 	cfg.time_scale = scale;
+	/* the firmware allows BUSY_N 1 ms to fall after a command that flags
+	 * it; the panel here takes nearly all of that */
+	cfg.busy_delay_us = 950;
 	epd_init(&model, &cfg);
 	model.log = on_log;
 	now_us = 1000;
@@ -79,7 +86,8 @@ static void setup(const eink_panel_t *panel, double scale)
 /* 100 us of card time: run commands, then the panel loop */
 static void tick(void)
 {
-	now_us += 100;
+	now_us += 100 + spi_ns / 1000;
+	spi_ns = 0;
 	gpu_run(&eink.gpu, 1000);
 	eink_poll(&eink, (uint32_t)now_us);
 	epd_advance(&model, ns());                  /* the panel's time goes on too */
@@ -481,8 +489,9 @@ static void test_policy(void)
 	CHECK_EQ(drfs, 0);
 	run_ms(200);
 	CHECK(drfs == 1 && model.busy_wf == EPD_WF_CLEAN, "the first refresh is a clean full one");
-	/* 150 ms quiet, then the module's power, a reset, PON and the data */
-	CHECK(drf_at[0] > 101000 + 150000 + 60000 && drf_at[0] < 101000 + 150000 + 100000,
+	/* 150 ms quiet, then the module's power, a reset, PON and the data
+	 * (78 KB at 10 MHz) */
+	CHECK(drf_at[0] > 101000 + 150000 + 60000 + 62000 && drf_at[0] < 101000 + 150000 + 160000,
 	      "... 150 ms after the last change (DRF at %llu us)", (unsigned long long)drf_at[0]);
 	CHECK(settle(5000), "settles");
 	CHECK_EQ(model.refreshes[EPD_WF_CLEAN], 1);
