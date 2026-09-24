@@ -225,17 +225,17 @@ PLACEMENT = {
     "U3": (42, 11.5, 0),
     "R2": (41, 15.5, 0), "R3": (41, 17.5, 0),
     "R4": (49.5, 6, 0), "R5": (49.5, 8, 0),
-    "U2": (13, 13, 0),
-    "C11": (19.2, 11.5, 90),
+    "U2": (12.5, 13, 0),
+    "C11": (18.4, 10.5, 90),
     "R6": (12, 18.5, 0),
     "Y1": (19, 25, 0),
     "C15": (13.3, 23, 90), "C16": (13.3, 27, 90), "R1": (23, 26.5, 90),
     # decoupling around U1 (28, 17)
-    "C1": (21.8, 14.5, 90), "C2": (21.8, 19, 90),
+    "C1": (21.2, 14.5, 90), "C2": (21.2, 19.5, 90),
     "C3": (24.5, 23.8, 0), "C9": (31.5, 23.8, 0),
-    "C4": (34.2, 19, 90), "C5": (34.2, 14.5, 90), "C13": (36.5, 16.8, 90),
-    "C6": (22.4, 10.3, 90), "C10": (25.2, 10.3, 90), "C7": (28, 10.3, 90), "C8": (30.8, 10.3, 90),
-    "C12": (33.6, 10.3, 90),
+    "C4": (34.8, 19.5, 90), "C5": (34.8, 14.5, 90), "C13": (37.2, 17, 90),
+    "C6": (22.4, 9.7, 90), "C10": (25.2, 9.7, 90), "C7": (28, 9.7, 90), "C8": (30.8, 9.7, 90),
+    "C12": (33.6, 9.7, 90),
     "C14": (9, 27, 90),
     "R7": (38, 22, 90), "R8": (40, 22, 90),
     # the LEDs in a row along the top edge, the power LED first, each
@@ -265,7 +265,7 @@ def main():
         "system", schematic, PLACEMENT, OUTLINE, out=sys.argv[1] if len(sys.argv) > 1 else None,
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
-        power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=150,
+        power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=120,
         title="CUPC/8 system", revision=REVISION,
         # the pour reaches over the finger tops, so GND fingers join it
         zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
