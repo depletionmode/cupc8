@@ -236,3 +236,32 @@ fixed_in = "0f51f42"
 revert = [["hw/tools/kicadgen.py", "    clip_silk_to_board(board, outline)\n    clip_silk_to_pads(board)\n", "    clip_silk_to_board(board, outline)\n"]]
 cmd = "python3 hw/smoke/smoke.py"
 must_fail = ["silkscreen of J1 touches pad SH of J1"]
+
+[[bug]]
+name = "slot SPI: CS_n falling during slotspi_refresh sent two status bytes (host read the second as RESP_LEN)"
+fixed_in = "this commit"
+revert = [["fw/rp2040/common/slotspi.c", """	/* Swap the preload for the current status and response only while the
+	 * SM is still waiting for CS_n: stopped, it cannot move on, and at
+	 * `start` it has pulled nothing. (Checking the CS_n pin instead raced a
+	 * falling CS_n: the SM could pull the old status byte between the check
+	 * and the FIFO clear, and the frame then began with two status bytes,
+	 * so the host read the second as RESP_LEN.) If a frame has begun, it
+	 * goes out with the old preload; cs_rose re-arms after it. */
+	pio_sm_set_enabled(pio, sm, false);
+	if (pio_sm_get_pc(pio, sm) == prog + slotspi_offset_start) {
+		dma_channel_abort(dma_tx);
+		pio_sm_clear_fifos(pio, sm);
+		arm_tx();
+	}
+	pio_sm_set_enabled(pio, sm, true);
+""", """	if (gpio_get(PIN_SLOT_NCS)) {
+		/* No frame in progress, so the SM is parked at `wait` (or, if CS_n
+		 * has just fallen, at the blocking first pull): swap its preload
+		 * for the current status and response without stopping it. */
+		dma_channel_abort(dma_tx);
+		pio_sm_clear_fifos(pio, sm);
+		arm_tx();
+	}
+"""]]
+cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
+must_fail = ["FAIL race sweep: every READ framed"]

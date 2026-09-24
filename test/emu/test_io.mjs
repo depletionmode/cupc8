@@ -131,6 +131,72 @@ for (const speed of [1, 2]) {
   expect(!(status() & CONNECTED), `${name}: unplugged, KBD_CONNECTED clear`);
 }
 
+// ------------------------------------- CS_n falling while the card refreshes
+// The main loop swaps the MISO preload (slotspi_refresh) whenever the status
+// changes, e.g. a key arrives. A frame whose CS_n falls inside that swap once
+// began with the old status byte AND the new one, so the host read the
+// second status byte as RESP_LEN (it showed up only on a full-speed keyboard,
+// by the timing of that build). Hit the window on purpose: the swap starts by
+// masking IO_IRQ_BANK0 (an NVIC ICER write, bit 13); drop CS_n k cycles
+// after that write, for k across the swap, and check every READ is framed.
+{
+  const kbd = new UsbKeyboard({ speed: 2, interval: 1 });
+  emu.mcu.usbCtrl.attachDevice(kbd);
+  let st = 0;
+  for (let i = 0; i < 100 && !(st & CONNECTED); i++) {
+    wait(10e6);
+    st = status();
+  }
+  expect(st & CONNECTED, 'race sweep: keyboard enumerated');
+  const ppb = emu.mcu.ppb, write = ppb.writeUint32.bind(ppb);
+  let trap = null;
+  ppb.writeUint32 = (offset, value) => {
+    if (trap && trap.at === null && offset === 0x180 && value & (1 << 13)) trap.at = trap.cycles;
+    return write(offset, value);
+  };
+  const prev = emu.onCycle;
+  emu.onCycle = (e) => {
+    if (prev) prev(e);
+    if (!trap) return;
+    trap.cycles++;
+    if (trap.at !== null && trap.cycles - trap.at >= trap.k) {
+      const t = trap;
+      trap = null;
+      host.run(function* () {             // a bare READ, CS_n falling now
+        yield* this.select();
+        const s0 = yield* this.byte(0xfe);
+        yield this.byteGapNs;
+        const len = yield* this.byte(0);
+        for (let i = 0; i < len && i < 16; i++) { yield this.byteGapNs; yield* this.byte(0); }
+        yield* this.deselect();
+        t.got = { s0, len };
+        return t;
+      });
+    }
+  };
+  let framed = 0;
+  const odd = [];
+  for (let k = 0; k <= 120; k += 3) {
+    cmd([0x05]);                          // FLUSH: the FIFO is empty
+    cmd([0x00]);                          // GETKEY: a 1-byte response is pending
+    wait(2e6);
+    const t = { k, at: null, cycles: 0, got: null };
+    trap = t;
+    kbd.press(0, usage('q'));
+    kbd.press(0);
+    emu.runUntil(() => t.got !== null, 100e6);
+    if (!t.got) { odd.push(`k=${k}: no refresh seen`); trap = null; continue; }
+    if (t.got.len === 1) framed++;
+    else odd.push(`k=${k}: status $${t.got.s0.toString(16)} then RESP_LEN $${t.got.len.toString(16)}`);
+    wait(2e6);
+  }
+  emu.onCycle = prev;
+  ppb.writeUint32 = write;
+  expect(odd.length === 0, `race sweep: every READ framed as status, RESP_LEN 1 (${framed} ok${odd.length ? '; ' + odd.join('; ') : ''})`);
+  emu.mcu.usbCtrl.detachDevice();
+  wait(50e6);
+}
+
 // ------------------------------------------------------------ VBUS fault
 emu.mcu.gpio[VBUS_NFAULT].setInputValue(false);
 wait(10e6);
