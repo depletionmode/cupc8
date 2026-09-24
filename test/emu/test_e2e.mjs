@@ -2,7 +2,7 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007] [--record]
 //
 // CUPC8_EMU=native runs them on the native emulator (emu/machine,
 // test/emu/machinenative.mjs: the same machine, cycle for cycle, faster);
@@ -129,8 +129,57 @@ async function e2e003() {
   server.close();
 }
 
-const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003 };
+// ------------------------------------------------------------------ E2E-007
+// The e-ink card instead of the HDMI card (doc/hardware/eink-card.md): the
+// real eink.elf with the UC8179 panel model on its header (native emulator
+// only). The kernel finds it as the console by INFO; the panel shows BASIC's
+// prompt, a typed program and its output, once the card's own refreshes
+// have put them on the glass. The glass is compared with a golden image.
+function panelText(m) {
+  const s = m.panelScreen();
+  return s.error ? `(no panel: ${s.error})` : s.text.join('\n').replace(/\n+$/, '');
+}
+
+function panelGolden(name, p) {
+  const file = path.join(ROOT, 'test/eink/golden', name + '.pbm');
+  const pbm = Buffer.alloc(p.w / 8 * p.h);
+  for (let i = 0; i < p.w * p.h; i++) if (p.grey[i] < 128) pbm[i >> 3] |= 0x80 >> (i & 7);
+  const img = Buffer.concat([Buffer.from(`P4\n${p.w} ${p.h}\n`), pbm]);
+  if (record) fs.writeFileSync(file, img);
+  fs.writeFileSync(path.join(ROOT, 'build/emu', name + '.pbm'), img);
+  const want = fs.existsSync(file) ? fs.readFileSync(file) : null;
+  expect(want !== null && want.equals(img), `${name}: the panel's glass equals ${path.relative(ROOT, file)} ` +
+    `(this run's is build/emu/${name}.pbm)`);
+}
+
+async function e2e007() {
+  log('E2E-007: the e-ink card as the console: boot to BASIC on the panel, run a program');
+  if (!expect(backend === 'native', 'E2E-007 needs the native emulator (CUPC8_EMU=native)')) return;
+  const m = await Machine.create({ slots: { 1: 'eink', 2: 'io' } });
+  m.powerOn();
+  const on = async (want, ns) => m.runUntil(() => panelText(m).includes(want), ns, 50e6);
+  expect(await on('>>', 10e9), 'the BASIC prompt appears on the panel');
+  m.type('10 print 6*7\nrun\n');
+  if (!expect(await on('42', 10e9), 'the typed program runs and prints 42 on the panel')) console.log(panelText(m));
+  m.type('help\n');
+  expect(await on('REFRESH', 10e9), 'help lists the refresh command');
+  // the kernel found the e-ink card by INFO: `refresh` asks it for a clean
+  // full refresh (on HDMI it does nothing)
+  m.type('refresh\n');
+  expect(await m.runUntil(() => m.panel().refreshes[0] === 2, 10e9, 50e6), 'refresh: a second clean full refresh');
+  await m.runAsync(3e9);                       // every change refreshed, nothing pending
+  const p = m.panel();
+  expect(p.errors === 0, `the panel model saw nothing the chip would ignore (${p.errors}: ${p.error})`);
+  expect(p.refreshes[0] === 2, `clean full refreshes at power-on and for refresh (${p.refreshes})`);
+  expect(p.refreshes[3] >= 3, `partial refreshes for the typing (${p.refreshes})`);
+  expect(p.busy === 0, 'the panel is idle');
+  golden('E2E-007', panelText(m));
+  panelGolden('E2E-007', p);
+  m.stop();
+}
+
+const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007 };
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
-for (const [id, fn] of Object.entries(tests)) if (!only || only === id) await fn();
+for (const [id, fn] of Object.entries(tests)) if (only ? only === id : id !== 'E2E-007' || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);
