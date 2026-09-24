@@ -154,10 +154,13 @@ static void test_sockets(void)
 	CHECK(!strcmp(last_sni, "localhost"), "CONNECT_HOST gave the backend SNI '%s', not the host name", last_sni);
 
 	/* SEND from the card, read on the server */
+	uint32_t tx0 = w.tx_bytes, rx0 = w.rx_bytes;
 	uint8_t msg[] = {0x14, 0, 5, 'h', 'e', 'l', 'l', 'o'};
 	send_frame(msg, sizeof msg);
 	char buf[32] = {0};
 	CHECK(read(fd, buf, sizeof buf) == 5 && memcmp(buf, "hello", 5) == 0, "server got '%s'", buf);
+	/* the TX LED counts what went out */
+	CHECK(w.tx_bytes - tx0 == 5, "tx_bytes counted %u, not 5", (unsigned)(w.tx_bytes - tx0));
 
 	/* server replies; the card reports it and RECV returns it */
 	CHECK(write(fd, "PONG", 4) == 4, "server write");
@@ -174,6 +177,7 @@ static void test_sockets(void)
 	SEND(0x15, 0, 32);                                 /* RECV */
 	int n = read_resp(r, 40);
 	CHECK(n == 5 && r[0] == 4 && memcmp(r + 1, "PONG", 4) == 0, "recv %d bytes", n);
+	CHECK(w.rx_bytes - rx0 == 4, "rx_bytes counted %u, not 4", (unsigned)(w.rx_bytes - rx0));
 
 	/* the server closes: PEER_CLOSED */
 	close(fd);

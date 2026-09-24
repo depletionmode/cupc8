@@ -16,6 +16,10 @@ DEFAULTS="$SRC/sdkconfig.defaults"
 [ "$VARIANT" = qemu ] && DEFAULTS="$DEFAULTS;$SRC/sdkconfig.qemu"
 LOG=$OUT.log
 mkdir -p "$ROOT/build"
+# the defaults only apply to a fresh sdkconfig: a stale one in $OUT would
+# silently keep old settings (it kept CONFIG_LWIP_SO_RCVBUF off after the
+# defaults turned it on), so the image is always built from the defaults
+rm -f "$OUT/sdkconfig"
 if ! idf.py -C "$SRC" -B "$OUT" -D SDKCONFIG="$OUT/sdkconfig" -D SDKCONFIG_DEFAULTS="$DEFAULTS" build > "$LOG" 2>&1; then
 	grep -E "error|Error|FAILED" "$LOG" | head -30
 	exit 1

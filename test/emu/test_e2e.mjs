@@ -9,6 +9,7 @@
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { Machine } from './machine.mjs';
 import { kernelRom, ROOT } from './romimage.mjs';
@@ -83,13 +84,44 @@ async function e2e002() {
   log('booting');
   expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI after the reset');
   m.type('10 print 6*7\nrun\n');
-  expect(await waitFor(m, '42', 3e9), 'the typed program runs and prints 42');
+  if (!expect(await waitFor(m, '42', 3e9), 'the typed program runs and prints 42')) console.log('---- screen\n' + screenText(m));
   await m.runAsync(200e6);
   golden('E2E-002', screenText(m));
   m.stop();
 }
 
-const tests = { 'E2E-002': e2e002 };
+// ------------------------------------------------------------------ E2E-003
+// The kernel's `net` command on the real Wi-Fi firmware (QEMU, user-mode NAT:
+// the host is 10.0.2.2): join, then an HTTP GET from a server on this host,
+// its page shown on HDMI.
+async function e2e003() {
+  log('E2E-003: Wi-Fi join, then an HTTP GET from a local server, shown on HDMI');
+  const page = 'HELLO FROM THE HOST';
+  let requests = 0;
+  const server = http.createServer((req, res) => {
+    requests++;
+    res.sendDate = false;                         // the screen is compared with a recording
+    res.writeHead(200, { 'Content-Type': 'text/plain', Connection: 'close' });
+    res.end(page + '\n');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io', 3: 'wifi' } });
+  m.powerOn();
+  expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+  m.type('net join cupc8 password\n');
+  expect(await waitFor(m, 'joined, address 10.0.2.15', 20e9), 'net join joins and prints the DHCP address');
+  log(`fetching from 10.0.2.2:${port}`);
+  m.type(`net get 10.0.2.2 ${port}\n`);
+  expect(await waitFor(m, page, 30e9), 'net get prints the page the host served');
+  expect(requests === 1, `the server saw one request (${requests})`);
+  await m.runAsync(200e6);
+  golden('E2E-003', screenText(m).replace(new RegExp(`10\\.0\\.2\\.2 ${port}`, 'g'), '10.0.2.2 PORT'));
+  m.stop();
+  server.close();
+}
+
+const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003 };
 for (const [id, fn] of Object.entries(tests)) if (!only || only === id) await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);
