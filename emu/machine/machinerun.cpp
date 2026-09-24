@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iterator>
 #include <sstream>
@@ -122,6 +123,12 @@ static Result run(const Machine::Options &o, const std::vector<Step> &steps) {
   }
   d << "screen " << std::hex << fnv(r.screen.data(), r.screen.size()) << std::dec << "\n";
   r.digest = d.str();
+  for (auto &[k, c] : m.threadCpu()) std::fprintf(stderr, "  thread %s: %.1f s CPU\n", k.c_str(), c);
+  {
+    timespec ts;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    std::fprintf(stderr, "  process: %.1f s CPU\n", ts.tv_sec + ts.tv_nsec * 1e-9);
+  }
   r.ns = m.ns();
   r.secs = secs;
   r.ok = ok;

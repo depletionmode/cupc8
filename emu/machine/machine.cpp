@@ -7,6 +7,8 @@
 #include <unistd.h>
 
 #include <climits>
+#include <ctime>
+#include <cstdlib>
 
 #include <algorithm>
 #include <cctype>
@@ -213,25 +215,6 @@ static uint32_t decodeData(uint32_t sym) {
     d |= (sym & 0x100 ? bit : bit ^ 1) << i;
   }
   return d;
-}
-
-TmdsCapture::TmdsCapture(Emu &emu) {
-  auto &sms = emu.mcu->pio[0].machines;
-  for (int lane = 0; lane < 3; lane++) {
-    sms[lane].txFIFO.onPull = [this, lane, &emu](uint32_t w) {
-      if (on) {
-        lanes[lane].push_back(w & 0x3ff);
-        lanes[lane].push_back((w >> 10) & 0x3ff);
-        if (lane == 0) times.push_back(emu.ns());
-      }
-    };
-  }
-}
-
-void TmdsCapture::start() {
-  for (auto &l : lanes) l.clear();
-  times.clear();
-  on = true;
 }
 
 std::vector<TmdsCapture::Line> TmdsCapture::analyse() const {
@@ -510,10 +493,40 @@ void Machine::workerLoop(size_t index, uint32_t seenWindow, uint32_t seenRun) {
     for (;;) {
       seenWindow = window.load(std::memory_order_acquire);
       cardWindow(w);
-      if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 != n) break;  // not the last: wait for the next window
-      if (!leadNext()) break;                                                  // the run is over
+      timespec ts;
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      w.cpu.store(ts.tv_sec + ts.tv_nsec * 1e-9, std::memory_order_relaxed);
+      if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 != n) {
+        // Not the last. A quick card volunteers to lead the next window, so
+        // that the slow card (the last to arrive) need not run the board
+        // before its own share: it chases the board instead. The volunteer
+        // spins for a while and withdraws if the others take too long.
+        uint32_t idle = 0;
+        if (!w.volunteer || !handoff.compare_exchange_strong(idle, 1, std::memory_order_acq_rel)) break;
+        bool accepted = false;
+        for (unsigned i = 0; i < volunteerSpins; i++) {
+          if (handoff.load(std::memory_order_acquire) == 2) {
+            accepted = true;
+            break;
+          }
+          cpuRelax();
+        }
+        uint32_t offered = 1;
+        if (!accepted && handoff.compare_exchange_strong(offered, 0, std::memory_order_acq_rel)) break;  // withdrawn
+        handoff.store(0, std::memory_order_relaxed);  // accepted by the last card: lead
+      } else {
+        uint32_t offered = 1;
+        if (handoff.compare_exchange_strong(offered, 2, std::memory_order_acq_rel)) break;  // a volunteer leads
+      }
+      if (!leadNext()) break;  // the run is over
     }
   }
+}
+
+std::vector<std::pair<std::string, double>> Machine::threadCpu() const {
+  std::vector<std::pair<std::string, double>> out;
+  for (auto &w : workers) out.emplace_back(w->sys ? "sysctl" : w->card->kind, w->cpu.load());
+  return out;
 }
 
 void Machine::startWorkers() {
@@ -523,17 +536,21 @@ void Machine::startWorkers() {
   if (sysctl) {
     auto w = std::make_unique<Worker>();
     w->sys = sysctl.get();
+    w->volunteer = true;
     workers.push_back(std::move(w));
   }
   for (auto &[slot, card] : cards) {
     if (card->emu()) {
       auto w = std::make_unique<Worker>();
       w->card = card.get();
+      w->volunteer = card->kind != "gpu";
       workers.push_back(std::move(w));
     } else {
       mainCards.push_back(card.get());
     }
   }
+  handoff.store(0);
+  if (const char *v = std::getenv("CUPC8_EMU_VOLUNTEER_SPINS")) volunteerSpins = static_cast<unsigned>(std::atoi(v));
   // what the threads have seen so far, taken now: a thread may start after the first run()
   const uint32_t w0 = window.load(), r0 = runSeq.load();
   for (size_t i = 0; i < workers.size(); i++) workers[i]->th = std::thread([this, i, w0, r0] { workerLoop(i, w0, r0); });

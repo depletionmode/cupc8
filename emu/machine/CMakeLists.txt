@@ -25,30 +25,29 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)   # the RP2040 library goes into a Node addon
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# Link-time optimisation and -O3 (no fast-math: the port's float time
-# arithmetic is exact JS semantics, and rp2040run built this way gives
-# byte-identical --trace-every traces on the GPU, IO and system card images).
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-# the RP2040 port, untouched, as a PIC static library of this build
+# hidden visibility: inside a shared object, default visibility makes every
+# call interposable and nothing inlines (emu/rp2040 builds rp2040emu so too)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+# the RP2040 port and its card-test harness (the Emu loop, TMDS capture),
+# untouched and built with their own flags, as static libraries of this build
+option(MACHINE_LTO "-O3 and link-time optimisation for this tree's copy of the RP2040 library" OFF)
+if(MACHINE_LTO)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
 add_subdirectory("${CUPC8_ROOT}/emu/rp2040" rp2040 EXCLUDE_FROM_ALL)
-target_compile_options(rp2040emu PRIVATE -O3)
+if(MACHINE_LTO)
+  target_compile_options(rp2040emu PRIVATE -O3)
+  target_compile_options(rp2040harness PRIVATE -O3)
+endif()
 
-# the B1 bootrom, extracted from rp2040js as emu/rp2040 does
-set(BOOTROM_INC "${CMAKE_CURRENT_BINARY_DIR}/generated/bootrom_b1.inc")
-add_custom_command(
-  OUTPUT "${BOOTROM_INC}"
-  COMMAND ${CMAKE_COMMAND} -DIN=${RP2040JS_DIR}/demo/bootrom.ts -DOUT=${BOOTROM_INC}
-          -P "${CUPC8_ROOT}/emu/rp2040/cmake/extract_bootrom.cmake"
-  DEPENDS "${RP2040JS_DIR}/demo/bootrom.ts" "${CUPC8_ROOT}/emu/rp2040/cmake/extract_bootrom.cmake"
-  VERBATIM)
-
-add_library(machine STATIC machine.cpp emu.cpp "${CUPC8_ROOT}/fw/test/sysmodels.c" "${BOOTROM_INC}")
+add_library(machine STATIC machine.cpp "${CUPC8_ROOT}/fw/test/sysmodels.c")
 target_include_directories(machine PUBLIC
-  "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated" "${CUPC8_ROOT}/soc/emu" "${CUPC8_ROOT}/fw/test")
+  "${CMAKE_CURRENT_SOURCE_DIR}" "${CUPC8_ROOT}/soc/emu" "${CUPC8_ROOT}/fw/test")
 target_include_directories(machine SYSTEM PUBLIC
   "${EMU_OBJ_DIR}" "${VERILATOR_ROOT}/include" "${VERILATOR_ROOT}/include/vltstd")
-target_compile_options(machine PRIVATE -O3 $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wno-unused-parameter>)
-target_link_libraries(machine PUBLIC rp2040emu
+target_compile_options(machine PRIVATE -O2 $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wno-unused-parameter>)
+target_link_libraries(machine PUBLIC rp2040harness
   "${EMU_OBJ_DIR}/Vmachine_core__ALL.a" "${EMU_OBJ_DIR}/verilated.o" "${EMU_OBJ_DIR}/verilated_threads.o" pthread)
 
 add_executable(machinerun machinerun.cpp)
