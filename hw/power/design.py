@@ -42,28 +42,55 @@ CABLE_R_VBUS = 0.500 / 3.0
 CABLE_R_GND = 0.250 / 3.0
 # Source classes, and the current each lets the sink draw (SPEC)
 SOURCE_CLASSES = {"default USB 2.0": 0.5, "default USB 3.x": 0.9, "Type-C 1.5 A": 1.5, "Type-C 3.0 A": 3.0}
-WIFI_MIN_CLASS = "Type-C 1.5 A"     # power.md policy: PWR_HI needed for the radio
+# power.md policy (David, 2026-09-24): the full machine needs a 3.0 A source.
+# PWR_HI = "Type-C 3.0 A"; below it the radio stays off and SD writes are refused
+FULL_CLASS = "Type-C 3.0 A"
+REDUCED_CLASS = "Type-C 1.5 A"      # what a 1.5 A source must still run: radio off, no SD writes
 
 # ---------------------------------------------------------------------------
-# Main board input path: receptacle -> fuse -> TVS -> SY6280 -> 5V_SYS
+# Main board input path: receptacle -> PTC -> TVS -> eFuse (TPS25947) -> 5V_SYS
+# The SY6280 (limit at most 2.5 A, +-25 %) can't pass the 3 A case with
+# margin, so the input switch is a TI TPS259470ARPWR eFuse (C3662799, 2,749
+# at JLC 2026-09-24; the latch-off TPS259470LRPWR C3662793 is the fallback).
+# DS SLVSFC9C (sha256 8f96de38...), fetched 2026-09-24.
 # ---------------------------------------------------------------------------
 R_RECEPTACLE = assume("main", "USB-C receptacle + VBUS/GND copper to the fuse: <= 20 mOhm loop", 0.020)
-FUSE_IN_R_MIN, FUSE_IN_R_MAX = 0.020, 0.100     # DS SMD1812P200TF16: Rmin, R1max
-FUSE_IN_IHOLD_40C = 1.80                        # DS derating chart, 40 C
-TVS_VRWM, TVS_VBR_MIN, TVS_VCLAMP = 5.0, 6.4, 9.2   # DS SMF5.0A
-SY6280_RON_TYP = 0.080                          # DS (typ only)
-SY6280_RON_MAX = assume("main/IO", "SY6280 RDS(on) taken as 1.5 x the 80 mOhm typ (hot, no max in the datasheet)", 0.120)
-SY6280_ILIM_K = 6800.0                          # DS: ILIM (A) = 6800 / RSET (ohm)
-SY6280_ILIM_TOL = 0.25                          # DS: 0.75..1.25 A at RSET = 6.8k
-SY6280_ILIM_PROG_MAX = 2.0                      # DS: highest programmable ILIM
-SY6280_TON = 120e-6                             # DS turn-on time
-SY6280_UVLO = 2.3                               # DS
-SY6280_THETA_JA = 200.0                         # DS, JEDEC 51-3 (low-K board)
-# power.md: "1.5 A limit". hw/power/budget.py shows why this is too low.
-SY6280_MAIN_RSET = assume("main", "SY6280 RSET (power.md: 1.5 A limit -> 4.53 kOhm)", 4530.0)
-R_5VSYS = assume("main", "5V_SYS copper, switch to the farthest slot / the buck: <= 20 mOhm", 0.020)
+# input PTC: SMD1812P350TF/16 (Ruilon, C46970911, 310 at JLC; the 6 V
+# SMD1812P350TF C20815, 2,858, is the fallback). Rmin/R1max from the LCSC
+# listing; the 40 C hold uses the Ruilon family's 90 % derating (P200: 1.80/2.00)
+FUSE_IN = assume("main", "input PTC SMD1812P350TF/16 (C46970911): 3.5 A hold, 8-30 mOhm, 16 V", "SMD1812P350TF/16")
+FUSE_IN_R_MIN, FUSE_IN_R_MAX = 0.008, 0.030
+FUSE_IN_IHOLD_40C = 3.5 * 0.90
+TVS_VRWM, TVS_VBR_MIN, TVS_VCLAMP = 5.0, 6.4, 9.2   # DS SMF5.0A (C193402)
+INSW_PART = assume("main", "input switch TPS259470ARPWR eFuse (C3662799), EN/UVLO tied to IN", "TPS259470ARPWR")
+INSW_RON_TYP, INSW_RON_MAX = 0.0283, 0.045      # DS: 28.3 mOhm typ, 45 mOhm max over -40..125 C
+INSW_ILIM_K = 3340.0        # DS table: ILIM ~ 3340 / RILM (1.007 A at 3.32k, 2.028 at 1.65k, 4.452 at 750)
+INSW_ILIM_TOL = (0.112, 0.087)  # DS: 1.800..2.200 A at 1.65k and 3.96..4.84 at 750 ohm (-11.2 %, +8.7 %)
+# RILM: the limit's max stays under 3.3 A (a 3.0 A source + 10 %), its min
+# well over the machine's worst case (budget.py B2)
+INSW_RILM = assume("main", "eFuse RILM 1.13 kOhm 1 % (limit 2.63 / 2.96 / 3.21 A min/nom/max)", 1130.0)
+INSW_THETA_JA = 74.5        # DS RPW, JEDEC board (41.7 on TI's EVM)
+# OVLO: IN -> R1 -> OVLO -> R2 -> GND; trips at 1.2 V (1.183..1.223) x (R1 + R2) / R2.
+# Must stay above vSafe5V max and below the 6 V absolute maximum of what 5V_SYS feeds
+# (TLV62569 VIN, the IO card's SY6280)
+INSW_OVLO_R = assume("main", "eFuse OVLO divider 37.4k / 10.0k 0.1 % from IN (1 % puts the trip up to "
+                     "6.00 V; see budget.py B17)", (37.4e3, 10.0e3))
+INSW_OVLO_TOL = 0.001
+INSW_OVLO_VTH = (1.183, 1.223)
+DOWNSTREAM_ABS_MAX = 6.0    # DS TLV62569, SY6280: VIN absolute maximum
+# dVdt: SR (V/ms) = 2000 / CdVdt (pF), with the pin current's spread
+# (0.81..3.82 uA around 2.21 typ) scaling it
+INSW_CDVDT = assume("main", "eFuse dVdt capacitor 680 pF (5V_SYS rises at 1.1..5.1 V/ms)", 680e-12)
+INSW_IDVDT = (0.81e-6, 2.21e-6, 3.82e-6)
+INSW_UVLO = 2.7             # DS: input UVLO (EN/UVLO tied to IN)
+R_5VSYS = assume("main", "5V_SYS copper, eFuse to the farthest slot / the buck: <= 20 mOhm", 0.020)
 # capacitance directly on VBUS, ahead of the switch (the USB 2.0 10 uF rule)
-C_VBUS_PRE = assume("main", "capacitance on VBUS ahead of the SY6280: 1 uF (<= 10 uF allowed)", 1.0e-6)
+C_VBUS_PRE = assume("main", "capacitance on VBUS ahead of the eFuse: 1 uF (<= 10 uF allowed)", 1.0e-6)
+
+# SY6280: now only the IO card's keyboard port switch (500 mA)
+SY6280_RON_TYP = 0.080                          # DS (typ only)
+SY6280_RON_MAX = assume("IO", "SY6280 RDS(on) taken as 1.5 x the 80 mOhm typ (hot, no max in the datasheet)", 0.120)
+SY6280_THETA_JA = 200.0                         # DS, JEDEC 51-3 (low-K board)
 
 # ---------------------------------------------------------------------------
 # Slot +5V feed: PTC -> 0 ohm link -> 50 mOhm sense -> 3 contacts -> card
@@ -73,8 +100,8 @@ SLOT_PTC_IHOLD_40C = 0.65                       # DS derating chart, 40 C
 R_SLOT_LINK = assume("main", "slot 0 ohm isolation link: <= 50 mOhm (0 ohm jumper spec)", 0.050)
 R_SLOT_SENSE = 0.050                            # power.md
 R_SLOT_CONTACTS = assume("main/cards", "slot +5V: 3 contacts at <= 30 mOhm each, plus 10 mOhm card copper", 0.030 / 3 + 0.010)
-SLOT_3V3_MAX = 0.300                            # slot.md
-SLOT_CARD_MAX = 1.0                             # slot.md: <= 1 A per card, +5V and +3V3 together
+SLOT_3V3_MAX = 0.300                            # slot.md: <= 300 mA of +3V3 per card
+SLOT_5V_MAX = 0.55                              # slot.md: <= 0.55 A of +5V per card
 
 # ---------------------------------------------------------------------------
 # 3V3 buck: TLV62569DBV (TI model for dynamics)
@@ -96,7 +123,11 @@ BUCK_FSW = 1.5e6            # DS
 BUCK_T_EDGE = 5e-9          # switching-loss estimate: 5 ns per edge
 BUCK_IQ_LOSS = 0.010        # gate drive + control, W (estimate)
 BUCK_THETA_JA = {"DBV": 188.2, "DDC": 106.2, "DRL": 146.3}  # DS
-BUCK_PACKAGE = "DBV"        # parts.md: TLV62569DBVR
+# the DBV (SOT-23-5) reaches 100 C at 1.21 A of 3V3 (THM-001); the machine can
+# ask for 1.22 A with slots 5-6 at their 300 mA each
+BUCK_PACKAGE = assume("main", "3V3 buck TLV62569PDDCR (C398365, SOT-23-6, 106 C/W; PG pin unused or to sysctl)",
+                      "DDC")
+WIFI_BUCK_PACKAGE = "DBV"   # BOARD wifi.py U2: TLV62569DBVR
 BUCK_DCR = 0.050
 BUCK_ETA_BUDGET = 0.90      # 5 V -> 3.3 V: DS figure 9 shows 94-95 % from 0.1 to 1 A;
                             # 0.90 leaves room for hot RDS(on) and a cheaper inductor
@@ -190,13 +221,21 @@ LOADS_3V3 = {
     "GPU card RP2040 + flash": 0.100,
     "GPU card TMDS": 0.045,
     "IO card RP2040 + flash": 0.050,
+    "storage card RP2040 + flash": 0.050,       # power.md / storage-card.md
+    "storage card microSD (writing)": 0.100,    # storage-card.md: up to ~100 mA writing
     "I2C expanders, SWD mux": 0.005,
     "LEDs": 0.030,
     "1V2 LDO (chipset core)": I_1V2_MAX,
 }
+# the graphics slot holds the HDMI card or the e-ink card (type $01 either
+# way); the budget carries the HDMI card, the heavier of the two
+GPU_CARD_3V3 = LOADS_3V3["GPU card RP2040 + flash"] + LOADS_3V3["GPU card TMDS"]
+EINK_CARD_3V3 = 0.095       # proposals/eink-gpu.md: ~45 mA typ, ~95 mA max, nothing from +5V
+STORAGE_CARD_3V3 = LOADS_3V3["storage card RP2040 + flash"] + LOADS_3V3["storage card microSD (writing)"]
+I_SD_WRITE = LOADS_3V3["storage card microSD (writing)"]
 I_KEYBOARD = 0.500          # USB 2.0 high-power device (IO card's switch limits it)
 I_HDMI_5V = 0.055           # HDMI +5V pin, per spec
-FUTURE_SLOTS = 3            # slots 4-6
+FUTURE_SLOTS = 2            # slots 5-6 (slot 4 holds the storage card in M1)
 
 # Capacitance on 5V_SYS, charged through the SY6280 at attach
 C_5VSYS = [
@@ -226,10 +265,15 @@ RP_PULLUP = {"R5": (4.75, 5.50), "R3": (3.135, 3.465)}
 VRD_RANGES = {"default": (0.25, 0.61), "1.5A": (0.70, 1.16), "3.0A": (1.31, 2.04)}
 VRD_THRESH = {"connect": 0.20, "1.5A": 0.66, "3.0A": 1.23}
 # PWR_HI comparator: one TLV7011 for both CC lines, so CC1 and CC2 are
-# averaged through two equal resistors (the unused CC sits at 0 V on its Rd);
-# the reference is half of 0.66 V from 3V3
+# averaged through two equal resistors (the unused CC sits at 0 V on its Rd).
+# PWR_HI means a 3.0 A source (power.md policy), so it trips between the 1.5 A
+# and 3.0 A ranges. With our 1 % Rd those are 1.090 V max and 1.524 V min
+# (cc.py); the reference puts the trip near their middle (1.30 V on CC, 0.648
+# V at the comparator) rather than at the spec's 1.23 V, which sits closer to
+# the 1.5 A side. The sysctl ADC keeps the spec's 1.23 V.
 CC_AVG_R = assume("main", "PWR_HI: CC1, CC2 -> 1 MOhm 1% each -> TLV7011 IN+ (averaged)", 1.0e6)
-CC_REF_R = assume("main", "PWR_HI reference: 3V3 -> 90.9k / 10k 1% -> IN- (0.330 V)", (90.9e3, 10.0e3))
+CC_REF_R = assume("main", "PWR_HI reference: 3V3 -> 41.2k / 10.0k 1% -> IN- (0.648 V: PWR_HI = 3.0 A source)",
+                  (41.2e3, 10.0e3))
 CC_REF_TOL_R = 0.01
 TLV7011_VIO = 0.008         # DS max
 TLV7011_VHYS = (0.0012, 0.014)  # DS min, max
@@ -275,9 +319,34 @@ def wifi_i_5v(v_card, i3=WIFI_I_3V3):
     return i3 * wifi_vout_range()[1] / (BUCK_ETA_BUDGET * v_card)
 
 
-def sy6280_ilim(rset=SY6280_MAIN_RSET):
-    nom = SY6280_ILIM_K / rset
-    return nom * (1 - SY6280_ILIM_TOL), nom, nom * (1 + SY6280_ILIM_TOL)
+def insw_ilim(rilm=None):
+    """The eFuse's current limit (min, nom, max) for an RILM."""
+    nom = INSW_ILIM_K / (rilm or INSW_RILM)
+    return nom * (1 - INSW_ILIM_TOL[0]), nom, nom * (1 + INSW_ILIM_TOL[1])
+
+
+def insw_ovlo():
+    """The eFuse's OVLO trip range (V): threshold spread and divider tolerance."""
+    r1, r2 = INSW_OVLO_R
+    t = INSW_OVLO_TOL
+    lo = INSW_OVLO_VTH[0] * (r1 * (1 - t) + r2 * (1 + t)) / (r2 * (1 + t))
+    hi = INSW_OVLO_VTH[1] * (r1 * (1 + t) + r2 * (1 - t)) / (r2 * (1 - t))
+    return lo, hi
+
+
+def insw_ramp(v):
+    """Time (s) for the eFuse's output to rise to v: (fastest, typical, slowest)."""
+    sr_typ = 2000e-12 / INSW_CDVDT * 1e3        # V/s, DS equation 4
+    return tuple(v / (sr_typ * i / INSW_IDVDT[1]) for i in (INSW_IDVDT[2], INSW_IDVDT[1], INSW_IDVDT[0]))
+
+
+def r_in(worst):
+    """Source to 5V_SYS: cable (VBUS + GND), receptacle, PTC, eFuse, copper.
+    Worst: the cable's full IR drop and every part at its max; typical: half
+    the cable limit and the parts at their min / typ."""
+    return ((1.0 if worst else 0.5) * (CABLE_R_VBUS + CABLE_R_GND) + R_RECEPTACLE
+            + (FUSE_IN_R_MAX if worst else FUSE_IN_R_MIN)
+            + (INSW_RON_MAX if worst else INSW_RON_TYP) + R_5VSYS)
 
 
 def main():
