@@ -7,7 +7,8 @@
 // (test/emu/fatimg.py: pyfatfs, and fsck.fat when installed), so files go
 // both ways: written by the card and read on the host, and the reverse.
 //
-//   CUPC8_EMU=native node test/emu/test_storage.mjs [only]
+//   CUPC8_EMU=native node test/emu/test_storage.mjs [fat16,fat32,slow,removal,wp,full]
+//   GAP=ns: the host's gap between frames (default slot.md's minimum, 20 us)
 //
 // Native only (the SD model is not in rp2040js).
 
@@ -28,6 +29,14 @@ if (!NATIVE) {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-storage-'));
 const fat = (...a) => execFileSync(PY, [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
 const fatLs = (img) => Object.fromEntries(JSON.parse(fat('ls', img).toString()));
+// a file as the host reads it, or null
+function fatGet(img, name) {
+  try {
+    return execFileSync(PY, [path.join(ROOT, 'test/emu/fatimg.py'), 'get', img, name], { stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return null;
+  }
+}
 function fatCheck(img) {
   try {
     fat('check', img);
@@ -58,7 +67,7 @@ function expect(cond, what) {
 }
 
 const emu = await Emu.load(path.join(ROOT, 'build/rp2040/storage.elf'), { mhz: 125 });
-const host = new SlotHost(emu, { clkDiv: 2 });
+const host = new SlotHost(emu, { clkDiv: 2, frameGapNs: Number(process.env.GAP ?? 20000) });
 const sd = new SdSocket(emu);
 
 function run(script, ns = 10e9) {
@@ -77,11 +86,23 @@ function run(script, ns = 10e9) {
   return host.result;
 }
 const wait = (ns) => run(function* () { yield ns; });
-// the status byte, from a reserved opcode (cards ignore $F3-$FD, slot.md)
-const status = () => run(function* () { return (yield* this.frame([0xf3]))[0]; });
+// the status byte, from a bare READ frame (READ is not a command: it neither
+// starts nor discards anything, slot.md)
+const status = () => run(function* () { return (yield* this.frame([0xfe]))[0]; });
+// a command with no response (BUF_PUT): done when BUSY clears
+function post(bytes) {
+  run(function* () { yield* this.frame(bytes); });
+  return until(S.BUSY, false, 3000);
+}
 // a command and its response; medium operations may take long (RESP_LEN 0 meanwhile)
 const LONG = { tries: 60000, retryNs: 50000 };  // 3 s
-const cmd = (bytes, opts = LONG) => run(function* () { yield* this.frame(bytes); return yield* this.read(opts); });
+function cmd(bytes, opts = LONG) {
+  const n0 = host.log.length;
+  const r = run(function* () { yield* this.frame(bytes); return yield* this.read(opts); });
+  if (process.env.DEBUG > 1) for (const f of host.log.slice(n0)) console.log('   mosi', f.mosi.slice(0, 6).map((b) => b.toString(16)).join(' '), 'miso', f.miso.slice(0, 8).map((b) => b.toString(16)).join(' '), '@', (emu.ns / 1e6).toFixed(3));
+  if (process.env.DEBUG) console.log('cmd', bytes.slice(0, 8).map((b) => b.toString(16)).join(' '), '->', r && [r.status.toString(16), ...r.data.slice(0, 12)].join(' '));
+  return r;
+}
 const S = { MEDIA: 0x40, MOUNTED: 0x20, BUSY: 0x10, WP: 0x08 };
 const E = { OK: 0, NOMEDIA: 1, NOTMOUNTED: 2, NOTFOUND: 3, EXISTS: 4, FULL: 5, WP: 6, BADHANDLE: 7, BADNAME: 8, IO: 9, TOOMANY: 10 };
 const nm = (s) => [s.length, ...Buffer.from(s, 'latin1')];
@@ -160,7 +181,7 @@ function noViolations(card, what) {
   expect(card && card.violations.length === 0, `${what}: the firmware keeps to the SD protocol (${card?.violations.join('; ')})`);
   expect(card && card.stats.maxHzBeforeInit <= 400e3, `${what}: SCK <= 400 kHz until initialised (${card?.stats.maxHzBeforeInit} Hz)`);
 }
-const section = (name) => !only || only === name;
+const section = (name) => !only || only.split(',').includes(name);
 const t0 = performance.now();
 
 // ---------------------------------------------------------------- no card
@@ -233,14 +254,14 @@ if (section('fat16')) {
   expect(Buffer.from(boot).equals(img0.subarray(0, 512)), 'BUF_GET x4: the boot sector as on the image');
   const last = img0.length / 512 - 1;
   const pat = Buffer.from(Array.from({ length: 512 }, (_, i) => (i * 13) & 255));
-  for (let off = 0; off < 512; off += 128) run(function* () { yield* this.frame([0x23, off & 255, off >> 8, 128, ...pat.subarray(off, off + 128)]); });
+  for (let off = 0; off < 512; off += 128) post([0x23, off & 255, off >> 8, 128, ...pat.subarray(off, off + 128)]);
   expect(err(cmd([0x21, ...le32(last)])) === 0, `BUF_PUT x4, BLK_WRITE ${last}`);
   expect(err(cmd([0x20, ...le32(last)])) === 0, 'BLK_READ it back');
   const back = [];
   for (let off = 0; off < 512; off += 128) back.push(...(cmd([0x22, off & 255, off >> 8, 128])?.data ?? []));
   expect(Buffer.from(back).equals(pat), 'the sector reads back as written');
   const saved = img0.subarray(last * 512, last * 512 + 512);
-  for (let off = 0; off < 512; off += 128) run(function* () { yield* this.frame([0x23, off & 255, off >> 8, 128, ...saved.subarray(off, off + 128)]); });
+  for (let off = 0; off < 512; off += 128) post([0x23, off & 255, off >> 8, 128, ...saved.subarray(off, off + 128)]);
   cmd([0x21, ...le32(last)]);
 
   expect(err(cmd([0x03])) === 0, 'ST_EJECT: ok');
@@ -251,8 +272,8 @@ if (section('fat16')) {
   expect(fs.readFileSync(img).subarray(last * 512, last * 512 + 512).equals(saved), 'the raw block write reached the image and was restored');
   const ls = fatLs(img);
   expect(ls['CARD.TXT'] === 1100 && ls['UNO.TXT'] === 300 && !('TWO.TXT' in ls) && !('ONE.TXT' in ls), `the host sees the card's files (${JSON.stringify(ls)})`);
-  expect(fat('get', img, 'CARD.TXT').equals(Buffer.concat([a, c])), 'the host reads CARD.TXT as the card wrote it');
-  expect(fat('get', img, 'UNO.TXT').equals(b), 'the host reads UNO.TXT (renamed) as written');
+  expect(fatGet(img, 'CARD.TXT')?.equals(Buffer.concat([a, c])), 'the host reads CARD.TXT as the card wrote it');
+  expect(fatGet(img, 'UNO.TXT')?.equals(b), 'the host reads UNO.TXT (renamed) as written');
   const chk = fatCheck(img);
   expect(chk.startsWith('ok'), `the host's FAT check passes on the card's writes (${chk.trim()})`);
   const s1 = until(S.MEDIA, false);
@@ -270,7 +291,7 @@ if (section('fat32')) {
   expect(readFile('BIG.TXT')?.equals(big), 'SDHC: and read back on the card');
   cmd([0x03]);
   noViolations(pull(), 'SDHC');
-  expect(fat('get', img, 'BIG.TXT').equals(big), 'SDHC: the host reads BIG.TXT');
+  expect(fatGet(img, 'BIG.TXT')?.equals(big), 'SDHC: the host reads BIG.TXT');
   const chk = fatCheck(img);
   expect(chk.startsWith('ok'), `SDHC: the host's FAT check passes (${chk.trim()})`);
 }
@@ -290,7 +311,7 @@ if (section('slow')) {
     let n = 0, busy = 0, answered = 0, resp = null;
     for (let i = 0; i < 20000 && !resp; i++) {
       yield 200e3;
-      const st = (yield* this.frame([0xf3]))[0];
+      const st = (yield* this.frame([0xfe]))[0];
       n++;
       if (!(st & 0x80)) answered++;
       if (st & 0x10) busy++;
@@ -305,7 +326,7 @@ if (section('slow')) {
   const card = pull();
   expect(card.stats.busyNs >= 250e6, `the model was busy ${card.stats.busyNs / 1e6} ms`);
   noViolations(card, 'slow card');
-  expect(fat('get', img, 'SLOW.TXT').equals(data), 'slow card: the host reads SLOW.TXT');
+  expect(fatGet(img, 'SLOW.TXT')?.equals(data), 'slow card: the host reads SLOW.TXT');
 }
 
 // ------------------------------------------------ hot removal
@@ -362,6 +383,8 @@ if (section('full')) {
   expect(chk.startsWith('ok'), `full card: the volume is still consistent (${chk.trim()})`);
 }
 
+const torn = host.log.filter((f) => f.miso.length && f.miso[0] & 0x80 && f.miso[0] !== 0xff);
+expect(torn.length === 0, `the status byte's bit 7 is always 0 (slot.md): ${torn.length} frames had ${[...new Set(torn.map((f) => '$' + f.miso[0].toString(16)))].slice(0, 8).join(' ')}`);
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`STO-010: real storage.elf with the SD card model, ${checks} checks, ${bad} failures ` +
   `(${(emu.ns / 1e9).toFixed(2)} s emulated in ${((performance.now() - t0) / 1e3).toFixed(1)} s)`);
