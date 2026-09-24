@@ -78,6 +78,11 @@ class GPIOPin {
   /** Returns the function that removes the listener (as the TS does). */
   std::function<void()> addListener(GPIOPinListener callback);
 
+  /** not in TS: whether any listener is registered (the PIO fast path needs none) */
+  bool hasListeners() const { return !listeners.empty(); }
+  /** test access to the private lastValue (not in TS) */
+  GPIOPinState debugLastValue() const { return lastValue; }
+
  private:
   bool rawInputValue = false;
   /**

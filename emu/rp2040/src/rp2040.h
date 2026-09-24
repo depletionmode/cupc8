@@ -169,6 +169,11 @@ class RP2040 {
   void writeUint16(uint32_t address, uint32_t value);
 
   uint32_t gpioValues() const;
+  /** not in TS: bring both PIO blocks' fast path up to date (RPPIO::sync) */
+  void syncPIO() {
+    pio[0].sync();
+    pio[1].sync();
+  }
 
   void setInterrupt(uint32_t irq, bool value);
 

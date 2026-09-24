@@ -135,6 +135,35 @@ class StateMachine {
   int32_t debugDelayLeft() const { return delayLeft; }
 
  private:
+  friend class RPPIO;
+
+  // --- fast path (not in rp2040js; see RPPIO::sync) ---
+  /** true if the machine is stalled in a WAIT whose condition only an event
+   *  that syncs the block can change, and is false now */
+  bool stalledStable() const;
+  /**
+   * true if every instruction reachable from `pc` is an OUT the lazy runner
+   * handles (see pio.cpp); then `mask` is the pins it can drive and `bits`
+   * its common bit count. Cached per (pio.progEpoch, pc).
+   */
+  bool runnerProgram(uint32_t &mask, uint32_t &bits);
+  /** n runner steps (clockTick() with divider 1, no autopull due); returns the pins changed on the way */
+  uint32_t runLazy(uint64_t n);
+  uint32_t analysedEpoch = 0;  // pio.progEpoch the cache below belongs to (0 = none)
+  uint32_t analysedPcs = 0;    // bit n: pc n analysed
+  uint32_t runnerPcs = 0;      // bit n: runner program from pc n
+  uint32_t runnerPcOnly = 0;   // bit n: ... and every instruction reachable from pc n is an `out pc`
+  std::array<uint32_t, 32> runnerMask{};
+  std::array<uint8_t, 32> runnerBits{};
+  /** instruction n decoded for runLazy (valid for analysedEpoch once analysed) */
+  struct LazyOp {
+    uint8_t destination = 0, bitCount = 0;
+    bool sideset = false;
+    uint8_t next = 0;  // nextPC() from here
+    uint32_t sideMask = 0, sideBits = 0;
+  };
+  std::array<LazyOp, 32> lazyOps{};
+
   /** system cycles (in 1/256ths) owed to this machine by its clock divider */
   uint32_t divPhase = 0;
   /** delay cycles ([n]) still to run after the last instruction */
@@ -198,7 +227,35 @@ class RPPIO : public BasePeripheral {
   void step();
   void stop();
 
+  /**
+   * Fast path (not in rp2040js). While every enabled machine of the block is
+   * either stalled on a stable WAIT or running a loop of plain OUTs (the
+   * PicoDVI serialiser) that will not autopull for a while, step() only counts
+   * the cycles it owes: nothing outside the block can see the difference (see
+   * pio.cpp for the argument). sync() replays the owed cycles, exactly, and
+   * returns to per-cycle stepping; every path by which the rest of the chip
+   * can see or change the block's state calls it first (the bus registers,
+   * GPIOPin's PIO output functions, setInputValue, addListener, IO_BANK0 and
+   * PADS writes). C++ code that reads machine or pin fields directly (tests)
+   * must call it too. fastPath = false turns the fast path off.
+   */
+  void sync() {
+    if (lazy) materialize();
+  }
+  bool fastPath = true;
+  /** statistics: cycles the block ran lazily (replayed by materialize) */
+  uint64_t lazyCycles = 0;
+  /** bumped by every register write that can change a machine's program or configuration */
+  uint32_t progEpoch = 1;
+
   // `private runTimer: NodeJS.Timeout | null` has no native counterpart.
+
+ private:
+  bool lazy = false;
+  uint64_t owed = 0;       // cycles counted but not yet run
+  uint64_t nextEvent = 0;  // the cycle (owed count) that must run for real
+  void tryEnterLazy();
+  void materialize();
 };
 
 }  // namespace rp2040js

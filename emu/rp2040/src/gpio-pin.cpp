@@ -70,9 +70,11 @@ bool GPIOPin::rawOutputEnable() const {
       return !!(rp2040.sio.gpioOutputEnable & bitmask);
 
     case FUNCTION_PIO0:
+      rp2040.pio[0].sync();  // PIO fast path: see its exact output
       return !!(rp2040.pio[0].pinDirections & bitmask);
 
     case FUNCTION_PIO1:
+      rp2040.pio[1].sync();  // PIO fast path: see its exact output
       return !!(rp2040.pio[1].pinDirections & bitmask);
 
     default:
@@ -90,9 +92,11 @@ bool GPIOPin::rawOutputValue() const {
       return !!(rp2040.sio.gpioValue & bitmask);
 
     case FUNCTION_PIO0:
+      rp2040.pio[0].sync();  // PIO fast path: see its exact output
       return !!(rp2040.pio[0].pinValues & bitmask);
 
     case FUNCTION_PIO1:
+      rp2040.pio[1].sync();  // PIO fast path: see its exact output
       return !!(rp2040.pio[1].pinValues & bitmask);
 
     default:
@@ -142,6 +146,7 @@ GPIOPinState GPIOPin::value() const {
 }
 
 void GPIOPin::setInputValue(bool value) {
+  rp2040.syncPIO();  // PIO fast path: an input may wake a stalled machine
   rawInputValue = value;
   const bool prevIrqValue = irqValue();
   if (value && inputEnable()) {
@@ -202,6 +207,7 @@ void GPIOPin::updateIRQValue(uint32_t value) {
 }
 
 std::function<void()> GPIOPin::addListener(GPIOPinListener callback) {
+  rp2040.syncPIO();  // PIO fast path: the listener sees every change from now on
   const uint64_t id = nextListenerId++;
   listeners.emplace(id, std::move(callback));
   return [this, id]() { listeners.erase(id); };
