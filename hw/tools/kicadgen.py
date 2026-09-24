@@ -1173,51 +1173,69 @@ def remove_dangling(board, pours=()):
     """What Freerouting sometimes leaves behind: a via joined on one layer
     only, or a track whose end meets nothing. Removed until none is left, as
     KiCad's own cleanup does. Nets in `pours` are left alone: their pours
-    are not filled yet, so their vias would look dangling. Returns the count."""
+    are not filled yet, so their vias would look dangling. Returns the count.
+    Every copper layer counts (inner signal layers too). The geometry is read
+    once into plain numbers: on a board with thousands of tracks, the SWIG
+    proxies of Cast() items stop working part-way through (Python 3.14)."""
     import pcbnew
-    removed = 0
+    copper = [l for l in board.GetEnabledLayers().CuStack()]
+    pads = {}
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            pads.setdefault(p.GetNetname(), []).append(p)
+    tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
+    segs, vias = {}, {}
+    for i in range(len(tracks)):
+        t = tracks[i]
+        net = t.GetNetname()
+        if net in pours:
+            continue
+        a, b = t.GetStart(), t.GetEnd()
+        if t.Type() == pcbnew.PCB_VIA_T:
+            vias.setdefault(net, []).append((i, a.x, a.y, t.Cast().GetWidth(pcbnew.F_Cu) // 2))
+        elif t.Type() == pcbnew.PCB_TRACE_T:
+            segs.setdefault(net, []).append((i, a.x, a.y, b.x, b.y, t.GetWidth() // 2, t.GetLayer()))
+
+    def seg_dist(x, y, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        k = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+        return math.hypot(x - ax - k * dx, y - ay - k * dy)
+
+    gone = set()
+
+    def joined(x, y, layer, net, reach, skip):
+        """anything of `net` on `layer` at (x, y): a pad, a via, another track"""
+        pt = pcbnew.VECTOR2I(int(x), int(y))
+        for p in pads.get(net, ()):
+            if p.IsOnLayer(layer) and p.HitTest(pt, int(reach)):
+                return True
+        for i, vx, vy, r in vias.get(net, ()):
+            if i != skip and i not in gone and math.hypot(x - vx, y - vy) <= r + reach:
+                return True
+        for i, ax, ay, bx, by, w, l in segs.get(net, ()):
+            if i != skip and i not in gone and l == layer and seg_dist(x, y, ax, ay, bx, by) <= w + reach:
+                return True
+        return False
+    # to a fixed point on the numbers, then remove everything at once: after
+    # a Remove, the board's SWIG proxies can no longer be listed again
     while True:
-        tracks = board.Tracks()                  # indexed: iterating it breaks on Python 3.14
-        items = [tracks[i].Cast() for i in range(len(tracks))]
-        items = [t for t in items if t.GetNetname() not in pours]
-        segs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]
-        vias = [t for t in items if t.Type() == pcbnew.PCB_VIA_T]
-        pads = [p for fp in board.GetFootprints() for p in fp.Pads()]
-
-        def seg_dist(pt, t):
-            ax, ay, bx, by = t.GetStart().x, t.GetStart().y, t.GetEnd().x, t.GetEnd().y
-            dx, dy = bx - ax, by - ay
-            k = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((pt.x - ax) * dx + (pt.y - ay) * dy) / (dx * dx + dy * dy)))
-            return math.hypot(pt.x - ax - k * dx, pt.y - ay - k * dy)
-
-        def joined(pt, layer, net, reach, skip=None):
-            """anything of `net` on `layer` at `pt`: a pad, a via, another track"""
-            for p in pads:
-                if p.GetNetname() == net and p.IsOnLayer(layer) and p.HitTest(pt, reach):
-                    return True
-            for v in vias:
-                if v is not skip and v.GetNetname() == net and v.HitTest(pt, reach):
-                    return True
-            for t in segs:
-                if t is not skip and t.GetNetname() == net and t.GetLayer() == layer and \
-                        seg_dist(pt, t) <= t.GetWidth() / 2 + reach:
-                    return True
-            return False
-        gone = []
-        for v in vias:
-            layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
-            if len(layers) < 2:
-                gone.append(v)
-        for t in segs:
-            for end in (t.GetStart(), t.GetEnd()):
-                if not joined(end, t.GetLayer(), t.GetNetname(), t.GetWidth() // 2, skip=t):
-                    gone.append(t)
-                    break
-        if not gone:
-            return removed
-        for t in gone:
-            board.Remove(t)
-        removed += len(gone)
+        more = set()
+        for net, vs in vias.items():
+            for i, x, y, r in vs:
+                if i not in gone and sum(1 for l in copper if joined(x, y, l, net, r, i)) < 2:
+                    more.add(i)
+        for net, ss in segs.items():
+            for i, ax, ay, bx, by, w, l in ss:
+                if i not in gone and not (joined(ax, ay, l, net, w, i) and joined(bx, by, l, net, w, i)):
+                    more.add(i)
+        if not more:
+            break
+        gone |= more
+    # removed from the end, by index, each proxy dropped at once: holding
+    # proxies of removed items breaks SWIG for the rest of the process
+    for i in sorted(gone, reverse=True):
+        board.Delete(tracks[i])
+    return len(gone)
 
 
 def autoroute(board, workdir, passes=40, pours=(), tries=3, power_layers=()):
