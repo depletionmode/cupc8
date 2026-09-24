@@ -678,7 +678,8 @@ def wanted(parts):
     def pin1_offset(fpid):
         lib, name = fpid.split(":")
         fp = pcbnew.FootprintLoad(kg.footprint_dir(lib), name)
-        return -pcbnew.ToMM([q for q in fp.Pads() if q.GetNumber() == "A1"][0].GetPosition().x)
+        a1 = "1" if fpid == sockets.SOCKETS["CUPC8_SystemSlot"][0] else "A1"    # C19188869 numbers 1-64
+        return -pcbnew.ToMM([q for q in fp.Pads() if q.GetNumber() == a1][0].GetPosition().x)
 
     at = {}
     at["J2"] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_CPUSocket"][0]), ROW_CPU, 0)
