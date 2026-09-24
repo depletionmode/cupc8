@@ -106,9 +106,17 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   CPU_CLK and the other inputs go straight to the FPGA.
 - **Straps.** CARD_ID = `10`: CARD_ID0 goes to GND, and CARD_ID1 is left to
   the main board's pull-up. PRSNT1_n is joined to PRSNT2_n.
-- **1V2 rail LED** ([power.md](../../doc/hardware/power.md)). 1.2 V cannot
-  light an LED, so an MMBT3904 driven from 1V2 switches a red LED on 3V3.
-  There are test pads for 1V2, 3V3 and GND.
+- **LEDs.** The PWR LED (red, 1 kΩ from 3V3) sits at the common power-LED
+  spot, 3 mm in from the body's top-left corner. Next to it along the top
+  edge is the 1V2 rail LED ([power.md](../../doc/hardware/power.md)). 1.2 V
+  cannot light an LED, so an MMBT3904 driven from 1V2 switches a red LED on
+  3V3. The silkscreen labels them "PWR" and "1V2". There are test pads for
+  1V2, 3V3 and GND, and an M3 hole 4 mm in from the top-right corner, as on
+  the I/O cards. The board's title and revision are "CUPC/8 CPU rev A".
+- **Parts** (LCSC): iCE40HX4K-TQ144 C1521989, W25Q32JVSSIQ C179173,
+  RT9013-12GB C58464, 4D03WGJ0330T5E 33 Ω × 4 C25508, MMBT3904 C20526,
+  KT-0603R red LED C2286, and 0603 basics: 100 nF C14663, 1 µF C15849,
+  4.7 µF C19666, 10 kΩ C25804, 1 kΩ C21190, 100 Ω C22775.
 - **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold 45° fingers.
   The layers are signal + GND pour / GND plane / 3V3 plane / signal + GND
   pour. 1V2 is routed as tracks. With a TQ144 there
