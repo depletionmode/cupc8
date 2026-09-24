@@ -657,7 +657,7 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None):
+                zone_outline=None, labels=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -670,6 +670,8 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
                draws its own tab. Silk, designators and zones still keep
                inside `outline`, the card body.
     zone_outline: the copper pours' polygon, if not `outline` less 0.5 mm
+    labels:    {ref: word}: the word (what an LED shows) printed where the part's
+               designator would go, in its place
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -743,7 +745,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         board.Add(seg)
 
     clip_silk_to_board(board, outline)
-    place_designators(board, outline)
+    place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     for zone in zones:
@@ -823,10 +825,12 @@ def clip_silk_to_board(board, outline, gap=0.15):
 SILK_TEXT = (1.0, 0.15)                 # designator height and stroke (JLC minimum stroke)
 
 
-def place_designators(board, outline, gap=0.3):
+def place_designators(board, outline, labels=None, gap=0.3):
     """Put every reference designator horizontal, in the first spot around its
     part that clears all pads, every other part's courtyard, the other
-    designators, board-only graphics (logos) and the board edge."""
+    designators, board-only graphics (logos) and the board edge. A part in
+    `labels` ({ref: word}) gets that word there instead, and its designator
+    is hidden: an LED says what it shows, not "D3"."""
     import pcbnew
     mm = pcbnew.FromMM
 
@@ -844,10 +848,17 @@ def place_designators(board, outline, gap=0.3):
     x0, y0, x1, y1 = outline
     inside = (x0 + 0.3, y0 + 0.3, x1 - 0.3, y1 - 0.3)
     placed = []
+    labels = labels or {}
     for fp in sorted(fps, key=lambda f: f.GetReference()):
         ref = fp.Reference()
         if not ref.IsVisible() or fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
             continue
+        if fp.GetReference() in labels:
+            ref.SetVisible(False)
+            ref = pcbnew.PCB_TEXT(board)
+            ref.SetText(labels[fp.GetReference()])
+            ref.SetLayer(pcbnew.F_SilkS)
+            board.Add(ref)
         ref.SetTextSize(pcbnew.VECTOR2I(mm(SILK_TEXT[0]), mm(SILK_TEXT[0])))
         ref.SetTextThickness(mm(SILK_TEXT[1]))
         ref.SetTextAngleDegrees(0)
@@ -916,6 +927,15 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
             for ref, num, on_f, on_b, bb, pad in pads:
                 if (on_f if front else on_b) and hit(bb, pad):
                     bad.append("silkscreen of %s touches pad %s of %s" % (fp.GetReference(), num, ref))
+    # the board's own silkscreen words (labels) against every pad
+    dr = board.Drawings()                        # indexed: iterating it breaks on Python 3.14
+    for d in [dr[i].Cast() for i in range(len(dr))]:
+        if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS):
+            front = d.GetLayer() == pcbnew.F_SilkS
+            gb = d.GetBoundingBox()
+            for ref, num, on_f, on_b, bb, _ in pads:
+                if (on_f if front else on_b) and bb.Intersects(gb):
+                    bad.append("label %r touches pad %s of %s" % (d.GetText(), num, ref))
     return sorted(set(bad))
 
 
@@ -1055,8 +1075,9 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     short track to its own via, pointing away from a small part's centre
     (towards a big one's), so the
     router routes round it instead of walling it in (a pad boxed in by
-    signals reaches the pour through a sliver or not at all). Pads within
-    reach of a via already placed share it. Returns the vias placed."""
+    signals reaches the pour through a sliver or not at all). No sharing a
+    neighbour's via: a signal routed between them would cut the pad off.
+    Returns the vias placed."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     ni = board.FindNet(net)
@@ -1086,8 +1107,6 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
         if p.GetNetname() != net or p.GetAttribute() != pcbnew.PAD_ATTRIB_SMD:
             continue
         cx, cy = to(p.GetPosition().x), to(p.GetPosition().y)
-        if any(math.hypot(cx - vx, cy - vy) < 1.3 for vx, vy in vias):
-            continue                                  # a neighbour's via is close enough
         fx, fy = to(fp.GetPosition().x), to(fp.GetPosition().y)
         base = math.atan2(cy - fy, cx - fx) if math.hypot(cx - fx, cy - fy) > 0.1 else -math.pi / 2
         if len(fp.Pads()) > 8:
@@ -1177,6 +1196,9 @@ def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
         board.Add(v)
         return True
     return False
+
+
+UNJOINED = []                            # pour pieces stitch(fragments=True) could not join, for the report
 
 
 def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fragments=False):
@@ -1355,6 +1377,10 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
             if fan:
                 reached.add(k)
                 count += 1
+            else:
+                UNJOINED.append("%s piece at %.1f,%.1f..%.1f,%.1f mm" % (
+                    "top" if layer == pcbnew.F_Cu else "bottom",
+                    to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
         return count
     xs = [p[0] for p in polygon]
     ys = [p[1] for p in polygon]
@@ -1483,7 +1509,7 @@ def check_order(spec, card_edge):
 
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
-             zone_outline=None, boards=2):
+             zone_outline=None, boards=2, labels=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> JLC stock for `boards` assembled -> 3D renders. `schematic(path,
@@ -1516,7 +1542,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
-                        graphics=graphics, edge=edge, zone_outline=zone_outline)
+                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
@@ -1547,13 +1573,14 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
         fill_zones(state["b"])
         for _ in range(3):                      # then any piece signals cut off, until none is left
+            del UNJOINED[:]
             k = sum(stitch(state["b"], z, poly, fragments=True) for z in zones[:1])
             if not k:
                 break
             n += k
             fill_zones(state["b"])
         pcbnew.SaveBoard(pcb, state["b"])
-        return "%d stitching vias" % n
+        return "%d stitching vias" % n + ("; NOT JOINED: " + "; ".join(UNJOINED) if UNJOINED else "")
     step("stitch + zones + save", fill)
 
     def silk():

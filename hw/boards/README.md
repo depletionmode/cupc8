@@ -39,7 +39,7 @@ Spec: `doc/hardware/wifi-card.md`.
   - MISO: GPIO5
   - CS_n: GPIO10
   - IRQ_n: GPIO3, open drain
-  - LINK LED: GPIO4
+  - LINK, TX and RX LEDs: GPIO4, GPIO0, GPIO1
 - **U2, AMS1117-3.3** (C6186), fed from the slot's +5V, with 22 µF in and
   22 µF + 100 nF out. The slot's +3V3 pins are left unconnected: Wi-Fi TX
   peaks near 350 mA, and the slot's +3V3 is limited to 300 mA.
@@ -52,7 +52,12 @@ Spec: `doc/hardware/wifi-card.md`.
   else.
 - **Programming port:** SWCLK drives U0RXD and SWDIO carries U0TXD. esptool
   runs through sysctl's UART tunnel.
-- **LEDs:** power (red: a green LED drops ~3 V, too close to the 3.3 V rail), and link on GPIO4 (green, 100 Ω).
+- **LEDs:** power at the standard spot (red: a green LED drops ~3 V, too
+  close to the 3.3 V rail for 1 kΩ), then LINK (GPIO4), TX (GPIO0) and RX
+  (GPIO1) in a row, green with 100 Ω. TX and RX light for 30 ms whenever
+  socket data moves.
+- **Outline:** the standard I/O card outline, with its M3 hole
+  (`slot.md`, Mechanical).
 - **Test pads** for the native USB-Serial/JTAG (GPIO18/19). They are for
   debugging only.
 - **PRSNT1_n (A1) is joined to PRSNT2_n (B18).** The RSVD pins are left

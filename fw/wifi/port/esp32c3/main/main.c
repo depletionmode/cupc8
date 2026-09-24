@@ -15,6 +15,19 @@
 
 static wifi_t card;
 
+#define ACTIVITY_MS 30                  /* an LED stays lit this long after data moves, so bursts show */
+
+/* light `pin` for ACTIVITY_MS after `count` changes */
+static void activity(gpio_num_t pin, uint32_t count, uint32_t *seen, TickType_t *until)
+{
+	TickType_t now = xTaskGetTickCount();
+	if (count != *seen) {
+		*seen = count;
+		*until = now + pdMS_TO_TICKS(ACTIVITY_MS);
+	}
+	gpio_set_level(pin, (int32_t)(*until - now) > 0);
+}
+
 void app_main(void)
 {
 	esp_err_t e = nvs_flash_init();
@@ -30,6 +43,12 @@ void app_main(void)
 	gpio_set_direction(PIN_SLOT_NIRQ, GPIO_MODE_INPUT);
 	gpio_reset_pin(PIN_LED_LINK);
 	gpio_set_direction(PIN_LED_LINK, GPIO_MODE_OUTPUT);
+	gpio_reset_pin(PIN_LED_TX);
+	gpio_set_direction(PIN_LED_TX, GPIO_MODE_OUTPUT);
+	gpio_reset_pin(PIN_LED_RX);
+	gpio_set_direction(PIN_LED_RX, GPIO_MODE_OUTPUT);
+	uint32_t tx_seen = 0, rx_seen = 0;
+	TickType_t tx_until = 0, rx_until = 0;
 
 	wifi_init(&card, &netesp_ops, netesp_init());
 	frames_init(&card.card);
@@ -46,6 +65,8 @@ void app_main(void)
 		frames_busy(false);
 		gpio_set_direction(PIN_SLOT_NIRQ, card_irq(&card.card) ? GPIO_MODE_OUTPUT : GPIO_MODE_INPUT);
 		gpio_set_level(PIN_LED_LINK, card.link == WIFI_LINK_UP);
+		activity(PIN_LED_TX, card.tx_bytes, &tx_seen, &tx_until);
+		activity(PIN_LED_RX, card.rx_bytes, &rx_seen, &rx_until);
 		vTaskDelay(1);
 	}
 }
