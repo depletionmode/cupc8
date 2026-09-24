@@ -2796,7 +2796,7 @@
 				)
 			)
 		)
-		(property "Footprint" "jlc:PCIE-SMD_PCIE-64P11L"
+		(property "Footprint" "cupc8:SOFNG_PCIE-64P11L"
 			(at 0 0 0)
 			(effects
 				(font

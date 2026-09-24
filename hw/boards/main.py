@@ -721,8 +721,12 @@ def wanted(parts):
     for net, pins_ in decap.items():
         caps = [r for r in refs("C", net) if 20 <= int(r[1:]) <= 33]
         for r, n in zip(caps, pins_):
-            x, y = pin_xy(n, 2.9)
-            at[r] = (x, y, side_rot(n))
+            # in the corner nearest the pin, where no pins fan out: the planes
+            # (In1 GND, In2 3V3) and the pins' own vias carry the current
+            x, y = pin_xy(n)
+            cx = fx + (13.5 if x > fx else -13.5)
+            cy = fy + (13.5 if y > fy else -13.5)
+            at[r] = (cx, cy, 45)
     x, y = pin_xy(54, 2.9)
     at["C37"] = (x, y, 0)
     x, y = pin_xy(126, 2.9)
@@ -1002,7 +1006,9 @@ def _graphics():
 
 # the nets that carry amps: 0.5 mm tracks (kicadgen's Power class)
 POWER_NETS = ("/VBUS", "/VBUS_F", "/5V_SYS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
-PLANES = (("/GND", "In1.Cu"), ("/+3V3", "In2.Cu"))
+# In1 a solid GND plane; In2 carries signals too (two signal layers leave ~80
+# connections unrouted), with a +3V3 pour filled round them after routing
+PLANES = (("/GND", "In1.Cu"), ("/+3V3", "In2.Cu", "routed"))
 
 
 def main():
