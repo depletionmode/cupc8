@@ -40,7 +40,16 @@ class RPSIO {
   RPSIO(const RPSIO &) = delete;
   RPSIO &operator=(const RPSIO &) = delete;
 
-  void selectCore(uint32_t index);
+  /**
+   * Make core `index`'s divider and interpolators the current ones. The swap
+   * itself waits until the next SIO access (readUint32, writeUint32,
+   * updateHardwareDivider: the only users of the banked fields), so that
+   * RP2040::step() selecting core 1 and back for every core 1 instruction
+   * costs nothing. Code outside sio.cpp that reads the banked public fields
+   * directly must call selectCore and then flushSelect() first.
+   */
+  void selectCore(uint32_t index) { selected = index; }
+  void flushSelect() { swapBank(selected); }
 
   void updateHardwareDivider(bool signed_);
 
@@ -55,7 +64,9 @@ class RPSIO {
     std::unique_ptr<Interpolator> interp1;
   };
   std::array<Bank, 2> banks;
-  uint32_t bank = 0;
+  uint32_t bank = 0;      // the bank in the fields above
+  uint32_t selected = 0;  // the bank selectCore() asked for
+  void swapBank(uint32_t index);
 
   std::array<uint32_t, 2> fifoErr = {0, 0};  // bit 2 WOF, bit 3 ROE
 

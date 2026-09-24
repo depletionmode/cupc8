@@ -144,6 +144,7 @@ function stateVector(mcu, irqLines, out) {
   if (irqLines) {
     out.push((mcu.core0.pendingInterrupts >>> 7) & 0xf);
   }
+  for (const pin of mcu.gpio) out.push(pin.lastValue >>> 0);
   return out;
 }
 
@@ -170,6 +171,7 @@ function stateLabels(irqLines) {
   }
   labels.push('dma.dreq[0..15]');
   if (irqLines) labels.push('core0.pendingInterrupts[7..10]');
+  for (let i = 0; i < 30; i++) labels.push(`gpio${i}.lastValue`);
   return labels;
 }
 
@@ -178,7 +180,9 @@ function stateLabels(irqLines) {
 
 function parseScenario(file) {
   const lines = readFileSync(file, 'utf8').split('\n');
-  let cycles = 0;
+  let cycles = 0,
+    listenMask = 0x3fffffff,
+    stateEvery = 1;
   const ev = [];
   for (const line of lines) {
     if (!line || line[0] === '#') continue;
@@ -187,9 +191,14 @@ function parseScenario(file) {
       cycles = Number(f[1]);
       continue;
     }
+    if (f[0] === 'L' || f[0] === 'V') {
+      if (f[0] === 'L') listenMask = parseInt(f[1], 16) >>> 0;
+      else stateEvery = parseInt(f[1], 16);
+      continue;
+    }
     ev.push([Number(f[0]), f[1], parseInt(f[2], 16) >>> 0, f.length > 3 ? parseInt(f[3], 16) >>> 0 : 0]);
   }
-  return { cycles, ev };
+  return { cycles, ev, listenMask, stateEvery };
 }
 
 async function runJs(file, mode, a, b, irqLines) {
@@ -197,7 +206,7 @@ async function runJs(file, mode, a, b, irqLines) {
   const mcu = new RP2040();
   mcu.pio[0].run = () => {};
   mcu.pio[1].run = () => {};
-  const { cycles, ev } = parseScenario(file);
+  const { cycles, ev, listenMask, stateEvery } = parseScenario(file);
   const dump = mode === 'dump';
   const out = [];
   const flush = () => {
@@ -221,7 +230,11 @@ async function runJs(file, mode, a, b, irqLines) {
   // Sync every pin's lastValue first, so that GPIO state left by other
   // peripherals' reset() (PWM touches pin 1) does not enter the comparison.
   for (const pin of mcu.gpio) pin.checkForUpdates();
-  mcu.gpio.forEach((pin, index) => pin.addListener((state) => observe('gpio', index, state)));
+  const listen = (index) =>
+    mcu.gpio[index].addListener((state, old) => observe('gpio', index, (state | (old << 8)) >>> 0));
+  mcu.gpio.forEach((pin, index) => {
+    if (listenMask & (1 << index)) listen(index);
+  });
   out.push(`irqlines ${irqLines ? 1 : 0}\n`);
   const state = [];
   let next = 0;
@@ -237,6 +250,21 @@ async function runJs(file, mode, a, b, irqLines) {
           break;
         case 'g':
           mcu.gpio[x].setInputValue(!!y);
+          break;
+        case 'p':
+          if (!dump) {
+            stateVector(mcu, irqLines, state);
+            mix(0x5a5a5a5a);
+            for (let i = 0; i < state.length; i++) mix(state[i]);
+          }
+          break;
+        case 'q': {
+          const pin = mcu.gpio[x];
+          observe('q', x, (pin.value | (pin.outputValue ? 0x100 : 0) | (pin.outputEnable ? 0x200 : 0) | (pin.status << 12)) >>> 0);
+          break;
+        }
+        case 'l':
+          listen(x);
           break;
         case 't':
           if (!mcu.pio[x >> 2].machines[x & 3].txFIFO.full) {
@@ -263,9 +291,13 @@ async function runJs(file, mode, a, b, irqLines) {
       if (cycle + 1 >= b) break;
       continue;
     }
-    stateVector(mcu, irqLines, state);
-    for (let i = 0; i < state.length; i++) mix(state[i]);
+    if ((cycle + 1) % stateEvery === 0) {
+      stateVector(mcu, irqLines, state);
+      for (let i = 0; i < state.length; i++) mix(state[i]);
+    }
     if ((cycle + 1) % a === 0 || cycle + 1 === cycles) {
+      stateVector(mcu, irqLines, state); // the final state of every block
+      for (let i = 0; i < state.length; i++) mix(state[i]);
       for (const pio of mcu.pio) for (const v of pio.instructions) mix(v);
       out.push(`h ${cycle} ${h.toString(16).padStart(8, '0')}\n`);
       if (out.length > 1000) flush();
@@ -302,6 +334,7 @@ class Scenario {
     this.name = name;
     this.lines = [];
     this.cycles = 0;
+    this.header = []; // "L <mask>" (listened pins), "V <n>" (state hashed every n cycles)
   }
   at(cycle, op, a, b) {
     this.lines.push(b === undefined ? `${cycle} ${op} ${hex(a)}` : `${cycle} ${op} ${hex(a)} ${hex(b)}`);
@@ -319,7 +352,8 @@ class Scenario {
     // events must be in cycle order (stable: same-cycle events keep their order)
     const parsed = this.lines.map((l, i) => [Number(l.slice(0, l.indexOf(' '))), i, l]);
     parsed.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
-    return `# ${this.name}\nC ${this.cycles}\n${parsed.map((p) => p[2]).join('\n')}\n`;
+    const header = this.header.map((l) => `${l}\n`).join('');
+    return `# ${this.name}\nC ${this.cycles}\n${header}${parsed.map((p) => p[2]).join('\n')}\n`;
   }
 }
 
@@ -823,6 +857,255 @@ function genSpi(seed, cycles, programs) {
   return S;
 }
 
+
+// --- the native fast path (RPPIO::sync): lazy runners and stalled machines ---
+//
+// These scenarios leave pins without listeners and hash the state vector only
+// every so often, so that the native PIO block can run lazily for long
+// stretches, and poke it through every way in and out of the fast path: bus
+// reads and writes of the block (FIFOs, DBG_PADOUT, CTRL restarts, clock
+// dividers, EXEC, program and configuration changes), GPIO reads of the
+// runners' pins, inputs that wake stalled machines, IO_BANK0/PADS writes on
+// the runners' pins, listeners added mid-run, FIFO underruns (the runner
+// stalls) and state peeks at random cycles.
+
+const OUT_DESTS = [0, 1, 2, 3, 4, 5, 6]; // PINS X Y NULL PINDIRS PC ISR (7 = EXEC: not a runner)
+
+/** a random OUT, mostly without delay, with side-set bits for `sidesetCount` */
+function randOut(R, sidesetCount, bitCount) {
+  const dest = R.chance(0.97) ? R.pick(OUT_DESTS) : 7;
+  const bits = bitCount ?? (R.chance(0.1) ? 0 : 1 + R.int(R.chance(0.5) ? 3 : 31));
+  const sideBits = sidesetCount ? R.int(32) & ~((1 << (5 - sidesetCount)) - 1) : 0;
+  const delay = R.chance(0.9) ? 0 : R.int(32) & ((1 << (5 - sidesetCount)) - 1);
+  return (0b011 << 13) | ((sideBits | delay) << 8) | (dest << 5) | (bits & 0x1f);
+}
+
+function lazyPokes(S, R, c, p, rate, pins) {
+  const base = PIO_BASE[p];
+  const m = R.int(4);
+  if (R.float() < rate.peek) S.at(c, 'p', 0);
+  if (R.float() < rate.q) S.at(c, 'q', R.pick(pins));
+  if (R.float() < rate.read) {
+    const k = R.int(4);
+    if (k === 0) S.r(c, base + R.pick([R_DBG_PADOUT, R_DBG_PADOE, R_FLEVEL, R_FSTAT, R_FDEBUG, R_INTR]));
+    else if (k === 1) S.r(c, smReg(p, m, R.pick([SM_ADDR, SM_INSTR, SM_EXECCTRL])));
+    else if (k === 2) S.r(c, base + R.pick(READ_REGS));
+    else S.at(c, 'x', p * 4 + m);
+  }
+  if (R.float() < rate.io) {
+    const pin = R.pick(pins);
+    const k = R.int(4);
+    if (k === 0) {
+      S.w(c, IO_BANK0 + 4 + 8 * pin, R.pick([5, 6, 7, 6 | (R.int(4) << 8), 6 | (R.int(4) << 12), 7 | (R.int(4) << 16)]));
+    } else if (k === 1) S.w(c, IO_BANK0 + 4 + 8 * pin, 6 + p);
+    else if (k === 2) S.w(c, PADS_BANK0 + 4 + 4 * pin, R.pick([PAD_IE | 0x10, PAD_IE | PAD_PUE, PAD_PDE | PAD_PUE, 0x80, PAD_IE]));
+    else S.g(c, pin, R.int(2));
+  }
+  if (R.float() < rate.listen) S.at(c, 'l', R.pick(pins));
+  if (R.float() < rate.exec) S.w(c, smReg(p, m, SM_INSTR), R.chance(0.5) ? randOut(R, 2) : randInstr(R));
+  if (R.float() < rate.ctrl) {
+    const k = R.int(4);
+    if (k === 0) S.w(c, base + R_CTRL + ATOMIC_SET, 1 << (4 + m)); // restart
+    else if (k === 1) S.w(c, base + R_CTRL + ATOMIC_SET, 1 << (8 + m)); // clkdiv restart
+    else if (k === 2) S.w(c, base + R_CTRL + ATOMIC_CLR, 1 << m); // disable ...
+    else S.w(c, base + R_CTRL + ATOMIC_SET, 1 << m); // ... enable
+  }
+  if (R.float() < rate.cfg) {
+    const k = R.int(5);
+    if (k === 0) S.w(c, smReg(p, m, SM_CLKDIV), R.pick([1 << 16, 2 << 16, (1 << 16) | (0x80 << 8), 3 << 16]));
+    else if (k === 1) S.w(c, smReg(p, m, SM_SHIFTCTRL) + ATOMIC_XOR, R.pick([1 << 17, 1 << 19, R.int(32) << 25]));
+    else if (k === 2) S.w(c, smReg(p, m, SM_EXECCTRL) + ATOMIC_XOR, R.pick([1 << 30, 1 << 29, R.int(32) << 12, R.int(32) << 7]));
+    else if (k === 3) S.w(c, smReg(p, m, SM_PINCTRL) + ATOMIC_XOR, R.pick([1 << 29, R.int(32) << 10, R.int(32), 1 << 20]));
+    else S.w(c, base + R_INSTR_MEM0 + 4 * R.int(32), R.chance(0.7) ? randOut(R, 2) : randInstr(R));
+  }
+  if (R.float() < rate.irq) S.w(c, base + R.pick([R_IRQ_FORCE, R_IRQ]), 1 << R.int(8));
+}
+
+function genLazyDvi(seed, cycles, programs) {
+  const R = rng(seed);
+  const S = new Scenario(`fast path: PicoDVI lanes + stalled slotspi, seed ${seed}`);
+  S.cycles = cycles;
+  const sdk = new Sdk(S);
+  const ser = programs.dvi_serialiser;
+  const off = sdk.addProgram(0, 0, ser, 0);
+  const lanes = [12, 14, 16];
+  const lanePins = [12, 13, 14, 15, 16, 17];
+  // listeners everywhere but the lanes (sometimes on one lane pin too)
+  let listen = 0x3fffffff & ~(0x3f << 12);
+  if (R.chance(0.2)) listen |= 1 << R.pick(lanePins);
+  S.header.push(`L ${hex(listen)}`, `V ${hex(R.pick([1, 3, 97, 1000, 5000]))}`);
+  const laneConfig = (sm) => {
+    const c = Sdk.config(ser, off);
+    Sdk.sideset(c, 2, false, false);
+    Sdk.pins(c, 'sideset', lanes[sm], 0);
+    Sdk.outShift(c, true, true, 10 * 2);
+    Sdk.join(c, true, false);
+    return c;
+  };
+  lanes.forEach((pin, sm) => {
+    sdk.setPinsWithMask(0, 0, sm, 2 << pin, 3 << pin, false, 0);
+    sdk.setPinsWithMask(0, 0, sm, ~0, 3 << pin, true, 0);
+    sdk.gpioInit(0, 0, pin);
+    sdk.gpioInit(0, 0, pin + 1);
+    sdk.init(0, 0, sm, off, laneConfig(sm));
+    sdk.setEnabled(0, 0, 1 << sm, false);
+  });
+  for (let lane = 0; lane < 3; lane++) for (let i = 0; i < 8; i++) S.at(1, 't', lane, R.u32() & 0xfffff);
+  S.w(2, PIO_BASE[0] + R_CTRL + ATOMIC_SET, 0x7 | (0x7 << 8));
+  // PIO1 SM2: slotspi waiting for CS (and the odd frame)
+  const spi = programs.slotspi;
+  const prog = sdk.addProgram(0, 1, spi, 32 - spi.words.length);
+  const c0 = Sdk.config(spi, prog);
+  Sdk.pins(c0, 'in', 3, 0);
+  Sdk.pins(c0, 'out', 4, 1);
+  Sdk.pins(c0, 'set', 4, 1);
+  Sdk.inShift(c0, false, true, 8);
+  Sdk.outShift(c0, false, false, 32);
+  sdk.gpioInit(0, 1, 4);
+  sdk.padInit(0, 2, false);
+  sdk.padInit(0, 3, false);
+  sdk.padInit(0, 5, true);
+  S.g(0, 5, 1);
+  sdk.init(0, 1, 2, prog, c0);
+  sdk.exec(0, 1, 2, 0xe020); // set x, 0
+  sdk.exec(0, 1, 2, prog); // jmp start
+  sdk.setEnabled(3, 1, 1 << 2, true);
+  const quiet = R.chance(0.5); // long stretches without pokes
+  const rate = {
+    peek: quiet ? 0.0002 : 0.003,
+    q: quiet ? 0.0002 : 0.003,
+    read: quiet ? 0.0002 : 0.002,
+    io: quiet ? 0.00005 : 0.0005,
+    listen: 0.00002,
+    exec: quiet ? 0.00002 : 0.0003,
+    ctrl: quiet ? 0.00002 : 0.0002,
+    cfg: quiet ? 0.00001 : 0.0001,
+    irq: 0.0002,
+  };
+  // the DMA: keep each lane's FIFO fed (a word per ~20 cycles), with jitter and underruns
+  const next = [3, 3, 3];
+  const period = R.pick([1, 5, 15, 19, 20]);
+  let restore = 0;
+  for (let c = 3; c < cycles; c++) {
+    for (let lane = 0; lane < 3; lane++) {
+      if (c >= next[lane]) {
+        // a plain bus write (as the DMA does; TXOVER if full) or one that checks for space
+        if (R.chance(0.7)) S.w(c, PIO_BASE[0] + R_TXF0 + 4 * lane, R.u32() & 0xfffff);
+        else S.at(c, 't', lane, R.u32() & 0xfffff);
+        next[lane] = c + (R.chance(0.998) ? period + R.int(3) : 100 + R.int(400));
+      }
+    }
+    if (R.chance(0.0003)) {
+      // a frame on the slot: CS low, a few SCK edges, CS high
+      S.g(c, 5, 0);
+      for (let k = 1; k < 16; k++) S.g(c + 7 * k, 2, k & 1);
+      S.g(c + 120, 5, 1);
+    }
+    lazyPokes(S, R, c, R.chance(0.8) ? 0 : 1, rate, [...lanePins, 4, 5]);
+    // put the lanes back now and then, so that the fast path gets going again
+    if (c >= restore && R.chance(0.0005)) {
+      restore = c + 5000;
+      ser.words.forEach((w, i) => S.w(c, PIO_BASE[0] + R_INSTR_MEM0 + 4 * (off + i), w));
+      for (const pin of lanePins) S.w(c, IO_BANK0 + 4 + 8 * pin, 6);
+      for (let sm = 0; sm < 3; sm++) {
+        const cfg = laneConfig(sm);
+        S.w(c, smReg(0, sm, SM_CLKDIV), 1 << 16);
+        S.w(c, smReg(0, sm, SM_EXECCTRL), cfg.execctrl >>> 0);
+        S.w(c, smReg(0, sm, SM_SHIFTCTRL), cfg.shiftctrl >>> 0);
+        S.w(c, smReg(0, sm, SM_PINCTRL), cfg.pinctrl >>> 0);
+      }
+      S.w(c, PIO_BASE[0] + R_CTRL + ATOMIC_SET, 0x7);
+    }
+  }
+  return S;
+}
+
+function genLazyRandom(seed, cycles) {
+  const R = rng(seed * 0x85ebca6b + 777);
+  const S = new Scenario(`fast path: random OUT runners and stalled machines, seed ${seed}`);
+  S.cycles = cycles;
+  let listen = 0;
+  const listenP = R.pick([0, 0.1, 0.5]);
+  for (let pin = 0; pin < 30; pin++) if (R.chance(listenP)) listen |= 1 << pin;
+  S.header.push(`L ${hex(listen)}`, `V ${hex(R.pick([1, 2, 50, 997, 10000]))}`);
+  const pins = [];
+  for (let i = 0; i < 6; i++) pins.push(R.int(30));
+  for (let p = 0; p < 2; p++) {
+    // instruction memory: an OUT-only runner block, a stall block, random rest
+    const sidesetCount = R.pick([0, 1, 2, 3]);
+    const sideEn = R.chance(0.3);
+    const runLen = 1 + R.int(6);
+    const commonBits = R.chance(0.8) ? 1 + R.int(R.chance(0.5) ? 2 : 31) : undefined;
+    const pcOnly = R.chance(0.4);
+    for (let i = 0; i < 32; i++) {
+      let w;
+      if (i < runLen) {
+        w = randOut(R, sidesetCount, commonBits);
+        if (pcOnly) w = (w & ~(7 << 5)) | (5 << 5); // out pc, n
+        if (sideEn && R.chance(0.5)) w |= 1 << 12; // the side-set enable bit
+      } else if (i < runLen + 4) {
+        const k = R.int(5);
+        if (k === 0) w = 0x2000 | (R.int(2) << 7) | R.int(30); // wait gpio
+        else if (k === 1) w = 0x2040 | (R.int(2) << 7) | R.int(8); // wait irq
+        else if (k === 2) w = 0x80a0; // pull block
+        else if (k === 3) w = 0x8020; // push block
+        else w = 0x2020 | (R.int(2) << 7) | R.int(32); // wait pin
+      } else w = randInstr(R);
+      S.w(0, PIO_BASE[p] + R_INSTR_MEM0 + 4 * i, w);
+    }
+    // a block of runners and stalled machines only can stay lazy through autopulls
+    const kinds = R.chance(0.6) ? ['run', 'run', 'stall', 'off'] : ['run', 'run', 'stall', 'random', 'off'];
+    for (let m = 0; m < 4; m++) {
+      const kind = R.pick(kinds);
+      const top = kind === 'run' ? runLen - 1 : 31;
+      const bottom = kind === 'run' ? 0 : R.int(32);
+      const exec =
+        (top << 12) | (bottom << 7) | (R.int(32) << 24) | (sideEn ? 1 << 30 : 0) | (R.chance(0.2) ? 1 << 29 : 0) | R.int(0x80);
+      let shift =
+        (R.chance(0.9) ? 1 << 17 : 0) | (R.int(2) << 19) | (R.int(32) << 25) | (R.int(2) << 18) | (R.chance(0.3) ? 1 << 16 : 0) | (R.int(32) << 20);
+      if (R.chance(0.5)) shift |= 1 << 30; // join TX
+      const pinctrl =
+        (sidesetCount << 29) | (R.int(4) << 26) | (R.int(9) << 20) | (R.int(30) << 15) | (R.pick(pins) << 10) | (R.int(30) << 5) | R.pick(pins);
+      S.w(0, smReg(p, m, SM_CLKDIV), R.chance(0.8) ? 1 << 16 : randClkdiv(R));
+      S.w(0, smReg(p, m, SM_EXECCTRL), exec >>> 0);
+      S.w(0, smReg(p, m, SM_SHIFTCTRL), shift >>> 0);
+      S.w(0, smReg(p, m, SM_PINCTRL), pinctrl >>> 0);
+      if (kind === 'stall') S.w(0, smReg(p, m, SM_INSTR), runLen + R.int(4)); // jmp to a stall
+      if (kind === 'run') S.w(0, smReg(p, m, SM_INSTR), R.int(runLen)); // jmp into the runner
+      if (kind !== 'off') S.w(0, PIO_BASE[p] + R_CTRL + ATOMIC_SET, 1 << m);
+    }
+  }
+  for (let pin = 0; pin < 30; pin++) {
+    if (R.chance(0.8)) S.w(0, IO_BANK0 + 4 + 8 * pin, R.chance(0.5) ? 6 : 7);
+    if (R.chance(0.9)) S.w(0, PADS_BANK0 + 4 + 4 * pin, PAD_IE | (R.int(4) << 2) | 0x30);
+    S.g(0, pin, R.int(2));
+  }
+  const quiet = R.chance(0.5);
+  const rate = {
+    peek: quiet ? 0.0001 : 0.002,
+    q: quiet ? 0.0001 : 0.002,
+    read: quiet ? 0.0001 : 0.002,
+    io: quiet ? 0.00005 : 0.0005,
+    listen: 0.00005,
+    exec: quiet ? 0.00005 : 0.0005,
+    ctrl: quiet ? 0.00005 : 0.0005,
+    cfg: quiet ? 0.00002 : 0.0002,
+    irq: quiet ? 0.00005 : 0.0005,
+  };
+  const feed = R.pick([0.02, 0.1, 0.4]);
+  for (let c = 1; c < cycles; c++) {
+    const p = R.int(2);
+    if (R.float() < feed) {
+      if (R.chance(0.5)) S.w(c, PIO_BASE[p] + R_TXF0 + 4 * R.int(4), R.u32());
+      else S.at(c, 't', p * 4 + R.int(4), R.u32());
+    }
+    if (R.float() < feed / 4) S.at(c, 'x', p * 4 + R.int(4));
+    if (R.float() < 0.0005) S.g(c, R.int(30), R.int(2));
+    lazyPokes(S, R, c, p, rate, pins);
+  }
+  return S;
+}
+
 // ---------------------------------------------------------------------------
 // Orchestration
 
@@ -888,7 +1171,7 @@ async function checkScenario(cxx, file, name, cycles) {
 }
 
 async function main(argv) {
-  const opt = { seeds: 40, cycles: 250000, realCycles: 1000000, realSeeds: 2, jobs: Math.max(1, cpus().length), cxx: null, keep: null };
+  const opt = { seeds: 40, cycles: 250000, realCycles: 1000000, realSeeds: 2, lazySeeds: 24, jobs: Math.max(1, cpus().length), cxx: null, keep: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--cxx') opt.cxx = argv[++i];
@@ -896,6 +1179,7 @@ async function main(argv) {
     else if (a === '--cycles') opt.cycles = Number(argv[++i]);
     else if (a === '--real-cycles') opt.realCycles = Number(argv[++i]);
     else if (a === '--real-seeds') opt.realSeeds = Number(argv[++i]);
+    else if (a === '--lazy-seeds') opt.lazySeeds = Number(argv[++i]);
     else if (a === '--jobs') opt.jobs = Number(argv[++i]);
     else if (a === '--keep') opt.keep = argv[++i];
     else throw new Error(`unknown option ${a}`);
@@ -917,6 +1201,10 @@ async function main(argv) {
     jobs.push(() => genSpi(2000 + s, opt.realCycles, programs));
   }
   for (let s = 0; s < opt.seeds; s++) jobs.push(() => genRandom(s, opt.cycles));
+  for (let s = 0; s < opt.lazySeeds; s++) {
+    jobs.push(() => genLazyDvi(3000 + s, opt.cycles, programs));
+    jobs.push(() => genLazyRandom(s, opt.cycles));
+  }
 
   let failures = 0,
     totalCycles = 0,

@@ -16,6 +16,10 @@ class ClockAlarm : public IAlarm {
   ClockAlarm *next = nullptr;
   double nanos = 0;
   bool scheduled = false;
+  /** Not in TS: whether the alarm is in the clock's list (a fired alarm is
+   * not, but keeps `scheduled`), so that unlinking one that is not in the
+   * list skips the search that would not find it. */
+  bool linked = false;
 
   ClockAlarm(SimulationClock &clock, AlarmCallback callback);
   /** Not in TS (GC): unlinks the alarm so the clock never holds a dangling pointer. */
@@ -45,10 +49,20 @@ class SimulationClock : public IClock {
 
   ClockAlarm *linkAlarm(double nanos, ClockAlarm *alarm);
   bool unlinkAlarm(ClockAlarm *alarm);
-  void tick(double deltaNanos);
+  void tick(double deltaNanos) {
+    // (the loop below, inline for the common case of no alarm due)
+    const double targetNanos = nanosCounter + deltaNanos;
+    if (!nextAlarm || nextAlarm->nanos > targetNanos) {
+      nanosCounter = targetNanos;
+      return;
+    }
+    fireAlarms(targetNanos);
+  }
   double nanosToNextAlarm() const;
 
  private:
+  /** tick()'s loop: fire the alarms due by targetNanos, then move to it */
+  void fireAlarms(double targetNanos);
   ClockAlarm *nextAlarm = nullptr;
 
   double nanosCounter = 0;

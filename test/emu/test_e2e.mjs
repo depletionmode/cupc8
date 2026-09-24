@@ -51,6 +51,9 @@ function screenText(m) {
 }
 
 function golden(name, text) {
+  // the cursor blinks: whether the prompt shows it depends on when the frame
+  // was captured, so a cursor at the end of the last line is not compared
+  text = text.replace(/ ?_$/, '');
   const file = path.join(ROOT, 'test/emu/golden', name + '.txt');
   if (record) fs.writeFileSync(file, text + '\n');
   const want = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\n$/, '') : null;

@@ -2,6 +2,7 @@
 // clock divider (clockTick/divPhase), delayLeft, FIFO join on SHIFTCTRL).
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -135,6 +136,35 @@ class StateMachine {
   int32_t debugDelayLeft() const { return delayLeft; }
 
  private:
+  friend class RPPIO;
+
+  // --- fast path (not in rp2040js; see RPPIO::sync) ---
+  /** true if the machine is stalled in a WAIT whose condition only an event
+   *  that syncs the block can change, and is false now */
+  bool stalledStable() const;
+  /**
+   * true if every instruction reachable from `pc` is an OUT the lazy runner
+   * handles (see pio.cpp); then `mask` is the pins it can drive and `bits`
+   * its common bit count. Cached per (pio.progEpoch, pc).
+   */
+  bool runnerProgram(uint32_t &mask, uint32_t &bits);
+  /** n runner steps (clockTick() with divider 1, no autopull due); returns the pins changed on the way */
+  uint32_t runLazy(uint64_t n);
+  uint64_t analysedEpoch = 0;  // pio.progEpoch the cache below belongs to (0 = none)
+  uint32_t analysedPcs = 0;    // bit n: pc n analysed
+  uint32_t runnerPcs = 0;      // bit n: runner program from pc n
+  uint32_t runnerPcOnly = 0;   // bit n: ... and every instruction reachable from pc n is an `out pc`
+  std::array<uint32_t, 32> runnerMask{};
+  std::array<uint8_t, 32> runnerBits{};
+  /** instruction n decoded for runLazy (valid for analysedEpoch once analysed) */
+  struct LazyOp {
+    // the side-set as `pins = (pins & keep) | set` on pinValues and pinDirections
+    uint32_t keepValues = 0xffffffff, setValues = 0, keepDirections = 0xffffffff, setDirections = 0;
+    uint8_t destination = 0, bitCount = 0;
+    uint8_t next = 0;  // nextPC() from here
+  };
+  std::array<LazyOp, 32> lazyOps{};
+
   /** system cycles (in 1/256ths) owed to this machine by its clock divider */
   uint32_t divPhase = 0;
   /** delay cycles ([n]) still to run after the last instruction */
@@ -195,10 +225,84 @@ class RPPIO : public BasePeripheral {
   void checkInterrupts();
   void irqUpdated();
   void checkChangedPins();
-  void step();
+  void step() {
+    // fast path: a lazy cycle only counts (see sync())
+    if (lazy && owed < nextEvent) {
+      owed++;
+      return;
+    }
+    stepExact();
+  }
   void stop();
 
+  /**
+   * Fast path (not in rp2040js). While every enabled machine of the block is
+   * either stalled on a stable WAIT or running a loop of plain OUTs (the
+   * PicoDVI serialiser) that will not autopull for a while, step() only counts
+   * the cycles it owes: nothing outside the block can see the difference (see
+   * pio.cpp for the argument). sync() replays the owed cycles, exactly, and
+   * returns to per-cycle stepping; every path by which the rest of the chip
+   * can see or change the block's state calls it first (the bus registers,
+   * GPIOPin's PIO output functions, setInputValue, addListener, IO_BANK0 and
+   * PADS writes). C++ code that reads machine or pin fields directly (tests)
+   * must call it too. fastPath = false turns the fast path off.
+   */
+  void sync() {
+    if (lazy) materialize();
+  }
+  bool fastPath = true;
+  /** fast path: how many of the next step() calls would only count (0: the next one does more) */
+  uint64_t lazySteps() const { return lazy ? nextEvent - owed : 0; }
+  /** fast path: the same as n calls of step(), for n <= lazySteps() */
+  void skipLazy(uint64_t n) { owed += n; }
+  /** statistics: cycles the block ran lazily (replayed by materialize) */
+  uint64_t lazyCycles = 0;
+  /** statistics: autopull cycles run without leaving the fast path */
+  uint64_t lazyEvents = 0;
+  /** bumped by every register write that can change a machine's program or configuration */
+  uint64_t progEpoch = 1;
+
   // `private runTimer: NodeJS.Timeout | null` has no native counterpart.
+
+ private:
+  friend struct PIOBusAccess;
+  bool lazy = false;
+  bool inStep = false;     // inside step()'s exact part
+  uint64_t owed = 0;       // cycles counted but not yet run
+  uint64_t nextEvent = 0;  // the cycle (owed count) that must run for real
+  uint32_t pendingTouched = 0;  // pins changed while lazy: checkForUpdates still owed
+  void stepExact();  // step() as in TS
+  bool lazyMachines(uint64_t &next, uint32_t &used);
+  void tryEnterLazy();
+  void catchUp();
+  void flushPins();
+  void materialize();
+  bool lazyEvent();
 };
+
+/** stepPIOs() when some block has to step for real within the n cycles */
+void stepPIOsSlow(std::array<RPPIO, 2> &pios, uint64_t n);
+
+/**
+ * `for (let i = 0; i < n; i++) for (const pio of pios) if (!pio.stopped) pio.step();`
+ * (rp2040emu.mjs's Emu.cycles without an onCycle hook), with the stretches in
+ * which every running block only counts (RPPIO::lazySteps) done at once.
+ */
+inline void stepPIOs(std::array<RPPIO, 2> &pios, double n) {
+  // the iterations of `i < n`: ceil(n) (n is a cycle count, far below 2**53)
+  int64_t whole = n > 0 ? static_cast<int64_t>(n) : 0;
+  if (static_cast<double>(whole) < n) {
+    whole++;
+  }
+  const uint64_t total = static_cast<uint64_t>(whole);
+  RPPIO &pio0 = pios[0], &pio1 = pios[1];
+  if ((pio0.stopped || pio0.lazySteps() >= total) && (pio1.stopped || pio1.lazySteps() >= total)) {
+    // the common case: every running block only counts all the way
+    if (!pio0.stopped) pio0.skipLazy(total);
+    if (!pio1.stopped) pio1.skipLazy(total);
+  } else {
+    stepPIOsSlow(pios, total);
+  }
+}
 
 }  // namespace rp2040js
