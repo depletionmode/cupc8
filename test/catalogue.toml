@@ -707,6 +707,35 @@ vrow = "2.5"
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 
 # ============================================================================
+# STO: storage card firmware (doc/hardware/storage-card.md)
+# ============================================================================
+[[test]]
+id = "STO-001"
+title = "Command interpreter, handles, removal"
+checks = "every command and its malformed frames (counted, never answered); IDENT type $04; READ not ready and BUSY until the worker has run a command, a newer command's (or an IDENT's) answer never replaced by an older one, queue overflow counted; files of 0-5000 bytes around the 128-byte chunks and 512-byte sectors written and read back in several chunk sizes, end of file (n' < n, then 0), seek, append, truncate; 4 handles at once, bad and closed handles, the wrong direction, a file open for write refused on another handle, reopening a handle flushes it, SOFT_RESET flushes every file; 8.3 names (too long, paths, reserved characters, dots refused; lower case finds the upper-case file), DIR_FIRST/NEXT names and sizes and the $FF end, DEL, RENAME; a full medium (F_WRITE says full, what fitted is kept, free 0) and a full root directory; write-protect (status and ST_INFO bit, every write refused, reads fine); card detect: unmounted at once, open handles fail with $01, pulled in the middle of a write, remounted on insertion with the closed files intact; ST_EJECT flushes and unmounts, ST_MOUNT; a blank medium, a dead one, none; BLK_READ/BLK_WRITE/BUF_GET/BUF_PUT, past the end; every closed file is on the medium as an independent reader sees it"
+method = "fw/test/test_storage.c: the core (fw/storage/core) on FatFs over in-memory images (fw/storage/host/imgdisk.c), through the slot protocol engine"
+kind = "sim"
+vrow = "2.9"
+cmd = "make -s -C fw test_storage"
+
+[[test]]
+id = "STO-002"
+title = "FAT images against a PC's reader"
+checks = "an image the core wrote (created, deleted, renamed, appended across an eject and mount, 0 B to 70 KB) holds exactly the expected files for pyfatfs, and fsck.fat finds nothing to fix; files a PC wrote (mkfs.fat, pyfatfs) read correctly through the core, and the core's own writes and deletes on that PC volume are right for pyfatfs and fsck.fat"
+method = "make -C fw test_storage: tools/fatcheck.py mkimg / check (pyfatfs 1.1.0 in a venv under ~/.local/share/cupc8-sdk, fsck.fat -n)"
+kind = "sim"
+vrow = "2.9"
+cmd = "make -s -C fw test_storage"
+
+[[test]]
+id = "STO-003"
+title = "Real binary on the emulated RP2040 with an SD card model"
+checks = "the real storage.elf on the native emulator with an SD SPI-mode model on SPI1 (CMD0/8/55/ACMD41/58, single-block read and write, busy time, card detect): mounts an image, writes and reads files that tools/fatcheck.py confirms, and the reverse; the slot answers (status byte, IDENT) while core 1 writes; ACT lit ~30 ms after SD activity, CARD while mounted"
+method = "the native emulator (emu/), the SD card model (another agent's work)"
+kind = "sim"
+vrow = "2.9"
+
+# ============================================================================
 # WIFI: Wi-Fi card firmware
 # ============================================================================
 [[test]]
