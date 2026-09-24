@@ -238,6 +238,8 @@ static void command(card_t *c, const uint8_t *f, int len)
 		if (3 + n > len) { c->errors++; break; }
 		if (w->net->send(w->ctx, s->handle, f + 3, n) != n)
 			event(w, WIFI_EV_ERROR, f[1]);
+		else
+			w->tx_bytes += (uint32_t)n;
 		break;
 	}
 	case 0x15: {                               /* RECV sock, max */
@@ -250,6 +252,7 @@ static void command(card_t *c, const uint8_t *f, int len)
 		int n = w->net->recv(w->ctx, s->handle, r + 1, max);
 		if (n < 0)
 			n = 0;
+		w->rx_bytes += (uint32_t)n;
 		r[0] = (uint8_t)n;
 		card_respond(c, r, 1 + n);
 		break;
@@ -287,6 +290,8 @@ static void command(card_t *c, const uint8_t *f, int len)
 		if (w->net->connect(w->ctx, s->handle, f + 2, port, 0) < 0 ||
 		    w->net->send(w->ctx, s->handle, f + 9, n) != n)
 			event(w, WIFI_EV_ERROR, f[1]);
+		else
+			w->tx_bytes += (uint32_t)n;
 		break;
 	}
 
