@@ -197,3 +197,18 @@ ESP ROM bootloader sync.
   main board mounting rail.
 - **Fit check:** the exact drawing is in `hw/lib/cards/card-outline.kicad_pcb`
   and is checked by the FreeCAD fit script.
+  - The script is `hw/mech/fit.py` (MECH-001…008 in `test/catalogue.toml`,
+    verification.md 4.7). It checks the outline against `IO_CARD_*` as
+    built, since `hw/lib/cards/card-outline.kicad_pcb` does not exist yet.
+    Until the main board is drawn, it places the slots from a stand-in:
+    six C404113 sockets at 20.32 mm.
+  - *Measured 2026-09-24, from the datasheets.* The x1 socket (UMAX
+    3183-10200P1T) is 11.25 mm tall, with a 1.78 mm slot 7.60 mm deep. So a
+    seated card's edge sits 3.65 mm above the main board, and the card's
+    shoulder sits 0.80 mm above the housing (the finger tab is 8.40 mm).
+  - With the Wi-Fi card in every slot: 16.28 mm between one card's tallest
+    part (the ESP32-C3 module, 2.44 mm) and the next card's back. The 20.32
+    mm pitch leaves 18.72 mm clear of the 1.6 mm board. The PCIe CEM
+    envelope is 14.47 mm on the component side and 2.67 mm on the solder side.
+  - The M3 hole axis (the rail) is 47.10 mm above the main board's top, and
+    the power LEDs are 48.10 mm above it.
