@@ -777,9 +777,10 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     if plane and layers == 4:
-        # In1.Cu is a solid plane of the pour net: a power layer, which
-        # the Specctra export marks so Freerouting routes nothing on it
-        board.SetLayerType(pcbnew.In1_Cu, pcbnew.LT_POWER)
+        # the pour on In1.Cu too: it stays a signal layer (a power layer
+        # costs Freerouting a quarter of its room, and a QFN-56 fan-out
+        # needs it), and the pour fills what the routes leave, which joins
+        # pieces the outer layers' routes wall in
         copper.append(pcbnew.In1_Cu)
     for net in zones:
         for layer in copper:
