@@ -227,7 +227,7 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .num
+	bzf .refresh
 	mov r0, #<[term_line_buf]
 	st [net_line], r0
 	mov r0, #>[term_line_buf]
@@ -237,6 +237,19 @@ term_parse:
 	b net_cmd
 	b .done
 
+.refresh:
+	term_s_refresh db "refresh"
+	mov r0, #>[term_s_refresh]
+	mov r1, #<[term_s_refresh]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .num
+	push pch
+	push pcl
+	b eink_cmd_refresh
+	b .done
 
 .num:
 	mov r0, #>[term_token_buf]
@@ -326,7 +339,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR NET\n"
+	term_s_help_buf db "\nNEW RUN CLR NET REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch

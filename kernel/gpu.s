@@ -6,6 +6,7 @@
 ; The console is the first graphics card in the slot table the boot ROM left
 ; at $0002-$0007. Its SPI register offset (slot * 16) is kept in gpu_spi;
 ; $ff means "no console", and every entry point then does nothing.
+; gpu_kind (kernel/eink.s) says which graphics card it is, from INFO.
 
 %define SLOT_TABLE $0002
 %define GPU_CFG_DIV2 16
@@ -14,6 +15,7 @@ gpu_spi: resb 1
 gpu_char: resb 1
 gpu_tmp: resb 1
 gpu_args: resb 8
+gpu_tries: resb 1
 
 gpu_init:
 	mov r0, #0xff
@@ -52,6 +54,63 @@ gpu_init:
 	push pch
 	push pcl
 	b gpu_cs_off
+	push pch
+	push pcl
+	b gpu_info
+.done:
+	pop pcl
+	pop pch
+
+; INFO: which graphics card the console is. gpu_kind = its first response
+; byte (0 HDMI, 1 e-paper), or $ff if it never answers (READ polled 255 times)
+gpu_info:
+	mov r0, #0xff
+	st [gpu_kind], r0
+	xor r0, r0
+	st [gpu_tries], r0
+	push pch
+	push pcl
+	b gpu_cs_on
+	mov r0, #0x08			; INFO
+	push pch
+	push pcl
+	b gpu_send
+	push pch
+	push pcl
+	b gpu_cs_off
+.poll:
+	push pch
+	push pcl
+	b gpu_cs_on
+	mov r0, #0xfe			; READ, the status byte comes back
+	push pch
+	push pcl
+	b gpu_send
+	xor r0, r0				; RESP_LEN, 0 = not ready yet
+	push pch
+	push pcl
+	b gpu_send
+	eq r0, #0
+	bzf .again
+	xor r0, r0				; kind
+	push pch
+	push pcl
+	b gpu_send
+	st [gpu_kind], r0
+	push pch
+	push pcl
+	b gpu_cs_off
+	b .done
+.again:
+	push pch
+	push pcl
+	b gpu_cs_off
+	ld r0, [gpu_tries]
+	add r0, #1
+	st [gpu_tries], r0
+	eq r0, #0xff
+	bzf .done
+	b .poll
 .done:
 	pop pcl
 	pop pch

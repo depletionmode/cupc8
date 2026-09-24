@@ -41,7 +41,7 @@ if(MACHINE_LTO)
   target_compile_options(rp2040harness PRIVATE -O3)
 endif()
 
-add_library(machine STATIC machine.cpp "${CUPC8_ROOT}/fw/test/sysmodels.c")
+add_library(machine STATIC machine.cpp einkpanel.cpp "${CUPC8_ROOT}/fw/test/sysmodels.c" "${CUPC8_ROOT}/fw/test/epdmodel.c")
 target_include_directories(machine PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}" "${CUPC8_ROOT}/soc/emu" "${CUPC8_ROOT}/fw/test")
 target_include_directories(machine SYSTEM PUBLIC

@@ -233,6 +233,56 @@ ENTRY(js_screen, {
   return o;
 })
 
+// the e-ink panel's glass: { w, h, seq, grey: Uint8Array (0 black ... 255
+// white), refreshes: [clean, fast, grey, partial], busy, errors, error,
+// partialsSinceFull, bytesWithoutCs }, or null with no e-ink card
+ENTRY(js_panel, {
+  machine::EinkPanel *p = m->panel();
+  napi_value o;
+  if (!p) {
+    napi_get_null(env, &o);
+    return o;
+  }
+  const auto pic = p->picture();
+  napi_create_object(env, &o);
+  set(env, o, "w", num(env, pic.w));
+  set(env, o, "h", num(env, pic.h));
+  set(env, o, "seq", num(env, pic.seq));
+  napi_value ab, arr;
+  void *data;
+  napi_create_arraybuffer(env, pic.grey.size(), &data, &ab);
+  std::memcpy(data, pic.grey.data(), pic.grey.size());
+  napi_create_typedarray(env, napi_uint8_array, pic.grey.size(), ab, 0, &arr);
+  set(env, o, "grey", arr);
+  napi_value r;
+  napi_create_array_with_length(env, 4, &r);
+  for (uint32_t i = 0; i < 4; i++) napi_set_element(env, r, i, num(env, p->m.refreshes[i]));
+  set(env, o, "refreshes", r);
+  set(env, o, "busy", num(env, p->m.busy_op));
+  set(env, o, "errors", num(env, p->m.errors));
+  set(env, o, "error", jsstr(env, p->m.error));
+  set(env, o, "partialsSinceFull", num(env, p->m.partials_since_full));
+  set(env, o, "maxPartialsBetweenFulls", num(env, p->m.max_partials_between_fulls));
+  set(env, o, "bytesWithoutCs", num(env, p->bytesWithoutCs));
+  return o;
+})
+
+ENTRY(js_panelScreen, {
+  std::string err;
+  const auto rows = m->panelScreen(&err);
+  napi_value o;
+  napi_create_object(env, &o);
+  if (!err.empty()) {
+    set(env, o, "error", jsstr(env, err));
+  } else {
+    napi_value arr;
+    napi_create_array_with_length(env, rows.size(), &arr);
+    for (size_t i = 0; i < rows.size(); i++) napi_set_element(env, arr, static_cast<uint32_t>(i), jsstr(env, rows[i]));
+    set(env, o, "text", arr);
+  }
+  return o;
+})
+
 ENTRY(js_type, {
   m->type(str(env, a.argv[1]));
   return nullptr;
@@ -391,7 +441,7 @@ napi_value init(napi_env env, napi_value exports) {
       {"state", js_state},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
       {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead},   {"setThreaded", js_setThreaded},
       {"stats", js_stats},     {"cards", js_cards},       {"spiLog", js_spiLog},     {"keyboard", js_keyboard},
-      {"destroy", js_destroy},
+      {"destroy", js_destroy}, {"panel", js_panel},   {"panelScreen", js_panelScreen},
   };
   for (auto &f : fns) {
     napi_value v;

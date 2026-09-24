@@ -143,6 +143,17 @@ export class Machine {
     return s;
   }
 
+  // the e-ink card's panel: the glass as of its last completed refresh,
+  // { w, h, seq, grey: Uint8Array, refreshes, busy, errors, error, ... }, or null
+  panel() {
+    return native.panel(this.h);
+  }
+
+  // the text on the e-ink panel's glass, 80x30: { text: [...] } or { error }
+  panelScreen() {
+    return native.panelScreen(this.h);
+  }
+
   // type on the USB keyboard: one report per key, then a release
   type(text) {
     native.type(this.h, text);
