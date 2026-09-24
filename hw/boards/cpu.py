@@ -220,10 +220,19 @@ def schematic(path, footprint_libs):
     s.connect(d1, "A", "LED_A")
     res("R9", "1k", "3V3", "LED_A", at=(170 * G, row * G))
 
+    # power LED (milestone-1.md, Indicator LEDs): 3V3, the same spot on every board
+    d2 = s.add("Device:LED", "D2", "red", "LED_SMD:LED_0603_1608Metric", at=(176 * G, (row - 4) * G),
+               fields={"LCSC": "C2286"})
+    s.connect(d2, "K", "GND")
+    s.connect(d2, "A", "PWR_LED_A")
+    res("R10", "1k", "3V3", "PWR_LED_A", at=(186 * G, row * G))
+    # M3 mounting hole (as the I/O cards, slot.md Mechanical)
+    s.add("Mechanical:MountingHole", "H1", "M3", kg.MOUNTING_HOLE, at=(196 * G, (row - 4) * G))
+
     # test pads
     for i, net in enumerate(("1V2", "3V3", "GND")):
         tp = s.add("Connector:TestPoint", "TP%d" % (i + 1), net, "cupc8:TestPad_D1.0mm",
-                   at=((180 + 8 * i) * G, row * G))
+                   at=((204 + 8 * i) * G, row * G))
         s.connect(tp, 1, net)
 
     # power flags: the socket and the LDO have passive pins
@@ -257,6 +266,7 @@ TAB = (EDGE_X - 0.65, EDGE_X + 50.65)          # where the footprint's tab meets
 EDGE = [(TAB[1], H), (W, H), (W, 0), (0, 0), (0, H), (TAB[0], H)]
 ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
 LOGO_MM = 12
+POWER_LED = kg.power_led_at(OUTLINE)
 
 
 def fpga_pad(pin):
@@ -296,14 +306,17 @@ def placement():
         # 33 ohm arrays: A below the FPGA, D and control to its right
         "RN1": (29.0, 41.5, 90), "RN2": (33.6, 41.5, 90), "RN3": (38.2, 41.5, 90), "RN4": (42.8, 41.5, 90),
         "RN5": (64.0, 31.5, 180), "RN6": (64.0, 27.0, 180), "RN7": (64.0, 22.5, 180), "RN8": (64.0, 18.0, 180),
-        # config flash and its pull-ups, top right by the config pins
-        "U2": (64.0, 8.0, 0), "C23": (64.0, 2.5, 0),
+        # config flash and its pull-ups, top right by the config pins, clear
+        # of the mounting hole's keep-out
+        "U2": (60.0, 9.0, 0), "C23": (60.5, 3.0, 0),
         "R1": (40.0, 4.0, 90), "R2": (44.0, 4.0, 90), "R3": (48.0, 4.0, 90), "R4": (52.0, 4.0, 90),
         "R5": (56.0, 4.0, 90),
         # 1V2 LDO and its rail LED, top left
         "U3": (15.0, 5.0, 0), "C21": (11.0, 5.0, 90), "C22": (19.0, 5.0, 90),
         "D1": (9.5, 12.0, 90), "R9": (12.5, 12.0, 90), "Q1": (9.5, 17.0, 0), "R8": (9.5, 21.5, 0),
-        "TP1": (2.5, 3.0, 0), "TP2": (2.5, 8.0, 0), "TP3": (2.5, 13.0, 0),
+        "D2": POWER_LED + (0,), "R10": (POWER_LED[0] + 3.5, POWER_LED[1], 0),
+        "H1": (W - 4.0, 4.0, 0),
+        "TP1": (2.5, 8.0, 0), "TP2": (2.5, 13.0, 0), "TP3": (2.5, 18.0, 0),
     })
     return p
 
