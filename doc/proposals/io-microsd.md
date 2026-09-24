@@ -1,6 +1,9 @@
 # Proposal: microSD storage on the IO card (target: Milestone 1)
 
-**Status: accepted for Milestone 1, 2026-09-24 (David), being implemented.**
+**Status: superseded 2026-09-24 (David): the microSD goes on its own
+storage card (`../hardware/storage-card.md`, card type $04), not on the IO
+card. The file system, protocol, kernel/BASIC and test reasoning below
+carries over there.** Earlier the same day: accepted for Milestone 1.
 Raised 2026-09-24 by David. Decisions on the open questions below, taking
 the recommended options: FatFs on the card (option 1); `SAVE` writes text;
 4 file handles; the IO card's back edge (x = −6.0 mm, the B1 end) is the

@@ -14,7 +14,7 @@
 
 meta:
   clock_mhz: 12
-  boards: [mainboard, cpu-card, system-card, gpu-card, io-card, wifi-card]
+  boards: [mainboard, cpu-card, system-card, gpu-card, io-card, wifi-card, storage-card]
 
 devices:
 
@@ -198,8 +198,26 @@ devices:
           - {name: SLOT_MISO, gpio: 4, dir: out}
           - {name: SLOT_nCS, gpio: 5, dir: in}
           - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
+      debug:
+        signals:
+          - {name: LED_KBD, gpio: 25, dir: out, note: keyboard connected}
+          - {name: LED_KEY, gpio: 24, dir: out, note: "keyboard activity: lit ~30 ms after each HID report"}
+          - {name: UART_TX, gpio: 16, dir: out}
+
+  storage_mcu:
+    board: storage-card
+    part: RP2040
+    lcsc: C2040
+    groups:
+      slot:
+        signals:
+          - {name: SLOT_SCK, gpio: 2, dir: in}
+          - {name: SLOT_MOSI, gpio: 3, dir: in}
+          - {name: SLOT_MISO, gpio: 4, dir: out}
+          - {name: SLOT_nCS, gpio: 5, dir: in}
+          - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
       sd:
-        note: "microSD in SPI mode on SPI1 (doc/proposals/io-microsd.md, doc/hardware/io-card.md); 10k pull-ups on CMD/DAT0-3"
+        note: "microSD in SPI mode on SPI1 (doc/hardware/storage-card.md); 10k pull-ups on CMD/DAT0-3"
         signals:
           - {name: SD_SCK, gpio: 14, dir: out, note: SPI1 SCK}
           - {name: SD_MOSI, gpio: 15, dir: out, note: "SPI1 TX, to the card's CMD"}
@@ -210,9 +228,8 @@ devices:
           - {name: SD_DAT2, gpio: 19, dir: in, note: "pulled up, unused in SPI mode: routed for a later 4-bit mode on PIO"}
       debug:
         signals:
-          - {name: LED_KBD, gpio: 25, dir: out, note: keyboard connected}
-          - {name: LED_KEY, gpio: 24, dir: out, note: "keyboard activity: lit ~30 ms after each HID report"}
-          - {name: LED_SD, gpio: 23, dir: out, note: "SD activity, in the top-edge LED row"}
+          - {name: LED_ACT, gpio: 24, dir: out, note: "medium activity, lit ~30 ms after each access"}
+          - {name: LED_CARD, gpio: 25, dir: out, note: "a card is inserted and mounted"}
           - {name: UART_TX, gpio: 16, dir: out}
 
   wifi_mcu:
