@@ -715,6 +715,15 @@ kind = "sim"
 vrow = "2.5"
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 
+[[test]]
+id = "STO-010"
+title = "Storage card real binary: files on the SD card model, checked on the host"
+checks = "the real storage.elf with the SD card model on its SPI1 (EMU-008), driven through the slot pins: IDENT type $04; no card: MEDIA clear, ST_INFO media 0, F_OPEN 'no medium'; an SDSC FAT16 and an SDHC FAT32 card made on the host mount on insertion; ST_INFO sizes; DIR; files written on the host read on the card, files the card writes (chunks, a partial chunk, append, two handles at once, rename, delete) read on the host with pyfatfs and pass fsck.fat; F_SEEK; not found, bad name, bad handle, exists; raw BLK_READ/BUF_GET of the boot sector, BUF_PUT/BLK_WRITE; ST_EJECT; a 250 ms-per-block card: every status frame answered with BUSY set and READ not ready until F_CLOSE completes; hot removal mid-write: MEDIA/MOUNTED clear, the open handle fails 'no medium', closed files intact after re-insertion; write-protected: WP in the status byte, writes and deletes refused, image unchanged; a full card: free 0, writes refused 'full', volume consistent; the firmware breaks no SD protocol rule and initialises at <= 400 kHz"
+method = "test/emu/test_storage.mjs on the native emulator (emu/rp2040/harness/sdcard.h, rp2040native.mjs SdSocket); host FAT: test/emu/fatimg.py (pyfatfs 1.1.0 in the SDK venv, fsck.fat)"
+kind = "sim"
+vrow = "2.5"
+cmd = "tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs"
+
 # ============================================================================
 # WIFI: Wi-Fi card firmware
 # ============================================================================
@@ -888,6 +897,15 @@ checks = "empty slots, a card removed between power cycles, corrupt kernel (bad 
 method = "co-sim"
 kind = "sim"
 vrow = "3.3"
+
+[[test]]
+id = "E2E-007"
+title = "Files: BASIC SAVE, power cycle, LOAD, RUN on the storage card"
+checks = "the whole machine on the native emulator with the GPU, IO and storage cards on their real firmware and a FAT image in the SD card model: a typed program SAVEd as text (read on the host), the machine powered off and on, LOAD and RUN print its output; DIR lists the files; a program written on the host LOADs and runs; a line typed during a SAVE to a 250 ms-per-block card is not lost; SAVE with no card, a write-protected card and a full card print their messages"
+method = "test/emu/test_e2e.mjs E2E-007 (machinenative.mjs m.sd, test/emu/fatimg.py)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
 
 [[test]]
 id = "E2E-005"
