@@ -373,6 +373,51 @@ def a_vias(board, via=0.6, drill=0.3, track=0.2):
             board.Add(vi)
 
 
+def track(board, net, layer, a, b, width):
+    import pcbnew
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(a[0]), pcbnew.FromMM(a[1])))
+    t.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(b[0]), pcbnew.FromMM(b[1])))
+    t.SetWidth(pcbnew.FromMM(width))
+    t.SetLayer(layer)
+    t.SetNet(net)
+    t.SetLocked(True)
+    board.Add(t)
+
+
+def supply_fingers(board, width=0.5, via=0.6, drill=0.3, top=H - 6.0):
+    """Locked tie from the three +3V3 fingers (B5-B7, front) into the In2
+    plane: each rises on F.Cu, a bar joins them, and one via drops into the
+    plane above the presence link's run (which cuts the plane's sliver over
+    the fingers off). The pad fan-out skips edge fingers, and a plane net is
+    not Freerouting's to join."""
+    import pcbnew
+    to = pcbnew.ToMM
+    for fp in board.GetFootprints():
+        if fp.GetReference() != "J1":
+            continue
+        pads = [p for p in fp.Pads() if p.GetNetname() == "/3V3"]
+        xs = sorted(to(p.GetPosition().x) for p in pads)
+        net = pads[0].GetNet()
+        for p in pads:
+            x = to(p.GetPosition().x)
+            track(board, net, pcbnew.F_Cu, (x, to(p.GetBoundingBox().GetTop()) + width / 2), (x, top), width)
+        track(board, net, pcbnew.F_Cu, (xs[0], top), (xs[-1], top), width)
+        mid = (xs[0] + xs[-1]) / 2
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(mid), pcbnew.FromMM(top)))
+        v.SetWidth(pcbnew.FromMM(via))
+        v.SetDrill(pcbnew.FromMM(drill))
+        v.SetNet(net)
+        v.SetLocked(True)
+        board.Add(v)
+
+
+def prepare(board):
+    a_vias(board)
+    supply_fingers(board)
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     import logo
@@ -383,7 +428,8 @@ def main():
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), OUTLINE, out=out, edge=EDGE, card_edge=True, layers=4,
         zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
-        labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION, prepare=a_vias,
+        labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION, prepare=prepare,
+        presence={"layer": "In2.Cu"},   # a B.Cu run would wall the address lines off their fingers
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 46.0, 0)])
     print("LCSC:", " ".join(sorted(lcsc)))
 

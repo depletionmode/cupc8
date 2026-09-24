@@ -1426,12 +1426,15 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     return n
 
 
-def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
+def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3, layer="B.Cu"):
     """Pre-route the presence link every card makes (PRSNT1_n on A1 joined
     to PRSNT2_n on the last B finger): up from A1 on B.Cu, across `rise` mm
     above the tab, a via, and down to the B finger on F.Cu. It must cross
     the other fingers' escapes, and Freerouting gives up on it; the few it
-    crosses it routes round. Returns True if a link was drawn."""
+    crosses it routes round. `layer` carries the run across: on a wide card
+    whose bottom-side fingers all have signals (the CPU card's address bus)
+    a B.Cu run walls them off, so it goes on an inner layer between vias.
+    Returns True if a link was drawn."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     for fp in board.GetFootprints():
@@ -1444,8 +1447,9 @@ def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
             continue
         y = tab_top - rise
         ax, bx = to(a1.GetPosition().x), to(bn.GetPosition().x)
+        run = board.GetLayerID(layer)
         pts = [(pcbnew.B_Cu, (ax, to(a1.GetBoundingBox().GetTop()) + width / 2), (ax, y)),
-               (pcbnew.B_Cu, (ax, y), (bx, y)),
+               (run, (ax, y), (bx, y)),
                (pcbnew.F_Cu, (bx, y), (bx, to(bn.GetBoundingBox().GetTop()) + width / 2))]
         for layer, a, b in pts:
             t = pcbnew.PCB_TRACK(board)
@@ -1456,13 +1460,14 @@ def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
             t.SetNet(a1.GetNet())
             t.SetLocked(True)
             board.Add(t)
-        v = pcbnew.PCB_VIA(board)
-        v.SetPosition(pcbnew.VECTOR2I(mm(bx), mm(y)))
-        v.SetWidth(mm(via))
-        v.SetDrill(mm(drill))
-        v.SetNet(a1.GetNet())
-        v.SetLocked(True)
-        board.Add(v)
+        for vx in ((bx,) if run == pcbnew.B_Cu else (ax, bx)):
+            v = pcbnew.PCB_VIA(board)
+            v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(y)))
+            v.SetWidth(mm(via))
+            v.SetDrill(mm(drill))
+            v.SetNet(a1.GetNet())
+            v.SetLocked(True)
+            board.Add(v)
         return True
     return False
 
@@ -1783,7 +1788,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, prepare=None):
+             io_card=False, prepare=None, presence=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1845,7 +1850,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
-            presence_link(b, outline[3])
+            presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
         # every poured net's pads get a via: GND, and any net on a plane
         # (build_board's (net, layers) zones), which is reached no other way
         state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
