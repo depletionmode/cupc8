@@ -37,6 +37,28 @@ if `<regex>` (ECMAScript syntax, searched like `RegExp.test`) matched, else 1.
 Output of the library: `librp2040emu.a`, include directory `src/`, namespace
 `rp2040js`.
 
+## Card-test harness and Node addon
+
+`harness/` (C++20, `librp2040harness.a`, namespace `rp2040js::harness`) is the
+test bench side, reusable from C++: `emu.h` is `test/emu/rp2040emu.mjs`'s Emu
+loop (bootrom, ELF loading, `step`/`cycles`/`runUntil`, an `onCycle` hook);
+`slothost.h` is `test/emu/slothost.mjs` (the slot's SPI master; its
+byte/select/deselect/frame/read generators are coroutines with the same waits
+and pin changes, and a script is a callback run between operations);
+`tmds.h` is `test/emu/tmds.mjs`'s capture. `node/rp2040emu_node.cpp` wraps
+them as `build/emu-native/rp2040emu.node` (built when Node's headers are
+found), which `test/emu/rp2040native.mjs` turns into drop-in Emu, SlotHost,
+TmdsCapture, UsbKeyboard and USBCDC classes. The card tests pick it with
+`CUPC8_EMU=native` (`test/emu/emu_backend.mjs`):
+
+```sh
+CUPC8_EMU=native node test/emu/test_gpu.mjs GPU-004     # also GPU-005, test_io.mjs, test_sysctl.mjs
+CUPC8_EMU_TRACE=1 node test/emu/test_io.mjs 2> js.trace  # every runUntil's ns, host frame, TMDS digest
+```
+
+The two backends give byte-identical `CUPC8_EMU_TRACE` output on GPU-004,
+GPU-005, IOC-004 (with `DEBUG=1`) and SYS-006.
+
 ## Verification
 
 Every module has a seeded differential harness against the patched rp2040js
@@ -145,6 +167,10 @@ has an explicit hook: `RPPIO::run` is a `std::function` (the host sets it to a
 no-op and steps PIO itself; there is no `setTimeout`), and
 `CortexM0Core::executeInstructionOverride`, when set, is called by
 `RP2040::step()` instead of `executeInstruction()` (`--core1-slow`).
+Two more, empty by default and not in rp2040js: `FIFO::onPull` is called with
+every value `pull()` returns (test/emu/tmds.mjs wraps the PIO TX FIFOs'
+`pull`), and `RPPPB::onWrite(offset, value)` at the start of every PPB
+`writeUint32` (rp2040emu.mjs's `ppbWriteTrap` wraps `ppb.writeUint32`).
 
 ## Differences from TS that cannot be avoided
 

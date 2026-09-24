@@ -23,8 +23,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)   # the RP2040 library goes into a Node addon
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Link-time optimisation and -O3 (no fast-math: the port's float time
+# arithmetic is exact JS semantics, and rp2040run built this way gives
+# byte-identical --trace-every traces on the GPU, IO and system card images).
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 # the RP2040 port, untouched, as a PIC static library of this build
 add_subdirectory("${CUPC8_ROOT}/emu/rp2040" rp2040 EXCLUDE_FROM_ALL)
+target_compile_options(rp2040emu PRIVATE -O3)
 
 # the B1 bootrom, extracted from rp2040js as emu/rp2040 does
 set(BOOTROM_INC "${CMAKE_CURRENT_BINARY_DIR}/generated/bootrom_b1.inc")
@@ -40,7 +45,7 @@ target_include_directories(machine PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/generated" "${CUPC8_ROOT}/soc/emu" "${CUPC8_ROOT}/fw/test")
 target_include_directories(machine SYSTEM PUBLIC
   "${EMU_OBJ_DIR}" "${VERILATOR_ROOT}/include" "${VERILATOR_ROOT}/include/vltstd")
-target_compile_options(machine PRIVATE -O2 $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wno-unused-parameter>)
+target_compile_options(machine PRIVATE -O3 $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wno-unused-parameter>)
 target_link_libraries(machine PUBLIC rp2040emu
   "${EMU_OBJ_DIR}/Vmachine_core__ALL.a" "${EMU_OBJ_DIR}/verilated.o" "${EMU_OBJ_DIR}/verilated_threads.o" pthread)
 

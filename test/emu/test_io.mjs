@@ -3,6 +3,7 @@
 // it for real), the CPU side through its slot pins with CUPC/8 SPI timing.
 //
 //   node test/emu/test_io.mjs
+//   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 
 import path from 'node:path';
 import { Emu, SlotHost, UsbKeyboard } from './emu_backend.mjs';     // CUPC8_EMU=native: the C++ emulator

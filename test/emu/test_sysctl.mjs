@@ -5,6 +5,7 @@
 // bitstream's sync word, the two TCA9555 expanders, and the CC voltages.
 //
 //   node test/emu/test_sysctl.mjs
+//   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 
 import path from 'node:path';
 import { Emu, USBCDC } from './emu_backend.mjs';                     // CUPC8_EMU=native: the C++ emulator

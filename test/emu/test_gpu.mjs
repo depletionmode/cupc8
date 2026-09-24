@@ -3,6 +3,7 @@
 // its DVI output captured and decoded from the TMDS serialisers.
 //
 //   node test/emu/test_gpu.mjs [GPU-004|GPU-005]
+//   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 //
 // GPU-004: the SPI slave: IDENT at every clk_div, the host timing minimums,
 //   responses and their discard rule, and FREE counting bytes still queued.

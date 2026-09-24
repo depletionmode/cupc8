@@ -240,10 +240,24 @@ ENTRY(js_type, {
 
 ENTRY(js_press, {
   if (!m->keyboard) throw std::runtime_error("no IO card (no keyboard)");
-  uint32_t mods = 0, key = 0;
+  // press(h, mods, [k1..k6]): UsbKeyboard.press(mods, ...keys)
+  uint32_t mods = 0;
   napi_get_value_uint32(env, a.argv[1], &mods);
-  if (a.argc > 2 && isType(env, a.argv[2], napi_number)) napi_get_value_uint32(env, a.argv[2], &key);
-  m->keyboard->press(mods, {key});
+  std::vector<uint32_t> keys;
+  bool isArr = false;
+  if (a.argc > 2) napi_is_array(env, a.argv[2], &isArr);
+  if (isArr) {
+    uint32_t n;
+    napi_get_array_length(env, a.argv[2], &n);
+    for (uint32_t i = 0; i < n; i++) {
+      napi_value v;
+      napi_get_element(env, a.argv[2], i, &v);
+      uint32_t k = 0;  // undefined / NaN: Uint8Array.from stores 0
+      if (isType(env, v, napi_number)) napi_get_value_uint32(env, v, &k);
+      keys.push_back(k);
+    }
+  }
+  m->keyboard->press(mods, keys);
   return nullptr;
 })
 
