@@ -734,6 +734,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         board.Add(seg)
 
     clip_silk_to_board(board, outline)
+    clip_silk_to_pads(board)
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
@@ -802,6 +803,64 @@ def clip_silk_to_board(board, outline, gap=0.15):
                 continue
             g.SetStart(pcbnew.VECTOR2I(mm(ax + dx * t0), mm(ay + dy * t0)))
             g.SetEnd(pcbnew.VECTOR2I(mm(ax + dx * t1), mm(ay + dy * t1)))
+
+
+def clip_silk_to_pads(board, gap=0.15):
+    """Trim footprint silkscreen segments that come within `gap` of a pad on
+    their side (edge to pad, the line's width counted): some library
+    footprints stop their outline 0.15 mm from a pad at the line's centre,
+    which leaves its edge 0.09 mm away (the HRO TYPE-C-31-M-12's shield
+    pads). The part of a segment inside a pad's box grown by gap + half the
+    width goes; what is left under 0.2 mm long goes too."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    pads = []
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            bb = pad.GetBoundingBox()
+            pads.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom()),
+                         pad.IsOnLayer(pcbnew.F_Cu), pad.IsOnLayer(pcbnew.B_Cu)))
+    for fp in board.GetFootprints():
+        gi = fp.GraphicalItems()          # indexed: iterating it breaks on Python 3.14
+        for g in [gi[i].Cast() for i in range(len(gi))]:
+            if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
+                continue
+            if not (isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT):
+                continue
+            front = g.GetLayer() == pcbnew.F_SilkS
+            ax, ay, bx, by = to(g.GetStart().x), to(g.GetStart().y), to(g.GetEnd().x), to(g.GetEnd().y)
+            dx, dy = bx - ax, by - ay
+            w = to(g.GetWidth()) / 2 + gap + 0.01          # 10 um clear of check_silk's inclusive edge
+            keep = [(0.0, 1.0)]
+            for x0, y0, x1, y1, on_f, on_b in pads:
+                if not (on_f if front else on_b):
+                    continue
+                # Liang-Barsky: the part of the segment inside the grown pad box
+                t0, t1 = 0.0, 1.0
+                for p, q in ((-dx, ax - (x0 - w)), (dx, (x1 + w) - ax), (-dy, ay - (y0 - w)), (dy, (y1 + w) - ay)):
+                    if p == 0:
+                        if q < 0:
+                            t0, t1 = 1, 0
+                    elif p < 0:
+                        t0 = max(t0, q / p)
+                    else:
+                        t1 = min(t1, q / p)
+                if t1 <= t0:
+                    continue
+                keep = [piece for a0, a1 in keep
+                        for piece in ((a0, min(a1, t0)), (max(a0, t1), a1)) if piece[1] > piece[0]]
+            if keep == [(0.0, 1.0)]:
+                continue
+            length = math.hypot(dx, dy)
+            keep = [(a0, a1) for a0, a1 in keep if length * (a1 - a0) >= 0.2]
+            for k, (a0, a1) in enumerate(keep):
+                seg = g if k == 0 else g.Duplicate()
+                seg.SetStart(pcbnew.VECTOR2I(mm(ax + dx * a0), mm(ay + dy * a0)))
+                seg.SetEnd(pcbnew.VECTOR2I(mm(ax + dx * a1), mm(ay + dy * a1)))
+                if k:
+                    fp.Add(seg)
+            if not keep:
+                fp.Remove(g)
 
 
 SILK_TEXT = (1.0, 0.15)                 # designator height and stroke (JLC minimum stroke)
@@ -892,7 +951,11 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
                 steps = max(2, int(pcbnew.ToMM((b - a).EuclideanNorm()) / 0.02))
                 probes = [pcbnew.VECTOR2I(int(a.x + (b.x - a.x) * k / steps), int(a.y + (b.y - a.y) * k / steps))
                           for k in range(steps + 1)]
-                hit = lambda bb, pad: any(bb.Contains(pt) for pt in probes)   # noqa: E731
+                # the line's edge, not its centre: the pad box grows by half its width
+                half = g.GetWidth() // 2
+                hit = lambda bb, pad, half=half: any(                          # noqa: E731
+                    pcbnew.BOX2I(bb.GetPosition() - pcbnew.VECTOR2I(half, half),
+                                 bb.GetSize() + pcbnew.VECTOR2L(2 * half, 2 * half)).Contains(pt) for pt in probes)
             elif isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_CIRCLE:
                 # the ring, not its bounding box (which holds the pad it rings)
                 c, r = g.GetCenter(), g.GetRadius() + g.GetWidth() / 2
