@@ -110,7 +110,7 @@ def core_placement(cx, cy, turn=0):
         "R2": (-1.6, 5.4, 90),        # XOUT
         "C16": (-7.8, 8.6, 90),
         "C17": (-5.0, 11.4, 0),
-        "R3": (3.6, 6.0, 90),         # RUN pull-up
+        "R3": (3.6, 6.0, 90),         # RUN pull-up (boards may move it by the slot)
     }
     if turn == 180:                      # the same arrangement, the chip turned round
         return {r: (cx - x, cy - y, (rot + 180) % 360) for r, (x, y, rot) in rel.items()}

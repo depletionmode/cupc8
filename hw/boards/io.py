@@ -87,6 +87,7 @@ POWER_NETS = rc.POWER_NETS + ("/VBUS",)
 PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
+    "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up: by its finger, clear of the SWD pins
     "U4": (16.5, -18, 0),
     "C18": (13.3, -18, 90),
     "R5": (19, -38.5, 0),
@@ -116,4 +117,4 @@ TITLE, REVISION = "CUPC/8 IO", "A"
 
 if __name__ == "__main__":
     rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS,
-             TITLE, REVISION, usb=True, passes=100)
+             TITLE, REVISION, usb=True, layers=4, passes=100)

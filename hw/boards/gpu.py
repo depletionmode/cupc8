@@ -135,6 +135,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "R1": (CX + 14.5, CY + 9, 90),
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
+    "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up: by its finger, clear of the SWD pins
     "U4": (14, -12.5, 0),
     "C18": (10.5, -12.5, 90),
     "J2": (HX, -44 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin

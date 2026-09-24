@@ -641,9 +641,10 @@ NET_CLASSES = [
     # name, track, clearance, via diameter, via drill
     ("Default", 0.2, 0.2, 0.6, 0.3),        # 0.2: two 0.6/0.3 vias then keep holes 0.5 apart (JLC)
     ("Power", 0.5, 0.2, 0.8, 0.4),
-    # nets on 0.4 mm pitch pads (QFN): a 0.2 track leaves exactly 0.2 to the
-    # next pad, which Freerouting will not take; 0.15 leaves 0.225
-    ("Fine", 0.15, 0.2, 0.6, 0.3),
+    # nets on 0.4 mm pitch pads (QFN): 0.15 mm tracks and 0.15 mm clearance
+    # (JLC: 0.127), or a track can't turn out of a pad beside its neighbour
+    # (a pad gap is 0.2); DRC still holds via holes 0.5 mm apart
+    ("Fine", 0.15, 0.15, 0.6, 0.3),
 ]
 
 
@@ -1179,6 +1180,7 @@ def remove_dangling(board, pours=()):
     are not filled yet, so their vias would look dangling. Returns the count."""
     import pcbnew
     removed = 0
+    copper = [pcbnew.F_Cu, pcbnew.B_Cu] + ([pcbnew.In1_Cu, pcbnew.In2_Cu] if board.GetCopperLayerCount() == 4 else [])
     while True:
         tracks = board.Tracks()                  # indexed: iterating it breaks on Python 3.14
         items = [tracks[i].Cast() for i in range(len(tracks))]
@@ -1208,7 +1210,8 @@ def remove_dangling(board, pours=()):
             return False
         gone = []
         for v in vias:
-            layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
+            # every copper layer: on 4 layers a via can carry a track to In2
+            layers = [l for l in copper if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
             if len(layers) < 2:
                 gone.append(v)
         for t in segs:
@@ -1269,9 +1272,10 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
     # Freerouting can hand back a track at 3/4 of its class's width (0.1124
     # mm for 0.15, out of a QFN's side pads), under JLC's minimum: each goes
-    # back to its class's width, and DRC judges the clearance
+    # back to the minimum, and DRC judges the clearance
+    want = pcbnew.FromMM(JLC_RULES["min_track_width"])
+    tracks = board.Tracks()
     for t in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_TRACE_T]:
-        want = t.GetEffectiveNetClass().GetTrackWidth()
         if t.GetWidth() < want:
             t.SetWidth(want)
 
