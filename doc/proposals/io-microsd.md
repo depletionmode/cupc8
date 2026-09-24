@@ -1,8 +1,11 @@
 # Proposal: microSD storage on the IO card (target: Milestone 1)
 
-**Status: proposal, set for Milestone 1. Not implemented yet.** Nothing in
-the boards, firmware, kernel or tests changes until this is accepted and
-scheduled. Raised 2026-09-24 by David.
+**Status: accepted for Milestone 1, 2026-09-24 (David), being implemented.**
+Raised 2026-09-24 by David. Decisions on the open questions below, taking
+the recommended options: FatFs on the card (option 1); `SAVE` writes text;
+4 file handles; the IO card's back edge (x = −6.0 mm, the B1 end) is the
+rear of the case, where the USB-A receptacle goes; the socket is a
+push-push microSD with card detect, picked from JLC's library by stock.
 
 **Hardware and software:** a microSD socket on the IO card, IO card firmware
 for the card and a file system, new IO card commands, and kernel and BASIC
