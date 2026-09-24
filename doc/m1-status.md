@@ -6,6 +6,12 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## Decisions (David, 2026-09-24)
 
+- **Power: the full M1 machine requires a USB-C 3.0 A source** (four cards
+  no longer fit 1.5 A with margin). Below 3 A the radio stays off and SD
+  writes are refused. The power agent re-derives the CC threshold, the
+  input switch/fuse and the POW/THM checks; the main board takes its parts
+  from `hw/power/design.py`.
+
 - **E-ink card: built for M1** as the second graphics option (replaces the
   HDMI card, type $01; `proposals/eink-gpu.md` Decisions; pins `eink_mcu`).
   The native emulator gets a UC8179 panel model.
