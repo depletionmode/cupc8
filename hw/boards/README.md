@@ -78,8 +78,8 @@ Spec: `doc/hardware/wifi-card.md`.
 - **Y1, 12 MHz X322512MSB4SI** (C9002, CL = 20 pF): 33 pF each side
   (2 × (20 − ~3 pF stray)), and 1 kΩ in series with XOUT as the design guide
   has for drive level (the crystal is rated 10–200 µW).
-- **U2, AMS1117-3.3** (C6186, JLC's footprint), from the slot's +5V, 10 µF in
-  and 22 µF out. The slot's +3V3 pins are left unconnected.
+- **3V3 from the slot's +3V3** (power.md: each card is well under the
+  slot's 300 mA), with 22 µF where it comes on at B4/A4. No regulator.
 - **Slot:** SCK, MOSI, CS_n, IRQ_n on GPIO2, 3, 5, 6 (IRQ_n is open drain in
   firmware). SWCLK/SWDIO go straight to the RP2040's SWD pins; CARD_RST_n
   is RUN, with a 10 kΩ pull-up. PRSNT1_n is joined to PRSNT2_n, the RSVD pins
