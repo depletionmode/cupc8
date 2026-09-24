@@ -1244,6 +1244,12 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
     env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
+    # tracks pre-routed on inner plane layers (presence_link's run on a wide
+    # card) are not in the DSN, and the SES import drops them: keep them
+    tracks = board.Tracks()
+    inner = [(tracks[i].GetStart(), tracks[i].GetEnd(), tracks[i].GetWidth(), tracks[i].GetLayer(),
+              tracks[i].GetNet()) for i in range(len(tracks))
+             if tracks[i].Type() == pcbnew.PCB_TRACE_T and tracks[i].GetLayer() not in (pcbnew.F_Cu, pcbnew.B_Cu)]
     for attempt in range(tries):
         # each try orders the problem differently (a UUID salt): Freerouting
         # can stall on one order and complete on another, and the salt keeps
@@ -1272,6 +1278,15 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
         raise RuntimeError("Freerouting wrote no session file")
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
+    for start, end, width, layer, net in inner:
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(start)
+        t.SetEnd(end)
+        t.SetWidth(width)
+        t.SetLayer(layer)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
     remove_dangling(board, pours)
     # the import can pair one net class's via diameter with another's drill
     # (0.6 mm with 0.4 mm: a 0.1 mm ring, under JLC's 0.13): keep a 0.15 mm ring

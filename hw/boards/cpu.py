@@ -307,7 +307,7 @@ def placement():
     for ref in ("C3", "C9", "C10", "C14"):
         p[ref] = beside(DECOUPLING[ref][2], dist=4.5)
     # the bottom side's decaps step aside from the arrays under the bus pins
-    p["C5"] = beside(6, along=-6.0)
+    p["C5"] = beside(6, along=-7.0)
     p["C1"] = beside(27, along=4.5)
     p["C6"] = beside(30, along=5.5)
     p.update({
@@ -413,9 +413,124 @@ def supply_fingers(board, width=0.5, via=0.6, drill=0.3, top=H - 6.0):
         board.Add(v)
 
 
+KNEE = 1.3                           # mm from an FPGA pad's centre to past the pad row's inner ends
+
+
+def plane_pins(board, via=0.6, drill=0.3, width=0.25, gap=0.2):
+    """Every FPGA pin on a plane net (GND, 3V3) needs its own via: Freerouting
+    leaves plane nets to their planes. kicadgen.ground_fanout places them one
+    pin at a time, and next to another supply pin 0.5 mm away it can leave
+    none. So the FPGA's are redone here as one scheme: each pin's track runs
+    straight in under the package past the pad row, then to a via that leans
+    away from its supply-pin neighbours (whose vias lean the other way), clear
+    of every via, track and pad already there."""
+    import math
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def seg_dist(px, py, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        k = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy or 1e-12)))
+        return math.hypot(px - ax - k * dx, py - ay - k * dy)
+    u1 = [fp for fp in board.GetFootprints() if fp.GetReference() == "U1"][0]
+    at = {(p.GetPosition().x, p.GetPosition().y) for p in u1.Pads() if p.GetNetname() in ("/GND", "/3V3")}
+    tracks = board.Tracks()
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    fanned = [s for s in items if s.Type() == pcbnew.PCB_TRACE_T and (s.GetStart().x, s.GetStart().y) in at]
+    ends = {(s.GetEnd().x, s.GetEnd().y) for s in fanned}
+    for item in fanned + [v for v in items if v.Type() == pcbnew.PCB_VIA_T
+                          and (v.GetPosition().x, v.GetPosition().y) in ends]:
+        board.Remove(item)
+    tracks = board.Tracks()
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    segs = [(to(s.GetStart().x), to(s.GetStart().y), to(s.GetEnd().x), to(s.GetEnd().y), s.GetNetname(),
+             to(s.GetWidth())) for s in items if s.Type() == pcbnew.PCB_TRACE_T]
+    vias = [(to(v.GetPosition().x), to(v.GetPosition().y), v.GetNetname()) for v in items
+            if v.Type() == pcbnew.PCB_VIA_T]
+    pads = [(p, p.GetBoundingBox()) for fp in board.GetFootprints() for p in fp.Pads()]
+    supply = {int(p.GetNumber()) for p in u1.Pads() if p.GetNetname() in ("/GND", "/3V3")}
+    for pad in u1.Pads():
+        net = pad.GetNetname()
+        if net not in ("/GND", "/3V3"):
+            continue
+        cx, cy = to(pad.GetPosition().x), to(pad.GetPosition().y)
+        num = int(pad.GetNumber())
+        _, _, dx, dy = fpga_pad(num)
+        # along the side, towards the next pin; lean away from supply-pin
+        # neighbours, whose vias fan out the other way
+        sx, sy = dy, -dx                              # the next pin's direction on every side
+        lean = (num - 1 in supply) - (num + 1 in supply)
+        sides = [s * (lean or 1) for s in (0.5, 1.0, 0.0, 1.5, -0.5, 2.0, -1.0)] if lean else \
+            [0.0, 0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.0, -2.0]
+        placed = False
+        for depth in (1.8, 2.6, 3.4, 4.2, 5.0, 5.8, 6.6):
+            for side in sides:
+                vx, vy = cx - dx * depth + sx * side, cy - dy * depth + sy * side
+                if any(math.hypot(vx - x, vy - y) < via + gap for x, y, _ in vias):
+                    continue
+                if any(n != net and seg_dist(vx, vy, *s[:4]) < via / 2 + gap + s[5] / 2 for s in segs
+                       for n in (s[4],)):
+                    continue
+                # straight in past the pad row's inner ends, then over to the via
+                kx, ky = cx - dx * KNEE, cy - dy * KNEE
+                path = [(cx + (kx - cx) * i / 8, cy + (ky - cy) * i / 8) for i in range(9)] + \
+                       [(kx + (vx - kx) * i / 16, ky + (vy - ky) * i / 16) for i in range(1, 17)]
+                if any(n != net and seg_dist(px, py, *s[:4]) < width / 2 + gap + s[5] / 2
+                       for s in segs for n in (s[4],) for px, py in path):
+                    continue
+                if any(n != net and math.hypot(px - x, py - y) < width / 2 + gap + via / 2
+                       for x, y, n in vias for px, py in path):
+                    continue
+                bad = False
+                for p, bb in pads:
+                    if p.GetNetname() == net:
+                        continue
+                    grow = gap + width / 2
+                    x0, y0, x1, y1 = to(bb.GetLeft()) - grow, to(bb.GetTop()) - grow, to(bb.GetRight()) + grow, \
+                        to(bb.GetBottom()) + grow
+                    if any(x0 < px < x1 and y0 < py < y1 for px, py in path) or \
+                            (x0 - via / 2 < vx < x1 + via / 2 and y0 - via / 2 < vy < y1 + via / 2):
+                        bad = True
+                        break
+                if bad:
+                    continue
+                track(board, pad.GetNet(), pcbnew.F_Cu, (cx, cy), (kx, ky), width)
+                track(board, pad.GetNet(), pcbnew.F_Cu, (kx, ky), (vx, vy), width)
+                v = pcbnew.PCB_VIA(board)
+                v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(vy)))
+                v.SetWidth(mm(via))
+                v.SetDrill(mm(drill))
+                v.SetNet(pad.GetNet())
+                v.SetLocked(True)
+                board.Add(v)
+                segs += [(cx, cy, kx, ky, net, width), (kx, ky, vx, vy, net, width)]
+                vias.append((vx, vy, net))
+                placed = True
+                break
+            if placed:
+                break
+        if not placed:
+            raise SystemExit("U1 pin %s (%s): no room for its plane via" % (pad.GetNumber(), net))
+
+
+def key_ties(board, width=0.25):
+    """The GND ties ground_fingers runs up the fingers either side of the key
+    notch pass 0.3 mm from its edge at their 0.5 mm width: narrow those."""
+    import pcbnew
+    to = pcbnew.ToMM
+    notch = (EDGE_X + 10.55, EDGE_X + 12.45)          # the footprint's key, x of its sides
+    tracks = board.Tracks()
+    for s in [tracks[i].Cast() for i in range(len(tracks))]:
+        if s.Type() == pcbnew.PCB_TRACE_T and s.GetNetname() == "/GND" and s.IsLocked() and \
+                to(s.GetStart().y) > H - 5 and min(abs(to(s.GetStart().x) - n) for n in notch) < 0.8:
+            s.SetWidth(pcbnew.FromMM(width))
+
+
 def prepare(board):
+    key_ties(board)
     a_vias(board)
     supply_fingers(board)
+    plane_pins(board)
 
 
 def main():
