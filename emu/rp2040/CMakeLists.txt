@@ -52,9 +52,11 @@ if(RP2040EMU_PGO STREQUAL "generate" OR RP2040EMU_PGO STREQUAL "use")
   if(RP2040EMU_PGO STREQUAL "generate")
     list(APPEND _fast_flags "-fprofile-generate=${RP2040EMU_PGO_DIR}" -fprofile-update=single)
   else()
-    # code the training did not run (USB, the tests' own code) keeps -O2 as it is
+    # code the training did not run (USB, the tests' own code) keeps -O2 as it
+    # is; a source changed since the training builds (without its profile,
+    # with a warning) instead of failing: rerun tools/pgo.sh
     list(APPEND _fast_flags "-fprofile-use=${RP2040EMU_PGO_DIR}" -fprofile-partial-training
-         -Wno-missing-profile)
+         -Wno-missing-profile -Wno-error=coverage-mismatch)
   endif()
 elseif(NOT RP2040EMU_PGO STREQUAL "")
   message(FATAL_ERROR "RP2040EMU_PGO must be generate, use or empty, not ${RP2040EMU_PGO}")
