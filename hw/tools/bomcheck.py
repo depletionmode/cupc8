@@ -53,6 +53,7 @@ import csv
 import importlib.util
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -169,7 +170,13 @@ def schematic_parts(sch):
         if ref.startswith("#"):
             continue
         f = c.get("fields", {})
-        pins = kg.symbol_pins(lib[libid[ref]]) if libid.get(ref) in lib else {}
+        pins = {}
+        if libid.get(ref) in lib:                 # every unit's pins: an FPGA is drawn in several
+            sym = lib[libid[ref]]
+            units = {int(m.group(1)) for m in (re.search(r"_(\d+)_\d+$", str(s[1])) for s in kg.find(sym, "symbol"))
+                     if m}
+            for u in sorted(units | {1}):
+                pins.update(kg.symbol_pins(sym, u))
         out[ref] = {"value": c["value"], "footprint": c["footprint"], "lcsc": f.get("LCSC") or f.get("LCSC Part"),
                     "pins": {n: p[3] for n, p in pins.items()}}
     return out
@@ -214,6 +221,16 @@ def package_ok(pkg, fp_name):
         return ("L%s-W%s" % (a, b)) in name or ("L%s-W%s" % (b, a)) in name
     if p.isdigit():                                  # chip sizes: 0402, 0603, 0805 ...
         return ("_%s_" % p) in name or name.startswith(p) or ("_%s" % p) in name
+    m = re.fullmatch(r"(\d{4})X(\d)", p)             # "0603x4": an array of n chips, 2n pads
+    if m:
+        return ("_%s" % m.group(1)) in name and ("-%dP" % (2 * int(m.group(2))) in name or p in name)
+    m = re.fullmatch(r"(.+)\((\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)\)", p)   # "TQFP-144(20x20)": and its body
+    if m:
+        body = ["%.1f" % float(v) for v in m.group(2, 3)]
+        return name.startswith(m.group(1)) and "L%s-W%s" % tuple(body) in name
+    m = re.fullmatch(r"(.+)-(150|208)MIL", p)        # "SOIC-8-208mil": the body width in mils
+    if m:
+        return name.startswith(m.group(1)) and "-W%s-" % {"150": "3.9", "208": "5.3"}[m.group(2)] in name
     return name.startswith(p) or ("_%s" % p) in name or ("_%s_" % p) in name
 
 

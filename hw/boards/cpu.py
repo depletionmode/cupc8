@@ -40,6 +40,8 @@ G = kg.GRID
 # 0603 throughout: KiCad's 0402 silkscreen sits closer to its pads than
 # kicadgen.check_silk allows
 R0603 = "Resistor_SMD:R_0603_1608Metric"
+# JLC's footprint for C1521989: pin 1 at the bottom left, running right
+TQFP144 = "jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL"
 C0603 = "Capacitor_SMD:C_0603_1608Metric"
 LCSC = {
     "100n": "C14663", "1u": "C15849", "4.7u": "C19666",         # caps (basic)
@@ -70,10 +72,10 @@ SERIES = [
     ["CPU_A4", "CPU_A5", "CPU_A6", "CPU_A7"],
     ["CPU_A8", "CPU_A9", "CPU_A10", "CPU_A11"],
     ["CPU_A12", "CPU_A13", "CPU_A14", "CPU_A15"],
+    ["CPU_nSTB", "CPU_RW", "CPU_SYNC", None],
     ["CPU_D0", "CPU_D1", "CPU_D2", "CPU_D3"],
     ["CPU_D4", "CPU_D5", "CPU_D6", "CPU_D7"],
-    ["CPU_RW", "CPU_nSTB", "CPU_SYNC", "CPU_HALTED"],
-    ["CPU_WAITING", "CPU_TMR_EXP0", "CPU_TMR_EXP1", None],
+    ["CPU_TMR_EXP0", "CPU_TMR_EXP1", "CPU_HALTED", "CPU_WAITING"],
 ]
 assert sorted(n for a in SERIES for n in a if n) == sorted(DRIVEN), "series arrays miss a card output"
 
@@ -152,7 +154,7 @@ def schematic(path, footprint_libs):
     u1 = {}
     for unit, (gx, gy) in unit_at.items():
         u = s.add("FPGA_Lattice:ICE40HX4K-TQ144", "U1", "ICE40HX4K-TQ144",
-                  "Package_QFP:TQFP-144_20x20mm_P0.5mm", at=(gx * G, gy * G), unit=unit,
+                  TQFP144, at=(gx * G, gy * G), unit=unit,
                   fields={"LCSC": "C1521989"})
         u1[unit] = u
         for num, (x, y, a, name, ptype, ln, hidden) in u.pins.items():
@@ -165,7 +167,7 @@ def schematic(path, footprint_libs):
                 s.nc(u, num, stub=G)
 
     # config flash
-    u2 = s.add("Memory_Flash:W25Q32JVSS", "U2", "W25Q32JVSSIQ", "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm",
+    u2 = s.add("Memory_Flash:W25Q32JVSS", "U2", "W25Q32JVSSIQ", "jlc:SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL",
                at=(172 * G, 28 * G), fields={"LCSC": "C179173"})
     for pin, net in (("~{CS}", "FL1_nCS"), ("CLK", "FL1_SCK"), ("DI/IO_{0}", "FL1_MOSI"),
                      ("DO/IO_{1}", "FL1_MISO"), ("~{WP}/IO_{2}", "FL1_WPHOLD"), ("~{HOLD}/~{RESET}/IO_{3}", "FL1_WPHOLD"),
@@ -181,7 +183,7 @@ def schematic(path, footprint_libs):
 
     # 33 ohm series arrays
     for i, nets in enumerate(SERIES):
-        rn = s.add("Device:R_Pack04", "RN%d" % (i + 1), "33", "Resistor_SMD:R_Array_Convex_4x0603",
+        rn = s.add("Device:R_Pack04", "RN%d" % (i + 1), "33", "jlc:RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL",
                    at=((16 + 16 * i) * G, 108 * G), fields={"LCSC": LCSC["33x4"]})
         for k, net in enumerate(nets):
             if net:
@@ -253,14 +255,14 @@ def schematic(path, footprint_libs):
 # ------------------------------------------------------------------- board
 #
 # Card body 72 x 60 mm above the PCIe x8 finger tab (the footprint draws the
-# tab's Edge.Cuts; its ends meet the body at y = 60). The FPGA is turned a
-# quarter so its bank-3 side (A[15:0], IRQ) faces the fingers and its bank-2
-# side (D, control, config) faces right; the 33 ohm arrays sit between each
+# tab's Edge.Cuts; its ends meet the body at y = 60). The FPGA's bank-3
+# side (A[15:0], IRQ) faces the fingers and its bank-2 side (control, D,
+# timers, config, in the fingers' order from the bottom up) faces right; the 33 ohm arrays sit between each
 # side and the fingers, the flash beside the config pins.
 
 W, H = 72.0, 60.0
 EDGE_X = 11.0                        # finger A1/B1 centre
-FPGA = (38.0, 22.0, 90)
+FPGA = (38.0, 22.0, 0)
 OUTLINE = (0, 0, W, H)
 TAB = (EDGE_X - 0.65, EDGE_X + 50.65)          # where the footprint's tab meets the body
 EDGE = [(TAB[1], H), (W, H), (W, 0), (0, 0), (0, H), (TAB[0], H)]
@@ -273,9 +275,9 @@ def fpga_pad(pin):
     """Board position of an FPGA pad and its outward direction."""
     import math
     x0, y0, rot = FPGA
-    side, k = divmod(int(pin) - 1, 36)   # 0 left, 1 bottom, 2 right, 3 top (unrotated), k along it
+    side, k = divmod(int(pin) - 1, 36)   # 0 bottom, 1 right, 2 top, 3 left (unrotated), k along it
     t = -8.75 + 0.5 * k
-    ux, uy, ox, oy = [(-10.66, t, -1, 0), (t, 10.66, 0, 1), (10.66, -t, 1, 0), (-t, -10.66, 0, -1)][side]
+    ux, uy, ox, oy = [(t, 10.95, 0, 1), (10.95, -t, 1, 0), (-t, -10.95, 0, -1), (-10.95, t, -1, 0)][side]
     a = math.radians(rot)                # KiCad turns counter-clockwise on screen (y down)
     rx, ry = ux * math.cos(a) + uy * math.sin(a), -ux * math.sin(a) + uy * math.cos(a)
     dx, dy = round(ox * math.cos(a) + oy * math.sin(a)), round(-ox * math.sin(a) + oy * math.cos(a))
@@ -301,11 +303,11 @@ def placement():
     p.update({
         "C15": (16, 44, 90), "C16": (66, 44, 90),              # 3V3 bulk: finger entry, right side
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": (51.9, 22.5, 270), "C17": (58.5, 22.5, 270), "R6": (58.5, 26.5, 90),
+        "C18": (52.2, 22.5, 270), "C17": (54.9, 22.5, 270), "R6": (54.9, 26.8, 90),
         "C20": (24.1, 22.0, 90), "C19": (16.5, 22.0, 90), "R7": (16.5, 26.0, 90),
         # 33 ohm arrays: A below the FPGA, D and control to its right
-        "RN1": (29.0, 40.5, 90), "RN2": (33.6, 40.5, 90), "RN3": (38.2, 40.5, 90), "RN4": (42.8, 40.5, 90),
-        "RN5": (64.0, 31.5, 180), "RN6": (64.0, 27.0, 180), "RN7": (64.0, 22.5, 180), "RN8": (64.0, 18.0, 180),
+        "RN1": (29.0, 40.5, 0), "RN2": (33.6, 40.5, 0), "RN3": (38.2, 40.5, 0), "RN4": (42.8, 40.5, 0),
+        "RN5": (58.0, 30.5, 90), "RN6": (58.0, 27.0, 90), "RN7": (58.0, 23.5, 90), "RN8": (58.0, 20.0, 90),
         # config flash and its pull-ups, top right by the config pins, clear
         # of the mounting hole's keep-out
         "U2": (60.0, 9.0, 0), "C23": (60.5, 3.0, 0),
