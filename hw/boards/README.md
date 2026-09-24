@@ -79,11 +79,14 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
 
 - **FPGA pins** are read from `hw/pins.yaml` (`cpu_fpga`), the file that also
   generates `build/hw/cpucard.pcf`, so the schematic and the bitstream agree
-  by construction. The bank-2 bus pins run bottom to top in the fingers'
-  left-to-right order: /RST, /STB, /RDY, RW, SYNC, D0–D4, CLK (GBIN5, pin 49),
-  D5–D7, TMR_EXP0/1, HALTED, WAITING. That way only CPU_CLK crosses other bus
-  lines on the way to the socket. In the first pin order the control lines
-  crossed all eight data lines, and Freerouting could not route them.
+  by construction. Each side of the package carries its bus lines in the
+  order of their fingers, left to right. The bottom side (bank 3) has A0–A15
+  on pins 1–20, then CPU_CLK (21, GBIN6), /RST, /STB, /RDY, RW and SYNC
+  (22–26). The right side (bank 2), bottom up, has D0–D7 (37–45), IRQ0–3
+  (47–52), TMR_EXP0/1, HALTED and WAITING (55–61). So the front-side lines
+  reach their fingers without crossing, and A drops to the back layer
+  through its arrays. With the first two pin orders, Freerouting left 5–7
+  bus nets unrouted on every try, even when it could also route on In2.
 - **Footprints** are JLC's own (`jlc:`, imported from the LCSC part) for the
   FPGA, the flash and the resistor arrays, so the BOM check (BRD-001) matches
   them pad for pad. The pin tables are in `hw/parts/`. The FPGA's table is
@@ -124,9 +127,8 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   and the clock. Two planes give every one of them a short via to its supply
   and a solid return path under the whole bus, without cutting up a pour. On
   two layers the fan-out would have to share its layers with the power.
-- **Placement.** The FPGA's bank 3 (A[15:0], IRQ) faces the fingers. Bank 2
-  (control, D, timers, config) faces right. The eight 33 Ω arrays run in one
-  row under the package, in the fingers' order: A, then /STB-RW-SYNC, D0–3,
-  D4–7 and the timer lines. The flash sits by the config pins, top right,
+- **Placement.** Each 33 Ω array sits at its pins. A0–15 and /STB-RW-SYNC
+  are in a row under the bottom side. D0–3, D4–7 and the timer lines are in
+  a column right of the right side. The flash sits by the config pins, top right,
   clear of the M3 hole. The PWR LED is at the common spot, 3 mm in from the
   top-left corner. Nothing sits in the 4.5 mm strip above the fingers.
