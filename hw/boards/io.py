@@ -89,8 +89,13 @@ PLACEMENT = dict(rc.core_placement(28, -17.5), **{
     "U2": (1.5, -13.5, 0),
     "C1": (-4.5, -13.5, 90),
     "C2": (7.5, -13.5, 90),
-    "U4": (14, -12.5, 0),
-    "C18": (10.5, -12.5, 90),
+    # SWD crosses the slot lines on its way from the chip's bottom edge to
+    # fingers B6-B9: the crystal and the MISO buffer sit clear of that path
+    "Y1": (20.3, -11.6, 0),
+    "C16": (17.6, -11.6, 90),
+    "C17": (20.7, -8.9, 0),
+    "U4": (16.5, -18, 0),
+    "C18": (13.3, -18, 90),
     "R5": (19, -38.5, 0),
     "D2": (19, -41, 0),
     "R6": (25, -38.5, 0),
