@@ -78,19 +78,20 @@ def schematic(path, footprint_libs):
 
 POWER_NETS = rc.POWER_NETS
 CX, CY = 26, -19               # the RP2040, turned round: its SD pins (GPIO12-19) face the socket
-SX = 36                        # the socket: its opening on the top edge
+SX = 40                        # the socket: its opening on the top edge
 PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
-    # as on the GPU card: the middle of the chip's top edge (DVDD, IOVDD,
-    # XIN/XOUT) keeps its caps, the crystal sits to the left, the flash by the
-    # QSPI pins (now at the bottom)
-    "C12": (CX - 0.7, CY - 5.3, 90),     # DVDD 23
+    # the chip's top edge after the turn: SD pins at its right end and on its
+    # left side, so the middle (DVDD, IOVDD, XIN/XOUT, SWD) is open: the
+    # crystal goes straight above XIN/XOUT, the flash by the QSPI pins (now
+    # at the bottom)
+    "C12": (CX - 1.0, CY - 5.3, 90),     # DVDD 23
+    "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 3.2, CY + 7.2, 90),      # IOVDD 49
-    "C5": (CX + 5.6, CY + 4.4, 0),       # IOVDD 22: out of the pocket, so XIN/XOUT can leave it
-    "Y1": (CX - 8.5, CY - 4.0, 0),
-    "C16": (CX - 11.2, CY - 4.0, 90),
-    "C17": (CX - 8.5, CY - 1.4, 0),
-    "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
+    "R2": (CX + 0.7, CY - 5.3, 90),      # XOUT
+    "Y1": (CX + 0.4, CY - 9.6, 0),
+    "C16": (CX - 2.9, CY - 9.6, 90),
+    "C17": (CX + 3.7, CY - 9.6, 90),
     "U3": (CX + 7, CY + 9.5, 0),
     "C15": (CX + 7, CY + 5.6, 0),
     "R1": (CX + 12.5, CY + 9.5, 90),
@@ -111,7 +112,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "U5": (SX - 3.6, -25.5, 90),
     "U6": (SX + 5.5, -25.5, 90),
     "RN1": (SX + 10.5, -25.0, 90),
-    "R20": (SX - 6.0, -27.5, 90),
+    "R20": (SX - 6.0, -24.0, 90),
     "R21": (SX + 9.8, -30.5, 90),
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })

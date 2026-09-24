@@ -115,7 +115,7 @@ def schematic(path, footprint_libs):
 
 
 POWER_NETS = rc.POWER_NETS         # HDMI_5V (55 mA) stays a signal-width track: pin 18 is 0.3 mm wide
-CX, CY = 26, -18               # the RP2040, turned round: its TMDS edge (GPIO10-17) faces the receptacle
+CX, CY = 26, -16               # the RP2040, turned round: its TMDS edge (GPIO10-17) faces the receptacle
 HX = CX + 1.5                  # the receptacle's centre: pin n at HX - 4.5 + 0.5 (n - 1), so D2 runs straight up
 # Up from the chip: the arrays, the ESD, the receptacle at the top edge. The
 # edge's middle pins (RUN, SWD, DVDD, IOVDD, XIN/XOUT) sit between the D2
@@ -130,9 +130,9 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "C16": (CX - 11.2, CY - 4.0, 90),
     "C17": (CX - 8.5, CY - 1.4, 0),
     "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
-    "U3": (CX + 9, CY + 9, 0),       # flash, by the QSPI pins (now on the bottom edge)
-    "C15": (CX + 10.5, CY + 4.6, 0),
-    "R1": (CX + 14.5, CY + 9, 90),
+    "U3": (CX + 9.5, CY + 6.0, 0),     # flash, by the QSPI pins (now on the bottom edge)
+    "C15": (CX + 12.0, CY + 2.4, 0),
+    "R1": (CX + 15.0, CY + 6.0, 90),
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up: by its finger, clear of the SWD pins
