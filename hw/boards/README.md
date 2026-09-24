@@ -74,8 +74,8 @@ Spec: `doc/hardware/wifi-card.md`.
 
 sysctl, the RP2040 that programs and debugs the machine
 ([system-slot.md](../../doc/hardware/system-slot.md),
-[sysctl.md](../../doc/hardware/sysctl.md)), on a 56 × 38 mm card above a
-PCIe x4 finger tab (1.6 mm, hard-gold 45° fingers), with a USB-C port on
+[sysctl.md](../../doc/hardware/sysctl.md)), on a 56 × 44 mm card above a
+PCIe x4 finger tab (the shared card rules above), with a USB-C port on
 the top edge for the host PC. Everything is placed by JLC; nothing is fitted
 by hand.
 
@@ -85,8 +85,9 @@ puts sysctl in its distribution tree and its current budget (50 mA max).
 There is no AMS1117 on this card: running the RP2040 from the same rail as
 the chipset, flashes and expanders it drives means its I/O can never be
 powered while theirs is not, or the other way round, and it saves a part.
-The slot's **+5V (A11) is not connected**. (parts.md budgets two AMS1117s
-for the system card; that line can drop to 6.)
+The slot's **+5V (A11) is not connected**. The ADC's reference (ADC_AVDD)
+is the same slot +3V3, with 100 nF at the pin, which is what the power
+analysis assumes for CC sensing (power.md: ±3 %, ≤ 12 LSB).
 
 **USB-C.** A data-only device port: 5.1 kΩ Rd on CC1 and CC2, 27 Ω on
 D+/D−, and a USBLC6-2SC6 between the receptacle and the resistors.
@@ -128,5 +129,8 @@ USB CDC link and the SWD pads cover debugging.
 
 **Board.** Four layers (JLC04161H-7628), GND poured on both outer layers.
 The fan-out of a 0.4 mm QFN-56 with 50-odd slot nets through the finger
-tab did not route cleanly on two. The strip 4.5 mm above the fingers holds
-no parts. Passives are 0603 basic parts.
+tab did not route cleanly on two, nor in a 38 mm-tall body. The RP2040's
+nets are in kicadgen's "Fine" class (0.15 mm track, 0.2 mm clearance): a
+0.2 mm track leaves no room between its 0.2 mm pads at 0.4 mm pitch. J1 is
+JLC's own footprint (jlc: import), since KiCad's splits the paired contacts
+(A1/B12 ...) that JLC places as one pad. Passives are 0603 basic parts.
