@@ -129,21 +129,79 @@ bool CortexM0Core::checkCondition(uint32_t cond) const {
   return (cond & 0b1) && cond != 0b1111 ? !result : result;
 }
 
-uint32_t CortexM0Core::readUint32(uint32_t address) { return rp2040.readUint32(address); }
+// The core's bus accesses: rp2040.readUint32(address) etc., with the paths
+// of those functions that only read or write SRAM or flash taken here
+// directly (the same bytes, no side effects there); everything else goes
+// through the chip. (Offsets are compared in size_t: no wrap-around.)
+//  - readUint32: an aligned SRAM or flash (0x10-0x13, the mirrors) word, as
+//    its SRAM / flash branches (an unaligned address logs an error first);
+//  - readUint16 / readUint8: its own first branches, flash (0x10) and SRAM;
+//  - writeUint32: SRAM, which has no peripheral (findPeripheral is null for
+//    0x20000000-0x3fffffff), so its SRAM branch;
+//  - writeUint16 / writeUint8: their first branch, SRAM.
+uint32_t CortexM0Core::readUint32(uint32_t address) {
+  if (!(address & 0x3)) {
+    const uint32_t ramOffset = address - RAM_START_ADDRESS;
+    if (ramOffset <= rp2040.sram.size() - 4) {
+      return loadLE32(rp2040.sram.data() + ramOffset);
+    }
+    const uint32_t flashOffset = address & 0x00ffffff;
+    if (address - FLASH_START_ADDRESS < FLASH_END_ADDRESS - FLASH_START_ADDRESS &&
+        flashOffset <= rp2040.flash.size() - 4) {
+      return loadLE32(rp2040.flash.data() + flashOffset);
+    }
+  }
+  return rp2040.readUint32(address);
+}
 
-uint32_t CortexM0Core::readUint16(uint32_t address) { return rp2040.readUint16(address); }
+uint32_t CortexM0Core::readUint16(uint32_t address) {
+  const uint32_t flashOffset = address - FLASH_START_ADDRESS;
+  if (flashOffset <= rp2040.flash.size() - 2) {
+    return loadLE16(rp2040.flash.data() + flashOffset);
+  }
+  const uint32_t ramOffset = address - RAM_START_ADDRESS;
+  if (ramOffset <= rp2040.sram.size() - 2) {
+    return loadLE16(rp2040.sram.data() + ramOffset);
+  }
+  return rp2040.readUint16(address);
+}
 
-uint32_t CortexM0Core::readUint8(uint32_t address) { return rp2040.readUint8(address); }
+uint32_t CortexM0Core::readUint8(uint32_t address) {
+  const uint32_t flashOffset = address - FLASH_START_ADDRESS;
+  if (flashOffset < rp2040.flash.size()) {
+    return rp2040.flash[flashOffset];
+  }
+  const uint32_t ramOffset = address - RAM_START_ADDRESS;
+  if (ramOffset < rp2040.sram.size()) {
+    return rp2040.sram[ramOffset];
+  }
+  return rp2040.readUint8(address);
+}
 
 void CortexM0Core::writeUint32(uint32_t address, uint32_t value) {
+  const uint32_t ramOffset = address - RAM_START_ADDRESS;
+  if (ramOffset <= rp2040.sram.size() - 4) {
+    storeLE32(rp2040.sram.data() + ramOffset, value);
+    return;
+  }
   rp2040.writeUint32(address, value);
 }
 
 void CortexM0Core::writeUint16(uint32_t address, uint32_t value) {
+  const uint32_t ramOffset = address - RAM_START_ADDRESS;
+  if (ramOffset <= rp2040.sram.size() - 2) {
+    storeLE16(rp2040.sram.data() + ramOffset, static_cast<uint16_t>(value));
+    return;
+  }
   rp2040.writeUint16(address, value);
 }
 
 void CortexM0Core::writeUint8(uint32_t address, uint32_t value) {
+  const uint32_t ramOffset = address - RAM_START_ADDRESS;
+  if (ramOffset < rp2040.sram.size()) {
+    rp2040.sram[ramOffset] = static_cast<uint8_t>(value);
+    return;
+  }
   rp2040.writeUint8(address, value);
 }
 

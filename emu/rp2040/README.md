@@ -132,6 +132,11 @@ prove it):
   Nothing is cached, so writes need no invalidation. core-diff runs blocks
   from SRAM, flash, the three mirrors and the bootrom, and now and then
   fetches at the end of a memory or outside every memory.
+- The core's own bus accesses (`CortexM0Core::readUint32` etc.) take the
+  chip's SRAM and flash branches directly: an aligned SRAM or flash (and
+  mirror) word read, `readUint16`/`readUint8` from flash or SRAM, and
+  stores to SRAM (which has no peripheral in `findPeripheral`); anything else
+  goes through `RP2040::readUint32` etc. as before.
 - `RP2040::runSteps(limit, stopNanos, clock, nsPerCycle)` is the Emu loop
   (rp2040emu.mjs's `step()` and `cycles(n)` without an `onCycle` hook: the
   idle path, `step()`, `stepPIOs`, `clock.tick`) as one function with the
