@@ -3,11 +3,10 @@
 // it for real), the CPU side through its slot pins with CUPC/8 SPI timing.
 //
 //   node test/emu/test_io.mjs
+//   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 
 import path from 'node:path';
-import { Emu } from './rp2040emu.mjs';
-import { SlotHost } from './slothost.mjs';
-import { UsbKeyboard } from './usbkbd.mjs';
+import { Emu, SlotHost, UsbKeyboard } from './emu_backend.mjs';     // CUPC8_EMU=native: the C++ emulator
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const emu = await Emu.load(path.join(ROOT, 'build/rp2040/io.elf'), { mhz: 125 });
@@ -129,6 +128,57 @@ for (const speed of [1, 2]) {
   emu.mcu.usbCtrl.detachDevice();
   wait(50e6);
   expect(!(status() & CONNECTED), `${name}: unplugged, KBD_CONNECTED clear`);
+}
+
+// ------------------------------------- CS_n falling while the card refreshes
+// The main loop swaps the MISO preload (slotspi_refresh) whenever the status
+// changes, e.g. a key arrives. A frame whose CS_n falls inside that swap once
+// began with the old status byte AND the new one, so the host read the
+// second status byte as RESP_LEN (it showed up only on a full-speed keyboard,
+// by the timing of that build). Hit the window on purpose: the swap starts by
+// masking IO_IRQ_BANK0 (an NVIC ICER write, bit 13); drop CS_n k cycles
+// after that write, for k across the swap, and check every READ is framed.
+{
+  const kbd = new UsbKeyboard({ speed: 2, interval: 1 });
+  emu.mcu.usbCtrl.attachDevice(kbd);
+  let st = 0;
+  for (let i = 0; i < 100 && !(st & CONNECTED); i++) {
+    wait(10e6);
+    st = status();
+  }
+  expect(st & CONNECTED, 'race sweep: keyboard enumerated');
+  const trap = emu.ppbWriteTrap(0x180, 1 << 13);
+  const bareRead = (t) =>
+    host.run(function* () {               // a bare READ, CS_n falling now
+      yield* this.select();
+      const s0 = yield* this.byte(0xfe);
+      yield this.byteGapNs;
+      const len = yield* this.byte(0);
+      for (let i = 0; i < len && i < 16; i++) { yield this.byteGapNs; yield* this.byte(0); }
+      yield* this.deselect();
+      t.got = { s0, len };
+      return t;
+    });
+  let framed = 0;
+  const odd = [];
+  for (let k = 0; k <= 120; k += 3) {
+    cmd([0x05]);                          // FLUSH: the FIFO is empty
+    cmd([0x00]);                          // GETKEY: a 1-byte response is pending
+    wait(2e6);
+    const t = { k, got: null };
+    trap.arm(k, () => bareRead(t));
+    kbd.press(0, usage('q'));
+    kbd.press(0);
+    emu.runUntil(() => t.got !== null, 100e6);
+    if (!t.got) { odd.push(`k=${k}: no refresh seen`); trap.disarm(); continue; }
+    if (t.got.len === 1) framed++;
+    else odd.push(`k=${k}: status $${t.got.s0.toString(16)} then RESP_LEN $${t.got.len.toString(16)}`);
+    wait(2e6);
+  }
+  trap.remove();
+  expect(odd.length === 0, `race sweep: every READ framed as status, RESP_LEN 1 (${framed} ok${odd.length ? '; ' + odd.join('; ') : ''})`);
+  emu.mcu.usbCtrl.detachDevice();
+  wait(50e6);
 }
 
 // ------------------------------------------------------------ VBUS fault

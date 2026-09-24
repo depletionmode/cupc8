@@ -3,6 +3,7 @@
 // its DVI output captured and decoded from the TMDS serialisers.
 //
 //   node test/emu/test_gpu.mjs [GPU-004|GPU-005]
+//   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 //
 // GPU-004: the SPI slave: IDENT at every clk_div, the host timing minimums,
 //   responses and their discard rule, and FREE counting bytes still queued.
@@ -17,9 +18,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Emu } from './rp2040emu.mjs';
-import { SlotHost } from './slothost.mjs';
-import { TmdsCapture } from './tmds.mjs';
+import { Emu, SlotHost, TmdsCapture } from './emu_backend.mjs';     // CUPC8_EMU=native: the C++ emulator
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const ELF = path.join(ROOT, 'build/rp2040/gpu.elf');

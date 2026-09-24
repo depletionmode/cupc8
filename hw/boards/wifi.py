@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The Wi-Fi card (doc/hardware/wifi-card.md): an ESP32-C3-MINI-1U on a slot
-card, powered from the slot's +5V through its own AMS1117-3.3, with MISO
+card, powered from the slot's +5V through its own TLV62569 buck, with MISO
 released through a 74LVC1G125 whenever the card is not selected.
 
     python3 hw/boards/wifi.py [outdir]      (default build/hw/wifi)
@@ -29,19 +29,26 @@ def schematic(path, footprint_libs):
     j1 = s.add("cupc8:CUPC8_Slot", "J1", "slot", "Connector_PCBEdge:BUS_PCIexpress_x1", at=(30 * G, 50 * G))
     u1 = s.add("jlc:ESP32-C3-MINI-1U-N4", "U1", "ESP32-C3-MINI-1U-N4",
                "jlc:WIFIM-SMD_61P-L13.2-W12.5-P0.80", at=(110 * G, 50 * G), fields={"LCSC": "C2911374"})
-    u2 = s.add("jlc:AMS1117-3.3", "U2", "AMS1117-3.3", "jlc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",
-               at=(70 * G, 18 * G), fields={"LCSC": "C6186"})
+    # a buck, not an LDO: hw/power (POW-003, THM-001) found the AMS1117 first
+    # used here left the ESP32-C3 at 2.71 V in a TX burst at the worst corner
+    # (3.0 V minimum) and at Tj 120 C; TI's model of this buck gives 3.22 V
+    u2 = s.add("jlc:TLV62569DBVR", "U2", "TLV62569DBVR", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR",
+               at=(70 * G, 18 * G), fields={"LCSC": "C141836"})
+    l1 = s.add("Device:L", "L1", "2.2u", "jlc:IND-SMD_L3.0-W3.0_FNR30XXS", at=(82 * G, 12 * G), rot=90,
+               fields={"LCSC": "C167747"})
     u3 = s.add("jlc:74LVC1G125GW_C52140430", "U3", "74LVC1G125GW", "jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL",
                at=(70 * G, 80 * G), fields={"LCSC": "C52140430"})
 
     def passive(kind, ref, val, fp, lcsc, at, rot=90):
         return s.add("Device:" + kind, ref, val, fp, at=at, rot=rot, fields={"LCSC": lcsc})
 
-    c1 = passive("C", "C1", "22u", C0805, "C45783", (60 * G, 26 * G))      # regulator in
-    c2 = passive("C", "C2", "22u", C0805, "C45783", (82 * G, 26 * G))      # regulator out / module bulk
-    c3 = passive("C", "C3", "100n", C0603, "C14663", (96 * G, 26 * G))     # at the module's 3V3 pin
+    c1 = passive("C", "C1", "22u", C0805, "C45783", (60 * G, 26 * G))      # buck in
+    c2 = passive("C", "C2", "22u", C0805, "C45783", (86 * G, 26 * G))      # buck out / module bulk
+    c3 = passive("C", "C3", "100n", C0603, "C14663", (100 * G, 26 * G))    # at the module's 3V3 pin
     c4 = passive("C", "C4", "100n", C0603, "C14663", (80 * G, 90 * G))     # buffer VCC
     c5 = passive("C", "C5", "1u", C0603, "C15849", (90 * G, 70 * G))       # EN delay (Espressif: 10k/1u)
+    r9 = passive("R", "R9", "453k", R0603, "C25818", (60 * G, 38 * G))     # feedback: 0.6 V x (1 + 453/100) = 3.32 V
+    r10 = passive("R", "R10", "100k", R0603, "C25803", (60 * G, 46 * G))
     r1 = passive("R", "R1", "10k", R0603, "C25804", (90 * G, 60 * G))      # EN pull-up
     r2 = passive("R", "R2", "10k", R0603, "C25804", (136 * G, 14 * G), rot=0)     # GPIO9 boot strap: normal boot
     r3 = passive("R", "R3", "10k", R0603, "C25804", (136 * G, 30 * G), rot=0)     # GPIO8 strap high
@@ -92,9 +99,16 @@ def schematic(path, footprint_libs):
 
     # power
     s.connect(u2, "VIN", "+5V")
+    s.connect(u2, "EN", "+5V")
     s.connect(u2, "GND", "GND")
-    s.connect(u2, "2", "3V3")                  # the tab (4) is stacked on VOUT
-    s.connect(u2, "4", "3V3")
+    s.connect(u2, "SW", "SW")
+    s.connect(u2, "FB", "FB")
+    s.connect(l1, 1, "SW")
+    s.connect(l1, 2, "3V3")
+    s.connect(r9, 1, "3V3")
+    s.connect(r9, 2, "FB")
+    s.connect(r10, 1, "FB")
+    s.connect(r10, 2, "GND")
     for c, net in ((c1, "+5V"), (c2, "3V3"), (c3, "3V3"), (c4, "3V3")):
         s.connect(c, 1, net)
         s.connect(c, 2, "GND")
@@ -178,9 +192,12 @@ PLACEMENT = {
     "D1": kg.IO_CARD_PWR_LED + (0,),           # the power LED: the same place on every board
     "R5": (-3, -38.5, 0),
     "J1": (0, 0, 0),
-    "U3": (26, -15, 0),
+    "U3": (26, -15, 90),
     "C4": (26, -18.5, 0),
-    "U2": (4, -14, 0),
+    "U2": (4, -15, 0),
+    "L1": (4, -20, 0),
+    "R9": (9, -16, 90),
+    "R10": (11, -16, 90),
     "C1": (-2.5, -9, 90),
     "C2": (11, -12.5, 90),                 # clear of the fingers' GND ties (up to y = -9.45)
     "U1": (41, -29, 0),                    # the U.FL end towards the top edge, clear of H1
@@ -190,24 +207,29 @@ PLACEMENT = {
     "R2": (52, -20, 90),
     "R3": (50, -20, 90),
     "R4": (48, -20, 90),
-    "R6": (19, -24, 0),
-    "D2": (19, -26.5, 0),                  # LINK, TX, RX in a row
-    "R7": (25, -24, 0),
-    "D3": (25, -26.5, 0),
-    "R8": (31, -24, 0),
-    "D4": (31, -26.5, 0),
+    # LINK, TX, RX along the top edge, in a row with the power LED
+    # (milestone-1.md, Indicator LEDs), each resistor under its LED as R5
+    "D2": (4, -41, 0),
+    "R6": (4, -38.5, 0),
+    "D3": (10, -41, 0),
+    "R7": (10, -38.5, 0),
+    "D4": (16, -41, 0),
+    "R8": (16, -38.5, 0),
     "TP1": (34, -38, 0),
     "TP2": (28, -38, 0),
 }
 LOGO_MM = 12
+# doc/milestone-1.md, Board revision: bump for every board sent to be made
+TITLE, REVISION = "CUPC/8 Wi-Fi", "A"
 
 
 def main():
     logo.footprint(LOGO_MM)
     lcsc = kg.pipeline("wifi", schematic, PLACEMENT, BODY, out=sys.argv[1] if len(sys.argv) > 1 else None,
-                       edge=EDGE, card_edge=True, zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5), power_nets=("/+5V", "/3V3", "/GND"),
-                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 10, -35, 0)],
-                       labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"})
+                       io_card=True, power_nets=("/+5V", "/3V3", "/GND"),
+                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 22, -27, 0)],
+                       labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
+                       title=TITLE, revision=REVISION)                       # bottom right
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

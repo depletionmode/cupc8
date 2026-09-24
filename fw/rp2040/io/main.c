@@ -63,6 +63,21 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 	tuh_hid_receive_report(dev_addr, instance);
 }
 
+/* TinyUSB's host waits in here while it enumerates (450 ms debouncing a new
+ * keyboard, 50 ms resets): keep answering the slot meanwhile, or a frame
+ * waits past slot.md's 5 ms deadline (the boot ROM's IDENT probe got RESP_LEN
+ * 0 and recorded the slot as empty). Overrides TinyUSB's weak busy-wait. */
+void tusb_time_delay_ms_api(uint32_t ms)
+{
+	uint32_t start = now_ms();
+	while (now_ms() - start < ms) {
+		if (slotspi_poll()) {
+			slotspi_refresh();
+			slotspi_update_irq();
+		}
+	}
+}
+
 static uint8_t status(card_t *c, uint32_t queued_bytes, uint32_t queued_frames)
 {
 	(void)queued_bytes;

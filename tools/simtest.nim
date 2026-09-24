@@ -313,8 +313,14 @@ proc testSymbolsAndKernelDecode() =
              table.lineFor[termAddress].file == "term.s")
   let source = table.sourceLines("term.s")
   expectTrue("source loader", source.len > 8 and source[6].strip == "term_do:")
+  # the instruction after term_do's first, whatever that one's length
+  var nextIns = -1
+  for a in table.insAddrs:
+    if a > termAddress:
+      nextIns = a
+      break
   expectTrue("previous instruction anchor",
-             table.prevInsAddr(termAddress + 2, 1) == termAddress)
+             nextIns > termAddress and table.prevInsAddr(nextIns, 1) == termAddress)
 
   cpuReset()
   cpuLoadFile(kernelDir / "kernel.o")
@@ -1167,6 +1173,24 @@ proc testBasicLeds() =
   ioModel = imLegacy
 
 run testBasicLeds
+
+proc testBasicJunkRam() =
+  ## KRN-003: the kernel must not rely on RAM being zero at power-up (the
+  ## SRAM comes up with junk). Its .bss (the BASIC program buffer and its
+  ## index) was never cleared: on the whole-machine emulator the typed line
+  ## went in after junk and RUN gave "TOKENIZER ERROR!".
+  echo "== BASIC on power-up junk RAM =="
+  let rom = buildKernelRom()
+  ramJunk = true
+  let got = basicRun(rom, @["10 print 6*7"])
+  ramJunk = false
+  if got == @["42"]:
+    ok("BASIC on junk RAM")
+  else:
+    fail("BASIC on junk RAM: got " & $got & ", want @[\"42\"]")
+  ioModel = imLegacy
+
+run testBasicJunkRam
 
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another

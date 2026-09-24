@@ -196,7 +196,7 @@ static void command(card_t *c, const uint8_t *f, int len)
 		break;
 	case 0x01: {                                        /* GETKEYS n */
 		if (len < 2 || f[1] < 1 || f[1] > 16) { c->errors++; break; }
-		for (int i = 0; i < f[1]; i++)
+		for (int i = 0; i < f[1] && i < (int)sizeof r; i++)   /* f[1] <= 16: the bound is for the compiler */
 			r[i] = pop(io);
 		card_respond(c, r, f[1]);
 		break;

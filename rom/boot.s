@@ -22,6 +22,7 @@
 ;   $0f08 V_DST   2  RAM write pointer      $0f12 V_CHAR  character for putc
 ;   $0f0a V_LEN   2  bytes left to copy     $0f13 V_TMP
 ;   $0f0c V_ENTRY 2  kernel entry           $0f14 V_TYPE  card type from IDENT
+;                                           $0f15 V_TRY   READ retries left
 
 %define GPO $f000
 %define ROM_BANK $f204
@@ -48,6 +49,7 @@
 %define V_CHAR $0f12
 %define V_TMP $0f13
 %define V_TYPE $0f14
+%define V_TRY $0f15
 
 ; strings (defined before use - the assembler resolves data symbols in pass 1)
 msg_banner db "CUPC/8 boot\n"
@@ -566,7 +568,10 @@ probe_slot:
 	push pch
 	push pcl
 	b wait_5ms					; slot.md - the card needs >= 5 ms to answer
+	mov r0, #20					; then up to 20 more tries, 5 ms apart
+	st V_TRY, r0
 
+.read:
 	push pch
 	push pcl
 	b cs_on
@@ -578,6 +583,8 @@ probe_slot:
 	push pch
 	push pcl
 	b spi_xfer
+	eq r1, #0					; $00 - not ready yet, end the frame and retry (slot.md)
+	bzf .not_ready
 	mov r1, #0					; card type
 	push pch
 	push pcl
@@ -604,6 +611,22 @@ probe_slot:
 	eq r0, #0xc8
 	bzf .present
 	mov r1, #0
+	b .store
+.not_ready:
+	push pch
+	push pcl
+	b cs_off
+	ld r0, V_TRY
+	sub r0, #1
+	st V_TRY, r0
+	eq r0, #0
+	bzf .gave_up
+	push pch
+	push pcl
+	b wait_5ms
+	b .read
+.gave_up:
+	mov r1, #0					; never answered - an empty slot
 	b .store
 .present:
 	ld r1, V_TYPE
