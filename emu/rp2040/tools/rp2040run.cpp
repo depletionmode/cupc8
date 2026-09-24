@@ -129,29 +129,37 @@ class Emu {
   // by which that moved the chip's time on
   void step() {
     if (mcu->waiting()) {
-      // both cores asleep: skip to the next timer alarm, but no further than
-      // one microsecond so PIO and the test bench still see time pass
-      const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
-      const double cycles = std::max(1.0, jsMathRound(ns / nsPerCycle));
-      mcu->idle(cycles);
-      this->cycles(cycles);
+      stepIdle();
       return;
     }
     const double cycles = mcu->step();  // 0 when the core that ran is still behind the other
     if (cycles) this->cycles(cycles);
   }
 
+  // both cores asleep: skip to the next timer alarm, but no further than
+  // one microsecond so PIO and the test bench still see time pass
+  __attribute__((noinline)) void stepIdle() {
+    const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
+    const double cycles = std::max(1.0, jsMathRound(ns / nsPerCycle));
+    mcu->idle(cycles);
+    this->cycles(cycles);
+  }
+
   void cycles(double n) {
     if (onCycle) {
-      for (double i = 0; i < n; i++) {
-        for (RPPIO &pio : mcu->pio)
-          if (!pio.stopped) pio.step();
-        onCycle(*this);
-      }
+      cyclesHooked(n);
     } else {
       stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
     }
     clock.tick(n * nsPerCycle);
+  }
+
+  __attribute__((noinline)) void cyclesHooked(double n) {
+    for (double i = 0; i < n; i++) {
+      for (RPPIO &pio : mcu->pio)
+        if (!pio.stopped) pio.step();
+      onCycle(*this);
+    }
   }
 
   // run until cond() is true; false if `ns` of emulated time pass first

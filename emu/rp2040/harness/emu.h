@@ -49,8 +49,22 @@ class Emu {
 
   // one step: an instruction on the core that is behind, and the PIO cycles
   // by which that moved the chip's time on
-  void step();
-  void cycles(double n);
+  void step() {
+    if (mcu->waiting()) {
+      stepIdle();
+      return;
+    }
+    const double n = mcu->step();  // 0 when the core that ran is still behind the other
+    if (n) cycles(n);
+  }
+  void cycles(double n) {
+    if (onCycle) {
+      cyclesHooked(n);
+    } else {
+      stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
+    }
+    clock.tick(n * nsPerCycle);
+  }
 
   // run until cond() is true; false if `ns` of emulated time pass first
   template <class Cond>
@@ -62,6 +76,12 @@ class Emu {
     }
     return cond();
   }
+
+ private:
+  /** step() with both cores asleep */
+  void stepIdle();
+  /** cycles()' PIO loop with the onCycle hook */
+  void cyclesHooked(double n);
 };
 
 }  // namespace rp2040js::harness

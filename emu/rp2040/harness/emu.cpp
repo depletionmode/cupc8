@@ -75,31 +75,21 @@ Emu::Emu(const std::string &elf, double mhz, double core1Slow) {
   }
 }
 
-void Emu::step() {
-  if (mcu->waiting()) {
-    // both cores asleep: skip to the next timer alarm, but no further than
-    // one microsecond so PIO and the test bench still see time pass
-    const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
-    const double n = std::max(1.0, jsMathRound(ns / nsPerCycle));
-    mcu->idle(n);
-    cycles(n);
-    return;
-  }
-  const double n = mcu->step();  // 0 when the core that ran is still behind the other
-  if (n) cycles(n);
+void Emu::stepIdle() {
+  // both cores asleep: skip to the next timer alarm, but no further than
+  // one microsecond so PIO and the test bench still see time pass
+  const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
+  const double n = std::max(1.0, jsMathRound(ns / nsPerCycle));
+  mcu->idle(n);
+  cycles(n);
 }
 
-void Emu::cycles(double n) {
-  if (onCycle) {
-    for (double i = 0; i < n; i++) {
-      for (RPPIO &pio : mcu->pio)
-        if (!pio.stopped) pio.step();
-      onCycle();
-    }
-  } else {
-    stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
+void Emu::cyclesHooked(double n) {
+  for (double i = 0; i < n; i++) {
+    for (RPPIO &pio : mcu->pio)
+      if (!pio.stopped) pio.step();
+    onCycle();
   }
-  clock.tick(n * nsPerCycle);
 }
 
 }  // namespace rp2040js::harness

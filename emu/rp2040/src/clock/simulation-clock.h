@@ -49,10 +49,20 @@ class SimulationClock : public IClock {
 
   ClockAlarm *linkAlarm(double nanos, ClockAlarm *alarm);
   bool unlinkAlarm(ClockAlarm *alarm);
-  void tick(double deltaNanos);
+  void tick(double deltaNanos) {
+    // (the loop below, inline for the common case of no alarm due)
+    const double targetNanos = nanosCounter + deltaNanos;
+    if (!nextAlarm || nextAlarm->nanos > targetNanos) {
+      nanosCounter = targetNanos;
+      return;
+    }
+    fireAlarms(targetNanos);
+  }
   double nanosToNextAlarm() const;
 
  private:
+  /** tick()'s loop: fire the alarms due by targetNanos, then move to it */
+  void fireAlarms(double targetNanos);
   ClockAlarm *nextAlarm = nullptr;
 
   double nanosCounter = 0;

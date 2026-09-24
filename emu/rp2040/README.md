@@ -103,6 +103,10 @@ prove it):
   SIO access (code reading those fields directly calls `flushSelect()`).
 - Inline common cases: `CortexM0Core::setInterrupt`, alarm unlinking, FIFO
   wrap-around, `checkInterrupts`' single `intRaw()`.
+- The step loop is inline: `RP2040::step()` (reading the cores' `waiting`
+  flags directly), the Emu's `step()`/`cycles()` (the idle path and the
+  `onCycle` loop out of line), and `SimulationClock::tick`, which only walks
+  the alarm list when the next alarm is due (`fireAlarms`).
 
 ## Status
 

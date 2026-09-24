@@ -311,40 +311,5 @@ void RP2040::updateIOInterrupt() {
   setInterrupt(IRQ::IO_BANK0, interruptValue);
 }
 
-bool RP2040::running(uint32_t i) const { return !cores[i]->waiting && !(i == 1 && core1Held); }
-
-double RP2040::step() {
-  const bool run0 = running(0), run1 = running(1);
-  if (!run0 && !run1) {
-    return 0;
-  }
-  const uint32_t i = run0 && run1 ? (coreTime[0] <= coreTime[1] ? 0 : 1) : run0 ? 0 : 1;
-  if (coreTime[i] < now) {
-    coreTime[i] = now;  // it was asleep: it starts from now
-  }
-  coreIndex = i;
-  sio.selectCore(i);
-  CortexM0Core &core = *cores[i];
-  coreTime[i] +=
-      core.executeInstructionOverride ? core.executeInstructionOverride() : core.executeInstruction();
-  coreIndex = 0;
-  sio.selectCore(0);
-  double t = std::numeric_limits<double>::infinity();
-  for (uint32_t c = 0; c < 2; c++) {
-    if (running(c)) {
-      t = std::min(t, coreTime[c]);
-    }
-  }
-  if (t == std::numeric_limits<double>::infinity()) {
-    t = coreTime[i];
-  }
-  const double delta = std::max(0.0, t - now);
-  now += delta;
-  return delta;
-}
-
-void RP2040::idle(double cycles) { now += cycles; }
-
-bool RP2040::waiting() const { return core0.waiting && (core1.waiting || core1Held); }
 
 }  // namespace rp2040js
