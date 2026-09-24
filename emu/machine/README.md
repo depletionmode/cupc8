@@ -91,13 +91,33 @@ emu/rp2040 was changed for this directory.
 
 ## Speed
 
-The machine's speed is the GPU card's: at 252 MHz with three DVI serialiser
-state machines running every cycle it takes about 700 host instructions per
-emulated cycle and runs ~30x slower than real time on its own (rp2040run,
-quiet 2.1 GHz Xeon), against ~4x for the IO card, ~3x for the system card and
-~2-3x for the main board. Threads take the other cards and the board off the
-critical path, so the whole machine runs at nearly the GPU's own speed; the
-"few times slower than real time" target needs a faster RP2040 core/PIO/GPIO
-path in emu/rp2040 (not changed here: it must stay structure-preserving).
-Measured numbers are in the report of the change that added this directory
-and in `test/emu/machine_diff.sh`'s output.
+Boot to BASIC and type a program (1.6 s emulated, `test/emu/machine_diff.sh`,
+quiet 4-core 2.1 GHz Xeon, 2026-09-24):
+
+| backend | slower than real time |
+|---|---|
+| machine.mjs (rp2040js) | 102x |
+| native, serial | 44x |
+| native, threaded | 42-48x (no reliable gain) |
+| native, `-DMACHINE_LTO=ON` | about 10% less |
+
+The machine runs at the GPU card's speed. At 252 MHz, with three DVI
+serialiser state machines running every cycle, the GPU takes about 700 host
+instructions per emulated cycle and alone runs ~33x slower than real time
+standalone (rp2040run) and ~41x inside the machine (its thread is busy 98% of
+the wall time in a threaded run). The IO card (~4x), the system card (~3x)
+and the main board (~2-3x) are what the threads take off the critical path,
+which is why threading gains so little. The spec's "a few times slower than
+real time" needs a faster RP2040 core/PIO/GPIO path in emu/rp2040 (not
+changed here: the port is kept structure-preserving). On an oversubscribed
+host the threaded mode can be slower than serial (`CUPC8_EMU_THREADS=0`).
+
+## Notes
+
+- The Wi-Fi card is QEMU on its own real-time clock, so E2E-003 is not
+  cycle-deterministic on either backend (nor are runs where cupc8.py talks to
+  the system card: its bytes arrive at slice boundaries that depend on wall
+  time). Once, under heavy load, a native E2E-003 run hung waiting for the
+  card's `$5A` reply to a `$A5` frame; a quiet rerun passed. The pipe
+  protocol has no timeout or resynchronisation, on either backend.
+- `CUPC8_ESP_TRACE=FILE` logs every exchange with QEMU and the board's time.
