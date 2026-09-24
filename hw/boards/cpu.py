@@ -72,8 +72,8 @@ SERIES = [
     ["CPU_A4", "CPU_A5", "CPU_A6", "CPU_A7"],
     ["CPU_A8", "CPU_A9", "CPU_A10", "CPU_A11"],
     ["CPU_A12", "CPU_A13", "CPU_A14", "CPU_A15"],
-    ["CPU_nSTB", "CPU_RW", "CPU_SYNC", None],
-    ["CPU_D0", "CPU_D1", "CPU_D2", "CPU_D3"],
+    ["CPU_nSTB", "CPU_RW", "CPU_SYNC", None],               # bottom side, after CLK and /RST
+    ["CPU_D0", "CPU_D1", "CPU_D2", "CPU_D3"],               # right side, bottom up
     ["CPU_D4", "CPU_D5", "CPU_D6", "CPU_D7"],
     ["CPU_TMR_EXP0", "CPU_TMR_EXP1", "CPU_HALTED", "CPU_WAITING"],
 ]
@@ -256,8 +256,10 @@ def schematic(path, footprint_libs):
 #
 # Card body 72 x 60 mm above the PCIe x8 finger tab (the footprint draws the
 # tab's Edge.Cuts; its ends meet the body at y = 60). The FPGA's bank-3
-# side (A[15:0], IRQ) faces the fingers and its bank-2 side (control, D,
-# timers, config, in the fingers' order from the bottom up) faces right; the 33 ohm arrays sit between each
+# side (A[15:0], then CLK and the control lines) faces the fingers and its
+# bank-2 side (D, IRQ, timers, then config) faces right, each in the
+# fingers' left-to-right order, so the front-side bus lines reach their
+# fingers without crossing; the 33 ohm arrays sit between each
 # side and the fingers, the flash beside the config pins.
 
 W, H = 72.0, 60.0
@@ -301,14 +303,23 @@ def placement():
     # the PLL filter caps sit between these and their pins' neighbours
     p["C11"] = beside(123, along=-0.75)
     p["C8"] = beside(57, along=-0.5)
+    # the top side's sit a little further out: room for U1's designator
+    for ref in ("C3", "C9", "C10", "C14"):
+        p[ref] = beside(DECOUPLING[ref][2], dist=4.5)
+    # the bottom side's decaps step aside from the arrays under the bus pins
+    p["C5"] = beside(6, along=-6.0)
+    p["C1"] = beside(27, along=4.5)
+    p["C6"] = beside(30, along=5.0)
     p.update({
         "C15": (16, 44, 90), "C16": (66, 44, 90),              # 3V3 bulk: finger entry, right side
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
         "C18": (52.2, 22.5, 270), "C17": (57.6, 22.5, 270), "R6": (57.6, 26.8, 90),
         "C20": (24.1, 22.0, 90), "C19": (16.5, 22.0, 90), "R7": (16.5, 26.0, 90),
-        # 33 ohm arrays in a row below the FPGA, in the fingers' order: A, then control, D, timers
-        "RN1": (29.0, 40.5, 0), "RN2": (33.6, 40.5, 0), "RN3": (38.2, 40.5, 0), "RN4": (42.8, 40.5, 0),
-        "RN5": (48.5, 36.5, 0), "RN6": (53.0, 36.5, 0), "RN7": (57.5, 36.5, 0), "RN8": (62.0, 36.5, 0),
+        # 33 ohm arrays at their pins: A and control under the bottom side,
+        # D and the timer lines in a column right of the right side
+        "RN1": (28.6, 37.2, 0), "RN2": (32.2, 37.2, 0), "RN3": (35.8, 37.2, 0), "RN4": (39.4, 37.2, 0),
+        "RN5": (43.4, 37.2, 0),
+        "RN6": (60.5, 30.8, 90), "RN7": (60.5, 26.8, 90), "RN8": (60.5, 21.0, 90),
         # config flash and its pull-ups, top right by the config pins, clear
         # of the mounting hole's keep-out
         "U2": (60.0, 9.0, 0), "C23": (60.5, 3.0, 0),
