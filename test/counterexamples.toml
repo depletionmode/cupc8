@@ -290,7 +290,7 @@ must_fail = ["FAIL rom id after a killed run's late reply"]
 
 [[bug]]
 name = "kernel BASIC: variables were never cleared, so on power-up junk RAM an unset one printed junk"
-fixed_in = "this commit"
+fixed_in = "f9150e6"
 revert = [["kernel/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
 	xor r1, r1
 .clear_variables:
