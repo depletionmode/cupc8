@@ -2,7 +2,7 @@
 // plus the per-cycle GPIO toggle of test/emu/run_nested.mjs.
 //
 //   rp2040run <elf> --until <regex> --max-ns <ns> [--mhz N] [--core1-slow F]
-//             [--toggle-gpio PIN:EVERY_N_CYCLES] [--trace-every N]
+//             [--toggle-gpio PIN:EVERY_N_CYCLES]... [--trace-every N]
 //
 // Loads the B1 bootrom and the ELF's flash segments, starts core 0 at
 // 0x10000000 (boot stage 2, as the bootrom would), runs until the UART0 text
@@ -142,10 +142,14 @@ class Emu {
   }
 
   void cycles(double n) {
-    for (double i = 0; i < n; i++) {
-      for (RPPIO &pio : mcu->pio)
-        if (!pio.stopped) pio.step();
-      if (onCycle) onCycle(*this);
+    if (onCycle) {
+      for (double i = 0; i < n; i++) {
+        for (RPPIO &pio : mcu->pio)
+          if (!pio.stopped) pio.step();
+        onCycle(*this);
+      }
+    } else {
+      stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
     }
     clock.tick(n * nsPerCycle);
   }
@@ -214,8 +218,7 @@ int main(int argc, char **argv) {
   std::string elf, until;
   bool haveUntil = false;
   double maxNs = -1, mhz = 125, core1Slow = 1;
-  int togglePin = -1;
-  double toggleEvery = 0;
+  std::vector<std::pair<int, double>> toggles;  // (pin, every n cycles), applied in this order
   double traceEvery = 0;
   for (int i = 1; i < argc; i++) {
     const std::string a = argv[i];
@@ -236,9 +239,10 @@ int main(int argc, char **argv) {
       const std::string v = next();
       const size_t colon = v.find(':');
       if (colon == std::string::npos) usage();
-      togglePin = static_cast<int>(number(v.substr(0, colon).c_str()));
-      toggleEvery = number(v.substr(colon + 1).c_str());
+      const int togglePin = static_cast<int>(number(v.substr(0, colon).c_str()));
+      const double toggleEvery = number(v.substr(colon + 1).c_str());
       if (togglePin < 0 || togglePin > 29 || toggleEvery < 1) usage();
+      toggles.emplace_back(togglePin, toggleEvery);
     } else if (a == "--trace-every") {
       traceEvery = number(next());
     } else if (a.size() > 1 && a[0] == '-') {
@@ -264,12 +268,15 @@ int main(int argc, char **argv) {
   try {
     emu = std::make_unique<Emu>(elf, mhz, core1Slow);
     emu->traceEvery = static_cast<uint64_t>(traceEvery);
-    if (togglePin >= 0) {
-      // run_nested.mjs: every Nth cycle, flip the pin's input
-      emu->onCycle = [pin = togglePin, every = toggleEvery, n = 0.0](Emu &e) mutable {
-        if (std::fmod(++n, every) == 0) {
-          GPIOPin &gpio = e.mcu->gpio[pin];
-          gpio.setInputValue(!gpio.inputValue());
+    if (!toggles.empty()) {
+      // run_nested.mjs: every Nth cycle, flip the pin's input (each option its own count)
+      emu->onCycle = [toggles, n = 0.0](Emu &e) mutable {
+        n++;
+        for (const auto &[pin, every] : toggles) {
+          if (std::fmod(n, every) == 0) {
+            GPIOPin &gpio = e.mcu->gpio[pin];
+            gpio.setInputValue(!gpio.inputValue());
+          }
         }
       };
     }
@@ -290,5 +297,14 @@ int main(int argc, char **argv) {
     return 1;
   }
   writeUart(emu->uart);
+  if (std::getenv("RP2040RUN_STATS")) {
+    for (RPPIO &pio : emu->mcu->pio) {
+      pio.sync();
+      std::fprintf(stderr, "%s: lazy cycles %.0f, lazy autopulls %.0f, machines enabled", pio.name.c_str(),
+                   static_cast<double>(pio.lazyCycles), static_cast<double>(pio.lazyEvents));
+      for (StateMachine &sm : pio.machines) std::fprintf(stderr, " %d", sm.enabled ? 1 : 0);
+      std::fprintf(stderr, "\n");
+    }
+  }
   return done ? 0 : 1;
 }

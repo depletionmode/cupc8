@@ -4,16 +4,18 @@
 // port is cycle-identical to rp2040js on a real firmware image.
 //
 //   node emu/rp2040/test/trace/trace.mjs <elf> --until <regex> --max-ns <ns>
-//        [--mhz N] [--toggle-gpio PIN:EVERY_N_CYCLES] [--trace-every N]
+//        [--mhz N] [--toggle-gpio PIN:EVERY_N_CYCLES]... [--trace-every N]
 
 import { Emu } from '../../../../test/emu/rp2040emu.mjs';
 
 const args = process.argv.slice(2);
 const elf = args.shift();
 const opt = {};
+const toggles = [];
 while (args.length) {
   const k = args.shift();
-  opt[k.replace(/^--/, '')] = args.shift();
+  if (k === '--toggle-gpio') toggles.push(args.shift().split(':').map(Number));
+  else opt[k.replace(/^--/, '')] = args.shift();
 }
 const until = new RegExp(opt.until ?? '$^');
 const maxNs = Number(opt['max-ns'] ?? 1e9);
@@ -21,11 +23,14 @@ const every = Number(opt['trace-every'] ?? 0);
 const emu = await Emu.load(elf, { mhz: Number(opt.mhz ?? 125) });
 const hex8 = (v) => (v >>> 0).toString(16).padStart(8, '0');
 
-if (opt['toggle-gpio']) {
-  const [pin, n] = opt['toggle-gpio'].split(':').map(Number);
+if (toggles.length) {
+  // every Nth cycle, flip the pin's input (each option its own count, applied in order)
   let c = 0;
   emu.onCycle = () => {
-    if (++c % n === 0) emu.mcu.gpio[pin].setInputValue(!emu.mcu.gpio[pin].inputValue);
+    c++;
+    for (const [pin, n] of toggles) {
+      if (c % n === 0) emu.mcu.gpio[pin].setInputValue(!emu.mcu.gpio[pin].inputValue);
+    }
   };
 }
 let lines = [];

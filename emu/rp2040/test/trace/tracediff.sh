@@ -16,7 +16,11 @@ mkdir -p "$OUT"
 CASES=(
 	'selftest;emu_selftest.elf;EMU (PASS|FAIL)[^\n]*\n;200e6;'
 	'nested;emu_nested.elf;NEST (PASS|FAIL)[^\n]*\n;500e6;--toggle-gpio 2:997'
-	'gpu;gpu.elf;^NEVER$;100e6;--mhz 252'
+	'gpu;gpu.elf;^NEVER$;300e6;--mhz 252'
+	# the DVI output running while the slot's pins move: CS_n (5) falls and
+	# rises every 60000 cycles, SCK (2) and MOSI (3) toggle meanwhile, so the
+	# slotspi machine wakes, shifts bits, pushes bytes and is restarted
+	'gpuspi;gpu.elf;^NEVER$;300e6;--mhz 252 --toggle-gpio 5:60000 --toggle-gpio 2:41 --toggle-gpio 3:97'
 	'io;io.elf;^NEVER$;100e6;'
 	'sysctl;sysctl.elf;^NEVER$;100e6;'
 )
