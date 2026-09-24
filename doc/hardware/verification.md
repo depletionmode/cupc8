@@ -47,7 +47,7 @@ Rules for the matrix:
 |---|---|---|---|
 | 3.1 | **The schematics themselves** | The co-sim's top level is **generated from the KiCad netlists** of all five boards. Every connection between FPGA netlists, SRAM/ROM timing models, connectors and card models comes from the schematic. Pull-ups become weak pulls, and series resistors become delays. A swapped or missing wire fails the simulation. | the end-to-end tests below pass on the netlist-generated top level |
 | 3.2 | End-to-end | Blank ROM → program over modelled USB → boot → BASIC → type a program → run it → Wi-Fi join → TCP fetch from a local test server → golden HDMI frame | all pass |
-| 3.3 | Negative end-to-end | No CPU card, empty slots, corrupt kernel, interrupted ROM programming, card unplugged mid-run, low-power USB source | each behaves as specified |
+| 3.3 | Negative end-to-end | Empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power USB source. Out of scope: a missing CPU card (broken hardware) and cards plugged or pulled while powered (cards change only with the power off, `slot.md`) | each behaves as specified |
 | 3.4 | Pin consistency | `pins.yaml` ↔ `.pcf` ↔ firmware `pins.h` ↔ KiCad netlists, and iCE40 pin roles ↔ the Lattice pinout CSV | zero differences |
 
 ## 4. Electrical and board
@@ -72,5 +72,5 @@ Rules for the matrix:
 | RP2040 at 252 MHz (per part) | Silicon margin varies | PicoDVI's standard 252 MHz with its core voltage bump (VREG 1.20 V), used widely on RP2040. Bring-up checks each unit for an hour with a soak test pattern. The spare boards cover a marginal part. |
 | USB-host enumeration with real keyboards | rp2040js has no USB host | TinyUSB host HID is widely used; the HID parsing is tested on recorded reports from real keyboards; boot protocol forced |
 | ESP32-C3 SPI slave on silicon | QEMU doesn't model the GPSPI slave | Espressif's documented `spi_slave` driver; the core is tested through an SPI shim that follows the datasheet timing; the framing rules (READ frames, 20 µs re-arm gap) were chosen for this driver |
-| Wi-Fi RF | Radio isn't simulable | **Pre-certified module with an external antenna** (ESP32-C3-MINI-1U + U.FL), so our layout doesn't affect the radio |
+| Wi-Fi RF | Radio isn't simulable | **Pre-certified module with an external antenna** (ESP32-C3-MINI-1U + MHF III lead to an SMA antenna), so our layout doesn't affect the radio |
 | Assembly defects | Manufacturing | JLC AOI and X-ray on request for the TQFP; the debug features in `debugging.md` (LEDs, POST codes, test pads, isolation links, current sense, and the RP2040's stop/step/trace with `trace --diff` against the simulator); bring-up in stages; the spare main board |

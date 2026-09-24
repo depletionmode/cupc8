@@ -280,3 +280,10 @@ revert = [["kernel/term.s", """term_do:
 """]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
 must_fail = ["FAIL: BASIC on junk RAM"]
+
+[[bug]]
+name = "cupc8.py: no resync when it opens the port - a killed run's late reply passed for the next run's, and every reply after it came one request late"
+fixed_in = "871f985"
+revert = [["tools/cupc8.py", "        self.buf = b\"\"\n        self.resync()\n", "        self.buf = b\"\"\n"]]
+cmd = "make -C fw sysctl_sim && python3 test/host/test_cupc8.py"
+must_fail = ["FAIL rom id after a killed run's late reply"]
