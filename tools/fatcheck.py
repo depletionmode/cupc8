@@ -4,6 +4,12 @@
     fatcheck.py mkimg IMG
         a FAT16 volume as a PC formats it (mkfs.fat), with files a PC wrote
         (pyfatfs): PC.TXT, EMPTY.TXT, DELME.TXT
+    fatcheck.py blank IMG KB
+        an empty FAT volume of KB kilobytes (mkfs.fat: FAT12 when small)
+    fatcheck.py put IMG NAME FILE
+        FILE's bytes as NAME in the image's root, as a PC writes it
+    fatcheck.py fill IMG
+        files over every free cluster: the volume is full
     fatcheck.py check IMG [EXPECT_DIR] [--absent NAME...] [--size NAME=BYTES...]
         every file in EXPECT_DIR is in the image's root with the same bytes,
         the --absent names are not, the --size files have that size, and
@@ -86,6 +92,38 @@ def mkimg(path):
     print("fatcheck: %s: PC.TXT, EMPTY.TXT, DELME.TXT" % path)
 
 
+def clusters(path):
+    """the volume's real data cluster count, from its boot sector (pyfatfs
+    1.1.0 overcounts on FAT12, and would allocate past the end)"""
+    off = partition_offset(path)
+    with open(path, "rb") as f:
+        f.seek(off)
+        b = f.read(512)
+
+    def u16(o):
+        return int.from_bytes(b[o:o + 2], "little")
+
+    def u32(o):
+        return int.from_bytes(b[o:o + 4], "little")
+
+    per_cluster, reserved, fats, roots = b[13], u16(14), b[16], u16(17)
+    total = u16(19) or u32(32)
+    fat_sectors = u16(22) or u32(36)
+    data = total - reserved - fats * fat_sectors - (roots * 32 + 511) // 512
+    return data // per_cluster
+
+
+def fill(path):
+    fs = open_fs(path)
+    size = fs.fs.bytes_per_cluster
+    n = clusters(path)
+    used = sum(1 for c in fs.fs.fat[2:2 + n] if c != 0)
+    for i in range(n - used):
+        fs.writebytes("/FILL%d.DAT" % i, b"\xff" * size)
+    fs.close()
+    print("fatcheck: %s: %d clusters filled" % (path, n - used))
+
+
 def check(path, expect_dir, absent, sizes):
     fails = []
     fs = open_fs(path)
@@ -123,6 +161,19 @@ def main():
     args = sys.argv[1:]
     if len(args) == 2 and args[0] == "mkimg":
         mkimg(args[1])
+        return 0
+    if len(args) == 3 and args[0] == "blank":
+        if os.path.exists(args[1]):
+            os.unlink(args[1])
+        subprocess.run(["mkfs.fat", "-C", args[1], args[2]], check=True, capture_output=True)
+        return 0
+    if len(args) == 4 and args[0] == "put":
+        fs = open_fs(args[1])
+        fs.writebytes("/" + args[2], open(args[3], "rb").read())
+        fs.close()
+        return 0
+    if len(args) == 2 and args[0] == "fill":
+        fill(args[1])
         return 0
     if len(args) >= 2 and args[0] == "check":
         path, rest = args[1], args[2:]

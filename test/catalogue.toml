@@ -538,6 +538,15 @@ vrow = "2.3"
 cmd = "tools/run_tests.sh"
 
 [[test]]
+id = "KRN-006"
+title = "Files on the storage card: SAVE, LOAD, DIR, DEL"
+checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file too long for the program buffer stops at PROGRAM FULL and what fitted runs; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); no SD card, no storage card, a full card"
+method = "tools/simtest.nim testStorage: the real kernel on sim.nim with the storage card model (the real fw/storage/core over an image file, fw/sim/simcards.c); images made and checked with tools/fatcheck.py"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testStorage"
+
+[[test]]
 id = "KRN-005"
 title = "Slot IRQ handler"
 checks = "a card holding IRQ_n low cannot hide another card's IRQ: the kernel, asleep in WAI for keys, wakes for every key while slot 3 holds its line (IRQ-002 checks the same rule on the chipset RTL)"

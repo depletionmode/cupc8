@@ -38,6 +38,15 @@ Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`,
 
 `net` refuses to start the radio on a USB source under 1.5 A (see the power budget).
 
+Files, on the storage card's microSD card (`doc/hardware/storage-card.md`). A card formatted on a PC works as it is (FAT12, FAT16 or FAT32). Names are 8.3 (`PROG.BAS`), in any case, with or without the quotes:
+
+- `save "NAME"` writes the program as text, one line per program line, each ending in CR LF, so a PC can read and edit it. It replaces a file of that name.
+- `load "NAME"` clears the program (`new`), then takes the file's lines as if they were typed: a line that does not start with a line number (a blank line, say) is skipped, and a line longer than 78 characters is cut. A line that does not fit stops the load with `PROGRAM FULL`.
+- `dir` lists every file with its size in bytes.
+- `del "NAME"` deletes a file.
+
+They print `SAVED` or `LOADED` when done, or what went wrong: `no SD card`, `no storage card` (none fitted), `file not found`, `card full`, `write protected`, `bad file name` (not 8.3), `no file system on the card` (not formatted) or `card error`.
+
 There is no compiler available for the CUPC/8 ISA. Development tools are cross-platform and consist of an assembler and a simulator which provides 1-to-1 simulation of the full computer (including display and input). The simulator can be executed natively or compiled to JavaScript (using emscripten) and run through a web browser.
 
 ## 3. Central Processing Unit
