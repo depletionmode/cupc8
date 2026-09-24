@@ -268,6 +268,7 @@ TAB = (EDGE_X - 0.65, EDGE_X + 50.65)          # where the footprint's tab meets
 EDGE = [(TAB[1], H), (W, H), (W, 0), (0, 0), (0, H), (TAB[0], H)]
 ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
 LOGO_MM = 12
+TITLE, REVISION = "CUPC/8 CPU", "A"
 POWER_LED = kg.power_led_at(OUTLINE)
 
 
@@ -315,10 +316,13 @@ def placement():
         "R5": (56.0, 4.0, 90),
         # 1V2 LDO and its rail LED, top left
         "U3": (15.0, 5.0, 0), "C21": (11.0, 5.0, 90), "C22": (19.0, 5.0, 90),
-        "D1": (9.5, 12.0, 90), "R9": (12.5, 12.0, 90), "Q1": (9.5, 17.0, 0), "R8": (9.5, 21.5, 0),
-        "D2": POWER_LED + (0,), "R10": (POWER_LED[0] + 3.5, POWER_LED[1], 0),
+        # LEDs in a row along the top edge from the common PWR spot, each
+        # with its resistor under it; the 1V2 LED's switch below that
+        "D2": POWER_LED + (0,), "R10": (POWER_LED[0], POWER_LED[1] + 4.0, 90),
+        "D1": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R9": (POWER_LED[0] + 4.5, POWER_LED[1] + 4.0, 90),
+        "Q1": (POWER_LED[0] + 4.5, POWER_LED[1] + 10.0, 0), "R8": (POWER_LED[0] + 4.5, POWER_LED[1] + 14.5, 0),
         "H1": (W - 4.0, 4.0, 0),
-        "TP1": (2.5, 8.0, 0), "TP2": (2.5, 13.0, 0), "TP3": (2.5, 18.0, 0),
+        "TP1": (2.5, 14.0, 0), "TP2": (2.5, 18.5, 0), "TP3": (2.5, 23.0, 0),
     })
     return p
 
@@ -333,7 +337,7 @@ def main():
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), OUTLINE, out=out, edge=EDGE, card_edge=True, layers=4,
         zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
-        labels={"D1": "1V2", "D2": "PWR"},
+        labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 46.0, 0)])
     print("LCSC:", " ".join(sorted(lcsc)))
 
