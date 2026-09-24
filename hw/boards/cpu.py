@@ -545,6 +545,7 @@ def main():
         zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
         labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence={"layer": "In2.Cu"},   # a B.Cu run would wall the address lines off their fingers
+        passes=60,                      # 40 leaves one of the long FL1 nets unrouted about half the time
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 46.0, 0)])
     print("LCSC:", " ".join(sorted(lcsc)))
 
