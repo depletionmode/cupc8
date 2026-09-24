@@ -20,8 +20,10 @@ uint32_t FIFO::pull() {
   if (used) {
     this->start = (start + 1) % length;
     this->used--;
+    if (onPull) onPull(buffer[start]);
     return buffer[start];
   }
+  if (onPull) onPull(0);
   return 0;
 }
 

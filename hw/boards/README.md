@@ -59,7 +59,7 @@ Spec: `doc/hardware/wifi-card.md`.
   runs through sysctl's UART tunnel.
 - **LEDs:** power at the standard spot (red: a green LED drops ~3 V, too
   close to the 3.3 V rail for 1 kΩ), then LINK (GPIO4), TX (GPIO0) and RX
-  (GPIO1) in a row, green with 100 Ω. TX and RX light for 30 ms whenever
+  (GPIO1) in a row with it along the top edge, green with 100 Ω. TX and RX light for 30 ms whenever
   socket data moves.
 - **Outline:** the standard I/O card outline, with its M3 hole
   (`slot.md`, Mechanical).

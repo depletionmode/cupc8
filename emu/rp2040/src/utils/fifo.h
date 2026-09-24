@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace rp2040js {
@@ -9,6 +10,10 @@ namespace rp2040js {
 class FIFO {
  public:
   std::vector<uint32_t> buffer;
+
+  /** Test-harness hook, not in rp2040js: called with every value pull()
+   * returns (what test/emu/tmds.mjs gets by wrapping fifo.pull). */
+  std::function<void(uint32_t)> onPull;
 
   explicit FIFO(uint32_t size);
 

@@ -207,12 +207,14 @@ PLACEMENT = {
     "R2": (52, -20, 90),
     "R3": (50, -20, 90),
     "R4": (48, -20, 90),
-    "R6": (19, -24, 0),
-    "D2": (19, -26.5, 0),                  # LINK, TX, RX in a row
-    "R7": (25, -24, 0),
-    "D3": (25, -26.5, 0),
-    "R8": (31, -24, 0),
-    "D4": (31, -26.5, 0),
+    # LINK, TX, RX along the top edge, in a row with the power LED
+    # (milestone-1.md, Indicator LEDs), each resistor under its LED as R5
+    "D2": (4, -41, 0),
+    "R6": (4, -38.5, 0),
+    "D3": (10, -41, 0),
+    "R7": (10, -38.5, 0),
+    "D4": (16, -41, 0),
+    "R8": (16, -38.5, 0),
     "TP1": (34, -38, 0),
     "TP2": (28, -38, 0),
 }
@@ -224,10 +226,10 @@ TITLE, REVISION = "CUPC/8 Wi-Fi", "A"
 def main():
     logo.footprint(LOGO_MM)
     lcsc = kg.pipeline("wifi", schematic, PLACEMENT, BODY, out=sys.argv[1] if len(sys.argv) > 1 else None,
-                       edge=EDGE, card_edge=True, zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5), power_nets=("/+5V", "/3V3", "/GND"),
-                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 10, -35, 0)],
+                       io_card=True, power_nets=("/+5V", "/3V3", "/GND"),
+                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 22, -27, 0)],
                        labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
-                       title=TITLE, revision=REVISION, revision_at=(10, -29.5))   # under the logo
+                       title=TITLE, revision=REVISION)                       # bottom right
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

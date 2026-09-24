@@ -899,7 +899,8 @@ SILK_TEXT = (1.0, 0.15)                 # designator height and stroke (JLC mini
 
 def mark_revision(board, title, revision, at):
     """The board's name and revision, "<title> rev <revision>", on the top
-    silkscreen centred at `at` (mm), and in its title block (the Gerbers' X2
+    silkscreen with its bottom-right corner at `at` (mm; normally 1 mm in from
+    the body's bottom-right corner), and in its title block (the Gerbers' X2
     file attributes carry it), so boards of different builds can be told
     apart (doc/milestone-1.md, Board revision)."""
     import pcbnew
@@ -909,8 +910,8 @@ def mark_revision(board, title, revision, at):
     t.SetLayer(pcbnew.F_SilkS)
     t.SetTextSize(pcbnew.VECTOR2I(mm(SILK_TEXT[0]), mm(SILK_TEXT[0])))
     t.SetTextThickness(mm(SILK_TEXT[1]))
-    t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
-    t.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
+    t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_RIGHT)
+    t.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_BOTTOM)
     t.SetPosition(pcbnew.VECTOR2I(mm(at[0]), mm(at[1])))
     board.Add(t)
     tb = board.GetTitleBlock()
@@ -1760,7 +1761,8 @@ def check_order(spec, card_edge):
 
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
-             zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None):
+             zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
+             io_card=False):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1768,12 +1770,25 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     Every board carries its name and revision (doc/milestone-1.md, Board
     revision): `title` and `revision` are printed as "<title> rev <revision>"
-    on the top silkscreen, centred at `revision_at` (mm), and go in the
+    on the top silkscreen, in the body's bottom-right corner unless
+    `revision_at` names another bottom-right anchor (mm), and go in the
     board's title block, which the Gerbers' X2 attributes carry."""
     import pcbnew
-    if not (title and revision and revision_at):
-        raise SystemExit("%s: every board needs a title, a revision and a place for them "
-                         "(doc/milestone-1.md, Board revision)" % name)
+    if io_card:
+        # every I/O card is the same shape (slot.md, Mechanical): the outline,
+        # finger edge and pour come from here, and the parts every card has in
+        # the same place are checked
+        if outline not in (None, IO_CARD_BODY) or edge not in (None, IO_CARD_EDGE):
+            raise SystemExit("%s: an I/O card has the standard outline (IO_CARD_BODY/EDGE), not its own" % name)
+        outline, edge, card_edge = IO_CARD_BODY, IO_CARD_EDGE, True
+        zone_outline = zone_outline or card_zone(IO_CARD_BODY, IO_CARD_TAB, -1.5)
+        for ref, want in (("J1", (0, 0, 0)), ("H1", IO_CARD_HOLE + (0,)), ("D1", IO_CARD_PWR_LED + (0,))):
+            if tuple(placement.get(ref, ())[:3]) != want:
+                raise SystemExit("%s: an I/O card has %s at %s (slot.md, Mechanical), not %s" % (
+                    name, ref, want, placement.get(ref)))
+    if not (title and revision):
+        raise SystemExit("%s: every board needs a title and a revision (doc/milestone-1.md, Board revision)" % name)
+    revision_at = revision_at or (outline[2] - 1.0, outline[3] - 1.0)
     out = os.path.abspath(out or os.path.join(ROOT, "build", "hw", name))
     os.makedirs(out, exist_ok=True)
     sch, pcb, pro = (os.path.join(out, name + e) for e in (".kicad_sch", ".kicad_pcb", ".kicad_pro"))
