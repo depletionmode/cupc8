@@ -340,6 +340,8 @@ begin
 			wait for 4 * T;
 			rd(16#f203#, d);
 			check(d(1) = '1' and d(0) = '0', "SYSCTL with PWR_HI high: $" & to_hstring(d));
+			pwr_hi <= '0';			-- back to the default source: later sections read $f203 whole
+			wait for 4 * T;
 			models_clean("RST-001");
 		end if;
 
