@@ -180,6 +180,8 @@ class CortexM0Core {
   /** the decode chain's branch k (0..83): runs it and returns true if its condition holds */
   template <int K>
   bool exec(uint32_t opcode, uint32_t opcode2, uint32_t opcodePC, uint32_t &deltaCycles);
+  /** readUint16 for an instruction fetch (reads SRAM, flash and the bootrom directly) */
+  uint32_t fetch16(uint32_t address);
   /** the decode chain from branch k on */
   void chain(uint32_t k, uint32_t opcode, uint32_t opcode2, uint32_t opcodePC, uint32_t &deltaCycles);
 

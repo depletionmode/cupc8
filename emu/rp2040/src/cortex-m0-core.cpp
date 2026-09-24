@@ -2842,6 +2842,33 @@ uint32_t CortexM0Core::executeInstructionChain() {
   return deltaCycles;
 }
 
+// rp2040.readUint16(address) for an instruction fetch (an even address), with
+// the memories it reads without side effects read directly: SRAM and flash
+// (its own fast paths), the XIP mirrors 0x11000000-0x13ffffff and the bootrom
+// (its readUint32 fallback, an aligned word, of which it takes a half: on a
+// little-endian host the halfword at the address in the word's bytes).
+// Everything else (other regions, the last halfword of a memory, which throws
+// or warns in TS) goes through readUint16. Nothing is cached, so writes need
+// no invalidation.
+RP2040_ALWAYS_INLINE uint32_t CortexM0Core::fetch16(uint32_t address) {
+  RP2040 &chip = rp2040;
+  const uint32_t ramOffset = address - RAM_START_ADDRESS;
+  if (ramOffset + 2 <= chip.sram.size()) {
+    return loadLE16(chip.sram.data() + ramOffset);
+  }
+  const uint32_t flashOffset = address & 0x00ffffff;
+  if (address - FLASH_START_ADDRESS < FLASH_END_ADDRESS - FLASH_START_ADDRESS &&
+      flashOffset + 4 <= chip.flash.size()) {
+    return loadLE16(chip.flash.data() + flashOffset);
+  }
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  if (address + 4 <= chip.bootrom.size() * 4) {
+    return loadLE16(reinterpret_cast<const uint8_t *>(chip.bootrom.data()) + address);
+  }
+#endif
+  return readUint16(address);
+}
+
 uint32_t CortexM0Core::executeInstruction() {
   if (interruptsUpdated) {
     if (checkForInterrupts()) {
@@ -2852,10 +2879,10 @@ uint32_t CortexM0Core::executeInstruction() {
   // ARM Thumb instruction encoding - 16 bits / 2 bytes
   // JS: `this.PC & ~1` is an int32 (negative for PC >= 2**31); only its hex in the warning shows it
   const uint32_t opcodePC = PC() & ~1u;  // ensure no LSB set PC are executed
-  const uint32_t opcode = readUint16(opcodePC);
+  const uint32_t opcode = fetch16(opcodePC);  // readUint16(opcodePC)
   // (opcode >> 12 == 0b1111 || opcode >> 11 == 0b11101)
   const bool wideInstruction = opcode >> 11 >= 0b11101;
-  const uint32_t opcode2 = wideInstruction ? readUint16(opcodePC + 2) : 0;
+  const uint32_t opcode2 = wideInstruction ? fetch16(opcodePC + 2) : 0;
   registers[15] += 2;
   // the chain's first branch that holds for the opcode (see decodeTable)
   const uint32_t deltaCycles = decodeTable[opcode](*this, opcode, opcode2, opcodePC);
