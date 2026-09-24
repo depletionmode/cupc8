@@ -232,7 +232,7 @@ must_fail = ["FAIL T0", "hw/boards/wifi.py has AMS1117-3.3, these checks model T
 
 [[bug]]
 name = "boards: footprint silkscreen 0.09 mm from a pad passed the 0.15 mm check (line width ignored)"
-fixed_in = "this commit"
+fixed_in = "0f51f42"
 revert = [["hw/tools/kicadgen.py", "    clip_silk_to_board(board, outline)\n    clip_silk_to_pads(board)\n", "    clip_silk_to_board(board, outline)\n"]]
 cmd = "python3 hw/smoke/smoke.py"
 must_fail = ["silkscreen of J1 touches pad SH of J1"]
