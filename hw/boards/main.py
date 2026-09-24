@@ -33,6 +33,27 @@ G = kg.GRID
 
 # ------------------------------------------------------------------ parts
 
+# The power path, as hw/power/design.py assumes it (power.md, "Assumptions the
+# boards must meet"): name -> (value, LCSC). The power scripts can read it here.
+POWER = {
+    "CC_RD": ("5.1k 1%", "C23186"),                   # R1, R2
+    "VBUS_C_AHEAD": ("1u", "C15849"),                 # C1: <= 10 uF ahead of the SY6280
+    "SY6280_RSET": ("3.48k 1%", "C22996"),            # R3 (POW-006 B2)
+    "5V_SYS_BULK": ("22u", "C45783"),                 # C3
+    "SLOT_LINK": ("0R 0805, <= 50 mOhm", "C17477"),   # R201.. (each slot's isolation link)
+    "BUCK": ("TLV62569PDDCR", "C398365"),             # U3 (THM-001 T2)
+    "BUCK_L": ("2.2uH HPC5020NF-2R2M, Isat 4.1 A, DCR 32 mOhm", "C357060"),   # L1
+    "BUCK_CIN": ("10u", "C19702"),                    # C5
+    "BUCK_COUT": ("22u", "C45783"),                   # C7
+    "BUCK_R1": ("453k 0.1%", "C861412"),              # R5
+    "BUCK_R2": ("100k 0.1%", "C2912578"),             # R6
+    "3V3_DECOUPLING": ("3 x 22u + 100n at each load", "C45783"),   # C35, C43, C45 (~45 uF effective)
+    "LDO_COUT": ("1u + 4 x 100n at the iCE40 VCC pins", "C15849"),  # C10, C20-C23
+    "CC_AVG_R": ("1M 1%", "C22935"),                  # R13, R14
+    "CC_REF_R1": ("90.9k 1%", "C23129"),              # R15
+    "CC_REF_R2": ("10k 1%", "C25804"),                # R16
+}
+
 # LCSC numbers of the passives (JLC basic parts unless noted)
 R0603 = {"0": "C21189", "33": "C23140", "100": "C22775", "1k": "C21190", "2.2k": "C4190", "3k": "C4211",
          "4.7k": "C23162", "5.1k": "C23186", "10k": "C25804", "22k": "C31850", "27k": "C22967",
@@ -186,25 +207,25 @@ def build_parts():
          {1: "CC1", 6: "CC1", 3: "CC2", 4: "CC2", 2: "GND", 5: "VBUS_F"})
     part("F1", "Device:Polyfuse", "2A", "Fuse:Fuse_1812_4532Metric", "C20812", {1: "VBUS", 2: "VBUS_F"})
     part("D1", "Device:D_Zener", "SMF5.0A", "Diode_SMD:D_SOD-123F", "C193402", {"K": "VBUS_F", "A": "GND"})   # a unidirectional TVS
-    C("C1", "4.7u", "VBUS_F")
+    C("C1", "1u", "VBUS_F")                        # <= 10 uF ahead of the switch (POW-004)
     C("C2", "100n", "VBUS_F")
     part("U2", "jlc:SY6280AAC", "SY6280AAC", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL", "C55136",
          {"IN": "VBUS_F", "EN": "VBUS_F", "GND": "GND", "ISET": "ISET", "OUT": "5V_SYS"})
-    R("R3", "4.7k", "ISET", "GND")                  # 6800 / 4.7k = 1.45 A limit
+    R("R3", "3.48k", "ISET", "GND", lcsc=POWER["SY6280_RSET"][1])   # 6800 / 3.48k: 1.47 / 1.95 / 2.44 A (POW-006 B2)
     C("C3", "22u", "5V_SYS")
-    C("C4", "22u", "5V_SYS")
     R("R4", "0", "5V_SYS", "+5V", "Resistor_SMD:R_1206_3216Metric", "C17888")     # 5V isolation link
 
     # ---- 3V3 buck, 1V2 LDO
-    part("U3", "jlc:TLV62569DBVR", "TLV62569DBVR", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "C141836",
-         {"VIN": "5V_SYS", "EN": "5V_SYS", "GND": "GND", "SW": "BUCK_SW", "FB": "BUCK_FB"})
-    part("L1", "Device:L", "2.2uH", "jlc:IND-SMD_L3.0-W3.0_FNR30XXS", "C167747", {1: "BUCK_SW", 2: "3V3_BUCK"})
-    R("R5", "100k", "3V3_BUCK", "BUCK_FB")          # 0.6 V x (1 + 100k/22k) = 3.33 V
-    R("R6", "22k", "BUCK_FB", "GND")
+    # the DDC package (thermal: THM-001 T2 fails the DBV with slots 4-6 at their 300 mA)
+    part("U3", "jlc:TLV62569PDDCR", "TLV62569PDDCR", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "C398365",
+         {"VIN": "5V_SYS", "EN": "5V_SYS", "GND": "GND", "SW": "BUCK_SW", "FB": "BUCK_FB", "PG": None})
+    part("L1", "Device:L", "2.2uH", "jlc:IND-SMD_L5.0-W5.0", POWER["BUCK_L"][1],     # Isat 4.1 A, 32 mOhm
+         {1: "BUCK_SW", 2: "3V3_BUCK"})
+    R("R5", "453k", "3V3_BUCK", "BUCK_FB", lcsc=POWER["BUCK_R1"][1])   # 0.6 V x (1 + 453k/100k) = 3.318 V, 0.1 %
+    R("R6", "100k", "BUCK_FB", "GND", lcsc=POWER["BUCK_R2"][1])
     C("C5", "10u", "5V_SYS")
     C("C6", "100n", "5V_SYS")
     C("C7", "22u", "3V3_BUCK")
-    C("C8", "22u", "3V3_BUCK")
     R("R7", "0", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", "C17888")  # 3V3 isolation link
     part("U4", "jlc:RT9013-12GB", "RT9013-12GB", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "C58464",
          {"VIN": "+3V3", "EN": "+3V3", "GND": "GND", "NC": None, "VOUT": "1V2_LDO"})
@@ -229,8 +250,8 @@ def build_parts():
     R("R13", "1M", "CC1", "CC_AVG")
     R("R14", "1M", "CC2", "CC_AVG")
     C("C11", "100n", "CC_AVG")
-    R("R15", "27k", "+3V3", "CC_REF")               # 3.3 V x 3k / 30k = 0.33 V
-    R("R16", "3k", "CC_REF", "GND")
+    R("R15", "90.9k", "+3V3", "CC_REF", lcsc=POWER["CC_REF_R1"][1])   # 3.3 V x 10k / 100.9k = 0.327 V
+    R("R16", "10k", "CC_REF", "GND")
     part("U5", "jlc:TLV7011DBVR", "TLV7011DBVR", "jlc:TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL", "C702117",
          {"VCC": "+3V3", "VEE": "GND", "IN+": "CC_AVG", "IN": "CC_REF", "OUT": "PWR_HI"})
     C("C12", "100n", "+3V3")
@@ -291,8 +312,7 @@ def build_parts():
     # VCC 1V2: one 100 nF per pin, and bulk; VCCIO: one per pin; PLL filter
     for i, net in enumerate(["+1V2"] * 4 + ["+3V3"] * 10):
         C("C%d" % (20 + i), "100n", net)
-    C("C34", "10u", "+1V2")
-    C("C35", "10u", "+3V3")
+    C("C35", "22u", "+3V3")
     R("R50", "100", "+1V2", "VCCPLL")
     C("C36", "10u", "VCCPLL")
     C("C37", "100n", "VCCPLL")
@@ -352,7 +372,7 @@ def build_parts():
     for i in range(8):                               # weak keepers: a floating bus reads $FF
         R("R%d" % (90 + i), "47k", "+3V3", "CPU_D%d" % i)
     C("C42", "10u", "+5V")
-    C("C43", "10u", "+3V3")
+    C("C43", "22u", "+3V3")
     C("C44", "100n", "+3V3")
     for net in ["CPU_nRST", "CPU_CDONE", "CPUCARD_nCRESET", "FL1_SCK", "FL1_MOSI", "FL1_MISO", "FL1_nCS"] + \
             sorted({cpu_net(n) for n in names.values() if n.startswith("RSVD")}):
@@ -370,7 +390,7 @@ def build_parts():
         R("R%d" % (101 + i), "10k", "+3V3", net)   # MUX_SEL high: channel 7, nothing
     R("R105", "4.7k", "+3V3", "I2C_SDA")
     R("R106", "4.7k", "+3V3", "I2C_SCL")
-    C("C45", "10u", "+3V3")
+    C("C45", "22u", "+3V3")
     C("C46", "100n", "+3V3")
     for net in ["SYS_PRSNT2_n", "I2C_SDA", "I2C_SCL", "PROG_CLK", "PROG_IO", "MUX_SEL0", "MUX_SEL1",
                 "MUX_SEL2"] + sorted({sys_net(n) for n in names.values() if n.startswith("RSVD")}):
@@ -701,7 +721,6 @@ def wanted(parts):
     at["C38"] = (x, y, 0)
     at["R50"] = (fx - 1.0, fy + 17.0, 0)
     at["C36"] = (fx - 1.0, fy + 20.0, 0)
-    at["C34"] = (fx - 16.5, fy + 8.0, 90)
     at["C35"] = (fx + 16.5, fy - 8.0, 90)
     # series resistors next to their chipset pin, one step further out
     for spec in parts:
@@ -785,10 +804,10 @@ def wanted(parts):
     y = H - 12.0
     power = {"R1": (62.0, y - 2), "R2": (78.0, y - 2), "U1": (70.0, y - 9, 0), "F1": (58.0, y - 9, 90),
              "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "C2": (65.5, y - 14), "U2": (58.0, y - 19),
-             "R3": (58.0, y - 23), "C3": (51.0, y - 19, 90), "C4": (47.5, y - 19, 90),
-             "R4": (51.0, y - 27, 0), "U3": (78.0, y - 19, 90), "L1": (83.0, y - 19), "R5": (86.5, y - 15),
-             "R6": (86.5, y - 12), "C5": (74.0, y - 19, 90), "C6": (72.0, y - 23), "C7": (88.0, y - 19, 90),
-             "C8": (91.5, y - 19, 90), "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),
+             "R3": (58.0, y - 23), "C3": (51.0, y - 19, 90),
+             "R4": (51.0, y - 27, 0), "U3": (78.0, y - 19, 90), "L1": (84.0, y - 20), "R5": (86.5, y - 15),
+             "R6": (86.5, y - 12), "C5": (74.0, y - 19, 90), "C6": (72.0, y - 23), "C7": (89.5, y - 19, 90),
+             "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),
              "C10": (101.0, y - 13, 0), "R8": (101.0, y - 25), "R9": (115.5, 95.2), "D2": (120.0, 95.2),
              "R10": (115.5, 98.4), "D3": (120.0, 98.4), "R11": (107.0, 101.6), "Q1": (111.0, 101.6),
              "R12": (115.5, 101.6), "D4": (120.0, 101.6), "R13": (84.0, y - 5), "R14": (84.0, y - 2),
