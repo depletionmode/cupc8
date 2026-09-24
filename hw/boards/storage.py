@@ -84,11 +84,11 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # left side, so the middle (DVDD, IOVDD, XIN/XOUT, SWD) is open: the
     # crystal goes straight above XIN/XOUT, the flash by the QSPI pins (now
     # at the bottom)
-    "C12": (CX - 1.0, CY - 5.3, 90),     # DVDD 23
+    "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23 (its pin escapes by a via: pocket_escapes)
     "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 3.2, CY + 7.2, 90),      # IOVDD 49
-    "R2": (CX + 0.7, CY - 5.3, 90),      # XOUT
+    "R2": (CX + 3.7, CY - 7.2, 90),      # XOUT
     "Y1": (CX + 0.4, CY - 9.6, 0),
     "C16": (CX - 2.9, CY - 9.6, 90),
     "C17": (CX + 3.7, CY - 9.6, 90),
@@ -125,4 +125,4 @@ TITLE, REVISION = "CUPC/8 storage", "A"
 
 if __name__ == "__main__":
     rc.build("storage", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "ACT", "D3": "CARD"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=100)
+             TITLE, REVISION, layers=LAYERS, passes=100, preroute=rc.pocket_escapes)

@@ -8,6 +8,7 @@ RP2040", laid out on the schematic sheet around a fixed origin.
 Every placed part carries its JLC LCSC number. Passives are JLC basic parts.
 """
 
+import math
 import os
 import sys
 
@@ -344,6 +345,49 @@ def tie_testen(board):
     the pours (nothing else reaches it: the pour can't get between pins)."""
     tx, ty = pad_at(board, "U1", 19)
     cx, cy = pad_at(board, "U1", 57)
-    # to 1.2 mm short of the centre along the pin's axis: inside the 3.2 mm pad
-    k = 1.2 / max(abs(tx - cx), abs(ty - cy))
-    track(board, "/GND", (tx, ty), (cx + (tx - cx) * k, cy + (ty - cy) * k))
+    # straight in, across the pad's own axis, to 1.2 mm from the centre
+    if abs(tx - cx) > abs(ty - cy):
+        end = (cx + math.copysign(1.2, tx - cx), ty)
+    else:
+        end = (tx, cy + math.copysign(1.2, ty - cy))
+    track(board, "/GND", (tx, ty), end)
+
+
+def escape(board, pin, out, side=0.0, net=None):
+    """A Fine-class escape for an RP2040 pin: a track from its pad to a via
+    `out` mm from the pad's centre, outwards (negative: inwards, into the
+    ring between the pads and the exposed pad, under the chip), `side` mm
+    along the chip's edge. The via drops the net to the inner layers."""
+    import math
+    px, py = pad_at(board, "U1", pin)
+    cx, cy = pad_at(board, "U1", 57)
+    ux, uy = px - cx, py - cy
+    if abs(ux) > abs(uy):                     # the pin's edge: outward unit vector
+        ux, uy = math.copysign(1, ux), 0.0
+    else:
+        ux, uy = 0.0, math.copysign(1, uy)
+    vx, vy = px + ux * out - uy * side, py + uy * out + ux * side
+    netname = net or board.FindFootprintByReference("U1").FindPadByNumber(str(pin)).GetNetname()
+    if side:                                 # out past the pad's end, over by `side` at 45 degrees, on to the via
+        pts = [(px, py), (px + ux * 0.75, py + uy * 0.75),
+               (px + ux * (0.75 + abs(side)) - uy * side, py + uy * (0.75 + abs(side)) + ux * side), (vx, vy)]
+    else:
+        pts = [(px, py), (vx, vy)]
+    for a, b in zip(pts, pts[1:]):
+        track(board, netname, a, b, width=0.15)
+    via(board, netname, (vx, vy), size=0.65)
+
+
+def pocket_escapes(board):
+    """The turned cards (GPU, storage): the middle of the chip's top edge,
+    between the pins that fan out to the edge connector, has seven pins to
+    get out: RUN, SWCLK and IOVDD 22 through vias in the ring under the chip,
+    SWDIO, DVDD 23 and XOUT through vias in a row just outside, XIN through
+    one a row further out. Freerouting can't find these in a 0.4 mm pitch
+    row with the pocket walled in by signal pairs."""
+    tie_testen(board)
+    for pin in (26, 24, 22):                  # RUN, SWCLK, IOVDD: in
+        escape(board, pin, -1.14)
+    for pin in (25, 23, 21):                  # SWDIO, DVDD, XOUT: out, one row
+        escape(board, pin, 1.16)
+    escape(board, 20, 2.26, side=0.3)         # XIN: the next row out, clear of XOUT's via
