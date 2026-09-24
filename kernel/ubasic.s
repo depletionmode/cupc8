@@ -71,6 +71,16 @@ ubasic_init:
 	b .clear_gosub_stack
 .done_clear_gosub_stack:
 
+	; every variable starts at 0: RAM powers up with junk
+	xor r1, r1
+.clear_variables:
+	gt r1, #39
+	bzf .done_clear_variables
+	st [ub_variables]+r1, r0
+	add r1, #1
+	b .clear_variables
+.done_clear_variables:
+
 	st [ended], r0
 
 	st [ub_line_index_current], r0

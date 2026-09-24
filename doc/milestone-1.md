@@ -15,6 +15,11 @@
   - an **IO board** that lets you use a **USB keyboard**;
   - a **graphics board** that outputs **HDMI**;
   - *Added:* a **Wi-Fi networking card**.
+  - *Added 2026-09-24, proposal, not implemented yet:* a **microSD card slot
+    on the IO board** for file storage, with the file system and kernel and
+    BASIC support. The USB-A port is on the card's back edge and the microSD
+    on its top edge, both reachable from outside
+    ([proposals/io-microsd.md](proposals/io-microsd.md)).
 - *Added:* the main board has **extra slots** for future expansion cards.
 - There must be a **physical ROM** where the **boot ROM and then the kernel**
   reside.

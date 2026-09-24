@@ -287,3 +287,20 @@ fixed_in = "871f985"
 revert = [["tools/cupc8.py", "        self.buf = b\"\"\n        self.resync()\n", "        self.buf = b\"\"\n"]]
 cmd = "make -C fw sysctl_sim && python3 test/host/test_cupc8.py"
 must_fail = ["FAIL rom id after a killed run's late reply"]
+
+[[bug]]
+name = "kernel BASIC: variables were never cleared, so on power-up junk RAM an unset one printed junk"
+fixed_in = "f9150e6"
+revert = [["kernel/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
+	xor r1, r1
+.clear_variables:
+	gt r1, #39
+	bzf .done_clear_variables
+	st [ub_variables]+r1, r0
+	add r1, #1
+	b .clear_variables
+.done_clear_variables:
+
+""", ""]]
+cmd = "tools/run_tests.sh testBasicJunkRamVariables"
+must_fail = ["FAIL: BASIC variables on junk RAM"]
