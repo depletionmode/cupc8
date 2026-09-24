@@ -1383,7 +1383,7 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
                     continue
                 if any(math.hypot(vx - ox, vy - oy) < via + 0.25 for ox, oy in vias):
                     continue
-                if any(l[4] != net and seg_dist(vx, vy, *l[:4]) < via / 2 + gap + 0.25 for l in locked):
+                if any(l[4] != net and seg_dist(vx, vy, *l[:4]) < via / 2 + gap + 0.35 for l in locked):   # 0.35: clears another net's via too
                     continue
                 samples = [(cx + (vx - cx) * i / 12, cy + (vy - cy) * i / 12) for i in range(13)]
                 if not all(clear_of(sx, sy, track / 2 + gap) for sx, sy in samples):

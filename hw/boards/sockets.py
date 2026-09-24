@@ -44,14 +44,53 @@ sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
 
 EDGE = os.path.join(kg.KICAD_FOOTPRINTS, "Connector_PCBEdge.pretty")
+CUPC8 = os.path.join(kg.HW_LIB, "cupc8.pretty")
 
 # card symbol -> (socket footprint, KiCad card-edge footprint it must mate
 # with, the symbol the main board uses for the socket)
 SOCKETS = {
-    "CUPC8_Slot": ("jlc:CONN-TH_36P-P1.00-V_3183-XXXXXPXT", "BUS_PCIexpress_x1", "cupc8:CUPC8_Slot"),
-    "CUPC8_CPUSocket": ("jlc:CONN-TH_98P-P1.00-V_3183-XXXXXPXT", "BUS_PCIexpress_x8", "cupc8:CUPC8_CPUSocket"),
-    "CUPC8_SystemSlot": ("jlc:PCIE-SMD_PCIE-64P11L", "BUS_PCIexpress_x4", "cupc8_main:CUPC8_SystemSlot_64P11L"),
+    "CUPC8_Slot": ("cupc8:UMAX_3183-10200P1T", "BUS_PCIexpress_x1", "cupc8:CUPC8_Slot"),
+    "CUPC8_CPUSocket": ("cupc8:UMAX_3183-10112P1T", "BUS_PCIexpress_x8", "cupc8:CUPC8_CPUSocket"),
+    "CUPC8_SystemSlot": ("cupc8:SOFNG_PCIE-64P11L", "BUS_PCIexpress_x4", "cupc8_main:CUPC8_SystemSlot_64P11L"),
 }
+
+# the JLC imports they are made from, and what changes (derive()):
+#  - the UMAX sockets: EasyEDA's holes (0.91 or 0.80 mm, 1.52 or 1.30 mm
+#    rings) and 2.5/2.4 mm posts leave pin A11/B11's ring 0.06-0.2 mm from
+#    the key post, under JLC's 0.25 mm. The drawing's recommended layout
+#    (318307001 sheet 4) is 0.70 +-0.08 mm holes and 2.35 mm posts: drill
+#    0.75 mm with a 1.2 mm ring, posts 2.35 mm
+#  - the Sofng socket: its hold-down pads (65) reach over the locating
+#    holes' edge (mask bridge): narrowed to 1.3 mm, centre 0.15 mm outward
+DERIVED = {
+    "UMAX_3183-10200P1T": ("CONN-TH_36P-P1.00-V_3183-XXXXXPXT", "umax"),
+    "UMAX_3183-10112P1T": ("CONN-TH_98P-P1.00-V_3183-XXXXXPXT", "umax"),
+    "SOFNG_PCIE-64P11L": ("PCIE-SMD_PCIE-64P11L", "sofng"),
+}
+
+
+def derive():
+    """Write the DERIVED footprints into hw/lib/cupc8.pretty. Pad numbers and
+    positions stay JLC's (hw/tools/bomcheck.py matches them)."""
+    import re
+    for name, (src, kind) in DERIVED.items():
+        text = open(os.path.join(kg.HW_LIB, "jlc.pretty", src + ".kicad_mod")).read()
+        text = text.replace("easyeda2kicad:" + src, "cupc8:" + name, 1)
+        if kind == "umax":
+            text = re.sub(r"(\(pad \w+ thru_hole circle \(at [^)]*\)) \(size [\d.]+ [\d.]+\) (\(layers [^)]*\))\(drill [\d.]+\)",
+                          r"\1 (size 1.2 1.2) \2(drill 0.75)", text)
+            text = re.sub(r'(\(pad "" np_thru_hole circle \(at [^)]*\)) \(size [\d.]+ [\d.]+\) \(drill [\d.]+\)',
+                          r"\1 (size 2.35 2.35) (drill 2.35)", text)
+        else:
+            def nail(m):
+                x = float(m.group(1))
+                return "(pad 65 smd rect (at %.2f %s) (size 1.30 %s)" % (x + (0.15 if x > 0 else -0.15),
+                                                                         m.group(2), m.group(3))
+            text = re.sub(r"\(pad 65 smd rect \(at ([-\d.]+) ([-\d.]+)(?: [-\d.]+)?\) \(size [\d.]+ ([\d.]+)\)", nail, text)
+        path = os.path.join(CUPC8, name + ".kicad_mod")
+        if not os.path.exists(path) or open(path).read() != text:
+            with open(path, "w") as f:
+                f.write(text)
 
 
 def x4_contact(pad):
@@ -165,6 +204,7 @@ def selftest():
 
 def main():
     import pcbnew  # noqa: F401
+    derive()
     bad = selftest() + check()
     for b in bad:
         print("FAIL", b)

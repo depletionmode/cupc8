@@ -1010,6 +1010,7 @@ def main():
     import logo
     import pincheck
     build_parts()                                   # writes cupc8_main.kicad_sym, which the check reads
+    sockets.derive()
     bad = sockets.selftest() + sockets.check()
     if bad:
         raise SystemExit("sockets:\n  " + "\n  ".join(bad))
