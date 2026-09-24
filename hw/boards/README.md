@@ -20,20 +20,20 @@ python3 hw/boards/wifi.py
 
 Shared rules:
 - **Revision:** every board passes `title`, `revision` and `revision_at` to `pipeline()`, which prints `<title> rev <revision>` on the top silkscreen and puts the revision in the title block (and so in the Gerbers). Bump the board script's `REVISION` (A, B, ...) for every order that changes the board (`doc/milestone-1.md`, Board revision).
-- **Cards:** 1.6 mm, with hard-gold fingers and a 45° chamfer. These are
+- **Cards:** 1.6 mm, with hard-gold fingers and a 30° chamfer. These are
   order options, written in `fab/order.json` and checked there.
 - **Card edge:** each card's finger tab is KiCad's `BUS_PCIexpress_*`
   footprint. The script draws the body's outline and meets the tab where it
   starts.
 - **Branding:** the Kaplan Labs logo on the top silkscreen of every board.
-- **Assembly:** nothing is fitted by hand. The Wi-Fi card's U.FL antenna is
+- **Assembly:** nothing is fitted by hand. The Wi-Fi card's antenna lead (MHF III to SMA) is
   the one exception: it is plugged in, not soldered.
 
 ## Wi-Fi card (`wifi.py`)
 
 Spec: `doc/hardware/wifi-card.md`.
 
-- **U1, ESP32-C3-MINI-1U-N4** (C2911374). The U.FL end sits at the card's top
+- **U1, ESP32-C3-MINI-1U-N4** (C2911374). The antenna receptacle (MHF III) end sits towards the card's top
   edge. The GPIOs follow `hw/pins.yaml`:
   - SCK: GPIO6
   - MOSI: GPIO7

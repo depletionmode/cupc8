@@ -72,5 +72,5 @@ Rules for the matrix:
 | RP2040 at 252 MHz (per part) | Silicon margin varies | PicoDVI's standard 252 MHz with its core voltage bump (VREG 1.20 V), used widely on RP2040. Bring-up checks each unit for an hour with a soak test pattern. The spare boards cover a marginal part. |
 | USB-host enumeration with real keyboards | rp2040js has no USB host | TinyUSB host HID is widely used; the HID parsing is tested on recorded reports from real keyboards; boot protocol forced |
 | ESP32-C3 SPI slave on silicon | QEMU doesn't model the GPSPI slave | Espressif's documented `spi_slave` driver; the core is tested through an SPI shim that follows the datasheet timing; the framing rules (READ frames, 20 µs re-arm gap) were chosen for this driver |
-| Wi-Fi RF | Radio isn't simulable | **Pre-certified module with an external antenna** (ESP32-C3-MINI-1U + U.FL), so our layout doesn't affect the radio |
+| Wi-Fi RF | Radio isn't simulable | **Pre-certified module with an external antenna** (ESP32-C3-MINI-1U + MHF III lead to an SMA antenna), so our layout doesn't affect the radio |
 | Assembly defects | Manufacturing | JLC AOI and X-ray on request for the TQFP; the debug features in `debugging.md` (LEDs, POST codes, test pads, isolation links, current sense, and the RP2040's stop/step/trace with `trace --diff` against the simulator); bring-up in stages; the spare main board |
