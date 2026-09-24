@@ -1,0 +1,624 @@
+// The whole machine, natively: see machine.h. Every function here is the
+// machine.mjs / tmds.mjs function of the same name, in the same order.
+#include "machine.h"
+
+#include <unistd.h>
+
+#include <algorithm>
+#include <cctype>
+#include <cerrno>
+#include <cstring>
+#include <fstream>
+#include <iterator>
+#include <sstream>
+#include <stdexcept>
+
+#include "../../soc/emu/board.h"
+
+#if defined(__x86_64__) || defined(__i386__)
+#include <immintrin.h>
+static inline void cpuRelax() { _mm_pause(); }
+#else
+static inline void cpuRelax() {}
+#endif
+
+using namespace rp2040js;
+
+namespace machine {
+
+// the RP2040 cards' slot pins (hw/pins.yaml)
+namespace P {
+constexpr int SCK = 2, MOSI = 3, MISO = 4, NCS = 5, NIRQ = 6;
+}
+
+static std::vector<uint8_t> packBits(const std::vector<uint8_t> &bits) {
+  std::vector<uint8_t> out;
+  for (size_t i = 0; i + 8 <= bits.size(); i += 8) {
+    uint8_t v = 0;
+    for (size_t j = 0; j < 8; j++) v = static_cast<uint8_t>((v << 1) | bits[i + j]);
+    out.push_back(v);
+  }
+  return out;
+}
+
+// ------------------------------------------------------------ Rp2040Card
+
+Rp2040Card::Rp2040Card(const std::string &kind_, const std::string &elf, double mhz) : e(elf, mhz) {
+  kind = kind_;
+  auto &g = e.mcu->gpio;
+  g[P::NCS].setInputValue(true);
+  g[P::SCK].setInputValue(false);
+  g[P::MOSI].setInputValue(false);
+}
+
+void Rp2040Card::drive(uint32_t sck, uint32_t mosi, bool selected) {
+  if (logging) {
+    // record every frame: its MOSI bytes, and the time it ended
+    if (selected && !sel) {
+      bits.clear();
+      rbits.clear();
+      t0 = e.ns();
+    }
+    if (selected && sck && !sck_) {
+      bits.push_back(static_cast<uint8_t>(mosi));
+      rbits.push_back(static_cast<uint8_t>(miso()));
+    }
+    if (!selected && sel && !bits.empty()) {
+      log.push_back({t0, e.ns(), packBits(bits), packBits(rbits), static_cast<uint32_t>(bits.size() % 8)});
+    }
+    sel = selected;
+    sck_ = sck;
+  }
+  auto &g = e.mcu->gpio;
+  g[P::MOSI].setInputValue(!!mosi);
+  g[P::SCK].setInputValue(!!sck);
+  g[P::NCS].setInputValue(!selected);
+}
+
+uint32_t Rp2040Card::miso() {
+  GPIOPin &p = e.mcu->gpio[P::MISO];
+  return p.outputEnable() ? (p.outputValue() ? 1 : 0) : 1;  // released: the main board's pull-up
+}
+
+bool Rp2040Card::irq() {
+  GPIOPin &p = e.mcu->gpio[P::NIRQ];
+  return p.outputEnable() && !p.outputValue();  // open drain, active low
+}
+
+// ------------------------------------------------------------ EspCard
+
+EspCard::EspCard(int tx_, int rx_) : tx(tx_), rx(rx_) { kind = "wifi"; }
+
+void EspCard::read(uint8_t *b, size_t n) {
+  for (size_t got = 0; got < n;) {
+    const ssize_t r = ::read(rx, b + got, n - got);
+    if (r < 0 && errno == EINTR) continue;
+    if (r <= 0) throw std::runtime_error("the Wi-Fi card's QEMU closed its UART");
+    got += static_cast<size_t>(r);
+  }
+}
+
+void EspCard::write(const std::vector<uint8_t> &b) {
+  for (size_t put = 0; put < b.size();) {
+    const ssize_t r = ::write(tx, b.data() + put, b.size() - put);
+    if (r < 0 && errno == EINTR) continue;
+    if (r <= 0) throw std::runtime_error("cannot write to the Wi-Fi card's QEMU");
+    put += static_cast<size_t>(r);
+  }
+}
+
+void EspCard::drive(uint32_t sck, uint32_t mosi, bool sel) {
+  if (sel && !selected) {
+    write({0xa6});
+    uint8_t h[3];
+    read(h, 3);
+    std::vector<uint8_t> pre(h[1] | (h[2] << 8));
+    read(pre.data(), pre.size());
+    bits.clear();
+    for (uint8_t b : pre)
+      for (int i = 7; i >= 0; i--) bits.push_back((b >> i) & 1);
+    mosi_.clear();
+    bit = 0;
+  } else if (!sel && selected) {
+    const std::vector<uint8_t> bytes = packBits(mosi_);
+    if (!bytes.empty()) {
+      std::vector<uint8_t> msg = {0xa5, static_cast<uint8_t>(bytes.size() & 0xff),
+                                  static_cast<uint8_t>(bytes.size() >> 8)};
+      msg.insert(msg.end(), bytes.begin(), bytes.end());
+      write(msg);
+      std::vector<uint8_t> reply(3 + bytes.size());
+      read(reply.data(), reply.size());
+    }
+  }
+  if (sel && sck && !lastSck) {  // mode 0: sampled on the rising edge
+    mosi_.push_back(static_cast<uint8_t>(mosi));
+    bit++;
+  }
+  selected = sel;
+  lastSck = sck;
+}
+
+uint32_t EspCard::miso() { return selected ? (bit < bits.size() ? bits[bit] : 0) : 1; }
+
+// ------------------------------------------------------------ SysctlCard
+
+static constexpr int BR_NCS = 5, SYS_NRST = 23, CHIPSET_CDONE = 7, CPUCARD_CDONE = 17;
+
+SysctlCard::SysctlCard(const std::string &elf) : e(elf, 125), cdc(e.mcu->usbCtrl) {
+  auto &g = e.mcu->gpio;
+  g[CHIPSET_CDONE].setInputValue(true);  // both FPGAs configured
+  g[CPUCARD_CDONE].setInputValue(true);
+  g[8].setInputValue(true);
+  e.mcu->spi[0].onTransmit = [this](uint32_t b) { pending = Pending{b, 0, 0, 0}; };
+  cdc.onSerialData = [this](const std::vector<uint8_t> &buf) {
+    fromCard.insert(fromCard.end(), buf.begin(), buf.end());
+  };
+}
+
+void SysctlCard::feed() {
+  while (!toCard.empty() && cdc.txFIFO.itemCount() < 256) {
+    cdc.sendSerialByte(toCard.front());
+    toCard.pop_front();
+  }
+}
+
+// the bridge pins, as they are this clock (called once per core clock while busy)
+BridgePins SysctlCard::bridgePins(uint32_t brMiso) {
+  GPIOPin &n = e.mcu->gpio[BR_NCS];
+  const uint32_t ncs = n.outputEnable() ? (n.outputValue() ? 1 : 0) : 1;
+  if (!pending) return {0, 0, ncs};
+  Pending &p = *pending;
+  // 1 MHz: 6 core clocks a half period; sample MISO as SCK rises (mode 0)
+  const uint32_t phase = p.half / 6;
+  const uint32_t bit = phase >> 1, high = phase & 1;
+  if (high && p.half % 6 == 0) p.got = (p.got << 1) | brMiso;
+  p.half++;
+  if (bit >= 8) {
+    const uint32_t got = p.got;
+    pending.reset();
+    e.mcu->spi[0].completeTransmit(got & 0xff);
+    return {0, 0, ncs};
+  }
+  return {high, (p.out >> (7 - bit)) & 1, ncs};
+}
+
+bool SysctlCard::sysReset() {
+  GPIOPin &p = e.mcu->gpio[SYS_NRST];
+  return p.outputEnable() && !p.outputValue();  // driven low: the supervisor resets the board
+}
+
+// ------------------------------------------------------------ TmdsCapture
+
+// control tokens: (C1 = vsync, C0 = hsync)
+static int ctrlToken(uint32_t sym) {
+  switch (sym) {
+    case 0b1101010100: return 0;
+    case 0b0010101011: return 1;
+    case 0b0101010100: return 2;
+    case 0b1010101011: return 3;
+    default: return -1;
+  }
+}
+
+static uint32_t decodeData(uint32_t sym) {
+  uint32_t q = sym & 0xff;
+  if (sym & 0x200) q = ~q & 0xff;
+  uint32_t d = q & 1;
+  for (int i = 1; i < 8; i++) {
+    const uint32_t bit = ((q >> i) ^ (q >> (i - 1))) & 1;
+    d |= (sym & 0x100 ? bit : bit ^ 1) << i;
+  }
+  return d;
+}
+
+TmdsCapture::TmdsCapture(Emu &emu) {
+  auto &sms = emu.mcu->pio[0].machines;
+  for (int lane = 0; lane < 3; lane++) {
+    sms[lane].txFIFO.onPull = [this, lane, &emu](uint32_t w) {
+      if (on) {
+        lanes[lane].push_back(w & 0x3ff);
+        lanes[lane].push_back((w >> 10) & 0x3ff);
+        if (lane == 0) times.push_back(emu.ns());
+      }
+    };
+  }
+}
+
+void TmdsCapture::start() {
+  for (auto &l : lanes) l.clear();
+  times.clear();
+  on = true;
+}
+
+std::vector<TmdsCapture::Line> TmdsCapture::analyse() const {
+  const auto &blue = lanes[0];
+  const size_t n = std::min({lanes[0].size(), lanes[1].size(), lanes[2].size()});
+  auto ctrl = [&](size_t i) { return i < blue.size() ? ctrlToken(blue[i]) : -1; };  // -1 for data symbols
+  // hsync is active low: C0 = 0 during the pulse
+  auto hs = [&](size_t i) { int c = ctrl(i); return c >= 0 && (c & 1) == 0; };
+  auto vs = [&](size_t i) { int c = ctrl(i); return c >= 0 && (c & 2) == 0; };
+  std::vector<size_t> starts;
+  for (size_t i = 1; i < n; i++)
+    if (hs(i) && !hs(i - 1)) starts.push_back(i);
+  std::vector<Line> out;
+  for (size_t l = 0; l + 1 < starts.size(); l++) {
+    const size_t a = starts[l], b = starts[l + 1];
+    size_t hsLen = 0;
+    while (hs(a + hsLen)) hsLen++;
+    long ds = -1;
+    size_t dl = 0;
+    for (size_t i = a; i < b; i++) {
+      if (ctrl(i) < 0) {
+        if (ds < 0) ds = static_cast<long>(i);
+        dl++;
+      }
+    }
+    out.push_back({a, b - a, hsLen, ds, dl, vs(a)});
+  }
+  return out;
+}
+
+TmdsCapture::Frame TmdsCapture::frame(const std::vector<Line> &lines) const {
+  Frame f;
+  // a frame starts at the first line after a vsync run
+  size_t k = 1;
+  while (k < lines.size() && !(lines[k - 1].vsync && !lines[k].vsync)) k++;
+  std::vector<const Line *> active;
+  for (size_t l = k; l < lines.size() && active.size() < 480; l++) {
+    if (lines[l].vsync) {
+      f.error = "vsync after " + std::to_string(active.size()) + " active lines";
+      return f;
+    }
+    if (lines[l].dataLen) active.push_back(&lines[l]);
+  }
+  if (active.size() < 480) {
+    f.error = "only " + std::to_string(active.size()) + " active lines captured";
+    return f;
+  }
+  f.rgb.assign(640 * 480, 0);
+  for (size_t y = 0; y < 480; y++) {
+    const Line &L = *active[y];
+    if (L.dataLen != 640) {
+      f.error = "line " + std::to_string(y) + " has " + std::to_string(L.dataLen) + " data symbols";
+      f.rgb.clear();
+      return f;
+    }
+    for (size_t x = 0; x < 640; x++) {
+      const size_t i = static_cast<size_t>(L.dataStart) + x;
+      f.rgb[y * 640 + x] = (decodeData(lanes[2][i]) << 16) | (decodeData(lanes[1][i]) << 8) | decodeData(lanes[0][i]);
+    }
+  }
+  f.firstLine = k;
+  return f;
+}
+
+// ------------------------------------------------------------ Machine
+
+Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(o.root), threaded_(o.threaded) {
+  if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
+  for (const auto &[slot, kind] : o.slots) {
+    if (kind == "wifi") {
+      auto c = std::make_unique<EspCard>(o.espTx, o.espRx);
+      c->slot = slot;
+      cards.emplace_back(slot, std::move(c));
+      continue;
+    }
+    auto c = std::make_unique<Rp2040Card>(kind, root + "/build/rp2040/" + kind + ".elf", kind == "gpu" ? 252 : 125);
+    c->slot = slot;
+    c->logging = o.spiLog;
+    if (kind == "gpu") tmds = std::make_unique<TmdsCapture>(c->e);
+    if (kind == "io") {
+      c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
+      keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
+    }
+    cards.emplace_back(slot, std::move(c));
+  }
+  romImage = o.rom;
+  if (threaded_) startWorkers();
+}
+
+Machine::~Machine() { stopWorkers(); }
+
+void Machine::powerOn() {
+  board->init(romImage.data(), romImage.size());
+  board->run(12, inputs(false));  // the supervisor holds nPOR a moment
+  if (keyboard)
+    for (auto &[slot, c] : cards)
+      if (c->kind == "io") {
+        c->emu()->mcu->usbCtrl.attachDevice(keyboard.get());
+        break;
+      }
+}
+
+uint32_t Machine::inputs(bool por) {
+  const uint32_t out = board->outputs();
+  const uint32_t cs = (out >> 2) & 0x7f;
+  uint32_t miso = 1, nirq = 0x3f;
+  for (auto &[slot, card] : cards) {
+    const int dev = slot - 1;
+    if (!((cs >> dev) & 1)) miso &= card->miso();
+    if (card->irq()) nirq &= ~(1u << dev);
+  }
+  const bool reset = sysctl && sysctl->sysReset();
+  return miso | (nirq << 1) | (br.sck << 7) | (br.mosi << 8) | (br.ncs << 9) | ((pwrHi ? 1u : 0u) << 10) |
+         (1u << 11) | ((por && !reset ? 1u : 0u) << 12);
+}
+
+double Machine::ns() const { return board->ns(); }
+
+// run the machine for `ns` of emulated time
+void Machine::runFor(double ns) {
+  const double end = board->ns() + ns;
+  while (board->ns() < end) iterate();
+}
+
+void Machine::iterate() {
+  const uint32_t out = board->outputs();
+  const uint32_t cs = (out >> 2) & 0x7f;
+  if (sysctl) br = sysctl->bridgePins((out >> 9) & 1);
+  const bool busy = cs != 0x7f || (sysctl && (!br.ncs || sysctl->pending));
+  if (busy || workers.empty())
+    iterateSerial(busy, cs);
+  else
+    iterateThreaded();
+  stats.busyIterations += busy;
+  stats.idleWindows += !busy;
+  if (stats.traceOn) traceStep();
+}
+
+void Machine::iterateSerial(bool busy, uint32_t cs) {
+  // A card reacts to the pins it was given at the last clock during the
+  // clock that follows, so it runs up to the next edge before the core
+  // samples MISO there (machine.mjs).
+  if (cs != 0x7f)
+    for (auto &[slot, card] : cards) card->advance(board->ns() + NS_PER_CLOCK);
+  const uint32_t n = board->run(busy ? 1 : IDLE_CLOCKS, inputs());
+  (busy ? stats.busyClocks : stats.idleClocks) += n;
+  const double t = board->ns();
+  if (sysctl) sysctl->advance(t);
+  const uint32_t now = board->outputs();
+  const uint32_t sck = now & 1, mosi = (now >> 1) & 1, ncs = (now >> 2) & 0x7f;
+  for (auto &[slot, card] : cards) {
+    card->advance(t);
+    card->drive(sck, mosi, !((ncs >> (slot - 1)) & 1));
+  }
+}
+
+// An idle window (no slot or bridge selected, so no card is advanced before
+// the board runs): the board runs up to IDLE_CLOCKS with the inputs sampled
+// now while every card thread chases its clock count, then each card takes
+// its end-of-window drive() on its own thread.
+void Machine::iterateThreaded() {
+  const uint32_t in = inputs();
+  progress.store(board->clocks, std::memory_order_relaxed);
+  const uint64_t w = go.fetch_add(1, std::memory_order_release) + 1;
+  go.notify_all();
+  const uint32_t n = board->run(IDLE_CLOCKS, in, [this] { progress.store(board->clocks, std::memory_order_release); });
+  stats.idleClocks += n;
+  windowOut = board->outputs();
+  progress.store(board->clocks | FINAL, std::memory_order_release);
+  const uint32_t sck = windowOut & 1, mosi = (windowOut >> 1) & 1, ncs = (windowOut >> 2) & 0x7f;
+  for (Card *c : mainCards) c->drive(sck, mosi, !((ncs >> (c->slot - 1)) & 1));
+  for (auto &wk : workers) {
+    for (unsigned spins = 0; wk->done.load(std::memory_order_acquire) != w; spins++) {
+      if (spins < 20000)
+        cpuRelax();
+      else
+        std::this_thread::yield();
+    }
+  }
+}
+
+void Machine::workerLoop(Worker &w) {
+  uint64_t seen = 0;
+  Emu &e = w.sys ? w.sys->e : *w.card->emu();
+  for (;;) {
+    for (unsigned spins = 0;; spins++) {
+      const uint64_t g = go.load(std::memory_order_acquire);
+      if (g != seen) {
+        seen = g;
+        break;
+      }
+      if (spins < 20000)
+        cpuRelax();
+      else
+        go.wait(g, std::memory_order_acquire);
+    }
+    if (quit) return;
+    if (w.sys) w.sys->feed();  // the first half of SysctlCard.advance
+    for (;;) {
+      const uint64_t p = progress.load(std::memory_order_acquire);
+      // the board has run this far, so the window ends no earlier:
+      // advance(t) would take every one of these steps
+      const double target = static_cast<double>(p & ~FINAL) * NS_PER_CLOCK;
+      while (e.ns() < target) e.step();
+      if (p & FINAL) break;
+      while (progress.load(std::memory_order_acquire) == p) cpuRelax();
+    }
+    if (w.card) {
+      const uint32_t out = windowOut;
+      w.card->drive(out & 1, (out >> 1) & 1, !((((out >> 2) & 0x7f) >> (w.card->slot - 1)) & 1));
+    }
+    w.done.store(seen, std::memory_order_release);
+  }
+}
+
+void Machine::startWorkers() {
+  if (!workers.empty()) return;
+  quit = false;
+  mainCards.clear();
+  const uint64_t g = go.load();
+  auto add = [&](Card *c, SysctlCard *s) {
+    auto w = std::make_unique<Worker>();
+    w->card = c;
+    w->sys = s;
+    w->done.store(g);
+    workers.push_back(std::move(w));
+  };
+  if (sysctl) add(nullptr, sysctl.get());
+  for (auto &[slot, card] : cards) {
+    if (card->emu())
+      add(card.get(), nullptr);
+    else
+      mainCards.push_back(card.get());
+  }
+  for (auto &w : workers) {
+    Worker *wp = w.get();
+    w->th = std::thread([this, wp] { workerLoop(*wp); });
+  }
+}
+
+void Machine::stopWorkers() {
+  if (workers.empty()) return;
+  quit = true;
+  go.fetch_add(1, std::memory_order_release);
+  go.notify_all();
+  for (auto &w : workers) w->th.join();
+  workers.clear();
+  mainCards.clear();
+}
+
+void Machine::setThreaded(bool on) {
+  threaded_ = on;
+  if (on)
+    startWorkers();
+  else
+    stopWorkers();
+}
+
+void Machine::traceStep() {
+  auto mix = [this](uint64_t v) {
+    for (int i = 0; i < 8; i++) {
+      stats.trace ^= (v >> (8 * i)) & 0xff;
+      stats.trace *= 0x100000001b3ull;
+    }
+  };
+  mix(board->clocks);
+  mix(board->outputs());
+  auto mixNs = [&](double d) {
+    uint64_t b;
+    std::memcpy(&b, &d, 8);
+    mix(b);
+  };
+  if (sysctl) mixNs(sysctl->e.ns());
+  for (auto &[slot, card] : cards)
+    if (card->emu()) mixNs(card->emu()->ns());
+}
+
+Machine::State Machine::state() const {
+  Vmachine_core *top = board->top;
+  return {top->dbg_pc, top->dbg_sp, top->dbg_r0, top->dbg_r1, top->cpu_halted, top->cpu_n_rst, top->gpo};
+}
+
+// capture a whole frame from the GPU's TMDS output (about two frame times)
+TmdsCapture::Frame Machine::frame() {
+  if (!tmds) {
+    TmdsCapture::Frame f;
+    f.error = "no graphics card";
+    return f;
+  }
+  tmds->start();
+  runFor(40e6);
+  tmds->stop();
+  return tmds->frame(tmds->analyse());
+}
+
+// the 8x16 text font: font8x8_cp437 with each row doubled (gpu.c)
+static std::vector<std::array<uint8_t, 16>> loadFont(const std::string &root) {
+  std::ifstream in(root + "/fw/common/font8x8_cp437.c");
+  if (!in) throw std::runtime_error("cannot read fw/common/font8x8_cp437.c");
+  const std::string src((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  std::vector<uint8_t> bytes;
+  auto hex = [](char c) { return std::isxdigit(static_cast<unsigned char>(c)) != 0; };
+  for (size_t i = src.find('{'); i != std::string::npos && i + 3 < src.size();) {  // /0x[0-9a-fA-F]{2}/g
+    if (src[i] == '0' && src[i + 1] == 'x' && hex(src[i + 2]) && hex(src[i + 3])) {
+      bytes.push_back(static_cast<uint8_t>(std::stoi(src.substr(i + 2, 2), nullptr, 16)));
+      i += 4;
+    } else {
+      i++;
+    }
+  }
+  std::vector<std::array<uint8_t, 16>> font(256);
+  for (int c = 0; c < 256; c++)
+    for (int r = 0; r < 16; r++) {
+      const size_t at = static_cast<size_t>(c * 8 + (r >> 1));
+      font[c][r] = at < bytes.size() ? bytes[at] : 0;
+    }
+  return font;
+}
+
+// the text on screen: each 8x16 cell matched against the font (either polarity,
+// so the cursor's inverted cell reads as its character)
+std::vector<std::string> Machine::screen(std::string *error) {
+  const TmdsCapture::Frame f = frame();
+  if (!f.error.empty()) {
+    if (error) *error = f.error;
+    return {};
+  }
+  if (font.empty()) font = loadFont(root);
+  std::vector<std::string> rows;
+  for (int row = 0; row < 30; row++) {
+    std::string line;
+    for (int col = 0; col < 80; col++) {
+      auto px = [&](int x, int y) { return f.rgb[(row * 16 + y) * 640 + col * 8 + x] & 0xc0c0c0; };  // RGB222 levels
+      const uint32_t bg = px(0, 0);
+      std::array<uint8_t, 16> bits{}, inv{};
+      bool any = false;
+      for (int y = 0; y < 16; y++) {
+        uint8_t b = 0;
+        for (int x = 0; x < 8; x++)
+          if (px(x, y) != bg) b |= 0x80 >> x;
+        bits[y] = b;
+        inv[y] = static_cast<uint8_t>(~b & 0xff);
+        any |= b != 0;
+      }
+      char ch = ' ';
+      if (any) {
+        int c = -1;
+        for (int i = 0; i < 256 && c < 0; i++)
+          if (font[i] == bits || font[i] == inv) c = i;
+        ch = c >= 32 && c < 127 ? static_cast<char>(c) : c < 0 ? '?' : '.';
+      }
+      line += ch;
+    }
+    while (!line.empty() && line.back() == ' ') line.pop_back();
+    rows.push_back(line);
+  }
+  return rows;
+}
+
+// type on the USB keyboard: one report per key, then a release
+void Machine::type(const std::string &text) {
+  if (!keyboard) throw std::runtime_error("no IO card (no keyboard)");
+  static const std::string shifted = "~!@#$%^&*()_+{}|:\"<>?";
+  // machine.mjs writes "`1234567890-=[]\;',./": `\;` is ';' in a JS string,
+  // so the backslash is missing and ; ' , . / map one usage code early
+  static const std::string plain = "`1234567890-=[];',./";
+  static const int codes[] = {53, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46, 47, 48, 49, 51, 52, 54, 55, 56};
+  for (char c : text) {
+    uint32_t mods = 0, u = 0;  // an unknown key is `undefined`, which Uint8Array.from stores as 0
+    if (c >= 'a' && c <= 'z')
+      u = 4 + (c - 'a');
+    else if (c >= 'A' && c <= 'Z') {
+      u = 4 + (c - 'A');
+      mods = 2;
+    } else if (c >= '1' && c <= '9')
+      u = 30 + (c - '1');
+    else if (c == '0')
+      u = 39;
+    else if (c == '\n')
+      u = 40;
+    else if (c == ' ')
+      u = 44;
+    else {
+      const size_t pk = plain.find(c), sk = shifted.find(c);
+      const long k = pk != std::string::npos ? static_cast<long>(pk) : sk != std::string::npos ? static_cast<long>(sk) : -1;
+      if (sk != std::string::npos) mods = 2;
+      u = k >= 0 ? codes[k] : 0;
+    }
+    keyboard->press(mods, {u});
+    keyboard->press(0);
+  }
+}
+
+}  // namespace machine

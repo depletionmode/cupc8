@@ -17,9 +17,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Emu } from './rp2040emu.mjs';
-import { SlotHost } from './slothost.mjs';
-import { TmdsCapture } from './tmds.mjs';
+import { Emu, SlotHost, TmdsCapture } from './emu_backend.mjs';     // CUPC8_EMU=native: the C++ emulator
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const ELF = path.join(ROOT, 'build/rp2040/gpu.elf');

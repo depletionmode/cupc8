@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "../utils/timer32.h"
@@ -29,6 +30,11 @@ class RPPPB : public BasePeripheral {
   Timer32 systickTimer;
   /** `new Timer32PeriodicAlarm(this.systickTimer, () => {...})` */
   Timer32PeriodicAlarm systickAlarm;
+
+  /** Test-harness hook, not in rp2040js (empty by default): called with
+   * (offset, value) at the start of every writeUint32, which is what
+   * test/emu/rp2040emu.mjs's ppbWriteTrap gets by wrapping ppb.writeUint32. */
+  std::function<void(uint32_t offset, uint32_t value)> onWrite;
 
   RPPPB(RP2040 &rp2040, const std::string &name);
 

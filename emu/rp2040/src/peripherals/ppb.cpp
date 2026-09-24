@@ -149,6 +149,7 @@ uint32_t RPPPB::readUint32(uint32_t offset) {
 }
 
 void RPPPB::writeUint32(uint32_t offset, uint32_t value) {
+  if (onWrite) onWrite(offset, value);  // test-harness hook (see ppb.h)
   CortexM0Core &core = rp2040.core();
 
   const uint32_t hardwareInterruptMask = (1u << MAX_HARDWARE_IRQ) - 1;

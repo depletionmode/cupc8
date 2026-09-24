@@ -5,9 +5,7 @@
 //   node test/emu/test_io.mjs
 
 import path from 'node:path';
-import { Emu } from './rp2040emu.mjs';
-import { SlotHost } from './slothost.mjs';
-import { UsbKeyboard } from './usbkbd.mjs';
+import { Emu, SlotHost, UsbKeyboard } from './emu_backend.mjs';     // CUPC8_EMU=native: the C++ emulator
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const emu = await Emu.load(path.join(ROOT, 'build/rp2040/io.elf'), { mhz: 125 });
@@ -148,50 +146,35 @@ for (const speed of [1, 2]) {
     st = status();
   }
   expect(st & CONNECTED, 'race sweep: keyboard enumerated');
-  const ppb = emu.mcu.ppb, write = ppb.writeUint32.bind(ppb);
-  let trap = null;
-  ppb.writeUint32 = (offset, value) => {
-    if (trap && trap.at === null && offset === 0x180 && value & (1 << 13)) trap.at = trap.cycles;
-    return write(offset, value);
-  };
-  const prev = emu.onCycle;
-  emu.onCycle = (e) => {
-    if (prev) prev(e);
-    if (!trap) return;
-    trap.cycles++;
-    if (trap.at !== null && trap.cycles - trap.at >= trap.k) {
-      const t = trap;
-      trap = null;
-      host.run(function* () {             // a bare READ, CS_n falling now
-        yield* this.select();
-        const s0 = yield* this.byte(0xfe);
-        yield this.byteGapNs;
-        const len = yield* this.byte(0);
-        for (let i = 0; i < len && i < 16; i++) { yield this.byteGapNs; yield* this.byte(0); }
-        yield* this.deselect();
-        t.got = { s0, len };
-        return t;
-      });
-    }
-  };
+  const trap = emu.ppbWriteTrap(0x180, 1 << 13);
+  const bareRead = (t) =>
+    host.run(function* () {               // a bare READ, CS_n falling now
+      yield* this.select();
+      const s0 = yield* this.byte(0xfe);
+      yield this.byteGapNs;
+      const len = yield* this.byte(0);
+      for (let i = 0; i < len && i < 16; i++) { yield this.byteGapNs; yield* this.byte(0); }
+      yield* this.deselect();
+      t.got = { s0, len };
+      return t;
+    });
   let framed = 0;
   const odd = [];
   for (let k = 0; k <= 120; k += 3) {
     cmd([0x05]);                          // FLUSH: the FIFO is empty
     cmd([0x00]);                          // GETKEY: a 1-byte response is pending
     wait(2e6);
-    const t = { k, at: null, cycles: 0, got: null };
-    trap = t;
+    const t = { k, got: null };
+    trap.arm(k, () => bareRead(t));
     kbd.press(0, usage('q'));
     kbd.press(0);
     emu.runUntil(() => t.got !== null, 100e6);
-    if (!t.got) { odd.push(`k=${k}: no refresh seen`); trap = null; continue; }
+    if (!t.got) { odd.push(`k=${k}: no refresh seen`); trap.disarm(); continue; }
     if (t.got.len === 1) framed++;
     else odd.push(`k=${k}: status $${t.got.s0.toString(16)} then RESP_LEN $${t.got.len.toString(16)}`);
     wait(2e6);
   }
-  emu.onCycle = prev;
-  ppb.writeUint32 = write;
+  trap.remove();
   expect(odd.length === 0, `race sweep: every READ framed as status, RESP_LEN 1 (${framed} ok${odd.length ? '; ' + odd.join('; ') : ''})`);
   emu.mcu.usbCtrl.detachDevice();
   wait(50e6);

@@ -17,6 +17,8 @@ set(RP2040JS_DIR "${_sdk}/rp2040js" CACHE PATH "patched rp2040js checkout (for d
 
 file(GLOB_RECURSE RP2040EMU_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_library(rp2040emu STATIC ${RP2040EMU_SOURCES})
+# position-independent so that the Node addon below can link it
+set_target_properties(rp2040emu PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(rp2040emu PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_options(rp2040emu PRIVATE -O2 -Wall -Wextra)
 
@@ -64,3 +66,35 @@ add_executable(test_periph_diff test/periph/test_periph_diff.cpp)
 target_compile_options(test_periph_diff PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(test_periph_diff PRIVATE rp2040emu)
 target_link_options(test_periph_diff PRIVATE "-Wl,--wrap=_ZN8rp2040js6RP204012setInterruptEjb")
+
+# The card-test harness (harness/: test/emu/rp2040emu.mjs's Emu loop, the slot
+# host of slothost.mjs, TMDS capture) and its Node addon rp2040emu.node, for
+# test/emu/rp2040native.mjs (CUPC8_EMU=native). The harness needs C++20
+# (coroutines); the addon is built only if Node's headers are found.
+add_library(rp2040harness STATIC harness/emu.cpp harness/slothost.cpp "${BOOTROM_INC}")
+set_target_properties(rp2040harness PROPERTIES CXX_STANDARD 20 POSITION_INDEPENDENT_CODE ON)
+target_include_directories(rp2040harness PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/harness"
+                           PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_compile_options(rp2040harness PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(rp2040harness PUBLIC rp2040emu)
+
+find_program(NODE_EXECUTABLE node)
+if(NODE_EXECUTABLE)
+  get_filename_component(_node_bin "${NODE_EXECUTABLE}" REALPATH)
+  get_filename_component(_node_prefix "${_node_bin}" DIRECTORY)
+  get_filename_component(_node_prefix "${_node_prefix}" DIRECTORY)
+  set(NODE_INCLUDE_DIR "${_node_prefix}/include/node" CACHE PATH "Node's C headers (node_api.h)")
+endif()
+if(NODE_INCLUDE_DIR AND EXISTS "${NODE_INCLUDE_DIR}/node_api.h")
+  add_library(rp2040emu_node MODULE node/rp2040emu_node.cpp)
+  set_target_properties(rp2040emu_node PROPERTIES CXX_STANDARD 20 PREFIX "" OUTPUT_NAME rp2040emu SUFFIX ".node")
+  target_include_directories(rp2040emu_node PRIVATE "${NODE_INCLUDE_DIR}")
+  target_compile_definitions(rp2040emu_node PRIVATE NODE_GYP_MODULE_NAME=rp2040emu)
+  target_compile_options(rp2040emu_node PRIVATE -O2 -Wall -Wextra)
+  target_link_libraries(rp2040emu_node PRIVATE rp2040harness)
+  if(APPLE)
+    target_link_options(rp2040emu_node PRIVATE -undefined dynamic_lookup)
+  endif()
+else()
+  message(STATUS "node_api.h not found: not building rp2040emu.node")
+endif()
