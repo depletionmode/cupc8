@@ -125,13 +125,13 @@ fixed_in = "29cfa8f"
 before = "d7f6145"
 files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ["FAIL full-speed: typed \"Hello\""]
+must_fail = ['typed "Hello" + Enter, got']
 
 [[bug]]
 name = "wifi core: CONNECT_HOST connected with no SNI, so TLS could not check the certificate name"
 fixed_in = "3fbe93d"
 before = "78b4e49"
-files = ["fw/wifi/core/wifi.c"]
+revert = [["fw/wifi/core/wifi.c", "w->pending_port, host) < 0", "w->pending_port, 0) < 0"]]
 cmd = "make -C fw test_wifi"
 must_fail = ["CONNECT_HOST gave the backend SNI '(none)'"]
 
@@ -221,3 +221,62 @@ revert = [
 ]
 cmd = "python3 hw/tools/bomcheck.py wifi"
 must_fail = ["pin 2 is 'Y' in the symbol, 'A' in the datasheet", "pin 4 is 'A' in the symbol, 'Y' in the datasheet"]
+
+[[bug]]
+name = "Wi-Fi card: an AMS1117 LDO browned out the ESP32-C3 in a TX burst and ran at Tj 120 C"
+fixed_in = "1e95f44"
+before = "619d56d"
+files = ["hw/boards/wifi.py"]
+cmd = "python3 hw/power/thermal.py"
+must_fail = ["FAIL T0", "hw/boards/wifi.py has AMS1117-3.3, these checks model TLV62569DBVR"]
+
+[[bug]]
+name = "boards: footprint silkscreen 0.09 mm from a pad passed the 0.15 mm check (line width ignored)"
+fixed_in = "0f51f42"
+revert = [["hw/tools/kicadgen.py", "    clip_silk_to_board(board, outline)\n    clip_silk_to_pads(board)\n", "    clip_silk_to_board(board, outline)\n"]]
+cmd = "python3 hw/smoke/smoke.py"
+must_fail = ["silkscreen of J1 touches pad SH of J1"]
+
+[[bug]]
+name = "slot SPI: CS_n falling during slotspi_refresh sent two status bytes (host read the second as RESP_LEN)"
+fixed_in = "a9ba773"
+revert = [["fw/rp2040/common/slotspi.c", """	/* Swap the preload for the current status and response only while the
+	 * SM is still waiting for CS_n: stopped, it cannot move on, and at
+	 * `start` it has pulled nothing. (Checking the CS_n pin instead raced a
+	 * falling CS_n: the SM could pull the old status byte between the check
+	 * and the FIFO clear, and the frame then began with two status bytes,
+	 * so the host read the second as RESP_LEN.) If a frame has begun, it
+	 * goes out with the old preload; cs_rose re-arms after it. */
+	pio_sm_set_enabled(pio, sm, false);
+	if (pio_sm_get_pc(pio, sm) == prog + slotspi_offset_start) {
+		dma_channel_abort(dma_tx);
+		pio_sm_clear_fifos(pio, sm);
+		arm_tx();
+	}
+	pio_sm_set_enabled(pio, sm, true);
+""", """	if (gpio_get(PIN_SLOT_NCS)) {
+		/* No frame in progress, so the SM is parked at `wait` (or, if CS_n
+		 * has just fallen, at the blocking first pull): swap its preload
+		 * for the current status and response without stopping it. */
+		dma_channel_abort(dma_tx);
+		pio_sm_clear_fifos(pio, sm);
+		arm_tx();
+	}
+"""]]
+cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
+must_fail = ["FAIL race sweep: every READ framed"]
+
+[[bug]]
+name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
+fixed_in = "52423fa"
+revert = [["kernel/term.s", """term_do:
+	; start with an empty program: .bss is not cleared, and the SRAM
+	; powers up with junk
+	xor r0, r0
+	st [term_basic_prog_buf_idx], r0
+	st [term_basic_prog_buf], r0
+
+""", """term_do:
+"""]]
+cmd = "tools/run_tests.sh testBasicJunkRam"
+must_fail = ["FAIL: BASIC on junk RAM"]

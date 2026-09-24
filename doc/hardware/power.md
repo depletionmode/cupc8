@@ -101,27 +101,32 @@ figures:
 The TI buck model's switches are 10 mΩ rather than 100/60 mΩ, so buck losses
 come from the datasheet RDS(on) and not from the simulation.
 
-As of 2026-09-24 (branch milestone-1), three tests fail: **POW-003, POW-006
-and THM-001.** Each failure below comes with a proposed fix. None of the
+As of 2026-09-24 (branch milestone-1), two tests fail: **POW-006 and
+THM-001** (T2). Each failure below comes with a proposed fix. None of those
 fixes is applied, because each one changes a board or a spec.
+
+**Fixed:** POW-003 W1w/W2w and THM-001 T4. The Wi-Fi card's AMS1117 left the
+ESP32-C3 at 2.71 V (3.0 V minimum) in a TX burst at the worst corner, and ran
+at Tj 119.6 °C. U2 is now a **TLV62569DBVR buck** (C141836) with L1 2.2 µH
+(C167747), 22 µF in, 22 µF + 100 nF out and R9/R10 453k/100k (3.32 V). THM-001
+T4 gives 58 mW, **Tj 50.9 °C**. POW-003 is now `hw/power/buck.py wifi-card`,
+run on the card as built. The earlier proposal run of this buck, with a more
+pessimistic feed, gave a 3.22 V minimum through the burst. The as-built run
+(F1–F3, at both corners) needs TI's model from www.ti.com and has not yet
+been run on this branch.
 
 ### Out of spec
 
 | Check | Result | Proposed fix |
 |---|---|---|
-| POW-003 W1w/W2w, Wi-Fi card supply at the worst corner (4.75 V source, full Type-C cable drop, parts at max resistance, M1 worst-case load) | Slot +5V reaches the card at 3.91 V. The AMS1117 (1.20 V dropout at 358 mA) then leaves the ESP32-C3 at **2.71 V** against its 3.0 V minimum (−0.29 V). At the typical corner it passes, dipping to 3.18 V. | Replace U2 on the Wi-Fi card with a **TLV62569DBVR buck** (C141836, already in the BOM, 2.2 µH, 22 µF out). `hw/power/buck.py wifi-card` simulates it at the same worst corner with a more pessimistic feed: 3.22 V minimum through the burst. This also fixes THM-001 T4. |
-| THM-001 T4, Wi-Fi card AMS1117 | 358 mA (TX at 100 % duty) from 5.5 V: 884 mW × 90 °C/W gives **Tj 119.6 °C**. From 5.0 V it is still 103 °C. | The buck above (58 mW, Tj 51 °C). Keeping the AMS1117 would need θJA ≤ 68 °C/W, meaning ≥ 225 mm² of tab copper over a plane per the AMS table, and would still fail POW-003. A pre-drop resistor would make POW-003 worse. |
 | THM-001 T2, 3V3 buck with slots 4–6 each drawing their 300 mA of +3V3 (1.37 A total) | TLV62569**DBV** (188 °C/W): 386 mW, **Tj 112.7 °C**. The M1 load alone gives 54.9 °C. | Use **TLV62569PDDCR** (C398365, 16k in stock, 106 °C/W, good to 1.70 A), or cap slots 4–6 at 740 mA of +3V3 in total (the DBV is good to 1.21 A). |
-| POW-006 B2, input switch current limit | The M1 worst case is 1.35 A. With "1.5 A" (RSET 4.53 kΩ) the SY6280's ±25 % tolerance puts the limit anywhere from **1.13 A** to 1.88 A. | RSET **3.40 kΩ**: 1.50 / 2.00 / 2.50 A (min/nom/max). The nominal 2.0 A is the SY6280's highest programmable limit (B3, zero margin). |
-| POW-006 B14 (passes with 18 mA to spare) and the source table above | Even with a 3.0 A source, the SY6280 (1.50 A minimum) and the 2 A PTC leave **18 mA** for slots 4–6. "Headroom for slots 4–6" doesn't hold. | For real slot 4–6 budgets, fit a ≥ 3 A input eFuse/switch and a matching fuse. Until then sysctl must refuse slot 4–6 declarations. |
-| POW-006 B5/B6, default USB with the radio off | Max budget, 100 mA keyboard: **589 mA** against 500 mA (USB 2.0). With a 500 mA keyboard: 1.01 A against 900 mA (USB 3.x). | The "Default USB" row above holds only for typical loads. Either say so, or have the policy also limit the keyboard port (IO card SY6280) on default sources. |
-| POW-006 B9, slot.md's "≤ 1 A per card" | The slot PTC (SMD1206P075TFT) holds only **0.65 A** at 40 °C. | Say ≤ 0.55 A from +5V per card in slot.md, or fit a larger PTC. M1's cards fit: Wi-Fi 369 mA and keyboard 500 mA pass B7/B8. |
-| POW-006 B12, keyboard VBUS at worst case | **3.80 V** at the USB-A port, against 4.40 V (USB 2.0 low-power port). The cable alone takes 0.34 V from 4.75 V. Typical is 4.51 V (pass). | Can't be met from a USB-powered board at the worst-case source and cable. Accept (keyboards run their logic at 3.3 V) and document it. Dropping the redundant 2 A PTC or a lower-RDS switch gains about 0.25 V. |
+| POW-006 B2, input switch current limit | The M1 worst case is 1.32 A. With "1.5 A" (RSET 4.53 kΩ) the SY6280's ±25 % tolerance puts the limit anywhere from **1.13 A** to 1.88 A. | RSET **3.48 kΩ**: 1.47 / 1.95 / 2.44 A (min/nom/max). The nominal 1.95 A is just under the SY6280's highest programmable limit (B3, 2 % margin). |
+| POW-006 B14 (passes with 9 mA to spare) and the source table above | Even with a 3.0 A source, the SY6280 (1.47 A minimum) and the 2 A PTC leave **9 mA** for slots 4–6. "Headroom for slots 4–6" doesn't hold. | For real slot 4–6 budgets, fit a ≥ 3 A input eFuse/switch and a matching fuse. Until then sysctl must refuse slot 4–6 declarations. |
+| POW-006 B5/B6, default USB with the radio off | Max budget, 100 mA keyboard: **572 mA** against 500 mA (USB 2.0). With a 500 mA keyboard: 993 mA against 900 mA (USB 3.x). | The "Default USB" row above holds only for typical loads. Either say so, or have the policy also limit the keyboard port (IO card SY6280) on default sources. |
+| POW-006 B9, slot.md's "≤ 1 A per card" | The slot PTC (SMD1206P075TFT) holds only **0.65 A** at 40 °C. | Say ≤ 0.55 A from +5V per card in slot.md, or fit a larger PTC. M1's cards fit: Wi-Fi 348 mA (worst, through its buck) and keyboard 500 mA pass B7/B8. |
+| POW-006 B12, keyboard VBUS at worst case | **3.81 V** at the USB-A port, against 4.40 V (USB 2.0 low-power port). The cable alone takes 0.33 V from 4.75 V. Typical is 4.53 V (pass). | Can't be met from a USB-powered board at the worst-case source and cable. Accept (keyboards run their logic at 3.3 V) and document it. Dropping the redundant 2 A PTC or a lower-RDS switch gains about 0.25 V. |
 
 Other observations (not failures):
-- AMS1117 stability: the datasheet specifies 22 µF tantalum, and the
-  LM1117 needs 0.3–22 Ω of ESR. The Wi-Fi card has ceramic 22 µF + 100 nF.
-  Nothing here can check this, and the buck fix removes it.
 - The SMF5.0A's 5.0 V standoff is below vSafe5V max (5.5 V). Leakage rises,
   but it stays under breakdown (B15 passes). Its 9.2 V clamp is above the
   SY6280's 6 V absolute maximum.
@@ -129,7 +134,7 @@ Other observations (not failures):
   the rows.
 - Resolved: the system, GPU and IO cards run from the slot's +3V3 (this
   budget and io-card.md); parts.md no longer lists an AMS1117 for them.
-  The Wi-Fi card has the TLV62569 buck proposed above (POW-003, THM-001 T4).
+  The Wi-Fi card has its own TLV62569 buck (POW-003, THM-001 T4).
 
 ### Results that pass (margins)
 
@@ -137,9 +142,9 @@ Other observations (not failures):
 |---|---|
 | POW-001 3V3 buck | DC range 3.246–3.390 V (0.1 % divider). Worst 0→500 mA step: 3.238 V (+103 mV over 3.135). Light-load max: 3.423 V (+42 mV under 3.465). DC low sits 76 mV above the MAX811T's 3.17 V maximum threshold. Up in 0.72 ms. Ripple 1.6 mVpp in PWM (1.1–1.4 MHz), 10–17 mVpp in power-save (17–30 kHz). |
 | POW-002 1V2 | Worst low 1.172 V, including the step droop and ripple (+32 mV). Start-up peak 1.224 V (+36 mV). PSRR −44 dB at 17 kHz, −14 dB at 1.5 MHz. |
-| POW-004 inrush | 1 µF ahead of the switch (≤ 10 µF). The surge is held at the SY6280 limit (1.13–2.50 A). 5V_SYS is up in 0.24–0.48 ms, and the switch dissipates ≤ 1.5 mJ. The charge above the final load is 229–392 µC (46–78 µF at 5 V): the capacitance sits behind surge limiting, as USB 2.0 §7.2.4.1 allows, so the "≤ 10 µF effective" above means ahead of the switch. |
+| POW-004 inrush | 1 µF ahead of the switch (≤ 10 µF). The surge is held at the SY6280 limit (1.13–2.44 A). 5V_SYS is up in 0.20–0.39 ms, and the switch dissipates ≤ 1.4 mJ. The charge above the final load is 184–322 µC (37–64 µF at 5 V): the capacitance sits behind surge limiting, as USB 2.0 §7.2.4.1 allows, so the "≤ 10 µF effective" above means ahead of the switch. |
 | POW-005 CC | Realised CC ranges: default 0.317–0.571 V, 1.5 A 0.829–1.090 V, 3.0 A 1.524–1.936 V. PWR_HI trips between 0.595 V (+24 mV clear of default) and 0.719 V (+109 mV clear of 1.5 A). The ADC classes clear by 60–102 mV. TI's TLV7011 model agrees at both edges. |
-| THM-001 | Buck (M1 load) 54.9 °C, RT9013 62.2 °C, main SY6280 at 1.50 A 94.0 °C, IO card SY6280 46.0 °C. |
+| THM-001 | Buck (M1 load) 54.9 °C, Wi-Fi card buck at TX 50.9 °C, RT9013 62.2 °C, main SY6280 at 1.47 A 91.5 °C, IO card SY6280 46.0 °C. |
 
 ### Assumptions the boards must meet
 
@@ -147,7 +152,7 @@ Other observations (not failures):
 
 - **Main board:** receptacle and VBUS/GND copper ≤ 20 mΩ loop. 5V_SYS copper
   ≤ 20 mΩ. ≤ 10 µF on VBUS ahead of the SY6280 (1 µF assumed). 5V_SYS bulk
-  22 µF. SY6280 RSET per B2 (3.40 kΩ). Slot 0 Ω links ≤ 50 mΩ. Buck: 2.2 µH
+  22 µF. SY6280 RSET per B2 (3.48 kΩ). Slot 0 Ω links ≤ 50 mΩ. Buck: 2.2 µH
   (Isat ≥ 2.5 A, DCR ≤ 50 mΩ), 22 µF out, 10 µF in, divider 453k/100k at
   **0.1 %** (1 % fails POW-001 by 6–9 mV). ≥ 20 µF of effective 3V3
   decoupling at the loads. ≤ 100 µF on 3V3 in total. RT9013: 1 µF + 4 ×
@@ -156,6 +161,12 @@ Other observations (not failures):
   and IN− at 0.330 V from 3V3 via 90.9k/10k 1 %.
 - **Cards:** slot +5V contacts ≤ 30 mΩ each. IO, GPU and system cards
   ≤ 10 µF on +5V.
+- **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's
+  listing gives 2.2 µH ±20 %, Isat 2 A and DCR 78 mΩ, which the checks use.
+  CJiang's own datasheet hasn't been read yet. R10 (C25803) is UNI-ROYAL
+  0603WAF1003T5E, ±1 %. R9 (C25818) is assumed to be from the same ±1 %
+  series; that isn't confirmed yet. The LCSC, oneyac and vendor sites were
+  all unreachable on 2026-09-24.
 - **System card:** ADC reference = its 3.3 V rail ±3 %. ADC error ≤ 12 LSB.
 - **Not re-fetched:** the MAX811T's threshold (2.98–3.17 V) and its ~10 µs
   glitch immunity. Both datasheet sources were unavailable on 2026-09-24.

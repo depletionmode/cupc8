@@ -12,10 +12,14 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   external antenna means our layout can't detune the radio, which can't be
   simulated (see `verification.md` §5). There is no separate MCU: the ESP32-C3
   is both the SPI slave and the network stack.
-- **Power:** AMS1117-3.3 (C6186, a basic part) from the slot's **+5V**. The
-  card does not use the slot's +3V3, because Wi-Fi TX peaks at ~350 mA and
-  the slot's +3V3 is limited to 300 mA. The regulator is followed by the
-  bulk capacitance Espressif recommends (22 µF + 0.1 µF at the module).
+- **Power:** a **TLV62569DBVR buck** (C141836, the main board's 3V3 part)
+  from the slot's **+5V**, with 2.2 µH (FNR3015S2R2MT, C167747) and a
+  453k/100k divider (3.32 V). The card does not use the slot's +3V3, because
+  Wi-Fi TX peaks at ~350 mA and the slot's +3V3 is limited to 300 mA. The
+  buck is followed by the bulk capacitance Espressif recommends (22 µF +
+  0.1 µF at the module). An AMS1117 LDO was used first. It failed the power
+  checks: 2.71 V at the module in a TX burst at the worst-case corner, and
+  Tj ≈ 120 °C (`power.md`, POW-003, THM-001).
 - **SPI slave:** ESP32-C3 GPSPI2 routed to SCK/MOSI/MISO/CS_n through the GPIO
   matrix. MISO reaches the slot through a **74LVC1G125** tri-state buffer
   whose /OE is CS_n, so this card releases the shared MISO line whenever it

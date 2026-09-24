@@ -11,7 +11,8 @@ Every check in hw/power reads its numbers from here. Each value is one of:
   ASSUME  not decided yet. The board named in the note must meet it; these
           are listed by running this file, and in doc/hardware/power.md.
 
-Datasheets (fetched 2026-09-24): TLV62569 SLVSDG1C; RT9013 DS9013-09;
+Datasheets (fetched 2026-09-24): TLV62569 SLVSDG1C (the main board's 3V3
+and the Wi-Fi card's); RT9013 DS9013-09;
 AMS1117 (Advanced Monolithic, LCSC C6186); SY6280 AN_SY6280 Rev 0.1;
 TLV7011 SLVSDM5F; SMD1812P200TF16 (Ruilon); SMD1206P075TFT (PTTC); SMF5.0A
 (MDD); ESP32-C3-MINI-1U datasheet v2.2; LM1117 SNOS412Q (for the 1117-class
@@ -128,7 +129,9 @@ BUCK_RIPPLE = [(17e3, 0.030), (30e3, 0.030), (1.1e6, 0.005), (1.5e6, 0.005)]
 I_1V2_MAX = 0.040                               # power.md (chipset core)
 
 # ---------------------------------------------------------------------------
-# Card 3V3 LDO: AMS1117-3.3 (Wi-Fi card: BOARD hw/boards/wifi.py)
+# Card 3V3 LDO: AMS1117-3.3. No M1 card has one (the Wi-Fi card's failed
+# POW-003 and THM-001 and became the buck below); thermal.py still checks one
+# for the GPU, IO and system cards in case they ever regulate from +5V
 # ---------------------------------------------------------------------------
 AMS1117_VOUT_MIN, AMS1117_VOUT_NOM = 3.201, 3.300   # DS over line, load and temperature
 AMS1117 = dict(VSET=3.3, TSS=20e-6,
@@ -145,15 +148,34 @@ AMS1117 = dict(VSET=3.3, TSS=20e-6,
                # the figure, which errs on the safe side for a droop check.
                RDC=0.004, LEQ=2e-6, RP=2.0)
 AMS1117_THETA_JA = 90.0     # DS SOT-223 (46..90 by copper; table 1: 65 with 225 mm^2 top + plane)
+
+# ---------------------------------------------------------------------------
+# Wi-Fi card 3V3 buck: TLV62569DBV, the main board's part (BOARD hw/boards/wifi.py U2)
+# ---------------------------------------------------------------------------
+WIFI_BUCK_L = 2.2e-6        # BOARD wifi.py L1, FNR3015S2R2MT (C167747, CJiang, not Sunlord)
+# L1 per LCSC's C167747 listing: 2.2 uH +-20 %, Isat 2 A, rated 2 A, DCR 78 mOhm.
+# Not yet read from CJiang's own datasheet (LCSC and oneyac blocked 2026-09-24),
+# so it stays an assumption; Isat 2 A against a 0.36 A load (+ ~0.2 A ripple)
+WIFI_BUCK_DCR = assume("Wi-Fi", "buck inductor L1 (FNR3015S2R2MT): DCR 78 mOhm, Isat 2 A (LCSC listing; "
+                       "CJiang datasheet not yet read)", 0.078)
+WIFI_BUCK_R1, WIFI_BUCK_R2 = 453e3, 100e3       # BOARD wifi.py R9 / R10 (VOUT = 3.318 V)
+# R10 C25803 is UNI-ROYAL 0603WAF1003T5E (the WAF series is +-1 %). R9 C25818
+# is assumed to be the same series (0603WAF4533T5E): not yet confirmed
+WIFI_BUCK_RES_TOL = assume("Wi-Fi", "buck feedback R9 (C25818) 1 %, as R10 (C25803, UNI-ROYAL 0603WAF, 1 %)", 0.01)
 WIFI_CIN = 22e-6            # BOARD wifi.py C1
 WIFI_COUT = 22e-6           # BOARD wifi.py C2 (0805 22 uF, derated below)
 WIFI_COUT_HF = 100e-9       # BOARD wifi.py C3
+# what the values above say hw/boards/wifi.py places: wifi_board_mismatches()
+# fails POW-003 and THM-001 if the board script no longer agrees
+WIFI_BOARD = {"U2": "TLV62569DBVR", "L1": "2.2u", "R9": "453k", "R10": "100k",
+              "C1": "22u", "C2": "22u", "C3": "100n"}
 CERAMIC_DERATE = 0.6        # DC bias at 3.3-5 V on 0805 22 uF parts
-ESP32_VDD_MIN = 3.0         # DS ESP32-C3-MINI-1U: 3.0..3.6 V
+ESP32_VDD_MIN, ESP32_VDD_MAX = 3.0, 3.6     # DS ESP32-C3-MINI-1U
 ESP32_I_TX = 0.350          # DS: 802.11b 20.5 dBm, rated at 100 % duty
 ESP32_I_IDLE = 0.010        # a light-sleep / idle floor for the step (DS: RX is 82 mA)
 ESP32_SUPPLY_MIN = 0.5      # DS: supply must deliver >= 0.5 A
 WIFI_I_LEDS = 0.0013 + 0.006 + 0.001   # power LED (1k), link LED (100 ohm), EN/strap pull-ups
+WIFI_I_3V3 = ESP32_I_TX + WIFI_I_LEDS   # the Wi-Fi card's 3V3 load, TX at 100 % duty
 
 # ---------------------------------------------------------------------------
 # Loads (power.md budget, max column), in A
@@ -174,7 +196,6 @@ LOADS_3V3 = {
 }
 I_KEYBOARD = 0.500          # USB 2.0 high-power device (IO card's switch limits it)
 I_HDMI_5V = 0.055           # HDMI +5V pin, per spec
-I_WIFI_5V = ESP32_I_TX + WIFI_I_LEDS + AMS1117["IQ"]     # the Wi-Fi card from slot +5V
 FUTURE_SLOTS = 3            # slots 4-6
 
 # Capacitance on 5V_SYS, charged through the SY6280 at attach
@@ -223,11 +244,35 @@ def buck_vout(r1=None, r2=None, vfb=BUCK_VFB_NOM):
     return vfb * (1 + r1 / r2)
 
 
-def buck_vout_range():
-    """3V3 DC extremes: VFB tolerance and the divider's resistor tolerance."""
-    lo = buck_vout(BUCK_R1 * (1 - BUCK_RES_TOL), BUCK_R2 * (1 + BUCK_RES_TOL), BUCK_VFB_NOM * (1 - BUCK_VFB_TOL))
-    hi = buck_vout(BUCK_R1 * (1 + BUCK_RES_TOL), BUCK_R2 * (1 - BUCK_RES_TOL), BUCK_VFB_NOM * (1 + BUCK_VFB_TOL))
+def buck_vout_range(r1=None, r2=None, tol=None):
+    """3V3 DC extremes: VFB tolerance and the divider's resistor tolerance.
+    The main board's buck by default; the Wi-Fi card's with its own values."""
+    r1, r2 = r1 or BUCK_R1, r2 or BUCK_R2
+    tol = BUCK_RES_TOL if tol is None else tol
+    lo = buck_vout(r1 * (1 - tol), r2 * (1 + tol), BUCK_VFB_NOM * (1 - BUCK_VFB_TOL))
+    hi = buck_vout(r1 * (1 + tol), r2 * (1 - tol), BUCK_VFB_NOM * (1 + BUCK_VFB_TOL))
     return lo, hi
+
+
+def wifi_vout_range():
+    return buck_vout_range(WIFI_BUCK_R1, WIFI_BUCK_R2, WIFI_BUCK_RES_TOL)
+
+
+def wifi_board_mismatches():
+    """[(ref, value here, value in hw/boards/wifi.py)] for each WIFI_BOARD part
+    whose value in the board script differs (None: not on the board)."""
+    import os
+    import re
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "boards", "wifi.py")
+    # s.add(lib_id, ref, value, ...) and passive(kind, ref, value, ...)
+    placed = dict(re.findall(r'(?:s\.add|passive)\(\s*"[^"]*",\s*"([A-Z]+\d+)",\s*"([^"]+)"', open(path).read()))
+    return [(ref, want, placed.get(ref)) for ref, want in sorted(WIFI_BOARD.items()) if placed.get(ref) != want]
+
+
+def wifi_i_5v(v_card, i3=WIFI_I_3V3):
+    """The Wi-Fi card's draw from the slot's +5V, given the voltage that
+    reaches it: its buck at the budget efficiency and its DC high output."""
+    return i3 * wifi_vout_range()[1] / (BUCK_ETA_BUDGET * v_card)
 
 
 def sy6280_ilim(rset=SY6280_MAIN_RSET):

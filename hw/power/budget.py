@@ -5,7 +5,8 @@
 
 The loads are power.md's max column (design.LOADS_3V3 etc.), the 3V3 buck
 input at design.BUCK_ETA_BUDGET, and the Wi-Fi card at Espressif's TX current
-(rated at 100 % duty). The voltage chain goes from the source to each card:
+(rated at 100 % duty) through its own buck, so its +5V current rises as the
+voltage reaching it falls. The voltage chain goes from the source to each card:
 
   source VBUS -> cable (VBUS and GND) -> receptacle -> 2 A PTC -> SY6280
     -> 5V_SYS -> slot PTC -> 0 ohm link -> sense -> contacts -> card
@@ -32,8 +33,9 @@ def i_buck_in(v5, i3=None):
     return (i3 if i3 is not None else i_3v3()) * 3.3 / (d.BUCK_ETA_BUDGET * v5)
 
 
-def chain(corner, keyboard=d.I_KEYBOARD, wifi=d.I_WIFI_5V, extra_3v3=0.0, extra_5v=0.0):
-    """Node voltages (V) and the total VBUS current (A) at one corner."""
+def chain(corner, keyboard=d.I_KEYBOARD, wifi_3v3=d.WIFI_I_3V3, extra_3v3=0.0, extra_5v=0.0):
+    """Node voltages (V) and the total VBUS current (A) at one corner.
+    wifi_3v3 is the Wi-Fi card's 3V3 load; its +5V draw is solved here."""
     worst = corner == "worst"
     vbus = d.VBUS_MIN if worst else d.VBUS_NOM
     k = 1.0 if worst else 0.5
@@ -42,12 +44,14 @@ def chain(corner, keyboard=d.I_KEYBOARD, wifi=d.I_WIFI_5V, extra_3v3=0.0, extra_
             + (d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP) + d.R_5VSYS)
     r_slot = ((d.SLOT_PTC_R_MAX if worst else d.SLOT_PTC_R_MIN) + d.R_SLOT_LINK
               + d.R_SLOT_SENSE + d.R_SLOT_CONTACTS)
-    v5 = vbus
-    for _ in range(50):                     # the buck's input current depends on v5
+    v5 = v_card = vbus
+    for _ in range(50):                     # both bucks' input currents depend on their input
+        wifi = d.wifi_i_5v(v_card, wifi_3v3)
         itot = i_buck_in(v5, i_3v3() + extra_3v3) + keyboard + d.I_HDMI_5V + wifi + extra_5v
         v5 = vbus - itot * r_in
-    return {"vbus": vbus, "itot": itot, "v5": v5, "r_slot": r_slot,
-            "wifi_in": v5 - wifi * r_slot,
+        v_card = v5 - wifi * r_slot
+    return {"vbus": vbus, "itot": itot, "v5": v5, "r_slot": r_slot, "iwifi": wifi,
+            "wifi_in": v_card,
             "kbd_port": v5 - keyboard * (r_slot + d.SY6280_RON_MAX if worst else r_slot + d.SY6280_RON_TYP)}
 
 
@@ -72,8 +76,9 @@ def main():
     w, t = chain("worst"), chain("typical")
     c.info("3V3 load (max)", "%.0f mA; buck input at %.0f%%: %.0f mA at 5V_SYS %.2f V" % (
         1e3 * i3, 100 * d.BUCK_ETA_BUDGET, 1e3 * i_buck_in(w["v5"]), w["v5"]))
-    c.info("Wi-Fi card from +5V", "%.0f mA (ESP32 TX %.0f mA at 100%% duty + LEDs + AMS1117 Iq)" % (
-        1e3 * d.I_WIFI_5V, 1e3 * d.ESP32_I_TX))
+    c.info("Wi-Fi card from +5V", "%.0f mA worst, %.0f mA typical (ESP32 TX %.0f mA at 100%% duty + LEDs, "
+           "through its buck at %.0f%%)" % (1e3 * w["iwifi"], 1e3 * t["iwifi"], 1e3 * d.ESP32_I_TX,
+                                          100 * d.BUCK_ETA_BUDGET))
     c.info("chain, worst", "VBUS %.2f V -> 5V_SYS %.3f V -> Wi-Fi card +5V %.3f V, keyboard port %.3f V "
            "(total %.0f mA)" % (w["vbus"], w["v5"], w["wifi_in"], w["kbd_port"], 1e3 * w["itot"]))
     c.info("chain, typical", "VBUS %.2f V -> 5V_SYS %.3f V -> Wi-Fi card +5V %.3f V, keyboard port %.3f V "
@@ -94,16 +99,16 @@ def main():
             "<=", "A", need=MARGIN)
 
     # default USB: the policy turns the radio off; an ordinary keyboard
-    idle = chain("worst", keyboard=0.100, wifi=0.030 + d.WIFI_I_LEDS + d.AMS1117["IQ"])
+    idle = chain("worst", keyboard=0.100, wifi_3v3=0.030 + d.WIFI_I_LEDS)
     c.check("B5", "default USB 2.0 port, radio off, 100 mA keyboard", idle["itot"],
             d.SOURCE_CLASSES["default USB 2.0"], "<=", "A")
     c.check("B6", "default USB 3.x port, radio off, 500 mA keyboard", chain(
-        "worst", wifi=0.030 + d.WIFI_I_LEDS + d.AMS1117["IQ"])["itot"],
+        "worst", wifi_3v3=0.030 + d.WIFI_I_LEDS)["itot"],
         d.SOURCE_CLASSES["default USB 3.x"], "<=", "A")
 
     # slots
     hold = d.SLOT_PTC_IHOLD_40C
-    c.check("B7", "Wi-Fi card +5V vs slot PTC hold at 40 C", d.I_WIFI_5V, hold, "<=", "A", need=MARGIN)
+    c.check("B7", "Wi-Fi card +5V (worst) vs slot PTC hold at 40 C", w["iwifi"], hold, "<=", "A", need=MARGIN)
     c.check("B8", "IO card +5V (keyboard) vs slot PTC hold at 40 C", d.I_KEYBOARD, hold, "<=", "A",
             need=MARGIN)
     c.check("B9", "slot.md per-card budget (1 A, may all be +5V) vs slot PTC hold at 40 C",

@@ -19,7 +19,8 @@ by I1 and I2, not by that charge.
 
 At attach: 5V_SYS capacitance (design.C_5VSYS, nominal values: the most
 charge), the 3V3 buck starting (drawing its soft-start charge and the 3V3
-load), the Wi-Fi card's AMS1117 into its 22 uF and a booting ESP32 (100 mA),
+load), the Wi-Fi card's TLV62569 starting the same way into its 22 uF and a booting
+ESP32 (100 mA),
 HDMI 5 V. The IO card's keyboard port stays off until its firmware turns it
 on. The cable is its IR-drop resistance and 1 uH (ASSUME: ~1 m).
 """
@@ -40,6 +41,7 @@ def run(corner, rset):
     ilim = hi if corner == "high" else lo
     c_main = sum(c for n, c in d.C_5VSYS if n != "Wi-Fi card C1")
     i_buck = (d.C_3V3_TOTAL * 3.3 / 0.8e-3 + budget.i_3v3()) * 3.3 / (d.BUCK_ETA_BUDGET * 5.0)
+    i_wifi = ((d.WIFI_COUT + d.WIFI_COUT_HF) * 3.3 / 0.8e-3 + 0.100) * 3.3 / (d.BUCK_ETA_BUDGET * 5.0)
     deck = """
 Vs src 0 PWL(0 0 1u {vbus})
 Lc src a {lc}
@@ -54,9 +56,8 @@ Bbuck v5 0 i = {ib} * min(1, max(0, (v(v5) - 2.45) / 2.5))
 Rhdmi v5 0 {rh}
 Rslot v5 card {rslot}
 Cwin card 0 {cwin}
-X2 card w3 0 LDO_BEH params: {ams}
-Cwout w3 0 {cwout}
-Resp w3 0 33
+* the Wi-Fi card's buck: the same, into its 22 uF and a booting ESP32
+Bwifi card 0 i = {iw} * min(1, max(0, (v(card) - 2.45) / 2.5))
 .tran 100n 5m
 .control
 run
@@ -73,7 +74,7 @@ meas tran esw integ pw from=0 to=5m
 """.format(vbus=vbus, lc=L_CABLE, rc=d.CABLE_R_VBUS + d.CABLE_R_GND + d.R_RECEPTACLE, cpre=d.C_VBUS_PRE,
            rf=d.FUSE_IN_R_MIN, ron=d.SY6280_RON_TYP, ilim=ilim, ton=d.SY6280_TON, c5=c_main, ib=i_buck,
            rh=5.0 / d.I_HDMI_5V, rslot=d.SLOT_PTC_R_MIN + d.R_SLOT_LINK + d.R_SLOT_SENSE + d.R_SLOT_CONTACTS,
-           cwin=d.WIFI_CIN, ams=spice.params(d.AMS1117), cwout=d.WIFI_COUT)
+           cwin=d.WIFI_CIN, iw=i_wifi)
     name = "pow004_%s_%d" % (corner, rset)
     m = spice.run(name, deck.replace("{name}", name))
     tt, v5 = spice.wave(name)

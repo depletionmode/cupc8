@@ -107,4 +107,48 @@ export class Emu {
     }
     return cond();
   }
+
+  // fn() on every nth cycle from now (chained after the current onCycle)
+  everyCycles(n, fn) {
+    const prev = this.onCycle;
+    let tick = 0;
+    this.onCycle = (e) => {
+      if (prev) prev(e);
+      if (++tick % n) return;
+      fn();
+    };
+  }
+
+  // A trap on the PPB (NVIC, SysTick) writes: once armed with arm(k, fire),
+  // the first writeUint32 at `offset` with any bit of `mask` set is noted,
+  // and fire() is called on the k-th onCycle after it (counted from arming;
+  // chained after the current onCycle). remove() takes the hooks out again.
+  // rp2040native.mjs does the same natively.
+  ppbWriteTrap(offset, mask) {
+    const ppb = this.mcu.ppb, write = ppb.writeUint32.bind(ppb);
+    let trap = null;
+    ppb.writeUint32 = (o, value) => {
+      if (trap && trap.at === null && o === offset && value & mask) trap.at = trap.cycles;
+      return write(o, value);
+    };
+    const prev = this.onCycle;
+    this.onCycle = (e) => {
+      if (prev) prev(e);
+      if (!trap) return;
+      trap.cycles++;
+      if (trap.at !== null && trap.cycles - trap.at >= trap.k) {
+        const t = trap;
+        trap = null;
+        t.fire();
+      }
+    };
+    return {
+      arm: (k, fire) => (trap = { k, fire, at: null, cycles: 0 }),
+      disarm: () => (trap = null),
+      remove: () => {
+        this.onCycle = prev;
+        ppb.writeUint32 = write;
+      },
+    };
+  }
 }
