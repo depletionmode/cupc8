@@ -270,9 +270,9 @@ def core(s, gpios, leds=(), usb=False):
         r, d = "R%d" % (5 + i), "D%d" % (2 + i)
         # red KT-0603R (Vf ~2 V) takes 1k from 3V3; green KT-0603G (Vf ~2.9 V) 100R
         red = colour == "red"
-        p[r] = passive(s, "R", r, "1k" if red else "100R", ((22 + 12 * i) * G, 96 * G), fp=R0603,
+        p[r] = passive(s, "R", r, "1k" if red else "100R", ((22 + 14 * i) * G, 96 * G), fp=R0603,
                        lcsc="C21190" if red else "C22775")
-        p[d] = s.add("Device:LED", d, colour, LED0603, at=((22 + 12 * i) * G, 112 * G), rot=90,
+        p[d] = s.add("Device:LED", d, colour, LED0603, at=((22 + 14 * i) * G, 118 * G), rot=90,
                      fields={"LCSC": "C2286" if red else "C12624"})
         two(s, p[r], net, net + "_A")
         s.connect(p[d], "A", net + "_A")
@@ -300,7 +300,7 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb), preroute=preroute or tie_testen)
+                       fine_nets=u1_nets(gpios, usb), preroute=preroute or tie_testen, route_tries=6)
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

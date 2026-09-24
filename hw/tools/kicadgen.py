@@ -1785,7 +1785,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, fine_nets=(), preroute=None):
+             io_card=False, fine_nets=(), preroute=None, route_tries=3):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1851,7 +1851,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones))
+    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones, tries=route_tries))
 
     def fill():
         x0, y0, x1, y1 = outline
