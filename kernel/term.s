@@ -5,6 +5,12 @@ term_basic_prog_buf: resb 256
 term_line_buf: resb 80
 
 term_do:
+	; start with an empty program: .bss is not cleared, and the SRAM
+	; powers up with junk
+	xor r0, r0
+	st [term_basic_prog_buf_idx], r0
+	st [term_basic_prog_buf], r0
+
 	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n"
 	mov r0, #>[term_s_info]
 	mov r1, #<[term_s_info]

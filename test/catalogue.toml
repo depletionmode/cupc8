@@ -612,6 +612,33 @@ vrow = "2.4"
 cmd = "tools/fw_rp2040.sh emu_nested && node test/emu/run_nested.mjs"
 
 [[test]]
+id = "EMU-004"
+title = "Native RP2040 emulator: cycle-identical to rp2040js on real firmware"
+checks = "emu/rp2040 (the C++ port) and the patched rp2040js give byte-identical traces (ns, core 0 PC, core 1 PC every 97 steps) and UART output on the EMU-001/002 self-tests and 100 ms of the GPU (252 MHz, PicoDVI), IO and system card images"
+method = "emu/rp2040/test/trace/tracediff.sh: build/emu-native/rp2040run against emu/rp2040/test/trace/trace.mjs (the same loop as test/emu/rp2040emu.mjs)"
+kind = "sim"
+vrow = "2.4"
+cmd = "tools/fw_rp2040.sh && emu/rp2040/test/trace/tracediff.sh"
+
+[[test]]
+id = "EMU-005"
+title = "Native RP2040 emulator: each module against rp2040js"
+checks = "seeded randomised differential runs, every state change compared: the Cortex-M0+ core and PPB (500k instructions, exceptions, SysTick), PIO (every instruction and option, the project's real programs), the peripherals (DMA, UART, SPI, I2C, timers, PWM, ADC, RTC, watchdog: bus traffic, alarms, IRQs) and USB (device and host, the keyboard model); zero mismatches"
+method = "emu/rp2040/test/diffs.sh (core-diff.mjs, pio_diff.mjs, periph_diff.mjs, usb_diff.mjs)"
+kind = "sim"
+vrow = "2.4"
+cmd = "emu/rp2040/test/diffs.sh"
+
+[[test]]
+id = "EMU-006"
+title = "Native emulator backend: the card tests give byte-identical results"
+checks = "GPU-004/005, IOC-004 and SYS-006 pass on both rp2040js and the native emulator (CUPC8_EMU=js|native), with identical stdout and an identical trace of every runUntil end time, every slot-host frame (MOSI/MISO) and a digest of every TMDS capture"
+method = "test/emu/backend_diff.sh (test/emu/emu_backend.mjs, test/emu/rp2040native.mjs, emu/rp2040/node)"
+kind = "sim"
+vrow = "2.4"
+cmd = "test/emu/backend_diff.sh"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
@@ -705,7 +732,7 @@ vrow = "2.6"
 [[test]]
 id = "WIFI-004"
 title = "Wi-Fi card board, ready for JLC"
-checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, card order spec (1.6 mm, hard-gold 45 degree fingers)"
+checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, card order spec (1.6 mm, hard-gold 45 degree fingers), the board's name and revision on the top silkscreen and in the title block"
 method = "hw/boards/wifi.py through kicadgen.pipeline: Freerouting, GND fingers tied, presence link pre-routed, GND pads fanned out, stitched pours"
 cmd = "python3 hw/boards/wifi.py"
 kind = "static"
@@ -864,6 +891,76 @@ cmd = "python3 hw/smoke/smoke.py"
 
 
 # ============================================================================
+# POW / THM: the power tree (doc/hardware/power.md), verification 4.4 / 4.5.
+# Values and assumptions: hw/power/design.py. The main board isn't drawn
+# yet, so these check power.md's design plus the listed assumptions; the
+# MB-005/MB-006 entries re-run them against the schematic once it exists.
+# ============================================================================
+[[test]]
+id = "POW-001"
+title = "3V3 buck: start-up, 0->500 mA step, dropout (TI TLV62569 model)"
+checks = "3V3 within 3.135-3.465 V at the DC corners through start-up, a 0->500 mA step and its release, at 5V_SYS worst-low and 5.5 V; above the MAX811T threshold; up in <= 2 ms into the full load and 100 uF; 5V_SYS headroom over 100 % duty dropout"
+method = "hw/power/buck.py: TI's PSpice transient model (fetched, sha256-pinned, VSWITCH ported) in ngspice, fed through the worst-case input path"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/buck.py"
+
+[[test]]
+id = "POW-002"
+title = "1V2 LDO (RT9013): start-up, core step, dropout, PSRR"
+checks = "model reproduces the datasheet load step within 25 %; 1V2 within the iCE40's 1.14-1.26 V with 2 % DC tolerance, the 0->40 mA step and the buck's ripple through the PSRR; dropout headroom at the lowest 3V3"
+method = "hw/power/ldo.py 1v2: behavioural LDO (models/behavioural.lib) fitted to the RT9013 datasheet; AC analysis at POW-001's ripple frequencies"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/ldo.py 1v2"
+
+[[test]]
+id = "POW-003"
+title = "Wi-Fi card TLV62569 buck: ESP32-C3 TX burst, dropout"
+checks = "with the card as built (U2 TLV62569, L1 2.2 uH, 22 uF in, 22 uF + 100 nF out, R9/R10 453k/100k at 1 %) at the typical and worst-case slot +5V: ESP32-C3 supply >= 3.0 V through a 350 mA TX burst at the DC low corner, <= 3.6 V through start-up, light load and the burst's release at the DC high corner, and the card's +5V in the burst covers VOUT + I x (RDS(on) hot + DCR)"
+method = "hw/power/buck.py wifi-card: TI's TLV62569 model fed through the whole source-to-card chain"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/buck.py wifi-card"
+
+[[test]]
+id = "POW-004"
+title = "USB-C attach inrush"
+checks = "<= 10 uF on VBUS ahead of the SY6280; the surge through it held to its current limit; 5V_SYS up within 2 ms; VBUS stays above the switch's UVLO; at vSafe5V min and max, for the RSET in power.md and budget.py's proposal"
+method = "hw/power/inrush.py: behavioural SY6280 (soft start, current limit) into the 5V_SYS capacitance and the loads that start at attach"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/inrush.py"
+
+[[test]]
+id = "POW-005"
+title = "USB-C CC divider, PWR_HI comparator and ADC thresholds"
+checks = "every compliant source's CC voltage on our Rd falls on the right side of the PWR_HI trip points (TLV7011 offset, hysteresis, 3V3 and resistor tolerances) and of sysctl's 0.20/0.66/1.23 V ADC thresholds; TI's TLV7011 model agrees at the window edges"
+method = "hw/power/cc.py: tolerance stack-up against the Type-C Rp options, plus ngspice with TI's TLV7011 model"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/power/cc.py"
+
+[[test]]
+id = "POW-006"
+title = "Worst-case current budget, input path and slot feeds"
+checks = "M1 worst case within the 1.5 A source class, the SY6280's minimum current limit and the input PTC's 40 C hold, with 10 % margin; default-USB operation with the radio off; each slot's +5V within its PTC's 40 C hold; keyboard VBUS >= 4.40 V; what is left for slots 4-6"
+method = "hw/power/budget.py: power.md's max loads through the source/cable/fuse/switch/PTC chain at worst and typical corners"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/power/budget.py"
+
+[[test]]
+id = "THM-001"
+title = "Regulator junction temperatures at 40 C ambient"
+checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 4-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, an AMS1117 on any other card that regulated from +5V, and both SY6280s, from datasheet theta_JA"
+method = "hw/power/thermal.py: dissipation at each part's hottest corner x theta_JA"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/power/thermal.py"
+
+
+# ============================================================================
 # Board tests. Every board gets the same static set (-0xx), board-specific
 # checks (-05x), and hardware bring-up tests (-1xx, kind = "hw").
 # ============================================================================
@@ -936,7 +1033,7 @@ vrow = "4.7"
 [[test]]
 id = "MB-009"
 title = "Main board fab package"
-checks = "Gerbers re-imported and DRC-clean; drill file matches the holes; CPL render reviewed (hand check recorded)"
+checks = "Gerbers re-imported and DRC-clean; drill file matches the holes; CPL render reviewed (hand check recorded); the board's name and revision ('<name> rev <X>') on the top silkscreen and in the Gerber X2 attributes"
 method = "hw/tools/fabcheck.py"
 kind = "static"
 vrow = "4.9"
@@ -1073,7 +1170,7 @@ vrow = "4.7"
 [[test]]
 id = "CC-009"
 title = "CPU card fab package"
-checks = "as MB-009, plus gold fingers + bevel noted in the fab notes"
+checks = "as MB-009, plus gold fingers + bevel noted in the fab notes; the board's name and revision ('<name> rev <X>') on the top silkscreen and in the Gerber X2 attributes"
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
@@ -1162,7 +1259,7 @@ vrow = "4.7"
 [[test]]
 id = "GC-009"
 title = "GPU card fab package"
-checks = "as CC-009, plus the impedance-controlled stackup ordered"
+checks = "as CC-009, plus the impedance-controlled stackup ordered; the board's name and revision ('<name> rev <X>') on the top silkscreen and in the Gerber X2 attributes"
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
@@ -1243,7 +1340,7 @@ vrow = "4.7"
 [[test]]
 id = "IC-009"
 title = "IO card fab package"
-checks = "as CC-009"
+checks = "as CC-009; the board's name and revision ('<name> rev <X>') on the top silkscreen and in the Gerber X2 attributes"
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
@@ -1300,7 +1397,7 @@ vrow = "4.3"
 [[test]]
 id = "WC-005"
 title = "Wi-Fi card power"
-checks = "AMS1117 + bulk capacitance hold 3.3 V ≥ 3.0 V through a 350 mA TX burst"
+checks = "TLV62569 buck + bulk capacitance hold 3V3 ≥ 3.0 V through a 350 mA TX burst, on the laid-out board"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
@@ -1324,7 +1421,7 @@ vrow = "4.7"
 [[test]]
 id = "WC-009"
 title = "Wi-Fi card fab package"
-checks = "as CC-009"
+checks = "as CC-009; the board's name and revision ('<name> rev <X>') on the top silkscreen and in the Gerber X2 attributes"
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"

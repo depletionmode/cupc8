@@ -99,6 +99,8 @@ var
   romOff*: bool = false
   pwrHi*: bool = true            # USB-C source >= 1.5 A (a board input, kept across reset)
   romBank*: int = 0
+  ramJunk*: bool = false         # cpuReset leaves RAM as the SRAM powers up (the
+                                 # emulator's pattern, soc/emu/board.h), not zeroed
   spiTxR, spiRxR, spiCfgR: array[8, int]
   spiHold*: int = -1             # device selected by SPI_CS, -1 = none
   slotIrqPrev: int = 0
@@ -740,7 +742,7 @@ proc cpuReset*() =
   stepOutSP = 0
   resumeBreak = -1
   for i in 0..mem.high:
-    mem[i] = 0
+    mem[i] = if ramJunk and i < 0xf000: (i * 13 + 5) and 0xff else: 0
   for i in 0..spi_tx_buf.high:
     spi_tx_buf[i] = 0
     spi_rx_buf[i] = 0

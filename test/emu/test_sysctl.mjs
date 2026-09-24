@@ -5,11 +5,11 @@
 // bitstream's sync word, the two TCA9555 expanders, and the CC voltages.
 //
 //   node test/emu/test_sysctl.mjs
+//   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 
 import path from 'node:path';
-import { Emu, SDK } from './rp2040emu.mjs';
+import { Emu, USBCDC } from './emu_backend.mjs';                     // CUPC8_EMU=native: the C++ emulator
 
-const rp = await import(path.join(SDK, 'rp2040js/dist/esm/index.js'));
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const emu = await Emu.load(path.join(ROOT, 'build/rp2040/sysctl.elf'), { mhz: 125 });
 const gpio = emu.mcu.gpio;
@@ -118,19 +118,15 @@ i2c.onReadByte = () => i2c.completeRead(expander[i2cAddr]?.[i2cReg++ & 7] ?? 0xf
 const cardHeld = (slot) => !((expander[0x20][6] >> slot) & 1) && !((expander[0x20][2] >> slot) & 1);
 
 // ------------------------------------------------------------ USB CDC host
-const cdc = new rp.USBCDC(emu.mcu.usbCtrl);
+const cdc = new USBCDC(emu.mcu.usbCtrl);
 let connected = false, rxBytes = [];
 const pending = [];
 cdc.onDeviceConnected = () => (connected = true);
 cdc.onSerialData = (buf) => rxBytes.push(...buf);
-const prevCycle = emu.onCycle;
-let tick = 0;
-emu.onCycle = (e) => {
-  if (prevCycle) prevCycle(e);
-  if (++tick % 1000) return;
+emu.everyCycles(1000, () => {
   fpgaTick();
   while (pending.length && cdc.txFIFO.itemCount < 512) cdc.sendSerialByte(pending.shift());
-};
+});
 
 function crc8(bytes) {
   let c = 0;

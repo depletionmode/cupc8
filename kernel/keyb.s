@@ -9,6 +9,7 @@
 
 keyb_spi: resb 1
 keyb_tmp: resb 1
+keyb_try: resb 1
 
 keyb_init:
 	mov r0, #0xff
@@ -100,6 +101,9 @@ keyb_poll:
 	push pcl
 	b keyb_cs_off
 
+	mov r0, #0				; READ tries so far
+	st [keyb_try], r0
+.read:
 	push pch				; READ frame - status, RESP_LEN, then the key
 	push pcl
 	b keyb_cs_on
@@ -111,6 +115,8 @@ keyb_poll:
 	push pch
 	push pcl
 	b keyb_send
+	eq r0, #0				; RESP_LEN $00 - not ready yet, end the frame and retry (slot.md)
+	bzf .not_ready
 	mov r0, #0
 	push pch
 	push pcl
@@ -121,6 +127,16 @@ keyb_poll:
 	b keyb_cs_off
 	ld r0, [keyb_tmp]
 	b .done
+.not_ready:
+	push pch
+	push pcl
+	b keyb_cs_off
+	ld r0, [keyb_try]
+	add r0, #1
+	st [keyb_try], r0
+	eq r0, #0				; 256 tries (well past the card's 5 ms) - give up, no key
+	bzf .none
+	b .read
 .none:
 	mov r0, #0xff
 .done:

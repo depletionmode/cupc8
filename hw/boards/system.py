@@ -210,6 +210,7 @@ EDGE_AT = (W / 2 - 16.5, H + 4.95)
 OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
 LOGO_MM = 12
+REVISION = "A"            # doc/milestone-1.md, Board revision: bump for every board sent to be made
 LABELS = {"D1": "PWR", "D2": "STAT", "D3": "TX", "D4": "RX"}   # silkscreen says what each LED shows
 LOGO_AT = (48.8, 28.6)
 
@@ -224,7 +225,7 @@ PLACEMENT = {
     "R2": (41, 15.5, 0), "R3": (41, 17.5, 0),
     "R4": (49.5, 6, 0), "R5": (49.5, 8, 0),
     "U2": (13, 13, 0),
-    "C11": (18.5, 7.5, 0),
+    "C11": (19.2, 11.5, 90),
     "R6": (12, 18.5, 0),
     "Y1": (19, 25, 0),
     "C15": (13.3, 23, 90), "C16": (13.3, 27, 90), "R1": (23, 26.5, 90),
@@ -236,15 +237,17 @@ PLACEMENT = {
     "C12": (33.6, 10.3, 90),
     "C14": (9, 27, 90),
     "R7": (38, 22, 90), "R8": (40, 22, 90),
-    "D1": kg.power_led_at(OUTLINE) + (0,), "R9": (6.5, 3, 0),
-    "D3": (51, 12, 0), "R20": (51, 14.5, 0),
-    "D4": (51, 17, 0), "R21": (51, 19.5, 0),
-    "D2": (45, 19, 0), "R10": (45, 21.5, 0),
+    # the LEDs in a row along the top edge, the power LED first, each
+    # resistor under its LED (milestone-1.md, Indicator LEDs)
+    "D1": kg.power_led_at(OUTLINE) + (0,), "R9": (3, 5.5, 0),
+    "D2": (9, 3, 0), "R10": (9, 5.5, 0),
+    "D3": (15, 3, 0), "R20": (15, 5.5, 0),
+    "D4": (21, 3, 0), "R21": (21, 5.5, 0),
 }
 for _i, _n in enumerate(TERMINATED):
     PLACEMENT["R%d" % (11 + _i)] = (14 + 3.4 * _i, 31, 90)
 for _i, (_ref, _) in enumerate(TEST_PADS):
-    PLACEMENT[_ref] = (2.5, 7.5 + 3 * _i, 0)
+    PLACEMENT[_ref] = (2.5, 9 + 2.9 * _i, 0)
 
 
 # every net on the RP2040's 0.4 mm-pitch pads routes in 0.15 mm track (kicadgen "Fine")
@@ -261,6 +264,7 @@ def main():
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, fine_nets=FINE_NETS,
+        title="CUPC/8 system", revision=REVISION,
         # the pour reaches over the finger tops, so GND fingers join it
         zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)], labels=LABELS)

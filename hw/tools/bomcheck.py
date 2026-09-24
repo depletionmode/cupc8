@@ -52,6 +52,7 @@ With CUPC8_OFFLINE=1 a part not recorded yet is skipped, and the result says so.
 import csv
 import importlib.util
 import math
+import re
 import os
 import shutil
 import subprocess
@@ -222,8 +223,10 @@ def package_ok(pkg, fp_name):
     if p in PACKAGE_NAMES and PACKAGE_NAMES[p] in name:
         return True
     if p.startswith("SMD,") and "X" in p:           # "SMD,13.2x12.5mm": the body size
-        a, b = p[4:].rstrip("M").split("X")[:2]
-        return ("L%s-W%s" % (a, b)) in name or ("L%s-W%s" % (b, a)) in name
+        a, b = (float(v) for v in p[4:].rstrip("M").split("X")[:2])
+        # as numbers: JLC writes "3x3mm" where the footprint says L3.0-W3.0
+        body = [(float(l), float(w)) for l, w in re.findall(r"L([\d.]+)-W([\d.]+)", name)]
+        return (a, b) in body or (b, a) in body
     if p.isdigit():                                  # chip sizes: 0402, 0603, 0805 ...
         return ("_%s_" % p) in name or name.startswith(p) or ("_%s" % p) in name
     return name.startswith(p) or ("_%s" % p) in name or ("_%s_" % p) in name

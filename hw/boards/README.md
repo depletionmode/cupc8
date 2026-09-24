@@ -19,6 +19,7 @@ python3 hw/boards/wifi.py
 ```
 
 Shared rules:
+- **Revision:** every board passes `title`, `revision` and `revision_at` to `pipeline()`, which prints `<title> rev <revision>` on the top silkscreen and puts the revision in the title block (and so in the Gerbers). Bump the board script's `REVISION` (A, B, ...) for every order that changes the board (`doc/milestone-1.md`, Board revision).
 - **Cards:** 1.6 mm, with hard-gold fingers and a 45° chamfer. These are
   order options, written in `fab/order.json` and checked there.
 - **Card edge:** each card's finger tab is KiCad's `BUS_PCIexpress_*`
@@ -40,9 +41,13 @@ Spec: `doc/hardware/wifi-card.md`.
   - CS_n: GPIO10
   - IRQ_n: GPIO3, open drain
   - LINK, TX and RX LEDs: GPIO4, GPIO0, GPIO1
-- **U2, AMS1117-3.3** (C6186), fed from the slot's +5V, with 22 µF in and
-  22 µF + 100 nF out. The slot's +3V3 pins are left unconnected: Wi-Fi TX
-  peaks near 350 mA, and the slot's +3V3 is limited to 300 mA.
+- **U2, TLV62569DBVR buck** (C141836), fed from the slot's +5V, with L1
+  2.2 µH (FNR3015S2R2MT, C167747), 22 µF in, 22 µF + 100 nF out, and a
+  453k/100k feedback divider (3.32 V). An AMS1117 LDO failed the power
+  checks: in a TX burst at the worst-case corner it left the ESP32-C3 at
+  2.71 V (3.0 V minimum), and it ran at Tj ≈ 120 °C (`hw/power`, POW-003,
+  THM-001). The slot's +3V3 pins are left unconnected: Wi-Fi TX peaks near
+  350 mA, and the slot's +3V3 is limited to 300 mA.
 - **U3, 74LVC1G125** (C52140430). Its /OE is CS_n, so the card drives the
   shared MISO line only while it is selected.
 - **EN:** 10 kΩ / 1 µF RC, per Espressif. CARD_RST_n, which is open drain on
@@ -54,7 +59,7 @@ Spec: `doc/hardware/wifi-card.md`.
   runs through sysctl's UART tunnel.
 - **LEDs:** power at the standard spot (red: a green LED drops ~3 V, too
   close to the 3.3 V rail for 1 kΩ), then LINK (GPIO4), TX (GPIO0) and RX
-  (GPIO1) in a row, green with 100 Ω. TX and RX light for 30 ms whenever
+  (GPIO1) in a row with it along the top edge, green with 100 Ω. TX and RX light for 30 ms whenever
   socket data moves.
 - **Outline:** the standard I/O card outline, with its M3 hole
   (`slot.md`, Mechanical).

@@ -103,8 +103,39 @@ def find1(node, key):
     return r[0] if r else None
 
 
+# UUIDs are derived from a counter, not random: KiCad orders its exports (the
+# Specctra DSN among them) by UUID, and a random order gave Freerouting a
+# different problem, and a different route, on every run
+_UID = uuidlib.UUID("6b1c5a62-1d8e-4c3e-9f0a-c5e8a0d2b7f1")
+_uid_n = [0]
+
+
 def uid():
-    return Q(str(uuidlib.uuid4()))
+    _uid_n[0] += 1
+    return Q(str(uuidlib.uuid5(_UID, "sch/%d" % _uid_n[0])))
+
+
+def stable_uuids(board, salt=0):
+    """Give every board item a UUID derived from what it is (footprints by
+    reference, their pads and graphics by index), replacing the random ones
+    pcbnew assigns, so that exports ordered by UUID are the same every run."""
+    import pcbnew
+
+    def kiid(key):
+        return pcbnew.KIID(str(uuidlib.uuid5(_UID, "%d/%s" % (salt, key) if salt else key)))
+    fps = sorted(board.GetFootprints(), key=lambda f: f.GetReference())
+    for fp in fps:
+        ref = fp.GetReference()
+        fp.SetUuidDirect(kiid("fp/" + ref))
+        pads = fp.Pads()
+        for i in range(len(pads)):
+            pads[i].SetUuidDirect(kiid("pad/%s/%d" % (ref, i)))
+        gi = fp.GraphicalItems()          # indexed: iterating it breaks on Python 3.14
+        for i in range(len(gi)):
+            gi[i].SetUuidDirect(kiid("gfx/%s/%d" % (ref, i)))
+    for name, items in (("drw", board.Drawings()), ("trk", board.Tracks()), ("zone", board.Zones())):
+        for i in range(len(items)):
+            items[i].SetUuidDirect(kiid("%s/%d" % (name, i)))
 
 
 # ----------------------------------------------------------------- symbols
@@ -739,6 +770,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         board.Add(seg)
 
     clip_silk_to_board(board, outline)
+    clip_silk_to_pads(board)
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
@@ -809,7 +841,89 @@ def clip_silk_to_board(board, outline, gap=0.15):
             g.SetEnd(pcbnew.VECTOR2I(mm(ax + dx * t1), mm(ay + dy * t1)))
 
 
+def clip_silk_to_pads(board, gap=0.15):
+    """Trim footprint silkscreen segments that come within `gap` of a pad on
+    their side (edge to pad, the line's width counted): some library
+    footprints stop their outline 0.15 mm from a pad at the line's centre,
+    which leaves its edge 0.09 mm away (the HRO TYPE-C-31-M-12's shield
+    pads). The part of a segment inside a pad's box grown by gap + half the
+    width goes; what is left under 0.2 mm long goes too."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    pads = []
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            bb = pad.GetBoundingBox()
+            pads.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom()),
+                         pad.IsOnLayer(pcbnew.F_Cu), pad.IsOnLayer(pcbnew.B_Cu)))
+    for fp in board.GetFootprints():
+        gi = fp.GraphicalItems()          # indexed: iterating it breaks on Python 3.14
+        for g in [gi[i].Cast() for i in range(len(gi))]:
+            if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
+                continue
+            if not (isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT):
+                continue
+            front = g.GetLayer() == pcbnew.F_SilkS
+            ax, ay, bx, by = to(g.GetStart().x), to(g.GetStart().y), to(g.GetEnd().x), to(g.GetEnd().y)
+            dx, dy = bx - ax, by - ay
+            w = to(g.GetWidth()) / 2 + gap + 0.01          # 10 um clear of check_silk's inclusive edge
+            keep = [(0.0, 1.0)]
+            for x0, y0, x1, y1, on_f, on_b in pads:
+                if not (on_f if front else on_b):
+                    continue
+                # Liang-Barsky: the part of the segment inside the grown pad box
+                t0, t1 = 0.0, 1.0
+                for p, q in ((-dx, ax - (x0 - w)), (dx, (x1 + w) - ax), (-dy, ay - (y0 - w)), (dy, (y1 + w) - ay)):
+                    if p == 0:
+                        if q < 0:
+                            t0, t1 = 1, 0
+                    elif p < 0:
+                        t0 = max(t0, q / p)
+                    else:
+                        t1 = min(t1, q / p)
+                if t1 <= t0:
+                    continue
+                keep = [piece for a0, a1 in keep
+                        for piece in ((a0, min(a1, t0)), (max(a0, t1), a1)) if piece[1] > piece[0]]
+            if keep == [(0.0, 1.0)]:
+                continue
+            length = math.hypot(dx, dy)
+            keep = [(a0, a1) for a0, a1 in keep if length * (a1 - a0) >= 0.2]
+            for k, (a0, a1) in enumerate(keep):
+                seg = g if k == 0 else g.Duplicate()
+                seg.SetStart(pcbnew.VECTOR2I(mm(ax + dx * a0), mm(ay + dy * a0)))
+                seg.SetEnd(pcbnew.VECTOR2I(mm(ax + dx * a1), mm(ay + dy * a1)))
+                if k:
+                    fp.Add(seg)
+            if not keep:
+                fp.Remove(g)
+
+
 SILK_TEXT = (1.0, 0.15)                 # designator height and stroke (JLC minimum stroke)
+
+
+def mark_revision(board, title, revision, at):
+    """The board's name and revision, "<title> rev <revision>", on the top
+    silkscreen with its bottom-right corner at `at` (mm; normally 1 mm in from
+    the body's bottom-right corner), and in its title block (the Gerbers' X2
+    file attributes carry it), so boards of different builds can be told
+    apart (doc/milestone-1.md, Board revision)."""
+    import pcbnew
+    mm = pcbnew.FromMM
+    t = pcbnew.PCB_TEXT(board)
+    t.SetText("%s rev %s" % (title, revision))
+    t.SetLayer(pcbnew.F_SilkS)
+    t.SetTextSize(pcbnew.VECTOR2I(mm(SILK_TEXT[0]), mm(SILK_TEXT[0])))
+    t.SetTextThickness(mm(SILK_TEXT[1]))
+    t.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_RIGHT)
+    t.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_BOTTOM)
+    t.SetPosition(pcbnew.VECTOR2I(mm(at[0]), mm(at[1])))
+    board.Add(t)
+    tb = board.GetTitleBlock()
+    tb.SetTitle(title)
+    tb.SetRevision(revision)
+    tb.SetCompany("Kaplan Labs")
+    board.SetTitleBlock(tb)
 
 
 def place_designators(board, outline, labels=None, gap=0.3):
@@ -897,10 +1011,11 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
                 steps = max(2, int(pcbnew.ToMM((b - a).EuclideanNorm()) / 0.02))
                 probes = [pcbnew.VECTOR2I(int(a.x + (b.x - a.x) * k / steps), int(a.y + (b.y - a.y) * k / steps))
                           for k in range(steps + 1)]
-                # the pad's true shape, as for rings: an oval or slotted pad's
-                # bounding box reaches corners the pad does not
-                hit = lambda bb, pad, probes=probes: any(                        # noqa: E731
-                    bb.Contains(pt) and pad.HitTest(pt, mm(clearance)) for pt in probes)
+                # the line's edge, not its centre: the pad box grows by half its width
+                half = g.GetWidth() // 2
+                hit = lambda bb, pad, half=half: any(                          # noqa: E731
+                    pcbnew.BOX2I(bb.GetPosition() - pcbnew.VECTOR2I(half, half),
+                                 bb.GetSize() + pcbnew.VECTOR2L(2 * half, 2 * half)).Contains(pt) for pt in probes)
             elif isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_CIRCLE:
                 # the ring, not its bounding box (which holds the pad it rings)
                 c, r = g.GetCenter(), g.GetRadius() + g.GetWidth() / 2
@@ -917,7 +1032,16 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
             for ref, num, on_f, on_b, bb, pad in pads:
                 if (on_f if front else on_b) and hit(bb, pad):
                     bad.append("silkscreen of %s touches pad %s of %s" % (fp.GetReference(), num, ref))
-    # the board's own silkscreen words (labels) against every pad
+    # the board's own silkscreen words (labels, the revision) against every
+    # pad, and the free-standing ones (not a part's label) against every
+    # part's courtyard on their side
+    courts = []
+    for fp in board.GetFootprints():
+        side = pcbnew.F_CrtYd if fp.GetLayer() == pcbnew.F_Cu else pcbnew.B_CrtYd
+        if len(fp.Pads()):
+            cb = fp.GetCourtyard(side).BBox() if fp.GetCourtyard(side).OutlineCount() else None
+            if cb is not None:
+                courts.append((fp.GetReference(), fp.GetLayer() == pcbnew.F_Cu, cb))
     dr = board.Drawings()                        # indexed: iterating it breaks on Python 3.14
     for d in [dr[i].Cast() for i in range(len(dr))]:
         if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS):
@@ -926,6 +1050,10 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
             for ref, num, on_f, on_b, bb, _ in pads:
                 if (on_f if front else on_b) and bb.Intersects(gb):
                     bad.append("label %r touches pad %s of %s" % (d.GetText(), num, ref))
+            if " rev " in d.GetText():
+                for ref, on_f, cb in courts:
+                    if on_f == front and cb.Intersects(gb):
+                        bad.append("label %r overlaps the courtyard of %s" % (d.GetText(), ref))
     return sorted(set(bad))
 
 
@@ -967,6 +1095,130 @@ def check_models(tolerance=0.6):
     return bad
 
 
+def canonical_dsn(text, seed=0):
+    """The Specctra DSN in an order of our own: KiCad's export lists parts,
+    images and net pins in an order that changes from run to run, and
+    Freerouting's result depends on it. Everything order-free is sorted;
+    `seed` > 0 then shuffles those lists by a seeded generator, so a retry
+    gets a different, but still reproducible, problem."""
+    import random
+    rnd = random.Random(seed)
+    text = text.replace('(string_quote ")', "(string_quote QUOTE_CHAR)")
+    tree = parse(text)
+
+    def order(items, key):
+        items.sort(key=key)
+        if seed:
+            rnd.shuffle(items)
+        return items
+
+    def reorder(node, tag, key):
+        """sort (and maybe shuffle) node's `tag` children in place, keeping
+        everything else where it was"""
+        slots = [i for i, e in enumerate(node) if isinstance(e, list) and e and e[0] == tag]
+        for i, e in zip(slots, order([node[i] for i in slots], key)):
+            node[i] = e
+    name = lambda e: str(e[1])                                     # noqa: E731
+    # KiCad names a footprint's variants base, base::1, base::2 in the order
+    # it meets them: name them by content instead
+    rename = {}
+    for library in find(tree, "library"):
+        groups = {}
+        for img in find(library, "image"):
+            groups.setdefault(str(img[1]).split("::")[0], []).append(img)
+        for base, imgs in groups.items():
+            imgs.sort(key=lambda img: dump(img[2:]))
+            for n, img in enumerate(imgs):
+                new = base if n == 0 else "%s::%d" % (base, n)
+                rename[str(img[1])] = new
+                img[1] = type(img[1])(new)
+    for placement in find(tree, "placement"):
+        for comp in find(placement, "component"):
+            comp[1] = type(comp[1])(rename.get(str(comp[1]), str(comp[1])))
+    for placement in find(tree, "placement"):
+        reorder(placement, "component", name)
+        for comp in find(placement, "component"):
+            reorder(comp, "place", name)
+    for wiring in find(tree, "wiring"):                # pre-routed copper
+        # KiCad sometimes joins connected segments into one path: split every
+        # path into its segments
+        out = []
+        for e in wiring:
+            path = find1(e, "path") if isinstance(e, list) and e and e[0] == "wire" else None
+            if path is None or len(path) <= 7:
+                out.append(e)
+                continue
+            pts = path[3:]
+            for i in range(0, len(pts) - 2, 2):
+                out.append([p if p is not path else path[:3] + pts[i:i + 4] for p in e])
+        wiring[:] = out
+        reorder(wiring, "wire", dump)
+        reorder(wiring, "via", dump)
+    for library in find(tree, "library"):
+        reorder(library, "image", name)
+        reorder(library, "padstack", name)
+    for network in find(tree, "network"):
+        reorder(network, "net", name)
+        for net in find(network, "net"):
+            for pins in find(net, "pins"):
+                pins[1:] = order(pins[1:], str)
+        for cls in find(network, "class"):
+            cls[2:] = [e for e in cls[2:] if isinstance(e, list)] + order(
+                [e for e in cls[2:] if not isinstance(e, list)], str)
+    return dump(tree).replace("(string_quote QUOTE_CHAR)", '(string_quote ")')
+
+
+def remove_dangling(board, pours=()):
+    """What Freerouting sometimes leaves behind: a via joined on one layer
+    only, or a track whose end meets nothing. Removed until none is left, as
+    KiCad's own cleanup does. Nets in `pours` are left alone: their pours
+    are not filled yet, so their vias would look dangling. Returns the count."""
+    import pcbnew
+    removed = 0
+    while True:
+        tracks = board.Tracks()                  # indexed: iterating it breaks on Python 3.14
+        items = [tracks[i].Cast() for i in range(len(tracks))]
+        items = [t for t in items if t.GetNetname() not in pours]
+        segs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]
+        vias = [t for t in items if t.Type() == pcbnew.PCB_VIA_T]
+        pads = [p for fp in board.GetFootprints() for p in fp.Pads()]
+
+        def seg_dist(pt, t):
+            ax, ay, bx, by = t.GetStart().x, t.GetStart().y, t.GetEnd().x, t.GetEnd().y
+            dx, dy = bx - ax, by - ay
+            k = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((pt.x - ax) * dx + (pt.y - ay) * dy) / (dx * dx + dy * dy)))
+            return math.hypot(pt.x - ax - k * dx, pt.y - ay - k * dy)
+
+        def joined(pt, layer, net, reach, skip=None):
+            """anything of `net` on `layer` at `pt`: a pad, a via, another track"""
+            for p in pads:
+                if p.GetNetname() == net and p.IsOnLayer(layer) and p.HitTest(pt, reach):
+                    return True
+            for v in vias:
+                if v is not skip and v.GetNetname() == net and v.HitTest(pt, reach):
+                    return True
+            for t in segs:
+                if t is not skip and t.GetNetname() == net and t.GetLayer() == layer and \
+                        seg_dist(pt, t) <= t.GetWidth() / 2 + reach:
+                    return True
+            return False
+        gone = []
+        for v in vias:
+            layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
+            if len(layers) < 2:
+                gone.append(v)
+        for t in segs:
+            for end in (t.GetStart(), t.GetEnd()):
+                if not joined(end, t.GetLayer(), t.GetNetname(), t.GetWidth() // 2, skip=t):
+                    gone.append(t)
+                    break
+        if not gone:
+            return removed
+        for t in gone:
+            board.Remove(t)
+        removed += len(gone)
+
+
 def autoroute(board, workdir, passes=40, pours=(), tries=3):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
@@ -975,13 +1227,23 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
-    if not pcbnew.ExportSpecctraDSN(board, dsn):
-        raise RuntimeError("DSN export failed")
     env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
     for attempt in range(tries):
+        # each try orders the problem differently (a UUID salt): Freerouting
+        # can stall on one order and complete on another, and the salt keeps
+        # every run of the pipeline the same
+        stable_uuids(board, attempt)
+        if not pcbnew.ExportSpecctraDSN(board, dsn):
+            raise RuntimeError("DSN export failed")
+        with open(dsn) as f:
+            text = canonical_dsn(f.read(), attempt)
+        with open(dsn, "w") as f:
+            f.write(text)
         if os.path.exists(ses):
             os.remove(ses)
-        r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)),
+        # one optimiser thread: with a pool, the route (and whether it
+        # completes) changes from run to run
+        r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)), "-mt", "1",
                  "--gui.enabled=false"], env=env)
         with open(os.path.join(workdir, "freerouting.log"), "w") as f:
             f.write(r.stdout + r.stderr)
@@ -994,6 +1256,7 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
         raise RuntimeError("Freerouting wrote no session file")
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
+    remove_dangling(board, pours)
     # the import can pair one net class's via diameter with another's drill
     # (0.6 mm with 0.4 mm: a 0.1 mm ring, under JLC's 0.13): keep a 0.15 mm ring
     tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
@@ -1503,12 +1766,34 @@ def check_order(spec, card_edge):
 
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
-             zone_outline=None, boards=2, labels=None, fine_nets=()):
+             zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
+             io_card=False, fine_nets=()):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
-    renders. `schematic(path, footprint_libs)` writes the sheet. Returns {LCSC number: count per board}."""
+    renders. `schematic(path, footprint_libs)` writes the sheet. Returns {LCSC number: count per board}.
+
+    Every board carries its name and revision (doc/milestone-1.md, Board
+    revision): `title` and `revision` are printed as "<title> rev <revision>"
+    on the top silkscreen, in the body's bottom-right corner unless
+    `revision_at` names another bottom-right anchor (mm), and go in the
+    board's title block, which the Gerbers' X2 attributes carry."""
     import pcbnew
+    if io_card:
+        # every I/O card is the same shape (slot.md, Mechanical): the outline,
+        # finger edge and pour come from here, and the parts every card has in
+        # the same place are checked
+        if outline not in (None, IO_CARD_BODY) or edge not in (None, IO_CARD_EDGE):
+            raise SystemExit("%s: an I/O card has the standard outline (IO_CARD_BODY/EDGE), not its own" % name)
+        outline, edge, card_edge = IO_CARD_BODY, IO_CARD_EDGE, True
+        zone_outline = zone_outline or card_zone(IO_CARD_BODY, IO_CARD_TAB, -1.5)
+        for ref, want in (("J1", (0, 0, 0)), ("H1", IO_CARD_HOLE + (0,)), ("D1", IO_CARD_PWR_LED + (0,))):
+            if tuple(placement.get(ref, ())[:3]) != want:
+                raise SystemExit("%s: an I/O card has %s at %s (slot.md, Mechanical), not %s" % (
+                    name, ref, want, placement.get(ref)))
+    if not (title and revision):
+        raise SystemExit("%s: every board needs a title and a revision (doc/milestone-1.md, Board revision)" % name)
+    revision_at = revision_at or (outline[2] - 1.0, outline[3] - 1.0)
     out = os.path.abspath(out or os.path.join(ROOT, "build", "hw", name))
     os.makedirs(out, exist_ok=True)
     sch, pcb, pro = (os.path.join(out, name + e) for e in (".kicad_sch", ".kicad_pcb", ".kicad_pro"))
@@ -1536,6 +1821,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels)
+        mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
