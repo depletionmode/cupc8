@@ -50,6 +50,11 @@ add_executable(test_pio_diff test/pio/test_pio_diff.cpp)
 target_compile_options(test_pio_diff PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(test_pio_diff PRIVATE rp2040emu)
 
+# utils/js.h's fast ToUint32 / Math.round against their plain definitions
+add_executable(test_js_numbers test/js/test_js_numbers.cpp)
+target_compile_options(test_js_numbers PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(test_js_numbers PRIVATE rp2040emu)
+
 # USB differential test: test/usb/usb_diff.mjs drives rp2040js and this replay
 # driver with the same ops and compares traces:
 #   node emu/rp2040/test/usb/usb_diff.mjs build/emu-native/test_usb_diff
