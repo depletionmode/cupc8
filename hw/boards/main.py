@@ -311,6 +311,9 @@ def build_parts():
          {"B": "Q2_B", "E": "GND", "C": "LED_CDONE_K"})
     R("R56", "1k", "+3V3", "LED_CDONE_A")
     LED("D5", "LED_CDONE_A", "LED_CDONE_K")
+    # the power LED, 3 mm in from the top-left corner like every board's (milestone-1.md)
+    R("R57", "1k", "+3V3", "LED_PWR")
+    LED("D6", "LED_PWR", "GND")
     # GPO LEDs D1-D8 of the docs are D11-D18 here
     for i in range(8):
         R("R%d" % (60 + i), "1k", "GPO%d" % i, "LED_GPO%d" % i)
@@ -573,7 +576,13 @@ def row_slot(n):
 FPGA = (97.0, 47.0)                               # centre of U7
 LOGO_MM = 12
 LOGO_AT = (108.0, 160.0)
-HOLES = [(4.5, 4.5), (W - 4.5, 4.5), (4.5, H - 4.5), (W - 4.5, H - 4.5), (W - 4.5, 56.0), (W - 4.5, 128.0)]
+# the I/O cards' M3 hole is 52 mm east of contact B1 and 40 mm up (slot.md,
+# Mechanical), so all six line up on x = RAIL_X: a mounting rail there carries
+# a standoff per card, on two posts screwed to the board beyond slots 1 and 6
+RAIL_X = PIN1_X + kg.IO_CARD_HOLE[0]
+RAIL_POSTS = [(RAIL_X, ROW_SYS + SLOT_PITCH * 1 - 10.0), (RAIL_X, ROW_SYS + SLOT_PITCH * 6 + 10.0)]
+HOLES = [(4.5, 10.0), (W - 4.5, 4.5), (4.5, H - 4.5), (W - 4.5, H - 4.5), (W - 4.5, 56.0), (W - 4.5, 128.0)] + \
+    RAIL_POSTS
 
 
 def wanted(parts):
@@ -610,6 +619,8 @@ def wanted(parts):
     at["J1"] = (70.0, H - 3.19, 0)               # USB-C, opening south (smoke.py: edge 3.19 mm off the pegs)
     at["J4"] = (116.6, 107.0, 0)                 # AUX SPI header, east edge
     at["SW1"] = (119.5, 140.0, 0)
+    at["D6"] = kg.power_led_at(OUTLINE) + (0,)   # the power LED, where every board has it
+    at["R57"] = (at["D6"][0] + 4.0, at["D6"][1], 0)
     for i, (x, y) in enumerate(HOLES):
         at["H%d" % (i + 1)] = (x, y, 0)
 
@@ -717,10 +728,10 @@ def wanted(parts):
         for i, r in enumerate(pads):
             at[r] = (24.0 + 3.0 * i, y0 + 12.4, 0)
     # slot expanders, programming-port mux and their pulls: east of the slots
-    at["U13"] = (60.0, row_slot(1) + 2, 90)
-    at["U14"] = (60.0, row_slot(2) + 2, 90)
-    at["U11"] = (60.0, row_slot(3) + 2, 90)
-    at["U12"] = (60.0, row_slot(4) + 2, 90)
+    at["U13"] = (74.0, row_slot(1) + 8, 90)
+    at["U14"] = (74.0, row_slot(2) + 4, 90)
+    at["U11"] = (74.0, row_slot(3) + 2, 90)
+    at["U12"] = (74.0, row_slot(4) + 2, 90)
     for r, u in (("C49", "U13"), ("C50", "U14"), ("C47", "U11"), ("C48", "U12")):
         at[r] = (at[u][0] + 6.0, at[u][1], 90)
     at["R107"] = (70.0, row_slot(5), 0)
@@ -767,7 +778,7 @@ def legalize(parts, at, margin=0.35, extra=None):
     import math
     import pcbnew
     mm = pcbnew.FromMM
-    fixed = ("J", "U7", "U9", "U10", "H")
+    fixed = ("J", "U7", "U9", "U10", "H", "D6")
     order = sorted(at, key=lambda r: (not r.startswith(fixed), r))
     fps = {}
     for s in parts:
