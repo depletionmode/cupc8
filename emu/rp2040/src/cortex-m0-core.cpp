@@ -2847,22 +2847,22 @@ uint32_t CortexM0Core::executeInstructionChain() {
 // (its own fast paths), the XIP mirrors 0x11000000-0x13ffffff and the bootrom
 // (its readUint32 fallback, an aligned word, of which it takes a half: on a
 // little-endian host the halfword at the address in the word's bytes).
-// Everything else (other regions, the last halfword of a memory, which throws
-// or warns in TS) goes through readUint16. Nothing is cached, so writes need
-// no invalidation.
+// Everything else (other regions, where it may warn, and to keep the bounds
+// simple the last halfword of flash and of the bootrom) goes through
+// readUint16. Nothing is cached, so writes need no invalidation.
 RP2040_ALWAYS_INLINE uint32_t CortexM0Core::fetch16(uint32_t address) {
   RP2040 &chip = rp2040;
   const uint32_t ramOffset = address - RAM_START_ADDRESS;
-  if (ramOffset + 2 <= chip.sram.size()) {
+  if (ramOffset <= chip.sram.size() - 2) {  // (size_t: no wrap-around)
     return loadLE16(chip.sram.data() + ramOffset);
   }
   const uint32_t flashOffset = address & 0x00ffffff;
   if (address - FLASH_START_ADDRESS < FLASH_END_ADDRESS - FLASH_START_ADDRESS &&
-      flashOffset + 4 <= chip.flash.size()) {
+      flashOffset <= chip.flash.size() - 4) {
     return loadLE16(chip.flash.data() + flashOffset);
   }
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-  if (address + 4 <= chip.bootrom.size() * 4) {
+  if (address <= chip.bootrom.size() * 4 - 4) {
     return loadLE16(reinterpret_cast<const uint8_t *>(chip.bootrom.data()) + address);
   }
 #endif

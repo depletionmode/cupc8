@@ -835,7 +835,10 @@ async function step() {
   // halfword outside it) or outside every memory
   const edgeFetch = chance(0.004);
   if (edgeFetch) {
-    await setReg(15, pick([0x20041ffe, 0x10fffffe, 0x11fffffe, 0x13fffffe, 0x00003ffe, 0x00004000, 0x20042000, 0x30000000]));
+    await setReg(15, pick([
+        0x20041ffe, 0x10fffffe, 0x11fffffe, 0x13fffffe, 0x00003ffe, 0x00003ffc, 0x00004000, 0x20042000,
+        0x30000000, 0x1ffffffe, 0x1ffffffc, 0xfffffffc, 0xfffffffe, 0x0ffffffe,
+      ]));
   }
   if (!spOK()) {
     const msp = (MS_LO + SP_MARGIN + ri(MS_HI - MS_LO - 2 * SP_MARGIN)) & ~3;
