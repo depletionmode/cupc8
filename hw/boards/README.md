@@ -74,7 +74,17 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
 
 - **FPGA pins** are read from `hw/pins.yaml` (`cpu_fpga`), the file that also
   generates `build/hw/cpucard.pcf`, so the schematic and the bitstream agree
-  by construction.
+  by construction. The bank-2 bus pins run bottom to top in the fingers'
+  left-to-right order: /RST, /STB, /RDY, RW, SYNC, D0–D4, CLK (GBIN5, pin 49),
+  D5–D7, TMR_EXP0/1, HALTED, WAITING. That way only CPU_CLK crosses other bus
+  lines on the way to the socket. In the first pin order the control lines
+  crossed all eight data lines, and Freerouting could not route them.
+- **Footprints** are JLC's own (`jlc:`, imported from the LCSC part) for the
+  FPGA, the flash and the resistor arrays, so the BOM check (BRD-001) matches
+  them pad for pad. The pin tables are in `hw/parts/`. The FPGA's table is
+  Lattice's HX4K TQ144 pinout. All 144 pins were cross-checked against
+  KiCad's symbol and icestorm's chipdb. EasyEDA's symbol for C1521989 has
+  another device's pin names, and nothing uses it.
 - **Power** (Lattice FPGA-TN-02006, the iCE40 hardware checklist). VCC 1V2
   comes from an RT9013-12GB off the socket's +3V3. All four VCCIO banks,
   SPI_VCC and VPP_2V5 are on 3V3; VPP_2V5 may be 2.5–3.3 V when the FPGA
@@ -101,7 +111,9 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   and the clock. Two planes give every one of them a short via to its supply
   and a solid return path under the whole bus, without cutting up a pour. On
   two layers the fan-out would have to share its layers with the power.
-- **Placement.** The FPGA is turned a quarter turn, so bank 3 (A[15:0],
-  IRQ) faces the fingers and bank 2 (D, control, config) faces right. The A
-  arrays sit between the package and the fingers. The D/control arrays sit
-  on the right, and the flash is by the config pins.
+- **Placement.** The FPGA's bank 3 (A[15:0], IRQ) faces the fingers. Bank 2
+  (control, D, timers, config) faces right. The eight 33 Ω arrays run in one
+  row under the package, in the fingers' order: A, then /STB-RW-SYNC, D0–3,
+  D4–7 and the timer lines. The flash sits by the config pins, top right,
+  clear of the M3 hole. The PWR LED is at the common spot, 3 mm in from the
+  top-left corner. Nothing sits in the 4.5 mm strip above the fingers.
