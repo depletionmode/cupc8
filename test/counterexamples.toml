@@ -206,7 +206,7 @@ must_fail = ["FAIL the boot ROM's probe READ came"]
 
 [[bug]]
 name = "BOM check: a wrong JLC rotation correction (the LEDs turned half round, cathode on the anode's pad)"
-fixed_in = "BRD-001"
+fixed_in = "c005c7c"
 revert = [["hw/parts/jlc_rotation.yaml", "LED_SMD:LED_0603_1608Metric:\n  rotation: 0\n", "LED_SMD:LED_0603_1608Metric:\n  rotation: 180\n"]]
 cmd = "python3 hw/tools/bomcheck.py wifi"
 must_fail = ["jlc_rotation.yaml adds 180 degrees, but JLC's footprint (EasyEDA LED0603-RD) is KiCad's turned by 0",
@@ -214,7 +214,7 @@ must_fail = ["jlc_rotation.yaml adds 180 degrees, but JLC's footprint (EasyEDA L
 
 [[bug]]
 name = "BOM check: a symbol with two IC pins swapped (74LVC1G125 A and Y)"
-fixed_in = "BRD-001"
+fixed_in = "c005c7c"
 revert = [
   ["hw/lib/jlc.kicad_sym", "        (name \"Y\" (effects (font (size 1.27 1.27))))\n        (number \"4\"", "        (name \"Y\" (effects (font (size 1.27 1.27))))\n        (number \"2\""],
   ["hw/lib/jlc.kicad_sym", "        (name \"A\" (effects (font (size 1.27 1.27))))\n        (number \"2\"", "        (name \"A\" (effects (font (size 1.27 1.27))))\n        (number \"4\""],
