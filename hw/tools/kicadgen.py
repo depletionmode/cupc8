@@ -1927,11 +1927,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             if layers == 4:
-                # across on In2.Cu inside the tab, just below the body, where
-                # no route needs In2 (the tab has no vias), so it walls off
-                # nothing; the via keepout starts below it
-                presence_link(b, outline[3], rise=-0.8, across=pcbnew.In2_Cu)
-                tab_via_keepout(b, outline[3] + 1.5)
+                # across on In2.Cu just above the tab (the key notch reaches
+                # the body's edge), below where In2 routes turn down to their
+                # fingers' vias, so it walls off next to nothing
+                presence_link(b, outline[3], rise=0.5, across=pcbnew.In2_Cu)
+                tab_via_keepout(b, outline[3])
             else:
                 presence_link(b, outline[3])
                 tab_via_keepout(b, outline[3])
