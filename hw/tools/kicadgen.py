@@ -1783,7 +1783,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False):
+             io_card=False, prepare=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1793,7 +1793,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     revision): `title` and `revision` are printed as "<title> rev <revision>"
     on the top silkscreen, in the body's bottom-right corner unless
     `revision_at` names another bottom-right anchor (mm), and go in the
-    board's title block, which the Gerbers' X2 attributes carry."""
+    board's title block, which the Gerbers' X2 attributes carry.
+
+    `prepare(board)`, if given, runs after the pad fan-out and before
+    Freerouting: a board's own locked pre-routing (layer changes the router
+    would otherwise scatter)."""
     import pcbnew
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
@@ -1845,6 +1849,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # every poured net's pads get a via: GND, and any net on a plane
         # (build_board's (net, layers) zones), which is reached no other way
         state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
+        if prepare:                   # the board's own locked pre-routing, before Freerouting
+            prepare(b)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \

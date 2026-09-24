@@ -309,7 +309,7 @@ def placement():
     # the bottom side's decaps step aside from the arrays under the bus pins
     p["C5"] = beside(6, along=-6.0)
     p["C1"] = beside(27, along=4.5)
-    p["C6"] = beside(30, along=5.0)
+    p["C6"] = beside(30, along=5.5)
     p.update({
         "C15": (16, 44, 90), "C16": (66, 44, 90),              # 3V3 bulk: finger entry, right side
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
@@ -317,13 +317,13 @@ def placement():
         "C20": (24.1, 22.0, 90), "C19": (16.5, 22.0, 90), "R7": (16.5, 26.0, 90),
         # 33 ohm arrays at their pins: A and control under the bottom side,
         # D and the timer lines in a column right of the right side
-        "RN1": (28.6, 37.2, 0), "RN2": (32.2, 37.2, 0), "RN3": (35.8, 37.2, 0), "RN4": (39.4, 37.2, 0),
-        "RN5": (43.4, 37.2, 0),
+        "RN1": (28.0, 37.2, 0), "RN2": (32.0, 37.2, 0), "RN3": (36.0, 37.2, 0), "RN4": (40.0, 37.2, 0),
+        "RN5": (44.0, 37.2, 0),
         "RN6": (60.5, 30.8, 90), "RN7": (60.5, 26.8, 90), "RN8": (60.5, 21.0, 90),
         # config flash and its pull-ups, top right by the config pins, clear
         # of the mounting hole's keep-out
         "U2": (60.0, 9.0, 0), "C23": (60.5, 3.0, 0),
-        "R1": (40.0, 4.0, 90), "R2": (44.0, 4.0, 90), "R3": (48.0, 4.0, 90), "R4": (52.0, 4.0, 90),
+        "R1": (42.0, 4.0, 90), "R2": (45.5, 4.0, 90), "R3": (49.0, 4.0, 90), "R4": (52.5, 4.0, 90),
         "R5": (56.0, 4.0, 90),
         # 1V2 LDO and its rail LED, top left
         "U3": (15.0, 5.0, 0), "C21": (11.0, 5.0, 90), "C22": (19.0, 5.0, 90),
@@ -338,6 +338,41 @@ def placement():
     return p
 
 
+def a_vias(board, via=0.6, drill=0.3, track=0.2):
+    """Locked pre-routing: each address line leaves its array (finger side,
+    pads 1-4, 0.8 mm apart) on a short track to its own via, in two
+    staggered rows just under the arrays. A goes to the back-side fingers;
+    placing its layer changes here keeps the front below the arrays clear
+    for the control and data lines, which Freerouting otherwise has to
+    thread through vias it scattered itself."""
+    import pcbnew
+    mm = pcbnew.FromMM
+    for fp in board.GetFootprints():
+        if fp.GetReference() not in ("RN1", "RN2", "RN3", "RN4"):
+            continue
+        for pad in fp.Pads():
+            k = int(pad.GetNumber())
+            if k > 4:
+                continue
+            px, py = pad.GetPosition().x, pad.GetPosition().y
+            v = pcbnew.VECTOR2I(px, py + mm(1.2 if k % 2 else 2.4))
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(pad.GetPosition())
+            t.SetEnd(v)
+            t.SetWidth(mm(track))
+            t.SetLayer(pcbnew.F_Cu)
+            t.SetNet(pad.GetNet())
+            t.SetLocked(True)
+            board.Add(t)
+            vi = pcbnew.PCB_VIA(board)
+            vi.SetPosition(v)
+            vi.SetWidth(mm(via))
+            vi.SetDrill(mm(drill))
+            vi.SetNet(pad.GetNet())
+            vi.SetLocked(True)
+            board.Add(vi)
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     import logo
@@ -348,7 +383,7 @@ def main():
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), OUTLINE, out=out, edge=EDGE, card_edge=True, layers=4,
         zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
-        labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION,
+        labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION, prepare=a_vias,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 46.0, 0)])
     print("LCSC:", " ".join(sorted(lcsc)))
 
