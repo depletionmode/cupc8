@@ -864,13 +864,16 @@ def place_designators(board, outline, labels=None, gap=0.3):
         ref.SetTextAngleDegrees(0)
         ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
         ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
-        cx0, cy0, cx1, cy1 = courts[fp.GetReference()]
-        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
         others = [c for r, c in courts.items() if r != fp.GetReference()]
         spots = []
-        for shift in (0, 1, -1, 2, -2, 3, -3):
-            spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
-                      (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
+        # round the courtyard, then (for an imported footprint whose courtyard
+        # is only its body, leads outside it) round its pads
+        for cx0, cy0, cx1, cy1 in (courts[fp.GetReference()],
+                                   union([courts[fp.GetReference()]] + [box(p.GetBoundingBox(), 0.5) for p in fp.Pads()])):
+            mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+            for shift in (0, 1, -1, 2, -2, 3, -3):
+                spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
+                          (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
         for sx, sy in spots:
             ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
             t = box(ref.GetBoundingBox())

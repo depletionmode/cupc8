@@ -303,11 +303,11 @@ def placement():
     p.update({
         "C15": (16, 44, 90), "C16": (66, 44, 90),              # 3V3 bulk: finger entry, right side
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": (52.2, 22.5, 270), "C17": (54.9, 22.5, 270), "R6": (54.9, 26.8, 90),
+        "C18": (52.2, 22.5, 270), "C17": (57.6, 22.5, 270), "R6": (57.6, 26.8, 90),
         "C20": (24.1, 22.0, 90), "C19": (16.5, 22.0, 90), "R7": (16.5, 26.0, 90),
-        # 33 ohm arrays: A below the FPGA, D and control to its right
+        # 33 ohm arrays in a row below the FPGA, in the fingers' order: A, then control, D, timers
         "RN1": (29.0, 40.5, 0), "RN2": (33.6, 40.5, 0), "RN3": (38.2, 40.5, 0), "RN4": (42.8, 40.5, 0),
-        "RN5": (58.0, 30.5, 90), "RN6": (58.0, 27.0, 90), "RN7": (58.0, 23.5, 90), "RN8": (58.0, 20.0, 90),
+        "RN5": (48.5, 36.5, 0), "RN6": (53.0, 36.5, 0), "RN7": (57.5, 36.5, 0), "RN8": (62.0, 36.5, 0),
         # config flash and its pull-ups, top right by the config pins, clear
         # of the mounting hole's keep-out
         "U2": (60.0, 9.0, 0), "C23": (60.5, 3.0, 0),
