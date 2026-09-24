@@ -1182,6 +1182,10 @@ def remove_dangling(board, pours=()):
         items = [t for t in items if t.GetNetname() not in pours]
         segs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]
         vias = [t for t in items if t.Type() == pcbnew.PCB_VIA_T]
+        # what can go: not the locked pre-routes (a presence link crossing on
+        # an inner layer has vias joined on one outer layer only), but they
+        # still count as what the rest is joined to
+        removable = [t for t in segs + vias if not t.IsLocked()]
         pads = [p for fp in board.GetFootprints() for p in fp.Pads()]
 
         def seg_dist(pt, t):
@@ -1204,11 +1208,11 @@ def remove_dangling(board, pours=()):
                     return True
             return False
         gone = []
-        for v in vias:
+        for v in [v for v in vias if v in removable]:
             layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
             if len(layers) < 2:
                 gone.append(v)
-        for t in segs:
+        for t in [t for t in segs if t in removable]:
             for end in (t.GetStart(), t.GetEnd()):
                 if not joined(end, t.GetLayer(), t.GetNetname(), t.GetWidth() // 2, skip=t):
                     gone.append(t)
