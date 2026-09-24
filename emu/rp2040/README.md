@@ -95,8 +95,16 @@ prove it):
   does). `RPPIO::fastPath = false` turns it off; `lazyCycles`/`lazyEvents`
   count it (`RP2040RUN_STATS=1 rp2040run ...` prints them). `stepPIOs()` is
   Emu.cycles' PIO loop with the lazy stretches done in bulk.
-- The Cortex-M0 decode enters its if/else chain at the first branch whose
-  opcode test can hold (a table built from the chain's own conditions).
+- The Cortex-M0 decode is a 64K-entry handler table (`decodeTable`, by first
+  halfword). The TS if/else chain is split, by a script, into its branches'
+  conditions (`decodeCond<k>`) and bodies (`exec<k>`), verbatim; entry
+  `opcode` is the handler of the first branch whose opcode test can hold
+  (`decodeEntry`, the chain's own conditions), which runs that branch and,
+  if its opcode2 term fails, the rest of the chain (`chain(k + 1)`). So every
+  opcode runs the branch the chain would. `test_decode` (EMU-005 `decode`)
+  checks the table exhaustively (all opcodes; all second halfwords of the
+  32-bit ones) and executes every opcode through the table and through the
+  plain chain (`executeInstructionChain()`, the reference) from the same state.
 - `toUint32`/`jsMathRound` go through int64 where that is exact
   (`test/js/test_js_numbers.cpp`); Timer32 keeps `baseFreq / prescaler`.
 - `RPSIO::selectCore` defers the divider/interpolator bank swap to the next

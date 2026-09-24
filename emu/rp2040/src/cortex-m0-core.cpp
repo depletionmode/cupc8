@@ -20,6 +20,7 @@
 #include "cortex-m0-core.h"
 
 #include <algorithm>
+#include <utility>
 #include <stdexcept>
 #include <string>
 
@@ -655,82 +656,148 @@ static const std::array<uint8_t, 0x10000> &decodeEntry() {
   return table;
 }
 
-uint32_t CortexM0Core::executeInstruction() {
-  if (interruptsUpdated) {
-    if (checkForInterrupts()) {
-      waiting = false;
-      waitingForEvent = false;
-    }
+// The decode chain, split into its branches (generated from the if/else-if
+// chain of cortex-m0-core.ts, which executeInstruction was, by a script that
+// moved each branch's condition and body verbatim).
+#define RP2040_ALWAYS_INLINE inline __attribute__((always_inline))
+
+template <int K>
+constexpr bool decodeCond(uint32_t opcode, uint32_t opcode2);
+
+// The decode chain's branches, one per `k` (0..82, in the chain's order;
+// 83 is its final else). decodeCond<k> is branch k's condition and exec<k>
+// its body, both verbatim from the if/else-if chain of cortex-m0-core.ts;
+// exec<k> runs the body and returns true when the condition holds.
+
+// ADCS
+template <>
+constexpr bool decodeCond<0>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<0>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<0>(opcode, opcode2)) {
+    return false;
   }
-  // ARM Thumb instruction encoding - 16 bits / 2 bytes
-  // JS: `this.PC & ~1` is an int32 (negative for PC >= 2**31); only its hex in the warning shows it
-  const uint32_t opcodePC = PC() & ~1u;  // ensure no LSB set PC are executed
-  const uint32_t opcode = readUint16(opcodePC);
-  const bool wideInstruction = opcode >> 12 == 0b1111 || opcode >> 11 == 0b11101;
-  const uint32_t opcode2 = wideInstruction ? readUint16(opcodePC + 2) : 0;
-  registers[15] += 2;
-  uint32_t deltaCycles = 1;
-  switch (decodeEntry()[opcode]) {
-  // ADCS
-    case 0:
-  if (opcode >> 6 == 0b0100000101) {
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     // JS: registers[Rdn] + 1 can be 2**32
     registers[Rdn] = toUint32(addUpdateFlags(registers[Rm], static_cast<double>(registers[Rdn]) +
                                                                 (C ? 1 : 0)));
-    break;
   }
-    [[fallthrough]];
-  // ADD (register = SP plus immediate)
-    case 1:
-  if (opcode >> 11 == 0b10101) {
+  return true;
+}
+
+// ADD (register = SP plus immediate)
+template <>
+constexpr bool decodeCond<1>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b10101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<1>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<1>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rd = (opcode >> 8) & 0x7;
     registers[Rd] = SP() + (imm8 << 2);
-    break;
   }
-    [[fallthrough]];
-  // ADD (SP plus immediate)
-    case 2:
-  if (opcode >> 7 == 0b101100000) {
+  return true;
+}
+
+// ADD (SP plus immediate)
+template <>
+constexpr bool decodeCond<2>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 7 == 0b101100000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<2>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<2>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm32 = (opcode & 0x7f) << 2;
     setSP(SP() + imm32);
-    break;
   }
-    [[fallthrough]];
-  // ADDS (Encoding T1)
-    case 3:
-  if (opcode >> 9 == 0b0001110) {
+  return true;
+}
+
+// ADDS (Encoding T1)
+template <>
+constexpr bool decodeCond<3>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0001110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<3>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<3>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm3 = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(addUpdateFlags(registers[Rn], imm3));
-    break;
   }
-    [[fallthrough]];
-  // ADDS (Encoding T2)
-    case 4:
-  if (opcode >> 11 == 0b00110) {
+  return true;
+}
+
+// ADDS (Encoding T2)
+template <>
+constexpr bool decodeCond<4>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<4>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<4>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rdn = (opcode >> 8) & 0x7;
     registers[Rdn] = toUint32(addUpdateFlags(registers[Rdn], imm8));
-    break;
   }
-    [[fallthrough]];
-  // ADDS (register)
-    case 5:
-  if (opcode >> 9 == 0b0001100) {
+  return true;
+}
+
+// ADDS (register)
+template <>
+constexpr bool decodeCond<5>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0001100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<5>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<5>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(addUpdateFlags(registers[Rn], registers[Rm]));
-    break;
   }
-    [[fallthrough]];
-  // ADD (register)
-    case 6:
-  if (opcode >> 8 == 0b01000100) {
+  return true;
+}
+
+// ADD (register)
+template <>
+constexpr bool decodeCond<6>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 8 == 0b01000100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<6>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<6>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     const uint32_t Rdn = ((opcode & 0x80) >> 4) | (opcode & 0x7);
     const uint32_t leftValue = Rdn == pcRegister ? PC() + 2 : registers[Rdn];
@@ -745,33 +812,63 @@ uint32_t CortexM0Core::executeInstruction() {
     } else if (Rdn == spRegister) {
       registers[Rdn] = result & ~0x3u;
     }
-    break;
   }
-    [[fallthrough]];
-  // ADR
-    case 7:
-  if (opcode >> 11 == 0b10100) {
+  return true;
+}
+
+// ADR
+template <>
+constexpr bool decodeCond<7>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b10100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<7>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<7>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rd = (opcode >> 8) & 0x7;
     registers[Rd] = (opcodePC & 0xfffffffc) + 4 + (imm8 << 2);
-    break;
   }
-    [[fallthrough]];
-  // ANDS (Encoding T2)
-    case 8:
-  if (opcode >> 6 == 0b0100000000) {
+  return true;
+}
+
+// ANDS (Encoding T2)
+template <>
+constexpr bool decodeCond<8>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<8>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<8>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = registers[Rdn] & registers[Rm];
     registers[Rdn] = result;
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
-    break;
   }
-    [[fallthrough]];
-  // ASRS (immediate)
-    case 9:
-  if (opcode >> 11 == 0b00010) {
+  return true;
+}
+
+// ASRS (immediate)
+template <>
+constexpr bool decodeCond<9>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<9>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<9>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
@@ -785,12 +882,22 @@ uint32_t CortexM0Core::executeInstruction() {
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
     C = input & static_cast<uint32_t>(jsShl(1, shiftN - 1)) ? true : false;
-    break;
   }
-    [[fallthrough]];
-  // ASRS (register)
-    case 10:
-  if (opcode >> 6 == 0b0100000100) {
+  return true;
+}
+
+// ASRS (register)
+template <>
+constexpr bool decodeCond<10>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<10>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<10>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t input = registers[Rdn];
@@ -804,12 +911,22 @@ uint32_t CortexM0Core::executeInstruction() {
     // TS bug, kept: for shiftN == 0 this is `1 << -1` == 1 << 31, so C = input bit 31
     // (the architecture leaves C unchanged)
     C = input & static_cast<uint32_t>(jsShl(1, shiftN - 1)) ? true : false;
-    break;
   }
-    [[fallthrough]];
-  // B (with cond)
-    case 11:
-  if (opcode >> 12 == 0b1101 && ((opcode >> 9) & 0x7) != 0b111) {
+  return true;
+}
+
+// B (with cond)
+template <>
+constexpr bool decodeCond<11>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 12 == 0b1101 && ((opcode >> 9) & 0x7) != 0b111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<11>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<11>(opcode, opcode2)) {
+    return false;
+  }
+  {
     int32_t imm8 = static_cast<int32_t>((opcode & 0xff) << 1);
     const uint32_t cond = (opcode >> 8) & 0xf;
     if (imm8 & (1 << 8)) {
@@ -819,44 +936,84 @@ uint32_t CortexM0Core::executeInstruction() {
       registers[15] += static_cast<uint32_t>(imm8 + 2);
       deltaCycles++;
     }
-    break;
   }
-    [[fallthrough]];
-  // B
-    case 12:
-  if (opcode >> 11 == 0b11100) {
+  return true;
+}
+
+// B
+template <>
+constexpr bool decodeCond<12>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b11100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<12>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<12>(opcode, opcode2)) {
+    return false;
+  }
+  {
     int32_t imm11 = static_cast<int32_t>((opcode & 0x7ff) << 1);
     if (imm11 & (1 << 11)) {
       imm11 = (imm11 & 0x7ff) - 0x800;
     }
     registers[15] += static_cast<uint32_t>(imm11 + 2);
     deltaCycles++;
-    break;
   }
-    [[fallthrough]];
-  // BICS
-    case 13:
-  if (opcode >> 6 == 0b0100001110) {
+  return true;
+}
+
+// BICS
+template <>
+constexpr bool decodeCond<13>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<13>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<13>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = (registers[Rdn] &= ~registers[Rm]);
     N = !!(result & 0x80000000);
     Z = result == 0;
-    break;
   }
-    [[fallthrough]];
-  // BKPT
-    case 14:
-  if (opcode >> 8 == 0b10111110) {
+  return true;
+}
+
+// BKPT
+template <>
+constexpr bool decodeCond<14>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 8 == 0b10111110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<14>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<14>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = opcode & 0xff;
     breakRewind = 2;
     rp2040.onBreak(imm8);
-    break;
   }
-    [[fallthrough]];
-  // BL
-    case 15:
-  if (opcode >> 11 == 0b11110 && opcode2 >> 14 == 0b11 && ((opcode2 >> 12) & 0x1) == 1) {
+  return true;
+}
+
+// BL
+template <>
+constexpr bool decodeCond<15>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b11110 && opcode2 >> 14 == 0b11 && ((opcode2 >> 12) & 0x1) == 1;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<15>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<15>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm11 = opcode2 & 0x7ff;
     const uint32_t J2 = (opcode2 >> 11) & 0x1;
     const uint32_t J1 = (opcode2 >> 13) & 0x1;
@@ -870,119 +1027,249 @@ uint32_t CortexM0Core::executeInstruction() {
     registers[15] += 2 + imm32;
     deltaCycles += 2;
     blTaken(*this, false);
-    break;
   }
-    [[fallthrough]];
-  // BLX
-    case 16:
-  if (opcode >> 7 == 0b010001111 && (opcode & 0x7) == 0) {
+  return true;
+}
+
+// BLX
+template <>
+constexpr bool decodeCond<16>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 7 == 0b010001111 && (opcode & 0x7) == 0;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<16>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<16>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     setLR(PC() | 0x1);
     setPC(registers[Rm] & ~1u);
     deltaCycles++;
     blTaken(*this, true);
-    break;
   }
-    [[fallthrough]];
-  // BX
-    case 17:
-  if (opcode >> 7 == 0b010001110 && (opcode & 0x7) == 0) {
+  return true;
+}
+
+// BX
+template <>
+constexpr bool decodeCond<17>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 7 == 0b010001110 && (opcode & 0x7) == 0;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<17>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<17>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     BXWritePC(registers[Rm]);
     deltaCycles++;
-    break;
   }
-    [[fallthrough]];
-  // CMN (register)
-    case 18:
-  if (opcode >> 6 == 0b0100001011) {
+  return true;
+}
+
+// CMN (register)
+template <>
+constexpr bool decodeCond<18>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001011;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<18>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<18>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rn = opcode & 0x7;
     addUpdateFlags(registers[Rn], registers[Rm]);
-    break;
   }
-    [[fallthrough]];
-  // CMP immediate
-    case 19:
-  if (opcode >> 11 == 0b00101) {
+  return true;
+}
+
+// CMP immediate
+template <>
+constexpr bool decodeCond<19>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<19>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<19>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rn = (opcode >> 8) & 0x7;
     const uint32_t imm8 = opcode & 0xff;
     substractUpdateFlags(registers[Rn], imm8);
-    break;
   }
-    [[fallthrough]];
-  // CMP (register)
-    case 20:
-  if (opcode >> 6 == 0b0100001010) {
+  return true;
+}
+
+// CMP (register)
+template <>
+constexpr bool decodeCond<20>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<20>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<20>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rn = opcode & 0x7;
     substractUpdateFlags(registers[Rn], registers[Rm]);
-    break;
   }
-    [[fallthrough]];
-  // CMP (register) encoding T2
-    case 21:
-  if (opcode >> 8 == 0b01000101) {
+  return true;
+}
+
+// CMP (register) encoding T2
+template <>
+constexpr bool decodeCond<21>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 8 == 0b01000101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<21>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<21>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     const uint32_t Rn = ((opcode >> 4) & 0x8) | (opcode & 0x7);
     substractUpdateFlags(registers[Rn], registers[Rm]);
-    break;
   }
-    [[fallthrough]];
-  // CPSID i
-    case 22:
-  if (opcode == 0xb672) {
+  return true;
+}
+
+// CPSID i
+template <>
+constexpr bool decodeCond<22>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0xb672;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<22>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<22>(opcode, opcode2)) {
+    return false;
+  }
+  {
     PM = true;
-    break;
   }
-    [[fallthrough]];
-  // CPSIE i
-    case 23:
-  if (opcode == 0xb662) {
+  return true;
+}
+
+// CPSIE i
+template <>
+constexpr bool decodeCond<23>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0xb662;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<23>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<23>(opcode, opcode2)) {
+    return false;
+  }
+  {
     PM = false;
     interruptsUpdated = true;
-    break;
   }
-    [[fallthrough]];
-  // DMB SY
-    case 24:
-  if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f50) {
+  return true;
+}
+
+// DMB SY
+template <>
+constexpr bool decodeCond<24>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f50;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<24>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<24>(opcode, opcode2)) {
+    return false;
+  }
+  {
     registers[15] += 2;
     deltaCycles += 2;
-    break;
   }
-    [[fallthrough]];
-  // DSB SY
-    case 25:
-  if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f40) {
+  return true;
+}
+
+// DSB SY
+template <>
+constexpr bool decodeCond<25>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f40;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<25>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<25>(opcode, opcode2)) {
+    return false;
+  }
+  {
     registers[15] += 2;
     deltaCycles += 2;
-    break;
   }
-    [[fallthrough]];
-  // EORS
-    case 26:
-  if (opcode >> 6 == 0b0100000001) {
+  return true;
+}
+
+// EORS
+template <>
+constexpr bool decodeCond<26>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<26>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<26>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = registers[Rm] ^ registers[Rdn];
     registers[Rdn] = result;
     N = !!(result & 0x80000000);
     Z = result == 0;
-    break;
   }
-    [[fallthrough]];
-  // ISB SY
-    case 27:
-  if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f60) {
+  return true;
+}
+
+// ISB SY
+template <>
+constexpr bool decodeCond<27>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f60;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<27>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<27>(opcode, opcode2)) {
+    return false;
+  }
+  {
     registers[15] += 2;
     deltaCycles += 2;
-    break;
   }
-    [[fallthrough]];
-  // LDMIA
-    case 28:
-  if (opcode >> 11 == 0b11001) {
+  return true;
+}
+
+// LDMIA
+template <>
+constexpr bool decodeCond<28>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b11001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<28>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<28>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rn = (opcode >> 8) & 0x7;
     const uint32_t registers_ = opcode & 0xff;
     uint32_t address = registers[Rn];
@@ -997,131 +1284,241 @@ uint32_t CortexM0Core::executeInstruction() {
     if (!(registers_ & (1u << Rn))) {
       registers[Rn] = address;
     }
-    break;
   }
-    [[fallthrough]];
-  // LDR (immediate)
-    case 29:
-  if (opcode >> 11 == 0b01101) {
+  return true;
+}
+
+// LDR (immediate)
+template <>
+constexpr bool decodeCond<29>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b01101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<29>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<29>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 2;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rn] + imm5;
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDR (sp + immediate)
-    case 30:
-  if (opcode >> 11 == 0b10011) {
+  return true;
+}
+
+// LDR (sp + immediate)
+template <>
+constexpr bool decodeCond<30>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b10011;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<30>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<30>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rt = (opcode >> 8) & 0x7;
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t addr = SP() + (imm8 << 2);
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDR (literal)
-    case 31:
-  if (opcode >> 11 == 0b01001) {
+  return true;
+}
+
+// LDR (literal)
+template <>
+constexpr bool decodeCond<31>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b01001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<31>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<31>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = (opcode & 0xff) << 2;
     const uint32_t Rt = (opcode >> 8) & 7;
     const uint32_t nextPC = PC() + 2;
     const uint32_t addr = (nextPC & 0xfffffffc) + imm8;
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDR (register)
-    case 32:
-  if (opcode >> 9 == 0b0101100) {
+  return true;
+}
+
+// LDR (register)
+template <>
+constexpr bool decodeCond<32>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<32>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<32>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDRB (immediate)
-    case 33:
-  if (opcode >> 11 == 0b01111) {
+  return true;
+}
+
+// LDRB (immediate)
+template <>
+constexpr bool decodeCond<33>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b01111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<33>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<33>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rn] + imm5;
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint8(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDRB (register)
-    case 34:
-  if (opcode >> 9 == 0b0101110) {
+  return true;
+}
+
+// LDRB (register)
+template <>
+constexpr bool decodeCond<34>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<34>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<34>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint8(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDRH (immediate)
-    case 35:
-  if (opcode >> 11 == 0b10001) {
+  return true;
+}
+
+// LDRH (immediate)
+template <>
+constexpr bool decodeCond<35>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b10001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<35>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<35>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double addr = static_cast<double>(registers[Rn]) + (imm5 << 1);  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(addr));
     registers[Rt] = readUint16Number(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDRH (register)
-    case 36:
-  if (opcode >> 9 == 0b0101101) {
+  return true;
+}
+
+// LDRH (register)
+template <>
+constexpr bool decodeCond<36>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<36>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<36>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double addr = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(addr));
     registers[Rt] = readUint16Number(addr);
-    break;
   }
-    [[fallthrough]];
-  // LDRSB
-    case 37:
-  if (opcode >> 9 == 0b0101011) {
+  return true;
+}
+
+// LDRSB
+template <>
+constexpr bool decodeCond<37>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101011;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<37>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<37>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(addr);
     registers[Rt] = static_cast<uint32_t>(signExtend8(readUint8(addr)));
-    break;
   }
-    [[fallthrough]];
-  // LDRSH
-    case 38:
-  if (opcode >> 9 == 0b0101111) {
+  return true;
+}
+
+// LDRSH
+template <>
+constexpr bool decodeCond<38>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<38>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<38>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double addr = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(addr));
     registers[Rt] = static_cast<uint32_t>(signExtend16(readUint16Number(addr)));
-    break;
   }
-    [[fallthrough]];
-  // LSLS (immediate)
-    case 39:
-  if (opcode >> 11 == 0b00000) {
+  return true;
+}
+
+// LSLS (immediate)
+template <>
+constexpr bool decodeCond<39>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<39>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<39>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
@@ -1131,12 +1528,22 @@ uint32_t CortexM0Core::executeInstruction() {
     N = !!(result & 0x80000000);
     Z = result == 0;
     C = imm5 ? !!(input & static_cast<uint32_t>(jsShl(1, 32 - imm5))) : C;
-    break;
   }
-    [[fallthrough]];
-  // LSLS (register)
-    case 40:
-  if (opcode >> 6 == 0b0100000010) {
+  return true;
+}
+
+// LSLS (register)
+template <>
+constexpr bool decodeCond<40>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<40>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<40>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t input = registers[Rdn];
@@ -1149,12 +1556,22 @@ uint32_t CortexM0Core::executeInstruction() {
     // TS bug, kept: for shiftCount > 32, `1 << (32 - shiftCount)` takes the count mod 32,
     // so C is some bit of input instead of 0
     C = shiftCount ? !!(input & static_cast<uint32_t>(jsShl(1, 32 - shiftCount))) : C;
-    break;
   }
-    [[fallthrough]];
-  // LSRS (immediate)
-    case 41:
-  if (opcode >> 11 == 0b00001) {
+  return true;
+}
+
+// LSRS (immediate)
+template <>
+constexpr bool decodeCond<41>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<41>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<41>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
@@ -1164,12 +1581,22 @@ uint32_t CortexM0Core::executeInstruction() {
     N = !!(result & 0x80000000);
     Z = result == 0;
     C = !!((input >> (imm5 ? imm5 - 1 : 31)) & 0x1);
-    break;
   }
-    [[fallthrough]];
-  // LSRS (register)
-    case 42:
-  if (opcode >> 6 == 0b0100000011) {
+  return true;
+}
+
+// LSRS (register)
+template <>
+constexpr bool decodeCond<42>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000011;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<42>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<42>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t shiftAmount = registers[Rm] & 0xff;
@@ -1181,12 +1608,22 @@ uint32_t CortexM0Core::executeInstruction() {
     // TS bug, kept: for shiftAmount == 0 this is `input >>> -1` == input >>> 31, so C = input
     // bit 31 (the architecture leaves C unchanged)
     C = shiftAmount <= 32 ? !!(jsShr(input, shiftAmount - 1) & 0x1) : false;
-    break;
   }
-    [[fallthrough]];
-  // MOV
-    case 43:
-  if (opcode >> 8 == 0b01000110) {
+  return true;
+}
+
+// MOV
+template <>
+constexpr bool decodeCond<43>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 8 == 0b01000110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<43>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<43>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     const uint32_t Rd = ((opcode >> 4) & 0x8) | (opcode & 0x7);
     uint32_t value = Rm == pcRegister ? PC() + 2 : registers[Rm];
@@ -1197,45 +1634,85 @@ uint32_t CortexM0Core::executeInstruction() {
       value &= ~3u;
     }
     registers[Rd] = value;
-    break;
   }
-    [[fallthrough]];
-  // MOVS
-    case 44:
-  if (opcode >> 11 == 0b00100) {
+  return true;
+}
+
+// MOVS
+template <>
+constexpr bool decodeCond<44>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<44>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<44>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t value = opcode & 0xff;
     const uint32_t Rd = (opcode >> 8) & 7;
     registers[Rd] = value;
     N = !!(value & 0x80000000);
     Z = value == 0;
-    break;
   }
-    [[fallthrough]];
-  // MRS
-    case 45:
-  if (opcode == 0b1111001111101111 && opcode2 >> 12 == 0b1000) {
+  return true;
+}
+
+// MRS
+template <>
+constexpr bool decodeCond<45>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0b1111001111101111 && opcode2 >> 12 == 0b1000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<45>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<45>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t SYSm = opcode2 & 0xff;
     const uint32_t Rd = (opcode2 >> 8) & 0xf;
     registers[Rd] = readSpecialRegister(SYSm);
     registers[15] += 2;
     deltaCycles += 2;
-    break;
   }
-    [[fallthrough]];
-  // MSR
-    case 46:
-  if (opcode >> 4 == 0b111100111000 && opcode2 >> 8 == 0b10001000) {
+  return true;
+}
+
+// MSR
+template <>
+constexpr bool decodeCond<46>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 4 == 0b111100111000 && opcode2 >> 8 == 0b10001000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<46>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<46>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t SYSm = opcode2 & 0xff;
     const uint32_t Rn = opcode & 0xf;
     writeSpecialRegister(SYSm, registers[Rn]);
     registers[15] += 2;
     deltaCycles += 2;
-    break;
   }
-    [[fallthrough]];
-  // MULS
-    case 47:
-  if (opcode >> 6 == 0b0100001101) {
+  return true;
+}
+
+// MULS
+template <>
+constexpr bool decodeCond<47>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<47>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<47>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rdm = opcode & 0x7;
     // Math.imul: the low 32 bits of the product
@@ -1243,36 +1720,66 @@ uint32_t CortexM0Core::executeInstruction() {
     registers[Rdm] = result;
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
-    break;
   }
-    [[fallthrough]];
-  // MVNS
-    case 48:
-  if (opcode >> 6 == 0b0100001111) {
+  return true;
+}
+
+// MVNS
+template <>
+constexpr bool decodeCond<48>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<48>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<48>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 7;
     const uint32_t Rd = opcode & 7;
     const uint32_t result = ~registers[Rm];
     registers[Rd] = result;
     N = !!(result & 0x80000000);
     Z = result == 0;
-    break;
   }
-    [[fallthrough]];
-  // ORRS (Encoding T2)
-    case 49:
-  if (opcode >> 6 == 0b0100001100) {
+  return true;
+}
+
+// ORRS (Encoding T2)
+template <>
+constexpr bool decodeCond<49>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<49>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<49>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = registers[Rdn] | registers[Rm];
     registers[Rdn] = result;
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
-    break;
   }
-    [[fallthrough]];
-  // POP
-    case 50:
-  if (opcode >> 9 == 0b1011110) {
+  return true;
+}
+
+// POP
+template <>
+constexpr bool decodeCond<50>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b1011110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<50>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<50>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t P = (opcode >> 8) & 1;
     uint32_t address = SP();
     for (uint32_t i = 0; i <= 7; i++) {
@@ -1289,12 +1796,22 @@ uint32_t CortexM0Core::executeInstruction() {
     } else {
       setSP(address);
     }
-    break;
   }
-    [[fallthrough]];
-  // PUSH
-    case 51:
-  if (opcode >> 9 == 0b1011010) {
+  return true;
+}
+
+// PUSH
+template <>
+constexpr bool decodeCond<51>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b1011010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<51>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<51>(opcode, opcode2)) {
+    return false;
+  }
+  {
     uint32_t bitCount = 0;
     for (uint32_t i = 0; i <= 8; i++) {
       if (opcode & (1u << i)) {
@@ -1313,44 +1830,84 @@ uint32_t CortexM0Core::executeInstruction() {
       writeUint32(address, registers[14]);
     }
     setSP(SP() - 4 * bitCount);
-    break;
   }
-    [[fallthrough]];
-  // REV
-    case 52:
-  if (opcode >> 6 == 0b1011101000) {
+  return true;
+}
+
+// REV
+template <>
+constexpr bool decodeCond<52>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011101000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<52>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<52>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     const uint32_t input = registers[Rm];
     registers[Rd] = ((input & 0xff) << 24) | (((input >> 8) & 0xff) << 16) |
                     (((input >> 16) & 0xff) << 8) | ((input >> 24) & 0xff);
-    break;
   }
-    [[fallthrough]];
-  // REV16
-    case 53:
-  if (opcode >> 6 == 0b1011101001) {
+  return true;
+}
+
+// REV16
+template <>
+constexpr bool decodeCond<53>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011101001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<53>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<53>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     const uint32_t input = registers[Rm];
     registers[Rd] = (((input >> 16) & 0xff) << 24) | (((input >> 24) & 0xff) << 16) |
                     ((input & 0xff) << 8) | ((input >> 8) & 0xff);
-    break;
   }
-    [[fallthrough]];
-  // REVSH
-    case 54:
-  if (opcode >> 6 == 0b1011101011) {
+  return true;
+}
+
+// REVSH
+template <>
+constexpr bool decodeCond<54>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011101011;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<54>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<54>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     const uint32_t input = registers[Rm];
     registers[Rd] = static_cast<uint32_t>(signExtend16(((input & 0xff) << 8) | ((input >> 8) & 0xff)));
-    break;
   }
-    [[fallthrough]];
-  // ROR
-    case 55:
-  if (opcode >> 6 == 0b0100000111) {
+  return true;
+}
+
+// ROR
+template <>
+constexpr bool decodeCond<55>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<55>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<55>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t input = registers[Rdn];
@@ -1363,46 +1920,96 @@ uint32_t CortexM0Core::executeInstruction() {
     Z = result == 0;
     // TS bug, kept: C is set from the result even when (Rm & 0xff) == 0 (should be unchanged)
     C = !!(result & 0x80000000);
-    break;
   }
-    [[fallthrough]];
-  // NEGS / RSBS
-    case 56:
-  if (opcode >> 6 == 0b0100001001) {
+  return true;
+}
+
+// NEGS / RSBS
+template <>
+constexpr bool decodeCond<56>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<56>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<56>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(substractUpdateFlags(0, registers[Rn]));
-    break;
   }
-    [[fallthrough]];
-  // NOP
-    case 57:
-  if (opcode == 0b1011111100000000) {
+  return true;
+}
+
+// NOP
+template <>
+constexpr bool decodeCond<57>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0b1011111100000000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<57>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<57>(opcode, opcode2)) {
+    return false;
+  }
+  {
     // Do nothing!
-    break;
   }
-    [[fallthrough]];
-  // SBCS (Encoding T1)
-    case 58:
-  if (opcode >> 6 == 0b0100000110) {
+  return true;
+}
+
+// SBCS (Encoding T1)
+template <>
+constexpr bool decodeCond<58>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100000110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<58>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<58>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     // JS: registers[Rm] + 1 can be 2**32
     registers[Rdn] = toUint32(substractUpdateFlags(
         registers[Rdn], static_cast<double>(registers[Rm]) + (1 - (C ? 1 : 0))));
-    break;
   }
-    [[fallthrough]];
-  // SEV
-    case 59:
-  if (opcode == 0b1011111101000000) {
+  return true;
+}
+
+// SEV
+template <>
+constexpr bool decodeCond<59>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0b1011111101000000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<59>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<59>(opcode, opcode2)) {
+    return false;
+  }
+  {
     rp2040.sendEvent();
-    break;
   }
-    [[fallthrough]];
-  // STMIA
-    case 60:
-  if (opcode >> 11 == 0b11000) {
+  return true;
+}
+
+// STMIA
+template <>
+constexpr bool decodeCond<60>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b11000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<60>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<60>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rn = (opcode >> 8) & 0x7;
     const uint32_t registers_ = opcode & 0xff;
     uint32_t address = registers[Rn];
@@ -1417,207 +2024,407 @@ uint32_t CortexM0Core::executeInstruction() {
     if (!(registers_ & (1u << Rn))) {
       registers[Rn] = address;
     }
-    break;
   }
-    [[fallthrough]];
-  // STR (immediate)
-    case 61:
-  if (opcode >> 11 == 0b01100) {
+  return true;
+}
+
+// STR (immediate)
+template <>
+constexpr bool decodeCond<61>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b01100;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<61>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<61>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 2;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rn] + imm5;
     deltaCycles += cyclesIO(address, true);
     writeUint32(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // STR (sp + immediate)
-    case 62:
-  if (opcode >> 11 == 0b10010) {
+  return true;
+}
+
+// STR (sp + immediate)
+template <>
+constexpr bool decodeCond<62>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b10010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<62>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<62>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rt = (opcode >> 8) & 0x7;
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t address = SP() + (imm8 << 2);
     deltaCycles += cyclesIO(address, true);
     writeUint32(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // STR (register)
-    case 63:
-  if (opcode >> 9 == 0b0101000) {
+  return true;
+}
+
+// STR (register)
+template <>
+constexpr bool decodeCond<63>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<63>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<63>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(address, true);
     writeUint32(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // STRB (immediate)
-    case 64:
-  if (opcode >> 11 == 0b01110) {
+  return true;
+}
+
+// STRB (immediate)
+template <>
+constexpr bool decodeCond<64>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b01110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<64>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<64>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rn] + imm5;
     deltaCycles += cyclesIO(address, true);
     writeUint8(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // STRB (register)
-    case 65:
-  if (opcode >> 9 == 0b0101010) {
+  return true;
+}
+
+// STRB (register)
+template <>
+constexpr bool decodeCond<65>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<65>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<65>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(address, true);
     writeUint8(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // STRH (immediate)
-    case 66:
-  if (opcode >> 11 == 0b10000) {
+  return true;
+}
+
+// STRH (immediate)
+template <>
+constexpr bool decodeCond<66>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b10000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<66>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<66>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 1;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double address = static_cast<double>(registers[Rn]) + imm5;  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(address), true);
     writeUint16Number(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // STRH (register)
-    case 67:
-  if (opcode >> 9 == 0b0101001) {
+  return true;
+}
+
+// STRH (register)
+template <>
+constexpr bool decodeCond<67>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0101001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<67>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<67>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double address = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(address), true);
     writeUint16Number(address, registers[Rt]);
-    break;
   }
-    [[fallthrough]];
-  // SUB (SP minus immediate)
-    case 68:
-  if (opcode >> 7 == 0b101100001) {
+  return true;
+}
+
+// SUB (SP minus immediate)
+template <>
+constexpr bool decodeCond<68>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 7 == 0b101100001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<68>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<68>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm32 = (opcode & 0x7f) << 2;
     setSP(SP() - imm32);
-    break;
   }
-    [[fallthrough]];
-  // SUBS (Encoding T1)
-    case 69:
-  if (opcode >> 9 == 0b0001111) {
+  return true;
+}
+
+// SUBS (Encoding T1)
+template <>
+constexpr bool decodeCond<69>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0001111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<69>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<69>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm3 = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(substractUpdateFlags(registers[Rn], imm3));
-    break;
   }
-    [[fallthrough]];
-  // SUBS (Encoding T2)
-    case 70:
-  if (opcode >> 11 == 0b00111) {
+  return true;
+}
+
+// SUBS (Encoding T2)
+template <>
+constexpr bool decodeCond<70>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 11 == 0b00111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<70>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<70>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rdn = (opcode >> 8) & 0x7;
     registers[Rdn] = toUint32(substractUpdateFlags(registers[Rdn], imm8));
-    break;
   }
-    [[fallthrough]];
-  // SUBS (register)
-    case 71:
-  if (opcode >> 9 == 0b0001101) {
+  return true;
+}
+
+// SUBS (register)
+template <>
+constexpr bool decodeCond<71>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 9 == 0b0001101;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<71>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<71>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(substractUpdateFlags(registers[Rn], registers[Rm]));
-    break;
   }
-    [[fallthrough]];
-  // SVC
-    case 72:
-  if (opcode >> 8 == 0b11011111) {
+  return true;
+}
+
+// SVC
+template <>
+constexpr bool decodeCond<72>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 8 == 0b11011111;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<72>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<72>(opcode, opcode2)) {
+    return false;
+  }
+  {
     pendingSVCall = true;
     interruptsUpdated = true;
-    break;
   }
-    [[fallthrough]];
-  // SXTB
-    case 73:
-  if (opcode >> 6 == 0b1011001001) {
+  return true;
+}
+
+// SXTB
+template <>
+constexpr bool decodeCond<73>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011001001;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<73>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<73>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = static_cast<uint32_t>(signExtend8(registers[Rm]));
-    break;
   }
-    [[fallthrough]];
-  // SXTH
-    case 74:
-  if (opcode >> 6 == 0b1011001000) {
+  return true;
+}
+
+// SXTH
+template <>
+constexpr bool decodeCond<74>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011001000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<74>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<74>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = static_cast<uint32_t>(signExtend16(registers[Rm]));
-    break;
   }
-    [[fallthrough]];
-  // TST
-    case 75:
-  if (opcode >> 6 == 0b0100001000) {
+  return true;
+}
+
+// TST
+template <>
+constexpr bool decodeCond<75>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b0100001000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<75>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<75>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rn = opcode & 0x7;
     const uint32_t result = registers[Rn] & registers[Rm];
     N = !!(result & 0x80000000);
     Z = result == 0;
-    break;
   }
-    [[fallthrough]];
-  // UDF
-    case 76:
-  if (opcode >> 8 == 0b11011110) {
+  return true;
+}
+
+// UDF
+template <>
+constexpr bool decodeCond<76>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 8 == 0b11011110;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<76>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<76>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm8 = opcode & 0xff;
     breakRewind = 2;
     rp2040.onBreak(imm8);
-    break;
   }
-    [[fallthrough]];
-  // UDF (Encoding T2)
-    case 77:
-  if (opcode >> 4 == 0b111101111111 && opcode2 >> 12 == 0b1010) {
+  return true;
+}
+
+// UDF (Encoding T2)
+template <>
+constexpr bool decodeCond<77>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 4 == 0b111101111111 && opcode2 >> 12 == 0b1010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<77>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<77>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t imm4 = opcode & 0xf;
     const uint32_t imm12 = opcode2 & 0xfff;
     breakRewind = 4;
     rp2040.onBreak((imm4 << 12) | imm12);
     registers[15] += 2;
-    break;
   }
-    [[fallthrough]];
-  // UXTB
-    case 78:
-  if (opcode >> 6 == 0b1011001011) {
+  return true;
+}
+
+// UXTB
+template <>
+constexpr bool decodeCond<78>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011001011;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<78>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<78>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = registers[Rm] & 0xff;
-    break;
   }
-    [[fallthrough]];
-  // UXTH
-    case 79:
-  if (opcode >> 6 == 0b1011001010) {
+  return true;
+}
+
+// UXTH
+template <>
+constexpr bool decodeCond<79>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode >> 6 == 0b1011001010;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<79>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<79>(opcode, opcode2)) {
+    return false;
+  }
+  {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = registers[Rm] & 0xffff;
-    break;
   }
-    [[fallthrough]];
-  // WFE
-    case 80:
-  if (opcode == 0b1011111100100000) {
+  return true;
+}
+
+// WFE
+template <>
+constexpr bool decodeCond<80>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0b1011111100100000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<80>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<80>(opcode, opcode2)) {
+    return false;
+  }
+  {
     deltaCycles++;
     if (eventRegistered) {
       eventRegistered = false;
@@ -1625,35 +2432,433 @@ uint32_t CortexM0Core::executeInstruction() {
       waiting = true;
       waitingForEvent = true;
     }
-    break;
   }
-    [[fallthrough]];
-  // WFI
-    case 81:
-  if (opcode == 0b1011111100110000) {
+  return true;
+}
+
+// WFI
+template <>
+constexpr bool decodeCond<81>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0b1011111100110000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<81>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<81>(opcode, opcode2)) {
+    return false;
+  }
+  {
     deltaCycles++;
     waiting = true;
-    break;
   }
-    [[fallthrough]];
-  // YIELD
-    case 82:
-  if (opcode == 0b1011111100010000) {
+  return true;
+}
+
+// YIELD
+template <>
+constexpr bool decodeCond<82>(uint32_t opcode, [[maybe_unused]] uint32_t opcode2) {
+  return opcode == 0b1011111100010000;
+}
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<82>([[maybe_unused]] uint32_t opcode, [[maybe_unused]] uint32_t opcode2,
+                                          [[maybe_unused]] uint32_t opcodePC, [[maybe_unused]] uint32_t &deltaCycles) {
+  if (!decodeCond<82>(opcode, opcode2)) {
+    return false;
+  }
+  {
     // do nothing for now. Wait for event!
     logger().info(LOG_NAME, "Yield");
-    break;
   }
-    [[fallthrough]];
-    default:  // (case 83) the final else: not implemented
-  {
+  return true;
+}
+
+// the final else: not implemented
+template <>
+RP2040_ALWAYS_INLINE bool CortexM0Core::exec<83>(uint32_t opcode, uint32_t opcode2, uint32_t opcodePC,
+                                           [[maybe_unused]] uint32_t &deltaCycles) {
     // JS: opcodePC is an int32, so `.toString(16)` shows a '-' for PC >= 2**31
     logger().warn(LOG_NAME, "Warning: Instruction at " +
                                 toHex(static_cast<double>(static_cast<int32_t>(opcodePC))) +
                                 " is not implemented yet!");
     logger().warn(LOG_NAME, "Opcode: 0x" + toHex(opcode) + " (0x" + toHex(opcode2) + ")");
-  }
-  }  // switch
+  return true;
+}
 
+/** whether decodeCond<k> reads opcode2 (the others are functions of the opcode alone) */
+static constexpr std::array<bool, 83> decodeCondUsesOpcode2 = {
+    false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, true, true, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false,
+};
+
+// The chain itself from branch k on: the first branch whose condition holds
+// runs (exec<83>, the final else, if none does). chain(0, ...) is the if/else
+// chain of the TS as it stands, and the reference for the decode table.
+void CortexM0Core::chain(uint32_t k, uint32_t opcode, uint32_t opcode2, uint32_t opcodePC,
+                         uint32_t &deltaCycles) {
+  switch (k) {
+    case 0:
+      if (exec<0>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 1:
+      if (exec<1>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 2:
+      if (exec<2>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 3:
+      if (exec<3>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 4:
+      if (exec<4>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 5:
+      if (exec<5>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 6:
+      if (exec<6>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 7:
+      if (exec<7>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 8:
+      if (exec<8>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 9:
+      if (exec<9>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 10:
+      if (exec<10>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 11:
+      if (exec<11>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 12:
+      if (exec<12>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 13:
+      if (exec<13>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 14:
+      if (exec<14>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 15:
+      if (exec<15>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 16:
+      if (exec<16>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 17:
+      if (exec<17>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 18:
+      if (exec<18>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 19:
+      if (exec<19>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 20:
+      if (exec<20>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 21:
+      if (exec<21>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 22:
+      if (exec<22>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 23:
+      if (exec<23>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 24:
+      if (exec<24>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 25:
+      if (exec<25>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 26:
+      if (exec<26>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 27:
+      if (exec<27>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 28:
+      if (exec<28>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 29:
+      if (exec<29>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 30:
+      if (exec<30>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 31:
+      if (exec<31>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 32:
+      if (exec<32>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 33:
+      if (exec<33>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 34:
+      if (exec<34>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 35:
+      if (exec<35>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 36:
+      if (exec<36>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 37:
+      if (exec<37>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 38:
+      if (exec<38>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 39:
+      if (exec<39>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 40:
+      if (exec<40>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 41:
+      if (exec<41>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 42:
+      if (exec<42>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 43:
+      if (exec<43>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 44:
+      if (exec<44>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 45:
+      if (exec<45>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 46:
+      if (exec<46>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 47:
+      if (exec<47>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 48:
+      if (exec<48>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 49:
+      if (exec<49>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 50:
+      if (exec<50>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 51:
+      if (exec<51>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 52:
+      if (exec<52>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 53:
+      if (exec<53>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 54:
+      if (exec<54>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 55:
+      if (exec<55>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 56:
+      if (exec<56>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 57:
+      if (exec<57>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 58:
+      if (exec<58>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 59:
+      if (exec<59>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 60:
+      if (exec<60>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 61:
+      if (exec<61>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 62:
+      if (exec<62>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 63:
+      if (exec<63>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 64:
+      if (exec<64>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 65:
+      if (exec<65>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 66:
+      if (exec<66>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 67:
+      if (exec<67>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 68:
+      if (exec<68>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 69:
+      if (exec<69>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 70:
+      if (exec<70>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 71:
+      if (exec<71>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 72:
+      if (exec<72>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 73:
+      if (exec<73>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 74:
+      if (exec<74>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 75:
+      if (exec<75>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 76:
+      if (exec<76>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 77:
+      if (exec<77>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 78:
+      if (exec<78>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 79:
+      if (exec<79>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 80:
+      if (exec<80>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 81:
+      if (exec<81>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    case 82:
+      if (exec<82>(opcode, opcode2, opcodePC, deltaCycles)) return;
+      [[fallthrough]];
+    default:
+      exec<83>(opcode, opcode2, opcodePC, deltaCycles);
+  }
+}
+
+// The decode table (not in TS): decodeTable[opcode] is the handler of the
+// chain's entry branch k = decodeEntry()[opcode], the first branch whose
+// condition can hold for that opcode: every earlier branch's condition is
+// false for it whatever opcode2 is (verifyDecodeTable() checks this for all
+// 65536 opcodes and, for the 32-bit ones, all 65536 second halfwords). The
+// handler runs branch k and, if its condition does not hold after all (a
+// condition with an opcode2 term), the rest of the chain from k + 1. So every
+// opcode runs exactly the branch that chain(0, ...) would.
+template <int K>
+uint32_t CortexM0Core::decodeHandler(CortexM0Core &core, uint32_t opcode, uint32_t opcode2,
+                                     uint32_t opcodePC) {
+  uint32_t deltaCycles = 1;
+  if constexpr (K < 83) {
+    if (!core.exec<K>(opcode, opcode2, opcodePC, deltaCycles)) {
+      core.chain(K + 1, opcode, opcode2, opcodePC, deltaCycles);
+    }
+  } else {
+    core.exec<83>(opcode, opcode2, opcodePC, deltaCycles);
+  }
+  return deltaCycles;
+}
+
+template <size_t... K>
+constexpr std::array<CortexM0Core::DecodeHandler, 84> decodeHandlers(std::index_sequence<K...>) {
+  return {&CortexM0Core::decodeHandler<static_cast<int>(K)>...};
+}
+
+const std::array<CortexM0Core::DecodeHandler, 0x10000> CortexM0Core::decodeTable = [] {
+  const auto handlers = decodeHandlers(std::make_index_sequence<84>());
+  std::array<DecodeHandler, 0x10000> t{};
+  for (uint32_t opcode = 0; opcode < 0x10000; opcode++) {
+    t[opcode] = handlers[decodeEntry()[opcode]];
+  }
+  return t;
+}();
+
+// decodeTable against the chain: for every opcode, no branch before its entry
+// branch k holds, for any opcode2 the decoder can pass (0 for a 16-bit
+// instruction, all 65536 for a 32-bit one), and branch k holds for some
+// opcode2 (or is the final else). A condition that does not read opcode2 is
+// evaluated once. Returns the number of opcodes that fail.
+template <size_t... K>
+static bool anyCondBefore(uint32_t k, bool withOpcode2, uint32_t opcode, uint32_t opcode2,
+                          std::index_sequence<K...>) {
+  return ((K < k && decodeCondUsesOpcode2[K] == withOpcode2 &&
+           decodeCond<static_cast<int>(K)>(opcode, opcode2)) ||
+          ...);
+}
+template <size_t... K>
+static bool condAt(uint32_t k, uint32_t opcode, uint32_t opcode2, std::index_sequence<K...>) {
+  return ((K == k && decodeCond<static_cast<int>(K)>(opcode, opcode2)) || ...);
+}
+
+uint32_t CortexM0Core::verifyDecodeTable() {
+  const auto handlers = decodeHandlers(std::make_index_sequence<84>());
+  constexpr auto seq = std::make_index_sequence<83>();
+  uint32_t bad = 0;
+  for (uint32_t opcode = 0; opcode < 0x10000; opcode++) {
+    const uint32_t k = decodeEntry()[opcode];
+    const bool wide = opcode >> 12 == 0b1111 || opcode >> 11 == 0b11101;
+    const uint32_t opcode2End = wide ? 0x10000 : 1;
+    bool ok = decodeTable[opcode] == handlers[k] && !anyCondBefore(k, false, opcode, 0, seq);
+    bool entryHolds = k == 83 || (!decodeCondUsesOpcode2[k] && condAt(k, opcode, 0, seq));
+    for (uint32_t opcode2 = 0; ok && opcode2 < opcode2End; opcode2++) {
+      ok = !anyCondBefore(k, true, opcode, opcode2, seq);
+      entryHolds = entryHolds || condAt(k, opcode, opcode2, seq);
+    }
+    if (!ok || !entryHolds) {
+      bad++;
+    }
+  }
+  return bad;
+}
+
+uint32_t CortexM0Core::executeInstructionChain() {
+  // executeInstruction() through the plain chain (the reference for the decode table)
+  if (interruptsUpdated) {
+    if (checkForInterrupts()) {
+      waiting = false;
+      waitingForEvent = false;
+    }
+  }
+  const uint32_t opcodePC = PC() & ~1u;
+  const uint32_t opcode = readUint16(opcodePC);
+  const bool wideInstruction = opcode >> 12 == 0b1111 || opcode >> 11 == 0b11101;
+  const uint32_t opcode2 = wideInstruction ? readUint16(opcodePC + 2) : 0;
+  registers[15] += 2;
+  uint32_t deltaCycles = 1;
+  chain(0, opcode, opcode2, opcodePC, deltaCycles);
+  cycles += deltaCycles;
+  return deltaCycles;
+}
+
+uint32_t CortexM0Core::executeInstruction() {
+  if (interruptsUpdated) {
+    if (checkForInterrupts()) {
+      waiting = false;
+      waitingForEvent = false;
+    }
+  }
+  // ARM Thumb instruction encoding - 16 bits / 2 bytes
+  // JS: `this.PC & ~1` is an int32 (negative for PC >= 2**31); only its hex in the warning shows it
+  const uint32_t opcodePC = PC() & ~1u;  // ensure no LSB set PC are executed
+  const uint32_t opcode = readUint16(opcodePC);
+  // (opcode >> 12 == 0b1111 || opcode >> 11 == 0b11101)
+  const bool wideInstruction = opcode >> 11 >= 0b11101;
+  const uint32_t opcode2 = wideInstruction ? readUint16(opcodePC + 2) : 0;
+  registers[15] += 2;
+  // the chain's first branch that holds for the opcode (see decodeTable)
+  const uint32_t deltaCycles = decodeTable[opcode](*this, opcode, opcode2, opcodePC);
   cycles += deltaCycles;
   return deltaCycles;
 }

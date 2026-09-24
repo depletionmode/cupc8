@@ -67,6 +67,11 @@ add_executable(test_core_diff test/core/test_core_diff.cpp)
 target_compile_options(test_core_diff PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(test_core_diff PRIVATE rp2040emu)
 
+# the decode table against the if/else chain it was generated from (exhaustive)
+add_executable(test_decode test/core/test_decode.cpp)
+target_compile_options(test_decode PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(test_decode PRIVATE rp2040emu)
+
 # Peripheral differential test (dma, uart, spi, i2c, timer, watchdog, rtc, adc,
 # pwm, timer32) against rp2040js, driven by test/periph/periph_diff.mjs:
 #   node emu/rp2040/test/periph/periph_diff.mjs --cxx build/emu-native/test_periph_diff

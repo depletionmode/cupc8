@@ -160,7 +160,29 @@ class CortexM0Core {
   /** One instruction; returns deltaCycles (and adds it to `cycles`). */
   uint32_t executeInstruction();
 
+  /**
+   * Not in TS. executeInstruction() decoding through the plain if/else chain
+   * of the TS (branch after branch from the first) instead of the decode
+   * table: the reference the table is tested against.
+   */
+  uint32_t executeInstructionChain();
+  /** Not in TS: the decode table's exhaustive check against the chain (0 = pass; see the .cpp). */
+  static uint32_t verifyDecodeTable();
+
+  /** a decode table entry: runs the instruction, returns deltaCycles */
+  using DecodeHandler = uint32_t (*)(CortexM0Core &core, uint32_t opcode, uint32_t opcode2, uint32_t opcodePC);
+  /** decodeTable[opcode] (not in TS): the chain from the first branch that can hold for the opcode */
+  template <int K>
+  static uint32_t decodeHandler(CortexM0Core &core, uint32_t opcode, uint32_t opcode2, uint32_t opcodePC);
+
  private:
+  static const std::array<DecodeHandler, 0x10000> decodeTable;
+  /** the decode chain's branch k (0..83): runs it and returns true if its condition holds */
+  template <int K>
+  bool exec(uint32_t opcode, uint32_t opcode2, uint32_t opcodePC, uint32_t &deltaCycles);
+  /** the decode chain from branch k on */
+  void chain(uint32_t k, uint32_t opcode, uint32_t opcode2, uint32_t opcodePC, uint32_t &deltaCycles);
+
   // JS arithmetic on 32-bit values that can overflow 32 bits (e.g.
   // registers[Rdn] + carry == 2**32), hence double in and out, as in TS.
   double substractUpdateFlags(double minuend, double subtrahend);
