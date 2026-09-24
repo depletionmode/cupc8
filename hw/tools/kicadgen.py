@@ -881,7 +881,10 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
                 steps = max(2, int(pcbnew.ToMM((b - a).EuclideanNorm()) / 0.02))
                 probes = [pcbnew.VECTOR2I(int(a.x + (b.x - a.x) * k / steps), int(a.y + (b.y - a.y) * k / steps))
                           for k in range(steps + 1)]
-                hit = lambda bb, pad: any(bb.Contains(pt) for pt in probes)   # noqa: E731
+                # the pad's true shape, as for rings: an oval or slotted pad's
+                # bounding box reaches corners the pad does not
+                hit = lambda bb, pad, probes=probes: any(                        # noqa: E731
+                    bb.Contains(pt) and pad.HitTest(pt, mm(clearance)) for pt in probes)
             elif isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_CIRCLE:
                 # the ring, not its bounding box (which holds the pad it rings)
                 c, r = g.GetCenter(), g.GetRadius() + g.GetWidth() / 2

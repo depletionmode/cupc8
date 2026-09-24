@@ -30,7 +30,7 @@ G = kg.GRID
 R0603 = "Resistor_SMD:R_0603_1608Metric"
 C0603 = "Capacitor_SMD:C_0603_1608Metric"
 C0805 = "Capacitor_SMD:C_0805_2012Metric"
-LED0805 = "LED_SMD:LED_0805_2012Metric"
+LED0603 = "LED_SMD:LED_0603_1608Metric"
 TP = "cupc8:TestPad_D1.0mm"
 
 # sysctl GPIO -> net, from hw/pins.yaml (fw/rp2040/sysctl depends on them).
@@ -74,9 +74,10 @@ PASSIVES = (
      ("R7", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SDA"),
      ("R8", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SCL"),
      ("R9", "Device:R", "1k", R0603, "C21190", "+3V3", "LED_PWR"),
-     ("R10", "Device:R", "220", R0603, "C22962", "LED_STATUS", "LED_ST"),
-     ("D1", "Device:LED", "red", LED0805, "C84256", "LED_PWR", "GND"),       # power
-     ("D2", "Device:LED", "green", LED0805, "C2297", "LED_ST", "GND")] +     # status, GPIO29
+     # green drops ~3 V, so 100 Ohm for a few mA from 3.3 V (as the Wi-Fi card)
+     ("R10", "Device:R", "100", R0603, "C22775", "LED_STATUS", "LED_ST"),
+     ("D1", "Device:LED", "red", LED0603, "C2286", "LED_PWR", "GND"),        # power
+     ("D2", "Device:LED", "green", LED0603, "C12624", "LED_ST", "GND")] +    # status, GPIO29
     [("R%d" % (11 + i), "Device:R", "33", R0603, "C23140", n + "_MCU", n) for i, n in enumerate(TERMINATED)]
 )
 
@@ -209,7 +210,7 @@ EDGE_AT = (W / 2 - 16.5, H + 4.95)
 OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
 LOGO_MM = 12
-LOGO_AT = (48.5, 31.5)
+LOGO_AT = (48.8, 28.6)
 
 PLACEMENT = {
     "J2": (EDGE_AT[0], EDGE_AT[1], 0),
@@ -231,26 +232,27 @@ PLACEMENT = {
     "C4": (34.2, 19, 90), "C5": (34.2, 14.5, 90), "C13": (36.5, 16.8, 90),
     "C6": (22.4, 10.3, 90), "C10": (25.2, 10.3, 90), "C7": (28, 10.3, 90), "C8": (30.8, 10.3, 90),
     "C12": (33.6, 10.3, 90),
-    "C14": (8.5, 34.8, 0),
+    "C14": (9, 27, 90),
     "R7": (38, 22, 90), "R8": (40, 22, 90),
     "D1": (51, 13, 0), "R9": (51, 15.5, 0),
-    "D2": (51, 20, 0), "R10": (51, 22.5, 0),
+    "D2": (51, 19, 0), "R10": (51, 21.5, 0),
 }
 for _i, _n in enumerate(TERMINATED):
-    PLACEMENT["R%d" % (11 + _i)] = (15 + 3.2 * _i, 31, 90)
+    PLACEMENT["R%d" % (11 + _i)] = (14 + 3.4 * _i, 31, 90)
 for _i, (_ref, _) in enumerate(TEST_PADS):
-    PLACEMENT[_ref] = (2.5, 3 + 3.1 * _i, 0)
+    PLACEMENT[_ref] = (2.5, 2.5 + 2.9 * _i, 0)
 
 
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     logo.footprint(LOGO_MM)
-    kg.pipeline("system", schematic, PLACEMENT, OUTLINE,
-                out=sys.argv[1] if len(sys.argv) > 1 else None,
-                power_nets=("/+3V3", "/1V1", "/GND"), edge=EDGE, card_edge=True, layers=4,
-                # the pour reaches over the finger tops, so GND fingers join it
-                zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
-                graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)])
+    lcsc = kg.pipeline(
+        "system", schematic, PLACEMENT, OUTLINE, out=sys.argv[1] if len(sys.argv) > 1 else None,
+        power_nets=("/+3V3", "/1V1", "/GND"), edge=EDGE, card_edge=True, layers=4,
+        # the pour reaches over the finger tops, so GND fingers join it
+        zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
+        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)])
+    print("LCSC:", " ".join(sorted(lcsc)))
 
 
 if __name__ == "__main__":
