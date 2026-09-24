@@ -117,7 +117,7 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   RT9013-12GB C58464, 4D03WGJ0330T5E 33 Ω × 4 C25508, MMBT3904 C20526,
   KT-0603R red LED C2286, and 0603 basics: 100 nF C14663, 1 µF C15849,
   4.7 µF C19666, 10 kΩ C25804, 1 kΩ C21190, 100 Ω C22775.
-- **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold 45° fingers.
+- **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold fingers, bevelled per the fab order spec (`kicadgen.order_spec`).
   The layers are signal + GND pour / GND plane / 3V3 plane / signal + GND
   pour. 1V2 is routed as tracks. With a TQ144 there
   are 16 supply pins on all four sides, plus 31 series-terminated bus lines
