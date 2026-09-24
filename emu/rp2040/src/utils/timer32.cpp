@@ -1,317 +1,196 @@
 // Port of rp2040js src/utils/timer32.ts
 //
-// STUB: every body below still has to be ported from the TS shown in its
-// comment (see README.md, "Porting rules"). Bus-facing methods abort so that
-// firmware cannot run on a half-ported peripheral without noticing.
+// Float math throughout, exactly as the JS numbers: ticks are
+// ((nanos - baseNanos) / 1e9) * (baseFreq / prescaler), `%` is fmod,
+// Math.round is jsMathRound.
 #include "timer32.h"
 
+#include <cmath>
 #include <utility>
+
 #include "js.h"
 
 namespace rp2040js {
 
-Timer32::Timer32(IClock &clock, double baseFreq) : clock(clock), baseFreq(baseFreq) {
-  // TODO(port): utils/timer32.ts
-  //   constructor(
-  //     readonly clock: IClock,
-  //     private baseFreq: number,
-  //   ) {}
-}
+Timer32::Timer32(IClock &clock, double baseFreq) : clock(clock), baseFreq(baseFreq) {}
 
 void Timer32::reset() {
-  // TODO(port): utils/timer32.ts
-  //   reset() {
-  //     this.baseNanos = this.clock.nanos;
-  //     this.baseValue = 0;
-  //     this.updated();
-  //   }
+  baseNanos = clock.nanos();
+  baseValue = 0;
+  updated();
 }
 
 void Timer32::set(double value, bool zigZagDown) {
-  // TODO(port): utils/timer32.ts
-  //   set(value: number, zigZagDown = false) {
-  //     this.baseValue = zigZagDown ? this.topValue * 2 - value : value;
-  //     this.baseNanos = this.clock.nanos;
-  //     this.updated();
-  //   }
-  (void)value;
-  (void)zigZagDown;
+  baseValue = zigZagDown ? topValue * 2 - value : value;
+  baseNanos = clock.nanos();
+  updated();
 }
 
-void Timer32::advance(double delta) {
-  // TODO(port): utils/timer32.ts
-  //   advance(delta: number) {
-  //     this.baseValue += delta;
-  //   }
-  (void)delta;
-}
+void Timer32::advance(double delta) { baseValue += delta; }
 
 double Timer32::rawCounter() const {
-  // TODO(port): utils/timer32.ts
-  //   get rawCounter() {
-  //     const { baseFreq, prescalerValue, baseNanos, baseValue, enabled, timerMode } = this;
-  //     if (!baseFreq || !prescalerValue || !enabled) {
-  //       return this.baseValue;
-  //     }
-  //     const zigzag = timerMode == TimerMode.ZigZag;
-  //     const ticks = ((this.clock.nanos - baseNanos) / 1e9) * (baseFreq / prescalerValue);
-  //     const topModulo = zigzag ? this.topValue * 2 : this.topValue + 1;
-  //     const delta = timerMode == TimerMode.Decrement ? topModulo - (ticks % topModulo) : ticks;
-  //     let currentValue = Math.round(baseValue + delta);
-  //     if (this.topValue != 0xffffffff) {
-  //       currentValue %= topModulo;
-  //     }
-  //     return currentValue;
-  //   }
-  return 0;
+  // const { baseFreq, prescalerValue, baseNanos, baseValue, enabled, timerMode } = this;
+  if (!baseFreq || !prescalerValue || !enabled) {
+    return baseValue;
+  }
+  const bool zigzag = timerMode == TimerMode::ZigZag;
+  const double ticks = ((clock.nanos() - baseNanos) / 1e9) * (baseFreq / prescalerValue);
+  const double topModulo = zigzag ? topValue * 2 : topValue + 1;
+  const double delta =
+      timerMode == TimerMode::Decrement ? topModulo - std::fmod(ticks, topModulo) : ticks;
+  double currentValue = jsMathRound(baseValue + delta);
+  if (topValue != 0xffffffff) {
+    currentValue = std::fmod(currentValue, topModulo);
+  }
+  return currentValue;
 }
 
 uint32_t Timer32::counter() const {
-  // TODO(port): utils/timer32.ts
-  //   get counter() {
-  //     let currentValue = this.rawCounter;
-  //     if (this.timerMode == TimerMode.ZigZag && currentValue > this.topValue) {
-  //       currentValue = this.topValue * 2 - currentValue;
-  //     }
-  //     return currentValue >>> 0;
-  //   }
-  return 0;
+  double currentValue = rawCounter();
+  if (timerMode == TimerMode::ZigZag && currentValue > topValue) {
+    currentValue = topValue * 2 - currentValue;
+  }
+  return toUint32(currentValue);
 }
 
-double Timer32::top() const {
-  // TODO(port): utils/timer32.ts
-  //   get top() {
-  //     return this.topValue;
-  //   }
-  return 0;
-}
+double Timer32::top() const { return topValue; }
 
 void Timer32::setTop(double value) {
-  // TODO(port): utils/timer32.ts
-  //   set top(value: number) {
-  //     const { counter } = this;
-  //     this.topValue = value;
-  //     this.set(counter <= this.topValue ? counter : 0);
-  //   }
-  (void)value;
+  const double counter = this->counter();
+  topValue = value;
+  set(counter <= topValue ? counter : 0);
 }
 
-double Timer32::frequency() const {
-  // TODO(port): utils/timer32.ts
-  //   get frequency() {
-  //     return this.baseFreq;
-  //   }
-  return 0;
-}
+double Timer32::frequency() const { return baseFreq; }
 
 void Timer32::setFrequency(double value) {
-  // TODO(port): utils/timer32.ts
-  //   set frequency(value: number) {
-  //     this.baseValue = this.counter;
-  //     this.baseNanos = this.clock.nanos;
-  //     this.baseFreq = value;
-  //     this.updated();
-  //   }
-  (void)value;
+  baseValue = counter();
+  baseNanos = clock.nanos();
+  baseFreq = value;
+  updated();
 }
 
-double Timer32::prescaler() const {
-  // TODO(port): utils/timer32.ts
-  //   get prescaler() {
-  //     return this.prescalerValue;
-  //   }
-  return 0;
-}
+double Timer32::prescaler() const { return prescalerValue; }
 
 void Timer32::setPrescaler(double value) {
-  // TODO(port): utils/timer32.ts
-  //   set prescaler(value: number) {
-  //     this.baseValue = this.counter;
-  //     this.baseNanos = this.clock.nanos;
-  //     this.enabled = this.prescalerValue !== 0;
-  //     this.prescalerValue = value;
-  //     this.updated();
-  //   }
-  (void)value;
+  baseValue = counter();
+  baseNanos = clock.nanos();
+  // TS bug (kept): tests the old prescaler value, before assigning the new one.
+  enabled = prescalerValue != 0;
+  prescalerValue = value;
+  updated();
 }
 
 double Timer32::toNanos(double cycles) const {
-  // TODO(port): utils/timer32.ts
-  //   toNanos(cycles: number) {
-  //     const { baseFreq, prescalerValue } = this;
-  //     return (cycles * 1e9) / (baseFreq / prescalerValue);
-  //   }
-  (void)cycles;
-  return 0;
+  return (cycles * 1e9) / (baseFreq / prescalerValue);
 }
 
-bool Timer32::enable() const {
-  // TODO(port): utils/timer32.ts
-  //   get enable() {
-  //     return this.enabled;
-  //   }
-  return false;
-}
+bool Timer32::enable() const { return enabled; }
 
 void Timer32::setEnable(bool value) {
-  // TODO(port): utils/timer32.ts
-  //   set enable(value: boolean) {
-  //     if (value !== this.enabled) {
-  //       if (value) {
-  //         this.baseNanos = this.clock.nanos;
-  //       } else {
-  //         this.baseValue = this.counter;
-  //       }
-  //       this.enabled = value;
-  //       this.updated();
-  //     }
-  //   }
-  (void)value;
+  if (value != enabled) {
+    if (value) {
+      baseNanos = clock.nanos();
+    } else {
+      baseValue = counter();
+    }
+    enabled = value;
+    updated();
+  }
 }
 
-TimerMode Timer32::mode() const {
-  // TODO(port): utils/timer32.ts
-  //   get mode() {
-  //     return this.timerMode;
-  //   }
-  return TimerMode::Increment;
-}
+TimerMode Timer32::mode() const { return timerMode; }
 
 void Timer32::setMode(TimerMode value) {
-  // TODO(port): utils/timer32.ts
-  //   set mode(value: TimerMode) {
-  //     if (this.timerMode !== value) {
-  //       const { counter } = this;
-  //       this.timerMode = value;
-  //       this.set(counter);
-  //     }
-  //   }
-  (void)value;
+  if (timerMode != value) {
+    const double counter = this->counter();
+    timerMode = value;
+    set(counter);
+  }
 }
 
 void Timer32::updated() {
-  // TODO(port): utils/timer32.ts
-  //   private updated() {
-  //     for (const listener of this.listeners) {
-  //       listener();
-  //     }
-  //   }
+  // `for (const listener of this.listeners)`: listeners are only added at construction
+  for (size_t i = 0; i < listeners.size(); i++) {
+    listeners[i]();
+  }
 }
 
 Timer32PeriodicAlarm::Timer32PeriodicAlarm(Timer32 &timer, std::function<void()> callback)
     : timer(timer), callback(std::move(callback)) {
-  // TODO(port): utils/timer32.ts
-  //   constructor(
-  //     readonly timer: Timer32,
-  //     readonly callback: () => void,
-  //   ) {
-  //     this.clockAlarm = this.timer.clock.createAlarm(this.handleAlarm);
-  //     timer.listeners.push(this.update);
-  //   }
+  clockAlarm = timer.clock.createAlarm([this] { handleAlarm(); });
+  timer.listeners.push_back([this] { update(); });
 }
 
-bool Timer32PeriodicAlarm::enable() const {
-  // TODO(port): utils/timer32.ts
-  //   get enable() {
-  //     return this.enabled;
-  //   }
-  return false;
-}
+bool Timer32PeriodicAlarm::enable() const { return enabled; }
 
 void Timer32PeriodicAlarm::setEnable(bool value) {
-  // TODO(port): utils/timer32.ts
-  //   set enable(value: boolean) {
-  //     if (value !== this.enabled) {
-  //       this.enabled = value;
-  //       if (value && this.timer.enable) {
-  //         this.schedule();
-  //       } else {
-  //         this.cancel();
-  //       }
-  //     }
-  //   }
-  (void)value;
+  if (value != enabled) {
+    enabled = value;
+    if (value && timer.enable()) {
+      schedule();
+    } else {
+      cancel();
+    }
+  }
 }
 
-double Timer32PeriodicAlarm::target() const {
-  // TODO(port): utils/timer32.ts
-  //   get target() {
-  //     return this.targetValue;
-  //   }
-  return 0;
-}
+double Timer32PeriodicAlarm::target() const { return targetValue; }
 
 void Timer32PeriodicAlarm::setTarget(double value) {
-  // TODO(port): utils/timer32.ts
-  //   set target(value: number) {
-  //     if (value === this.targetValue) {
-  //       return;
-  //     }
-  //     this.targetValue = value;
-  //     if (this.enabled && this.timer.enable) {
-  //       this.cancel();
-  //       this.schedule();
-  //     }
-  //   }
-  (void)value;
+  if (value == targetValue) {
+    return;
+  }
+  targetValue = value;
+  if (enabled && timer.enable()) {
+    cancel();
+    schedule();
+  }
 }
 
 void Timer32PeriodicAlarm::handleAlarm() {
-  // TODO(port): utils/timer32.ts
-  //   handleAlarm = () => {
-  //     this.callback();
-  //     if (this.enabled && this.timer.enable) {
-  //       this.schedule();
-  //     }
-  //   };
+  callback();
+  if (enabled && timer.enable()) {
+    schedule();
+  }
 }
 
 void Timer32PeriodicAlarm::update() {
-  // TODO(port): utils/timer32.ts
-  //   update = () => {
-  //     this.cancel();
-  //     if (this.enabled && this.timer.enable) {
-  //       this.schedule();
-  //     }
-  //   };
+  cancel();
+  if (enabled && timer.enable()) {
+    schedule();
+  }
 }
 
 void Timer32PeriodicAlarm::schedule() {
-  // TODO(port): utils/timer32.ts
-  //   private schedule() {
-  //     const { timer, targetValue } = this;
-  //     const { top, mode, rawCounter } = timer;
-  //     let cycleDelta = targetValue - rawCounter;
-  //     if (mode === TimerMode.ZigZag && cycleDelta < 0) {
-  //       if (cycleDelta < -top) {
-  //         cycleDelta += 2 * top;
-  //       } else {
-  //         cycleDelta = top * 2 - targetValue - rawCounter;
-  //       }
-  //     }
-  //     if (top != 0xffffffff) {
-  //       if (cycleDelta <= 0) {
-  //         cycleDelta += top + 1;
-  //       }
-  //       if (targetValue > top) {
-  //         // Skip alarm
-  //         return;
-  //       }
-  //     }
-  //     if (mode === TimerMode.Decrement) {
-  //       cycleDelta = top + 1 - cycleDelta;
-  //     }
-  //     const cyclesToAlarm = cycleDelta >>> 0;
-  //     const nanosToAlarm = timer.toNanos(cyclesToAlarm);
-  //     this.clockAlarm.schedule(nanosToAlarm);
-  //   }
+  const double top = timer.top();
+  const TimerMode mode = timer.mode();
+  const double rawCounter = timer.rawCounter();
+  double cycleDelta = targetValue - rawCounter;
+  if (mode == TimerMode::ZigZag && cycleDelta < 0) {
+    if (cycleDelta < -top) {
+      cycleDelta += 2 * top;
+    } else {
+      cycleDelta = top * 2 - targetValue - rawCounter;
+    }
+  }
+  if (top != 0xffffffff) {
+    if (cycleDelta <= 0) {
+      cycleDelta += top + 1;
+    }
+    if (targetValue > top) {
+      // Skip alarm
+      return;
+    }
+  }
+  if (mode == TimerMode::Decrement) {
+    cycleDelta = top + 1 - cycleDelta;
+  }
+  const uint32_t cyclesToAlarm = toUint32(cycleDelta);
+  const double nanosToAlarm = timer.toNanos(cyclesToAlarm);
+  clockAlarm->schedule(nanosToAlarm);
 }
 
-void Timer32PeriodicAlarm::cancel() {
-  // TODO(port): utils/timer32.ts
-  //   private cancel() {
-  //     this.clockAlarm.cancel();
-  //   }
-}
+void Timer32PeriodicAlarm::cancel() { clockAlarm->cancel(); }
 
 }  // namespace rp2040js

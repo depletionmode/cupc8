@@ -1,14 +1,56 @@
 // Port of rp2040js src/peripherals/pwm.ts
-//
-// STUB: every body below still has to be ported from the TS shown in its
-// comment (see README.md, "Porting rules"). Bus-facing methods abort so that
-// firmware cannot run on a half-ported peripheral without noticing.
 #include "pwm.h"
+
+#include <cmath>
 
 #include "../rp2040.h"
 #include "../utils/js.h"
 
 namespace rp2040js {
+
+/** Control and status register */
+static constexpr uint32_t CHn_CSR = 0x00;
+/**
+ * INT and FRAC form a fixed-point fractional number.
+ * Counting rate is system clock frequency divided by this number.
+ * Fractional division uses simple 1st-order sigma-delta.
+ */
+static constexpr uint32_t CHn_DIV = 0x04;
+/** Direct access to the PWM counter */
+static constexpr uint32_t CHn_CTR = 0x08;
+/** Counter compare values */
+static constexpr uint32_t CHn_CC = 0x0c;
+/** Counter wrap value */
+static constexpr uint32_t CHn_TOP = 0x10;
+
+/**
+ * This register aliases the CSR_EN bits for all channels.
+ * Writing to this register allows multiple channels to be enabled
+ * or disabled simultaneously, so they can run in perfect sync.
+ * For each channel, there is only one physical EN register bit,
+ * which can be accessed through here or CHx_CSR.
+ */
+static constexpr uint32_t EN = 0xa0;
+/** Raw Interrupts */
+static constexpr uint32_t INTR = 0xa4;
+/** Interrupt Enable */
+static constexpr uint32_t INTE = 0xa8;
+/** Interrupt Force */
+static constexpr uint32_t INTF = 0xac;
+/** Interrupt status after masking & forcing */
+static constexpr uint32_t INTS = 0xb0;
+
+static constexpr uint32_t INT_MASK = 0xff;
+
+/* CHn_CSR bits */
+static constexpr uint32_t CSR_PH_ADV = 1 << 7;
+static constexpr uint32_t CSR_PH_RET = 1 << 6;
+static constexpr uint32_t CSR_DIVMODE_SHIFT = 4;
+static constexpr uint32_t CSR_DIVMODE_MASK = 0x3;
+static constexpr uint32_t CSR_B_INV = 1 << 3;
+static constexpr uint32_t CSR_A_INV = 1 << 2;
+static constexpr uint32_t CSR_PH_CORRECT = 1 << 1;
+static constexpr uint32_t CSR_EN = 1 << 0;
 
 PWMChannel::PWMChannel(RPPWM &pwm, IClock &clock, uint32_t index)
     : timer(clock, pwm.clockFreq()),
@@ -22,233 +64,181 @@ PWMChannel::PWMChannel(RPPWM &pwm, IClock &clock, uint32_t index)
       pinA2(index < 7 ? static_cast<int32_t>(16 + index * 2) : -1),
       pinB2(index < 7 ? static_cast<int32_t>(16 + index * 2 + 1) : -1),
       pwm(pwm) {
-  // TODO(port): peripherals/pwm.ts
-  //   constructor(
-  //     private pwm: RPPWM,
-  //     readonly clock: IClock,
-  //     readonly index: number,
-  //   ) {
-  //     this.alarmA.enable = true;
-  //     this.alarmB.enable = true;
-  //     this.alarmBottom.enable = true;
-  //   }
+  alarmA.setEnable(true);
+  alarmB.setEnable(true);
+  alarmBottom.setEnable(true);
 }
 
 uint32_t PWMChannel::readRegister(uint32_t offset) {
-  // TODO(port): peripherals/pwm.ts
-  //   readRegister(offset: number) {
-  //     switch (offset) {
-  //       case CHn_CSR:
-  //         return this.csr;
-  //       case CHn_DIV:
-  //         return this.div;
-  //       case CHn_CTR:
-  //         return this.timer.counter;
-  //       case CHn_CC:
-  //         return this.cc;
-  //       case CHn_TOP:
-  //         return this.top;
-  //     }
-  //     /* Shouldn't get here */
-  //     return 0;
-  //   }
-  (void)offset;
+  switch (offset) {
+    case CHn_CSR:
+      return csr;
+    case CHn_DIV:
+      return div;
+    case CHn_CTR:
+      return timer.counter();
+    case CHn_CC:
+      return cc;
+    case CHn_TOP:
+      return top;
+  }
+  /* Shouldn't get here */
   return 0;
 }
 
 void PWMChannel::writeRegister(uint32_t offset, uint32_t value) {
-  // TODO(port): peripherals/pwm.ts
-  //   writeRegister(offset: number, value: number) {
-  //     switch (offset) {
-  //       case CHn_CSR:
-  //         if (value & CSR_EN && !(this.csr & CSR_EN)) {
-  //           this.updateDoubleBuffered();
-  //         }
-  //         this.csr = value & ~(CSR_PH_ADV | CSR_PH_RET);
-  //         if (this.csr & CSR_PH_ADV) {
-  //           this.timer.advance(1);
-  //         }
-  //         if (this.csr & CSR_PH_RET) {
-  //           this.timer.advance(-1);
-  //         }
-  //         this.divMode = (this.csr >> CSR_DIVMODE_SHIFT) & CSR_DIVMODE_MASK;
-  //         this.setBDirection(this.divMode === PWMDivMode.FreeRunning);
-  //         this.updateEnable();
-  //         this.lastBValue = this.gpioBValue;
-  //         this.timer.mode = value & CSR_PH_CORRECT ? TimerMode.ZigZag : TimerMode.Increment;
-  //         break;
-  //       case CHn_DIV: {
-  //         this.div = value & 0x000f_ffff;
-  //         const intValue = (value >> 4) & 0xff;
-  //         const fracValue = value & 0xf;
-  //         this.timer.prescaler = (intValue ? intValue : 256) + fracValue / 16;
-  //         break;
-  //       }
-  //       case CHn_CTR:
-  //         this.timer.set(value & 0xffff);
-  //         break;
-  //       case CHn_CC:
-  //         this.cc = value;
-  //         this.ccUpdated = true;
-  //         break;
-  //       case CHn_TOP:
-  //         this.top = value & 0xffff;
-  //         this.topUpdated = true;
-  //         break;
-  //     }
-  //   }
-  (void)offset;
-  (void)value;
+  switch (offset) {
+    case CHn_CSR:
+      if (value & CSR_EN && !(csr & CSR_EN)) {
+        updateDoubleBuffered();
+      }
+      csr = value & ~(CSR_PH_ADV | CSR_PH_RET);
+      // TS bug (kept): PH_ADV / PH_RET were just masked out, so these never fire.
+      if (csr & CSR_PH_ADV) {
+        timer.advance(1);
+      }
+      if (csr & CSR_PH_RET) {
+        timer.advance(-1);
+      }
+      divMode = static_cast<PWMDivMode>((csr >> CSR_DIVMODE_SHIFT) & CSR_DIVMODE_MASK);
+      setBDirection(divMode == PWMDivMode::FreeRunning);
+      updateEnable();
+      lastBValue = gpioBValue();
+      timer.setMode(value & CSR_PH_CORRECT ? TimerMode::ZigZag : TimerMode::Increment);
+      break;
+    case CHn_DIV: {
+      div = value & 0x000fffff;
+      const uint32_t intValue = (value >> 4) & 0xff;
+      const uint32_t fracValue = value & 0xf;
+      timer.setPrescaler((intValue ? intValue : 256) + fracValue / 16.0);
+      break;
+    }
+    case CHn_CTR:
+      timer.set(value & 0xffff);
+      break;
+    case CHn_CC:
+      cc = value;
+      ccUpdated = true;
+      break;
+    case CHn_TOP:
+      top = value & 0xffff;
+      topUpdated = true;
+      break;
+  }
 }
 
 void PWMChannel::reset() {
-  // TODO(port): peripherals/pwm.ts
-  //   reset() {
-  //     this.writeRegister(CHn_CSR, 0);
-  //     this.writeRegister(CHn_DIV, 0x01 << 4);
-  //     this.writeRegister(CHn_CTR, 0);
-  //     this.writeRegister(CHn_CC, 0);
-  //     this.writeRegister(CHn_TOP, 0xffff);
-  //     this.countingUp = true;
-  //     this.timer.enable = false;
-  //     this.timer.reset();
-  //   }
+  writeRegister(CHn_CSR, 0);
+  writeRegister(CHn_DIV, 0x01 << 4);
+  writeRegister(CHn_CTR, 0);
+  writeRegister(CHn_CC, 0);
+  writeRegister(CHn_TOP, 0xffff);
+  countingUp = true;
+  timer.setEnable(false);
+  timer.reset();
 }
 
 void PWMChannel::updateDoubleBuffered() {
-  // TODO(port): peripherals/pwm.ts
-  //   private updateDoubleBuffered() {
-  //     if (this.ccUpdated) {
-  //       this.alarmB.target = this.cc >>> 16;
-  //       this.alarmA.target = this.cc & 0xffff;
-  //       this.ccUpdated = false;
-  //     }
-  //     if (this.topUpdated) {
-  //       this.timer.top = this.top;
-  //       this.topUpdated = false;
-  //     }
-  //   }
+  if (ccUpdated) {
+    alarmB.setTarget(cc >> 16);
+    alarmA.setTarget(cc & 0xffff);
+    ccUpdated = false;
+  }
+  if (topUpdated) {
+    timer.setTop(top);
+    topUpdated = false;
+  }
 }
 
 void PWMChannel::wrap() {
-  // TODO(port): peripherals/pwm.ts
-  //   private wrap() {
-  //     this.pwm.channelInterrupt(this.index);
-  //     this.updateDoubleBuffered();
-  //     if (!(this.csr & CSR_PH_CORRECT)) {
-  //       this.setA(this.alarmA.target > 0);
-  //       this.setB(this.alarmB.target > 0);
-  //     }
-  //   }
+  pwm.channelInterrupt(index);
+  updateDoubleBuffered();
+  if (!(csr & CSR_PH_CORRECT)) {
+    setA(alarmA.target() > 0);
+    setB(alarmB.target() > 0);
+  }
 }
 
 void PWMChannel::setA(bool value) {
-  // TODO(port): peripherals/pwm.ts
-  //   setA(value: boolean) {
-  //     if (this.csr & CSR_A_INV) {
-  //       value = !value;
-  //     }
-  //     this.pwm.gpioSet(this.pinA1, value);
-  //     if (this.pinA2 >= 0) {
-  //       this.pwm.gpioSet(this.pinA2, value);
-  //     }
-  //   }
-  (void)value;
+  if (csr & CSR_A_INV) {
+    value = !value;
+  }
+  pwm.gpioSet(pinA1, value);
+  if (pinA2 >= 0) {
+    pwm.gpioSet(pinA2, value);
+  }
 }
 
 void PWMChannel::setB(bool value) {
-  // TODO(port): peripherals/pwm.ts
-  //   setB(value: boolean) {
-  //     if (this.csr & CSR_B_INV) {
-  //       value = !value;
-  //     }
-  //     this.pwm.gpioSet(this.pinB1, value);
-  //     if (this.pinB2 >= 0) {
-  //       this.pwm.gpioSet(this.pinB2, value);
-  //     }
-  //   }
-  (void)value;
+  if (csr & CSR_B_INV) {
+    value = !value;
+  }
+  pwm.gpioSet(pinB1, value);
+  if (pinB2 >= 0) {
+    pwm.gpioSet(pinB2, value);
+  }
 }
 
 bool PWMChannel::gpioBValue() const {
-  // TODO(port): peripherals/pwm.ts
-  //   get gpioBValue() {
-  //     return (
-  //       this.pwm.gpioRead(this.pinB1) || (this.pinB2 > 0 ? this.pwm.gpioRead(this.pinB2) : false)
-  //     );
-  //   }
-  return false;
+  return pwm.gpioRead(pinB1) || (pinB2 > 0 ? pwm.gpioRead(pinB2) : false);
 }
 
 void PWMChannel::setBDirection(bool value) {
-  // TODO(port): peripherals/pwm.ts
-  //   setBDirection(value: boolean) {
-  //     this.pwm.gpioSetDir(this.pinB1, value);
-  //     if (this.pinB2 >= 0) {
-  //       this.pwm.gpioSetDir(this.pinB2, value);
-  //     }
-  //   }
-  (void)value;
+  pwm.gpioSetDir(pinB1, value);
+  if (pinB2 >= 0) {
+    pwm.gpioSetDir(pinB2, value);
+  }
 }
 
 void PWMChannel::gpioBChanged() {
-  // TODO(port): peripherals/pwm.ts
-  //   gpioBChanged() {
-  //     const value = this.gpioBValue;
-  //     if (value === this.lastBValue) {
-  //       return;
-  //     }
-  //     this.lastBValue = value;
-  //     switch (this.divMode) {
-  //       case PWMDivMode.BGated:
-  //         this.updateEnable();
-  //         break;
-  //
-  //       case PWMDivMode.BRisingEdge:
-  //         if (value) {
-  //           this.tickCounter++;
-  //         }
-  //         break;
-  //
-  //       case PWMDivMode.BFallingEdge:
-  //         if (!value) {
-  //           this.tickCounter++;
-  //         }
-  //         break;
-  //     }
-  //
-  //     if (this.tickCounter >= this.timer.prescaler) {
-  //       this.timer.advance(1);
-  //       this.tickCounter -= this.timer.prescaler;
-  //     }
-  //   }
+  const bool value = gpioBValue();
+  if (value == lastBValue) {
+    return;
+  }
+  lastBValue = value;
+  switch (divMode) {
+    case PWMDivMode::BGated:
+      updateEnable();
+      break;
+
+    case PWMDivMode::BRisingEdge:
+      if (value) {
+        tickCounter++;
+      }
+      break;
+
+    case PWMDivMode::BFallingEdge:
+      if (!value) {
+        tickCounter++;
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  if (tickCounter >= timer.prescaler()) {
+    timer.advance(1);
+    tickCounter -= timer.prescaler();
+  }
 }
 
 void PWMChannel::updateEnable() {
-  // TODO(port): peripherals/pwm.ts
-  //   updateEnable() {
-  //     const { csr, divMode } = this;
-  //     const enable = !!(csr & CSR_EN);
-  //     this.timer.enable =
-  //       enable &&
-  //       (divMode === PWMDivMode.FreeRunning || (divMode === PWMDivMode.BGated && this.gpioBValue));
-  //   }
+  const bool enable = !!(csr & CSR_EN);
+  timer.setEnable(enable && (divMode == PWMDivMode::FreeRunning ||
+                             (divMode == PWMDivMode::BGated && gpioBValue())));
 }
 
 void PWMChannel::setEn(uint32_t value) {
-  // TODO(port): peripherals/pwm.ts
-  //   set en(value: number) {
-  //     if (value && !(this.csr & CSR_EN)) {
-  //       this.updateDoubleBuffered();
-  //     }
-  //     if (value) {
-  //       this.csr |= CSR_EN;
-  //     } else {
-  //       this.csr &= ~CSR_EN;
-  //     }
-  //     this.updateEnable();
-  //   }
-  (void)value;
+  if (value && !(csr & CSR_EN)) {
+    updateDoubleBuffered();
+  }
+  if (value) {
+    csr |= CSR_EN;
+  } else {
+    csr &= ~CSR_EN;
+  }
+  updateEnable();
 }
 
 RPPWM::RPPWM(RP2040 &rp2040, const std::string &name)
@@ -262,181 +252,117 @@ RPPWM::RPPWM(RP2040 &rp2040, const std::string &name)
           {*this, rp2040.clock, 5},
           {*this, rp2040.clock, 6},
           {*this, rp2040.clock, 7},
-      }} {
-  // TODO(port): peripherals/pwm.ts
-  //   readonly channels = [
-  //     new PWMChannel(this, this.rp2040.clock, 0),
-}
+      }} {}
 
-uint32_t RPPWM::intStatus() const {
-  // TODO(port): peripherals/pwm.ts
-  //   get intStatus() {
-  //     return (this.intRaw & this.intEnable) | this.intForce;
-  //   }
-  return 0;
-}
+uint32_t RPPWM::intStatus() const { return (intRaw & intEnable) | intForce; }
 
 uint32_t RPPWM::readUint32(uint32_t offset) {
-  // TODO(port): peripherals/pwm.ts
-  //   readUint32(offset: number) {
-  //     if (offset < EN) {
-  //       const channel = Math.floor(offset / 0x14);
-  //       return this.channels[channel].readRegister(offset % 0x14);
-  //     }
-  //     switch (offset) {
-  //       case EN:
-  //         return (
-  //           (this.channels[7].en << 7) |
-  //           (this.channels[6].en << 6) |
-  //           (this.channels[5].en << 5) |
-  //           (this.channels[4].en << 4) |
-  //           (this.channels[3].en << 3) |
-  //           (this.channels[2].en << 2) |
-  //           (this.channels[1].en << 1) |
-  //           (this.channels[0].en << 0)
-  //         );
-  //       case INTR:
-  //         return this.intRaw;
-  //       case INTE:
-  //         return this.intEnable;
-  //       case INTF:
-  //         return this.intForce;
-  //       case INTS:
-  //         return this.intStatus;
-  //     }
-  //     return super.readUint32(offset);
-  //   }
-  (void)offset;
-  TODO_PORT_ABORT("peripherals/pwm.ts", "RPPWM::readUint32");
+  if (offset < EN) {
+    const uint32_t channel = offset / 0x14;  // Math.floor(offset / 0x14)
+    return channels[channel].readRegister(offset % 0x14);
+  }
+  switch (offset) {
+    case EN:
+      // TS bug (kept): PWMChannel has a setter for `en` but no getter, so each
+      // `channels[n].en` is undefined and `undefined << n` is 0: EN reads as 0.
+      return 0;
+    case INTR:
+      return intRaw;
+    case INTE:
+      return intEnable;
+    case INTF:
+      return intForce;
+    case INTS:
+      return intStatus();
+  }
+  return BasePeripheral::readUint32(offset);
 }
 
 void RPPWM::writeUint32(uint32_t offset, uint32_t value) {
-  // TODO(port): peripherals/pwm.ts
-  //   writeUint32(offset: number, value: number) {
-  //     if (offset < EN) {
-  //       const channel = Math.floor(offset / 0x14);
-  //       return this.channels[channel].writeRegister(offset % 0x14, value);
-  //     }
-  //
-  //     switch (offset) {
-  //       case EN:
-  //         this.channels[7].en = value & (1 << 7);
-  //         this.channels[6].en = value & (1 << 6);
-  //         this.channels[5].en = value & (1 << 5);
-  //         this.channels[4].en = value & (1 << 4);
-  //         this.channels[3].en = value & (1 << 3);
-  //         this.channels[2].en = value & (1 << 2);
-  //         this.channels[1].en = value & (1 << 1);
-  //         this.channels[0].en = value & (1 << 0);
-  //         break;
-  //       case INTR:
-  //         this.intRaw &= ~(value & INT_MASK);
-  //         this.checkInterrupts();
-  //         break;
-  //       case INTE:
-  //         this.intEnable = value & INT_MASK;
-  //         this.checkInterrupts();
-  //         break;
-  //       case INTF:
-  //         this.intForce = value & INT_MASK;
-  //         this.checkInterrupts();
-  //         break;
-  //       default:
-  //         super.writeUint32(offset, value);
-  //     }
-  //   }
-  (void)offset;
-  (void)value;
-  TODO_PORT_ABORT("peripherals/pwm.ts", "RPPWM::writeUint32");
+  if (offset < EN) {
+    const uint32_t channel = offset / 0x14;  // Math.floor(offset / 0x14)
+    return channels[channel].writeRegister(offset % 0x14, value);
+  }
+
+  switch (offset) {
+    case EN:
+      channels[7].setEn(value & (1 << 7));
+      channels[6].setEn(value & (1 << 6));
+      channels[5].setEn(value & (1 << 5));
+      channels[4].setEn(value & (1 << 4));
+      channels[3].setEn(value & (1 << 3));
+      channels[2].setEn(value & (1 << 2));
+      channels[1].setEn(value & (1 << 1));
+      channels[0].setEn(value & (1 << 0));
+      break;
+    case INTR:
+      intRaw &= ~(value & INT_MASK);
+      checkInterrupts();
+      break;
+    case INTE:
+      intEnable = value & INT_MASK;
+      checkInterrupts();
+      break;
+    case INTF:
+      intForce = value & INT_MASK;
+      checkInterrupts();
+      break;
+    default:
+      BasePeripheral::writeUint32(offset, value);
+  }
 }
 
-double RPPWM::clockFreq() const {
-  // TODO(port): peripherals/pwm.ts
-  //   get clockFreq() {
-  //     return this.rp2040.clkSys;
-  //   }
-  return 0;
-}
+double RPPWM::clockFreq() const { return rp2040.clkSys; }
 
 void RPPWM::channelInterrupt(uint32_t index) {
-  // TODO(port): peripherals/pwm.ts
-  //   channelInterrupt(index: number) {
-  //     this.intRaw |= 1 << index;
-  //     this.checkInterrupts();
-  //
-  //     // We also set the DMA Request (DREQ) for the channel
-  //     this.rp2040.dma.setDREQ(DREQChannel.DREQ_PWM_WRAP0 + index);
-  //   }
-  (void)index;
+  intRaw |= 1 << index;
+  checkInterrupts();
+
+  // We also set the DMA Request (DREQ) for the channel
+  rp2040.dma.setDREQ(static_cast<DREQChannel>(DREQ_PWM_WRAP0 + index));
 }
 
-void RPPWM::checkInterrupts() {
-  // TODO(port): peripherals/pwm.ts
-  //   checkInterrupts() {
-  //     this.rp2040.setInterrupt(IRQ.PWM_WRAP, !!this.intStatus);
-  //   }
-}
+void RPPWM::checkInterrupts() { rp2040.setInterrupt(IRQ::PWM_WRAP, !!intStatus()); }
 
 void RPPWM::gpioSet(uint32_t index, bool value) {
-  // TODO(port): peripherals/pwm.ts
-  //   gpioSet(index: number, value: boolean) {
-  //     const bit = 1 << index;
-  //     const newGpioValue = value ? this.gpioValue | bit : this.gpioValue & ~bit;
-  //     if (this.gpioValue != newGpioValue) {
-  //       this.gpioValue = newGpioValue;
-  //       this.rp2040.gpio[index].checkForUpdates();
-  //     }
-  //   }
-  (void)index;
-  (void)value;
+  const uint32_t bit = static_cast<uint32_t>(jsShl(1, index));
+  const uint32_t newGpioValue = value ? gpioValue | bit : gpioValue & ~bit;
+  if (gpioValue != newGpioValue) {
+    gpioValue = newGpioValue;
+    rp2040.gpio[index].checkForUpdates();
+  }
 }
 
 void RPPWM::gpioSetDir(uint32_t index, bool output) {
-  // TODO(port): peripherals/pwm.ts
-  //   gpioSetDir(index: number, output: boolean) {
-  //     const bit = 1 << index;
-  //     const newGpioDirection = output ? this.gpioDirection | bit : this.gpioDirection & ~bit;
-  //     if (this.gpioDirection != newGpioDirection) {
-  //       this.gpioDirection = newGpioDirection;
-  //       this.rp2040.gpio[index].checkForUpdates();
-  //     }
-  //   }
-  (void)index;
-  (void)output;
+  const uint32_t bit = static_cast<uint32_t>(jsShl(1, index));
+  const uint32_t newGpioDirection = output ? gpioDirection | bit : gpioDirection & ~bit;
+  if (gpioDirection != newGpioDirection) {
+    gpioDirection = newGpioDirection;
+    rp2040.gpio[index].checkForUpdates();
+  }
 }
 
-bool RPPWM::gpioRead(uint32_t index) {
-  // TODO(port): peripherals/pwm.ts
-  //   gpioRead(index: number) {
-  //     return this.rp2040.gpio[index].inputValue;
-  //   }
-  (void)index;
-  return false;
-}
+bool RPPWM::gpioRead(uint32_t index) { return rp2040.gpio[index].inputValue(); }
 
 void RPPWM::gpioOnInput(uint32_t index) {
-  // TODO(port): peripherals/pwm.ts
-  //   gpioOnInput(index: number) {
-  //     if (this.gpioDirection && 1 << index) {
-  //       return;
-  //     }
-  //     for (const channel of this.channels) {
-  //       if (channel.pinB1 === index || channel.pinB2 === index) {
-  //         channel.gpioBChanged();
-  //       }
-  //     }
-  //   }
-  (void)index;
+  // TS bug (kept): `this.gpioDirection && 1 << index` (logical, not bitwise
+  // and): returns whenever any PWM pin is an output.
+  if (gpioDirection && jsShl(1, index)) {
+    return;
+  }
+  for (PWMChannel &channel : channels) {
+    if (channel.pinB1 == static_cast<int32_t>(index) ||
+        channel.pinB2 == static_cast<int32_t>(index)) {
+      channel.gpioBChanged();
+    }
+  }
 }
 
 void RPPWM::reset() {
-  // TODO(port): peripherals/pwm.ts
-  //   reset() {
-  //     this.gpioDirection = 0xffffffff;
-  //     for (const channel of this.channels) {
-  //       channel.reset();
-  //     }
-  //   }
+  gpioDirection = 0xffffffff;
+  for (PWMChannel &channel : channels) {
+    channel.reset();
+  }
 }
 
 }  // namespace rp2040js

@@ -40,7 +40,7 @@ class PWMChannel {
   bool countingUp = true;
   bool ccUpdated = false;
   bool topUpdated = false;
-  uint32_t tickCounter = 0;
+  double tickCounter = 0;  // `tickCounter -= timer.prescaler` makes it fractional
   PWMDivMode divMode = PWMDivMode::FreeRunning;
 
   IClock &clock;
