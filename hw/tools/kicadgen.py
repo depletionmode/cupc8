@@ -1244,12 +1244,17 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
     env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
-    # tracks pre-routed on inner plane layers (presence_link's run on a wide
-    # card) are not in the DSN, and the SES import drops them: keep them
+    # a net pre-routed partly on an inner plane layer (presence_link's run on
+    # a wide card): the DSN has no inner track, so Freerouting sees the rest
+    # dangling and trims it, and the import drops the inner track. Such a net
+    # is restored whole, as it was pre-routed.
     tracks = board.Tracks()
-    inner = [(tracks[i].GetStart(), tracks[i].GetEnd(), tracks[i].GetWidth(), tracks[i].GetLayer(),
-              tracks[i].GetNet()) for i in range(len(tracks))
-             if tracks[i].Type() == pcbnew.PCB_TRACE_T and tracks[i].GetLayer() not in (pcbnew.F_Cu, pcbnew.B_Cu)]
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    held = {t.GetNetname() for t in items
+            if t.Type() == pcbnew.PCB_TRACE_T and t.GetLayer() not in (pcbnew.F_Cu, pcbnew.B_Cu)}
+    inner = [(t.Type() == pcbnew.PCB_VIA_T, t.GetStart(), t.GetEnd(), t.GetWidth(), t.GetLayer(), t.GetNet(),
+              t.GetDrillValue() if t.Type() == pcbnew.PCB_VIA_T else 0)
+             for t in items if t.GetNetname() in held]
     for attempt in range(tries):
         # each try orders the problem differently (a UUID salt): Freerouting
         # can stall on one order and complete on another, and the salt keeps
@@ -1278,12 +1283,20 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
         raise RuntimeError("Freerouting wrote no session file")
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
-    for start, end, width, layer, net in inner:
-        t = pcbnew.PCB_TRACK(board)
-        t.SetStart(start)
-        t.SetEnd(end)
+    tracks = board.Tracks()
+    for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:
+        board.Remove(t)
+    for is_via, start, end, width, layer, net, drill in inner:
+        if is_via:
+            t = pcbnew.PCB_VIA(board)
+            t.SetPosition(start)
+            t.SetDrill(drill)
+        else:
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(start)
+            t.SetEnd(end)
+            t.SetLayer(layer)
         t.SetWidth(width)
-        t.SetLayer(layer)
         t.SetNet(net)
         t.SetLocked(True)
         board.Add(t)
