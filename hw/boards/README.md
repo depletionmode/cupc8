@@ -107,4 +107,9 @@ test pads.
 GND while powering up for the USB boot ROM; it reaches QSPI_SS through
 1 kΩ), the debug UART (GPIO0 TX, GPIO1 RX), +3V3, 1V1, GND, and RSVD_B1/B2.
 
-**LEDs.** Power (red, +3V3) and status (green, GPIO29).
+**LEDs.** Power (red, 1 kΩ from +3V3) and status (green, 100 Ω, GPIO29).
+
+**Board.** Four layers (JLC04161H-7628), GND poured on both outer layers.
+The fan-out of a 0.4 mm QFN-56 with 50-odd slot nets through the finger
+tab did not route cleanly on two. The strip 4.5 mm above the fingers holds
+no parts. Passives are 0603 basic parts.
