@@ -528,31 +528,21 @@ def key_ties(board, width=0.25):
             s.SetWidth(pcbnew.FromMM(width))
 
 
-def ring_keepout(board, reach=12.0):
-    """No F.Cu pour among the FPGA's pins: between pads 0.5 mm apart it can
-    only reach a pad through a sliver under the 0.15 mm minimum. Every supply
-    pin there has its own via to its plane (plane_pins)."""
+def ring_pads(board):
+    """No pour joins the FPGA's supply pads: between pads 0.5 mm apart it
+    could only reach one through a sliver under the 0.15 mm minimum. Each has
+    its own via to its plane (plane_pins). (A rule area would do it too, but
+    KiCad hands Freerouting a fill-only rule area as a keepout for tracks.)"""
     import pcbnew
-    mm = pcbnew.FromMM
-    x0, y0 = FPGA[0], FPGA[1]
-    z = pcbnew.ZONE(board)
-    z.SetIsRuleArea(True)
-    z.SetDoNotAllowZoneFills(True)
-    z.SetDoNotAllowTracks(False)
-    z.SetDoNotAllowVias(False)
-    z.SetDoNotAllowPads(False)
-    z.SetDoNotAllowFootprints(False)
-    z.SetLayer(pcbnew.F_Cu)
-    ol = z.Outline()
-    ol.NewOutline()
-    for px, py in ((x0 - reach, y0 - reach), (x0 + reach, y0 - reach), (x0 + reach, y0 + reach),
-                   (x0 - reach, y0 + reach)):
-        ol.Append(mm(px), mm(py))
-    board.Add(z)
+    for fp in board.GetFootprints():
+        if fp.GetReference() == "U1":
+            for pad in fp.Pads():
+                if pad.GetNetname() in ("/GND", "/3V3"):
+                    pad.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_NONE)
 
 
 def prepare(board):
-    ring_keepout(board)
+    ring_pads(board)
     key_ties(board)
     a_vias(board)
     supply_fingers(board)
