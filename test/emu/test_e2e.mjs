@@ -196,12 +196,14 @@ async function e2e007() {
 
   log('power cycle');
   m = await boot();
-  if (!expect(await line(m, 'load "demo"'), 'LOAD "demo" after the power cycle')) console.log(shown(m));
+  if (!expect(await line(m, 'load "demo"') && !/not found|error/i.test(screenText(m).split(/load "demo"/i).at(-1)),
+    'LOAD "demo" after the power cycle')) console.log(shown(m));
   if (!expect(await line(m, 'run', '42'), 'RUN prints "saved" and 42')) console.log(shown(m));
   expect(screenText(m).includes('saved'), 'the loaded program printed "saved"');
   if (!expect(await line(m, 'dir', 'HOSTPROG'), 'DIR lists the files')) console.log(shown(m));
   expect(/DEMO/.test(screenText(m)), 'DIR shows DEMO');
-  if (!expect(await line(m, 'load "hostprog"'), 'LOAD a program written on the host')) console.log(shown(m));
+  if (!expect(await line(m, 'load "hostprog.bas"') && !/not found/i.test(screenText(m).split(/load "hostprog.bas"/i).at(-1)),
+    'LOAD a program written on the host (HOSTPROG.BAS)')) console.log(shown(m));
   if (!expect(await line(m, 'run', 'FROM THE HOST'), 'it runs: 123 and "FROM THE HOST"')) console.log(shown(m));
   expect(screenText(m).includes('123'), 'the host program printed 123');
   m.stop();
@@ -211,14 +213,14 @@ async function e2e007() {
   m = await boot({ sd: { writeMs: 250 } });
   m.type('10 print "slow"\n');
   await m.runAsync(200e6);
-  m.type('save "slow"\nprint 7*6+1\n');
-  if (!expect(await m.runUntil(() => screenText(m).includes('43'), 20e9, 100e6), 'a line typed during a slow SAVE runs afterwards (43)')) console.log(shown(m));
+  m.type('save "slow"\n20 print 7*6+1\nrun\n');   // typed at once: most of it while SAVE waits on the card
+  if (!expect(await m.runUntil(() => screenText(m).includes('43'), 20e9, 100e6), 'lines typed during a slow SAVE are kept and run afterwards (43)')) console.log(shown(m));
   expect(m.sd.card().stats.busyNs >= 250e6, `the card was busy ${m.sd.card().stats.busyNs / 1e6} ms`);
   m.stop();
 
   // SAVE with no card, a full card, a write-protected card
   const errors = [
-    ['no card', { image: null }, /no card|no medium/i],
+    ['no card', { image: null }, /no (sd )?card|no medium/i],
     ['write-protected', { sd: { writeProtect: true } }, /protect/i],
     ['full', { image: 'full' }, /full/i],
   ];
