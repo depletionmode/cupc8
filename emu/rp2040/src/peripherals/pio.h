@@ -22,9 +22,17 @@ enum class WaitType {
   rxFIFO,
   txFIFO,
   IRQ,
-  // (the TS enum ends with a trailing comma, nothing more)
+  Out,  // Out instruction
 };
 
+/**
+ * JS number note: x, y, inputShiftReg and outputShiftReg hold a JS number that
+ * is sometimes a negative int32 (after `<<=`, `|=`, or `x = osr`) and
+ * sometimes a uint32 (after `>>>`). Every use of them in pio.ts is bitwise,
+ * a Uint32Array store (FIFO push), `=== 0`, `(x - 1) >>> 0` or `x >>> 0 !==
+ * y >>> 0`, all of which only see the 32-bit pattern, so a uint32_t holding
+ * that pattern behaves identically (compare them as `v >>> 0` against JS).
+ */
 class StateMachine {
  public:
   bool enabled = false;
@@ -121,6 +129,10 @@ class StateMachine {
   void clockTick();
 
   void checkWait();
+
+  /** Test access to the private divider/delay state (not in TS). */
+  uint32_t debugDivPhase() const { return divPhase; }
+  int32_t debugDelayLeft() const { return delayLeft; }
 
  private:
   /** system cycles (in 1/256ths) owed to this machine by its clock divider */
