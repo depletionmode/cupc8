@@ -1,0 +1,32 @@
+#!/bin/bash
+# Run a command with KiCad 10 (the official kicad/kicad:10.0.6-amd64-full
+# image, Debian trixie, unpacked in /opt/kicad10) by chrooting into it.
+# Paths are the same inside and out (/home, /tmp, /root/.ccr, /opt/freerouting
+# are bind-mounted), so e.g.
+#     cd /home/user/cupc8 && /opt/kicad10-run python3 hw/boards/wifi.py
+# Inside: python3 is 3.13 with pcbnew, yaml, numpy, PIL; kicad-cli is 10.0.6;
+# freerouting is 2.4.1 on Temurin 25; the libraries are /usr/share/kicad/*.
+set -e
+R=/opt/kicad10
+bind() {  # bind <host path> [ro]
+    mkdir -p "$R$1"
+    mountpoint -q "$R$1" && return 0
+    mount --bind "$1" "$R$1"
+    if [ "$2" = ro ]; then mount -o remount,bind,ro "$R$1"; fi
+}
+bind /proc; bind /sys; bind /dev; bind /dev/pts; bind /dev/shm
+bind /tmp; bind /home; bind /opt/freerouting ro; bind /root/.ccr ro
+cp -f /etc/resolv.conf /etc/hosts "$R/etc/" 2>/dev/null || true
+[ $# -gt 0 ] || set -- bash
+pass=()   # the project's own settings go through
+while IFS= read -r v; do pass+=("$v=${!v}"); done < <(compgen -e | grep -E '^(CUPC8_|KAPLAN_|JLCPARTS_|KICAD)')
+exec chroot "$R" /usr/bin/env -i \
+    HOME=/root USER=root LANG=C.UTF-8 LC_ALL=C.UTF-8 TERM="${TERM:-dumb}" \
+    PATH=/opt/freerouting:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ${HTTPS_PROXY:+HTTPS_PROXY=$HTTPS_PROXY https_proxy=$HTTPS_PROXY} \
+    ${HTTP_PROXY:+HTTP_PROXY=$HTTP_PROXY http_proxy=$HTTP_PROXY} \
+    ${NO_PROXY:+NO_PROXY=$NO_PROXY no_proxy=$NO_PROXY} \
+    SSL_CERT_FILE=/root/.ccr/ca-bundle.crt REQUESTS_CA_BUNDLE=/root/.ccr/ca-bundle.crt \
+    "${pass[@]}" \
+    /bin/sh -c 'cd "$0" && exec "$@"' "$PWD" "$@"

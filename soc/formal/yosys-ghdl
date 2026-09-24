@@ -4,6 +4,22 @@
 # symlink under the expected name goes on the library path.
 set -euo pipefail
 S=/opt/oss-cad-suite
+# no OSS CAD Suite (only its tool links in $S/bin, or nothing): a system yosys
+# with a distribution ghdl plugin (e.g. Ubuntu's yosys-plugin-ghdl)
+if [ ! -x "$S/libexec/yosys" ]; then
+	# libghdl looks for the std/ieee libraries under GHDL_PREFIX; Ubuntu
+	# installs them per backend (/usr/lib/ghdl/mcode/vhdl)
+	for d in /usr/lib/ghdl/mcode/vhdl /usr/lib/ghdl/llvm/vhdl; do
+		[ -z "${GHDL_PREFIX:-}" ] && [ -d "$d/std" ] && export GHDL_PREFIX=$d
+	done
+	# the system binary itself: tools/formal.py puts a "yosys" wrapper that
+	# calls this script first on PATH
+	for y in /usr/bin/yosys /usr/local/bin/yosys; do
+		[ -x "$y" ] && exec "$y" -m ghdl "$@"
+	done
+	echo "yosys-ghdl: no OSS CAD Suite and no system yosys" >&2
+	exit 1
+fi
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 fix="$ROOT/build/formal/libfix"
 mkdir -p "$fix"

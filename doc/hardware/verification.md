@@ -56,7 +56,7 @@ Rules for the matrix:
 |---|---|---|---|
 | 4.1 | Schematics | KiCad ERC | 0 errors, and every waiver justified in writing |
 | 4.2 | Layouts | KiCad DRC with JLC's rule set | 0 errors, 0 unconnected |
-| 4.3 | Footprints and symbols | LCSC/EasyEDA-imported footprints only. A script checks the package, symbol pinout against the datasheet table, and pin 1/rotation for each BOM line. | all lines pass |
+| 4.3 | Footprints and symbols | Every footprint matches, pad for pad, the EasyEDA footprint JLC places for its LCSC part (KiCad's own footprints are allowed when they do; an imported one when they don't). `hw/tools/bomcheck.py` (BRD-001) checks the package, the symbol pinout against the datasheet table in `hw/parts/<LCSC>.yaml`, and each line's CPL rotation against JLC's footprint. | all lines pass |
 | 4.4 | Power | ngspice for each regulator (startup, load step, dropout, PSRR), USB-C inrush, and the 6-slot worst-case budget. A script checks the USB-C CC divider and ADC thresholds against the Type-C spec. | within spec with margin |
 | 4.5 | Thermal | Per-regulator dissipation vs θJA at 40 °C ambient | Tj ≤ 100 °C |
 | 4.6 | Signal integrity | openEMS: HDMI TMDS route, connector breakout and vias (loss and return loss up to 1.26 GHz), and the USB D+/D− routes. ngspice with IBIS models: the 6-slot shared SPI bus (SCK fan-out, MISO sharing), the CPU bus across the x8 socket, and the SRAM/ROM bus. | TMDS/USB impedance within ±10% and loss within budget; no ringing past VIH/VIL thresholds |

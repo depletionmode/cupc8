@@ -132,6 +132,14 @@ def check_features(shapes, scale, min_mm):
 
 def footprint(width_mm, layer="F.SilkS"):
     import pcbnew
+    name = "KaplanLabs_Logo_%gmm" % width_mm
+    path = os.path.join(LIB, name + ".kicad_mod")
+    if not os.path.exists(SVG) and os.path.exists(path):
+        # the SVG is not in the repo; without it, use the footprint committed
+        # from it (KAPLAN_LOGO=<svg> regenerates it)
+        print("logo: %s not found; using the committed %s" % (SVG, os.path.relpath(path, ROOT)))
+        m = re.search(r'\(descr "Kaplan Labs logo, [\d.]+ x ([\d.]+) mm', open(path).read())
+        return path, float(m.group(1)) if m else None, None, None
     with open(SVG) as f:
         shapes = ink(f.read())
     xs = [x for o, _ in shapes for x, _ in o]
@@ -156,7 +164,6 @@ def footprint(width_mm, layer="F.SilkS"):
                 ps.Append(x, y, -1, idx)
     ps.Fracture()
 
-    name = "KaplanLabs_Logo_%gmm" % width_mm
     height = (max(ys) - min(ys)) * scale
     lines = ['(footprint "%s"' % name, '\t(version 20240108)', '\t(generator "cupc8-logo")',
              '\t(layer "F.Cu")', '\t(descr "Kaplan Labs logo, %g x %.1f mm, %s")' % (width_mm, height, layer),
@@ -173,7 +180,6 @@ def footprint(width_mm, layer="F.SilkS"):
                      % (pts, layer))
     lines.append(")")
     os.makedirs(LIB, exist_ok=True)
-    path = os.path.join(LIB, name + ".kicad_mod")
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
     return path, height, lost, ps.OutlineCount()

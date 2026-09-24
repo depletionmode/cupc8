@@ -44,7 +44,7 @@ extras. Stock checked 2026-09-23.
 | Card MCUs and sysctl | RP2040 | C2040 | 74,212 | 6 | system, GPU, IO |
 | MCU flash | W25Q16JVSSIQ | C131025 | 17,654 | 6 | one per RP2040 |
 | 12 MHz crystal | X322512MSB4SI | C9002 | 74,175 (basic) | 6 | one per RP2040 |
-| Card 3V3 LDO | AMS1117-3.3 | C6186 | 1,175,062 (basic) | 8 | system, GPU, IO, Wi-Fi |
+| Wi-Fi card 3V3 buck | TLV62569DBVR (2 A), with a 2.2 µH FNR3015S2R2MT (C167747) | C141836 | 251,932 | 2 | Wi-Fi: an LDO failed the TX-burst and thermal checks (`hw/power`, POW-003, THM-001). The system, GPU and IO cards run from the slot's +3V3 (`power.md`). |
 | HDMI connector | HDMI 19PIN 043 (type A, SMD right angle) | C2858275 | 47,920 | 2 | GPU |
 | HDMI ESD | TPD4E05U06DQAR (4 lines) | C138714 | 182,893 | 4 | GPU: two, for the 8 TMDS lines |
 | USB-A receptacle | USB-302S-T (SMD right angle) | C112455 | 3,791 | 2 | IO |
