@@ -137,20 +137,15 @@ def schematic(path, footprint_libs):
     s.connect(y1, "4", "GND")
 
     # USB-C to the host: data only. VBUS goes nowhere (see the module doc).
-    j1 = s.add("Connector:USB_C_Receptacle_USB2.0_16P", "J1", "HRO TYPE-C-31-M-12",
-               "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+    # JLC's own footprint (its pads are the ones JLC places: bomcheck, BRD-001)
+    j1 = s.add("jlc:TYPE-C-31-M-12", "J1", "TYPE-C-31-M-12", "jlc:USB-C_SMD-TYPE-C-31-M-12_1",
                at=(96 * G, 18 * G), fields={"LCSC": "C165948"})
-    s.nc(j1, "A4")                            # VBUS, with A9, B4, B9 stacked on it
-    s.connect(j1, "A1", "GND")
-    s.connect(j1, "SH", "GND")
-    s.connect(j1, "A5", "USB_CC1")
-    s.connect(j1, "B5", "USB_CC2")
-    s.connect(j1, "A6", "USB_DP")
-    s.connect(j1, "B6", "USB_DP")
-    s.connect(j1, "A7", "USB_DM")
-    s.connect(j1, "B7", "USB_DM")
-    s.nc(j1, "A8")
-    s.nc(j1, "B8")
+    for pin, net in (("A1B12", "GND"), ("B1A12", "GND"), ("1", "GND"), ("2", "GND"), ("3", "GND"),
+                     ("4", "GND"), ("A5", "USB_CC1"), ("B5", "USB_CC2"), ("A6", "USB_DP"),
+                     ("B6", "USB_DP"), ("A7", "USB_DM"), ("B7", "USB_DM")):
+        s.connect(j1, pin, net)
+    for pin in ("A4B9", "B4A9", "A8", "B8"):    # VBUS goes nowhere; SBU unused
+        s.nc(j1, pin)
 
     # ESD clamps to +3V3, the rail of the pins they protect, not to VBUS:
     # tied to VBUS its steering diodes would lift VBUS to ~2.7 V from the
@@ -221,9 +216,10 @@ LOGO_AT = (48.8, 28.6)
 PLACEMENT = {
     "J2": (EDGE_AT[0], EDGE_AT[1], 0),
     "U1": (28, 17, 0),
-    # the HRO drawing puts the board edge 3.19 mm from the footprint origin
-    # (hw/smoke/smoke.py); a half turn faces the opening up, off the top edge
-    "J1": (42, 3.19, 180),
+    # the HRO drawing puts the board edge 5.79 mm from the locating pegs,
+    # which this footprint has at y = -1.21: the edge is at y = 4.58, and the
+    # shell overhangs it by 0.51 mm. A half turn faces the opening up.
+    "J1": (42, 4.58, 180),
     "U3": (42, 11.5, 0),
     "R2": (41, 15.5, 0), "R3": (41, 17.5, 0),
     "R4": (49.5, 6, 0), "R5": (49.5, 8, 0),

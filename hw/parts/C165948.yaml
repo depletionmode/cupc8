@@ -1,0 +1,21 @@
+# TYPE-C-31-M-12 (Korean Hroparts), USB-C 2.0 receptacle, 16 contacts + shell, SMD
+datasheet: hw/datasheets/C165948_HRO_TYPE-C-31-M-12.pdf
+source: "HRO TYPE-C-31-M-12 drawing: the recommended PCB layout's pad assignment (A1/B12, A4/B9, B8, A5, B7, A6, A7, B6, A8, B5, B4/A9, B1/A12 across the row) and the shell's four tabs"
+package: SMD
+pins:
+  A1B12: GND
+  A4B9: VBUS
+  B8: SBU2
+  A5: CC1
+  B7: [DN2, D-]
+  A6: [DP1, D+]
+  A7: [DN1, D-]
+  B6: [DP2, D+]
+  A8: SBU1
+  B5: CC2
+  B4A9: VBUS
+  B1A12: GND
+  1: [EH, SHIELD]         # the four shell tabs
+  2: [EH, SHIELD]
+  3: [EH, SHIELD]
+  4: [EH, SHIELD]
