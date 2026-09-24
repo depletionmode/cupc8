@@ -864,6 +864,76 @@ cmd = "python3 hw/smoke/smoke.py"
 
 
 # ============================================================================
+# POW / THM: the power tree (doc/hardware/power.md), verification 4.4 / 4.5.
+# Values and assumptions: hw/power/design.py. The main board isn't drawn
+# yet, so these check power.md's design plus the listed assumptions; the
+# MB-005/MB-006 entries re-run them against the schematic once it exists.
+# ============================================================================
+[[test]]
+id = "POW-001"
+title = "3V3 buck: start-up, 0->500 mA step, dropout (TI TLV62569 model)"
+checks = "3V3 within 3.135-3.465 V at the DC corners through start-up, a 0->500 mA step and its release, at 5V_SYS worst-low and 5.5 V; above the MAX811T threshold; up in <= 2 ms into the full load and 100 uF; 5V_SYS headroom over 100 % duty dropout"
+method = "hw/power/buck.py: TI's PSpice transient model (fetched, sha256-pinned, VSWITCH ported) in ngspice, fed through the worst-case input path"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/buck.py"
+
+[[test]]
+id = "POW-002"
+title = "1V2 LDO (RT9013): start-up, core step, dropout, PSRR"
+checks = "model reproduces the datasheet load step within 25 %; 1V2 within the iCE40's 1.14-1.26 V with 2 % DC tolerance, the 0->40 mA step and the buck's ripple through the PSRR; dropout headroom at the lowest 3V3"
+method = "hw/power/ldo.py 1v2: behavioural LDO (models/behavioural.lib) fitted to the RT9013 datasheet; AC analysis at POW-001's ripple frequencies"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/ldo.py 1v2"
+
+[[test]]
+id = "POW-003"
+title = "Wi-Fi card AMS1117: ESP32-C3 TX burst, dropout"
+checks = "model reproduces the 1117 load-step figure within 25 %; ESP32-C3 supply >= 3.0 V through a 350 mA TX burst with the card as built (22 uF in, 22 uF + 100 nF out), at the typical and worst-case slot +5V"
+method = "hw/power/ldo.py wifi: behavioural AMS1117 fed through the whole source-to-card chain"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/ldo.py wifi"
+
+[[test]]
+id = "POW-004"
+title = "USB-C attach inrush"
+checks = "<= 10 uF on VBUS ahead of the SY6280; the surge through it held to its current limit; 5V_SYS up within 2 ms; VBUS stays above the switch's UVLO; at vSafe5V min and max, for the RSET in power.md and budget.py's proposal"
+method = "hw/power/inrush.py: behavioural SY6280 (soft start, current limit) into the 5V_SYS capacitance and the loads that start at attach"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/inrush.py"
+
+[[test]]
+id = "POW-005"
+title = "USB-C CC divider, PWR_HI comparator and ADC thresholds"
+checks = "every compliant source's CC voltage on our Rd falls on the right side of the PWR_HI trip points (TLV7011 offset, hysteresis, 3V3 and resistor tolerances) and of sysctl's 0.20/0.66/1.23 V ADC thresholds; TI's TLV7011 model agrees at the window edges"
+method = "hw/power/cc.py: tolerance stack-up against the Type-C Rp options, plus ngspice with TI's TLV7011 model"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/power/cc.py"
+
+[[test]]
+id = "POW-006"
+title = "Worst-case current budget, input path and slot feeds"
+checks = "M1 worst case within the 1.5 A source class, the SY6280's minimum current limit and the input PTC's 40 C hold, with 10 % margin; default-USB operation with the radio off; each slot's +5V within its PTC's 40 C hold; keyboard VBUS >= 4.40 V; what is left for slots 4-6"
+method = "hw/power/budget.py: power.md's max loads through the source/cable/fuse/switch/PTC chain at worst and typical corners"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/power/budget.py"
+
+[[test]]
+id = "THM-001"
+title = "Regulator junction temperatures at 40 C ambient"
+checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 4-6 at 300 mA of +3V3 each), both RT9013s, each card's AMS1117 and both SY6280s, from datasheet theta_JA"
+method = "hw/power/thermal.py: dissipation at each part's hottest corner x theta_JA"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/power/thermal.py"
+
+
+# ============================================================================
 # Board tests. Every board gets the same static set (-0xx), board-specific
 # checks (-05x), and hardware bring-up tests (-1xx, kind = "hw").
 # ============================================================================
