@@ -785,13 +785,14 @@ def legalize(parts, at, margin=0.35, extra=None):
         fp = fps[r]
         fp.SetOrientationDegrees(rot)
         found = None
+        fp.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
+        e = (extra or {}).get(r, 0.0)
+        b0 = _box(fp)
+        b0 = (b0[0] - e, b0[1] - e, b0[2] + e, b0[3] + e)
         for k in range(0, 6000):
             a, rad = k * 0.5, 0.25 * math.sqrt(k)
             dx, dy = rad * math.cos(a), rad * math.sin(a)
-            fp.SetPosition(pcbnew.VECTOR2I(mm(x + dx), mm(y + dy)))
-            b = _box(fp)
-            e = (extra or {}).get(r, 0.0)
-            b = (b[0] - e, b[1] - e, b[2] + e, b[3] + e)
+            b = (b0[0] + dx, b0[1] + dy, b0[2] + dx, b0[3] + dy)
             if r != "J1" and (b[0] < 0.6 or b[1] < 0.6 or b[2] > W - 0.6 or b[3] > H - 0.6):
                 continue
             if any(kg.overlap(b, o, margin) for o in placed):
