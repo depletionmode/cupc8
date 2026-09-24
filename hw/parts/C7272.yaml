@@ -1,0 +1,10 @@
+# MAX811TEUS+T (Analog Devices), 3.08 V reset supervisor, SOT-143
+datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/MAX811-MAX812.pdf
+source: "Analog Devices MAX811/MAX812 datasheet, Pin Configuration (SOT143, top view) and Pin Description"
+package: SOT-143
+pins:
+  1: "GND"
+  2: ["RESET", "~{RESET}"]
+  3: ["MR", "~{MR}"]
+  4: "VCC"
+ccw: [1, 4]

@@ -2,24 +2,26 @@
 """The main board's card-edge sockets, and the check that a card mates with them.
 
 The cards use the cupc8:CUPC8_* symbols with KiCad's BUS_PCIexpress_* finger
-footprints; the main board uses the same symbols with the footprints of the
-real sockets (LCSC):
+footprints; the main board uses the footprints of the real sockets (LCSC),
+imported with hw/tools/jlcimport.py:
 
     I/O slot     C404113   UMAX 3183-10200P1T, PCIe x1 36 contacts, THT
     CPU socket   C404111   UMAX 3183-10112P1T, PCIe x8 98 contacts, THT
     system slot  C19188869 PCIE-64P11L, PCIe x4 64 contacts, SMD with posts
 
-The two THT sockets import (hw/tools/jlcimport.py) with pads already named
-A1..B49 as the UMAX drawing labels them (A row "A PIN#1", B row "B PIN#1").
-The SMD socket imports with pads 1..64 and 65 for both hold-downs; EasyEDA's
-symbol for it names 1..32 A1..A32 and 33..64 B1..B32. derive() writes a copy
-into hw/lib/cupc8.pretty with the pads renamed to match, and the hold-downs
-unnamed (mechanical, no net).
+The two THT sockets have their pads named A1..B49 as the UMAX drawing labels
+the rows ("A PIN#1", "B PIN#1"), so the main board uses the card symbols
+as they are. The SMD socket's pads are 1..64, and 65 for both hold-downs;
+EasyEDA's symbol for it names 1..32 A1..A32 and 33..64 B1..B32 (x4_contact).
+The main board uses a copy of cupc8:CUPC8_SystemSlot numbered that way
+(hw/boards/main.py, cupc8_main:CUPC8_SystemSlot_64P11L), so JLC's own
+footprint places it.
 
 check() is the guard against the mistake that would kill every card: it
 mates KiCad's card finger footprint with each socket footprint, the way the
 card physically goes in (its key in the socket's key), and requires every
-finger to land on the socket contact of the same name.
+finger to land on the socket contact of the same name, and the main board's
+symbol to give that contact's pad the card symbol's name for it.
 
 Geometry (both footprints are top views, Y down):
   - a card footprint has its fingers at the bottom edge, pin 1 at the left,
@@ -30,11 +32,10 @@ Geometry (both footprints are top views, Y down):
   - along the socket, the card's key notch sits on the socket's key: the
     widest gap between neighbouring contacts, where the key post is
 
-    python3 hw/boards/sockets.py          derive the x4 footprint, then check
+    python3 hw/boards/sockets.py          the self-test, then the check
 """
 
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -42,38 +43,29 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
 
-JLC = os.path.join(ROOT, "hw", "lib", "jlc.pretty")
-CUPC8 = os.path.join(ROOT, "hw", "lib", "cupc8.pretty")
 EDGE = os.path.join(kg.KICAD_FOOTPRINTS, "Connector_PCBEdge.pretty")
 
-X4_SRC = "PCIE-SMD_PCIE-64P11L"
-X4 = "PCIe_x4_Socket_PCIE-64P11L"
-
-# symbol -> (socket footprint, KiCad card-edge footprint it must mate with)
+# card symbol -> (socket footprint, KiCad card-edge footprint it must mate
+# with, the symbol the main board uses for the socket)
 SOCKETS = {
-    "CUPC8_Slot": ("jlc:CONN-TH_36P-P1.00-V_3183-XXXXXPXT", "BUS_PCIexpress_x1"),
-    "CUPC8_CPUSocket": ("jlc:CONN-TH_98P-P1.00-V_3183-XXXXXPXT", "BUS_PCIexpress_x8"),
-    "CUPC8_SystemSlot": ("cupc8:" + X4, "BUS_PCIexpress_x4"),
+    "CUPC8_Slot": ("jlc:CONN-TH_36P-P1.00-V_3183-XXXXXPXT", "BUS_PCIexpress_x1", "cupc8:CUPC8_Slot"),
+    "CUPC8_CPUSocket": ("jlc:CONN-TH_98P-P1.00-V_3183-XXXXXPXT", "BUS_PCIexpress_x8", "cupc8:CUPC8_CPUSocket"),
+    "CUPC8_SystemSlot": ("jlc:PCIE-SMD_PCIE-64P11L", "BUS_PCIexpress_x4", "cupc8_main:CUPC8_SystemSlot_64P11L"),
 }
 
 
-def derive():
-    """cupc8:PCIe_x4_Socket_PCIE-64P11L from the EasyEDA import of C19188869."""
-    text = open(os.path.join(JLC, X4_SRC + ".kicad_mod")).read()
+def x4_contact(pad):
+    """The contact of a C19188869 pad (None for the hold-downs, 65)."""
+    n = int(pad)
+    return None if n > 64 else ("A%d" % n if n <= 32 else "B%d" % (n - 32))
 
-    def name(m):
-        n = int(m.group(1))
-        new = "A%d" % n if n <= 32 else "B%d" % (n - 32) if n <= 64 else '""'
-        return "(pad %s smd" % new
-    out = re.sub(r"\(pad (\d+) smd", name, text)
-    out = out.replace("easyeda2kicad:" + X4_SRC, "cupc8:" + X4, 1).replace(
-        "(fp_text value " + X4_SRC, "(fp_text value " + X4, 1)
-    path = os.path.join(CUPC8, X4 + ".kicad_mod")
-    old = open(path).read() if os.path.exists(path) else None
-    if out != old:
-        with open(path, "w") as f:
-            f.write(out)
-    return path
+
+def x4_pad(contact):
+    """The C19188869 pad of a system slot contact: x4_contact's inverse."""
+    return str(int(contact[1:]) + (0 if contact[0] == "A" else 32))
+
+
+CONTACT = {"CUPC8_SystemSlot": x4_contact}
 
 
 def _load(fpid_or_dir, name=None):
@@ -104,16 +96,24 @@ def check_socket(symbol, socket_fpid, card_name, sock=None):
     bad = []
     sock = sock or _load(socket_fpid)
     card = _load(EDGE, card_name)
-    sp = {p.GetNumber(): (to(p.GetPosition().x), to(p.GetPosition().y)) for p in sock.Pads() if p.GetNumber()}
+    contact = CONTACT.get(symbol, lambda n: n)
+    pads = {p.GetNumber() for p in sock.Pads() if p.GetNumber()}
+    sp = {contact(p.GetNumber()): (to(p.GetPosition().x), to(p.GetPosition().y)) for p in sock.Pads()
+          if p.GetNumber() and contact(p.GetNumber())}
     cp = {p.GetNumber(): (to(p.GetPosition().x), p.IsOnLayer(pcbnew.F_Cu)) for p in card.Pads() if p.GetNumber()}
     if set(sp) != set(cp):
-        bad.append("%s: socket pads %s vs card fingers %s differ: %s" % (
+        bad.append("%s: socket contacts %s vs card fingers %s differ: %s" % (
             symbol, len(sp), len(cp), sorted(set(sp) ^ set(cp))[:8]))
-    # the symbol's pins are exactly the contacts
-    sym = kg.load_symbol("cupc8:" + symbol)
-    pins = set(kg.symbol_pins(sym))
-    if pins != set(sp):
-        bad.append("%s: symbol pins and socket pads differ: %s" % (symbol, sorted(pins ^ set(sp))[:8]))
+    # the main board's symbol has a pin for every pad, and each contact's pin
+    # has the card symbol's name for that contact
+    card_names = {n: p[3] for n, p in kg.symbol_pins(kg.load_symbol("cupc8:" + symbol)).items()}
+    main_pins = kg.symbol_pins(kg.load_symbol(SOCKETS[symbol][2]))
+    if set(main_pins) != pads:
+        bad.append("%s: symbol pins and socket pads differ: %s" % (symbol, sorted(set(main_pins) ^ pads)[:8]))
+    for num, p in main_pins.items():
+        c = contact(num)
+        if c and card_names.get(c) != p[3]:
+            bad.append("%s: pad %s is contact %s (%s) but its pin is %s" % (symbol, num, c, card_names.get(c), p[3]))
     ys = sorted({round(y, 3) for _, y in sp.values()})
     mid = (ys[0] + ys[-1]) / 2
     sk = _key_centre([x for x, _ in sp.values()], socket_fpid)
@@ -134,14 +134,15 @@ def check_socket(symbol, socket_fpid, card_name, sock=None):
             bad.append("%s: finger %s is %.2f mm from the key, contact %s is %.2f mm" % (
                 symbol, n, cx - ck, n, sx - sk))
     # pin 1 is on the short side of the key, as on PCIe
-    if (sp["A1"][0] - sk) * (sp["A%d" % max(int(k[1:]) for k in sp)][0] - sk) > 0:
+    last = "A%d" % max(int(k[1:]) for k in sp)
+    if (sp["A1"][0] - sk) * (sp[last][0] - sk) > 0:
         bad.append("%s: A1 and the last contact are on the same side of the key" % symbol)
     return bad
 
 
 def check():
     bad = []
-    for symbol, (fpid, card) in SOCKETS.items():
+    for symbol, (fpid, card, _) in SOCKETS.items():
         bad += check_socket(symbol, fpid, card)
     return bad
 
@@ -164,7 +165,6 @@ def selftest():
 
 def main():
     import pcbnew  # noqa: F401
-    derive()
     bad = selftest() + check()
     for b in bad:
         print("FAIL", b)

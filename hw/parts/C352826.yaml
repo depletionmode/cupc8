@@ -1,0 +1,22 @@
+# CD74HC4051PWR (TI), 8-channel analog mux, TSSOP-16
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/23a254f744eb1aed7c9789f75dc29aa0.pdf
+source: "TI CD74HC4051 datasheet (SCHS122), Pin Configuration and Functions: PW package; channels A0-A7, common A, select S0-S2, enable E (active low)"
+package: TSSOP-16
+pins:
+  1: "A4"
+  2: "A6"
+  3: ["A", "COM"]
+  4: "A7"
+  5: "A5"
+  6: ["E", "~{E}"]
+  7: "VEE"
+  8: "GND"
+  9: "S2"
+  10: "S1"
+  11: "S0"
+  12: "A3"
+  13: "A0"
+  14: "A1"
+  15: "A2"
+  16: "VCC"
+ccw: [1, 16]

@@ -169,7 +169,10 @@ def schematic_parts(sch):
         if ref.startswith("#"):
             continue
         f = c.get("fields", {})
-        pins = kg.symbol_pins(lib[libid[ref]]) if libid.get(ref) in lib else {}
+        pins = {}
+        if libid.get(ref) in lib:                  # every unit (the chipset's symbol has five)
+            for unit in range(1, 10):
+                pins.update(kg.symbol_pins(lib[libid[ref]], unit))
         out[ref] = {"value": c["value"], "footprint": c["footprint"], "lcsc": f.get("LCSC") or f.get("LCSC Part"),
                     "pins": {n: p[3] for n, p in pins.items()}}
     return out

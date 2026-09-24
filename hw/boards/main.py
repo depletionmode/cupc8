@@ -266,8 +266,8 @@ def build_parts():
     base = kg.load_symbol("FPGA_Lattice:ICE40HX4K-TQ144")
     unused = {int(n) for u in range(1, 6) for n, p in kg.symbol_pins(base, u).items()
               if chip.get(int(n)) is None and p[3] not in ("VCC", "GND") and not p[3].startswith("VCCIO")}
-    fpga_symbol({n for n in unused if n >= 100})
-    sym = kg.load_symbol("cupc8_fpga:ICE40HX4K-TQ144")
+    main_symbols({n for n in unused if n >= 100})
+    sym = kg.load_symbol("cupc8_main:ICE40HX4K-TQ144")
     for unit in range(1, 6):
         conns = {}
         for num, p in kg.symbol_pins(sym, unit).items():
@@ -283,7 +283,7 @@ def build_parts():
                 conns[num] = "GND"
             else:
                 conns[num] = None                   # NC and unused I/O
-        part("U7", "cupc8_fpga:ICE40HX4K-TQ144", "ICE40HX4K-TQ144", "Package_QFP:TQFP-144_20x20mm_P0.5mm",
+        part("U7", "cupc8_main:ICE40HX4K-TQ144", "ICE40HX4K-TQ144", "Package_QFP:TQFP-144_20x20mm_P0.5mm",
              "C1521989", conns, unit=unit)
     for i, sig in enumerate(s for s in sorted(set(chip.values()), key=str) if s and s.endswith("_SRC")):
         base = sig[:-4]
@@ -361,8 +361,10 @@ def build_parts():
     # ---- system slot (system-slot.md)
     group("system")
     names = edgesym.pinout("doc/hardware/system-slot.md")
-    part("J3", "cupc8:CUPC8_SystemSlot", "System slot", sockets.SOCKETS["CUPC8_SystemSlot"][0], "C19188869",
-         {num: sys_net(n) for num, n in names.items()})
+    conns = {x4_socket_pad(num): sys_net(n) for num, n in names.items()}
+    conns["65"] = "GND"                              # the hold-downs
+    part("J3", "cupc8_main:" + X4_SOCKET, "System slot", sockets.SOCKETS["CUPC8_SystemSlot"][0], "C19188869",
+         conns)
     R("R100", "1k", "+1V2", "V1V2_SENSE")          # sysctl's ADC on the 1V2 rail
     for i, net in enumerate(("MUX_SEL0", "MUX_SEL1", "MUX_SEL2", "SYS_PRSNT2_n")):
         R("R%d" % (101 + i), "10k", "+3V3", net)   # MUX_SEL high: channel 7, nothing
@@ -434,16 +436,17 @@ def build_parts():
 
 # --------------------------------------------------------------- schematic
 
-FPGA_LIB = os.path.join(ROOT, "hw", "lib", "cupc8_fpga.kicad_sym")
+MAIN_LIB = os.path.join(ROOT, "hw", "lib", "cupc8_main.kicad_sym")
 NC_ROOM = 1.6                            # a no-connect cross at a pin's end
+X4_SOCKET = "CUPC8_SystemSlot_64P11L"
 
 
 def fpga_symbol(unused):
-    """hw/lib/cupc8_fpga.kicad_sym: KiCad's ICE40HX4K-TQ144 (its pinout agrees
-    with icestorm and pincheck; EasyEDA's symbol for C1521989 has the HX1K's)
-    with the `unused` pins that have three-digit numbers made long enough for
-    the number and a no-connect cross, as hw/tools/jlcimport.py does for
-    imported parts. The body end of each pin stays put."""
+    """KiCad's ICE40HX4K-TQ144 (its pinout agrees with Lattice's HX4K pinout,
+    hw/datasheets/iCE40HX4K-TQ144-pinout.csv; EasyEDA's symbol for C1521989
+    has the HX1K's) with the `unused` pins that have three-digit numbers made
+    long enough for the number and a no-connect cross, as jlcimport.py does
+    for imported parts. The body end of each pin stays put."""
     sym = kg.load_symbol("FPGA_Lattice:ICE40HX4K-TQ144")
     sym[1] = kg.Q("ICE40HX4K-TQ144")
     need = kg.text_extent("144")[0] + NC_ROOM
@@ -461,12 +464,50 @@ def fpga_symbol(unused):
             elif isinstance(e, list):
                 walk(e)
     walk(sym)
-    text = kg.dump(["kicad_symbol_lib", ["version", 20231120], ["generator", kg.Q("cupc8-main")], sym]) + "\n"
-    old = open(FPGA_LIB).read() if os.path.exists(FPGA_LIB) else None
+    return sym
+
+
+x4_socket_pad = sockets.x4_pad
+
+
+def x4_socket_symbol():
+    """cupc8:CUPC8_SystemSlot with its pins numbered as the socket's pads
+    (sockets.x4_pad), so the board uses JLC's own footprint for the part, and
+    pin 65 for the two hold-down pads (GND)."""
+    sym = kg.load_symbol("cupc8:CUPC8_SystemSlot")
+    sym[1] = kg.Q(X4_SOCKET)
+    low = 0.0
+    for sub in kg.find(sym, "symbol"):
+        sub[1] = kg.Q(X4_SOCKET + str(sub[1])[len("CUPC8_SystemSlot"):])
+        for pin in kg.find(sub, "pin"):
+            num = kg.find1(pin, "number")
+            num[1] = kg.Q(x4_socket_pad(str(num[1])))
+            low = min(low, float(kg.find1(pin, "at")[2]))
+        for rect in kg.find(sub, "rectangle"):
+            low = min(low, float(kg.find1(rect, "end")[2]))
+    font = ["effects", ["font", ["size", 1.27, 1.27]]]
+    unit1 = [e for e in kg.find(sym, "symbol") if str(e[1]).endswith("_1_1")][0]
+    unit1.append(["pin", "passive", "line", ["at", 0, round(low - 2 * G, 2), 90], ["length", 2 * G],
+                  ["name", kg.Q("MP"), font], ["number", kg.Q("65"), font]])
+    for prop in kg.find(sym, "property"):
+        if prop[1] == "Footprint":
+            prop[2] = kg.Q(sockets.SOCKETS["CUPC8_SystemSlot"][0])
+        elif prop[1] == "Value":
+            prop[2] = kg.Q(X4_SOCKET)
+        elif prop[1] == "Reference":
+            kg.find1(prop, "at")[2] = round(float(kg.find1(prop, "at")[2]), 2)
+    return sym
+
+
+def main_symbols(unused):
+    """hw/lib/cupc8_main.kicad_sym: the two symbols only this board uses."""
+    text = kg.dump(["kicad_symbol_lib", ["version", 20231120], ["generator", kg.Q("cupc8-main")],
+                    fpga_symbol(unused), x4_socket_symbol()]) + "\n"
+    old = open(MAIN_LIB).read() if os.path.exists(MAIN_LIB) else None
     if text != old:
-        with open(FPGA_LIB, "w") as f:
+        with open(MAIN_LIB, "w") as f:
             f.write(text)
-    kg._libs.pop("cupc8_fpga", None)
+    kg._libs.pop("cupc8_main", None)
 
 PAPER = "A0"
 
@@ -940,7 +981,7 @@ def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     import logo
     import pincheck
-    sockets.derive()
+    build_parts()                                   # writes cupc8_main.kicad_sym, which the check reads
     bad = sockets.selftest() + sockets.check()
     if bad:
         raise SystemExit("sockets:\n  " + "\n  ".join(bad))

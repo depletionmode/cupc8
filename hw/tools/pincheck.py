@@ -321,6 +321,16 @@ def check_mainboard(pins, path=MAINBOARD_NET):
     sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
     import edgesym
     comps, pin_net, func = read_netlist(path)
+    # the system slot socket (C19188869) numbers its pads 1-64 (A1-A32, then
+    # B1-B32; hw/boards/sockets.py): name them by contact, as the docs do
+    for ref, c in comps.items():
+        if c[1] == "CUPC8_SystemSlot_64P11L":
+            comps[ref] = (c[0], "CUPC8_SystemSlot", c[2])
+            for key in [k for k in pin_net if k[0] == ref]:
+                n = int(key[1])
+                if n <= 64:
+                    new = (ref, "A%d" % n if n <= 32 else "B%d" % (n - 32))
+                    pin_net[new], func[new] = pin_net.pop(key), func.pop(key)
     nodes = {}
     for (ref, pin), n in pin_net.items():
         nodes.setdefault(n, []).append((ref, pin))

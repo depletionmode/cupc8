@@ -1,0 +1,11 @@
+# TLV7011DBVR (TI), comparator, SOT-23-5
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/d955c7471084950f84e5242f5ec7a175.pdf
+source: "TI TLV7011/TLV7021 datasheet (SLVSD17), 5 Pin Configuration and Functions: DBV package, Pin Functions"
+package: SOT-23-5
+pins:
+  1: "OUT"
+  2: "VEE"
+  3: "IN+"
+  4: ["IN-", "IN"]
+  5: "VCC"
+ccw: [1, 5]

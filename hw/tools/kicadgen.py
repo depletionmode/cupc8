@@ -24,7 +24,7 @@ HW_LIB = os.path.join(ROOT, "hw", "lib")
 PROJECT_FOOTPRINTS = {"cupc8": os.path.join(HW_LIB, "cupc8.pretty"), "jlc": os.path.join(HW_LIB, "jlc.pretty")}
 PROJECT_SYMBOLS = {"jlc": os.path.join(HW_LIB, "jlc.kicad_sym"),       # imported by hw/tools/jlcimport.py
                    "cupc8": os.path.join(HW_LIB, "cupc8.kicad_sym"),   # hw/tools/edgesym.py
-                   "cupc8_fpga": os.path.join(HW_LIB, "cupc8_fpga.kicad_sym")}   # hw/boards/main.py
+                   "cupc8_main": os.path.join(HW_LIB, "cupc8_main.kicad_sym")}   # hw/boards/main.py
 
 # 3D models for stock footprints whose model KiCad does not ship, placed from
 # the maker's drawing: footprint -> (model under hw/lib/models, offset mm

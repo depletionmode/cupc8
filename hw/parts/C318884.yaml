@@ -1,0 +1,10 @@
+# TS-1187A-B-A-B (XKB), 5.1 mm SMD tactile switch
+# EasyEDA's symbol names the four pads A-D.
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/56c8799ae5193945a16a1ffbe378246a.pdf
+source: "XKB TS-1187A datasheet, drawing: four terminals, joined in two pairs by the switch body; the board wires two diagonal pads, which are always on different terminals"
+package: SMD-4P,5.1x5.1mm
+pins:
+  1: ["1", "A"]
+  2: ["2", "B"]
+  3: ["3", "C"]
+  4: ["4", "D"]

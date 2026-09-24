@@ -1,0 +1,38 @@
+# SST39VF040-70-4I-NHE (Microchip), 512K x 8 flash, PLCC-32
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/406f13c11d944519b4ea113900723c66.pdf
+source: "Microchip SST39VF010/020/040 datasheet, Figure 2-2: Pin Assignments for 32-lead PLCC (top view)"
+package: PLCC-32(11.4x14)
+pins:
+  1: "A18"
+  2: "A16"
+  3: "A15"
+  4: "A12"
+  5: "A7"
+  6: "A6"
+  7: "A5"
+  8: "A4"
+  9: "A3"
+  10: "A2"
+  11: "A1"
+  12: "A0"
+  13: "DQ0"
+  14: "DQ1"
+  15: "DQ2"
+  16: "VSS"
+  17: "DQ3"
+  18: "DQ4"
+  19: "DQ5"
+  20: "DQ6"
+  21: "DQ7"
+  22: ["CE#", "~{CE}"]
+  23: "A10"
+  24: ["OE#", "~{OE}"]
+  25: "A11"
+  26: "A9"
+  27: "A8"
+  28: "A13"
+  29: "A14"
+  30: "A17"
+  31: ["WE#", "~{WE}"]
+  32: "VDD"
+ccw: [1, 32]

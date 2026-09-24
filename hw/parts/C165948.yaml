@@ -1,0 +1,22 @@
+# TYPE-C-31-M-12 (HRO), USB-C receptacle, 16 pins
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/9e56b777c022540fcce7c7f67825f55e.pdf
+source: "HRO TYPE-C-31-M-12 drawing (hw/datasheets/C165948_HRO_TYPE-C-31-M-12.pdf): contacts A1-A12, B1-B12 (USB 2.0 subset) and the shell"
+package: SMD
+pins:
+  "A1": "GND"
+  "A4": "VBUS"
+  "A5": "CC1"
+  "A6": "D+"
+  "A7": "D-"
+  "A8": "SBU1"
+  "A9": "VBUS"
+  "A12": "GND"
+  "B1": "GND"
+  "B4": "VBUS"
+  "B5": "CC2"
+  "B6": "D+"
+  "B7": "D-"
+  "B8": "SBU2"
+  "B9": "VBUS"
+  "B12": "GND"
+  "SH": ["SHIELD", "SH"]

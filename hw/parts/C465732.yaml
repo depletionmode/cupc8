@@ -1,0 +1,30 @@
+# TCA9555PWR (TI), 16-bit I2C I/O expander, TSSOP-24
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/b87b1e8b19259fa8f353ae4a0dd9a62d.pdf
+source: "TI TCA9555 datasheet (SCPS200), 5 Pin Configuration and Functions: PW package, Pin Functions"
+package: TSSOP-24
+pins:
+  1: ["INT", "~{INT}"]
+  2: "A1"
+  3: "A2"
+  4: "P00"
+  5: "P01"
+  6: "P02"
+  7: "P03"
+  8: "P04"
+  9: "P05"
+  10: "P06"
+  11: "P07"
+  12: "GND"
+  13: "P10"
+  14: "P11"
+  15: "P12"
+  16: "P13"
+  17: "P14"
+  18: "P15"
+  19: "P16"
+  20: "P17"
+  21: "A0"
+  22: "SCL"
+  23: "SDA"
+  24: "VCC"
+ccw: [1, 24]

@@ -1,0 +1,38 @@
+# IS62WV5128EBLL-45HLI (ISSI), 512K x 8 SRAM, sTSOP-32 type I
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/90ea0a0c4d567eb1821e29d9d114e8d1.pdf
+source: "ISSI IS62WV5128EALL/EBLL/ECLL datasheet Rev. A4, page 2: Pin Configurations, 32-pin STSOP (Type I)"
+package: STSOP-32-11.8mm
+pins:
+  1: "A11"
+  2: "A9"
+  3: "A8"
+  4: "A13"
+  5: ["WE#", "~{WE}"]
+  6: "A18"
+  7: "A15"
+  8: "VDD"
+  9: "A17"
+  10: "A16"
+  11: "A14"
+  12: "A12"
+  13: "A7"
+  14: "A6"
+  15: "A5"
+  16: "A4"
+  17: "A3"
+  18: "A2"
+  19: "A1"
+  20: "A0"
+  21: "I/O0"
+  22: "I/O1"
+  23: "I/O2"
+  24: "GND"
+  25: "I/O3"
+  26: "I/O4"
+  27: "I/O5"
+  28: "I/O6"
+  29: "I/O7"
+  30: ["CS#", "~{CS}"]
+  31: "A10"
+  32: ["OE#", "~{OE}"]
+ccw: [1, 32]

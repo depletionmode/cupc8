@@ -1,0 +1,9 @@
+# MMBT3904 (CJ), NPN transistor, SOT-23
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/9335632bcfa83df8351353eab379720e.pdf
+source: "Jiangsu Changjing MMBT3904 datasheet, SOT-23 pinout: 1 base, 2 emitter, 3 collector"
+package: SOT-23
+pins:
+  1: ["B", "Base"]
+  2: ["E", "Emitter"]
+  3: ["C", "Collector"]
+ccw: [1, 3]

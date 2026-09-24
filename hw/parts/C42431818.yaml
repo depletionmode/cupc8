@@ -1,0 +1,15 @@
+# PZ2.54-2X5P-H25, 2x5 2.54 mm pin header
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/53f82b9f905b8a9e4281b8d43e1074c3.pdf
+source: "the maker's drawing: pins 1-10 in two rows, odd numbers in the first"
+package: Plugin,P=2.54mm
+pins:
+  1: ["1", "Pin_1"]
+  2: ["2", "Pin_2"]
+  3: ["3", "Pin_3"]
+  4: ["4", "Pin_4"]
+  5: ["5", "Pin_5"]
+  6: ["6", "Pin_6"]
+  7: ["7", "Pin_7"]
+  8: ["8", "Pin_8"]
+  9: ["9", "Pin_9"]
+  10: ["10", "Pin_10"]

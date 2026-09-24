@@ -1,0 +1,11 @@
+# HSO321S 12 MHz 3.3 V (HCI), CMOS oscillator, 3.2 x 2.5 mm
+# EasyEDA's symbol draws pin 1 as ~{OE}; the datasheet's OE is active high (open = on). It is tied high.
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/45e535d539b88fff0ea69eeb356a7f8b.pdf
+source: "HCI HSO321S datasheet, Pin Connections: #1 OE (output enable, open or high = on), #2 GND, #3 Output, #4 Vdd"
+package: SMD3225-4P
+pins:
+  1: ["OE", "~{OE}"]
+  2: "GND"
+  3: ["Output", "OUT"]
+  4: ["Vdd", "VDD"]
+ccw: [1, 4]
