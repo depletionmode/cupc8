@@ -1412,7 +1412,8 @@ NOT_PARTS = ("Connector_PCBEdge:", "cupc8:KaplanLabs_Logo", "cupc8:TestPad", "Te
 
 def jlc_fab(sch, pcb, comps, fab):
     """JLC's assembly files: bom.csv (Comment, Designator, Footprint, LCSC Part #)
-    and cpl.csv (Designator, Mid X, Mid Y, Layer, Rotation). Every part must
+    and cpl.csv (Designator, Mid X, Mid Y, Layer, Rotation: KiCad's plus the
+    footprint's hw/parts/jlc_rotation.yaml correction). Every part must
     carry an LCSC number, because nothing is fitted by hand."""
     import csv
 
@@ -1433,13 +1434,16 @@ def jlc_fab(sch, pcb, comps, fab):
     raw = os.path.join(fab, "kicad-pos.csv")
     run(["kicad-cli", "pcb", "export", "pos", "--format", "csv", "--units", "mm", "--side", "both",
          "-o", raw, pcb])
+    import bomcheck
+    turn = bomcheck.rotations()           # JLC's footprint zero vs KiCad's (hw/parts/jlc_rotation.yaml)
     with open(raw) as f, open(os.path.join(fab, "cpl.csv"), "w", newline="") as g:
         w = csv.writer(g)
         w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
         for row in csv.DictReader(f):
             if row["Ref"] in placed:
+                rot = (float(row["Rot"]) + turn.get(placed[row["Ref"]]["footprint"], 0)) % 360
                 w.writerow([row["Ref"], row["PosX"] + "mm", row["PosY"] + "mm",
-                            "Top" if row["Side"] == "top" else "Bottom", row["Rot"]])
+                            "Top" if row["Side"] == "top" else "Bottom", "%.6f" % rot])
     os.remove(raw)
     counts = {}
     for (_, _, code), refs in groups.items():
@@ -1497,8 +1501,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
-    CPL -> JLC stock for `boards` assembled -> 3D renders. `schematic(path,
-    footprint_libs)` writes the sheet. Returns {LCSC number: count per board}."""
+    CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
+    renders. `schematic(path, footprint_libs)` writes the sheet. Returns {LCSC number: count per board}."""
     import pcbnew
     out = os.path.abspath(out or os.path.join(ROOT, "build", "hw", name))
     os.makedirs(out, exist_ok=True)
@@ -1590,6 +1594,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         state["lcsc"] = jlc_fab(sch, pcb, state["c"], fab)
         return "%d distinct parts" % len(state["lcsc"])
     step("JLC BOM + CPL", bom)
+
+    def parts():                          # verification 4.3 and 4.8's BOM <-> schematic (BRD-001)
+        import bomcheck
+        return bomcheck.check(name, out)
+    step("BOM: parts, pins, rotations", parts)
     step("JLC stock", lambda: check_stock(state["lcsc"], boards))
 
     def order():
