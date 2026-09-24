@@ -334,7 +334,7 @@ def build_parts():
     rom = {"A%d" % i: "MEM_A%d" % i for i in range(19)}
     rom.update({"DQ%d" % i: "MEM_D%d" % i for i in range(8)})
     rom.update({"~{CE}": "MEM_nCE_ROM", "~{OE}": "MEM_nOE", "~{WE}": "MEM_nWE", "VDD": "+3V3", "VSS": "GND"})
-    part("U10", "jlc:SST39VF040-70-4I-NHE", "SST39VF040", "jlc:PLCC-32_L14.0-W11.5-P1.27-T", "C645939", rom)
+    part("U10", "jlc:SST39VF040-70-4I-NHE", "SST39VF040", "Package_LCC:PLCC-32_11.4x14.0mm_P1.27mm", "C645939", rom)
     C("C41", "100n", "+3V3")
     # both chips deselected, and no ROM write, while the chipset configures
     for i, net in enumerate(("MEM_nCE_RAM", "MEM_nCE_ROM", "MEM_nWE")):
@@ -573,6 +573,11 @@ def row_slot(n):
     return ROW_SYS + SLOT_PITCH * n
 
 
+# LEDs say what they show (kicadgen prints these in place of the designator);
+# the GPO LEDs are bits 0-7 of $f000, the POST code
+LABELS = {"D2": "5V", "D3": "3V3", "D4": "1V2", "D5": "CDONE", "D6": "PWR"}
+LABELS.update({"D%d" % (11 + i): str(i) for i in range(8)})
+
 FPGA = (97.0, 47.0)                               # centre of U7
 LOGO_MM = 12
 LOGO_AT = (108.0, 160.0)
@@ -677,7 +682,7 @@ def wanted(parts):
     at["U6"] = (112.0, 141.0, 0)
     at["C13"] = (112.0, 144.5, 0)
     # memory decoupling and pulls
-    at["C41"] = (88.5, 12.0, 0)
+    at["C41"] = (80.0, 17.0, 90)
     at["C40"] = (104.5, 16.5, 0)
     for i, r in enumerate(("R70", "R71", "R72")):
         at[r] = (112.0, 19.0 + 2.2 * i, 0)
@@ -692,22 +697,22 @@ def wanted(parts):
     # CPU socket channel (between the CPU socket and the system slot)
     cpu_r = ["R%d" % i for i in list(range(80, 88)) + list(range(90, 98))]
     for i, r in enumerate(cpu_r):
-        at[r] = (22.0 + 3.4 * i, ROW_CPU + 8.6, 0)
+        at[r] = (20.0 + 3.7 * i, ROW_CPU + 8.4, 0)
     for i, r in enumerate(("C42", "C43", "C44")):
         at[r] = (8.0 + 3.6 * i, ROW_CPU + 8.6, 0)
     cpu_tp = [tp(n) for n in ("CPU_nRST", "CPU_CDONE", "CPUCARD_nCRESET", "FL1_SCK", "FL1_MOSI", "FL1_MISO",
                               "FL1_nCS")]
     cpu_tp += [tp("CPU_RSVD_A%d" % k) for k in range(2, 9)] + [tp("CPU_RSVD_B1")]
     for i, r in enumerate(cpu_tp):
-        at[r] = (10.0 + 2.6 * i, ROW_CPU + 12.8, 0)
+        at[r] = (8.0 + 3.4 * i, ROW_CPU + 12.6, 0)
     # system slot channel
     sys_parts = ["R100", "R101", "R102", "R103", "R104", "R105", "R106", "C45", "C46"]
     for i, r in enumerate(sys_parts):
-        at[r] = (8.0 + 3.4 * i, ROW_SYS + 9.0, 0)
+        at[r] = (8.0 + 3.8 * i, ROW_SYS + 8.8, 0)
     sys_tp = [tp(n) for n in ("SYS_PRSNT2_n", "I2C_SDA", "I2C_SCL", "PROG_CLK", "PROG_IO", "MUX_SEL0", "MUX_SEL1",
                               "MUX_SEL2", "SYS_RSVD_A1", "SYS_RSVD_A2", "SYS_RSVD_A3", "SYS_RSVD_B1", "SYS_RSVD_B2")]
     for i, r in enumerate(sys_tp):
-        at[r] = (8.0 + 2.6 * i, ROW_SYS + 12.6, 0)
+        at[r] = (8.0 + 3.4 * i, ROW_SYS + 12.8, 0)
     for i, net in enumerate(("CHIPSET_nCRESET", "CHIPSET_CDONE", "FL0_SCK", "FL0_MOSI", "FL0_MISO", "FL0_nCS",
                              "BR_SCK", "BR_MOSI", "BR_MISO", "BR_nCS", "MEM_nCE_RAM", "CLK12", "CPU_CLK", "nPOR",
                              "nMR", "SPI_SCK", "SPI_MOSI", "SPI_MISO")):
@@ -797,10 +802,10 @@ def legalize(parts, at, margin=0.35, extra=None):
         fp.SetOrientationDegrees(rot)
         found = None
         fp.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
-        e = (extra or {}).get(r, 0.0)
+        e = 0.0 if r.startswith(fixed) else (extra or {}).get(r, 0.0)
         b0 = _box(fp)
         b0 = (b0[0] - e, b0[1] - e, b0[2] + e, b0[3] + e)
-        for k in range(0, 6000):
+        for k in range(0, 20000):
             a, rad = k * 0.5, 0.25 * math.sqrt(k)
             dx, dy = rad * math.cos(a), rad * math.sin(a)
             b = (b0[0] + dx, b0[1] + dy, b0[2] + dx, b0[3] + dy)
@@ -820,29 +825,86 @@ def legalize(parts, at, margin=0.35, extra=None):
 def placement():
     """legalize(), then make room wherever kicadgen cannot fit a designator:
     that part gets a wider berth and everything is legalized again."""
-    import re
     parts = build_parts()
     at = wanted(parts)
     missing = sorted({s.ref for s in parts if s.fp} - set(at))
     if missing:
         raise SystemExit("no placement for: %s" % ", ".join(missing))
     extra = {}
-    for _ in range(200):
+    for _ in range(40):
         pl = legalize(parts, at, extra=extra)
-        try:
-            _designators(parts, pl)
+        bad = _designators(parts, pl) or _designators_kicad(parts, pl)
+        if not bad:
             return pl
-        except ValueError as e:
-            m = re.match(r"(\S+): no room for its designator", str(e))
-            if not m:
-                raise
-            extra[m.group(1)] = extra.get(m.group(1), 0.0) + 0.5
-    raise SystemExit("placement: designators still do not fit")
+        for r in bad:
+            extra[r] = extra.get(r, 0.0) + 0.5
+    raise SystemExit("placement: no room for the designators of %s" % ", ".join(bad))
+
+
+_TEXT_W = {}
+
+
+def _text_w(text):
+    """Width of a designator in kicadgen's silkscreen font (SILK_TEXT)."""
+    import pcbnew
+    if text not in _TEXT_W:
+        t = pcbnew.PCB_TEXT(pcbnew.BOARD())
+        t.SetText(text)
+        t.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(kg.SILK_TEXT[0]), pcbnew.FromMM(kg.SILK_TEXT[0])))
+        t.SetTextThickness(pcbnew.FromMM(kg.SILK_TEXT[1]))
+        bb = t.GetBoundingBox()
+        _TEXT_W[text] = (pcbnew.ToMM(bb.GetWidth()), pcbnew.ToMM(bb.GetHeight()))
+    return _TEXT_W[text]
 
 
 def _designators(parts, pl):
-    """kicadgen's designator placement on the footprints alone. The board is
-    kept: freeing a pcbnew BOARD breaks later SWIG calls in this process."""
+    """kicadgen.place_designators' search, run on the cached footprints: the
+    refs that would find no room (all of them, not just the first)."""
+    import pcbnew
+    to = pcbnew.ToMM
+
+    def box(bb, grow=0.0):
+        return (to(bb.GetLeft()) - grow, to(bb.GetTop()) - grow, to(bb.GetRight()) + grow, to(bb.GetBottom()) + grow)
+    courts, pads = {}, []
+    for ref, (x, y, rot) in pl.items():
+        fp = _FP_CACHE[ref]
+        fp.SetOrientationDegrees(rot)
+        fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
+        cy = fp.GetCourtyard(pcbnew.F_CrtYd)
+        courts[ref] = box(cy.BBox()) if cy.OutlineCount() else box(fp.GetBoundingBox(False))
+        pads += [box(p.GetBoundingBox(), 0.15) for p in fp.Pads()]
+    lx, ly = LOGO_AT
+    courts["G1"] = (lx - LOGO_MM / 2, ly - LOGO_MM / 2, lx + LOGO_MM / 2, ly + LOGO_MM / 2)
+    x0, y0, x1, y1 = OUTLINE
+    inside = (x0 + 0.3, y0 + 0.3, x1 - 0.3, y1 - 0.3)
+    placed, bad, gap = [], [], 0.3
+    for ref in sorted(pl):
+        w, h = _text_w(LABELS.get(ref, ref))
+        cx0, cy0, cx1, cy1 = courts[ref]
+        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+        others = [c for r, c in courts.items() if r != ref]
+        spots = []
+        for shift in (0, 1, -1, 2, -2, 3, -3):
+            spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
+                      (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
+        for sx, sy in spots:
+            t = (sx - w / 2, sy - h / 2, sx + w / 2, sy + h / 2)
+            if t[0] < inside[0] or t[1] < inside[1] or t[2] > inside[2] or t[3] > inside[3]:
+                continue
+            if any(kg.overlap(t, o, 0.12) for o in pads + others + placed):
+                continue
+            placed.append(t)
+            break
+        else:
+            bad.append(ref)
+    return bad
+
+
+def _designators_kicad(parts, pl):
+    """The same check with kicadgen's own place_designators, which has the last
+    word: [the ref it stops at], or []. The board is kept: freeing a pcbnew
+    BOARD breaks later SWIG calls in this process."""
+    import re
     import pcbnew
     board = pcbnew.BOARD()
     _BOARDS.append(board)
@@ -858,15 +920,43 @@ def _designators(parts, pl):
         x, y, rot = where[ref][:3]
         fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
         fp.SetOrientationDegrees(rot)
-    kg.place_designators(board, OUTLINE)
+    try:
+        kg.place_designators(board, OUTLINE, labels=LABELS)
+    except ValueError as e:
+        return [re.match(r"(\S+):", str(e)).group(1)]
+    return []
 
 
 def _graphics():
     return [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)]
 
 
+# the nets that carry amps: 0.5 mm tracks (kicadgen's Power class)
+POWER_NETS = ("/VBUS", "/VBUS_F", "/5V_SYS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
+PLANES = (("/GND", "In1.Cu"), ("/+3V3", "In2.Cu"))
+
+
+def main():
+    import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
+    import logo
+    import pincheck
+    sockets.derive()
+    bad = sockets.selftest() + sockets.check()
+    if bad:
+        raise SystemExit("sockets:\n  " + "\n  ".join(bad))
+    print("%-28s ok (card fingers land on their contacts, 3 sockets)" % "socket mating")
+    logo.footprint(LOGO_MM)
+    pl = placement()
+    out = sys.argv[1] if len(sys.argv) > 1 else None
+    lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=4, zones=("/GND",), planes=PLANES,
+                       power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3)
+    net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
+    n = pincheck.check_mainboard(load_pins(), net)
+    if pincheck.errors:
+        raise SystemExit("pincheck:\n  " + "\n  ".join(pincheck.errors))
+    print("%-28s ok (%d socket contacts and memory chips)" % ("pincheck, main board", n))
+    print("LCSC:", " ".join(sorted(lcsc)))
+
+
 if __name__ == "__main__":
-    out = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "build", "hw", "main"))
-    os.makedirs(out, exist_ok=True)
-    schematic(os.path.join(out, "main.kicad_sch"))
-    print("schematic written")
+    main()

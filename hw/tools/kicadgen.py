@@ -650,7 +650,7 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None):
+                zone_outline=None, labels=None, planes=()):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -663,6 +663,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     zone_outline: the copper pours' polygon, if not `outline` less 0.5 mm
     labels:    {ref: word}: the word (what an LED shows) printed where the part's
                designator would go, in its place
+    planes:    inner-layer pours, [(net, "In1.Cu"), ...]: whole-board planes
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -739,21 +740,22 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
-    for net in zones:
-        for layer in copper:
-            z = pcbnew.ZONE(board)
-            z.SetLayer(layer)
-            z.SetNet(netinfo[net])
-            z.SetLocalClearance(mm(0.3))
-            z.SetMinThickness(mm(0.25))
-            z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)   # solid: fine for reflow, no starved spokes
-            z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)   # no floating copper
-            ol = z.Outline()
-            ol.NewOutline()
-            for px, py in zone_outline or ((x0 + .5, y0 + .5), (x1 - .5, y0 + .5), (x1 - .5, y1 - .5),
-                                           (x0 + .5, y1 - .5)):
-                ol.Append(mm(px), mm(py))
-            board.Add(z)
+    pours = [(net, layer) for net in zones for layer in copper]
+    pours += [(net, board.GetLayerID(layer)) for net, layer in planes]
+    for net, layer in pours:
+        z = pcbnew.ZONE(board)
+        z.SetLayer(layer)
+        z.SetNet(netinfo[net])
+        z.SetLocalClearance(mm(0.3))
+        z.SetMinThickness(mm(0.25))
+        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)   # solid: fine for reflow, no starved spokes
+        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)   # no floating copper
+        ol = z.Outline()
+        ol.NewOutline()
+        for px, py in zone_outline or ((x0 + .5, y0 + .5), (x1 - .5, y0 + .5), (x1 - .5, y1 - .5),
+                                       (x0 + .5, y1 - .5)):
+            ol.Append(mm(px), mm(py))
+        board.Add(z)
     return board
 
 
@@ -961,16 +963,27 @@ def check_models(tolerance=0.6):
     return bad
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3):
+def autoroute(board, workdir, passes=40, pours=(), tries=3, power_layers=()):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
-    and an error after `tries`."""
+    and an error after `tries`. `power_layers` (inner planes) are typed power
+    in the DSN, so Freerouting keeps signals off them and reaches their net
+    with vias."""
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
     if not pcbnew.ExportSpecctraDSN(board, dsn):
         raise RuntimeError("DSN export failed")
+    if power_layers:
+        with open(dsn) as f:
+            text = f.read()
+        for layer in power_layers:
+            text, k = re.subn(r"(\(layer %s\s*\(type )signal\)" % re.escape(layer), r"\1power)", text)
+            if k != 1:
+                raise RuntimeError("DSN: no signal layer %s to make a plane" % layer)
+        with open(dsn, "w") as f:
+            f.write(text)
     env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
     for attempt in range(tries):
         if os.path.exists(ses):
@@ -1493,11 +1506,14 @@ def check_order(spec, card_edge):
 
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
-             zone_outline=None, boards=2, labels=None):
+             zone_outline=None, boards=2, labels=None, planes=()):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> JLC stock for `boards` assembled -> 3D renders. `schematic(path,
-    footprint_libs)` writes the sheet. Returns {LCSC number: count per board}."""
+    footprint_libs)` writes the sheet. `planes` are whole-board inner-layer
+    pours [(net, "In1.Cu"), ...]: their SMD pads get a via each, as the first
+    zone net's do, and Freerouting keeps signals off their layers. Returns
+    {LCSC number: count per board}."""
     import pcbnew
     out = os.path.abspath(out or os.path.join(ROOT, "build", "hw", name))
     os.makedirs(out, exist_ok=True)
@@ -1525,17 +1541,19 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
-                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels)
+                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels, planes=planes)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
-        state["fanout"] = ground_fanout(b, zones[0])
+        state["fanout"] = sum(ground_fanout(b, net) for net in
+                              [zones[0]] + sorted({n for n, _ in planes} - {zones[0]}))
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones))
+    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=tuple(zones) + tuple(n for n, _ in planes),
+                                        power_layers=[layer for _, layer in planes]))
 
     def fill():
         x0, y0, x1, y1 = outline
