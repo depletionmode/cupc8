@@ -72,10 +72,12 @@ Spec: `doc/hardware/wifi-card.md`.
 
 Specs: `doc/hardware/cpu-bus.md`, `slot.md`, `system-slot.md`,
 `memory-map.md`, `power.md`, `sysctl.md`, `debugging.md`. 4 layers
-(JLC04161H-7628): signals on F.Cu and B.Cu, In1.Cu a whole-board GND plane,
-In2.Cu a whole-board +3V3 plane. Freerouting sees the two inner layers as
-planes (`pipeline(planes=...)`), so it keeps signals off them. 125 × 178 mm,
-3 boards assembled.
+(JLC04161H-7628): In1.Cu is a solid GND plane (Freerouting sees it as a
+plane and keeps signals off it; every SMD GND pad has its own via), and
+F.Cu, In2.Cu and B.Cu carry signals, with GND pours on the outer layers and
+a +3V3 pour on In2 filled round the routing (`pipeline(planes=...)`). With
+only F.Cu and B.Cu for signals Freerouting stalls at ~80 unrouted
+connections. 125 × 178 mm, 3 boards assembled.
 
 ```
 python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pincheck netlist check
