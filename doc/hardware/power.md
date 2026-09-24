@@ -49,7 +49,7 @@ this table.
 | 3V3 buck input at 85% efficiency | 5V | 188 | 365 |
 | USB keyboard VBUS | 5V | 100 | 500 (switch limit) |
 | HDMI +5V pin (sink EDID power, per spec) | 5V | 10 | 55 |
-| Wi-Fi card (ESP32-C3 via its own AMS1117 from +5V; TX peaks) | 5V | 80 | 350 |
+| Wi-Fi card (ESP32-C3 via its own TLV62569 buck from +5V; TX peaks, ~260 mA at 5 V) | 5V | 80 | 350 |
 | Slots 4–6 (future cards; not in M1) | 5V | 0 | — |
 | **Total from USB-C (M1 cards)** | 5V | **≈ 380** | **≈ 1270** |
 
@@ -127,10 +127,9 @@ Other observations (not failures):
   SY6280's 6 V absolute maximum.
 - The 3V3 rows of the budget table sum to 467 mA, not 462. `budget.py` uses
   the rows.
-- parts.md lists an AMS1117 on the system, GPU and IO cards. This budget, and
-  io-card.md, feed those cards from the main 3V3. THM-001 T5–T7 cover the
-  AMS1117s in case they regulate from +5V: 56–75 °C, all pass. The budget
-  table follows power.md.
+- Resolved: the system, GPU and IO cards run from the slot's +3V3 (this
+  budget and io-card.md); parts.md no longer lists an AMS1117 for them.
+  The Wi-Fi card has the TLV62569 buck proposed above (POW-003, THM-001 T4).
 
 ### Results that pass (margins)
 
