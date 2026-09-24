@@ -84,21 +84,21 @@ POWER_NETS = rc.POWER_NETS + ("/VBUS",)
 # J2's opening is 12.04 mm in front of its footprint origin (the pegs are
 # 2.54 mm in front, the shell face 9.5 mm beyond them: C112455 drawing), so
 # turned to face up, the origin sits 12.04 mm below the top edge
-PLACEMENT = dict(rc.core_placement(20, -24), **{
+PLACEMENT = dict(rc.core_placement(27, -21), **{
     "J1": (0, 0, 0),
     "U2": (1.5, -13.5, 0),
     "C1": (-4.5, -13.5, 90),
     "C2": (7.5, -13.5, 90),
-    "U4": (17, -12, 0),
-    "C18": (20.5, -12, 90),
-    "R5": (20.5, -39.5, 0),
-    "D2": (20.5, -42, 0),
-    "R6": (26, -39.5, 0),
-    "D3": (26, -42, 0),
+    "U4": (14, -12.5, 0),
+    "C18": (10.5, -12.5, 90),
+    "R5": (19, -38.5, 0),
+    "D2": (19, -41, 0),
+    "R6": (25, -38.5, 0),
+    "D3": (25, -41, 0),
     "J2": (39.5, -44 + 12.04, 180),
     "U6": (39.5, -25, 0),
-    "R14": (33, -25.5, 90),
-    "R15": (35.5, -25.5, 90),
+    "R14": (35, -26, 90),
+    "R15": (36.5, -26.5, 90),
     "U5": (50, -22, 0),
     "C20": (53, -27, 0),
     "C21": (46, -17.5, 0),
@@ -107,7 +107,8 @@ PLACEMENT = dict(rc.core_placement(20, -24), **{
     "R11": (46.5, -21, 90),
     "R12": (37, -18, 90),
     "R13": (40, -18, 90),
-    "TP1": (24, -8), "TP2": (27.5, -8), "TP3": (31, -8), "TP4": (34.5, -8), "TP5": (38, -8), "TP6": (41.5, -8),
+    # bring-up pads down the left edge, the SWD ones nearest the fingers they share
+    "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LOGO_MM = 12
@@ -115,4 +116,4 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 49.5, -10, 0)]
 
 
 if __name__ == "__main__":
-    rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS)
+    rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS, usb=True)

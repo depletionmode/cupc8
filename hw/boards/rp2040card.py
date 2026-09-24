@@ -77,7 +77,7 @@ BODY, EDGE = kg.IO_CARD_BODY, kg.IO_CARD_EDGE
 OUTLINE_PLACEMENT = {"D1": kg.IO_CARD_PWR_LED + (0,),
                      "R4": (kg.IO_CARD_PWR_LED[0], kg.IO_CARD_PWR_LED[1] + 2.5, 0),
                      "H1": kg.IO_CARD_HOLE + (0,)}
-POWER_NETS = ("/+5V", "/3V3", "/1V1", "/GND")
+POWER_NETS = ("/+5V", "/GND")         # 3V3 and 1V1 reach the RP2040's fine pads: u1_nets()
 
 
 def core_placement(cx, cy, turn=0):
@@ -115,6 +115,20 @@ def core_placement(cx, cy, turn=0):
     if turn == 180:                      # the same arrangement, the chip turned round
         return {r: (cx - x, cy - y, (rot + 180) % 360) for r, (x, y, rot) in rel.items()}
     return {r: (cx + x, cy + y, rot) for r, (x, y, rot) in rel.items()}
+
+
+# the slot's pins on every RP2040 card (hw/pins.yaml)
+SLOT_GPIOS = {2: "SCK", 3: "MOSI", 4: "MISO_OUT", 5: "CS_n", 6: "IRQ_n"}
+
+
+def u1_nets(gpios, usb):
+    """Every net on the RP2040's pins but GND: they leave 0.4 mm pitch pads,
+    so they take the "Fine" net class (0.15 mm tracks)."""
+    nets = {"3V3", "1V1", "RUN", "SWCLK", "SWDIO", "XIN", "XOUT", "QSPI_SS", "QSPI_SCLK",
+            "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3"} | set(SLOT_GPIOS.values()) | set(gpios.values())
+    if usb:
+        nets |= {"USB_DP", "USB_DM"}
+    return tuple(sorted("/" + n for n in nets))
 
 
 def core(s, gpios, leds=(), usb=False):
@@ -180,8 +194,7 @@ def core(s, gpios, leds=(), usb=False):
     for pin, net in (("QSPI_SD0", "QSPI_SD0"), ("QSPI_SD1", "QSPI_SD1"), ("QSPI_SD2", "QSPI_SD2"),
                      ("QSPI_SD3", "QSPI_SD3"), ("QSPI_SCLK", "QSPI_SCLK"), ("~{QSPI_SS}", "QSPI_SS")):
         s.connect(u1, pin, net)
-    slot = {2: "SCK", 3: "MOSI", 4: "MISO_OUT", 5: "CS_n", 6: "IRQ_n"}
-    pins = {**slot, **gpios}
+    pins = {**SLOT_GPIOS, **gpios}
     for g in range(30):
         name = "GPIO%d" % g + ({26: "/ADC0", 27: "/ADC1", 28: "/ADC2", 29: "/ADC3"}.get(g, ""))
         if g in pins:
@@ -282,7 +295,7 @@ def core(s, gpios, leds=(), usb=False):
     return p
 
 
-def build(name, schematic, placement, power_nets, graphics, layers=2):
+def build(name, schematic, placement, power_nets, graphics, labels, gpios, usb=False, layers=2):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
@@ -291,5 +304,6 @@ def build(name, schematic, placement, power_nets, graphics, layers=2):
     lcsc = kg.pipeline(name, schematic, dict(placement, **OUTLINE_PLACEMENT), BODY,
                        out=sys.argv[1] if len(sys.argv) > 1 else None, edge=EDGE, card_edge=True,
                        zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5),
-                       power_nets=power_nets, graphics=graphics, layers=layers)
+                       power_nets=power_nets, graphics=graphics, layers=layers, labels=labels,
+                       fine_nets=u1_nets(gpios, usb))
     print("LCSC:", " ".join(sorted(lcsc)))
