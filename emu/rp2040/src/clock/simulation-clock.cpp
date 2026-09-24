@@ -44,10 +44,15 @@ ClockAlarm *SimulationClock::linkAlarm(double nanos, ClockAlarm *alarm) {
     alarm->next = alarmListItem;
   }
   alarm->scheduled = true;
+  alarm->linked = true;
   return alarm;
 }
 
 bool SimulationClock::unlinkAlarm(ClockAlarm *alarm) {
+  if (!alarm->linked) {
+    return false;  // (the search below would not find it)
+  }
+  alarm->linked = false;
   ClockAlarm *alarmListItem = nextAlarm;
   if (!alarmListItem) {
     return false;
@@ -68,11 +73,12 @@ bool SimulationClock::unlinkAlarm(ClockAlarm *alarm) {
   return false;
 }
 
-void SimulationClock::tick(double deltaNanos) {
-  const double targetNanos = nanosCounter + deltaNanos;
+void SimulationClock::fireAlarms(double targetNanos) {
+  // tick(deltaNanos): `const targetNanos = this.nanosCounter + deltaNanos` (in the header)
   ClockAlarm *alarm = nextAlarm;
   while (alarm && alarm->nanos <= targetNanos) {
     nextAlarm = alarm->next;
+    alarm->linked = false;
     nanosCounter = alarm->nanos;
     alarm->callback();
     alarm = nextAlarm;

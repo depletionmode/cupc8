@@ -64,6 +64,7 @@ void RPIO::writeUint32(uint32_t offset, uint32_t value) {
   if (offset <= GPIO_CTRL_LAST) {
     const PinFromOffset pin = getPinFromOffset(offset);
     if (pin.isCtrl) {
+      rp2040.syncPIO();  // PIO fast path: ctrl sets the pin's function and overrides
       pin.gpio.ctrl = value;
       pin.gpio.checkForUpdates();
     }

@@ -4,18 +4,27 @@
 //   test_pio_diff <scenario> dump <A> <B> print the full state after cycles A..B-1
 //   test_pio_diff <scenario> bench        run without observing, print speed
 //
-// A scenario is a text file written by pio_diff.mjs: "C <cycles>" and then
-// events "<cycle> <op> <a> <b>" (hex a/b) applied before that cycle's steps:
+// A scenario is a text file written by pio_diff.mjs: "C <cycles>", optionally
+// "L <hex pin mask>" (the pins that get a listener at the start; default all)
+// and "V <n>" (hash the state vector after every nth cycle only; default 1),
+// and then events "<cycle> <op> <a> <b>" (hex a/b) applied before that
+// cycle's steps:
 //   w addr value   rp2040.writeUint32       r addr   rp2040.readUint32 (observed)
 //   g pin value    gpio[pin].setInputValue  t n value TXF write if SM n's TX FIFO is not full
 //   x n            RXF read if SM n's RX FIFO is not empty (observed)
+//   p              hash the state vector now (observed)
+//   q pin          gpio[pin].value(), outputValue(), outputEnable(), status() (observed)
+//   l pin          add a listener to gpio[pin] (observed from then on)
 // Each cycle is then pio[0].step(); pio[1].step(). Both halves compute the
 // same state vector (stateVector in pio_diff.mjs) and hash it identically.
+// The state vector includes every pin's lastValue. The native PIO's fast
+// path (RPPIO::sync) is synced before every direct look at PIO state.
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -104,7 +113,8 @@ void pioState(const RPPIO &pio, std::vector<uint32_t> &out) {
   out.push_back(pio.irq1IntStatus());
 }
 
-void stateVector(const RP2040 &mcu, bool irqLines, std::vector<uint32_t> &out) {
+void stateVector(RP2040 &mcu, bool irqLines, std::vector<uint32_t> &out) {
+  mcu.syncPIO();  // the fast path: bring the machines up to date before reading them
   out.clear();
   pioState(mcu.pio[0], out);
   pioState(mcu.pio[1], out);
@@ -117,6 +127,9 @@ void stateVector(const RP2040 &mcu, bool irqLines, std::vector<uint32_t> &out) {
   out.push_back(dreq);
   if (irqLines) {
     out.push_back((mcu.core0.pendingInterrupts >> 7) & 0xf);
+  }
+  for (const GPIOPin &pin : mcu.gpio) {
+    out.push_back(static_cast<uint32_t>(pin.debugLastValue()));
   }
 }
 
@@ -147,7 +160,7 @@ int main(int argc, char **argv) {
     std::fprintf(stderr, "cannot read %s\n", argv[1]);
     return 2;
   }
-  uint32_t cycles = 0;
+  uint32_t cycles = 0, listenMask = 0x3fffffff, stateEvery = 1;
   std::vector<Event> events;
   std::string line;
   while (std::getline(in, line)) {
@@ -158,6 +171,13 @@ int main(int argc, char **argv) {
     if (line[0] == 'C') {
       char c;
       ls >> c >> cycles;
+      continue;
+    }
+    if (line[0] == 'L' || line[0] == 'V') {
+      char c;
+      std::string v;
+      ls >> c >> v;
+      (line[0] == 'L' ? listenMask : stateEvery) = static_cast<uint32_t>(std::stoul(v, nullptr, 16));
       continue;
     }
     Event e{};
@@ -203,10 +223,16 @@ int main(int argc, char **argv) {
   for (GPIOPin &pin : mcu.gpio) {
     pin.checkForUpdates();
   }
+  std::vector<std::function<void()>> removers;  // (listeners live as long as the chip)
+  auto listen = [&](uint32_t pin) {
+    removers.push_back(mcu.gpio[pin].addListener([&, pin](GPIOPinState state, GPIOPinState old) {
+      observe("gpio", pin, static_cast<uint32_t>(state) | static_cast<uint32_t>(old) << 8);
+    }));
+  };
   for (uint32_t pin = 0; pin < mcu.gpio.size() && !bench; pin++) {
-    mcu.gpio[pin].addListener([&, pin](GPIOPinState state, GPIOPinState) {
-      observe("gpio", pin, static_cast<uint32_t>(state));
-    });
+    if (listenMask & (1u << pin)) {
+      listen(pin);
+    }
   }
 
   std::vector<uint32_t> state;
@@ -225,12 +251,35 @@ int main(int argc, char **argv) {
         case 'g':
           mcu.gpio[e.a].setInputValue(e.b != 0);
           break;
+        case 'p':
+          if (!bench && !dump) {
+            stateVector(mcu, irqLines, state);
+            hash.mix(0x5a5a5a5au);
+            for (uint32_t v : state) {
+              hash.mix(v);
+            }
+          }
+          break;
+        case 'q': {
+          const GPIOPin &pin = mcu.gpio[e.a];
+          observe("q", e.a,
+                  static_cast<uint32_t>(pin.value()) | (pin.outputValue() ? 0x100 : 0) |
+                      (pin.outputEnable() ? 0x200 : 0) | (pin.status() << 12));
+          break;
+        }
+        case 'l':
+          if (!bench) {
+            listen(e.a);
+          }
+          break;
         case 't':
+          mcu.syncPIO();  // (a direct look at the FIFO)
           if (!mcu.pio[e.a >> 2].machines[e.a & 3].txFIFO.full()) {
             mcu.writeUint32(PIO_BASE[e.a >> 2] + 0x10 + 4 * (e.a & 3), e.b);
           }
           break;
         case 'x':
+          mcu.syncPIO();
           if (!mcu.pio[e.a >> 2].machines[e.a & 3].rxFIFO.empty()) {
             const uint32_t addr = PIO_BASE[e.a >> 2] + 0x20 + 4 * (e.a & 3);
             observe("r", addr, mcu.readUint32(addr));
@@ -260,11 +309,17 @@ int main(int argc, char **argv) {
       }
       continue;
     }
-    stateVector(mcu, irqLines, state);
-    for (uint32_t v : state) {
-      hash.mix(v);
+    if ((cycle + 1) % stateEvery == 0) {
+      stateVector(mcu, irqLines, state);
+      for (uint32_t v : state) {
+        hash.mix(v);
+      }
     }
     if ((cycle + 1) % hashEvery == 0 || cycle + 1 == cycles) {
+      stateVector(mcu, irqLines, state);  // the final state of every block
+      for (uint32_t v : state) {
+        hash.mix(v);
+      }
       for (const RPPIO &pio : mcu.pio) {
         for (uint32_t v : pio.instructions) {
           hash.mix(v);
@@ -272,6 +327,12 @@ int main(int argc, char **argv) {
       }
       std::printf("h %u %08x\n", cycle, hash.h);
     }
+  }
+  if (std::getenv("PIO_DIFF_STATS")) {
+    mcu.syncPIO();
+    std::fprintf(stderr, "lazy cycles: pio0 %llu pio1 %llu of %u; lazy autopulls %llu %llu\n",
+                 (unsigned long long)mcu.pio[0].lazyCycles, (unsigned long long)mcu.pio[1].lazyCycles, cycles,
+                 (unsigned long long)mcu.pio[0].lazyEvents, (unsigned long long)mcu.pio[1].lazyEvents);
   }
   if (bench) {
     const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();

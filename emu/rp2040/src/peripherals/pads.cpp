@@ -42,6 +42,7 @@ uint32_t RPPADS::readUint32(uint32_t offset) {
 
 void RPPADS::writeUint32(uint32_t offset, uint32_t value) {
   if (offset >= firstPadRegister && offset <= lastPadRegister) {
+    rp2040.syncPIO();  // PIO fast path: the pad sets the pin's value and input
     GPIOPin &gpio = getPinFromOffset(offset);
     const bool oldInputEnable = gpio.inputEnable();
     gpio.padValue = value;

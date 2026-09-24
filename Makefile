@@ -10,7 +10,7 @@ test:
 
 # the fab gate: fails while any test fails or any non-hardware test is pending
 verify:
-	python3 test/run.py --gate -j $(JOBS)
+	python3 test/run.py --gate -j $(JOBS); rc=$$?; python3 tools/fabready.py; exit $$rc
 
 test-list:
 	python3 test/run.py --list
