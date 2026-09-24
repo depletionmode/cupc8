@@ -9,8 +9,8 @@ at the corner that heats it most:
 
   TLV62569 (3V3)  loss from the datasheet RDS(on) (hot, see design.py),
                   a switching-loss estimate and the control current, at both
-                  5V_SYS corners; two loads: the M1 maximum, and the M1
-                  maximum plus slots 4-6 each drawing their 300 mA of +3V3
+                  5V_SYS corners; two loads: the M1 maximum (four cards),
+                  and that plus slots 5-6 each drawing their 300 mA of +3V3
   TLV62569 (Wi-Fi card)  the same loss model at Espressif's TX current,
                   rated at 100 % duty (a long transfer or an RF test), from
                   the slot's +5V at both of its corners
@@ -20,8 +20,9 @@ at the corner that heats it most:
                   No M1 card has one: the system, GPU and IO cards run from
                   the slot's +3V3 (power.md), so these only say what one
                   would take if they ever regulated from +5V.
-  SY6280          I^2 x RDS(on) hot at the most current the input can pass
-                  (its minimum limit) and on the IO card at 500 mA
+  input eFuse     I^2 x RON max at the most current it passes without
+                  limiting (its minimum limit)
+  SY6280          the IO card's keyboard port at 500 mA, RDS(on) hot
 """
 
 import sys
@@ -49,10 +50,12 @@ def main():
     v5s = (budget.chain("worst")["v5"], d.VBUS_MAX)
     m1 = budget.i_3v3()
     full = m1 + d.FUTURE_SLOTS * d.SLOT_3V3_MAX
-    for ident, what, i in (("T1", "M1 maximum", m1), ("T2", "M1 + slots 4-6 at 300 mA +3V3 each", full)):
+    for ident, what, i in (("T1", "M1 maximum (4 cards)", m1),
+                           ("T2", "M1 + slots 5-6 at 300 mA +3V3 each", full)):
         p = max(buck_loss(v, i) for v in v5s)
         c.check(ident, "TLV62569%s 3V3 buck, %s (%.0f mA): %.0f mW x %.0f C/W" % (
-            d.BUCK_PACKAGE, what, 1e3 * i, 1e3 * p, theta_buck), tj(p, theta_buck), lim, "<=", "C", fmt="%.1f")
+            d.BUCK_PACKAGE, what, 1e3 * i, 1e3 * p, theta_buck), tj(p, theta_buck), lim, "<=", "C", fmt="%.1f",
+            fix="TLV62569PDDCR (design.BUCK_PACKAGE = 'DDC'), or cap slots 5-6's +3V3")
     # what the 3V3 can carry on this package, and on the others
     for pkg, th in sorted(d.BUCK_THETA_JA.items()):
         imax = 0.0
@@ -72,8 +75,10 @@ def main():
             "", fmt="%d")
     v_card = (budget.chain("worst")["wifi_in"], d.VBUS_MAX)
     p = max(buck_loss(v, d.WIFI_I_3V3) for v in v_card)
+    theta_wifi = d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]
     c.check("T4", "TLV62569%s Wi-Fi card buck (hw/boards/wifi.py), %.0f mA: %.0f mW x %.0f C/W" % (
-        d.BUCK_PACKAGE, 1e3 * d.WIFI_I_3V3, 1e3 * p, theta_buck), tj(p, theta_buck), lim, "<=", "C", fmt="%.1f")
+        d.WIFI_BUCK_PACKAGE, 1e3 * d.WIFI_I_3V3, 1e3 * p, theta_wifi), tj(p, theta_wifi), lim, "<=", "C",
+        fmt="%.1f")
 
     ams = d.AMS1117
     cards = (("T5", "GPU card, if from +5V", d.LOADS_3V3["GPU card RP2040 + flash"] + d.LOADS_3V3["GPU card TMDS"]),
@@ -85,12 +90,14 @@ def main():
             what, 1e3 * i, d.VBUS_MAX, 1e3 * p, d.AMS1117_THETA_JA), tj(p, d.AMS1117_THETA_JA), lim, "<=",
             "C", fmt="%.1f")
 
-    lo, _, _ = d.sy6280_ilim(budget.proposed_rset(budget.chain("worst")["itot"]))
-    for ident, what, i in (("T8", "main input, at its minimum limit %.2f A (proposed RSET)" % lo, lo),
-                           ("T9", "IO card keyboard port, 500 mA", d.I_KEYBOARD)):
-        p = i ** 2 * d.SY6280_RON_MAX
-        c.check(ident, "SY6280 %s: %.0f mW x %.0f C/W" % (what, 1e3 * p, d.SY6280_THETA_JA),
-                tj(p, d.SY6280_THETA_JA), lim, "<=", "C", fmt="%.1f")
+    lo, _, _ = d.insw_ilim()
+    p = lo ** 2 * d.INSW_RON_MAX
+    c.check("T8", "%s input eFuse at its minimum limit %.2f A (the most it passes without limiting): "
+            "%.0f mW x %.1f C/W" % (d.INSW_PART, lo, 1e3 * p, d.INSW_THETA_JA), tj(p, d.INSW_THETA_JA), lim,
+            "<=", "C", fmt="%.1f")
+    p = d.I_KEYBOARD ** 2 * d.SY6280_RON_MAX
+    c.check("T9", "SY6280 IO card keyboard port, 500 mA: %.0f mW x %.0f C/W" % (1e3 * p, d.SY6280_THETA_JA),
+            tj(p, d.SY6280_THETA_JA), lim, "<=", "C", fmt="%.1f")
     return c.done()
 
 

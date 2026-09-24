@@ -101,7 +101,11 @@ chipset) is always the master.
 - **Response deadline:** a card must have its response ready within **5 ms**
   of the command frame's CS_n rising, unless the command says otherwise.
   Network operations complete asynchronously and signal through events
-  instead.
+  instead. The storage card's commands are **exempt** (`storage-card.md`):
+  an SD card can be busy for 250 ms on a write, so READ returns RESP_LEN
+  `$00` until the answer is ready, and the host retries for seconds, not
+  milliseconds. The common opcodes ($F0–$F2) keep the 5 ms deadline on every
+  card.
 - **Timing the host must meet:**
   - ≥ 2 µs from CS_n falling to the first SCK edge
   - ≥ 1 µs between bytes

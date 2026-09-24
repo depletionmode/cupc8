@@ -35,7 +35,7 @@ net_s_get1 db 71, 69, 84, 32, 47, 32, 72, 84, 84, 80, 47, 49, 46, 48, 13, 10, 72
 net_s_get2 db 13, 10, 13, 10, 0
 net_s_timeout db "\nnet timeout\n"
 net_s_nocard db "\nno wifi card\n"
-net_s_weak db "\nUSB power under 1.5A: net off\n"
+net_s_weak db "\nUSB power under 3A: net off\n"
 
 net_spi: resb 1
 net_tmp: resb 1
@@ -380,7 +380,7 @@ net_cmd:
 	ld r0, [net_spi]
 	eq r0, #0xff
 	bzf .no_card
-	; the radio's bursts need a 1.5 A source (SYSCTL bit 1, doc/hardware/power.md)
+	; the radio needs a 3 A source (SYSCTL bit 1, PWR_HI; doc/hardware/power.md)
 	ld r0, $f203
 	and r0, #2
 	eq r0, #0

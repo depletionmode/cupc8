@@ -22,6 +22,10 @@ main:
 
 	push pch
 	push pcl
+	b storage_init
+
+	push pch
+	push pcl
 	b irq_init
 
 	; run terminal
