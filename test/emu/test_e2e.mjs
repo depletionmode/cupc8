@@ -152,7 +152,7 @@ async function e2e007() {
   const fat = (...a) => execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
   const img = path.join(dir, 'card.img');
   fat('mkfs', img, '16', '16');
-  fs.writeFileSync(path.join(dir, 'host.bas'), '10 PRINT 100+23\n20 PRINT "FROM THE HOST"\n');
+  fs.writeFileSync(path.join(dir, 'host.bas'), '10 print 100+23\r\n20 print "FROM THE HOST"\r\n');
   fat('put', img, 'HOSTPROG.BAS', path.join(dir, 'host.bas'));
   const slots = { 1: 'gpu', 2: 'io', 3: 'storage' };
   const boot = async (opts = {}) => {
