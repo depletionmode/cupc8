@@ -1,0 +1,11 @@
+# 74LVC1G125GW (MDD), single 3-state buffer, SOT-353
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/c41e2e94e8d4ddcc91df5b82be1805c5.pdf
+source: "MDD 74LVC1G125 datasheet Rev 1.0 (Aug 08 2024), page 4: 5.2 Pin description, Table 2 (SOT23-5, SOT353 column), and Fig 4 (top view)"
+package: SOT-353
+pins:
+  1: "~{OE}"        # OE with an overbar: output enable, active low
+  2: A
+  3: GND
+  4: Y
+  5: VCC
+ccw: [1, 5]         # Fig 4: 1-3 along one side, 4-5 back along the other

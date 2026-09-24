@@ -203,3 +203,21 @@ fixed_in = "59a8a6b"
 revert = [["rom/boot.s", "\tb cs_off\n\tpush pch\n\tpush pcl\n\tb wait_5ms\t\t\t\t\t; slot.md - the card needs >= 5 ms to answer\n", "\tb cs_off\n"]]
 cmd = "tools/fw_rp2040.sh gpu && tools/emu_build.sh && node test/emu/test_machine.mjs"
 must_fail = ["FAIL the boot ROM's probe READ came"]
+
+[[bug]]
+name = "BOM check: a wrong JLC rotation correction (the LEDs turned half round, cathode on the anode's pad)"
+fixed_in = "BRD-001"
+revert = [["hw/parts/jlc_rotation.yaml", "LED_SMD:LED_0603_1608Metric:\n  rotation: 0\n", "LED_SMD:LED_0603_1608Metric:\n  rotation: 180\n"]]
+cmd = "python3 hw/tools/bomcheck.py wifi"
+must_fail = ["jlc_rotation.yaml adds 180 degrees, but JLC's footprint (EasyEDA LED0603-RD) is KiCad's turned by 0",
+             "jlc_rotation.yaml adds 180 degrees, but JLC's footprint (EasyEDA LED-SMD_L1.6-W0.8-R-RD) is KiCad's turned by 0"]
+
+[[bug]]
+name = "BOM check: a symbol with two IC pins swapped (74LVC1G125 A and Y)"
+fixed_in = "BRD-001"
+revert = [
+  ["hw/lib/jlc.kicad_sym", "        (name \"Y\" (effects (font (size 1.27 1.27))))\n        (number \"4\"", "        (name \"Y\" (effects (font (size 1.27 1.27))))\n        (number \"2\""],
+  ["hw/lib/jlc.kicad_sym", "        (name \"A\" (effects (font (size 1.27 1.27))))\n        (number \"2\"", "        (name \"A\" (effects (font (size 1.27 1.27))))\n        (number \"4\""],
+]
+cmd = "python3 hw/tools/bomcheck.py wifi"
+must_fail = ["pin 2 is 'Y' in the symbol, 'A' in the datasheet", "pin 4 is 'A' in the symbol, 'Y' in the datasheet"]

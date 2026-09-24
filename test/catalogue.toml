@@ -711,6 +711,15 @@ cmd = "python3 hw/boards/wifi.py"
 kind = "static"
 vrow = "3.4"
 
+[[test]]
+id = "BRD-001"
+title = "Every BOM line of every board: package, pinout, JLC rotation, BOM = schematic"
+checks = "per LCSC part: JLC's package name is the footprint's, and the footprint's pads are those of the EasyEDA footprint JLC places for that code (count and position within 0.2 mm, in one of four orientations); every symbol pin has a pad and every pad a pin; a part with more than two pins matches its datasheet pin table (hw/parts/<LCSC>.yaml, with source) name for name and numbers counterclockwise from the top; an LED's K and A sit where JLC's footprint has them; hw/parts/jlc_rotation.yaml's correction for the footprint is the one the pads give; with a build, bom.csv is exactly the schematic's LCSC parts and cpl.csv is the board's angles plus the corrections, top side only"
+method = "hw/tools/bomcheck.py (also a kicadgen.pipeline step after JLC BOM + CPL) against JLC's parts recorded in hw/parts/easyeda (bomcheck.py --refetch compares them with JLC's today); with no build it generates the schematic only"
+cmd = "python3 hw/tools/bomcheck.py all"
+kind = "static"
+vrow = "4.3"
+
 # ============================================================================
 # SYS: sysctl firmware
 # ============================================================================
