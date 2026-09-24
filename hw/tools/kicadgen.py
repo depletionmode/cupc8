@@ -644,8 +644,9 @@ NET_CLASSES = [
     # nets on a 0.4 mm-pitch part (the RP2040's QFN-56): its pads are 0.2 mm
     # apart, so at 0.2 mm clearance Freerouting counts every neighbouring pair
     # a violation and routes none of them. 0.15 mm track and clearance (JLC's
-    # minimum is 0.1, and min_clearance above is 0.15).
-    ("Fine", 0.15, 0.15, 0.6, 0.3),
+    # minimum is 0.1, and min_clearance above is 0.15). Its vias are 0.65 mm,
+    # so two at 0.15 mm apart still keep their holes 0.5 mm apart (JLC).
+    ("Fine", 0.15, 0.15, 0.65, 0.3),
 ]
 
 
@@ -1274,6 +1275,13 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
+    # Freerouting necks tracks down where they meet some pads (0.11 mm, and
+    # 0.075 mm on finger stubs), under JLC_RULES' minimum: bring them back up
+    # to it; DRC then checks the clearances this costs
+    least = pcbnew.FromMM(JLC_RULES["min_track_width"])
+    for t in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_TRACE_T]:
+        if t.GetWidth() < least:
+            t.SetWidth(least)
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
@@ -1349,7 +1357,9 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge")]
     others = []                                   # other nets' pads, grown for a via / a track
     for p, _ in pads:
-        if p.GetNetname() != net:
+        # not paste-only apertures (a QFN's exposed-pad stencil windows): no
+        # copper, no net, but they would keep every via off the exposed pad
+        if p.GetNetname() != net and p.IsOnCopperLayer():
             bb = p.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []
@@ -1378,10 +1388,16 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             # row of GND pins' vias would wall in the pins between them
             base += math.pi
         layer = pcbnew.F_Cu if p.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu
+        # a fine-pitch pin (a QFN's TESTEN between two signals) leaves at its own width
+        w = min(track, to(min(p.GetSize().x, p.GetSize().y)))
         placed = False
+        # after the fan of directions, straight along the pad's long side
+        # (its pin's own lane, the only way out between fine-pitch neighbours)
+        lane = (math.pi / 2 if p.GetSize().y > p.GetSize().x else 0.0) + (p.GetOrientation().AsRadians())
+        if math.cos(lane - base) < 0:
+            lane += math.pi
         for r in (1.0, 1.3, 1.6, 2.0):
-            for da in (0, 30, -30, 60, -60, 90, -90, 135, -135, 180):
-                a = base + math.radians(da)
+            for a in [base + math.radians(da) for da in (0, 30, -30, 60, -60, 90, -90, 135, -135, 180)] + [lane]:
                 vx, vy = cx + r * math.cos(a), cy + r * math.sin(a)
                 if not (ex0 < vx < ex1 and ey0 < vy < ey1):
                     continue
@@ -1392,15 +1408,15 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
                 if any(l[4] != net and seg_dist(vx, vy, *l[:4]) < via / 2 + gap + 0.25 for l in locked):
                     continue
                 samples = [(cx + (vx - cx) * i / 12, cy + (vy - cy) * i / 12) for i in range(13)]
-                if not all(clear_of(sx, sy, track / 2 + gap) for sx, sy in samples):
+                if not all(clear_of(sx, sy, w / 2 + gap) for sx, sy in samples):
                     continue
-                if any(l[4] != net and seg_dist(sx, sy, *l[:4]) < track / 2 + gap + 0.25
+                if any(l[4] != net and seg_dist(sx, sy, *l[:4]) < w / 2 + gap + 0.25
                        for l in locked for sx, sy in samples):
                     continue
                 t = pcbnew.PCB_TRACK(board)
                 t.SetStart(p.GetPosition())
                 t.SetEnd(pcbnew.VECTOR2I(mm(vx), mm(vy)))
-                t.SetWidth(mm(track))
+                t.SetWidth(mm(w))
                 t.SetLayer(layer)
                 t.SetNet(ni)
                 t.SetLocked(True)
