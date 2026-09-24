@@ -59,3 +59,13 @@ set_target_properties(machine_node PROPERTIES PREFIX "" SUFFIX ".node" OUTPUT_NA
 target_include_directories(machine_node PRIVATE "${NODE_INCLUDE}")
 target_compile_options(machine_node PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(machine_node PRIVATE machine)
+
+# GPU-009: the real e-ink firmware with the panel model, against the e-ink
+# core's own raster (the core is linked in, built as the card builds it)
+set(FW "${CUPC8_ROOT}/fw")
+add_executable(einkcard einkcard.cpp "${FW}/eink/core/eink.c" "${FW}/eink/core/uc8179.c" "${FW}/gpu/core/gpu.c"
+  "${FW}/common/cardproto.c" "${FW}/common/font8x8_cp437.c")
+target_include_directories(einkcard PRIVATE "${FW}/eink/core" "${FW}/gpu/core" "${FW}/common")
+target_compile_definitions(einkcard PRIVATE GPU_GFX_BYTES=96000)
+target_compile_options(einkcard PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(einkcard PRIVATE machine)

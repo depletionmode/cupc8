@@ -24,7 +24,9 @@
 #define EINK_MAX_W      800
 #define EINK_H          480
 #define EINK_MODE2_BYTES (EINK_MAX_W / 4 * EINK_H)
+#ifndef __cplusplus
 _Static_assert(GPU_GFX_BYTES >= EINK_MODE2_BYTES, "build the e-ink card with -DGPU_GFX_BYTES=96000");
+#endif
 
 enum { EINK_MODE_NATIVE = 2 };
 
