@@ -650,11 +650,11 @@ cmd = "test/emu/machine_diff.sh"
 [[test]]
 id = "EMU-008"
 title = "SD card model: SPI mode against the SD spec"
-checks = "the native emulator's SD card (emu/rp2040/harness/sdcard.h) against the SD Physical Layer Simplified Specification, each check citing its section: CRC7/CRC16; 74 power-up clocks; CMD0 into SPI mode with a checked CRC, CMD8 always checked, CMD59; CMD8 R7, ACMD41 idle until initialised, HCS from the first ACMD41 and only after CMD8; OCR with CCS; CSD 1.0/2.0 capacity and CRC, CID, SCR, SD status; single and multiple block reads (access time, CRC16, CMD12, out-of-range error token) and writes (data response tokens, busy while programming, surviving deselection, programmed only when busy ends), SDSC byte addresses and partial reads, write-protect (write error, WP violation), erase; and in its socket on SPI1 through the chip's registers: a byte takes 8 SCK periods, card detect, a DMA block read, removal and re-initialisation, and host mistakes (SCK over 400 kHz before init, SPI1's CSn on nCS) recorded"
-method = "emu/rp2040/test/sd/test_sdcard.cpp (build/emu-native/test_sdcard)"
+checks = "the native emulator's SD card (emu/rp2040/harness/sdcard.h) against the SD Physical Layer Simplified Specification, each check citing its section: CRC7/CRC16; 74 power-up clocks; CMD0 into SPI mode with a checked CRC, CMD8 always checked, CMD59; CMD8 R7, ACMD41 idle until initialised, HCS from the first ACMD41 and only after CMD8; OCR with CCS; CSD 1.0/2.0 capacity and CRC, CID, SCR, SD status; single and multiple block reads (access time, CRC16, CMD12, out-of-range error token) and writes (data response tokens, busy while programming, surviving deselection, programmed only when busy ends), SDSC byte addresses and partial reads, write-protect (write error, WP violation), erase; and in its socket on SPI1 through the chip's registers: a byte takes 8 SCK periods, card detect, a DMA block read, removal and re-initialisation, and host mistakes (SCK over 400 kHz before init, SPI1's CSn on nCS) recorded; then under the pico-sdk's own SPI and DMA code (an independent SD host, fw/rp2040/selftest/sdspi.c) on SDHC and SDSC images: init at 400 kHz, polled and DMA block reads, a write whose busy time the firmware's timer measures (1 ms and 250 ms), the capacity from the CSD, the written block in the image file, no violations"
+method = "emu/rp2040/test/sd/test_sdcard.cpp (build/emu-native/test_sdcard); test/emu/test_sdspi.mjs (build/rp2040/emu_sdspi.elf, CUPC8_EMU=native)"
 kind = "sim"
 vrow = "2.4"
-cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native test_sdcard >/dev/null && build/emu-native/test_sdcard"
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native >/dev/null && build/emu-native/test_sdcard && tools/fw_rp2040.sh emu_sdspi && CUPC8_EMU=native node test/emu/test_sdspi.mjs"
 
 [[test]]
 id = "GPU-004"

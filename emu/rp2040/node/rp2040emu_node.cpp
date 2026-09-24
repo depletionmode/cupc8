@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "emu.h"
+#include "sdcard.h"
 #include "slothost.h"
 #include "tmds.h"
 #include "usb/cdc.h"
@@ -76,6 +77,7 @@ struct Harness {
   Ref jsOnCycle;
 
   std::unique_ptr<TmdsCapture> tmds;
+  std::unique_ptr<rp2040js::harness::SdSocket> sd;
   std::vector<std::unique_ptr<UsbKeyboard>> keyboards;
   std::unique_ptr<USBCDC> cdc;
   Ref cdcOnData, cdcOnConnected;
@@ -664,6 +666,106 @@ ENTRY(tmdsData) {
   });
 }
 
+// ------------------------------------------------------------ microSD socket
+// sdCreate(h): the socket on SPI1 (storage card pins); sdInsert(h, image,
+// {highCapacity, writeProtect, initMs, readUs, writeMs, ncr}); sdRemove(h);
+// sdCard(h) -> null | {initialised, busy, blocks, violations, stats}
+rp2040js::harness::SdSocket &sdSocket(Harness &h) {
+  if (!h.sd) throw std::runtime_error("no SD socket: call sdCreate first");
+  return *h.sd;
+}
+ENTRY(sdCreate) {
+  return guard(env, [&] {
+    Args a(env, info);
+    a.h->sd = std::make_unique<rp2040js::harness::SdSocket>(*a.h->emu.mcu);
+    return undefined(env);
+  });
+}
+ENTRY(sdInsert) {
+  return guard(env, [&] {
+    Args a(env, info);
+    rp2040js::harness::SdCard::Options o;
+    napi_value opts = a.at(2);
+    napi_valuetype t;
+    check(env, napi_typeof(env, opts, &t));
+    if (t == napi_object) {
+      auto get = [&](const char *k, napi_value &v) {
+        bool has = false;
+        check(env, napi_has_named_property(env, opts, k, &has));
+        if (has) check(env, napi_get_named_property(env, opts, k, &v));
+        return has;
+      };
+      napi_value v;
+      auto flag = [&](const char *k, bool &out) {
+        if (get(k, v)) {
+          napi_value b;
+          check(env, napi_coerce_to_bool(env, v, &b));
+          check(env, napi_get_value_bool(env, b, &out));
+        }
+      };
+      auto num = [&](const char *k, double scale, double &out) {
+        if (get(k, v)) {
+          check(env, napi_get_value_double(env, v, &out));
+          out *= scale;
+        }
+      };
+      flag("highCapacity", o.highCapacity);
+      flag("writeProtect", o.writeProtect);
+      num("initMs", 1e6, o.initNs);
+      num("readUs", 1e3, o.readNs);
+      num("writeMs", 1e6, o.writeNs);
+      double ncr = o.ncr;
+      num("ncr", 1, ncr);
+      o.ncr = static_cast<unsigned>(ncr);
+    }
+    sdSocket(*a.h).insert(a.str(1), o);
+    return undefined(env);
+  });
+}
+ENTRY(sdRemove) {
+  return guard(env, [&] {
+    Args a(env, info);
+    sdSocket(*a.h).remove();
+    return undefined(env);
+  });
+}
+ENTRY(sdCard) {
+  return guard(env, [&] {
+    Args a(env, info);
+    auto *c = sdSocket(*a.h).card();
+    napi_value o;
+    if (!c) {
+      check(env, napi_get_null(env, &o));
+      return o;
+    }
+    check(env, napi_create_object(env, &o));
+    auto put = [&](napi_value obj, const char *k, napi_value v) { check(env, napi_set_named_property(env, obj, k, v)); };
+    put(o, "initialised", boolean(env, c->initialised()));
+    put(o, "busy", boolean(env, c->busy(a.h->emu.ns())));
+    put(o, "blocks", number(env, static_cast<double>(c->blocks())));
+    napi_value v;
+    check(env, napi_create_array_with_length(env, c->violations.size(), &v));
+    for (size_t j = 0; j < c->violations.size(); j++) {
+      napi_value sv;
+      check(env, napi_create_string_utf8(env, c->violations[j].data(), c->violations[j].size(), &sv));
+      check(env, napi_set_element(env, v, static_cast<uint32_t>(j), sv));
+    }
+    put(o, "violations", v);
+    napi_value st;
+    check(env, napi_create_object(env, &st));
+    put(st, "commands", number(env, static_cast<double>(c->stats.commands)));
+    put(st, "blocksRead", number(env, static_cast<double>(c->stats.blocksRead)));
+    put(st, "blocksWritten", number(env, static_cast<double>(c->stats.blocksWritten)));
+    put(st, "crcErrors", number(env, static_cast<double>(c->stats.crcErrors)));
+    put(st, "illegal", number(env, static_cast<double>(c->stats.illegal)));
+    put(st, "busyNs", number(env, c->stats.busyNs));
+    put(st, "maxHz", number(env, c->stats.maxHz));
+    put(st, "maxHzBeforeInit", number(env, c->stats.maxHzBeforeInit));
+    put(o, "stats", st);
+    return o;
+  });
+}
+
 // ------------------------------------------------------------ slot host
 // hostCreate(h, clkDiv, csSetupNs, byteGapNs, frameGapNs, resume): resume(result)
 // is the script's generator.next(result); it returns the next operation:
@@ -787,6 +889,7 @@ static napi_value Init(napi_env env, napi_value exports) {
       FN(adcSet),     FN(adcGet),      FN(kbdCreate),   FN(kbdPress),   FN(kbdState),   FN(usbAttach),
       FN(usbDetach),  FN(cdcCreate),   FN(cdcOn),       FN(cdcSend),    FN(cdcTxCount), FN(tmdsCreate),
       FN(tmdsStart),  FN(tmdsStop),    FN(tmdsData),    FN(hostCreate), FN(hostConfig), FN(hostRun),
+      FN(sdCreate),   FN(sdInsert),    FN(sdRemove),    FN(sdCard),
 #undef FN
   };
   napi_define_properties(env, exports, sizeof props / sizeof props[0], props);

@@ -27,9 +27,14 @@ if (NATIVE) {
   const { UsbKeyboard } = await import('./usbkbd.mjs');
   const rp = await import(path.join(SDK, 'rp2040js/dist/esm/index.js'));
   m = { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC: rp.USBCDC };
+  m.SdSocket = class {
+    constructor() {
+      throw new Error('SdSocket: the SD card model is native only (CUPC8_EMU=native)');
+    }
+  };
 }
 
-let { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC } = m;
+let { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, SdSocket } = m;
 
 if (process.env.CUPC8_EMU_TRACE) {
   const hosts = [];
@@ -68,4 +73,4 @@ if (process.env.CUPC8_EMU_TRACE) {
   };
 }
 
-export { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC };
+export { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, SdSocket };
