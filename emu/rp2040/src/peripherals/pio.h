@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -281,29 +280,28 @@ class RPPIO : public BasePeripheral {
   bool lazyEvent();
 };
 
+/** stepPIOs() when some block has to step for real within the n cycles */
+void stepPIOsSlow(std::array<RPPIO, 2> &pios, uint64_t n);
+
 /**
  * `for (let i = 0; i < n; i++) for (const pio of pios) if (!pio.stopped) pio.step();`
  * (rp2040emu.mjs's Emu.cycles without an onCycle hook), with the stretches in
  * which every running block only counts (RPPIO::lazySteps) done at once.
  */
 inline void stepPIOs(std::array<RPPIO, 2> &pios, double n) {
-  const uint64_t total = n > 0 ? static_cast<uint64_t>(std::ceil(n)) : 0;  // the iterations of i < n
-  for (uint64_t i = 0; i < total;) {
-    uint64_t k = total - i;
-    for (const RPPIO &pio : pios) {
-      if (!pio.stopped) k = std::min(k, pio.lazySteps());
-    }
-    if (k) {
-      for (RPPIO &pio : pios) {
-        if (!pio.stopped) pio.skipLazy(k);
-      }
-      i += k;
-    } else {
-      for (RPPIO &pio : pios) {
-        if (!pio.stopped) pio.step();
-      }
-      i++;
-    }
+  // the iterations of `i < n`: ceil(n) (n is a cycle count, far below 2**53)
+  int64_t whole = n > 0 ? static_cast<int64_t>(n) : 0;
+  if (static_cast<double>(whole) < n) {
+    whole++;
+  }
+  const uint64_t total = static_cast<uint64_t>(whole);
+  RPPIO &pio0 = pios[0], &pio1 = pios[1];
+  if ((pio0.stopped || pio0.lazySteps() >= total) && (pio1.stopped || pio1.lazySteps() >= total)) {
+    // the common case: every running block only counts all the way
+    if (!pio0.stopped) pio0.skipLazy(total);
+    if (!pio1.stopped) pio1.skipLazy(total);
+  } else {
+    stepPIOsSlow(pios, total);
   }
 }
 

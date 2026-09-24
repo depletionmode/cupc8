@@ -1453,6 +1453,26 @@ uint32_t StateMachine::runLazy(uint64_t n) {
   return touched;
 }
 
+void stepPIOsSlow(std::array<RPPIO, 2> &pios, uint64_t total) {
+  for (uint64_t i = 0; i < total;) {
+    uint64_t k = total - i;
+    for (const RPPIO &pio : pios) {
+      if (!pio.stopped) k = std::min(k, pio.lazySteps());
+    }
+    if (k) {
+      for (RPPIO &pio : pios) {
+        if (!pio.stopped) pio.skipLazy(k);
+      }
+      i += k;
+    } else {
+      for (RPPIO &pio : pios) {
+        if (!pio.stopped) pio.step();
+      }
+      i++;
+    }
+  }
+}
+
 bool RPPIO::lazyMachines(uint64_t &next, uint32_t &used) {
   next = UINT64_MAX;
   used = 0;
