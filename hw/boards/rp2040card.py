@@ -91,7 +91,7 @@ def core_placement(cx, cy, turn=0):
     # the 1V1 net with VREG_VOUT, as on the Pico, since nothing fits above it.
     rel = {
         "U1": (0, 0, 0),
-        "C3": (-5.4, -2.2, 0),        # IOVDD 1
+        "C3": (-5.8, -1.6, 0),        # IOVDD 1
         "C4": (-5.2, 3.2, 0),         # IOVDD 10, below the slot pins' fan-out
         "C12": (0.4, 5.4, 90),        # DVDD 23
         "C5": (0.4, 7.6, 90),         # IOVDD 22
@@ -147,8 +147,8 @@ def core(s, gpios, leds=(), usb=False):
         s.connect(j1, pin, "GND")
     s.connect(j1, "A1", "PRSNT")               # PRSNT1_n joined to PRSNT2_n: a seated card
     s.connect(j1, "B18", "PRSNT")
-    for pin in ("B4", "A4"):                   # the card makes its own 3V3 from +5V
-        s.nc(j1, pin)
+    for pin in ("B4", "A4"):
+        s.connect(j1, pin, "3V3")
     for pin in SLOT_RSVD + ("A18",):           # RSVD, and PROG_n (UART-bootloader cards only)
         s.nc(j1, pin)
     s.connect(j1, "B6", "SWCLK")
@@ -160,17 +160,9 @@ def core(s, gpios, leds=(), usb=False):
     s.connect(j1, "B15", "MOSI")
     s.connect(j1, "B16", "MISO")
 
-    # ---- 3V3: AMS1117-3.3 from the slot's +5V (datasheet: 10 uF in, 22 uF
-    # out). JLC's own footprint: KiCad's SOT-223 numbers its tab 2, EasyEDA's 4
-    u2 = p["U2"] = s.add("jlc:AMS1117-3.3", "U2", "AMS1117-3.3", "jlc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",
-                         at=(30 * G, 12 * G), fields={"LCSC": "C6186"})
-    s.connect(u2, "VIN", "+5V")
-    s.connect(u2, "2", "3V3")                  # the tab (4) is stacked on VOUT
-    s.connect(u2, "4", "3V3")
-    s.connect(u2, "GND", "GND")
-    p["C1"] = passive(s, "C", "C1", "10u", (16 * G, 14 * G))
+    # ---- 3V3 from the slot's +3V3 (power.md: the GPU and IO cards draw well
+    # under the slot's 300 mA); 22 uF where it comes onto the card
     p["C2"] = passive(s, "C", "C2", "22u", (44 * G, 14 * G))
-    two(s, p["C1"], "+5V", "GND")
     two(s, p["C2"], "3V3", "GND")
     flg = [s.add("power:PWR_FLAG", "#FLG0%d" % (i + 1), "PWR_FLAG", at=((6 + 6 * i) * G, 6 * G)) for i in range(3)]
     for f, net in zip(flg, ("+5V", "GND", "3V3")):   # the regulator's pins are passive; VREG_VOUT drives 1V1
@@ -297,15 +289,16 @@ def core(s, gpios, leds=(), usb=False):
     return p
 
 
-def build(name, schematic, placement, power_nets, graphics, labels, gpios, usb=False, layers=2):
+def build(name, schematic, placement, power_nets, graphics, labels, gpios, title, revision, usb=False,
+          layers=2):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
         if fpid.startswith("cupc8:KaplanLabs_Logo_"):
             logo.footprint(float(fpid.rsplit("_", 1)[1][:-2]))
     lcsc = kg.pipeline(name, schematic, dict(placement, **OUTLINE_PLACEMENT), BODY,
-                       out=sys.argv[1] if len(sys.argv) > 1 else None, edge=EDGE, card_edge=True,
-                       zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5),
+                       out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
+                       title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels,
                        fine_nets=u1_nets(gpios, usb))
     print("LCSC:", " ".join(sorted(lcsc)))

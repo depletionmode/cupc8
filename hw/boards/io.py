@@ -86,9 +86,7 @@ POWER_NETS = rc.POWER_NETS + ("/VBUS",)
 # turned to face up, the origin sits 12.04 mm below the top edge
 PLACEMENT = dict(rc.core_placement(28, -17.5), **{
     "J1": (0, 0, 0),
-    "U2": (1.5, -13.5, 0),
-    "C1": (-4.5, -13.5, 90),
-    "C2": (7.5, -13.5, 90),
+    "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     # SWD crosses the slot lines on its way from the chip's bottom edge to
     # fingers B6-B9: the crystal and the MISO buffer sit clear of that path
     "Y1": (20.3, -11.6, 0),
@@ -117,8 +115,10 @@ PLACEMENT = dict(rc.core_placement(28, -17.5), **{
 })
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LOGO_MM = 12
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 49.5, -10, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, -24, 0)]
+TITLE, REVISION = "CUPC/8 IO", "A"
 
 
 if __name__ == "__main__":
-    rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS, usb=True)
+    rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS,
+             TITLE, REVISION, usb=True)

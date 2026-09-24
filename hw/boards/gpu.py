@@ -134,14 +134,12 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "C15": (CX + 10.5, CY + 4.6, 0),
     "R1": (CX + 14.5, CY + 9, 90),
     "J1": (0, 0, 0),
-    "U2": (1.5, -13.5, 0),
-    "C1": (-4.5, -13.5, 90),
-    "C2": (7.5, -13.5, 90),
+    "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "U4": (14, -12.5, 0),
     "C18": (10.5, -12.5, 90),
     "J2": (HX, -44 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin
-    "U5": (HX - 3.25, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
-    "U6": (HX - 0.25, -31.0, 90),
+    "U5": (HX - 3.5, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
+    "U6": (HX, -31.0, 90),
     "RN1": (HX - 4, -28.2, 90),
     "RN2": (HX, -28.2, 90),
     "F1": (39, -42.5, 0),
@@ -161,7 +159,9 @@ PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LAYERS = 2
 LOGO_MM = 12
 GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0)]
+TITLE, REVISION = "CUPC/8 GPU", "A"
 
 
 if __name__ == "__main__":
-    rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, layers=LAYERS)
+    rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
+             layers=LAYERS)
