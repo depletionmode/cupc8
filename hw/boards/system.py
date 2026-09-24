@@ -215,6 +215,7 @@ EDGE_AT = (W / 2 - 16.5, H + 4.95)
 OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
 LOGO_MM = 12
+LABELS = {"D1": "PWR", "D2": "STAT", "D3": "TX", "D4": "RX"}   # silkscreen says what each LED shows
 LOGO_AT = (48.8, 28.6)
 
 PLACEMENT = {
@@ -258,7 +259,7 @@ def main():
         power_nets=("/+3V3", "/1V1", "/GND"), edge=EDGE, card_edge=True, layers=4,
         # the pour reaches over the finger tops, so GND fingers join it
         zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
-        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)])
+        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)], labels=LABELS)
     print("LCSC:", " ".join(sorted(lcsc)))
 
 
