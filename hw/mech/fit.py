@@ -109,7 +109,7 @@ RAIL_KEEPOUT = 6.4                     # the hole's keep-out: the rail standoff
 # body = 0.47 mm per card; two neighbours bowing towards each other
 MIN_GAP = 1.0
 
-# top-edge connectors: the plug that goes in, centred on the receptacle's
+# top- and back-edge connectors: the plug that goes in, centred on the receptacle's
 # opening. USB-C: Type-C spec r2.0 3.2.1 overmold 12.35 x 6.50 max. HDMI and
 # USB-A have no overmold limit in their specs: typical moulded plugs, assumed.
 PLUGS = {
@@ -143,7 +143,7 @@ CHECKS = {
     "MECH-001": "Card edge and socket fit vs PCIe CEM",
     "MECH-002": "Finger bevel and card thickness vs PCIe CEM",
     "MECH-003": "Card-to-card clearance, each card in each slot",
-    "MECH-004": "Top-edge connectors: overhang and plug access",
+    "MECH-004": "Top- and back-edge connectors: overhang and plug access",
     "MECH-005": "M3 holes line up for the rail; rail keep-out clear",
     "MECH-006": "Power LEDs in one place on every I/O card",
     "MECH-007": "Wi-Fi antenna: connector match and cable route",
