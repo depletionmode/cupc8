@@ -198,9 +198,20 @@ devices:
           - {name: SLOT_MISO, gpio: 4, dir: out}
           - {name: SLOT_nCS, gpio: 5, dir: in}
           - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
+      sd:
+        note: "microSD in SPI mode on SPI1 (doc/proposals/io-microsd.md, doc/hardware/io-card.md); 10k pull-ups on CMD/DAT0-3"
+        signals:
+          - {name: SD_SCK, gpio: 14, dir: out, note: SPI1 SCK}
+          - {name: SD_MOSI, gpio: 15, dir: out, note: "SPI1 TX, to the card's CMD"}
+          - {name: SD_MISO, gpio: 12, dir: in, note: "SPI1 RX, from the card's DAT0"}
+          - {name: SD_nCS, gpio: 13, dir: out, note: "SPI1 CSn, to the card's DAT3/CD"}
+          - {name: SD_nDETECT, gpio: 17, dir: in, note: "socket card-detect switch, pulled up: low = card in"}
+          - {name: SD_DAT1, gpio: 18, dir: in, note: "pulled up, unused in SPI mode: routed for a later 4-bit mode on PIO"}
+          - {name: SD_DAT2, gpio: 19, dir: in, note: "pulled up, unused in SPI mode: routed for a later 4-bit mode on PIO"}
       debug:
         signals:
           - {name: LED_KBD, gpio: 25, dir: out}
+          - {name: LED_SD, gpio: 23, dir: out, note: "SD activity, in the top-edge LED row"}
           - {name: UART_TX, gpio: 16, dir: out}
 
   wifi_mcu:
