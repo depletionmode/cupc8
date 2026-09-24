@@ -227,7 +227,7 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .refresh
+	bzf .save
 	mov r0, #<[term_line_buf]
 	st [net_line], r0
 	mov r0, #>[term_line_buf]
@@ -235,6 +235,62 @@ term_parse:
 	push pch
 	push pcl
 	b net_cmd
+	b .done
+
+.save:
+	term_s_save db "save"
+	mov r0, #>[term_s_save]
+	mov r1, #<[term_s_save]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .load
+	push pch
+	push pcl
+	b ub_cmd_save
+	b .done
+
+.load:
+	term_s_load db "load"
+	mov r0, #>[term_s_load]
+	mov r1, #<[term_s_load]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .dir
+	push pch
+	push pcl
+	b ub_cmd_load
+	b .done
+
+.dir:
+	term_s_dir db "dir"
+	mov r0, #>[term_s_dir]
+	mov r1, #<[term_s_dir]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .del
+	push pch
+	push pcl
+	b ub_cmd_dir
+	b .done
+
+.del:
+	term_s_del db "del"
+	mov r0, #>[term_s_del]
+	mov r1, #<[term_s_del]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .refresh
+	push pch
+	push pcl
+	b ub_cmd_del
 	b .done
 
 .refresh:
@@ -339,7 +395,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR NET REFRESH\n"
+	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch

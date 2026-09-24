@@ -131,9 +131,10 @@ $30 and $31 go through the bridge and return $07 while it is down.
 
 The main board's USB-C sink has 5.1 kΩ Rd on CC1 and CC2. The **policy lives on
 the main board**, so it holds with or without the system card: a comparator
-sets `PWR_HI` when either CC line is at least 0.66 V (a source of 1.5 A or
-more). The chipset shows it in `SYSCTL` bit 1 ($f203), and the kernel's `net`
-command refuses to start the radio without it.
+sets `PWR_HI` when either CC line is above ~1.30 V (a 3.0 A source;
+`power.md`). The chipset shows it in `SYSCTL` bit 1 ($f203). Without it the
+kernel's `net` command refuses to start the radio, and SAVE and DEL refuse to
+write the SD card.
 
 sysctl only reports the class, from its ADC readings of CC1/CC2 (the higher one):
 

@@ -81,9 +81,10 @@ class Checks:
         self.failed = []
         print(title)
 
-    def check(self, ident, what, value, limit, kind, unit="V", fmt="%.3f", need=0.0):
+    def check(self, ident, what, value, limit, kind, unit="V", fmt="%.3f", need=0.0, fix=None):
         """kind '>=' or '<='. Margin is how far inside the limit the value is;
-        `need` is the margin required, as a fraction of the limit."""
+        `need` is the margin required, as a fraction of the limit. `fix` is
+        printed with a failure: what would make it pass."""
         margin = value - limit if kind == ">=" else limit - value
         ok = margin >= need * abs(limit)
         rel = "" if not limit else " (%+.1f%%%s)" % (100 * margin / abs(limit),
@@ -93,6 +94,8 @@ class Checks:
             fmt % margin, unit, rel))
         if not ok:
             self.failed.append(ident)
+            if fix:
+                print("       %-8s fix: %s" % (ident, fix))
         return ok
 
     def info(self, what, text):

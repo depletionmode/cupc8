@@ -31,6 +31,7 @@
 #define CARD_TYPE_GPU  0x01
 #define CARD_TYPE_IO   0x02
 #define CARD_TYPE_WIFI 0x03
+#define CARD_TYPE_STORAGE 0x04
 
 typedef struct card card_t;
 
