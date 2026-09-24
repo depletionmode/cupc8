@@ -6,6 +6,10 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## Decisions (David, 2026-09-24)
 
+- **E-ink card: built for M1** as the second graphics option (replaces the
+  HDMI card, type $01; `proposals/eink-gpu.md` Decisions; pins `eink_mcu`).
+  The native emulator gets a UC8179 panel model.
+
 - **Storage card** (card type $04, `hardware/storage-card.md`): a separate
   RP2040 card for files, microSD in M1, a medium-neutral protocol so a later
   card can be tape or a hard disk. Replaces the microSD on the IO card

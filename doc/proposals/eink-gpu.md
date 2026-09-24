@@ -1,6 +1,6 @@
 # Proposal: an e-ink graphics card (a second option for the graphics card)
 
-**Status: proposal, for exploration — not scheduled; raised 2026-09-24 by David.**
+**Status: accepted for Milestone 1 and being built, 2026-09-24 (David): the second graphics card option. Raised 2026-09-24 by David.** Pins: `hw/pins.yaml`, `eink_mcu`.
 
 ## Decisions (David, 2026-09-24)
 
