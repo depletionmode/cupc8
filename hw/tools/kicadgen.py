@@ -641,10 +641,11 @@ NET_CLASSES = [
     # name, track, clearance, via diameter, via drill
     ("Default", 0.2, 0.2, 0.6, 0.3),        # 0.2: two 0.6/0.3 vias then keep holes 0.5 apart (JLC)
     ("Power", 0.5, 0.2, 0.8, 0.4),
-    # 0.15 mm tracks for nets on a 0.4 mm-pitch part (the RP2040's QFN-56):
-    # a 0.2 mm track leaving a 0.2 mm pad has exactly 0.2 mm to the next pad,
-    # and Freerouting will not route it. Clearances stay 0.2.
-    ("Fine", 0.15, 0.2, 0.6, 0.3),
+    # nets on a 0.4 mm-pitch part (the RP2040's QFN-56): its pads are 0.2 mm
+    # apart, so at 0.2 mm clearance Freerouting counts every neighbouring pair
+    # a violation and routes none of them. 0.15 mm track and clearance (JLC's
+    # minimum is 0.1, and min_clearance above is 0.15).
+    ("Fine", 0.15, 0.15, 0.6, 0.3),
 ]
 
 
