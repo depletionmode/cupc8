@@ -36,8 +36,7 @@ between slices exactly as machine.mjs does, so cupc8.py can talk to the
 system card's TCP port. The system card's CDC output is collected during a
 slice and written to the socket at its end; input from the socket is queued
 between slices, as in machine.mjs (where both only move when the event loop
-turns). `-DMACHINE_LTO=ON` builds this tree's copy of the RP2040 library with
-`-O3` and LTO (about 10% faster, same traces); off by default.
+turns). `-DMACHINE_LTO=ON`: see Speed.
 
 ## The loop
 
@@ -75,11 +74,16 @@ board's end outputs. So:
   chipset clock by clock, and the shared SCK/MOSI lines re-set their GPIO
   edge bits, so no card may run ahead).
 
-There is no board thread: the last card thread to arrive leads the next
-iteration (the serial part, and the board's run while the others chase),
-then does its own card's share; `runFor` hands the run to the threads and
-waits. The slow card (the GPU) is usually last, so it goes on without a
-hand-off. Waits spin briefly and then sleep on a futex. `machinerun --mode
+There is no board thread: whoever leads an iteration runs the serial part
+(bridgePins, busy iterations, the board's run while the others chase), then
+does its own card's share; `runFor` hands the run to the threads and waits.
+The leader is normally a quick card (IO, system card) that has finished its
+window and volunteers, spinning until the slow card (the GPU) arrives and
+hands over, so the GPU only ever chases; if nobody volunteers in time, the
+last card to arrive leads. Who leads cannot change the result: the leader
+does exactly the serial loop's work, with every other card parked.
+`CUPC8_EMU_VOLUNTEER_SPINS` (default 200000, 0 = never volunteer) bounds the
+volunteer's spin. Waits spin briefly and then sleep on a futex. `machinerun --mode
 both` and `test/emu/machine_diff.sh` check the result: identical board
 clocks, CPU state, RAM, every card's time, cycle counts and UART, a hash over
 (board clocks, outputs, every card's time) after every iteration, every SPI
@@ -92,25 +96,22 @@ emu/rp2040 was changed for this directory.
 ## Speed
 
 Boot to BASIC and type a program (1.6 s emulated, `test/emu/machine_diff.sh`,
-quiet 4-core 2.1 GHz Xeon, 2026-09-24):
+quiet 4-core 2.1 GHz Xeon, emu/rp2040 with its PIO fast path, 2026-09-24):
 
 | backend | slower than real time |
 |---|---|
-| machine.mjs (rp2040js) | 102x |
-| native, serial | 44x |
-| native, threaded | 42-48x (no reliable gain) |
-| native, `-DMACHINE_LTO=ON` | about 10% less |
+| machine.mjs (rp2040js) | 108x |
+| native, serial (`CUPC8_EMU_THREADS=0`) | 23.5x |
+| native, threaded (default) | 18.0x |
 
-The machine runs at the GPU card's speed. At 252 MHz, with three DVI
-serialiser state machines running every cycle, the GPU takes about 700 host
-instructions per emulated cycle and alone runs ~33x slower than real time
-standalone (rp2040run) and ~41x inside the machine (its thread is busy 98% of
-the wall time in a threaded run). The IO card (~4x), the system card (~3x)
-and the main board (~2-3x) are what the threads take off the critical path,
-which is why threading gains so little. The spec's "a few times slower than
-real time" needs a faster RP2040 core/PIO/GPIO path in emu/rp2040 (not
-changed here: the port is kept structure-preserving). On an oversubscribed
-host the threaded mode can be slower than serial (`CUPC8_EMU_THREADS=0`).
+The threaded machine runs at the GPU card's speed: the GPU thread is busy
+~95% of the wall time (252 MHz, three DVI serialisers every cycle), while the
+IO card, the system card and the main board (each ~2-3x slower than real time
+alone) run beside it. The spec's "a few times slower than real time" needs a
+faster GPU card emulation in emu/rp2040. `-DMACHINE_LTO=ON` builds this
+tree's copy of the RP2040 library with -O3 and LTO (about 10% faster before
+the PIO fast path; not re-measured). On an oversubscribed host the threaded
+mode can be slower than serial: the threads meet every 10 us of emulated time.
 
 ## Notes
 

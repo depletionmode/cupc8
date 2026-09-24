@@ -16,8 +16,8 @@ does everything except KiCad.
 The whole-machine emulator the end-to-end tests run on (`test/emu/test_e2e.mjs`)
 has two backends giving identical results: `test/emu/machine.mjs` (rp2040js
 cards, the default) and the native one in `emu/machine`
-(`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; about twice as
-fast, see its README). `test/emu/machine_diff.sh` checks that they agree.
+(`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; about six times
+as fast, see its README). `test/emu/machine_diff.sh` checks that they agree.
 
 ## KiCad 10
 
