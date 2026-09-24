@@ -26,10 +26,15 @@ class TmdsCapture {
         lanes[lane].push_back((w >> 10) & 0x3ff);
         if (lane == 0) times.push_back(this->emu.ns());
       };
+      // it only records (emu.ns() is the clock's time): the PIO fast path may stay on
+      emu.mcu->pio[0].machines[lane].txFIFO.onPullRecordsOnly = true;
     }
   }
   ~TmdsCapture() {
-    for (uint32_t lane = 0; lane < 3; lane++) emu.mcu->pio[0].machines[lane].txFIFO.onPull = nullptr;
+    for (uint32_t lane = 0; lane < 3; lane++) {
+      emu.mcu->pio[0].machines[lane].txFIFO.onPull = nullptr;
+      emu.mcu->pio[0].machines[lane].txFIFO.onPullRecordsOnly = false;
+    }
   }
   TmdsCapture(const TmdsCapture &) = delete;
   TmdsCapture &operator=(const TmdsCapture &) = delete;

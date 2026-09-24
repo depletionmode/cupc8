@@ -907,7 +907,24 @@ uint32_t RPPIO::irq0IntStatus() const { return (intRaw() & irq0IntEnable) | irq0
 
 uint32_t RPPIO::irq1IntStatus() const { return (intRaw() & irq1IntEnable) | irq1IntForce; }
 
+/**
+ * Fast path: a bus access sees and changes the exact state (sync() first),
+ * and afterwards the block may go lazy again at once (the conditions are
+ * checked on the state the access left), unless the access came from inside
+ * the block's own step() (a GPIO listener), which checks at its end.
+ */
+struct PIOBusAccess {
+  RPPIO &pio;
+  explicit PIOBusAccess(RPPIO &pio) : pio(pio) { pio.sync(); }
+  ~PIOBusAccess() {
+    if (pio.fastPath && !pio.lazy && !pio.inStep) {
+      pio.tryEnterLazy();
+    }
+  }
+};
+
 uint32_t RPPIO::readUint32(uint32_t offset) {
+  const PIOBusAccess access(*this);
   if (offset >= SM0_CLKDIV && offset <= SM0_PINCTRL) {
     return machines[0].readUint32(offset - SM0_CLKDIV);
   }
@@ -974,6 +991,21 @@ uint32_t RPPIO::readUint32(uint32_t offset) {
 }
 
 void RPPIO::writeUint32(uint32_t offset, uint32_t value) {
+  if (lazy && offset >= TXF0 && offset <= TXF3 && !machines[(offset - TXF0) >> 2].waiting) {
+    // Fast path: a TX FIFO write to a machine that is not waiting (a lazy
+    // runner or a disabled machine) changes only that FIFO, txStall, the
+    // DREQ and the interrupt lines (its checkWait() does nothing); none of
+    // that is read by a lazy cycle, and the runner's pull comes when it
+    // would anyway, so the block stays lazy.
+    machines[(offset - TXF0) >> 2].writeFIFO(value);
+    return;
+  }
+  const PIOBusAccess access(*this);
+  if (offset == CTRL || (offset >= INSTR_MEM0 && offset <= INSTR_MEM31) ||
+      (offset >= SM0_CLKDIV && offset <= SM3_PINCTRL)) {
+    // a program or configuration change: the fast path's analysis is stale
+    progEpoch++;
+  }
   if (offset >= INSTR_MEM0 && offset <= INSTR_MEM31) {
     const uint32_t index = (offset - INSTR_MEM0) >> 2;
     instructions[index] = value & 0xffff;
@@ -1080,8 +1112,11 @@ void RPPIO::pinDirectionsChanged(uint32_t value, uint32_t firstPin, uint32_t cou
 
 void RPPIO::checkInterrupts() {
   const uint32_t firstIrq = this->firstIrq;
-  rp2040.setInterrupt(firstIrq, !!irq0IntStatus());
-  rp2040.setInterrupt(firstIrq + 1, !!irq1IntStatus());
+  // irq0IntStatus() and irq1IntStatus(), with intRaw() computed once
+  // (setInterrupt cannot change what it reads)
+  const uint32_t raw = intRaw();
+  rp2040.setInterrupt(firstIrq, !!((raw & irq0IntEnable) | irq0IntForce));
+  rp2040.setInterrupt(firstIrq + 1, !!((raw & irq1IntEnable) | irq1IntForce));
 }
 
 void RPPIO::irqUpdated() {
@@ -1108,19 +1143,470 @@ void RPPIO::checkChangedPins() {
   }
 }
 
-void RPPIO::step() {
+void RPPIO::stepExact() {
+  if (lazy && lazyEvent()) {
+    return;  // the cycle that autopulls, run exactly without leaving the fast path
+  }
+  inStep = true;
   for (StateMachine &machine : machines) {
     machine.clockTick();
   }
   checkChangedPins();
+  inStep = false;
+  if (fastPath && !lazy) {
+    tryEnterLazy();
+  }
 }
 
 void RPPIO::stop() {
+  sync();
   for (StateMachine &machine : machines) {
     machine.enabled = false;
   }
   stopped = true;
   // (no runTimer to clear)
+}
+
+// ---------------------------------------------------------------------------
+// Fast path (not in rp2040js).
+//
+// The block goes lazy after a step() when every enabled machine is either
+//  - stalled: waiting, no delay or EXEC pending, its wait condition false now
+//    and changeable only by an event that syncs first (a GPIO input, IO_BANK0
+//    or PADS write, or a bus access to this block: FIFOs and IRQ flags only
+//    change through the bus or through other machines of the block, which
+//    here execute nothing but OUTs). Its step() is then a no-op apart from the
+//    clock divider phase, which advances by 256 mod the divisor per cycle; or
+//  - a runner: divider 1, autopull on, and every instruction reachable from
+//    its pc an OUT to PINS/X/Y/NULL/PINDIRS/PC/ISR with one common nonzero
+//    bit count and no delay (PicoDVI's `out pc, 1 side n` loop). Until the
+//    instruction that autopulls, its step() touches only its own registers
+//    and the block's pinValues/pinDirections under its pin mask: no FIFO,
+//    DREQ, IRQ or wait, and nothing that reads anything outside the machine.
+//    That instruction's cycle (nextEvent) is run for real.
+// and the runners' pin masks are disjoint, free of GPIO listeners and muxed
+// to this block, and oldPin* == pin* (checkChangedPins has run).
+//
+// While lazy, step() only counts cycles. Per cycle, the exact path's only
+// effects outside the machines are then checkChangedPins' calls to
+// GPIOPin::checkForUpdates for the runners' pins; with no listeners that only
+// sets the pin's lastValue to value(), which depends on the pin's PIO output
+// bits and its ctrl and pad registers, and those registers cannot change
+// without a sync. So materialize() replays each runner's owed cycles with the
+// real clockTick() (each machine alone: the masks are disjoint and nothing in
+// them reads another machine's state) and then calls checkForUpdates, in
+// ascending order, for every pin that changed in any of those cycles, which
+// leaves every pin's lastValue as the exact path would. Everything else (pc,
+// shift registers, counts, cycles, pin registers, divider phases) is then
+// exactly what per-cycle stepping gives.
+
+bool StateMachine::stalledStable() const {
+  if (!waiting || delayLeft > 0 || execValid) {
+    return false;
+  }
+  const uint32_t div = (clockDivInt ? clockDivInt : 65536) * 256 + clockDivFrac;
+  if (divPhase >= div) {
+    return false;  // the divider would step more than once in a cycle (a divisor shrunk)
+  }
+  switch (waitType) {
+    case WaitType::IRQ:
+      return !!(pio.irq & (1u << (waitIndex & 31))) != waitPolarity;
+    case WaitType::Pin:
+      return !(waitIndex < rp2040.gpio.size() && rp2040.gpio[waitIndex].inputValue() == waitPolarity);
+    case WaitType::rxFIFO:
+      return rxFIFO.full();
+    case WaitType::txFIFO:
+    case WaitType::Out:
+      return txFIFO.empty();
+    case WaitType::None:
+      break;
+  }
+  return false;
+}
+
+/** the pins `pinValuesChanged(value, firstPin, count)` can change */
+static inline uint32_t pinMask(uint32_t firstPin, uint32_t count) {
+  return (count > 31 ? 0xffffffff : lowMask(count) << firstPin) & 0x3fffffff;
+}
+
+bool StateMachine::runnerProgram(uint32_t &mask, uint32_t &bits) {
+  if (analysedEpoch != pio.progEpoch) {
+    analysedEpoch = pio.progEpoch;
+    analysedPcs = 0;
+    runnerPcs = 0;
+    runnerPcOnly = 0;
+  }
+  const uint32_t start = pc & 0x1f;
+  if (!(analysedPcs & (1u << start))) {
+    analysedPcs |= 1u << start;
+    const uint32_t sidesetCount = this->sidesetCount();
+    const bool sideEn = !!(execCtrl & EXECCTRL_SIDE_EN);
+    const uint32_t sideMask = sidesetCount ? pinMask(sidesetBase(), sideEn ? sidesetCount - 1 : sidesetCount) : 0;
+    const uint32_t outMask = pinMask(outBase(), outCount());
+    uint32_t seen = 1u << start, todo = 1u << start, m = 0, b = 0;
+    bool ok = true, pcOnly = true;
+    while (todo && ok) {
+      const uint32_t at = static_cast<uint32_t>(__builtin_ctz(todo));
+      todo &= todo - 1;
+      const uint32_t opcode = pio.instructions[at];
+      const uint32_t arg = opcode & 0xff;
+      const uint32_t bitCount = arg & 0x1f, destination = arg >> 5;
+      const uint32_t delaySideset = (opcode >> 8) & 0x1f;
+      const uint32_t delay = delaySideset & lowMask(static_cast<uint32_t>(5 - static_cast<int32_t>(sidesetCount)));
+      if (opcode >> 13 != 0b011 || bitCount == 0 || (b && bitCount != b) || destination == 0b111 || delay) {
+        ok = false;
+        break;
+      }
+      b = bitCount;
+      pcOnly = pcOnly && destination == 0b101;
+      LazyOp &op = lazyOps[at];
+      op.destination = static_cast<uint8_t>(destination);
+      op.bitCount = static_cast<uint8_t>(bitCount);
+      op.next = static_cast<uint8_t>(at == wrapTop() ? wrapBottom() : (at + 1) & 0x1f);
+      // setSideset(sideset, count): `pins = ((pins & ~mask) | ((sideset << base) & mask)) & 0x3fffffff`
+      // on pinDirections or pinValues (both always have bits 30, 31 clear), or nothing
+      op.keepValues = op.keepDirections = 0xffffffff;
+      op.setValues = op.setDirections = 0;
+      if (sidesetCount && (!sideEn || delaySideset & 0x10)) {
+        const uint32_t sideset =
+            static_cast<uint32_t>(jsSar(static_cast<int32_t>(delaySideset), static_cast<uint32_t>(5 - static_cast<int32_t>(sidesetCount))));
+        const uint32_t bits = (sideset << sidesetBase()) & sideMask;
+        if (execCtrl & EXECCTRL_SIDE_PINDIR) {
+          op.keepDirections = ~sideMask & 0x3fffffff;
+          op.setDirections = bits;
+        } else {
+          op.keepValues = ~sideMask & 0x3fffffff;
+          op.setValues = bits;
+        }
+      }
+      if (destination == 0b000 || destination == 0b100) {
+        m |= outMask;
+      }
+      if (sidesetCount && (!sideEn || delaySideset & 0x10)) {
+        m |= sideMask;
+      }
+      uint32_t next;
+      if (destination == 0b101) {
+        next = bitCount >= 5 ? 0xffffffff : lowMask(1u << bitCount);  // pcs 0 .. 2**bitCount - 1
+      } else {
+        next = 1u << (at == wrapTop() ? wrapBottom() : (at + 1) & 0x1f);
+      }
+      todo |= next & ~seen;
+      seen |= next;
+    }
+    if (ok) {
+      runnerPcs |= 1u << start;
+      if (pcOnly) {
+        runnerPcOnly |= 1u << start;
+      }
+      runnerMask[start] = m;
+      runnerBits[start] = static_cast<uint8_t>(b);
+    }
+  }
+  if (!(runnerPcs & (1u << start))) {
+    return false;
+  }
+  mask = runnerMask[start];
+  bits = runnerBits[start];
+  return true;
+}
+
+// clockTick() for a runner, `cycles` times: with divider 1 each tick is a
+// step() (divPhase keeps its value), with no delay left and no wait each step
+// executes pio.instructions[pc], an OUT that does not autopull (runnerProgram
+// and nextEvent). This is that path of step(), executeInstruction(),
+// outInstruction(), writeOutValue(), setSideset() and nextPC(), in the same
+// order, specialised: bitCount != 0, destination != EXEC, delay 0.
+uint32_t StateMachine::runLazy(uint64_t n) {
+  if (!n) {
+    return 0;
+  }
+  const bool shiftRight = !!(shiftCtrl & SHIFTCTRL_OUT_SHIFTDIR);
+  const uint32_t outBase = this->outBase(), outMask = pinMask(outBase, outCount());
+  // the machine's state in locals (the member and pio references may alias)
+  uint32_t values = pio.pinValues, directions = pio.pinDirections;
+  uint32_t osr = outputShiftReg, count = outputShiftCount, pc = this->pc;
+  uint32_t touched = 0;
+  bool update = true;
+  const std::array<LazyOp, 32> &ops = lazyOps;
+  if (runnerPcOnly & (1u << pc)) {
+    // The loop below for a program of `out pc, n` only (the PicoDVI
+    // serialiser): the OUT changes no pins, sets next = value & 0x1f and
+    // update = false, and every bit count is the same.
+    const uint32_t bitCount = ops[pc].bitCount;
+    const uint32_t mask = lowMask(bitCount), left = 32 - bitCount;
+    if (bitCount == 1 && pc <= 1 && n <= 32 && ops[0].keepValues == ops[1].keepValues &&
+        ops[0].keepDirections == ops[1].keepDirections) {
+      // `out pc, 1` at 0 and 1 (PicoDVI), in closed form. The OSR's bits, in
+      // the order they are shifted out, are c[0], c[1], ...; the pcs executed
+      // are p[0] = pc, p[j] = c[j - 1], and the next pc is c[n - 1]. Both
+      // side-sets write the same pins, so after instruction j the pins are
+      // (initial & keep) | set[p[j]]: they end as p[n - 1] leaves them, and a
+      // pin changed on the way if the first instruction changed it or if some
+      // p[j] != p[j - 1] and the two side-sets differ on it.
+      const uint32_t c = shiftRight ? osr : bitReverse(osr);  // c[j] = bit j
+      const uint32_t k = static_cast<uint32_t>(n) - 1;  // c[0 .. k-1] are p[1 .. n-1]
+      const bool change = (c & lowMask(k)) != (pc ? lowMask(k) : 0);
+      const LazyOp &first = ops[pc], &last = ops[k ? (c >> (k - 1)) & 1 : pc];
+      const uint32_t firstValues = (values & first.keepValues) | first.setValues;
+      const uint32_t firstDirections = (directions & first.keepDirections) | first.setDirections;
+      touched = (values ^ firstValues) | (directions ^ firstDirections);
+      if (change) {
+        touched |= (ops[0].setValues ^ ops[1].setValues) | (ops[0].setDirections ^ ops[1].setDirections);
+      }
+      values = (values & last.keepValues) | last.setValues;
+      directions = (directions & last.keepDirections) | last.setDirections;
+      pc = (c >> k) & 1;
+      osr = n == 32 ? 0 : shiftRight ? osr >> n : osr << n;
+    } else {
+    for (uint64_t i = 0; i < n; i++) {
+      const LazyOp &op = ops[pc];
+      const uint32_t before = values, beforeDirections = directions;
+      uint32_t value;
+      if (shiftRight) {
+        value = osr & mask;
+        osr >>= bitCount;
+      } else {
+        value = osr >> left;
+        osr <<= bitCount;
+      }
+      values = (values & op.keepValues) | op.setValues;
+      directions = (directions & op.keepDirections) | op.setDirections;
+      pc = value & 0x1f;
+      touched |= (before ^ values) | (beforeDirections ^ directions);
+    }
+    }
+    // `outputShiftCount += bitCount` per instruction, capped at 32
+    const uint64_t total = count + n * bitCount;
+    count = total > 32 ? 32 : static_cast<uint32_t>(total);
+    update = false;
+  } else {
+    uint32_t x = this->x, y = this->y, isr = inputShiftReg, isc = inputShiftCount;
+    uint32_t outValues = outPinValues, outDirections = outPinDirection;
+    for (uint64_t i = 0; i < n; i++) {
+      const uint32_t before = values, beforeDirections = directions;
+      const LazyOp &op = ops[pc];
+      // outInstruction(arg)
+      const uint32_t bitCount = op.bitCount;
+      uint32_t value;
+      if (shiftRight) {
+        value = osr & lowMask(bitCount);
+        osr >>= bitCount;
+      } else {
+        value = osr >> (32 - bitCount);
+        osr <<= bitCount;
+      }
+      uint32_t next = op.next;
+      update = true;
+      switch (op.destination) {
+        case 0b000:  // setOutPins(value)
+          outValues = value;
+          values = ((values & ~outMask) | ((value << outBase) & outMask)) & 0x3fffffff;
+          break;
+        case 0b001:
+          x = value;
+          break;
+        case 0b010:
+          y = value;
+          break;
+        case 0b011:
+          break;
+        case 0b100:  // setOutPinDirs(value)
+          outDirections = value;
+          directions = ((directions & ~outMask) | ((value << outBase) & outMask)) & 0x3fffffff;
+          break;
+        case 0b101:
+          next = value & 0x1f;
+          update = false;
+          break;
+        case 0b110:
+          isr = value;
+          isc = bitCount;
+          break;
+      }
+      count += bitCount;
+      if (count > 32) {
+        count = 32;
+      }
+      // setSideset() (pinValuesChanged or pinDirectionsChanged), or nothing
+      values = (values & op.keepValues) | op.setValues;
+      directions = (directions & op.keepDirections) | op.setDirections;
+      pc = next;
+      touched |= (before ^ values) | (beforeDirections ^ directions);
+    }
+    this->x = x;
+    this->y = y;
+    inputShiftReg = isr;
+    inputShiftCount = isc;
+    outPinValues = outValues;
+    outPinDirection = outDirections;
+  }
+  pio.pinValues = values;
+  pio.pinDirections = directions;
+  outputShiftReg = osr;
+  outputShiftCount = count;
+  this->pc = pc;
+  // `cycles++` once per instruction (delay 0): the sum of n ones is exact below 2**53
+  cycles += static_cast<double>(n);
+  updatePC = update;
+  delayLeft = 0;  // not waiting, delay 0: `cycles += 0; delayLeft = 0`
+  return touched;
+}
+
+void stepPIOsSlow(std::array<RPPIO, 2> &pios, uint64_t total) {
+  for (uint64_t i = 0; i < total;) {
+    uint64_t k = total - i;
+    for (const RPPIO &pio : pios) {
+      if (!pio.stopped) k = std::min(k, pio.lazySteps());
+    }
+    if (k) {
+      for (RPPIO &pio : pios) {
+        if (!pio.stopped) pio.skipLazy(k);
+      }
+      i += k;
+    } else {
+      for (RPPIO &pio : pios) {
+        if (!pio.stopped) pio.step();
+      }
+      i++;
+    }
+  }
+}
+
+bool RPPIO::lazyMachines(uint64_t &next, uint32_t &used) {
+  next = UINT64_MAX;
+  used = 0;
+  for (StateMachine &sm : machines) {
+    if (!sm.enabled) {
+      continue;
+    }
+    if (sm.waiting) {
+      if (!sm.stalledStable()) {
+        return false;
+      }
+      continue;
+    }
+    if (sm.execValid || sm.delayLeft > 0 || sm.clockDivInt != 1 || sm.clockDivFrac != 0 ||
+        !(sm.shiftCtrl & SHIFTCTRL_AUTOPULL)) {
+      return false;
+    }
+    uint32_t mask, bits;
+    const uint32_t pc = sm.pc & 0x1f;
+    if (sm.analysedEpoch == progEpoch && sm.runnerPcs & (1u << pc)) {  // (runnerProgram's cache)
+      mask = sm.runnerMask[pc];
+      bits = sm.runnerBits[pc];
+    } else if (!sm.runnerProgram(mask, bits)) {
+      return false;
+    }
+    const uint32_t threshold = sm.pullThreshold(), count = sm.outputShiftCount;
+    if (count >= threshold || (mask & used)) {
+      return false;
+    }
+    used |= mask;
+    // the instructions before the one that autopulls (the count caps at 32 >= threshold)
+    next = std::min<uint64_t>(next, (threshold - count + bits - 1) / bits);
+  }
+  return true;
+}
+
+void RPPIO::tryEnterLazy() {
+  if (oldPinValues != pinValues || oldPinDirections != pinDirections) {
+    return;
+  }
+  uint64_t next;
+  uint32_t used;
+  if (!lazyMachines(next, used)) {
+    return;
+  }
+  const uint32_t function = index ? FUNCTION_PIO1 : FUNCTION_PIO0;
+  for (uint32_t bits = used & ((1u << rp2040.gpio.size()) - 1); bits; bits &= bits - 1) {
+    const GPIOPin &pin = rp2040.gpio[static_cast<uint32_t>(__builtin_ctz(bits))];
+    if (pin.hasListeners() || pin.functionSelect() != function) {
+      return;
+    }
+  }
+  lazy = true;
+  owed = 0;
+  nextEvent = next;
+}
+
+void RPPIO::catchUp() {
+  const uint64_t cycles = owed;
+  owed = 0;
+  if (!cycles) {
+    return;
+  }
+  lazyCycles += cycles;
+  for (StateMachine &sm : machines) {
+    if (!sm.enabled) {
+      continue;
+    }
+    if (sm.waiting) {
+      const uint64_t div = (sm.clockDivInt ? sm.clockDivInt : 65536) * 256ull + sm.clockDivFrac;
+      sm.divPhase = static_cast<uint32_t>((sm.divPhase + 256 * cycles) % div);
+      continue;
+    }
+    pendingTouched |= sm.runLazy(cycles);
+  }
+}
+
+void RPPIO::flushPins() {
+  const uint32_t touched = pendingTouched;
+  pendingTouched = 0;
+  oldPinValues = pinValues;
+  oldPinDirections = pinDirections;
+  auto &gpio = rp2040.gpio;
+  for (uint32_t bits = touched & ((1u << gpio.size()) - 1); bits; bits &= bits - 1) {
+    gpio[static_cast<uint32_t>(__builtin_ctz(bits))].checkForUpdates();
+  }
+}
+
+void RPPIO::materialize() {
+  lazy = false;
+  catchUp();
+  flushPins();
+}
+
+bool RPPIO::lazyEvent() {
+  catchUp();
+  // A runner autopulls now. The cycle is every machine's real clockTick():
+  // the stalled ones and the runners that do not pull touch nothing outside
+  // themselves and their pins, and the pull's effects (the FIFO, its DREQ,
+  // the interrupt lines, txStall/fdebug on an underrun) are the exact ones,
+  // in machine order. What is left of the exact step is checkChangedPins,
+  // whose checkForUpdates calls stay deferred (pendingTouched) as in a lazy
+  // cycle. That needs the pull's onPull hook, if any, not to touch the chip.
+  for (StateMachine &sm : machines) {
+    if (sm.enabled && !sm.waiting && sm.outputShiftCount >= sm.pullThreshold() && sm.txFIFO.onPull &&
+        !sm.txFIFO.onPullRecordsOnly) {
+      lazy = false;
+      flushPins();
+      return false;  // the exact step (all caught up)
+    }
+  }
+  lazy = false;
+  inStep = true;
+  lazyEvents++;
+  const uint32_t values = pinValues, directions = pinDirections;
+  for (StateMachine &sm : machines) {
+    sm.clockTick();
+  }
+  pendingTouched |= (values ^ pinValues) | (directions ^ pinDirections);
+  inStep = false;
+  // Nothing outside the block changed since the last tryEnterLazy (that
+  // would have synced), and a runner's new pc is reachable from its old one:
+  // its pins are a subset of the ones checked then. So only the machines'
+  // own conditions need checking again.
+  uint64_t next;
+  uint32_t used;
+  if (lazyMachines(next, used)) {
+    lazy = true;
+    owed = 0;
+    nextEvent = next;
+  } else {
+    flushPins();  // the rest of the exact step: checkChangedPins
+  }
+  return true;
 }
 
 }  // namespace rp2040js

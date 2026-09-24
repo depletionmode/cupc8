@@ -12,7 +12,22 @@
 
 namespace rp2040js {
 
-Timer32::Timer32(IClock &clock, double baseFreq) : clock(clock), baseFreq(baseFreq) {}
+Timer32::Timer32(IClock &clock, double baseFreq)
+    : clock(clock), baseFreq(baseFreq), tickRate(baseFreq / prescalerValue) {}
+
+/** `x % m` (fmod) for integral x and m, without the library call where exact */
+static inline double modIntegral(double x, double m) {
+  if (x != 0 && std::fabs(x) < 4611686018427387904.0 && m >= 1 && m < 4611686018427387904.0) {
+    const int64_t xi = static_cast<int64_t>(x), mi = static_cast<int64_t>(m);
+    if (static_cast<double>(xi) == x && static_cast<double>(mi) == m) {
+      // both integers below 2**62: C++'s % truncates like fmod, and its
+      // result is exact; a zero result keeps x's sign, as fmod's does
+      const int64_t r = xi % mi;
+      return r ? static_cast<double>(r) : std::copysign(0.0, x);
+    }
+  }
+  return std::fmod(x, m);
+}
 
 void Timer32::reset() {
   baseNanos = clock.nanos();
@@ -34,13 +49,13 @@ double Timer32::rawCounter() const {
     return baseValue;
   }
   const bool zigzag = timerMode == TimerMode::ZigZag;
-  const double ticks = ((clock.nanos() - baseNanos) / 1e9) * (baseFreq / prescalerValue);
+  const double ticks = ((clock.nanos() - baseNanos) / 1e9) * tickRate;  // tickRate: baseFreq / prescalerValue
   const double topModulo = zigzag ? topValue * 2 : topValue + 1;
   const double delta =
       timerMode == TimerMode::Decrement ? topModulo - std::fmod(ticks, topModulo) : ticks;
   double currentValue = jsMathRound(baseValue + delta);
   if (topValue != 0xffffffff) {
-    currentValue = std::fmod(currentValue, topModulo);
+    currentValue = modIntegral(currentValue, topModulo);  // std::fmod(currentValue, topModulo)
   }
   return currentValue;
 }
@@ -67,6 +82,7 @@ void Timer32::setFrequency(double value) {
   baseValue = counter();
   baseNanos = clock.nanos();
   baseFreq = value;
+  tickRate = baseFreq / prescalerValue;
   updated();
 }
 
@@ -78,11 +94,12 @@ void Timer32::setPrescaler(double value) {
   // TS bug (kept): tests the old prescaler value, before assigning the new one.
   enabled = prescalerValue != 0;
   prescalerValue = value;
+  tickRate = baseFreq / prescalerValue;
   updated();
 }
 
 double Timer32::toNanos(double cycles) const {
-  return (cycles * 1e9) / (baseFreq / prescalerValue);
+  return (cycles * 1e9) / tickRate;  // tickRate: baseFreq / prescalerValue
 }
 
 bool Timer32::enable() const { return enabled; }

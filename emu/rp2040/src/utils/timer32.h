@@ -68,6 +68,8 @@ class Timer32 {
   TimerMode timerMode = TimerMode::Increment;
   bool enabled = true;
   double baseFreq;
+  /** `baseFreq / prescalerValue` (not in TS: kept up to date with both) */
+  double tickRate;
 
   void updated();
 };

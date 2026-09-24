@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "utils/js.h"
+
 namespace rp2040js {
 
 class RP2040;
@@ -134,7 +136,18 @@ class CortexM0Core {
 
   uint32_t vectPending() const;
 
-  void setInterrupt(uint32_t irq, bool value);
+  void setInterrupt(uint32_t irq, bool value) {
+    // the TS below, with its common cases inline: an interrupt that is
+    // already pending stays so, and clearing one only clears its bit
+    const uint32_t irqBit = static_cast<uint32_t>(jsShl(1, irq));
+    if (!value) {
+      pendingInterrupts &= ~irqBit;
+    } else if (!(pendingInterrupts & irqBit)) {
+      raiseInterrupt(irqBit);
+    }
+  }
+  /** setInterrupt(irq, true) for an interrupt that is not pending */
+  void raiseInterrupt(uint32_t irqBit);
   bool checkForInterrupts();
 
   uint32_t readSpecialRegister(uint32_t sysm);

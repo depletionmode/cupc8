@@ -169,7 +169,13 @@ class RP2040 {
   void writeUint16(uint32_t address, uint32_t value);
 
   uint32_t gpioValues() const;
+  /** not in TS: bring both PIO blocks' fast path up to date (RPPIO::sync) */
+  void syncPIO() {
+    pio[0].sync();
+    pio[1].sync();
+  }
 
+  /** (out of line: test_periph_diff observes it with ld --wrap) */
   void setInterrupt(uint32_t irq, bool value);
 
   /** Core 1 restarts in the bootrom, where it waits for the FIFO launch sequence. */

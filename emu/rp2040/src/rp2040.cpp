@@ -268,10 +268,6 @@ uint32_t RP2040::gpioValues() const {
   return result;
 }
 
-void RP2040::setInterrupt(uint32_t irq, bool value) {
-  core0.setInterrupt(irq, value);
-  core1.setInterrupt(irq, value);
-}
 
 void RP2040::resetCore1() {
   CortexM0Core &core1 = this->core1;
@@ -287,6 +283,11 @@ void RP2040::resetCore1() {
   coreIndex = 1;
   core1.reset();
   coreIndex = saved;
+}
+
+void RP2040::setInterrupt(uint32_t irq, bool value) {
+  core0.setInterrupt(irq, value);
+  core1.setInterrupt(irq, value);
 }
 
 void RP2040::sendEvent() {

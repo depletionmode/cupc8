@@ -3,22 +3,22 @@
 
 namespace rp2040js {
 
-FIFO::FIFO(uint32_t size) : buffer(size) {}
+FIFO::FIFO(uint32_t size) : buffer(size), length(size) {}
 
 void FIFO::push(uint32_t value) {
-  const uint32_t length = static_cast<uint32_t>(buffer.size());
   const uint32_t start = this->start, used = this->used;
   if (this->used < length) {
-    buffer[(start + used) % length] = value;
+    // `(start + used) % length`, with start, used < length
+    const uint32_t at = start + used;
+    buffer[at >= length ? at - length : at] = value;
     this->used++;
   }
 }
 
 uint32_t FIFO::pull() {
   const uint32_t start = this->start, used = this->used;
-  const uint32_t length = static_cast<uint32_t>(buffer.size());
   if (used) {
-    this->start = (start + 1) % length;
+    this->start = start + 1 == length ? 0 : start + 1;  // `(start + 1) % length`
     this->used--;
     if (onPull) onPull(buffer[start]);
     return buffer[start];
@@ -33,6 +33,7 @@ void FIFO::reset() { used = 0; }
 
 void FIFO::resize(uint32_t size) {
   buffer.assign(size, 0);
+  length = size;
   start = 0;
   used = 0;
 }

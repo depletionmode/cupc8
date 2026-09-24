@@ -369,17 +369,16 @@ uint32_t CortexM0Core::vectPending() const {
   return 0;
 }
 
-void CortexM0Core::setInterrupt(uint32_t irq, bool value) {
-  const uint32_t irqBit = static_cast<uint32_t>(jsShl(1, irq));
-  if (value && !(pendingInterrupts & irqBit)) {
-    pendingInterrupts |= irqBit;
-    interruptsUpdated = true;
-    if (waiting && checkForInterrupts()) {
-      waiting = false;
-      waitingForEvent = false;
-    }
-  } else if (!value) {
-    pendingInterrupts &= ~irqBit;
+// setInterrupt(irq, value) (inline in the header):
+//   const irqBit = 1 << irq;
+//   if (value && !(this.pendingInterrupts & irqBit)) { ...raiseInterrupt... }
+//   else if (!value) { this.pendingInterrupts &= ~irqBit; }
+void CortexM0Core::raiseInterrupt(uint32_t irqBit) {
+  pendingInterrupts |= irqBit;
+  interruptsUpdated = true;
+  if (waiting && checkForInterrupts()) {
+    waiting = false;
+    waitingForEvent = false;
   }
 }
 
@@ -552,6 +551,110 @@ uint32_t CortexM0Core::cyclesIO(uint32_t addr, bool write) const {
   return 1;
 }
 
+// The decode chain below, entered at its first branch whose condition can
+// hold for the opcode: each condition is a test of `opcode` alone, or of
+// `opcode` && a test of `opcode2`, so every branch before the first one
+// whose `opcode` part holds is false for that opcode whatever opcode2 is.
+// decodeEntry[opcode] is that branch (the chain's own conditions, in order,
+// without their opcode2 terms; generated from them), and the switch falls
+// through the rest of the chain exactly as the if/else-if did.
+static const std::array<uint8_t, 0x10000> &decodeEntry() {
+  static const std::array<uint8_t, 0x10000> table = [] {
+    std::array<uint8_t, 0x10000> t{};
+    for (uint32_t opcode = 0; opcode < 0x10000; opcode++) {
+      uint8_t k = 83;  // the final else
+      // clang-format off
+      if (opcode >> 6 == 0b0100000101) k = 0;
+      else if (opcode >> 11 == 0b10101) k = 1;
+      else if (opcode >> 7 == 0b101100000) k = 2;
+      else if (opcode >> 9 == 0b0001110) k = 3;
+      else if (opcode >> 11 == 0b00110) k = 4;
+      else if (opcode >> 9 == 0b0001100) k = 5;
+      else if (opcode >> 8 == 0b01000100) k = 6;
+      else if (opcode >> 11 == 0b10100) k = 7;
+      else if (opcode >> 6 == 0b0100000000) k = 8;
+      else if (opcode >> 11 == 0b00010) k = 9;
+      else if (opcode >> 6 == 0b0100000100) k = 10;
+      else if (opcode >> 12 == 0b1101 && ((opcode >> 9) & 0x7) != 0b111) k = 11;
+      else if (opcode >> 11 == 0b11100) k = 12;
+      else if (opcode >> 6 == 0b0100001110) k = 13;
+      else if (opcode >> 8 == 0b10111110) k = 14;
+      else if (opcode >> 11 == 0b11110) k = 15;
+      else if (opcode >> 7 == 0b010001111 && (opcode & 0x7) == 0) k = 16;
+      else if (opcode >> 7 == 0b010001110 && (opcode & 0x7) == 0) k = 17;
+      else if (opcode >> 6 == 0b0100001011) k = 18;
+      else if (opcode >> 11 == 0b00101) k = 19;
+      else if (opcode >> 6 == 0b0100001010) k = 20;
+      else if (opcode >> 8 == 0b01000101) k = 21;
+      else if (opcode == 0xb672) k = 22;
+      else if (opcode == 0xb662) k = 23;
+      else if (opcode == 0xf3bf) k = 24;
+      else if (opcode == 0xf3bf) k = 25;
+      else if (opcode >> 6 == 0b0100000001) k = 26;
+      else if (opcode == 0xf3bf) k = 27;
+      else if (opcode >> 11 == 0b11001) k = 28;
+      else if (opcode >> 11 == 0b01101) k = 29;
+      else if (opcode >> 11 == 0b10011) k = 30;
+      else if (opcode >> 11 == 0b01001) k = 31;
+      else if (opcode >> 9 == 0b0101100) k = 32;
+      else if (opcode >> 11 == 0b01111) k = 33;
+      else if (opcode >> 9 == 0b0101110) k = 34;
+      else if (opcode >> 11 == 0b10001) k = 35;
+      else if (opcode >> 9 == 0b0101101) k = 36;
+      else if (opcode >> 9 == 0b0101011) k = 37;
+      else if (opcode >> 9 == 0b0101111) k = 38;
+      else if (opcode >> 11 == 0b00000) k = 39;
+      else if (opcode >> 6 == 0b0100000010) k = 40;
+      else if (opcode >> 11 == 0b00001) k = 41;
+      else if (opcode >> 6 == 0b0100000011) k = 42;
+      else if (opcode >> 8 == 0b01000110) k = 43;
+      else if (opcode >> 11 == 0b00100) k = 44;
+      else if (opcode == 0b1111001111101111) k = 45;
+      else if (opcode >> 4 == 0b111100111000) k = 46;
+      else if (opcode >> 6 == 0b0100001101) k = 47;
+      else if (opcode >> 6 == 0b0100001111) k = 48;
+      else if (opcode >> 6 == 0b0100001100) k = 49;
+      else if (opcode >> 9 == 0b1011110) k = 50;
+      else if (opcode >> 9 == 0b1011010) k = 51;
+      else if (opcode >> 6 == 0b1011101000) k = 52;
+      else if (opcode >> 6 == 0b1011101001) k = 53;
+      else if (opcode >> 6 == 0b1011101011) k = 54;
+      else if (opcode >> 6 == 0b0100000111) k = 55;
+      else if (opcode >> 6 == 0b0100001001) k = 56;
+      else if (opcode == 0b1011111100000000) k = 57;
+      else if (opcode >> 6 == 0b0100000110) k = 58;
+      else if (opcode == 0b1011111101000000) k = 59;
+      else if (opcode >> 11 == 0b11000) k = 60;
+      else if (opcode >> 11 == 0b01100) k = 61;
+      else if (opcode >> 11 == 0b10010) k = 62;
+      else if (opcode >> 9 == 0b0101000) k = 63;
+      else if (opcode >> 11 == 0b01110) k = 64;
+      else if (opcode >> 9 == 0b0101010) k = 65;
+      else if (opcode >> 11 == 0b10000) k = 66;
+      else if (opcode >> 9 == 0b0101001) k = 67;
+      else if (opcode >> 7 == 0b101100001) k = 68;
+      else if (opcode >> 9 == 0b0001111) k = 69;
+      else if (opcode >> 11 == 0b00111) k = 70;
+      else if (opcode >> 9 == 0b0001101) k = 71;
+      else if (opcode >> 8 == 0b11011111) k = 72;
+      else if (opcode >> 6 == 0b1011001001) k = 73;
+      else if (opcode >> 6 == 0b1011001000) k = 74;
+      else if (opcode >> 6 == 0b0100001000) k = 75;
+      else if (opcode >> 8 == 0b11011110) k = 76;
+      else if (opcode >> 4 == 0b111101111111) k = 77;
+      else if (opcode >> 6 == 0b1011001011) k = 78;
+      else if (opcode >> 6 == 0b1011001010) k = 79;
+      else if (opcode == 0b1011111100100000) k = 80;
+      else if (opcode == 0b1011111100110000) k = 81;
+      else if (opcode == 0b1011111100010000) k = 82;
+      // clang-format on
+      t[opcode] = k;
+    }
+    return t;
+  }();
+  return table;
+}
+
 uint32_t CortexM0Core::executeInstruction() {
   if (interruptsUpdated) {
     if (checkForInterrupts()) {
@@ -567,47 +670,67 @@ uint32_t CortexM0Core::executeInstruction() {
   const uint32_t opcode2 = wideInstruction ? readUint16(opcodePC + 2) : 0;
   registers[15] += 2;
   uint32_t deltaCycles = 1;
+  switch (decodeEntry()[opcode]) {
   // ADCS
+    case 0:
   if (opcode >> 6 == 0b0100000101) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     // JS: registers[Rdn] + 1 can be 2**32
     registers[Rdn] = toUint32(addUpdateFlags(registers[Rm], static_cast<double>(registers[Rdn]) +
                                                                 (C ? 1 : 0)));
+    break;
   }
+    [[fallthrough]];
   // ADD (register = SP plus immediate)
-  else if (opcode >> 11 == 0b10101) {
+    case 1:
+  if (opcode >> 11 == 0b10101) {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rd = (opcode >> 8) & 0x7;
     registers[Rd] = SP() + (imm8 << 2);
+    break;
   }
+    [[fallthrough]];
   // ADD (SP plus immediate)
-  else if (opcode >> 7 == 0b101100000) {
+    case 2:
+  if (opcode >> 7 == 0b101100000) {
     const uint32_t imm32 = (opcode & 0x7f) << 2;
     setSP(SP() + imm32);
+    break;
   }
+    [[fallthrough]];
   // ADDS (Encoding T1)
-  else if (opcode >> 9 == 0b0001110) {
+    case 3:
+  if (opcode >> 9 == 0b0001110) {
     const uint32_t imm3 = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(addUpdateFlags(registers[Rn], imm3));
+    break;
   }
+    [[fallthrough]];
   // ADDS (Encoding T2)
-  else if (opcode >> 11 == 0b00110) {
+    case 4:
+  if (opcode >> 11 == 0b00110) {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rdn = (opcode >> 8) & 0x7;
     registers[Rdn] = toUint32(addUpdateFlags(registers[Rdn], imm8));
+    break;
   }
+    [[fallthrough]];
   // ADDS (register)
-  else if (opcode >> 9 == 0b0001100) {
+    case 5:
+  if (opcode >> 9 == 0b0001100) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(addUpdateFlags(registers[Rn], registers[Rm]));
+    break;
   }
+    [[fallthrough]];
   // ADD (register)
-  else if (opcode >> 8 == 0b01000100) {
+    case 6:
+  if (opcode >> 8 == 0b01000100) {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     const uint32_t Rdn = ((opcode & 0x80) >> 4) | (opcode & 0x7);
     const uint32_t leftValue = Rdn == pcRegister ? PC() + 2 : registers[Rdn];
@@ -622,24 +745,33 @@ uint32_t CortexM0Core::executeInstruction() {
     } else if (Rdn == spRegister) {
       registers[Rdn] = result & ~0x3u;
     }
+    break;
   }
+    [[fallthrough]];
   // ADR
-  else if (opcode >> 11 == 0b10100) {
+    case 7:
+  if (opcode >> 11 == 0b10100) {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rd = (opcode >> 8) & 0x7;
     registers[Rd] = (opcodePC & 0xfffffffc) + 4 + (imm8 << 2);
+    break;
   }
+    [[fallthrough]];
   // ANDS (Encoding T2)
-  else if (opcode >> 6 == 0b0100000000) {
+    case 8:
+  if (opcode >> 6 == 0b0100000000) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = registers[Rdn] & registers[Rm];
     registers[Rdn] = result;
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
+    break;
   }
+    [[fallthrough]];
   // ASRS (immediate)
-  else if (opcode >> 11 == 0b00010) {
+    case 9:
+  if (opcode >> 11 == 0b00010) {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
@@ -653,9 +785,12 @@ uint32_t CortexM0Core::executeInstruction() {
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
     C = input & static_cast<uint32_t>(jsShl(1, shiftN - 1)) ? true : false;
+    break;
   }
+    [[fallthrough]];
   // ASRS (register)
-  else if (opcode >> 6 == 0b0100000100) {
+    case 10:
+  if (opcode >> 6 == 0b0100000100) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t input = registers[Rdn];
@@ -669,9 +804,12 @@ uint32_t CortexM0Core::executeInstruction() {
     // TS bug, kept: for shiftN == 0 this is `1 << -1` == 1 << 31, so C = input bit 31
     // (the architecture leaves C unchanged)
     C = input & static_cast<uint32_t>(jsShl(1, shiftN - 1)) ? true : false;
+    break;
   }
+    [[fallthrough]];
   // B (with cond)
-  else if (opcode >> 12 == 0b1101 && ((opcode >> 9) & 0x7) != 0b111) {
+    case 11:
+  if (opcode >> 12 == 0b1101 && ((opcode >> 9) & 0x7) != 0b111) {
     int32_t imm8 = static_cast<int32_t>((opcode & 0xff) << 1);
     const uint32_t cond = (opcode >> 8) & 0xf;
     if (imm8 & (1 << 8)) {
@@ -681,32 +819,44 @@ uint32_t CortexM0Core::executeInstruction() {
       registers[15] += static_cast<uint32_t>(imm8 + 2);
       deltaCycles++;
     }
+    break;
   }
+    [[fallthrough]];
   // B
-  else if (opcode >> 11 == 0b11100) {
+    case 12:
+  if (opcode >> 11 == 0b11100) {
     int32_t imm11 = static_cast<int32_t>((opcode & 0x7ff) << 1);
     if (imm11 & (1 << 11)) {
       imm11 = (imm11 & 0x7ff) - 0x800;
     }
     registers[15] += static_cast<uint32_t>(imm11 + 2);
     deltaCycles++;
+    break;
   }
+    [[fallthrough]];
   // BICS
-  else if (opcode >> 6 == 0b0100001110) {
+    case 13:
+  if (opcode >> 6 == 0b0100001110) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = (registers[Rdn] &= ~registers[Rm]);
     N = !!(result & 0x80000000);
     Z = result == 0;
+    break;
   }
+    [[fallthrough]];
   // BKPT
-  else if (opcode >> 8 == 0b10111110) {
+    case 14:
+  if (opcode >> 8 == 0b10111110) {
     const uint32_t imm8 = opcode & 0xff;
     breakRewind = 2;
     rp2040.onBreak(imm8);
+    break;
   }
+    [[fallthrough]];
   // BL
-  else if (opcode >> 11 == 0b11110 && opcode2 >> 14 == 0b11 && ((opcode2 >> 12) & 0x1) == 1) {
+    case 15:
+  if (opcode >> 11 == 0b11110 && opcode2 >> 14 == 0b11 && ((opcode2 >> 12) & 0x1) == 1) {
     const uint32_t imm11 = opcode2 & 0x7ff;
     const uint32_t J2 = (opcode2 >> 11) & 0x1;
     const uint32_t J1 = (opcode2 >> 13) & 0x1;
@@ -720,80 +870,119 @@ uint32_t CortexM0Core::executeInstruction() {
     registers[15] += 2 + imm32;
     deltaCycles += 2;
     blTaken(*this, false);
+    break;
   }
+    [[fallthrough]];
   // BLX
-  else if (opcode >> 7 == 0b010001111 && (opcode & 0x7) == 0) {
+    case 16:
+  if (opcode >> 7 == 0b010001111 && (opcode & 0x7) == 0) {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     setLR(PC() | 0x1);
     setPC(registers[Rm] & ~1u);
     deltaCycles++;
     blTaken(*this, true);
+    break;
   }
+    [[fallthrough]];
   // BX
-  else if (opcode >> 7 == 0b010001110 && (opcode & 0x7) == 0) {
+    case 17:
+  if (opcode >> 7 == 0b010001110 && (opcode & 0x7) == 0) {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     BXWritePC(registers[Rm]);
     deltaCycles++;
+    break;
   }
+    [[fallthrough]];
   // CMN (register)
-  else if (opcode >> 6 == 0b0100001011) {
+    case 18:
+  if (opcode >> 6 == 0b0100001011) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rn = opcode & 0x7;
     addUpdateFlags(registers[Rn], registers[Rm]);
+    break;
   }
+    [[fallthrough]];
   // CMP immediate
-  else if (opcode >> 11 == 0b00101) {
+    case 19:
+  if (opcode >> 11 == 0b00101) {
     const uint32_t Rn = (opcode >> 8) & 0x7;
     const uint32_t imm8 = opcode & 0xff;
     substractUpdateFlags(registers[Rn], imm8);
+    break;
   }
+    [[fallthrough]];
   // CMP (register)
-  else if (opcode >> 6 == 0b0100001010) {
+    case 20:
+  if (opcode >> 6 == 0b0100001010) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rn = opcode & 0x7;
     substractUpdateFlags(registers[Rn], registers[Rm]);
+    break;
   }
+    [[fallthrough]];
   // CMP (register) encoding T2
-  else if (opcode >> 8 == 0b01000101) {
+    case 21:
+  if (opcode >> 8 == 0b01000101) {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     const uint32_t Rn = ((opcode >> 4) & 0x8) | (opcode & 0x7);
     substractUpdateFlags(registers[Rn], registers[Rm]);
+    break;
   }
+    [[fallthrough]];
   // CPSID i
-  else if (opcode == 0xb672) {
+    case 22:
+  if (opcode == 0xb672) {
     PM = true;
+    break;
   }
+    [[fallthrough]];
   // CPSIE i
-  else if (opcode == 0xb662) {
+    case 23:
+  if (opcode == 0xb662) {
     PM = false;
     interruptsUpdated = true;
+    break;
   }
+    [[fallthrough]];
   // DMB SY
-  else if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f50) {
+    case 24:
+  if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f50) {
     registers[15] += 2;
     deltaCycles += 2;
+    break;
   }
+    [[fallthrough]];
   // DSB SY
-  else if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f40) {
+    case 25:
+  if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f40) {
     registers[15] += 2;
     deltaCycles += 2;
+    break;
   }
+    [[fallthrough]];
   // EORS
-  else if (opcode >> 6 == 0b0100000001) {
+    case 26:
+  if (opcode >> 6 == 0b0100000001) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = registers[Rm] ^ registers[Rdn];
     registers[Rdn] = result;
     N = !!(result & 0x80000000);
     Z = result == 0;
+    break;
   }
+    [[fallthrough]];
   // ISB SY
-  else if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f60) {
+    case 27:
+  if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f60) {
     registers[15] += 2;
     deltaCycles += 2;
+    break;
   }
+    [[fallthrough]];
   // LDMIA
-  else if (opcode >> 11 == 0b11001) {
+    case 28:
+  if (opcode >> 11 == 0b11001) {
     const uint32_t Rn = (opcode >> 8) & 0x7;
     const uint32_t registers_ = opcode & 0xff;
     uint32_t address = registers[Rn];
@@ -808,98 +997,131 @@ uint32_t CortexM0Core::executeInstruction() {
     if (!(registers_ & (1u << Rn))) {
       registers[Rn] = address;
     }
+    break;
   }
+    [[fallthrough]];
   // LDR (immediate)
-  else if (opcode >> 11 == 0b01101) {
+    case 29:
+  if (opcode >> 11 == 0b01101) {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 2;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rn] + imm5;
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
+    break;
   }
+    [[fallthrough]];
   // LDR (sp + immediate)
-  else if (opcode >> 11 == 0b10011) {
+    case 30:
+  if (opcode >> 11 == 0b10011) {
     const uint32_t Rt = (opcode >> 8) & 0x7;
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t addr = SP() + (imm8 << 2);
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
+    break;
   }
+    [[fallthrough]];
   // LDR (literal)
-  else if (opcode >> 11 == 0b01001) {
+    case 31:
+  if (opcode >> 11 == 0b01001) {
     const uint32_t imm8 = (opcode & 0xff) << 2;
     const uint32_t Rt = (opcode >> 8) & 7;
     const uint32_t nextPC = PC() + 2;
     const uint32_t addr = (nextPC & 0xfffffffc) + imm8;
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
+    break;
   }
+    [[fallthrough]];
   // LDR (register)
-  else if (opcode >> 9 == 0b0101100) {
+    case 32:
+  if (opcode >> 9 == 0b0101100) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint32(addr);
+    break;
   }
+    [[fallthrough]];
   // LDRB (immediate)
-  else if (opcode >> 11 == 0b01111) {
+    case 33:
+  if (opcode >> 11 == 0b01111) {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rn] + imm5;
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint8(addr);
+    break;
   }
+    [[fallthrough]];
   // LDRB (register)
-  else if (opcode >> 9 == 0b0101110) {
+    case 34:
+  if (opcode >> 9 == 0b0101110) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(addr);
     registers[Rt] = readUint8(addr);
+    break;
   }
+    [[fallthrough]];
   // LDRH (immediate)
-  else if (opcode >> 11 == 0b10001) {
+    case 35:
+  if (opcode >> 11 == 0b10001) {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double addr = static_cast<double>(registers[Rn]) + (imm5 << 1);  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(addr));
     registers[Rt] = readUint16Number(addr);
+    break;
   }
+    [[fallthrough]];
   // LDRH (register)
-  else if (opcode >> 9 == 0b0101101) {
+    case 36:
+  if (opcode >> 9 == 0b0101101) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double addr = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(addr));
     registers[Rt] = readUint16Number(addr);
+    break;
   }
+    [[fallthrough]];
   // LDRSB
-  else if (opcode >> 9 == 0b0101011) {
+    case 37:
+  if (opcode >> 9 == 0b0101011) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t addr = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(addr);
     registers[Rt] = static_cast<uint32_t>(signExtend8(readUint8(addr)));
+    break;
   }
+    [[fallthrough]];
   // LDRSH
-  else if (opcode >> 9 == 0b0101111) {
+    case 38:
+  if (opcode >> 9 == 0b0101111) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double addr = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(addr));
     registers[Rt] = static_cast<uint32_t>(signExtend16(readUint16Number(addr)));
+    break;
   }
+    [[fallthrough]];
   // LSLS (immediate)
-  else if (opcode >> 11 == 0b00000) {
+    case 39:
+  if (opcode >> 11 == 0b00000) {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
@@ -909,9 +1131,12 @@ uint32_t CortexM0Core::executeInstruction() {
     N = !!(result & 0x80000000);
     Z = result == 0;
     C = imm5 ? !!(input & static_cast<uint32_t>(jsShl(1, 32 - imm5))) : C;
+    break;
   }
+    [[fallthrough]];
   // LSLS (register)
-  else if (opcode >> 6 == 0b0100000010) {
+    case 40:
+  if (opcode >> 6 == 0b0100000010) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t input = registers[Rdn];
@@ -924,9 +1149,12 @@ uint32_t CortexM0Core::executeInstruction() {
     // TS bug, kept: for shiftCount > 32, `1 << (32 - shiftCount)` takes the count mod 32,
     // so C is some bit of input instead of 0
     C = shiftCount ? !!(input & static_cast<uint32_t>(jsShl(1, 32 - shiftCount))) : C;
+    break;
   }
+    [[fallthrough]];
   // LSRS (immediate)
-  else if (opcode >> 11 == 0b00001) {
+    case 41:
+  if (opcode >> 11 == 0b00001) {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
@@ -936,9 +1164,12 @@ uint32_t CortexM0Core::executeInstruction() {
     N = !!(result & 0x80000000);
     Z = result == 0;
     C = !!((input >> (imm5 ? imm5 - 1 : 31)) & 0x1);
+    break;
   }
+    [[fallthrough]];
   // LSRS (register)
-  else if (opcode >> 6 == 0b0100000011) {
+    case 42:
+  if (opcode >> 6 == 0b0100000011) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t shiftAmount = registers[Rm] & 0xff;
@@ -950,9 +1181,12 @@ uint32_t CortexM0Core::executeInstruction() {
     // TS bug, kept: for shiftAmount == 0 this is `input >>> -1` == input >>> 31, so C = input
     // bit 31 (the architecture leaves C unchanged)
     C = shiftAmount <= 32 ? !!(jsShr(input, shiftAmount - 1) & 0x1) : false;
+    break;
   }
+    [[fallthrough]];
   // MOV
-  else if (opcode >> 8 == 0b01000110) {
+    case 43:
+  if (opcode >> 8 == 0b01000110) {
     const uint32_t Rm = (opcode >> 3) & 0xf;
     const uint32_t Rd = ((opcode >> 4) & 0x8) | (opcode & 0x7);
     uint32_t value = Rm == pcRegister ? PC() + 2 : registers[Rm];
@@ -963,33 +1197,45 @@ uint32_t CortexM0Core::executeInstruction() {
       value &= ~3u;
     }
     registers[Rd] = value;
+    break;
   }
+    [[fallthrough]];
   // MOVS
-  else if (opcode >> 11 == 0b00100) {
+    case 44:
+  if (opcode >> 11 == 0b00100) {
     const uint32_t value = opcode & 0xff;
     const uint32_t Rd = (opcode >> 8) & 7;
     registers[Rd] = value;
     N = !!(value & 0x80000000);
     Z = value == 0;
+    break;
   }
+    [[fallthrough]];
   // MRS
-  else if (opcode == 0b1111001111101111 && opcode2 >> 12 == 0b1000) {
+    case 45:
+  if (opcode == 0b1111001111101111 && opcode2 >> 12 == 0b1000) {
     const uint32_t SYSm = opcode2 & 0xff;
     const uint32_t Rd = (opcode2 >> 8) & 0xf;
     registers[Rd] = readSpecialRegister(SYSm);
     registers[15] += 2;
     deltaCycles += 2;
+    break;
   }
+    [[fallthrough]];
   // MSR
-  else if (opcode >> 4 == 0b111100111000 && opcode2 >> 8 == 0b10001000) {
+    case 46:
+  if (opcode >> 4 == 0b111100111000 && opcode2 >> 8 == 0b10001000) {
     const uint32_t SYSm = opcode2 & 0xff;
     const uint32_t Rn = opcode & 0xf;
     writeSpecialRegister(SYSm, registers[Rn]);
     registers[15] += 2;
     deltaCycles += 2;
+    break;
   }
+    [[fallthrough]];
   // MULS
-  else if (opcode >> 6 == 0b0100001101) {
+    case 47:
+  if (opcode >> 6 == 0b0100001101) {
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rdm = opcode & 0x7;
     // Math.imul: the low 32 bits of the product
@@ -997,27 +1243,36 @@ uint32_t CortexM0Core::executeInstruction() {
     registers[Rdm] = result;
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
+    break;
   }
+    [[fallthrough]];
   // MVNS
-  else if (opcode >> 6 == 0b0100001111) {
+    case 48:
+  if (opcode >> 6 == 0b0100001111) {
     const uint32_t Rm = (opcode >> 3) & 7;
     const uint32_t Rd = opcode & 7;
     const uint32_t result = ~registers[Rm];
     registers[Rd] = result;
     N = !!(result & 0x80000000);
     Z = result == 0;
+    break;
   }
+    [[fallthrough]];
   // ORRS (Encoding T2)
-  else if (opcode >> 6 == 0b0100001100) {
+    case 49:
+  if (opcode >> 6 == 0b0100001100) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t result = registers[Rdn] | registers[Rm];
     registers[Rdn] = result;
     N = !!(result & 0x80000000);
     Z = (result & 0xffffffff) == 0;
+    break;
   }
+    [[fallthrough]];
   // POP
-  else if (opcode >> 9 == 0b1011110) {
+    case 50:
+  if (opcode >> 9 == 0b1011110) {
     const uint32_t P = (opcode >> 8) & 1;
     uint32_t address = SP();
     for (uint32_t i = 0; i <= 7; i++) {
@@ -1034,9 +1289,12 @@ uint32_t CortexM0Core::executeInstruction() {
     } else {
       setSP(address);
     }
+    break;
   }
+    [[fallthrough]];
   // PUSH
-  else if (opcode >> 9 == 0b1011010) {
+    case 51:
+  if (opcode >> 9 == 0b1011010) {
     uint32_t bitCount = 0;
     for (uint32_t i = 0; i <= 8; i++) {
       if (opcode & (1u << i)) {
@@ -1055,32 +1313,44 @@ uint32_t CortexM0Core::executeInstruction() {
       writeUint32(address, registers[14]);
     }
     setSP(SP() - 4 * bitCount);
+    break;
   }
+    [[fallthrough]];
   // REV
-  else if (opcode >> 6 == 0b1011101000) {
+    case 52:
+  if (opcode >> 6 == 0b1011101000) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     const uint32_t input = registers[Rm];
     registers[Rd] = ((input & 0xff) << 24) | (((input >> 8) & 0xff) << 16) |
                     (((input >> 16) & 0xff) << 8) | ((input >> 24) & 0xff);
+    break;
   }
+    [[fallthrough]];
   // REV16
-  else if (opcode >> 6 == 0b1011101001) {
+    case 53:
+  if (opcode >> 6 == 0b1011101001) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     const uint32_t input = registers[Rm];
     registers[Rd] = (((input >> 16) & 0xff) << 24) | (((input >> 24) & 0xff) << 16) |
                     ((input & 0xff) << 8) | ((input >> 8) & 0xff);
+    break;
   }
+    [[fallthrough]];
   // REVSH
-  else if (opcode >> 6 == 0b1011101011) {
+    case 54:
+  if (opcode >> 6 == 0b1011101011) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     const uint32_t input = registers[Rm];
     registers[Rd] = static_cast<uint32_t>(signExtend16(((input & 0xff) << 8) | ((input >> 8) & 0xff)));
+    break;
   }
+    [[fallthrough]];
   // ROR
-  else if (opcode >> 6 == 0b0100000111) {
+    case 55:
+  if (opcode >> 6 == 0b0100000111) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     const uint32_t input = registers[Rdn];
@@ -1093,31 +1363,46 @@ uint32_t CortexM0Core::executeInstruction() {
     Z = result == 0;
     // TS bug, kept: C is set from the result even when (Rm & 0xff) == 0 (should be unchanged)
     C = !!(result & 0x80000000);
+    break;
   }
+    [[fallthrough]];
   // NEGS / RSBS
-  else if (opcode >> 6 == 0b0100001001) {
+    case 56:
+  if (opcode >> 6 == 0b0100001001) {
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(substractUpdateFlags(0, registers[Rn]));
+    break;
   }
+    [[fallthrough]];
   // NOP
-  else if (opcode == 0b1011111100000000) {
+    case 57:
+  if (opcode == 0b1011111100000000) {
     // Do nothing!
+    break;
   }
+    [[fallthrough]];
   // SBCS (Encoding T1)
-  else if (opcode >> 6 == 0b0100000110) {
+    case 58:
+  if (opcode >> 6 == 0b0100000110) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rdn = opcode & 0x7;
     // JS: registers[Rm] + 1 can be 2**32
     registers[Rdn] = toUint32(substractUpdateFlags(
         registers[Rdn], static_cast<double>(registers[Rm]) + (1 - (C ? 1 : 0))));
+    break;
   }
+    [[fallthrough]];
   // SEV
-  else if (opcode == 0b1011111101000000) {
+    case 59:
+  if (opcode == 0b1011111101000000) {
     rp2040.sendEvent();
+    break;
   }
+    [[fallthrough]];
   // STMIA
-  else if (opcode >> 11 == 0b11000) {
+    case 60:
+  if (opcode >> 11 == 0b11000) {
     const uint32_t Rn = (opcode >> 8) & 0x7;
     const uint32_t registers_ = opcode & 0xff;
     uint32_t address = registers[Rn];
@@ -1132,147 +1417,207 @@ uint32_t CortexM0Core::executeInstruction() {
     if (!(registers_ & (1u << Rn))) {
       registers[Rn] = address;
     }
+    break;
   }
+    [[fallthrough]];
   // STR (immediate)
-  else if (opcode >> 11 == 0b01100) {
+    case 61:
+  if (opcode >> 11 == 0b01100) {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 2;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rn] + imm5;
     deltaCycles += cyclesIO(address, true);
     writeUint32(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // STR (sp + immediate)
-  else if (opcode >> 11 == 0b10010) {
+    case 62:
+  if (opcode >> 11 == 0b10010) {
     const uint32_t Rt = (opcode >> 8) & 0x7;
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t address = SP() + (imm8 << 2);
     deltaCycles += cyclesIO(address, true);
     writeUint32(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // STR (register)
-  else if (opcode >> 9 == 0b0101000) {
+    case 63:
+  if (opcode >> 9 == 0b0101000) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(address, true);
     writeUint32(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // STRB (immediate)
-  else if (opcode >> 11 == 0b01110) {
+    case 64:
+  if (opcode >> 11 == 0b01110) {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rn] + imm5;
     deltaCycles += cyclesIO(address, true);
     writeUint8(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // STRB (register)
-  else if (opcode >> 9 == 0b0101010) {
+    case 65:
+  if (opcode >> 9 == 0b0101010) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const uint32_t address = registers[Rm] + registers[Rn];
     deltaCycles += cyclesIO(address, true);
     writeUint8(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // STRH (immediate)
-  else if (opcode >> 11 == 0b10000) {
+    case 66:
+  if (opcode >> 11 == 0b10000) {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 1;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double address = static_cast<double>(registers[Rn]) + imm5;  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(address), true);
     writeUint16Number(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // STRH (register)
-  else if (opcode >> 9 == 0b0101001) {
+    case 67:
+  if (opcode >> 9 == 0b0101001) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
     const double address = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
     deltaCycles += cyclesIO(toUint32(address), true);
     writeUint16Number(address, registers[Rt]);
+    break;
   }
+    [[fallthrough]];
   // SUB (SP minus immediate)
-  else if (opcode >> 7 == 0b101100001) {
+    case 68:
+  if (opcode >> 7 == 0b101100001) {
     const uint32_t imm32 = (opcode & 0x7f) << 2;
     setSP(SP() - imm32);
+    break;
   }
+    [[fallthrough]];
   // SUBS (Encoding T1)
-  else if (opcode >> 9 == 0b0001111) {
+    case 69:
+  if (opcode >> 9 == 0b0001111) {
     const uint32_t imm3 = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(substractUpdateFlags(registers[Rn], imm3));
+    break;
   }
+    [[fallthrough]];
   // SUBS (Encoding T2)
-  else if (opcode >> 11 == 0b00111) {
+    case 70:
+  if (opcode >> 11 == 0b00111) {
     const uint32_t imm8 = opcode & 0xff;
     const uint32_t Rdn = (opcode >> 8) & 0x7;
     registers[Rdn] = toUint32(substractUpdateFlags(registers[Rdn], imm8));
+    break;
   }
+    [[fallthrough]];
   // SUBS (register)
-  else if (opcode >> 9 == 0b0001101) {
+    case 71:
+  if (opcode >> 9 == 0b0001101) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = toUint32(substractUpdateFlags(registers[Rn], registers[Rm]));
+    break;
   }
+    [[fallthrough]];
   // SVC
-  else if (opcode >> 8 == 0b11011111) {
+    case 72:
+  if (opcode >> 8 == 0b11011111) {
     pendingSVCall = true;
     interruptsUpdated = true;
+    break;
   }
+    [[fallthrough]];
   // SXTB
-  else if (opcode >> 6 == 0b1011001001) {
+    case 73:
+  if (opcode >> 6 == 0b1011001001) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = static_cast<uint32_t>(signExtend8(registers[Rm]));
+    break;
   }
+    [[fallthrough]];
   // SXTH
-  else if (opcode >> 6 == 0b1011001000) {
+    case 74:
+  if (opcode >> 6 == 0b1011001000) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = static_cast<uint32_t>(signExtend16(registers[Rm]));
+    break;
   }
+    [[fallthrough]];
   // TST
-  else if (opcode >> 6 == 0b0100001000) {
+    case 75:
+  if (opcode >> 6 == 0b0100001000) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rn = opcode & 0x7;
     const uint32_t result = registers[Rn] & registers[Rm];
     N = !!(result & 0x80000000);
     Z = result == 0;
+    break;
   }
+    [[fallthrough]];
   // UDF
-  else if (opcode >> 8 == 0b11011110) {
+    case 76:
+  if (opcode >> 8 == 0b11011110) {
     const uint32_t imm8 = opcode & 0xff;
     breakRewind = 2;
     rp2040.onBreak(imm8);
+    break;
   }
+    [[fallthrough]];
   // UDF (Encoding T2)
-  else if (opcode >> 4 == 0b111101111111 && opcode2 >> 12 == 0b1010) {
+    case 77:
+  if (opcode >> 4 == 0b111101111111 && opcode2 >> 12 == 0b1010) {
     const uint32_t imm4 = opcode & 0xf;
     const uint32_t imm12 = opcode2 & 0xfff;
     breakRewind = 4;
     rp2040.onBreak((imm4 << 12) | imm12);
     registers[15] += 2;
+    break;
   }
+    [[fallthrough]];
   // UXTB
-  else if (opcode >> 6 == 0b1011001011) {
+    case 78:
+  if (opcode >> 6 == 0b1011001011) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = registers[Rm] & 0xff;
+    break;
   }
+    [[fallthrough]];
   // UXTH
-  else if (opcode >> 6 == 0b1011001010) {
+    case 79:
+  if (opcode >> 6 == 0b1011001010) {
     const uint32_t Rm = (opcode >> 3) & 0x7;
     const uint32_t Rd = opcode & 0x7;
     registers[Rd] = registers[Rm] & 0xffff;
+    break;
   }
+    [[fallthrough]];
   // WFE
-  else if (opcode == 0b1011111100100000) {
+    case 80:
+  if (opcode == 0b1011111100100000) {
     deltaCycles++;
     if (eventRegistered) {
       eventRegistered = false;
@@ -1280,23 +1625,34 @@ uint32_t CortexM0Core::executeInstruction() {
       waiting = true;
       waitingForEvent = true;
     }
+    break;
   }
+    [[fallthrough]];
   // WFI
-  else if (opcode == 0b1011111100110000) {
+    case 81:
+  if (opcode == 0b1011111100110000) {
     deltaCycles++;
     waiting = true;
+    break;
   }
+    [[fallthrough]];
   // YIELD
-  else if (opcode == 0b1011111100010000) {
+    case 82:
+  if (opcode == 0b1011111100010000) {
     // do nothing for now. Wait for event!
     logger().info(LOG_NAME, "Yield");
-  } else {
+    break;
+  }
+    [[fallthrough]];
+    default:  // (case 83) the final else: not implemented
+  {
     // JS: opcodePC is an int32, so `.toString(16)` shows a '-' for PC >= 2**31
     logger().warn(LOG_NAME, "Warning: Instruction at " +
                                 toHex(static_cast<double>(static_cast<int32_t>(opcodePC))) +
                                 " is not implemented yet!");
     logger().warn(LOG_NAME, "Opcode: 0x" + toHex(opcode) + " (0x" + toHex(opcode2) + ")");
   }
+  }  // switch
 
   cycles += deltaCycles;
   return deltaCycles;
