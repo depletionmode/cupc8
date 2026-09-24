@@ -10,6 +10,7 @@ Boards are built with the pcbnew API from the netlist that kicad-cli exports
 from the schematic, so the board can only contain what the schematic says.
 """
 
+import copy
 import math
 import os
 import re
@@ -22,7 +23,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 HW_LIB = os.path.join(ROOT, "hw", "lib")
 PROJECT_FOOTPRINTS = {"cupc8": os.path.join(HW_LIB, "cupc8.pretty"), "jlc": os.path.join(HW_LIB, "jlc.pretty")}
 PROJECT_SYMBOLS = {"jlc": os.path.join(HW_LIB, "jlc.kicad_sym"),       # imported by hw/tools/jlcimport.py
-                   "cupc8": os.path.join(HW_LIB, "cupc8.kicad_sym")}   # hw/tools/edgesym.py
+                   "cupc8": os.path.join(HW_LIB, "cupc8.kicad_sym"),   # hw/tools/edgesym.py
+                   "cupc8_fpga": os.path.join(HW_LIB, "cupc8_fpga.kicad_sym")}   # hw/boards/main.py
 
 # 3D models for stock footprints whose model KiCad does not ship, placed from
 # the maker's drawing: footprint -> (model under hw/lib/models, offset mm
@@ -124,7 +126,7 @@ def load_symbol(lib_id):
     """The symbol, flattened, named `lib_id` as a schematic embeds it."""
     lib, name = lib_id.split(":")
     syms = _library(lib)
-    sym = syms[name]
+    sym = copy.deepcopy(syms[name])       # the flattening below edits it: keep the cache intact
     parent = find1(sym, "extends")
     if parent:
         base = load_symbol(lib + ":" + parent[1])
@@ -156,7 +158,7 @@ def load_symbol(lib_id):
 
 TEXT = 1.27                              # field and label text size
 MARGIN = 0.25                            # clearance kept around text
-PAGES = {"A4": (297, 210), "A3": (420, 297), "A2": (594, 420)}
+PAGES = {"A4": (297, 210), "A3": (420, 297), "A2": (594, 420), "A1": (841, 594), "A0": (1189, 841)}
 FRAME = 10                               # page border
 TITLE_BLOCK = (112, 36)                  # bottom-right, width x height
 
