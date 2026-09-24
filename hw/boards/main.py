@@ -37,8 +37,16 @@ G = kg.GRID
 # boards must meet"): name -> (value, LCSC). The power scripts can read it here.
 POWER = {
     "CC_RD": ("5.1k 1%", "C23186"),                   # R1, R2
-    "VBUS_C_AHEAD": ("1u", "C15849"),                 # C1: <= 10 uF ahead of the SY6280
-    "SY6280_RSET": ("3.48k 1%", "C22996"),            # R3 (POW-006 B2)
+    # --- the input: PTC, TVS, eFuse (a 3.0 A source, power.md) ---
+    "FUSE_IN": ("3.5A SMD1812P350TF/16", "C46970911"),   # F1
+    "TVS": ("SMF5.0A", "C193402"),                    # D1
+    "VBUS_C_AHEAD": ("1u", "C15849"),                 # C1: the only capacitance ahead of the eFuse
+    "EFUSE": ("TPS259470ARPWR", "C3662799"),          # U2: EN/UVLO tied to IN
+    "EFUSE_RILM": ("1.13k 1%", "C22833"),             # R3: 3340 / 1.13k -> 2.63 / 2.96 / 3.21 A
+    "EFUSE_OVLO_R1": ("37.4k 0.1%", "C326727"),       # R58, IN -> OVLO
+    "EFUSE_OVLO_R2": ("10k 0.1%", "C95204"),          # R59, OVLO -> GND
+    "EFUSE_DVDT": ("680p", "C107055"),                # C15
+    # --- 5V_SYS and the rails ---
     "5V_SYS_BULK": ("22u", "C45783"),                 # C3
     "SLOT_LINK": ("0R 0805, <= 50 mOhm", "C17477"),   # R201.. (each slot's isolation link)
     "BUCK": ("TLV62569PDDCR", "C398365"),             # U3 (THM-001 T2)
@@ -50,7 +58,7 @@ POWER = {
     "3V3_DECOUPLING": ("3 x 22u + 100n at each load", "C45783"),   # C35, C43, C45 (~45 uF effective)
     "LDO_COUT": ("1u + 4 x 100n at the iCE40 VCC pins", "C15849"),  # C10, C20-C23
     "CC_AVG_R": ("1M 1%", "C22935"),                  # R13, R14
-    "CC_REF_R1": ("90.9k 1%", "C23129"),              # R15
+    "CC_REF_R1": ("41.2k 1%", "C23166"),              # R15: 0.648 V, PWR_HI = a 3.0 A source
     "CC_REF_R2": ("10k 1%", "C25804"),                # R16
 }
 
@@ -205,13 +213,19 @@ def build_parts():
     R("R2", "5.1k", "CC2", "GND")
     part("U1", "jlc:USBLC6-2SC6", "USBLC6-2SC6", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "C7519",
          {1: "CC1", 6: "CC1", 3: "CC2", 4: "CC2", 2: "GND", 5: "VBUS_F"})
-    part("F1", "Device:Polyfuse", "2A", "Fuse:Fuse_1812_4532Metric", "C20812", {1: "VBUS", 2: "VBUS_F"})
-    part("D1", "Device:D_Zener", "SMF5.0A", "Diode_SMD:D_SOD-123F", "C193402", {"K": "VBUS_F", "A": "GND"})   # a unidirectional TVS
-    C("C1", "1u", "VBUS_F")                        # <= 10 uF ahead of the switch (POW-004)
-    C("C2", "100n", "VBUS_F")
-    part("U2", "jlc:SY6280AAC", "SY6280AAC", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL", "C55136",
-         {"IN": "VBUS_F", "EN": "VBUS_F", "GND": "GND", "ISET": "ISET", "OUT": "5V_SYS"})
-    R("R3", "3.48k", "ISET", "GND", lcsc=POWER["SY6280_RSET"][1])   # 6800 / 3.48k: 1.47 / 1.95 / 2.44 A (POW-006 B2)
+    # the input path, all values from POWER (hw/power/design.py decides them)
+    part("F1", "Device:Polyfuse", "3.5A", "Fuse:Fuse_1812_4532Metric", POWER["FUSE_IN"][1], {1: "VBUS", 2: "VBUS_F"})
+    part("D1", "Device:D_Zener", "SMF5.0A", "Diode_SMD:D_SOD-123F", POWER["TVS"][1],
+         {"K": "VBUS_F", "A": "GND"})              # a unidirectional TVS
+    C("C1", "1u", "VBUS_F")                        # the only capacitance ahead of the eFuse (POW-004)
+    part("U2", "jlc:TPS259470ARPWR", "TPS259470ARPWR", "jlc:VQFN-10_L2.0-W2.0-P0.45-TL", POWER["EFUSE"][1],
+         {"IN": "VBUS_F", "EN/UVLO": "VBUS_F", "OVLO/OVCSEL": "EFUSE_OVLO", "GND": "GND", "OUT": "5V_SYS",
+          "ILM": "EFUSE_ILM", "DVDT": "EFUSE_DVDT", "ITIMER": None,          # open: fastest overcurrent response
+          "PG/AUXOFF": None, "~{FLT}/PGTH": None})   # open-drain flags nobody reads
+    R("R3", "1.13k", "EFUSE_ILM", "GND", lcsc=POWER["EFUSE_RILM"][1])
+    R("R58", "37.4k", "VBUS_F", "EFUSE_OVLO", lcsc=POWER["EFUSE_OVLO_R1"][1])
+    R("R59", "10k", "EFUSE_OVLO", "GND", lcsc=POWER["EFUSE_OVLO_R2"][1])
+    part("C15", "Device:C", "680p", FP_C, POWER["EFUSE_DVDT"][1], {1: "EFUSE_DVDT", 2: "GND"})
     C("C3", "22u", "5V_SYS")
     R("R4", "0", "5V_SYS", "+5V", "Resistor_SMD:R_1206_3216Metric", "C17888")     # 5V isolation link
 
@@ -244,13 +258,13 @@ def build_parts():
     R("R12", "1k", "+3V3", "LED_1V2_A")
     LED("D4", "LED_1V2_A", "LED_1V2_K")
 
-    # ---- USB-C power policy (sysctl.md): PWR_HI when either CC >= 0.66 V.
+    # ---- USB-C power policy (power.md): PWR_HI when the source is a 3.0 A one.
     # Only one CC line carries the source's Rp; the other sits at 0 V on its
-    # Rd, so the mean of the two is half the active one: compare it with 0.33 V.
+    # Rd, so the mean of the two is half the active one: compare it with 0.648 V.
     R("R13", "1M", "CC1", "CC_AVG")
     R("R14", "1M", "CC2", "CC_AVG")
     C("C11", "100n", "CC_AVG")
-    R("R15", "90.9k", "+3V3", "CC_REF", lcsc=POWER["CC_REF_R1"][1])   # 3.3 V x 10k / 100.9k = 0.327 V
+    R("R15", "41.2k", "+3V3", "CC_REF", lcsc=POWER["CC_REF_R1"][1])   # 3.3 V x 10k / 51.2k = 0.645 V
     R("R16", "10k", "CC_REF", "GND")
     part("U5", "jlc:TLV7011DBVR", "TLV7011DBVR", "jlc:TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL", "C702117",
          {"VCC": "+3V3", "VEE": "GND", "IN+": "CC_AVG", "IN": "CC_REF", "OUT": "PWR_HI"})
@@ -815,8 +829,8 @@ def wanted(parts):
     # power: south edge, around the USB-C inlet
     y = H - 12.0
     power = {"R1": (62.0, y - 2), "R2": (78.0, y - 2), "U1": (70.0, y - 9, 0), "F1": (58.0, y - 9, 90),
-             "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "C2": (65.5, y - 14), "U2": (58.0, y - 19),
-             "R3": (58.0, y - 23), "C3": (51.0, y - 19, 90),
+             "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "U2": (58.0, y - 19),
+             "R3": (58.0, y - 23), "R58": (62.5, y - 21), "R59": (62.5, y - 24), "C15": (54.0, y - 24), "C3": (51.0, y - 19, 90),
              "R4": (51.0, y - 27, 0), "U3": (78.0, y - 19, 90), "L1": (84.0, y - 20), "R5": (86.5, y - 15),
              "R6": (86.5, y - 12), "C5": (74.0, y - 19, 90), "C6": (72.0, y - 23), "C7": (89.5, y - 19, 90),
              "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),

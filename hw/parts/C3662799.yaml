@@ -1,0 +1,16 @@
+# TPS259470ARPWR (TI), 2.7-23 V 5.5 A eFuse, QFN-10 2 x 2 mm (RPW)
+datasheet: https://www.ti.com/lit/ds/symlink/tps25947.pdf
+source: "TI TPS25947 datasheet SLVSFC9C, section 5: Figure 5-1 RPW package (top view) and Table 5-1 Pin Functions"
+package: QFN-10(2x2)
+pins:
+  1: EN/UVLO
+  2: [OVLO/OVCSEL, OVLO]
+  3: [PG/AUXOFF, AUXOFF]
+  4: ["~{FLT}/PGTH", FLT]
+  5: IN
+  6: OUT
+  7: DVDT
+  8: GND
+  9: ILM
+  10: ITIMER
+ccw: [1, 10]        # Figure 5-1: 1-4 down one side, 5-6 along the bottom, 7-10 up the other
