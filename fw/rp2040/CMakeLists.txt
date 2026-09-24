@@ -75,6 +75,15 @@ target_compile_definitions(io PRIVATE PICO_DEFAULT_UART_TX_PIN=16 PICO_DEFAULT_U
 target_link_libraries(io pico_stdlib tinyusb_host slotspi)
 pico_enable_stdio_uart(io 1)
 
+# storage card: FatFs on a microSD card in SPI mode (SPI1), SD work on core 1
+set(STORAGE_CORE ${FW}/storage/core/storage.c ${FW}/storage/core/diskio.c)
+add_executable(storage storage/main.c storage/sd_spi.c ${STORAGE_CORE} ${FW}/third_party/fatfs/ff.c)
+cupc8_strict(storage/main.c storage/sd_spi.c ${STORAGE_CORE})
+target_include_directories(storage PRIVATE storage ${FW}/storage ${FW}/storage/core ${FW}/third_party/fatfs)
+target_compile_definitions(storage PRIVATE PICO_DEFAULT_UART_TX_PIN=16)
+target_link_libraries(storage pico_stdlib pico_multicore hardware_spi slotspi)
+pico_enable_stdio_uart(storage 1)
+
 # system card: the sysctl core on the RP2040, USB CDC device
 file(GLOB SYSCTL_CORE ${FW}/sysctl/core/*.c)
 add_executable(sysctl sysctl/main.c sysctl/usb_descriptors.c ${SYSCTL_CORE})

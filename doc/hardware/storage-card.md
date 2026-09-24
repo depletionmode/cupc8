@@ -89,6 +89,51 @@ Error codes: `$00` ok, `$01` no medium, `$02` not mounted, `$03` not found,
 `$04` exists, `$05` full, `$06` write-protected, `$07` bad handle, `$08` bad
 name, `$09` I/O error, `$0A` too many open.
 
+### As implemented (`fw/storage/core`, firmware 1.0)
+
+- **Answers.** Every command is queued (4 deep) and run in order by the
+  worker (core 1). READ returns RESP_LEN `$00` and the status byte has BUSY
+  until the latest command's answer is ready. An older command's answer is
+  never delivered once a newer command has been sent, nor over an answer a
+  common opcode (IDENT) set meanwhile. A command that finds the queue full
+  is counted as an error and dropped: the host must wait for each answer.
+- **Malformed frames** (too short, `n` > 128 or not matching the data, a
+  name longer than its frame, `mode` > 2, BUF_GET/PUT past byte 512, an
+  unknown opcode) are counted in the card's error count and **never
+  answered**, as on the other cards.
+- **F_READ error:** `n′` = `$FF`, then the error code (RESP_LEN 2). `n′` is
+  otherwise at most 128.
+- **DIR_FIRST/DIR_NEXT:** an entry is `size32, attr, len8, name` (the name
+  length-prefixed, as everywhere). RESP_LEN 1 is `$FF` at the end, or else an
+  error code (`$01`, `$02`, `$09`). DIR_NEXT after the end, or without a
+  DIR_FIRST, answers `$FF`. Every entry of the root directory is listed,
+  directories too (attribute bit 4).
+- **ST_INFO** `err` is the error of the last command before it (ST_INFO
+  does not change it); `flags` is the status byte without BUSY. With no
+  file system, `total32` is the medium's size and `free32` 0.
+- **F_OPEN** on a handle that is open closes (and flushes) that file first.
+  A file open for writing cannot be opened on another handle, a file open
+  for reading cannot be opened for writing, and an open file cannot be
+  deleted: `$0A` (FatFs's file lock; several readers are fine). Opening a read-only file for writing, or deleting it,
+  gives `$06`; a full root directory gives `$05`.
+- **Names:** 1–12 printable ASCII characters, no `/`, `\`, `:`, no leading
+  `.`; FatFs applies the rest of the 8.3 rules (reserved characters, 8 + 3).
+  Lower case is folded to upper case. F_DELETE refuses a directory (`$08`).
+- **Removal:** card detect (debounced 20 ms) clears MEDIA and MOUNTED at
+  once. Open handles then answer `$01` until closed (F_CLOSE answers `$01`
+  and frees the handle) or reopened, also after a card goes back in; a card
+  that goes in is mounted automatically.
+- **SOFT_RESET** closes and flushes every file (the volume stays mounted).
+- **Blocks:** BLK_READ/BLK_WRITE work with or without a file system.
+  BLK_WRITE flushes the files open for writing first, and makes FatFs read
+  its cached sector again; raw writes to a mounted volume are otherwise the
+  host's business (ST_EJECT first). BUF_PUT has no answer. An LBA past the
+  end is `$09`.
+- **Deadlines:** the RP2040 answers the slot (status byte, READ, the common
+  opcodes) from core 0 whatever core 1 is doing.
+- The kernel (`kernel/storage.s`) adds `$0B` (no answer after 65280 READs,
+  a few seconds) and `$0C` (no storage card fitted).
+
 **Deadlines:** medium operations can take far longer than the slot's 5 ms
 (an SD card may be busy 250 ms on a write, a later tape far longer). The
 storage card's commands are **exempt**: a READ returns RESP_LEN `$00` ("not
@@ -105,7 +150,18 @@ card loses at most the file being written.
   handles, FatFs (ChaN, BSD-style licence, LFN off) behind a disk-I/O
   interface. Host builds run it over a disk image.
 - `fw/rp2040/storage/`: the SD SPI-mode driver on SPI1, card detect, LEDs,
-  the slot SPI slave.
+  the slot SPI slave. Core 0 runs the slot SPI slave and the card engine,
+  debounces card detect and drives the LEDs; core 1 owns FatFs and the SD
+  card and runs one request at a time, handed over through the inter-core
+  FIFO. SD: CMD0, CMD8, ACMD41 (HCS), CMD58 (CCS: block or byte
+  addressing), CMD9 (size, and the CSD's permanent and temporary
+  write-protect bits, the only write-protect a microSD card has), CMD17 and
+  CMD24 single blocks, the busy wait after a write; commands carry their
+  CRC7, data CRCs are not checked. 400 kHz to identify, 12.5 MHz after.
+  `tools/fw_rp2040.sh storage` builds `build/rp2040/storage.elf`.
+- `fw/storage/host/imgdisk.c`: a disk image as the medium, for the host
+  tests (STO-001/002) and the simulator's storage card (`fw/sim/simcards.c`,
+  KRN-006).
 
 ## Kernel and BASIC
 

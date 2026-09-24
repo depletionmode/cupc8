@@ -6,6 +6,10 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## Decisions (David, 2026-09-24)
 
+- **E-ink card: built for M1** as the second graphics option (replaces the
+  HDMI card, type $01; `proposals/eink-gpu.md` Decisions; pins `eink_mcu`).
+  The native emulator gets a UC8179 panel model.
+
 - **Storage card** (card type $04, `hardware/storage-card.md`): a separate
   RP2040 card for files, microSD in M1, a medium-neutral protocol so a later
   card can be tape or a hard disk. Replaces the microSD on the IO card
@@ -36,7 +40,7 @@ survives a lost session. Newest first within each section. Specs live in
 | Main board | agent worktree | routing (the largest board) |
 | Storage firmware (`fw/storage`), kernel `storage.s`, BASIC SAVE/LOAD/DIR/DEL, tests | agent worktree | started (retargeted from the IO card) |
 | SD card model in the native emulator, card and end-to-end tests | agent worktree | started (attaches to the storage card) |
-| E-ink graphics card proposal | agent worktree | research |
+| E-ink graphics card proposal | `proposals/eink-gpu.md` | written; David's decisions recorded at its top (a replacement for the HDMI card, card type $01, 5.83" 648×480 panel on its driver module via a 2.54 mm header + TVS, native 4-grey mode from the start). Not scheduled. |
 
 ## Done (recent)
 

@@ -43,6 +43,8 @@ this table.
 | GPU card RP2040 @ 252 MHz + flash | 3V3 | 60 | 100 |
 | GPU card TMDS drive (4 pairs into the monitor's 50 Ω / 3.3 V termination) | 3V3 | 30 | 45 |
 | IO card RP2040 (USB host) + flash | 3V3 | 25 | 50 |
+| Storage card RP2040 + flash *(not yet in `budget.py`: see below)* | 3V3 | 25 | 50 |
+| Storage card microSD: ~1 mA idle, up to ~100 mA writing *(not yet in `budget.py`)* | 3V3 | 5 | 100 |
 | I²C expanders, SWD mux | 3V3 | 1 | 5 |
 | LEDs (~16 at 1–2 mA) | 3V3 | 15 | 30 |
 | **3V3 total** | | **242** | **462** |
@@ -56,6 +58,17 @@ this table.
 The worst case assumes a keyboard drawing the full 500 mA (e.g. an RGB
 gaming keyboard) and Wi-Fi transmitting. With an ordinary keyboard (< 100 mA)
 the maximum is about **870 mA** during Wi-Fi TX bursts.
+
+**The storage card** (`storage-card.md`, slot 4 in M1) adds up to 150 mA of
++3V3: its RP2040 and a microSD card writing. It runs from the slot's +3V3,
+well inside the card's 300 mA. It is not in `hw/power/design.py` yet, so
+the totals above and POW-006 leave it out. *Checked 2026-09-24 with it added
+(and `FUTURE_SLOTS` 3 → 2):* the 3V3 load becomes 617 mA, the worst-case
+input 1.477 A, and B1 (against a 1.5 A Type-C source, 10 % margin) goes from
+pass (+11.8 %) to **fail (+1.6 %)**; B3 and THM-001 T8 fail with the proposed
+SY6280 RSET. The budget needs a decision (the storage card's +3V3 load,
+the 1.5 A source policy, or the RSET) before the storage card is in the
+design numbers.
 
 Future cards in slots 4–6 must declare their budget. sysctl sums the declared
 budgets and compares them with the advertised source current.
