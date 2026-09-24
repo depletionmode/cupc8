@@ -2,17 +2,18 @@
 #ifndef GPU_PINS_H
 #define GPU_PINS_H
 
-/* dvi: blue pair */
+/* dvi: blue pair, P on 13 */
 #define PIN_TMDS_D00           12
 #define PIN_TMDS_D01           13
-/* dvi: green pair */
-#define PIN_TMDS_D10           10
-#define PIN_TMDS_D11           11
-/* dvi: red pair */
+/* dvi: green pair, P on 15 */
+#define PIN_TMDS_D10           14
+#define PIN_TMDS_D11           15
+/* dvi: red pair, P on 17 */
 #define PIN_TMDS_D20           16
 #define PIN_TMDS_D21           17
-#define PIN_TMDS_CLK0          14
-#define PIN_TMDS_CLK1          15
+/* dvi: P on 11 */
+#define PIN_TMDS_CLK0          10
+#define PIN_TMDS_CLK1          11
 #define PIN_HDMI_HPD           18
 #define PIN_HDMI_SCL           19
 #define PIN_HDMI_SDA           20
