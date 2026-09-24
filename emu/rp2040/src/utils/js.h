@@ -15,6 +15,12 @@ namespace rp2040js {
 
 /** JS ToUint32 (what `x >>> 0` and a Uint32Array store do to any number). */
 inline uint32_t toUint32(double x) {
+  if (x > -9223372036854775808.0 && x < 9223372036854775808.0) {
+    // |x| < 2**63 (not NaN): the conversion truncates towards zero, like
+    // trunc(), and the two's complement wrap to 32 bits is t mod 2**32, what
+    // the fmod below computes (exactly, without the library calls)
+    return static_cast<uint32_t>(static_cast<uint64_t>(static_cast<int64_t>(x)));
+  }
   if (!std::isfinite(x)) {
     return 0;
   }
@@ -47,7 +53,17 @@ inline double jsMathRound(double x) {
   if (!std::isfinite(x)) {
     return x;
   }
-  double r = std::floor(x);
+  double r;
+  if (x != 0 && std::fabs(x) < 4503599627370496.0) {
+    // |x| < 2**52: floor(x) through int64 (exact; x = -0 keeps the library's
+    // floor below, which returns -0)
+    r = static_cast<double>(static_cast<int64_t>(x));
+    if (r > x) {
+      r -= 1;
+    }
+  } else {
+    r = std::floor(x);  // 0, or |x| >= 2**52: x is an integer
+  }
   if (x - r >= 0.5) {
     r += 1;
   }

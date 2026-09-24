@@ -69,6 +69,22 @@ const CODE_LO = 0x20001000;
 const CODE_HI = 0x20002000;
 const HANDLERS = Array.from({ length: 8 }, (_, k) => CODE_LO + 0x100 + 0x200 * k);
 const HSET = new Set(HANDLERS);
+// Each block runs its code in one of these windows (the exception handlers stay
+// in the SRAM one): SRAM, flash, a flash XIP mirror (0x11/0x12/0x13, written
+// through 0x10: the mirrors only read) or the bootrom (which TS lets a store
+// write), so instruction fetches cover every memory the fetch path reads directly.
+// [lo, hi, write offset]
+const RUN_WINDOWS = [
+  [CODE_LO, CODE_HI, 0],
+  [0x10002000, 0x10003000, 0],
+  [0x11002000, 0x11003000, -0x01000000],
+  [0x12002000, 0x12003000, -0x02000000],
+  [0x13002000, 0x13003000, -0x03000000],
+  [0x00002000, 0x00003000, 0],
+];
+let run = RUN_WINDOWS[0];
+const inWindow = (w, a) => a >= w[0] && a <= w[1] - 4;
+const codeAddr = (a) => (inWindow(run, a) ? a + run[2] : a) >>> 0;
 const DATA_LO = 0x20010000;
 const DATA_HI = 0x20010400;
 const MS_LO = 0x2001fc00;
@@ -724,8 +740,12 @@ const DECODE = [
 const stats = new Map();
 const count = (k) => stats.set(k, (stats.get(k) ?? 0) + 1);
 function classify(pc) {
+  // (quietly: a fetch outside the memories warns, and the C++ side does not classify)
+  const logger = mcu.logger;
+  mcu.logger = { debug() {}, info() {}, warn() {}, error() {} };
   const o = mcu.readUint16(pc & ~1);
   const o2 = isWide(o) ? mcu.readUint16((pc & ~1) + 2) : 0;
+  mcu.logger = logger;
   for (const [name, test] of DECODE) if (test(o, o2)) return name;
   return 'unimplemented';
 }
@@ -746,6 +766,18 @@ async function newBlock() {
   const words = [];
   for (let i = 0; i < code.length; i += 2) words.push((code[i] | ((code[i + 1] ?? 0) << 16)) >>> 0);
   await pokeWords(CODE_LO, words);
+  run = chance(0.6) ? RUN_WINDOWS[0] : pick(RUN_WINDOWS);
+  if (run !== RUN_WINDOWS[0]) {
+    const other = [];
+    for (let a = run[0]; a < run[1]; ) {
+      const ins = genSafe(a + 4 <= run[1]);
+      other.push(...ins);
+      a += 2 * ins.length;
+    }
+    const w = [];
+    for (let i = 0; i < other.length; i += 2) w.push((other[i] | ((other[i + 1] ?? 0) << 16)) >>> 0);
+    await pokeWords(codeAddr(run[0]), w);
+  }
 
   // registers and fields
   for (let i = 0; i <= 12; i++) await setReg(i, randValue());
@@ -758,7 +790,7 @@ async function newBlock() {
   const psp = (PS_LO + SP_MARGIN + ri(PS_HI - PS_LO - 2 * SP_MARGIN)) & ~(chance(0.9) ? 3 : 0);
   await setReg(13, spsel ? psp & ~3 : msp);
   await setField('bankedSP', spsel ? msp : psp);
-  await setReg(15, (CODE_LO + ri(CODE_HI - CODE_LO - 4)) & ~(chance(0.9) ? 1 : 0));
+  await setReg(15, (run[0] + ri(run[1] - run[0] - 4)) & ~(chance(0.9) ? 1 : 0));
   for (const f of ['N', 'Z', 'C', 'V', 'nPRIV']) await setField(f, ri(2));
   await setField('PM', chance(0.3) ? 1 : 0);
   await setField(
@@ -796,8 +828,17 @@ async function newBlock() {
 async function step() {
   // keep PC in the code window and both stacks in their windows
   const pc = core.PC & ~1;
-  if (pc < CODE_LO || pc > CODE_HI - 4) {
-    await setReg(15, (CODE_LO + ri(CODE_HI - CODE_LO - 4)) & ~(chance(0.9) ? 1 : 0));
+  if (!inWindow(RUN_WINDOWS[0], pc) && !inWindow(run, pc)) {
+    await setReg(15, (run[0] + ri(run[1] - run[0] - 4)) & ~(chance(0.9) ? 1 : 0));
+  }
+  // now and then a fetch at the end of a memory (a 32-bit instruction's second
+  // halfword outside it) or outside every memory
+  const edgeFetch = chance(0.004);
+  if (edgeFetch) {
+    await setReg(15, pick([
+        0x20041ffe, 0x10fffffe, 0x11fffffe, 0x13fffffe, 0x00003ffe, 0x00003ffc, 0x00004000, 0x20042000,
+        0x30000000, 0x1ffffffe, 0x1ffffffc, 0xfffffffc, 0xfffffffe, 0x0ffffffe,
+      ]));
   }
   if (!spOK()) {
     const msp = (MS_LO + SP_MARGIN + ri(MS_HI - MS_LO - 2 * SP_MARGIN)) & ~3;
@@ -821,7 +862,8 @@ async function step() {
   // An instruction at a handler entry, or one that may run after an exception entry, must
   // not access memory (it could run with other register values than it was made for).
   const safeOnly = core.interruptsUpdated || HSET.has(opcodePC);
-  const allowWide = !HSET.has(opcodePC + 2) && opcodePC + 4 <= CODE_HI;
+  const allowWide =
+    edgeFetch || (!HSET.has(opcodePC + 2) && opcodePC + 4 <= (inWindow(run, opcodePC) ? run[1] : CODE_HI));
   let ins = null;
   if (!safeOnly && chance(0.35)) ins = await genMem();
   if (!ins && core.currentMode === 1 && chance(0.05)) {
@@ -837,8 +879,8 @@ async function step() {
     ins = [0xbf20];
   }
   if (!ins) ins = genSafe(allowWide);
-  await poke16(opcodePC, ins[0]);
-  if (ins.length > 1) await poke16(opcodePC + 2, ins[1]);
+  await poke16(codeAddr(opcodePC), ins[0]);
+  if (ins.length > 1) await poke16(codeAddr(opcodePC) + 2, ins[1]);
 
   let fetchPC = core.PC;
   let entered = null;
@@ -857,6 +899,7 @@ async function step() {
     };
   }
   const fetched = statsMode ? classify(fetchPC) : null;
+  if (statsMode) count(`fetch from ${hex(fetchPC >>> 24).padStart(2, '0')}xxxxxx`);
   let delta;
   try {
     delta = core.executeInstruction();

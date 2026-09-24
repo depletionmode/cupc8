@@ -1,6 +1,7 @@
 // Port of rp2040js src/rp2040.ts (with the cupc8 dual-core patch).
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -169,7 +170,13 @@ class RP2040 {
   void writeUint16(uint32_t address, uint32_t value);
 
   uint32_t gpioValues() const;
+  /** not in TS: bring both PIO blocks' fast path up to date (RPPIO::sync) */
+  void syncPIO() {
+    pio[0].sync();
+    pio[1].sync();
+  }
 
+  /** (out of line: test_periph_diff observes it with ld --wrap) */
   void setInterrupt(uint32_t irq, bool value);
 
   /** Core 1 restarts in the bootrom, where it waits for the FIFO launch sequence. */
@@ -181,12 +188,54 @@ class RP2040 {
   void updateIOInterrupt();
 
   /** One instruction on the core that is behind; returns the cycles by which the chip's time advanced (may be 0). */
-  double step();
+  double step() {
+    // running(0) / running(1), read from the fields directly
+    const bool run0 = !core0.waiting, run1 = !core1.waiting && !core1Held;
+    if (!run0 && !run1) {
+      return 0;
+    }
+    const uint32_t i = run0 && run1 ? (coreTime[0] <= coreTime[1] ? 0 : 1) : run0 ? 0 : 1;
+    double ti = coreTime[i];
+    if (ti < now) {
+      coreTime[i] = ti = now;  // it was asleep: it starts from now
+    }
+    coreIndex = i;
+    sio.selectCore(i);
+    CortexM0Core &core = i ? core1 : core0;
+    ti += core.executeInstructionOverride ? core.executeInstructionOverride() : core.executeInstruction();
+    coreTime[i] = ti;
+    coreIndex = 0;
+    sio.selectCore(0);
+    // the earliest running core's time (the one that ran if none is running now)
+    const bool r0 = !core0.waiting, r1 = !core1.waiting && !core1Held;
+    double t;
+    if (r0 && r1) {
+      t = std::min(coreTime[0], coreTime[1]);
+    } else if (r0 || r1) {
+      t = r0 ? coreTime[0] : coreTime[1];
+    } else {
+      t = ti;
+    }
+    const double delta = std::max(0.0, t - now);
+    now += delta;
+    return delta;
+  }
+
+  /**
+   * Not in TS: up to `limit` steps of the card-test Emu loop without an onCycle
+   * hook (test/emu/rp2040emu.mjs: `step()`, then `cycles(n)`), stopping before a
+   * step once clock.nanos() >= stopNanos; returns the steps taken. Each is
+   * exactly one Emu step: with both cores asleep, idle() to the next alarm (at
+   * most 1000 ns, at least one cycle), else step(); then, for the n cycles by
+   * which the chip's time moved, stepPIOs(pio, n) and clock.tick(n * nsPerCycle).
+   * `clock` must be this chip's clock. (One loop with the instruction inline.)
+   */
+  uint64_t runSteps(uint64_t limit, double stopNanos, SimulationClock &clock, double nsPerCycle);
 
   /** Both cores asleep: the chip's time moves on by `cycles`. */
-  void idle(double cycles);
+  void idle(double cycles) { now += cycles; }
 
-  bool waiting() const;
+  bool waiting() const { return core0.waiting && (core1.waiting || core1Held); }
 
  private:
   std::vector<std::unique_ptr<Peripheral>> ownedPeripherals;
@@ -199,7 +248,7 @@ class RP2040 {
   std::array<double, 2> coreTime = {0, 0};
   double now = 0;
 
-  bool running(uint32_t i) const;
+  bool running(uint32_t i) const { return !cores[i]->waiting && !(i == 1 && core1Held); }
 
   void init();
 };

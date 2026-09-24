@@ -94,7 +94,7 @@ RPSIO::RPSIO(RP2040 &rp2040) : rp2040(rp2040) {
   interp1 = banks[0].interp1.get();
 }
 
-void RPSIO::selectCore(uint32_t index) {
+void RPSIO::swapBank(uint32_t index) {
   if (index == bank) {
     return;
   }
@@ -125,6 +125,7 @@ void RPSIO::updateFifoIrq() {
 }
 
 void RPSIO::updateHardwareDivider(bool signed_) {
+  swapBank(selected);
   if (divDivisor == 0) {
     divQuotient = divDividend > 0 ? -1 : 1;
     divRemainder = divDividend;
@@ -145,6 +146,7 @@ void RPSIO::updateHardwareDivider(bool signed_) {
 }
 
 uint32_t RPSIO::readUint32(uint32_t offset) {
+  swapBank(selected);
   if (offset >= SPINLOCK0 && offset <= SPINLOCK31) {
     const uint32_t bitIndexMask = 1u << ((offset - SPINLOCK0) / 4);
     if (spinLock & bitIndexMask) {
@@ -308,6 +310,7 @@ uint32_t RPSIO::readUint32(uint32_t offset) {
 }
 
 void RPSIO::writeUint32(uint32_t offset, uint32_t value) {
+  swapBank(selected);
   if (offset >= SPINLOCK0 && offset <= SPINLOCK31) {
     const uint32_t bitIndexMask = ~(1u << ((offset - SPINLOCK0) / 4));
     spinLock &= bitIndexMask;

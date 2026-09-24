@@ -28,6 +28,8 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
+#include <functional>
 #include <deque>
 #include <map>
 #include <memory>
@@ -115,12 +117,17 @@ class Rp2040Card : public Card {
 class EspCard : public Card {
  public:
   EspCard(int tx, int rx);
+  ~EspCard() override;
+  // CUPC8_ESP_TRACE=FILE: every exchange with QEMU, with the board's time
+  std::function<double()> now;
   void drive(uint32_t sck, uint32_t mosi, bool selected) override;
   uint32_t miso() override;
   bool irq() override { return false; }
 
  private:
   int tx, rx;
+  FILE *trace = nullptr;
+  void traceBytes(const char *dir, const uint8_t *b, size_t n);
   bool selected = false;
   std::vector<uint8_t> bits, mosi_;
   size_t bit = 0;
@@ -239,7 +246,7 @@ class Machine {
   std::atomic<uint32_t> arrived{0};              // cards done with this window
   std::atomic<uint32_t> runSeq{0};               // run() requests
   std::atomic<uint32_t> handoff{0};              // 0 none, 1 a volunteer waits to lead, 2 accepted
-  unsigned volunteerSpins = 0;                   // CUPC8_EMU_VOLUNTEER_SPINS (0: never volunteer)
+  unsigned volunteerSpins = 200000;              // CUPC8_EMU_VOLUNTEER_SPINS (0: never volunteer)
   uint64_t windowStart = 0;        // the board's clock count at the window's start
   uint32_t windowOut = 0;          // the board's outputs at the window's end
   double runEnd = 0;

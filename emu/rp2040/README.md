@@ -20,6 +20,26 @@ build/emu-native/rp2040run build/rp2040/emu_nested.elf \
     --until 'NEST (PASS|FAIL)[^\n]*\n' --max-ns 500e6 --toggle-gpio 2:997
 ```
 
+Build options (plain `cmake` + `ninja` needs none of them). The library is
+compiled twice: `rp2040emu` (plain `-O2`; what `emu/machine` links, and
+`test_periph_diff`, whose `-Wl,--wrap` of `RP2040::setInterrupt` needs the
+calls between object files) and `rp2040emu_fast`, which `rp2040run`,
+`rp2040emu.node` (through `rp2040harness_fast`) and the other test drivers
+link, with
+
+- `-DRP2040EMU_LTO=ON` (the default where the compiler supports it):
+  link-time optimisation;
+- `-DRP2040EMU_NATIVE=ON`: `-march=native` (off by default: the binaries then
+  need this kind of CPU);
+- `-DRP2040EMU_PGO=generate|use` with `RP2040EMU_PGO_DIR`: profile-guided
+  optimisation (GCC). `emu/rp2040/tools/pgo.sh [build dir] [-D...]` does it
+  all: an instrumented build in `<dir>-pgogen`, trained by `rp2040run` on the
+  gpu (also with the slot pins moving), io, sysctl and self-test images, then
+  `<dir>` rebuilt with the profile.
+
+Everything is compiled with `-ffp-contract=off`: the float arithmetic must
+round as JS's does, so no fused multiply-adds (which `-march=native` offers).
+
 `rp2040run <elf> --until <regex> --max-ns <ns> [--mhz N] [--core1-slow F]
 [--toggle-gpio PIN:EVERY_N_CYCLES] [--trace-every N]` is
 `test/emu/rp2040emu.mjs` in C++: B1 bootrom (extracted from
@@ -67,6 +87,79 @@ it on real firmware: the same `(ns, pc0, pc1)` trace every 97 steps and the
 same UART output on the EMU-001/002 self-tests and the GPU, IO and system card
 images (`test/trace/tracediff.sh`, EMU-004). The self-tests run 20-40x faster
 than in rp2040js.
+
+## Speed without changing behaviour
+
+The port stays line for line with TS, with a few places where it takes a
+shortcut that is exact (same results, same calls, same order; EMU-004/005/006
+prove it):
+
+- **PIO fast path** (`RPPIO::sync`, pio.cpp's comments have the argument).
+  While every enabled machine of a block is either stalled on a WAIT that
+  only a syncing event can end, or a *runner* (divider 1, autopull, every
+  reachable instruction an OUT to PINS/X/Y/NULL/PINDIRS/PC/ISR with one bit
+  count and no delay: PicoDVI's `out pc, 1` serialiser), and the runners'
+  pins are disjoint, listener-free and muxed to the block, `step()` only
+  counts cycles. Its autopull cycle runs every machine's real `clockTick()`
+  (the pull's FIFO, DREQ and interrupt effects happen as they would), and a
+  TX FIFO write to a runner does not leave the fast path. What is owed —
+  the runners' registers and pins, stalled machines' divider phases, and
+  `checkForUpdates` for every pin that changed (with no listeners that only
+  sets `lastValue`) — is replayed by `sync()`, which every way in calls
+  first: the block's bus registers, `GPIOPin`'s PIO output functions,
+  `setInputValue`, `addListener`, IO_BANK0 ctrl and PADS writes. **C++ code
+  that reads PIO machine or pin fields directly must call
+  `RP2040::syncPIO()` first** (test_pio_diff does). A pull whose
+  `FIFO::onPull` is set only stays on the fast path if the hook sets
+  `onPullRecordsOnly` (it must not read or change the chip; TmdsCapture's
+  does). `RPPIO::fastPath = false` turns it off; `lazyCycles`/`lazyEvents`
+  count it (`RP2040RUN_STATS=1 rp2040run ...` prints them). `stepPIOs()` is
+  Emu.cycles' PIO loop with the lazy stretches done in bulk.
+- The Cortex-M0 decode is a 64K-entry handler table (`decodeTable`, by first
+  halfword). The TS if/else chain is split, by a script, into its branches'
+  conditions (`decodeCond<k>`) and bodies (`exec<k>`), verbatim; entry
+  `opcode` is the handler of the first branch whose opcode test can hold
+  (`decodeEntry`, the chain's own conditions), which runs that branch and,
+  if its opcode2 term fails, the rest of the chain (`chain(k + 1)`). So every
+  opcode runs the branch the chain would. `test_decode` (EMU-005 `decode`)
+  checks the table exhaustively (all opcodes; all second halfwords of the
+  32-bit ones) and executes every opcode through the table and through the
+  plain chain (`executeInstructionChain()`, the reference) from the same state.
+  The table is `constexpr` (built at compile time).
+- Instruction fetch (`CortexM0Core::fetch16`) reads SRAM, flash, its XIP
+  mirrors (0x11-0x13) and the bootrom directly, as `readUint16`'s own fast
+  paths and its aligned-word fallback do (no side effects there); anything
+  else (and, to keep the bounds simple, the last halfword of flash and of
+  the bootrom) takes `readUint16`.
+  Nothing is cached, so writes need no invalidation. core-diff runs blocks
+  from SRAM, flash, the three mirrors and the bootrom, and now and then
+  fetches at the end of a memory or outside every memory.
+- The core's own bus accesses (`CortexM0Core::readUint32` etc.) take the
+  chip's SRAM and flash branches directly: an aligned SRAM or flash (and
+  mirror) word read, `readUint16`/`readUint8` from flash or SRAM, and
+  stores to SRAM (which has no peripheral in `findPeripheral`); anything else
+  goes through `RP2040::readUint32` etc. as before.
+- `RP2040::runSteps(limit, stopNanos, clock, nsPerCycle)` is the Emu loop
+  (rp2040emu.mjs's `step()` and `cycles(n)` without an `onCycle` hook: the
+  idle path, `step()`, `stepPIOs`, `clock.tick`) as one function with the
+  instruction inline; `Emu::runUntil` (`Emu::steps(64)`), `Emu::runTo(t)`
+  (`while (ns() < t) step()`) and rp2040run (runs of steps between trace
+  points) use it. `test_runsteps` (EMU-005 `steps`) runs every card image
+  by `Emu::step()` and by runSteps in random runs and compares the chips.
+  There is no decoded-instruction cache: decoding is one table load and the
+  fetch one direct load, and an idealised cache (SRAM, never invalidated)
+  measured 0.4% fewer instructions and ~1% less time on gpu.elf, not worth
+  an invalidation scheme.
+- `toUint32`/`jsMathRound` go through int64 where that is exact
+  (`test/js/test_js_numbers.cpp`); Timer32 keeps `baseFreq / prescaler`.
+- `RPSIO::selectCore` defers the divider/interpolator bank swap to the next
+  SIO access (code reading those fields directly calls `flushSelect()`).
+- Inline common cases: `CortexM0Core::setInterrupt`, alarm unlinking, FIFO
+  wrap-around, `checkInterrupts`' single `intRaw()`.
+- The step loop is inline: `RP2040::step()` (reading the cores' `waiting`
+  flags directly), the Emu's `step()`/`cycles()` (the idle path and the
+  `onCycle` loop out of line), and `SimulationClock::tick`, which only walks
+  the alarm list when the next alarm is due (`fireAlarms`).
 
 ## Status
 

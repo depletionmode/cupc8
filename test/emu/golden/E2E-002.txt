@@ -1,0 +1,11 @@
+
+      CUPC/8 BASIC 2015.10
+
+>> 10 print 6*7
+
+>> run
+42
+
+DONE.
+
+>>

@@ -639,6 +639,15 @@ vrow = "2.4"
 cmd = "test/emu/backend_diff.sh"
 
 [[test]]
+id = "EMU-007"
+title = "Native whole-machine emulator: identical to machine.mjs, threaded = serial"
+checks = "boot to BASIC and a typed program (1.6 s emulated) on test/emu/machine.mjs, the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42"
+method = "test/emu/machine_diff.sh (test/emu/test_machine_native.mjs, emu/machine, tools/emu_machine_build.sh)"
+kind = "sim"
+vrow = "3.2"
+cmd = "test/emu/machine_diff.sh"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"

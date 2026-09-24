@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -49,8 +50,39 @@ class Emu {
 
   // one step: an instruction on the core that is behind, and the PIO cycles
   // by which that moved the chip's time on
-  void step();
-  void cycles(double n);
+  void step() {
+    if (mcu->waiting()) {
+      stepIdle();
+      return;
+    }
+    const double n = mcu->step();  // 0 when the core that ran is still behind the other
+    if (n) cycles(n);
+  }
+  void cycles(double n) {
+    if (onCycle) {
+      cyclesHooked(n);
+    } else {
+      stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
+    }
+    clock.tick(n * nsPerCycle);
+  }
+
+  // n calls of step() (one loop, RP2040::runSteps, when there is no onCycle hook)
+  void steps(uint64_t n) {
+    if (onCycle) {
+      for (uint64_t i = 0; i < n; i++) step();
+    } else {
+      mcu->runSteps(n, std::numeric_limits<double>::infinity(), clock, nsPerCycle);
+    }
+  }
+  // `while (ns() < t) step();`
+  void runTo(double t) {
+    if (onCycle) {
+      while (clock.nanos() < t) step();
+    } else {
+      mcu->runSteps(std::numeric_limits<uint64_t>::max(), t, clock, nsPerCycle);
+    }
+  }
 
   // run until cond() is true; false if `ns` of emulated time pass first
   template <class Cond>
@@ -58,10 +90,16 @@ class Emu {
     const double end = clock.nanos() + ns;
     while (clock.nanos() < end) {
       if (cond()) return true;
-      for (int i = 0; i < 64; i++) step();
+      steps(64);  // for (let i = 0; i < 64; i++) this.step();
     }
     return cond();
   }
+
+ private:
+  /** step() with both cores asleep */
+  void stepIdle();
+  /** cycles()' PIO loop with the onCycle hook */
+  void cyclesHooked(double n);
 };
 
 }  // namespace rp2040js::harness
