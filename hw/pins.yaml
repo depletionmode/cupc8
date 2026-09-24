@@ -226,6 +226,8 @@ devices:
       debug:
         signals:
           - {name: LED_LINK, gpio: 4, dir: out}
+          - {name: LED_TX, gpio: 0, dir: out, note: "socket data sent (milestone-1.md, Indicator LEDs)"}
+          - {name: LED_RX, gpio: 1, dir: out, note: "socket data received"}
 
 # Connector pinouts (doc/hardware/cpu-bus.md, doc/hardware/slot.md). The
 # checker compares these against the docs and the KiCad netlists.
