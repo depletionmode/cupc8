@@ -637,6 +637,11 @@ JLC_RULES = {
     "max_error": 0.005,
 }
 
+# JLC's 4-layer capability is finer (0.09 mm track and space): Freerouting
+# necks a Fine track down to 0.11 mm where it meets a fine-pitch pad, and
+# 0.075 mm onto a finger's stub, which the 2-layer minimum would refuse
+JLC_RULES_4 = {"min_track_width": 0.1, "min_connection": 0.1}
+
 NET_CLASSES = [
     # name, track, clearance, via diameter, via drill
     ("Default", 0.2, 0.2, 0.6, 0.3),        # 0.2: two 0.6/0.3 vias then keep holes 0.5 apart (JLC)
@@ -644,9 +649,9 @@ NET_CLASSES = [
     # nets on a 0.4 mm-pitch part (the RP2040's QFN-56): its pads are 0.2 mm
     # apart, so at 0.2 mm clearance Freerouting counts every neighbouring pair
     # a violation and routes none of them. 0.15 mm track and clearance (JLC's
-    # minimum is 0.1, and min_clearance above is 0.15). Its vias are 0.65 mm,
-    # so two at 0.15 mm apart still keep their holes 0.5 mm apart (JLC).
-    ("Fine", 0.15, 0.15, 0.65, 0.3),
+    # minimum is 0.1, and min_clearance above is 0.15). Its vias are 0.7 mm,
+    # so one 0.15 mm from a 0.6 mm Default via keeps the holes 0.5 mm apart (JLC).
+    ("Fine", 0.15, 0.15, 0.7, 0.3),
 ]
 
 
@@ -1281,13 +1286,6 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
-    # Freerouting necks tracks down where they meet some pads (0.11 mm, and
-    # 0.075 mm on finger stubs), under JLC_RULES' minimum: bring them back up
-    # to it; DRC then checks the clearances this costs
-    least = pcbnew.FromMM(JLC_RULES["min_track_width"])
-    for t in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_TRACE_T]:
-        if t.GetWidth() < least:
-            t.SetWidth(least)
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
@@ -1907,7 +1905,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def sheet():
         schematic(sch, footprint_libs)
-        write_project(pro, power_nets=power_nets, fine_nets=fine_nets)   # before ERC: it carries the library tables
+        write_project(pro, power_nets=power_nets, fine_nets=fine_nets,   # before ERC: it carries the library tables
+                      rules=JLC_RULES_4 if layers == 4 else None)
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
@@ -1928,9 +1927,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             if layers == 4:
                 # across on In2.Cu just above the tab (the key notch reaches
-                # the body's edge), below where In2 routes turn down to their
-                # fingers' vias, so it walls off next to nothing
-                presence_link(b, outline[3], rise=0.5, across=pcbnew.In2_Cu)
+                # the body's edge) and the GND ties' vias (1 mm above it),
+                # below where In2 routes turn down to their fingers' vias
+                presence_link(b, outline[3], rise=1.8, across=pcbnew.In2_Cu)
                 tab_via_keepout(b, outline[3])
             else:
                 presence_link(b, outline[3])
