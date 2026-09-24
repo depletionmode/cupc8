@@ -189,3 +189,17 @@ revert = [
 ]
 cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
 must_fail = ["FAIL GPU-005-traffic"]
+
+[[bug]]
+name = "boot ROM: SPI_RX read straight after SPI_GO, before the transfer is done - every card's IDENT came back a byte late and every slot was recorded empty"
+fixed_in = "050a96c"
+revert = [["rom/boot.s", "\tst $f102+r0, r1\n.spi_wait:\t\t\t\t\t; SPI_RX is only valid once SPI_STAT says done\n\tld r1, $f103+r0\n\teq r1, #0\n\tbzf .spi_wait\n\tld r1, $f101+r0\n", "\tst $f102+r0, r1\n\tld r1, $f101+r0\n"]]
+cmd = "tools/fw_rp2040.sh gpu && tools/emu_build.sh && node test/emu/test_machine.mjs"
+must_fail = ["FAIL the BASIC banner and prompt are not on the screen"]
+
+[[bug]]
+name = "boot ROM: the probe READ followed IDENT at once, not after the 5 ms slot.md gives a card"
+fixed_in = "59a8a6b"
+revert = [["rom/boot.s", "\tb cs_off\n\tpush pch\n\tpush pcl\n\tb wait_5ms\t\t\t\t\t; slot.md - the card needs >= 5 ms to answer\n", "\tb cs_off\n"]]
+cmd = "tools/fw_rp2040.sh gpu && tools/emu_build.sh && node test/emu/test_machine.mjs"
+must_fail = ["FAIL the boot ROM's probe READ came"]
