@@ -246,7 +246,7 @@ class Machine {
   std::atomic<uint32_t> arrived{0};              // cards done with this window
   std::atomic<uint32_t> runSeq{0};               // run() requests
   std::atomic<uint32_t> handoff{0};              // 0 none, 1 a volunteer waits to lead, 2 accepted
-  unsigned volunteerSpins = 0;                   // CUPC8_EMU_VOLUNTEER_SPINS (0: never volunteer)
+  unsigned volunteerSpins = 200000;              // CUPC8_EMU_VOLUNTEER_SPINS (0: never volunteer)
   uint64_t windowStart = 0;        // the board's clock count at the window's start
   uint32_t windowOut = 0;          // the board's outputs at the window's end
   double runEnd = 0;
