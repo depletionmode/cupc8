@@ -905,7 +905,6 @@ cmd = "python3 hw/smoke/smoke.py"
 # of them; it picks up each board as its build appears, and uses a stand-in
 # for the six I/O slots (20.32 mm pitch, the C404113 datasheet) until the
 # main board exists. Report: build/mech/report.txt, render: overview.png.
-# =====================================================================
 # ============================================================================
 [[test]]
 id = "MECH-001"
@@ -978,7 +977,8 @@ method = "hw/mech/fit.py (FreeCAD), sockets from the main board's footprints (pa
 kind = "static"
 vrow = "4.7"
 cmd = "python3 hw/mech/fit.py --check MECH-008"
-=======
+
+# ============================================================================
 # POW / THM: the power tree (doc/hardware/power.md), verification 4.4 / 4.5.
 # Values and assumptions: hw/power/design.py. The main board isn't drawn
 # yet, so these check power.md's design plus the listed assumptions; the
