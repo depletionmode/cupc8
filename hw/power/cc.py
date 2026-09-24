@@ -10,17 +10,19 @@ thresholds against the Type-C spec.
    and the ADC pin leakage. These "realised" ranges are what the thresholds
    must separate. (The spec's vRd ranges are wider because they allow Rd
    +-10 %; they are printed too, for reference.)
-2. PWR_HI: one TLV7011 for both CC lines, so CC1 and CC2 are averaged
-   through two equal resistors (only one CC line is ever driven; the other
-   sits on its Rd), and compared with half of 0.66 V taken from 3V3. The
+2. PWR_HI means a Type-C 3.0 A source (power.md policy). One TLV7011
+   serves both CC lines, so CC1 and CC2 are averaged through two equal
+   resistors (only one CC line is ever driven; the other sits on its Rd),
+   and compared with a reference from 3V3 set between the 1.5 A and 3.0 A
+   ranges (design.CC_REF_R). The
    trip points, referred back to CC, include the 3V3 tolerance, the divider
    resistors, the comparator's offset and its hysteresis.
    These are worst-case stack-ups (every tolerance at its extreme at once),
    so they pass on any positive margin; the margin is printed.
 3. The sysctl ADC thresholds (0.20, 0.66, 1.23 V) with the ADC's reference
    and conversion errors.
-4. TI's TLV7011 model in ngspice: PWR_HI with CC at the worst-case default
-   USB maximum and at the worst-case 1.5 A minimum, so the vendor model
+4. TI's TLV7011 model in ngspice: PWR_HI with CC at the worst-case 1.5 A
+   maximum and at the worst-case 3.0 A minimum, so the vendor model
    agrees with the arithmetic.
 """
 
@@ -72,7 +74,7 @@ def pwr_hi_trips():
     return rise_max, fall_min, (ref_lo, ref_hi), (k_lo, k_hi)
 
 
-def spice_check(c, v_default_max, v_15_min):
+def spice_check(c, v_lo, v_hi):
     """TI's TLV7011 model: PWR_HI for CC held at each value (averaged network)."""
     rt, rb = d.CC_REF_R
     deck = """
@@ -92,12 +94,12 @@ run
 meas tran pwr_lo find v(out) at=390u
 meas tran pwr_hi find v(out) at=890u
 .endc
-""".format(v3=d.buck_vout(), vlo=v_default_max, vhi=v_15_min, rd=d.RD, ra=d.CC_AVG_R, rt=rt, rb=rb)
+""".format(v3=d.buck_vout(), vlo=v_lo, vhi=v_hi, rd=d.RD, ra=d.CC_AVG_R, rt=rt, rb=rb)
     m = spice.run("pow005_tlv7011", deck, libs=("tlv7011.lib",))
     v3 = d.buck_vout()
-    c.check("C8", "TLV7011 model: PWR_HI with CC at the worst default-USB max (%.3f V)" % v_default_max,
+    c.check("C8", "TLV7011 model: PWR_HI with CC at the worst 1.5 A max (%.3f V)" % v_lo,
             m["pwr_lo"], 0.1 * v3, "<=")
-    c.check("C9", "TLV7011 model: PWR_HI with CC at the worst 1.5 A min (%.3f V)" % v_15_min,
+    c.check("C9", "TLV7011 model: PWR_HI with CC at the worst 3.0 A min (%.3f V)" % v_hi,
             m["pwr_hi"], 0.9 * v3, ">=")
 
 
@@ -111,14 +113,18 @@ def main():
             d.VRD_RANGES["default"][1], "<=")
     c.check("C2", "realised ranges inside the spec's vRd windows: 1.5 A min", ranges["1.5A"][0],
             d.VRD_RANGES["1.5A"][0], ">=")
+    c.check("C2b", "realised ranges inside the spec's vRd windows: 1.5 A max", ranges["1.5A"][1],
+            d.VRD_RANGES["1.5A"][1], "<=")
+    c.check("C2c", "realised ranges inside the spec's vRd windows: 3.0 A min", ranges["3.0A"][0],
+            d.VRD_RANGES["3.0A"][0], ">=")
 
     rise, fall, ref, k = pwr_hi_trips()
     c.info("PWR_HI", "reference %.4f..%.4f V, averaging factor %.4f..%.4f; trips referred to CC: "
            "falls no lower than %.3f V, rises no higher than %.3f V" % (ref[0], ref[1], k[0], k[1], fall, rise))
-    c.check("C3", "PWR_HI stays low for any default source (lowest trip vs default max)", fall,
-            ranges["default"][1], ">=")
-    c.check("C4", "PWR_HI goes high for any 1.5 A source (highest trip vs 1.5 A min)", rise,
-            ranges["1.5A"][0], "<=")
+    c.check("C3", "PWR_HI stays low for any 1.5 A (or default) source (lowest trip vs 1.5 A max)", fall,
+            ranges["1.5A"][1], ">=", fix="raise the reference (design.CC_REF_R)")
+    c.check("C4", "PWR_HI goes high for any 3.0 A source (highest trip vs 3.0 A min)", rise,
+            ranges["3.0A"][0], "<=", fix="lower the reference (design.CC_REF_R)")
 
     # sysctl ADC classes (sysctl.md): errors from its reference and conversion
     for ident, name, th, below, above in (
@@ -129,7 +135,7 @@ def main():
         gap = min(th - err - below, above - (th + err))
         c.check(ident, "ADC threshold %s: +-%.0f mV error, worst gap to a class" % (name, 1e3 * err),
                 gap, 0.0, ">=")
-    spice_check(c, ranges["default"][1], ranges["1.5A"][0])
+    spice_check(c, ranges["1.5A"][1], ranges["3.0A"][0])
     return c.done()
 
 

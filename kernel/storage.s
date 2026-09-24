@@ -15,10 +15,17 @@
 ;             data after it. A directory entry is size (4 bytes, low first),
 ;             attributes, name length, name.
 ; Each returns an error code in r0, 0 = ok (codes in storage-card.md, and
-; ST_E_NOCARD, ST_E_TIMEOUT below). st_print_err prints its message.
+; ST_E_NOCARD, ST_E_TIMEOUT, ST_E_POWER below). st_print_err prints its message.
+;
+; Writing needs a 3 A USB-C source (SYSCTL bit 1, PWR_HI; power.md): below
+; it, opening a file to write or append, and deleting one, return ST_E_POWER
+; before the card is asked. A brown-out in the middle of a write can leave the
+; file system damaged; one in the middle of a read loses nothing, so reading
+; stays allowed.
 
 %define ST_E_NOCARD #12
 %define ST_E_TIMEOUT #11
+%define ST_E_POWER #13
 %define ST_CFG_DIV2 16
 
 st_spi: resb 1
@@ -42,6 +49,7 @@ st_s_unmounted db "\nno file system on the card\n"
 st_s_exists db "\nfile exists\n"
 st_s_badname db "\nbad file name\n"
 st_s_error db "\ncard error\n"
+st_s_power db "\nUSB power under 3A: SD writes off\n"
 
 storage_init:
 	mov r0, #0xff
@@ -265,6 +273,14 @@ st_open:
 	ld r0, [st_spi]
 	eq r0, #0xff
 	bzf .nocard
+	ld r0, [st_mode]
+	eq r0, #0
+	bzf .allowed				; reading - any source
+	ld r0, $f203				; writing - PWR_HI (a 3 A source)
+	and r0, #2
+	eq r0, #0
+	bzf .weak
+.allowed:
 	mov r0, #0x10
 	push pch
 	push pcl
@@ -281,6 +297,10 @@ st_open:
 	push pcl
 	b st_send_name
 	b st_err_answer
+.weak:
+	mov r0, ST_E_POWER
+	pop pcl
+	pop pch
 .nocard:
 	mov r0, ST_E_NOCARD
 	pop pcl
@@ -386,11 +406,15 @@ st_close:
 	pop pcl
 	pop pch
 
-; F_DELETE st_name
+; F_DELETE st_name - a write to the file system: needs PWR_HI, as st_open
 st_delete:
 	ld r0, [st_spi]
 	eq r0, #0xff
 	bzf .nocard
+	ld r0, $f203
+	and r0, #2
+	eq r0, #0
+	bzf .weak
 	mov r0, #0x17
 	push pch
 	push pcl
@@ -399,6 +423,10 @@ st_delete:
 	push pcl
 	b st_send_name
 	b st_err_answer
+.weak:
+	mov r0, ST_E_POWER
+	pop pcl
+	pop pch
 .nocard:
 	mov r0, ST_E_NOCARD
 	pop pcl
@@ -462,6 +490,8 @@ st_print_err:
 	bzf .exists
 	eq r0, #8
 	bzf .badname
+	eq r0, #13
+	bzf .power
 	mov r0, #>[st_s_error]
 	mov r1, #<[st_s_error]
 	b .print
@@ -496,6 +526,10 @@ st_print_err:
 .badname:
 	mov r0, #>[st_s_badname]
 	mov r1, #<[st_s_badname]
+	b .print
+.power:
+	mov r0, #>[st_s_power]
+	mov r1, #<[st_s_power]
 .print:
 	push pch
 	push pcl
