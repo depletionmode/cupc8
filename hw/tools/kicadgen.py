@@ -1176,6 +1176,7 @@ def remove_dangling(board, pours=()):
     are not filled yet, so their vias would look dangling. Returns the count."""
     import pcbnew
     removed = 0
+    copper = list(board.GetEnabledLayers().CuStack())
     while True:
         tracks = board.Tracks()                  # indexed: iterating it breaks on Python 3.14
         items = [tracks[i].Cast() for i in range(len(tracks))]
@@ -1209,7 +1210,8 @@ def remove_dangling(board, pours=()):
             return False
         gone = []
         for v in [v for v in vias if v in removable]:
-            layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
+            # every copper layer: on a 4-layer card a via may join F.Cu to In1.Cu
+            layers = [l for l in copper if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
             if len(layers) < 2:
                 gone.append(v)
         for t in [t for t in segs if t in removable]:
@@ -1221,7 +1223,11 @@ def remove_dangling(board, pours=()):
             return removed
         for t in gone:
             board.Remove(t)
+            t.thisown = False
         removed += len(gone)
+        # drop every proxy before asking for the tracks again: with them alive,
+        # the next board.Tracks() comes back as a bare SwigPyObject
+        del tracks, items, segs, vias, removable, gone
 
 
 def autoroute(board, workdir, passes=40, pours=(), tries=3):
