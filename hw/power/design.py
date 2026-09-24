@@ -152,10 +152,16 @@ AMS1117_THETA_JA = 90.0     # DS SOT-223 (46..90 by copper; table 1: 65 with 225
 # ---------------------------------------------------------------------------
 # Wi-Fi card 3V3 buck: TLV62569DBV, the main board's part (BOARD hw/boards/wifi.py U2)
 # ---------------------------------------------------------------------------
-WIFI_BUCK_L = 2.2e-6        # BOARD wifi.py L1, FNR3015S2R2MT (C167747)
-WIFI_BUCK_DCR = assume("Wi-Fi", "buck inductor L1 (FNR3015S2R2MT): DCR <= 100 mOhm, Isat >= 1 A", 0.100)
+WIFI_BUCK_L = 2.2e-6        # BOARD wifi.py L1, FNR3015S2R2MT (C167747, CJiang, not Sunlord)
+# L1 per LCSC's C167747 listing: 2.2 uH +-20 %, Isat 2 A, rated 2 A, DCR 78 mOhm.
+# Not yet read from CJiang's own datasheet (LCSC and oneyac blocked 2026-09-24),
+# so it stays an assumption; Isat 2 A against a 0.36 A load (+ ~0.2 A ripple)
+WIFI_BUCK_DCR = assume("Wi-Fi", "buck inductor L1 (FNR3015S2R2MT): DCR 78 mOhm, Isat 2 A (LCSC listing; "
+                       "CJiang datasheet not yet read)", 0.078)
 WIFI_BUCK_R1, WIFI_BUCK_R2 = 453e3, 100e3       # BOARD wifi.py R9 / R10 (VOUT = 3.318 V)
-WIFI_BUCK_RES_TOL = assume("Wi-Fi", "buck feedback divider R9/R10 (C25818, C25803): 1 %", 0.01)
+# R10 C25803 is UNI-ROYAL 0603WAF1003T5E (the WAF series is +-1 %). R9 C25818
+# is assumed to be the same series (0603WAF4533T5E): not yet confirmed
+WIFI_BUCK_RES_TOL = assume("Wi-Fi", "buck feedback R9 (C25818) 1 %, as R10 (C25803, UNI-ROYAL 0603WAF, 1 %)", 0.01)
 WIFI_CIN = 22e-6            # BOARD wifi.py C1
 WIFI_COUT = 22e-6           # BOARD wifi.py C2 (0805 22 uF, derated below)
 WIFI_COUT_HF = 100e-9       # BOARD wifi.py C3

@@ -161,8 +161,12 @@ Other observations (not failures):
   and IN− at 0.330 V from 3V3 via 90.9k/10k 1 %.
 - **Cards:** slot +5V contacts ≤ 30 mΩ each. IO, GPU and system cards
   ≤ 10 µF on +5V.
-- **Wi-Fi card:** L1 (FNR3015S2R2MT) DCR ≤ 100 mΩ and Isat ≥ 1 A. R9/R10
-  (C25818, C25803) 1 %. Neither has been checked against its datasheet yet.
+- **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's
+  listing gives 2.2 µH ±20 %, Isat 2 A and DCR 78 mΩ, which the checks use.
+  CJiang's own datasheet hasn't been read yet. R10 (C25803) is UNI-ROYAL
+  0603WAF1003T5E, ±1 %. R9 (C25818) is assumed to be from the same ±1 %
+  series; that isn't confirmed yet. The LCSC, oneyac and vendor sites were
+  all unreachable on 2026-09-24.
 - **System card:** ADC reference = its 3.3 V rail ±3 %. ADC error ≤ 12 LSB.
 - **Not re-fetched:** the MAX811T's threshold (2.98–3.17 V) and its ~10 µs
   glitch immunity. Both datasheet sources were unavailable on 2026-09-24.
