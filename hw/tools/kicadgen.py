@@ -1252,7 +1252,9 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     items = [tracks[i].Cast() for i in range(len(tracks))]
     held = {t.GetNetname() for t in items
             if t.Type() == pcbnew.PCB_TRACE_T and t.GetLayer() not in (pcbnew.F_Cu, pcbnew.B_Cu)}
-    inner = [(t.Type() == pcbnew.PCB_VIA_T, t.GetStart(), t.GetEnd(), t.GetWidth(), t.GetLayer(), t.GetNet(),
+    # copies: GetStart() is a view into the item, which is removed below
+    inner = [(t.Type() == pcbnew.PCB_VIA_T, pcbnew.VECTOR2I(t.GetStart().x, t.GetStart().y),
+              pcbnew.VECTOR2I(t.GetEnd().x, t.GetEnd().y), t.GetWidth(), t.GetLayer(), t.GetNet(),
               t.GetDrillValue() if t.Type() == pcbnew.PCB_VIA_T else 0)
              for t in items if t.GetNetname() in held]
     for attempt in range(tries):
