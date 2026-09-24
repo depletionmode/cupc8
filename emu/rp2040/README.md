@@ -37,6 +37,15 @@ if `<regex>` (ECMAScript syntax, searched like `RegExp.test`) matched, else 1.
 Output of the library: `librp2040emu.a`, include directory `src/`, namespace
 `rp2040js`.
 
+## Verification
+
+Every module has a seeded differential harness against the patched rp2040js
+(`test/diffs.sh`, catalogue EMU-005), and the whole chip is cycle-identical to
+it on real firmware: the same `(ns, pc0, pc1)` trace every 97 steps and the
+same UART output on the EMU-001/002 self-tests and the GPU, IO and system card
+images (`test/trace/tracediff.sh`, EMU-004). The self-tests run 20-40x faster
+than in rp2040js.
+
 ## Status
 
 | TS module | C++ | state |
@@ -44,10 +53,10 @@ Output of the library: `librp2040emu.a`, include directory `src/`, namespace
 | rp2040.ts, sio.ts, interpolator.ts, gpio-pin.ts, irq.ts, simulator.ts | `src/` | ported |
 | peripherals/{peripheral,clocks,reset,psm,io,pads,ssi,busctrl,syscfg,sysinfo,tbman}.ts | `src/peripherals/` | ported |
 | clock/{clock,simulation-clock}.ts, utils/{fifo,logging,time,bit}.ts | `src/clock/`, `src/utils/` | ported |
-| cortex-m0-core.ts, peripherals/ppb.ts | | **stub** |
-| peripherals/pio.ts | | **stub** |
-| peripherals/{dma,uart,spi,i2c,timer,watchdog,rtc,adc,pwm}.ts, utils/timer32.ts | | **stub** |
-| peripherals/{usb,usb-host}.ts, usb/{cdc,setup,interfaces}.ts | | **stub** (interfaces.h complete) |
+| cortex-m0-core.ts, peripherals/ppb.ts | `src/`, `src/peripherals/` | ported; `test/core` |
+| peripherals/pio.ts | `src/peripherals/` | ported; `test/pio` |
+| peripherals/{dma,uart,spi,i2c,timer,watchdog,rtc,adc,pwm}.ts, utils/timer32.ts | `src/peripherals/`, `src/utils/` | ported; `test/periph` |
+| peripherals/{usb,usb-host}.ts, usb/{cdc,setup,interfaces}.ts, test/emu/usbkbd.mjs | `src/peripherals/`, `src/usb/` | ported; `test/usb` |
 
 Not ported: gdb/*, utils/assembler.ts, utils/pio-assembler.ts, clock/mock-clock.ts,
 index.ts, the specs.

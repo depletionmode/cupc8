@@ -612,6 +612,24 @@ vrow = "2.4"
 cmd = "tools/fw_rp2040.sh emu_nested && node test/emu/run_nested.mjs"
 
 [[test]]
+id = "EMU-004"
+title = "Native RP2040 emulator: cycle-identical to rp2040js on real firmware"
+checks = "emu/rp2040 (the C++ port) and the patched rp2040js give byte-identical traces (ns, core 0 PC, core 1 PC every 97 steps) and UART output on the EMU-001/002 self-tests and 100 ms of the GPU (252 MHz, PicoDVI), IO and system card images"
+method = "emu/rp2040/test/trace/tracediff.sh: build/emu-native/rp2040run against emu/rp2040/test/trace/trace.mjs (the same loop as test/emu/rp2040emu.mjs)"
+kind = "sim"
+vrow = "2.4"
+cmd = "tools/fw_rp2040.sh && emu/rp2040/test/trace/tracediff.sh"
+
+[[test]]
+id = "EMU-005"
+title = "Native RP2040 emulator: each module against rp2040js"
+checks = "seeded randomised differential runs, every state change compared: the Cortex-M0+ core and PPB (500k instructions, exceptions, SysTick), PIO (every instruction and option, the project's real programs), the peripherals (DMA, UART, SPI, I2C, timers, PWM, ADC, RTC, watchdog: bus traffic, alarms, IRQs) and USB (device and host, the keyboard model); zero mismatches"
+method = "emu/rp2040/test/diffs.sh (core-diff.mjs, pio_diff.mjs, periph_diff.mjs, usb_diff.mjs)"
+kind = "sim"
+vrow = "2.4"
+cmd = "emu/rp2040/test/diffs.sh"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
