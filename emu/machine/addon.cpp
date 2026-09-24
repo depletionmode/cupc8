@@ -305,6 +305,13 @@ ENTRY(js_cards, {
     if (e) {
       set(env, o, "ns", num(env, e->ns()));
       set(env, o, "uart", jsstr(env, e->uart));
+      set(env, o, "cycles", [&] {
+        napi_value c;
+        napi_create_array_with_length(env, 2, &c);
+        napi_set_element(env, c, 0, num(env, e->mcu->core0.cycles));
+        napi_set_element(env, c, 1, num(env, e->mcu->core1.cycles));
+        return c;
+      }());
     }
     napi_set_element(env, arr, i++, o);
   };
