@@ -105,16 +105,16 @@ void Interpolator::update() {
       toInt32(std::floor((alpha1 * (static_cast<double>(s32(base1)) - s32(base0))) / 256));
   const double blend1 = ctrl1.signed_ ? sblend1 : ublend1;
 
-  smresult0 = u32(result0);
-  smresult1 = u32(result1);
+  this->smresult0 = u32(result0);
+  this->smresult1 = u32(result1);
   // `u32(do_blend ? alpha1 : (do_clamp ? clamp0 : addresult0) | (ctrl0.forceMSB << 28))`
-  result0 = do_blend ? alpha1
+  this->result0 = do_blend ? alpha1
                      : u32(static_cast<double>(toInt32(do_clamp ? clamp0 : addresult0) |
                                                static_cast<int32_t>(ctrl0.forceMSB << 28)));
   // `u32((do_blend ? blend1 : addresult1) | (ctrl0.forceMSB << 28))`
-  result1 = static_cast<uint32_t>(toInt32(do_blend ? blend1 : addresult1) |
+  this->result1 = static_cast<uint32_t>(toInt32(do_blend ? blend1 : addresult1) |
                                   static_cast<int32_t>(ctrl0.forceMSB << 28));
-  result2 = u32(addresult2);
+  this->result2 = u32(addresult2);
 
   ctrl0.overf0 = overf0;
   ctrl0.overf1 = overf1;
