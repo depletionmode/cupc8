@@ -19,6 +19,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <regex>
 #include <string>
@@ -129,29 +130,37 @@ class Emu {
   // by which that moved the chip's time on
   void step() {
     if (mcu->waiting()) {
-      // both cores asleep: skip to the next timer alarm, but no further than
-      // one microsecond so PIO and the test bench still see time pass
-      const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
-      const double cycles = std::max(1.0, jsMathRound(ns / nsPerCycle));
-      mcu->idle(cycles);
-      this->cycles(cycles);
+      stepIdle();
       return;
     }
     const double cycles = mcu->step();  // 0 when the core that ran is still behind the other
     if (cycles) this->cycles(cycles);
   }
 
+  // both cores asleep: skip to the next timer alarm, but no further than
+  // one microsecond so PIO and the test bench still see time pass
+  __attribute__((noinline)) void stepIdle() {
+    const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
+    const double cycles = std::max(1.0, jsMathRound(ns / nsPerCycle));
+    mcu->idle(cycles);
+    this->cycles(cycles);
+  }
+
   void cycles(double n) {
     if (onCycle) {
-      for (double i = 0; i < n; i++) {
-        for (RPPIO &pio : mcu->pio)
-          if (!pio.stopped) pio.step();
-        onCycle(*this);
-      }
+      cyclesHooked(n);
     } else {
       stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
     }
     clock.tick(n * nsPerCycle);
+  }
+
+  __attribute__((noinline)) void cyclesHooked(double n) {
+    for (double i = 0; i < n; i++) {
+      for (RPPIO &pio : mcu->pio)
+        if (!pio.stopped) pio.step();
+      onCycle(*this);
+    }
   }
 
   // run until cond() is true; false if `ns` of emulated time pass first
@@ -159,9 +168,23 @@ class Emu {
     const double end = clock.nanos() + ns;
     while (clock.nanos() < end) {
       if (cond()) return true;
-      for (int i = 0; i < 64; i++) {
-        step();
-        afterStep();
+      // for (let i = 0; i < 64; i++) { this.step(); afterStep(); }, the steps
+      // between two trace points in one loop (RP2040::runSteps) unless onCycle
+      for (uint64_t i = 0; i < 64;) {
+        uint64_t k = 64 - i;
+        if (traceEvery) k = std::min(k, traceEvery - steps % traceEvery);
+        if (onCycle) {
+          step();
+          k = 1;
+        } else {
+          mcu->runSteps(k, std::numeric_limits<double>::infinity(), clock, nsPerCycle);
+        }
+        i += k;
+        steps += k;
+        if (traceEvery && steps % traceEvery == 0) {
+          std::fprintf(stderr, "%s %08x %08x\n", jsNumber(clock.nanos()).c_str(), mcu->core0.PC(),
+                       mcu->core1.PC());
+        }
       }
     }
     return cond();
@@ -170,14 +193,6 @@ class Emu {
   // --trace-every
   uint64_t traceEvery = 0;
   uint64_t steps = 0;
-
- private:
-  void afterStep() {
-    if (traceEvery && ++steps % traceEvery == 0) {
-      std::fprintf(stderr, "%s %08x %08x\n", jsNumber(clock.nanos()).c_str(), mcu->core0.PC(),
-                   mcu->core1.PC());
-    }
-  }
 };
 
 // process.stdout.write(string): the UART text is one UTF-16 unit per byte
