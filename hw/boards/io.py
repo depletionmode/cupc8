@@ -84,7 +84,7 @@ POWER_NETS = rc.POWER_NETS + ("/VBUS",)
 # J2's opening is 12.04 mm in front of its footprint origin (the pegs are
 # 2.54 mm in front, the shell face 9.5 mm beyond them: C112455 drawing), so
 # turned to face up, the origin sits 12.04 mm below the top edge
-PLACEMENT = dict(rc.core_placement(27, -21), **{
+PLACEMENT = dict(rc.core_placement(28, -17.5), **{
     "J1": (0, 0, 0),
     "U2": (1.5, -13.5, 0),
     "C1": (-4.5, -13.5, 90),
@@ -96,17 +96,17 @@ PLACEMENT = dict(rc.core_placement(27, -21), **{
     "R6": (25, -38.5, 0),
     "D3": (25, -41, 0),
     "J2": (39.5, -44 + 12.04, 180),
-    "U6": (39.5, -25, 0),
-    "R14": (35, -26, 90),
-    "R15": (36.5, -26.5, 90),
+    "U6": (41, -25.5, 0),
+    "R14": (36.5, -23, 0),
+    "R15": (36.5, -21.5, 0),
     "U5": (50, -22, 0),
     "C20": (53, -27, 0),
-    "C21": (46, -17.5, 0),
-    "C22": (45.5, -25.5, 90),
-    "R10": (43.5, -21, 90),
-    "R11": (46.5, -21, 90),
-    "R12": (37, -18, 90),
-    "R13": (40, -18, 90),
+    "C21": (51.5, -16.5, 90),
+    "C22": (44.5, -25.5, 90),
+    "R10": (47.5, -19.5, 90),
+    "R11": (45, -19.5, 90),
+    "R12": (37, -10, 90),
+    "R13": (40, -10, 90),
     # bring-up pads down the left edge, the SWD ones nearest the fingers they share
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })

@@ -21,7 +21,8 @@ G = kg.GRID
 # pairs are GPIO n (N) and n+1 (P): the firmware inverts the pads, which
 # puts the pairs round the chip in the receptacle's order.
 TMDS = {"D0": 12, "D1": 14, "D2": 16, "CK": 10}
-GPIOS = {0: "UART_TX", 18: "HDMI_HPD", 19: "HDMI_SCL", 20: "HDMI_SDA", 25: "LED_ACT"}
+# GPIO25 (LED_ACT in pins.yaml) has no LED: the GPU card has only its power LED
+GPIOS = {0: "UART_TX", 18: "HDMI_HPD", 19: "HDMI_SCL", 20: "HDMI_SDA"}
 for lane, g in TMDS.items():
     GPIOS[g], GPIOS[g + 1] = "TMDS_%sN" % lane, "TMDS_%sP" % lane
 
@@ -34,7 +35,7 @@ HDMI_NC = (13, 14)                          # CEC, utility
 
 def schematic(path, footprint_libs):
     s = kg.Schematic("gpu", "CUPC/8 graphics card (DVI on HDMI)", paper="A2")
-    rc.core(s, GPIOS, "ACT")
+    rc.core(s, GPIOS)
 
     # ---- the receptacle
     j2 = s.add("jlc:HDMI19PIN043", "J2", "HDMI-A", "cupc8:HDMI_A_SHOUHAN_HDMI-19PIN-043",
@@ -49,11 +50,12 @@ def schematic(path, footprint_libs):
     # ---- TMDS: 270 ohm in series with each GPIO, PicoDVI's DC-coupled
     # "DVI PHY" (Wren6991/PicoDVI hardware/mini_board, R12-R19): with the
     # sink's 50 ohm termination to its 3V3, a low GPIO sinks ~10 mA, as TMDS
-    # asks. Two 4 x 0402 arrays, in the connector's order.
+    # asks. Two 4 x 0603 arrays (0402 arrays have pads 0.15 mm apart, under
+    # the 0.2 mm clearance), in the connector's order.
     arrays = {"RN1": ("D2P", "D2N", "D1P", "D1N"), "RN2": ("D0P", "D0N", "CKP", "CKN")}
     for i, (ref, lines) in enumerate(arrays.items()):
-        rn = s.add("Device:R_Pack04", ref, "270", "Resistor_SMD:R_Array_Convex_4x0402",
-                   at=((188 + 16 * i) * G, 70 * G), fields={"LCSC": "C728722"})
+        rn = s.add("Device:R_Pack04", ref, "270", "Resistor_SMD:R_Array_Convex_4x0603",
+                   at=((188 + 16 * i) * G, 70 * G), fields={"LCSC": "C425067"})
         for k, line in enumerate(lines):
             s.connect(rn, k + 1, "TMDS_" + line)        # chip side
             s.connect(rn, 8 - k, "HD_" + line)          # connector side
@@ -112,58 +114,54 @@ def schematic(path, footprint_libs):
     s.write(path, footprint_libs=footprint_libs)
 
 
-# Taller than the other cards (60 mm is the slot's limit): the receptacle,
-# the ESD, the arrays and the crystal stack up between the chip and the top
-# edge, in that order, so the TMDS lines run straight up.
-BODY = (-6, -52, 56, -4.95)
-EDGE = [(-0.65, -4.95), (-6, -4.95), (-6, -52), (56, -52), (56, -4.95), (19.65, -4.95)]
 POWER_NETS = rc.POWER_NETS + ("/HDMI_5V",)
-HX = 26                        # the receptacle's centre: pin n at HX - 4.5 + 0.5 (n - 1)
-# the chip turned round, so its TMDS edge (GPIO10-17) faces the receptacle;
-# the crystal moves from under it (turned: over it) to the gap the TMDS
-# lines leave in the middle of that edge, by XIN/XOUT
-PLACEMENT = dict(rc.core_placement(24, -20, turn=180), **{
-    # the pocket between the D2 and D1 routes: XIN/XOUT, DVDD 23 and IOVDD 22
-    # sit on this edge between the pairs, so their parts do too
-    "R2": (24.25, -25.3, 90),
-    "C12": (23.3, -25.3, 90),
-    "C5": (23.3, -27.2, 90),
-    "Y1": (24.0, -29.6, 0),
-    "C16": (21.4, -29.6, 90),
-    "C17": (26.6, -29.6, 90),
+CX, CY = 26, -18               # the RP2040, turned round: its TMDS edge (GPIO10-17) faces the receptacle
+HX = CX + 1.5                  # the receptacle's centre: pin n at HX - 4.5 + 0.5 (n - 1), so D2 runs straight up
+# Up from the chip: the arrays, the ESD, the receptacle at the top edge. The
+# edge's middle pins (RUN, SWD, DVDD, IOVDD, XIN/XOUT) sit between the D2
+# and D1 pairs: DVDD's and IOVDD's caps stay in that pocket at their pins,
+# the rest leave it through vias, and the crystal sits off to the left.
+PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
+    "C12": (CX - 0.7, CY - 5.3, 90),     # DVDD 23
+    "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
+    "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
+    "C5": (CX + 0.3, CY - 5.3, 90),      # IOVDD 22
+    "Y1": (CX - 8.5, CY - 4.0, 0),
+    "C16": (CX - 11.2, CY - 4.0, 90),
+    "C17": (CX - 8.5, CY - 1.4, 0),
+    "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
+    "U3": (CX + 9, CY + 9, 0),       # flash, by the QSPI pins (now on the bottom edge)
+    "C15": (CX + 10.5, CY + 4.6, 0),
+    "R1": (CX + 14.5, CY + 9, 90),
     "J1": (0, 0, 0),
     "U2": (1.5, -13.5, 0),
     "C1": (-4.5, -13.5, 90),
     "C2": (7.5, -13.5, 90),
-    "U4": (17, -10, 0),
-    "C18": (20.5, -10, 90),
-    "R4": (-2.5, -46, 0),
-    "D1": (-2.5, -48.5, 0),
-    "R5": (1.5, -46, 0),
-    "D2": (1.5, -48.5, 0),
-    "J2": (HX, -52 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin
-    "U5": (HX - 3.25, -38.3, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
-    "U6": (HX - 0.25, -38.3, 90),
-    "RN1": (HX - 3.25, -33.5, 90),
-    "RN2": (HX - 0.25, -33.5, 90),
-    "F1": (35, -40.5, 90),
-    "D3": (35, -36.5, 90),
-    "C20": (32.5, -38.5, 90),
-    "R20": (38, -44, 90),
-    "R21": (38, -40.5, 90),
-    "Q1": (41.5, -36, 0),
-    "Q2": (46.5, -36, 0),
-    "R22": (41.5, -32, 90),
-    "R23": (41.5, -40, 90),
-    "R24": (46.5, -32, 90),
-    "R25": (46.5, -40, 90),
-    "TP1": (-2, -24), "TP2": (1.5, -24), "TP3": (5, -24), "TP4": (-2, -29), "TP5": (1.5, -29), "TP6": (5, -29),
+    "U4": (14, -12.5, 0),
+    "C18": (10.5, -12.5, 90),
+    "J2": (HX, -44 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin
+    "U5": (HX - 3.25, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
+    "U6": (HX - 0.25, -31.0, 90),
+    "RN1": (HX - 4, -28.2, 90),
+    "RN2": (HX, -28.2, 90),
+    "F1": (39, -42.5, 0),
+    "D3": (38.5, -39.5, 0),
+    "C20": (36.8, -36.5, 90),
+    "R20": (44.5, -42, 90),
+    "R21": (44.5, -38.5, 90),
+    "Q1": (44, -33, 0),
+    "Q2": (44, -28, 0),
+    "R22": (40.5, -30.5, 90),
+    "R23": (47.5, -33, 90),
+    "R24": (40.5, -25.5, 90),
+    "R25": (47.5, -28, 90),
+    "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LAYERS = 2
 LOGO_MM = 12
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 48, -22, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0)]
 
 
 if __name__ == "__main__":
-    rc.build("gpu", schematic, PLACEMENT, BODY, EDGE, POWER_NETS, GRAPHICS, layers=LAYERS)
+    rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, layers=LAYERS)

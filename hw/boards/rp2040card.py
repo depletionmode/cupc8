@@ -92,15 +92,15 @@ def core_placement(cx, cy, turn=0):
     rel = {
         "U1": (0, 0, 0),
         "C3": (-5.4, -2.2, 0),        # IOVDD 1
-        "C4": (-5.2, 1.2, 0),         # IOVDD 10
+        "C4": (-5.2, 3.2, 0),         # IOVDD 10, below the slot pins' fan-out
         "C12": (0.4, 5.4, 90),        # DVDD 23
         "C5": (0.4, 7.6, 90),         # IOVDD 22
         "C6": (5.2, 1.2, 0),          # IOVDD 33
         "C7": (5.2, -2.6, 0),         # IOVDD 42
-        "C9": (5.2, -4.1, 0),         # ADC_AVDD 43
-        "C11": (5.2, -5.6, 0),        # VREG_VIN 44
-        "C14": (5.2, -7.1, 0),        # VREG_VOUT 45
-        "C13": (5.2, -8.6, 0),        # DVDD 50
+        "C9": (5.2, -4.4, 0),         # ADC_AVDD 43
+        "C11": (5.2, -6.2, 0),        # VREG_VIN 44
+        "C14": (5.2, -8.0, 0),        # VREG_VOUT 45
+        "C13": (5.2, -9.8, 0),        # DVDD 50
         "C10": (0.3, -5.3, 90),       # USB_VDD 48
         "C8": (0.3, -7.2, 90),        # IOVDD 49
         "U3": (-7.0, -10.0, 90),      # flash
@@ -172,8 +172,8 @@ def core(s, gpios, leds=(), usb=False):
     p["C2"] = passive(s, "C", "C2", "22u", (44 * G, 14 * G))
     two(s, p["C1"], "+5V", "GND")
     two(s, p["C2"], "3V3", "GND")
-    flg = [s.add("power:PWR_FLAG", "#FLG0%d" % (i + 1), "PWR_FLAG", at=((6 + 6 * i) * G, 6 * G)) for i in range(2)]
-    for f, net in zip(flg, ("+5V", "GND")):      # VREG_VOUT drives 1V1
+    flg = [s.add("power:PWR_FLAG", "#FLG0%d" % (i + 1), "PWR_FLAG", at=((6 + 6 * i) * G, 6 * G)) for i in range(3)]
+    for f, net in zip(flg, ("+5V", "GND", "3V3")):   # the regulator's pins are passive; VREG_VOUT drives 1V1
         s.connect(f, 1, net)
 
     # ---- the RP2040
