@@ -27,11 +27,11 @@ import logo  # noqa: E402
 
 G = kg.GRID
 
-R0402 = "Resistor_SMD:R_0402_1005Metric"
-C0402 = "Capacitor_SMD:C_0402_1005Metric"
+R0603 = "Resistor_SMD:R_0603_1608Metric"
+C0603 = "Capacitor_SMD:C_0603_1608Metric"
 C0805 = "Capacitor_SMD:C_0805_2012Metric"
 LED0805 = "LED_SMD:LED_0805_2012Metric"
-TP = "TestPoint:TestPoint_Pad_D1.0mm"
+TP = "cupc8:TestPad_D1.0mm"
 
 # sysctl GPIO -> net, from hw/pins.yaml (fw/rp2040/sysctl depends on them).
 # Outputs that drive a slot SPI bus go through 33 Ohm source termination
@@ -55,29 +55,29 @@ TERMINATED = ["BR_SCK", "BR_MOSI", "BR_nCS", "FL0_SCK", "FL0_MOSI", "FL0_nCS",
 # two-pin parts: ref, symbol, value, footprint, LCSC, net on pin 1 (top), pin 2
 PASSIVES = (
     # RP2040 supply pins, one 100 nF each (IOVDD x6, USB_VDD, ADC_AVDD, DVDD x2)
-    [("C%d" % i, "Device:C", "100n", C0402, "C1525", "+3V3", "GND") for i in range(1, 9)] +
-    [("C9", "Device:C", "100n", C0402, "C1525", "1V1", "GND"),
-     ("C10", "Device:C", "100n", C0402, "C1525", "1V1", "GND"),
-     ("C11", "Device:C", "100n", C0402, "C1525", "+3V3", "GND"),       # flash
-     ("C12", "Device:C", "1u", C0402, "C52923", "+3V3", "GND"),        # VREG_VIN
-     ("C13", "Device:C", "1u", C0402, "C52923", "1V1", "GND"),         # VREG_VOUT
+    [("C%d" % i, "Device:C", "100n", C0603, "C14663", "+3V3", "GND") for i in range(1, 9)] +
+    [("C9", "Device:C", "100n", C0603, "C14663", "1V1", "GND"),
+     ("C10", "Device:C", "100n", C0603, "C14663", "1V1", "GND"),
+     ("C11", "Device:C", "100n", C0603, "C14663", "+3V3", "GND"),       # flash
+     ("C12", "Device:C", "1u", C0603, "C15849", "+3V3", "GND"),        # VREG_VIN
+     ("C13", "Device:C", "1u", C0603, "C15849", "1V1", "GND"),         # VREG_VOUT
      ("C14", "Device:C", "10u", C0805, "C15850", "+3V3", "GND"),       # slot bulk
      # X322512MSB4SI: CL = 20 pF; 2 x (20 - ~4 pF stray) = 32 pF -> 33 pF
-     ("C15", "Device:C", "33p", C0402, "C1562", "XIN", "GND"),
-     ("C16", "Device:C", "33p", C0402, "C1562", "XOUT_X", "GND"),
-     ("R1", "Device:R", "1k", R0402, "C11702", "XOUT", "XOUT_X"),
-     ("R2", "Device:R", "27", R0402, "C25100", "USB_DP_MCU", "USB_DP"),
-     ("R3", "Device:R", "27", R0402, "C25100", "USB_DM_MCU", "USB_DM"),
-     ("R4", "Device:R", "5.1k", R0402, "C25905", "USB_CC1", "GND"),     # UFP Rd
-     ("R5", "Device:R", "5.1k", R0402, "C25905", "USB_CC2", "GND"),
-     ("R6", "Device:R", "1k", R0402, "C11702", "QSPI_nSS", "BOOTSEL"),  # short TP to GND
-     ("R7", "Device:R", "10k", R0402, "C25744", "+3V3", "I2C_SDA"),
-     ("R8", "Device:R", "10k", R0402, "C25744", "+3V3", "I2C_SCL"),
-     ("R9", "Device:R", "1k", R0402, "C11702", "+3V3", "LED_PWR"),
-     ("R10", "Device:R", "220", R0402, "C25091", "LED_STATUS", "LED_ST"),
+     ("C15", "Device:C", "33p", C0603, "C1663", "XIN", "GND"),
+     ("C16", "Device:C", "33p", C0603, "C1663", "XOUT_X", "GND"),
+     ("R1", "Device:R", "1k", R0603, "C21190", "XOUT", "XOUT_X"),
+     ("R2", "Device:R", "27", R0603, "C25190", "USB_DP_MCU", "USB_DP"),
+     ("R3", "Device:R", "27", R0603, "C25190", "USB_DM_MCU", "USB_DM"),
+     ("R4", "Device:R", "5.1k", R0603, "C23186", "USB_CC1", "GND"),     # UFP Rd
+     ("R5", "Device:R", "5.1k", R0603, "C23186", "USB_CC2", "GND"),
+     ("R6", "Device:R", "1k", R0603, "C21190", "QSPI_nSS", "BOOTSEL"),  # short TP to GND
+     ("R7", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SDA"),
+     ("R8", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SCL"),
+     ("R9", "Device:R", "1k", R0603, "C21190", "+3V3", "LED_PWR"),
+     ("R10", "Device:R", "220", R0603, "C22962", "LED_STATUS", "LED_ST"),
      ("D1", "Device:LED", "red", LED0805, "C84256", "LED_PWR", "GND"),       # power
      ("D2", "Device:LED", "green", LED0805, "C2297", "LED_ST", "GND")] +     # status, GPIO29
-    [("R%d" % (11 + i), "Device:R", "33", R0402, "C25105", n + "_MCU", n) for i, n in enumerate(TERMINATED)]
+    [("R%d" % (11 + i), "Device:R", "33", R0603, "C23140", n + "_MCU", n) for i, n in enumerate(TERMINATED)]
 )
 
 # test pads: SWD and RUN for bring-up of the card itself, BOOTSEL (short to
@@ -91,7 +91,7 @@ def schematic(path, footprint_libs):
     s = kg.Schematic("system", "CUPC/8 system card (sysctl RP2040)")
 
     u1 = s.add("MCU_RaspberryPi:RP2040", "U1", "RP2040",
-               "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm_ThermalVias",
+               "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm",
                at=(24 * G, 30 * G), fields={"LCSC": "C2040"})
     for name in ("IOVDD", "USB_VDD", "ADC_AVDD", "VREG_VIN"):
         for n, pin in u1.pins.items():
@@ -209,7 +209,7 @@ EDGE_AT = (W / 2 - 16.5, H + 4.95)
 OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
 LOGO_MM = 12
-LOGO_AT = (47, 31.5)
+LOGO_AT = (48.5, 31.5)
 
 PLACEMENT = {
     "J2": (EDGE_AT[0], EDGE_AT[1], 0),
@@ -218,26 +218,26 @@ PLACEMENT = {
     # (hw/smoke/smoke.py); a half turn faces the opening up, off the top edge
     "J1": (42, 3.19, 180),
     "U3": (42, 11.5, 0),
-    "R2": (36.2, 12.5, 90), "R3": (38.2, 12.5, 90),
+    "R2": (41, 15.5, 0), "R3": (41, 17.5, 0),
     "R4": (49.5, 6, 0), "R5": (49.5, 8, 0),
     "U2": (13, 13, 0),
     "C11": (18.5, 7.5, 0),
-    "R6": (8, 7.5, 0),
+    "R6": (12, 18.5, 0),
     "Y1": (19, 25, 0),
-    "C15": (15, 23, 90), "C16": (15, 27, 90), "R1": (23, 26.5, 90),
+    "C15": (13.3, 23, 90), "C16": (13.3, 27, 90), "R1": (23, 26.5, 90),
     # decoupling around U1 (28, 17)
-    "C1": (22, 14.5, 90), "C2": (22, 19, 90),
-    "C3": (26, 23, 0), "C9": (29.5, 23, 0),
-    "C4": (34, 19, 90), "C5": (34, 15, 90),
-    "C6": (24, 11, 0), "C10": (26.8, 11, 0), "C7": (29.6, 11, 0), "C8": (32.4, 11, 0),
-    "C12": (31.5, 7.5, 0), "C13": (26, 7.5, 0),
-    "C14": (14, 34.5, 0),
+    "C1": (21.8, 14.5, 90), "C2": (21.8, 19, 90),
+    "C3": (24.5, 23.8, 0), "C9": (31.5, 23.8, 0),
+    "C4": (34.2, 19, 90), "C5": (34.2, 14.5, 90), "C13": (36.5, 16.8, 90),
+    "C6": (22.4, 10.3, 90), "C10": (25.2, 10.3, 90), "C7": (28, 10.3, 90), "C8": (30.8, 10.3, 90),
+    "C12": (33.6, 10.3, 90),
+    "C14": (8.5, 34.8, 0),
     "R7": (38, 22, 90), "R8": (40, 22, 90),
     "D1": (51, 13, 0), "R9": (51, 15.5, 0),
     "D2": (51, 20, 0), "R10": (51, 22.5, 0),
 }
 for _i, _n in enumerate(TERMINATED):
-    PLACEMENT["R%d" % (11 + _i)] = (15 + 2.8 * _i, 31, 90)
+    PLACEMENT["R%d" % (11 + _i)] = (15 + 3.2 * _i, 31, 90)
 for _i, (_ref, _) in enumerate(TEST_PADS):
     PLACEMENT[_ref] = (2.5, 3 + 3.1 * _i, 0)
 
@@ -247,7 +247,9 @@ def main():
     logo.footprint(LOGO_MM)
     kg.pipeline("system", schematic, PLACEMENT, OUTLINE,
                 out=sys.argv[1] if len(sys.argv) > 1 else None,
-                power_nets=("/+3V3", "/1V1", "/GND"), edge=EDGE, card_edge=True,
+                power_nets=("/+3V3", "/1V1", "/GND"), edge=EDGE, card_edge=True, layers=4,
+                # the pour reaches over the finger tops, so GND fingers join it
+                zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
                 graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)])
 
 
