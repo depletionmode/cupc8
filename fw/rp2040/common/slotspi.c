@@ -166,14 +166,20 @@ void slotspi_refresh(void)
 	/* only CS_n's interrupt shares this state: mask it alone, never the
 	 * video's (see slotspi_init) */
 	irq_set_enabled(IO_IRQ_BANK0, false);
-	if (gpio_get(PIN_SLOT_NCS)) {
-		/* No frame in progress, so the SM is parked at `wait` (or, if CS_n
-		 * has just fallen, at the blocking first pull): swap its preload
-		 * for the current status and response without stopping it. */
+	/* Swap the preload for the current status and response only while the
+	 * SM is still waiting for CS_n: stopped, it cannot move on, and at
+	 * `start` it has pulled nothing. (Checking the CS_n pin instead raced a
+	 * falling CS_n: the SM could pull the old status byte between the check
+	 * and the FIFO clear, and the frame then began with two status bytes,
+	 * so the host read the second as RESP_LEN.) If a frame has begun, it
+	 * goes out with the old preload; cs_rose re-arms after it. */
+	pio_sm_set_enabled(pio, sm, false);
+	if (pio_sm_get_pc(pio, sm) == prog + slotspi_offset_start) {
 		dma_channel_abort(dma_tx);
 		pio_sm_clear_fifos(pio, sm);
 		arm_tx();
 	}
+	pio_sm_set_enabled(pio, sm, true);
 	irq_set_enabled(IO_IRQ_BANK0, true);
 }
 

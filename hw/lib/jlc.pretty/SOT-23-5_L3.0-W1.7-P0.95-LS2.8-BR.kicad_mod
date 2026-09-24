@@ -9,7 +9,7 @@
 	(fp_text user %R (at 0 0) (layer F.Fab)
 		(effects (font (size 1 1) (thickness 0.15)))
 	)
-	(property "LCSC Part" "C58464")
+	(property "LCSC Part" "C141836")
 	
 	
 	

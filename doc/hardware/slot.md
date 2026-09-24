@@ -58,8 +58,10 @@ and 12. The pinout is custom. Never plug a real PCIe card in.
 | +5V | main → card | Each slot is fed through its own 750 mA-hold PTC fuse, a 0 Ω isolation link and a 50 mΩ sense resistor with test pads. |
 | +3V3 | main → card | From the main 3V3 buck. Max 300 mA per card. Cards with heavy loads regulate from +5V instead. |
 
-Budget per card: ≤ 1 A total from +5V and +3V3 combined. The whole-system
-budget is in `power.md`.
+Budget per card: ≤ 0.55 A from +5V and ≤ 300 mA from +3V3. The +5V figure is
+what the slot's 0.75 A-hold PTC fuse still holds at 40 °C (0.65 A) less a
+margin (`hw/power`, POW-006 B9). Every M1 card is well inside it. The
+whole-system budget is in `power.md`.
 
 ## Common card protocol
 
@@ -178,9 +180,16 @@ ESP ROM bootloader sync.
     (52.0, −40.0), 4 mm in from the top-right corner;
   - **power LED** (0603, lit from the card's own 3.3 V rail) centred at
     (−3.0, −41.0), 3 mm in from the top-left corner, the same on every card;
+  - **other LEDs** (link, activity) in a row along the top edge to the
+    right of the power LED, centred on the same line (y = −41.0);
+  - the board's **name and revision** (`<name> rev <X>`) on the silkscreen
+    in the bottom-right corner of the body;
   - nothing but the fingers' ground ties within 5 mm above the tab.
-  `hw/tools/kicadgen.py` carries these as `IO_CARD_*`, and every card's
-  script uses them.
+  `hw/tools/kicadgen.py` carries these as `IO_CARD_*`. Every I/O card's
+  script builds with `pipeline(io_card=True)`, which takes the outline from
+  there and refuses a card whose outline, finger connector, M3 hole or power
+  LED is not at these positions. The system card, in its own keyed slot, has
+  its own outline (`system-slot.md`).
 - **Connectors:** on the card's top edge, facing away from the main board.
 - **Mounting:** each card has an M3 hole that lines up with a standoff on a
   main board mounting rail. On the main board every socket has contact 1

@@ -1,0 +1,62 @@
+* CUPC/8 behavioural power models (ngspice).
+*
+* These are NOT vendor models. Advanced Monolithic Systems, Richtek and
+* Silergy publish none for the AMS1117, RT9013 and SY6280. Each model is built
+* from the datasheet figures that hw/power/design.py passes in as parameters,
+* and is only as good as those figures. The vendor models (TI TLV62569,
+* TLV7011) are fetched by hw/power/models/fetch.py.
+
+* ---------------------------------------------------------------------------
+* LDO_BEH: a linear regulator as a Thevenin source.
+*
+*   ideal source  VSET, ramped up over TSS from t = 0, plus the input
+*                 ripple shaped by the PSRR: PSRR_DC below F_PSRR, rising
+*                 20 dB/decade above it, up to 0 dB (no loop gain left)
+*   clamped by    dropout: never above VIN - (DROP0 + RDROP * Iout)
+*                 current limit: collapses above ILIM
+*   behind        the closed-loop output impedance RDC + (LEQ || RP): RDC is
+*                 the load regulation, LEQ the rise in impedance as the loop
+*                 gain falls, RP the pass device's own impedance at high
+*                 frequency. LEQ and RP are fitted to a datasheet load-step
+*                 figure (see design.py).
+*   input         draws Iout + IQ from IN
+*
+* Limits: it has no loop, so it says nothing about stability with a given
+* output capacitor; and it can sink current, which a real pass device can't
+* (this flatters the overshoot on load release, so the checks use the droop
+* when load is applied).
+* ---------------------------------------------------------------------------
+.subckt LDO_BEH in out gnd params: VSET=3.3 TSS=100u DROP0=1 RDROP=0.2 ILIM=1
++ IQ=5m PSRR_DC=1e-3 F_PSRR=1k VIN_NOM=5 RDC=5m LEQ=0.3u RP=0.2
+* PSRR: PSRR_DC * (vin - VIN_NOM), plus a first-order high-pass of vin with
+* its corner where the rising PSRR reaches 0 dB (F_PSRR / PSRR_DC)
+Chp in hp {1 / (6.2832 * 1000 * F_PSRR / PSRR_DC)}
+Rhp hp gnd 1k
+Bps ps gnd v = {PSRR_DC} * (v(in, gnd) - {VIN_NOM}) + (1 - {PSRR_DC}) * v(hp, gnd)
+* the source, clamped by dropout and current limit
+Bsrc src gnd v = max(0, min({VSET} * min(1, time / {TSS}) + v(ps, gnd),
++   v(in, gnd) - {DROP0} - {RDROP} * max(0, i(Vsense)))
++   - 100 * max(0, i(Vsense) - {ILIM}))
+Rdc src z {RDC}
+Leq z o2 {LEQ}
+Rp z o2 {RP}
+Vsense o2 out 0
+* input current
+Bin in gnd i = max(0, i(Vsense)) + {IQ}
+.ends LDO_BEH
+
+* ---------------------------------------------------------------------------
+* SW_BEH: a current-limited, soft-started load switch (SY6280 class).
+*
+*   TDLY after t = 0 (IN is applied at t = 0 in every deck) the gate ramps,
+*   and the output follows it from 0 to IN over TON (SY6280: 120 us). The
+*   channel is RON when fully on. Above ILIM the switch holds its current at
+*   ILIM (the SY6280 limits; it does not latch off). Reverse current is blocked (the SY6280 has no body diode).
+*   Thermal shutdown is not modelled: the inrush check computes the energy.
+* ---------------------------------------------------------------------------
+.subckt SW_BEH in out gnd params: RON=80m ILIM=1.5 TON=120u TDLY=5u
+* channel: i = x / RON, limited to ILIM with a sharp but smooth knee (the
+* 8-norm: within 5% of the linear value up to 0.9 * ILIM)
+Bx x gnd v = max(0, v(in, gnd) * min(1, max(0, time - {TDLY}) / {TON}) - v(out, gnd)) / {RON} / {ILIM}
+Bch in out i = {ILIM} * v(x, gnd) / pow(1 + pow(v(x, gnd), 8), 0.125)
+.ends SW_BEH
