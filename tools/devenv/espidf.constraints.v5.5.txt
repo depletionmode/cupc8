@@ -1,0 +1,16 @@
+# Hand-written stand-in for https://dl.espressif.com/dl/esp-idf/espidf.constraints.v5.5.txt
+# (dl.espressif.com is blocked here). Keeps the ESP-IDF v5.x-era major versions.
+esptool>=4.9,<5
+esp-idf-kconfig>=2.5,<3
+esp-idf-monitor>=1.7,<2
+esp-idf-size>=1.6,<2
+esp-coredump>=1.13,<2
+esp-idf-panic-decoder>=1.4,<2
+esp-idf-nvs-partition-gen>=0.1.8,<0.3
+esp-idf-diag>=0.1,<1
+idf-component-manager~=2.2
+pyclang>=0.6,<0.7
+construct~=2.10
+freertos_gdb~=1.0
+tree_sitter>=0.23,<0.26
+tree_sitter_c>=0.23,<0.25
