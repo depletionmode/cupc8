@@ -105,9 +105,16 @@ test pads.
 
 **Test pads** (not assembled parts): SWCLK, SWDIO, RUN, BOOTSEL (short it to
 GND while powering up for the USB boot ROM; it reaches QSPI_SS through
-1 kΩ), the debug UART (GPIO0 TX, GPIO1 RX), +3V3, 1V1, GND, and RSVD_B1/B2.
+1 kΩ), +3V3, 1V1, GND, and RSVD_B1/B2.
 
-**LEDs.** Power (red, 1 kΩ from +3V3) and status (green, 100 Ω, GPIO29).
+**LEDs** ([milestone-1.md](../../doc/milestone-1.md), Indicator LEDs):
+power (D1, red KT-0603R, 1 kΩ from +3V3) at `kg.power_led_at`, 3 mm in from
+the body's top-left; USB activity to the host (D3, TX, GPIO0) and from it
+(D4, RX, GPIO1), green KT-0603G with 100 Ω, each lit for ~30 ms after data
+in its direction; status (D2, green, GPIO29: on while the host has the USB
+device configured). All 30 GPIOs were assigned, so the activity LEDs take
+GPIO0/1, which `hw/pins.yaml` had as a debug UART that no firmware used; the
+USB CDC link and the SWD pads cover debugging.
 
 **Board.** Four layers (JLC04161H-7628), GND poured on both outer layers.
 The fan-out of a 0.4 mm QFN-56 with 50-odd slot nets through the finger
