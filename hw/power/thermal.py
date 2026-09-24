@@ -11,13 +11,15 @@ at the corner that heats it most:
                   a switching-loss estimate and the control current, at both
                   5V_SYS corners; two loads: the M1 maximum, and the M1
                   maximum plus slots 4-6 each drawing their 300 mA of +3V3
+  TLV62569 (Wi-Fi card)  the same loss model at Espressif's TX current,
+                  rated at 100 % duty (a long transfer or an RF test), from
+                  the slot's +5V at both of its corners
   RT9013 (1V2)    (3V3 max - 1V2 min) x 40 mA, main board and CPU card
   AMS1117 (card)  (+5V max - VOUT min) x Iout + VIN x IQ. The +5V max is
                   vSafe5V max with no drop (the lightest load elsewhere).
-                  The Wi-Fi card at Espressif's TX current, rated at 100 %
-                  duty (a long transfer or an RF test). The system, GPU and
-                  IO cards only if they regulate from +5V as parts.md lists
-                  (power.md feeds them from the main 3V3 instead).
+                  No M1 card has one: the system, GPU and IO cards run from
+                  the slot's +3V3 (power.md), so these only say what one
+                  would take if they ever regulated from +5V.
   SY6280          I^2 x RDS(on) hot at the most current the input can pass
                   (its minimum limit) and on the IO card at 500 mA
 """
@@ -63,9 +65,18 @@ def main():
     c.check("T3", "RT9013 1V2 LDO (main board; the CPU card's is the same): %.0f mW x %.0f C/W" % (
         1e3 * p, d.RT9013_THETA_JA), tj(p, d.RT9013_THETA_JA), lim, "<=", "C", fmt="%.1f")
 
+    bad = d.wifi_board_mismatches()
+    for ref, want, got in bad:
+        c.info(ref, "hw/boards/wifi.py has %s, these checks model %s (design.WIFI_BOARD)" % (got, want))
+    c.check("T0", "Wi-Fi card regulator parts in hw/boards/wifi.py that differ from the model", len(bad), 0, "<=",
+            "", fmt="%d")
+    v_card = (budget.chain("worst")["wifi_in"], d.VBUS_MAX)
+    p = max(buck_loss(v, d.WIFI_I_3V3) for v in v_card)
+    c.check("T4", "TLV62569%s Wi-Fi card buck (hw/boards/wifi.py), %.0f mA: %.0f mW x %.0f C/W" % (
+        d.BUCK_PACKAGE, 1e3 * d.WIFI_I_3V3, 1e3 * p, theta_buck), tj(p, theta_buck), lim, "<=", "C", fmt="%.1f")
+
     ams = d.AMS1117
-    cards = (("T4", "Wi-Fi card (hw/boards/wifi.py)", d.ESP32_I_TX + d.WIFI_I_LEDS),
-             ("T5", "GPU card, if from +5V", d.LOADS_3V3["GPU card RP2040 + flash"] + d.LOADS_3V3["GPU card TMDS"]),
+    cards = (("T5", "GPU card, if from +5V", d.LOADS_3V3["GPU card RP2040 + flash"] + d.LOADS_3V3["GPU card TMDS"]),
              ("T6", "IO card, if from +5V", d.LOADS_3V3["IO card RP2040 + flash"]),
              ("T7", "system card, if from +5V", d.LOADS_3V3["sysctl RP2040 + flash"]))
     for ident, what, i in cards:
@@ -73,14 +84,6 @@ def main():
         c.check(ident, "AMS1117 %s, %.0f mA from %.2f V: %.0f mW x %.0f C/W" % (
             what, 1e3 * i, d.VBUS_MAX, 1e3 * p, d.AMS1117_THETA_JA), tj(p, d.AMS1117_THETA_JA), lim, "<=",
             "C", fmt="%.1f")
-        if ident == "T4" and tj(p, d.AMS1117_THETA_JA) > lim:
-            need = (lim - d.AMBIENT_C) / p
-            c.info(ident, "needs theta_JA <= %.0f C/W (AMS table 1: 65 C/W with 225 mm^2 top copper over a "
-                   "plane, 55 with 1000 mm^2); at 5.0 V in it is %.1f C" % (
-                       need, tj((5.0 - d.AMS1117_VOUT_MIN) * i + 5.0 * ams["IQ"], d.AMS1117_THETA_JA)))
-            p_buck = buck_loss(d.VBUS_MAX, i)
-            c.info(ident, "with a TLV62569 on the card instead: %.0f mW, Tj %.1f C" % (
-                1e3 * p_buck, tj(p_buck, theta_buck)))
 
     lo, _, _ = d.sy6280_ilim(budget.proposed_rset(budget.chain("worst")["itot"]))
     for ident, what, i in (("T8", "main input, at its minimum limit %.2f A (proposed RSET)" % lo, lo),

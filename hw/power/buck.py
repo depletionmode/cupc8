@@ -2,9 +2,9 @@
 """POW-001: the 3V3 buck (TLV62569, TI's PSpice transient model in ngspice).
 
     python3 hw/power/buck.py            (~1 min; the three decks run in parallel)
-    python3 hw/power/buck.py wifi-card  a PROPOSAL, not a check of any board:
-                                        a TLV62569 in place of the Wi-Fi card's
-                                        AMS1117 (see POW-003 and THM-001)
+    python3 hw/power/buck.py wifi-card  POW-003: the Wi-Fi card's own TLV62569
+                                        (hw/boards/wifi.py U2) in an ESP32-C3 TX
+                                        burst, at the typical and worst corners
 
 The buck's input is 5V_SYS as budget.py builds it: the source behind the
 whole input path's resistance, with the other 5 V loads drawing their share,
@@ -98,25 +98,79 @@ def edges(t, v, a, b, level):
     return ts
 
 
+def wifi_deck(corner):
+    """POW-003: hw/boards/wifi.py as built. The source, the input path and the
+    other loads feed 5V_SYS; the card hangs off it through the slot's feed
+    (PTC, link, sense, contacts), so the slot's +5V sags with the burst as it
+    will."""
+    ch = budget.chain(corner)
+    worst = corner == "worst"
+    k = 1.0 if worst else 0.5
+    r_in = (k * (d.CABLE_R_VBUS + d.CABLE_R_GND) + d.R_RECEPTACLE
+            + (d.FUSE_IN_R_MAX if worst else d.FUSE_IN_R_MIN)
+            + (d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP) + d.R_5VSYS)
+    i0, i1 = d.ESP32_I_IDLE + d.WIFI_I_LEDS, d.WIFI_I_3V3
+    return """
+Vs src 0 PWL(0 0 {ton} {vbus})
+Rin src v5 {rin}
+Cbulk v5 0 {cbulk}
+Iother v5 0 PWL(0 0 {ton} {iother})
+Rslot v5 card {rslot}
+C1 card 0 {cin}
+X1 card fb sw card 0 TLV62569_TRANS
+L1 sw out {l}
+C2 out 0 {cout}
+C3 out 0 {chf}
+R9 out fb {r1}
+R10 fb 0 {r2}
+Iesp out 0 PWL(0 {i0} {t1} {i0} {t1e} {i1} {t2} {i1} {t2e} {i0})
+.options method=gear reltol=1e-3
+.tran 20n {tend} 0 20n
+.control
+run
+wrdata {{name}}.dat v(out) v(sw) v(card)
+.endc
+""".format(vbus=ch["vbus"], ton=d.SY6280_TON, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
+           iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], cin=d.WIFI_CIN * d.CERAMIC_DERATE,
+           l=d.WIFI_BUCK_L, cout=d.WIFI_COUT * d.CERAMIC_DERATE, chf=d.WIFI_COUT_HF, r1=d.WIFI_BUCK_R1,
+           r2=d.WIFI_BUCK_R2, i0=i0, i1=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6, tend=T_END)
+
+
+def run_wifi(corner):
+    name = "pow003_" + corner
+    spice.run(name, wifi_deck(corner).replace("{name}", name), libs=("TLV62569_TRANS.lib",))
+    return spice.wave(name)
+
+
 def wifi_card():
-    """The proposed Wi-Fi card regulator at POW-003's worst corner: the card's
-    feed is the whole worst-case chain (the other loads' current is put
-    through the slot's resistance too, which is pessimistic)."""
-    c = Checks("PROPOSAL: TLV62569 on the Wi-Fi card, worst corner (hw/power/buck.py wifi-card)")
-    w = budget.chain("worst")
-    r_in = (d.CABLE_R_VBUS + d.CABLE_R_GND + d.R_RECEPTACLE + d.FUSE_IN_R_MAX + d.SY6280_RON_MAX + d.R_5VSYS
-            + w["r_slot"])
-    i_other = w["itot"] - d.I_WIFI_5V
-    i0, i1 = d.ESP32_I_IDLE + d.WIFI_I_LEDS, d.ESP32_I_TX + d.WIFI_I_LEDS
-    load = "Iesp out 0 PWL(0 {a} {t1} {a} {t1e} {b} {t2} {b} {t2e} {a})\nC3 out 0 100n".format(
-        a=i0, b=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6)
-    text = deck(d.VBUS_MIN, r_in, i_other, d.WIFI_COUT * d.CERAMIC_DERATE, load).replace("{tend}", "%g" % T_END)
-    spice.run("wifi_card_buck", text.replace("{name}", "wifi_card_buck"), libs=("TLV62569_TRANS.lib",))
-    t, vout, vsw, vin = spice.wave("wifi_card_buck")
-    k_lo = d.buck_vout_range()[0] / d.buck_vout()
-    c.info("card +5V", "%.3f V during the burst" % min(window(t, vin, T_STEP, T_REL)))
-    c.check("F1", "ESP32-C3 supply minimum in a 350 mA burst, DC low corner", min(window(t, vout, T_STEP, T_REL))
-            * k_lo, d.ESP32_VDD_MIN, ">=")
+    """POW-003: the Wi-Fi card's TLV62569 (U2, L1, C1-C3, R9/R10), an ESP32-C3
+    TX burst at the typical and worst corners."""
+    c = Checks("POW-003 Wi-Fi card 3V3, TLV62569 TI model (hw/power/buck.py wifi-card)")
+    bad = d.wifi_board_mismatches()
+    for ref, want, got in bad:
+        c.info(ref, "hw/boards/wifi.py has %s, these checks model %s (design.WIFI_BOARD)" % (got, want))
+    c.check("F0", "Wi-Fi card regulator parts in hw/boards/wifi.py that differ from the model", len(bad), 0, "<=",
+            "", fmt="%d")
+    with concurrent.futures.ThreadPoolExecutor(2) as pool:
+        res = dict(zip(("typical", "worst"), pool.map(run_wifi, ("typical", "worst"))))
+    vnom = d.buck_vout(d.WIFI_BUCK_R1, d.WIFI_BUCK_R2)
+    lo_dc, hi_dc = d.wifi_vout_range()
+    k_lo, k_hi = lo_dc / vnom, hi_dc / vnom                    # sim -> worst DC corner
+    c.info("3V3 set point", "%.3f V nominal, DC range %.3f..%.3f V (VFB +-2%%, %.0f%% divider)" % (
+        vnom, lo_dc, hi_dc, 100 * d.WIFI_BUCK_RES_TOL))
+    for corner in ("typical", "worst"):
+        t, vout, vsw, vcard = res[corner]
+        n = corner[0]
+        vcard_min = min(window(t, vcard, T_STEP, T_REL))
+        c.info(corner, "slot +5V at the card %.3f V during the burst; 3V3 %.3f V before it" % (
+            vcard_min, spice.at(t, vout, T_STEP - 10e-6)))
+        c.check("F1" + n, "%s: ESP32-C3 supply minimum in a %.0f mA TX burst, DC low corner" % (
+            corner, 1e3 * d.WIFI_I_3V3), min(window(t, vout, T_STEP, T_REL)) * k_lo, d.ESP32_VDD_MIN, ">=")
+        c.check("F2" + n, "%s: start-up, light load and burst release, maximum at the DC high corner" % corner,
+                max(vout) * k_hi, d.ESP32_VDD_MAX, "<=")
+        # 100 % duty: the input must still cover VOUT + I x (high side hot + DCR)
+        c.check("F3" + n, "%s: slot +5V at the card in the burst vs VOUT high + I x (RDS(on) hot + DCR)" % corner,
+                vcard_min, hi_dc + d.WIFI_I_3V3 * (d.BUCK_RHS * d.BUCK_RDS_HOT + d.WIFI_BUCK_DCR), ">=")
     return c.done()
 
 

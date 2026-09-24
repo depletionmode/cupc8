@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The Wi-Fi card (doc/hardware/wifi-card.md): an ESP32-C3-MINI-1U on a slot
-card, powered from the slot's +5V through its own AMS1117-3.3, with MISO
+card, powered from the slot's +5V through its own TLV62569 buck, with MISO
 released through a 74LVC1G125 whenever the card is not selected.
 
     python3 hw/boards/wifi.py [outdir]      (default build/hw/wifi)

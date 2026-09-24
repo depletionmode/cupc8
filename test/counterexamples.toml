@@ -221,3 +221,11 @@ revert = [
 ]
 cmd = "python3 hw/tools/bomcheck.py wifi"
 must_fail = ["pin 2 is 'Y' in the symbol, 'A' in the datasheet", "pin 4 is 'A' in the symbol, 'Y' in the datasheet"]
+
+[[bug]]
+name = "Wi-Fi card: an AMS1117 LDO browned out the ESP32-C3 in a TX burst and ran at Tj 120 C"
+fixed_in = "1e95f44"
+before = "619d56d"
+files = ["hw/boards/wifi.py"]
+cmd = "python3 hw/power/thermal.py"
+must_fail = ["FAIL T0", "hw/boards/wifi.py has AMS1117-3.3, these checks model TLV62569DBVR"]
