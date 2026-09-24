@@ -1192,6 +1192,24 @@ proc testBasicJunkRam() =
 
 run testBasicJunkRam
 
+proc testBasicJunkRamVariables() =
+  ## KRN-003: RUN starts every BASIC variable at 0. ubasic_init cleared the
+  ## GOSUB and FOR stacks but not ub_variables, so on power-up junk RAM an
+  ## unset variable printed junk: `print hi` gave 223236 on the whole-machine
+  ## emulator (sim.nim zeroes RAM, so no other test saw it).
+  echo "== BASIC variables on power-up junk RAM =="
+  let rom = buildKernelRom()
+  ramJunk = true
+  let got = basicRun(rom, @["10 print a", "20 print z"])
+  ramJunk = false
+  if got == @["0", "0"]:
+    ok("BASIC variables start at 0 on junk RAM")
+  else:
+    fail("BASIC variables on junk RAM: got " & $got & ", want @[\"0\", \"0\"]")
+  ioModel = imLegacy
+
+run testBasicJunkRamVariables
+
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another
   ## card's IRQ: the kernel sleeps in WAI for keys, and every key must wake it.
