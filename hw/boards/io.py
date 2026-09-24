@@ -84,14 +84,9 @@ POWER_NETS = rc.POWER_NETS + ("/VBUS",)
 # J2's opening is 12.04 mm in front of its footprint origin (the pegs are
 # 2.54 mm in front, the shell face 9.5 mm beyond them: C112455 drawing), so
 # turned to face up, the origin sits 12.04 mm below the top edge
-PLACEMENT = dict(rc.core_placement(28, -17.5), **{
+PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
-    # SWD crosses the slot lines on its way from the chip's bottom edge to
-    # fingers B6-B9: the crystal and the MISO buffer sit clear of that path
-    "Y1": (20.3, -11.6, 0),
-    "C16": (17.6, -11.6, 90),
-    "C17": (20.7, -8.9, 0),
     "U4": (16.5, -18, 0),
     "C18": (13.3, -18, 90),
     "R5": (19, -38.5, 0),
@@ -99,13 +94,13 @@ PLACEMENT = dict(rc.core_placement(28, -17.5), **{
     "R6": (25, -38.5, 0),
     "D3": (25, -41, 0),
     "J2": (39.5, -44 + 12.04, 180),
-    "U6": (41, -25.5, 0),
-    "R14": (36.5, -23, 0),
-    "R15": (36.5, -21.5, 0),
+    "U6": (41.4, -25.3, 0),
+    "R14": (36.8, -19.6, 0),            # USB_DM, DP: by the ESD, over the cap column from pins 46/47
+    "R15": (36.8, -21.6, 0),
     "U5": (50, -22, 0),
     "C20": (53, -27, 0),
     "C21": (51.5, -16.5, 90),
-    "C22": (44.5, -25.5, 90),
+    "C22": (44.9, -25.5, 90),
     "R10": (47.5, -19.5, 90),
     "R11": (45, -19.5, 90),
     "R12": (37, -10, 90),
@@ -121,4 +116,4 @@ TITLE, REVISION = "CUPC/8 IO", "A"
 
 if __name__ == "__main__":
     rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS,
-             TITLE, REVISION, usb=True)
+             TITLE, REVISION, usb=True, passes=100)

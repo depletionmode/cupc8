@@ -773,6 +773,11 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
+    if layers == 4:
+        # In1 is a solid plane of the first pour net (Freerouting routes no
+        # power layer), under the top layer's signals; In2 routes, and pours
+        board.SetLayerType(pcbnew.In1_Cu, pcbnew.LT_POWER)
+        copper += [pcbnew.In1_Cu, pcbnew.In2_Cu]
     for net in zones:
         for layer in copper:
             z = pcbnew.ZONE(board)
@@ -1262,6 +1267,13 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
+    # Freerouting can hand back a track at 3/4 of its class's width (0.1124
+    # mm for 0.15, out of a QFN's side pads), under JLC's minimum: each goes
+    # back to its class's width, and DRC judges the clearance
+    for t in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_TRACE_T]:
+        want = t.GetEffectiveNetClass().GetTrackWidth()
+        if t.GetWidth() < want:
+            t.SetWidth(want)
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
@@ -1337,7 +1349,9 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge")]
     others = []                                   # other nets' pads, grown for a via / a track
     for p, _ in pads:
-        if p.GetNetname() != net:
+        # paste-only pads (a QFN's exposed pad is printed in pieces) have no
+        # copper and no net: not obstacles, or the exposed pad gets no via
+        if p.GetNetname() != net and p.IsOnCopperLayer():
             bb = p.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []

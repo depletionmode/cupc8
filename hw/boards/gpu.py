@@ -114,7 +114,7 @@ def schematic(path, footprint_libs):
     s.write(path, footprint_libs=footprint_libs)
 
 
-POWER_NETS = rc.POWER_NETS + ("/HDMI_5V",)
+POWER_NETS = rc.POWER_NETS         # HDMI_5V (55 mA) stays a signal-width track: pin 18 is 0.3 mm wide
 CX, CY = 26, -18               # the RP2040, turned round: its TMDS edge (GPIO10-17) faces the receptacle
 HX = CX + 1.5                  # the receptacle's centre: pin n at HX - 4.5 + 0.5 (n - 1), so D2 runs straight up
 # Up from the chip: the arrays, the ESD, the receptacle at the top edge. The
@@ -156,7 +156,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
-LAYERS = 2
+LAYERS = 4
 LOGO_MM = 12
 GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0)]
 TITLE, REVISION = "CUPC/8 GPU", "A"
@@ -164,4 +164,4 @@ TITLE, REVISION = "CUPC/8 GPU", "A"
 
 if __name__ == "__main__":
     rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
-             layers=LAYERS)
+             layers=LAYERS, passes=100)

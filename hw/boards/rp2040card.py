@@ -290,7 +290,7 @@ def core(s, gpios, leds=(), usb=False):
 
 
 def build(name, schematic, placement, power_nets, graphics, labels, gpios, title, revision, usb=False,
-          layers=2):
+          layers=2, passes=40):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
@@ -299,6 +299,6 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
     lcsc = kg.pipeline(name, schematic, dict(placement, **OUTLINE_PLACEMENT), BODY,
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
-                       power_nets=power_nets, graphics=graphics, layers=layers, labels=labels,
+                       power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
                        fine_nets=u1_nets(gpios, usb))
     print("LCSC:", " ".join(sorted(lcsc)))
