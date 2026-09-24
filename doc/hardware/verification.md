@@ -40,6 +40,7 @@ Rules for the matrix:
 | 2.6 | Wi-Fi card firmware | Core: host tests with lwIP's Unix port on TAP: DHCP, DNS, TCP, UDP, and TLS against a local server with a test CA. **Real binary** in Espressif's QEMU (esp32c3), with Wi-Fi replaced by QEMU's OpenCores Ethernet, running the same network tests. | pass |
 | 2.7 | sysctl firmware | Core: host tests of the USB command protocol, FPGA configuration (flash and CRAM), SST39 JEDEC program and erase via the bridge model, the SWD engine against an SWD target model, the ESP UART flasher against the esptool reference protocol, I²C expander and mux sequencing, and USB-C CC → current policy | pass |
 | 2.8 | Host tools (`cupc8.py`, `mkrom.py`, `jlcparts.py`) | pytest, including `cupc8.py` end-to-end against the co-sim's modelled USB | pass |
+| 2.9 | Storage card firmware (`storage-card.md`) | Core: host tests of every command and malformed frame on FatFs over disk images (handles, chunking, end of file, full medium, write-protect, card removal, 8.3 names, block commands), and the images cross-checked with a PC's FAT reader (pyfatfs, `fsck.fat`) both ways (STO-001/002). **Real binary** on the native emulator with an SD SPI-mode model (STO-003). | pass |
 
 ## 3. Whole system
 

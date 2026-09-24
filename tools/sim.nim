@@ -97,7 +97,7 @@ var
   slots*: array[6, SimCard]      # slot n = SPI device n; nil = empty
   rom*: seq[uint8]               # the ROM chip (512 KB)
   romOff*: bool = false
-  pwrHi*: bool = true            # USB-C source >= 1.5 A (a board input, kept across reset)
+  pwrHi*: bool = true            # USB-C source >= 3.0 A (a board input, kept across reset)
   romBank*: int = 0
   ramJunk*: bool = false         # cpuReset leaves RAM as the SRAM powers up (the
                                  # emulator's pattern, soc/emu/board.h), not zeroed

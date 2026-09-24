@@ -14,7 +14,7 @@
 
 meta:
   clock_mhz: 12
-  boards: [mainboard, cpu-card, system-card, gpu-card, io-card, wifi-card]
+  boards: [mainboard, cpu-card, system-card, gpu-card, io-card, wifi-card, storage-card, eink-card]
 
 devices:
 
@@ -201,6 +201,62 @@ devices:
       debug:
         signals:
           - {name: LED_KBD, gpio: 25, dir: out}
+          - {name: UART_TX, gpio: 16, dir: out}
+
+  storage_mcu:
+    board: storage-card
+    part: RP2040
+    lcsc: C2040
+    groups:
+      slot:
+        signals:
+          - {name: SLOT_SCK, gpio: 2, dir: in}
+          - {name: SLOT_MOSI, gpio: 3, dir: in}
+          - {name: SLOT_MISO, gpio: 4, dir: out}
+          - {name: SLOT_nCS, gpio: 5, dir: in}
+          - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
+      sd:
+        note: "microSD in SPI mode on SPI1 (doc/hardware/storage-card.md); 10k pull-ups on CMD/DAT0-3"
+        signals:
+          - {name: SD_SCK, gpio: 14, dir: out, note: SPI1 SCK}
+          - {name: SD_MOSI, gpio: 15, dir: out, note: "SPI1 TX, to the card's CMD"}
+          - {name: SD_MISO, gpio: 12, dir: in, note: "SPI1 RX, from the card's DAT0"}
+          - {name: SD_nCS, gpio: 13, dir: out, note: "SPI1 CSn, to the card's DAT3/CD"}
+          - {name: SD_nDETECT, gpio: 17, dir: in, note: "socket card-detect switch, pulled up: low = card in"}
+          - {name: SD_DAT1, gpio: 18, dir: in, note: "pulled up, unused in SPI mode: routed for a later 4-bit mode on PIO"}
+          - {name: SD_DAT2, gpio: 19, dir: in, note: "pulled up, unused in SPI mode: routed for a later 4-bit mode on PIO"}
+      debug:
+        signals:
+          - {name: LED_ACT, gpio: 24, dir: out, note: "medium activity, lit ~30 ms after each access"}
+          - {name: LED_CARD, gpio: 25, dir: out, note: "a card is inserted and mounted"}
+          - {name: UART_TX, gpio: 16, dir: out}
+
+  eink_mcu:
+    board: eink-card
+    part: RP2040
+    lcsc: C2040
+    note: "the e-ink graphics card (doc/proposals/eink-gpu.md, Decisions): the panel's driver module on a 2.54 mm 9-pin header"
+    groups:
+      slot:
+        signals:
+          - {name: SLOT_SCK, gpio: 2, dir: in}
+          - {name: SLOT_MOSI, gpio: 3, dir: in}
+          - {name: SLOT_MISO, gpio: 4, dir: out}
+          - {name: SLOT_nCS, gpio: 5, dir: in}
+          - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
+      panel:
+        note: "the module's 9-pin cable: VCC (3V3), GND, DIN, CLK, CS, DC, RST, BUSY, PWR; SPI1 write-only"
+        signals:
+          - {name: EPD_CLK, gpio: 10, dir: out, note: SPI1 SCK}
+          - {name: EPD_DIN, gpio: 11, dir: out, note: SPI1 TX}
+          - {name: EPD_nCS, gpio: 9, dir: out, note: SPI1 CSn}
+          - {name: EPD_DC, gpio: 12, dir: out, note: "data (1) or command (0)"}
+          - {name: EPD_nRST, gpio: 13, dir: out}
+          - {name: EPD_BUSY, gpio: 14, dir: in, note: "UC8179: low while busy"}
+          - {name: EPD_PWR, gpio: 15, dir: out, note: "the module's power switch (Waveshare HAT V2 PWR pin): high = on"}
+      debug:
+        signals:
+          - {name: LED_REFRESH, gpio: 24, dir: out, note: "lit while the panel refreshes"}
           - {name: UART_TX, gpio: 16, dir: out}
 
   wifi_mcu:

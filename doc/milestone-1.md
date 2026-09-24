@@ -13,8 +13,17 @@
     CPU later.
 - Expansion boards required now:
   - an **IO board** that lets you use a **USB keyboard**;
-  - a **graphics board** that outputs **HDMI**;
+  - a **graphics board** that outputs **HDMI**, and *(added 2026-09-24)* a
+    second graphics option, the **e-ink card**, driving a 5.83" 648 × 480
+    e-paper panel. It replaces the HDMI card (card type $01, never fitted
+    with it); the kernel picks its driver from the card's `INFO`
+    ([proposals/eink-gpu.md](proposals/eink-gpu.md), Decisions);
   - *Added:* a **Wi-Fi networking card**.
+  - *Added 2026-09-24:* a **storage card** (card type $04) for files, with
+    the file system on the card and kernel and BASIC support (`SAVE`,
+    `LOAD`, `DIR`, `DEL`). Its M1 medium is a **microSD card**; the protocol
+    names no medium, so a later card can be tape or a hard disk
+    ([hardware/storage-card.md](hardware/storage-card.md)).
 - *Added:* the main board has **extra slots** for future expansion cards.
 - There must be a **physical ROM** where the **boot ROM and then the kernel**
   reside.
