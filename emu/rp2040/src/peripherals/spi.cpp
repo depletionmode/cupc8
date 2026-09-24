@@ -1,8 +1,4 @@
 // Port of rp2040js src/peripherals/spi.ts
-//
-// STUB: every body below still has to be ported from the TS shown in its
-// comment (see README.md, "Porting rules"). Bus-facing methods abort so that
-// firmware cannot run on a half-ported peripheral without noticing.
 #include "spi.h"
 
 #include "../rp2040.h"
@@ -10,256 +6,236 @@
 
 namespace rp2040js {
 
+static constexpr uint32_t SSPCR0 = 0x000;    // Control register 0, SSPCR0 on page 3-4
+static constexpr uint32_t SSPCR1 = 0x004;    // Control register 1, SSPCR1 on page 3-5
+static constexpr uint32_t SSPDR = 0x008;     // Data register, SSPDR on page 3-6
+static constexpr uint32_t SSPSR = 0x00c;     // Status register, SSPSR on page 3-7
+static constexpr uint32_t SSPCPSR = 0x010;   // Clock prescale register, SSPCPSR on page 3-8
+static constexpr uint32_t SSPIMSC = 0x014;   // Interrupt mask set or clear register, SSPIMSC on page 3-9
+static constexpr uint32_t SSPRIS = 0x018;    // Raw interrupt status register, SSPRIS on page 3-10
+static constexpr uint32_t SSPMIS = 0x01c;    // Masked interrupt status register, SSPMIS on page 3-11
+static constexpr uint32_t SSPICR = 0x020;    // Interrupt clear register, SSPICR on page 3-11
+static constexpr uint32_t SSPDMACR = 0x024;  // DMA control register, SSPDMACR on page 3-12
+static constexpr uint32_t SSPPERIPHID0 = 0xfe0;  // Peripheral identification registers, SSPPeriphID0-3 on page 3-13
+static constexpr uint32_t SSPPERIPHID1 = 0xfe4;  // Peripheral identification registers, SSPPeriphID0-3 on page 3-13
+static constexpr uint32_t SSPPERIPHID2 = 0xfe8;  // Peripheral identification registers, SSPPeriphID0-3 on page 3-13
+static constexpr uint32_t SSPPERIPHID3 = 0xfec;  // Peripheral identification registers, SSPPeriphID0-3 on page 3-13
+static constexpr uint32_t SSPPCELLID0 = 0xff0;  // PrimeCell identification registers, SSPPCellID0-3 on page 3-16
+static constexpr uint32_t SSPPCELLID1 = 0xff4;  // PrimeCell identification registers, SSPPCellID0-3 on page 3-16
+static constexpr uint32_t SSPPCELLID2 = 0xff8;  // PrimeCell identification registers, SSPPCellID0-3 on page 3-16
+static constexpr uint32_t SSPPCELLID3 = 0xffc;  // PrimeCell identification registers, SSPPCellID0-3 on page 3-16
+
+// SSPCR0 bits:
+static constexpr uint32_t SCR_MASK = 0xff;
+static constexpr uint32_t SCR_SHIFT = 8;
+static constexpr uint32_t SPH = 1 << 7;
+static constexpr uint32_t SPO = 1 << 6;
+static constexpr uint32_t FRF_MASK = 0x3;
+static constexpr uint32_t FRF_SHIFT = 4;
+static constexpr uint32_t DSS_MASK = 0xf;
+static constexpr uint32_t DSS_SHIFT = 0;
+
+// SSPCR1 bits:
+static constexpr uint32_t SOD = 1 << 3;
+static constexpr uint32_t MS = 1 << 2;
+static constexpr uint32_t SSE = 1 << 1;
+static constexpr uint32_t LBM = 1 << 0;
+
+// SSPSR bits:
+static constexpr uint32_t BSY = 1 << 4;
+static constexpr uint32_t RFF = 1 << 3;
+static constexpr uint32_t RNE = 1 << 2;
+static constexpr uint32_t TNF = 1 << 1;
+static constexpr uint32_t TFE = 1 << 0;
+
+// SSPCPSR bits:
+static constexpr uint32_t CPSDVSR_MASK = 0xfe;
+static constexpr uint32_t CPSDVSR_SHIFT = 0;
+
+// SSPDMACR bits:
+static constexpr uint32_t TXDMAE = 1 << 1;
+static constexpr uint32_t RXDMAE = 1 << 0;
+
+// Interrupts:
+static constexpr uint32_t SSPTXINTR = 1 << 3;
+static constexpr uint32_t SSPRXINTR = 1 << 2;
+static constexpr uint32_t SSPRTINTR = 1 << 1;
+static constexpr uint32_t SSPRORINTR = 1 << 0;
+
+// Unused in the TS too; referenced so -Wunused stays quiet.
+[[maybe_unused]] static constexpr uint32_t UNUSED_SPI_CONSTS[] = {
+    FRF_MASK, FRF_SHIFT, SOD, LBM, CPSDVSR_SHIFT, TXDMAE, RXDMAE};
+
 RPSPI::RPSPI(RP2040 &rp2040, const std::string &name, uint32_t irq, ISPIDMAChannels dreq)
-    : BasePeripheral(rp2040, name), irq(irq), dreq(dreq) {
-  // TODO(port): peripherals/spi.ts
-  //   constructor(
-  //     rp2040: RP2040,
-  //     name: string,
-  //     readonly irq: number,
-  //     readonly dreq: ISPIDMAChannels,
-  //   ) {
-  //     super(rp2040, name);
-  //     this.updateDMATx();
-  //     this.updateDMARx();
-  //   }
-  (void)rp2040;
-  (void)name;
-  (void)irq;
-  (void)dreq;
-  // TODO(port): the onTransmit default
-  //   onTransmit: (value: number) => void = () => this.completeTransmit(0);
+    : BasePeripheral(rp2040, name),
+      onTransmit([this](uint32_t) { completeTransmit(0); }),
+      irq(irq),
+      dreq(dreq) {
+  updateDMATx();
+  updateDMARx();
 }
 
-uint32_t RPSPI::intStatus() const {
-  // TODO(port): peripherals/spi.ts
-  //   get intStatus() {
-  //     return this.intRaw & this.intEnable;
-  //   }
-  return 0;
-}
+uint32_t RPSPI::intStatus() const { return intRaw & intEnable; }
 
-bool RPSPI::enabled() const {
-  // TODO(port): peripherals/spi.ts
-  //   get enabled() {
-  //     return !!(this.control1 & SSE);
-  //   }
-  return false;
-}
+bool RPSPI::enabled() const { return !!(control1 & SSE); }
 
-uint32_t RPSPI::dataBits() const {
-  // TODO(port): peripherals/spi.ts
-  //   get dataBits() {
-  //     return ((this.control0 >> DSS_SHIFT) & DSS_MASK) + 1;
-  //   }
-  return 0;
-}
+uint32_t RPSPI::dataBits() const { return ((control0 >> DSS_SHIFT) & DSS_MASK) + 1; }
 
-bool RPSPI::masterMode() const {
-  // TODO(port): peripherals/spi.ts
-  //   get masterMode() {
-  //     return !(this.control0 & MS);
-  //   }
-  return false;
-}
+// TS bug (kept): tests MS (an SSPCR1 bit) in control0.
+bool RPSPI::masterMode() const { return !(control0 & MS); }
 
 uint32_t RPSPI::spiMode() const {
-  // TODO(port): peripherals/spi.ts
-  //   get spiMode() {
-  //     const cpol = this.control0 & SPO;
-  //     const cpha = this.control0 & SPH;
-  //     return cpol ? (cpha ? 2 : 3) : cpha ? 1 : 0;
-  //   }
-  return 0;
+  const uint32_t cpol = control0 & SPO;
+  const uint32_t cpha = control0 & SPH;
+  return cpol ? (cpha ? 2 : 3) : cpha ? 1 : 0;
 }
 
 double RPSPI::clockFrequency() const {
-  // TODO(port): peripherals/spi.ts
-  //   get clockFrequency() {
-  //     if (!this.clockDivisor) {
-  //       return 0;
-  //     }
-  //
-  //     const scr = (this.control0 >> SCR_SHIFT) & SCR_MASK;
-  //     return this.rp2040.clkPeri / (this.clockDivisor * (1 + scr));
-  //   }
-  return 0;
+  if (!clockDivisor) {
+    return 0;
+  }
+
+  const uint32_t scr = (control0 >> SCR_SHIFT) & SCR_MASK;
+  return rp2040.clkPeri / (static_cast<double>(clockDivisor) * (1 + scr));
 }
 
 void RPSPI::updateDMATx() {
-  // TODO(port): peripherals/spi.ts
-  //   private updateDMATx() {
-  //     if (this.txFIFO.full) {
-  //       this.rp2040.dma.clearDREQ(this.dreq.tx);
-  //     } else {
-  //       this.rp2040.dma.setDREQ(this.dreq.tx);
-  //     }
-  //   }
+  if (txFIFO.full()) {
+    rp2040.dma.clearDREQ(dreq.tx);
+  } else {
+    rp2040.dma.setDREQ(dreq.tx);
+  }
 }
 
 void RPSPI::updateDMARx() {
-  // TODO(port): peripherals/spi.ts
-  //   private updateDMARx() {
-  //     if (this.rxFIFO.empty) {
-  //       this.rp2040.dma.clearDREQ(this.dreq.rx);
-  //     } else {
-  //       this.rp2040.dma.setDREQ(this.dreq.rx);
-  //     }
-  //   }
+  if (rxFIFO.empty()) {
+    rp2040.dma.clearDREQ(dreq.rx);
+  } else {
+    rp2040.dma.setDREQ(dreq.rx);
+  }
 }
 
 void RPSPI::doTX() {
-  // TODO(port): peripherals/spi.ts
-  //   private doTX() {
-  //     if (!this.busy && !this.txFIFO.empty) {
-  //       const value = this.txFIFO.pull();
-  //       this.busy = true;
-  //       this.onTransmit(value);
-  //       this.fifosUpdated();
-  //     }
-  //   }
+  if (!busy && !txFIFO.empty()) {
+    const uint32_t value = txFIFO.pull();
+    busy = true;
+    onTransmit(value);
+    fifosUpdated();
+  }
 }
 
 void RPSPI::completeTransmit(uint32_t rxValue) {
-  // TODO(port): peripherals/spi.ts
-  //   completeTransmit(rxValue: number) {
-  //     this.busy = false;
-  //     if (!this.rxFIFO.full) {
-  //       this.rxFIFO.push(rxValue);
-  //     } else {
-  //       this.intRaw |= SSPRORINTR;
-  //     }
-  //     this.fifosUpdated();
-  //     this.doTX();
-  //   }
-  (void)rxValue;
+  busy = false;
+  if (!rxFIFO.full()) {
+    rxFIFO.push(rxValue);
+  } else {
+    intRaw |= SSPRORINTR;
+  }
+  fifosUpdated();
+  doTX();
 }
 
-void RPSPI::checkInterrupts() {
-  // TODO(port): peripherals/spi.ts
-  //   checkInterrupts() {
-  //     this.rp2040.setInterrupt(this.irq, !!this.intStatus);
-  //   }
-}
+void RPSPI::checkInterrupts() { rp2040.setInterrupt(irq, !!intStatus()); }
 
 void RPSPI::fifosUpdated() {
-  // TODO(port): peripherals/spi.ts
-  //   private fifosUpdated() {
-  //     const prevStatus = this.intStatus;
-  //     if (this.txFIFO.itemCount <= this.txFIFO.size / 2) {
-  //       this.intRaw |= SSPTXINTR;
-  //     } else {
-  //       this.intRaw &= ~SSPTXINTR;
-  //     }
-  //     if (this.rxFIFO.itemCount >= this.rxFIFO.size / 2) {
-  //       this.intRaw |= SSPRXINTR;
-  //     } else {
-  //       this.intRaw &= ~SSPRXINTR;
-  //     }
-  //     if (this.intStatus !== prevStatus) {
-  //       this.checkInterrupts();
-  //     }
-  //
-  //     this.updateDMATx();
-  //     this.updateDMARx();
-  //   }
+  const uint32_t prevStatus = intStatus();
+  if (txFIFO.itemCount() <= txFIFO.size() / 2) {
+    intRaw |= SSPTXINTR;
+  } else {
+    intRaw &= ~SSPTXINTR;
+  }
+  if (rxFIFO.itemCount() >= rxFIFO.size() / 2) {
+    intRaw |= SSPRXINTR;
+  } else {
+    intRaw &= ~SSPRXINTR;
+  }
+  if (intStatus() != prevStatus) {
+    checkInterrupts();
+  }
+
+  updateDMATx();
+  updateDMARx();
 }
 
 uint32_t RPSPI::readUint32(uint32_t offset) {
-  // TODO(port): peripherals/spi.ts
-  //   readUint32(offset: number) {
-  //     switch (offset) {
-  //       case SSPCR0:
-  //         return this.control0;
-  //       case SSPCR1:
-  //         return this.control1;
-  //       case SSPDR:
-  //         if (!this.rxFIFO.empty) {
-  //           const value = this.rxFIFO.pull();
-  //           this.fifosUpdated();
-  //           return value;
-  //         }
-  //         return 0;
-  //       case SSPSR:
-  //         return (
-  //           (this.busy || !this.txFIFO.empty ? BSY : 0) |
-  //           (this.rxFIFO.full ? RFF : 0) |
-  //           (!this.rxFIFO.empty ? RNE : 0) |
-  //           (!this.txFIFO.full ? TNF : 0) |
-  //           (this.txFIFO.empty ? TFE : 0)
-  //         );
-  //       case SSPCPSR:
-  //         return this.clockDivisor;
-  //       case SSPIMSC:
-  //         return this.intEnable;
-  //       case SSPRIS:
-  //         return this.intRaw;
-  //       case SSPMIS:
-  //         return this.intStatus;
-  //       case SSPDMACR:
-  //         return this.dmaControl;
-  //       case SSPPERIPHID0:
-  //         return 0x22;
-  //       case SSPPERIPHID1:
-  //         return 0x10;
-  //       case SSPPERIPHID2:
-  //         return 0x34;
-  //       case SSPPERIPHID3:
-  //         return 0x00;
-  //       case SSPPCELLID0:
-  //         return 0x0d;
-  //       case SSPPCELLID1:
-  //         return 0xf0;
-  //       case SSPPCELLID2:
-  //         return 0x05;
-  //       case SSPPCELLID3:
-  //         return 0xb1;
-  //     }
-  //     return super.readUint32(offset);
-  //   }
-  (void)offset;
-  TODO_PORT_ABORT("peripherals/spi.ts", "RPSPI::readUint32");
+  switch (offset) {
+    case SSPCR0:
+      return control0;
+    case SSPCR1:
+      return control1;
+    case SSPDR:
+      if (!rxFIFO.empty()) {
+        const uint32_t value = rxFIFO.pull();
+        fifosUpdated();
+        return value;
+      }
+      return 0;
+    case SSPSR:
+      return (busy || !txFIFO.empty() ? BSY : 0) | (rxFIFO.full() ? RFF : 0) |
+             (!rxFIFO.empty() ? RNE : 0) | (!txFIFO.full() ? TNF : 0) | (txFIFO.empty() ? TFE : 0);
+    case SSPCPSR:
+      return clockDivisor;
+    case SSPIMSC:
+      return intEnable;
+    case SSPRIS:
+      return intRaw;
+    case SSPMIS:
+      return intStatus();
+    case SSPDMACR:
+      return dmaControl;
+    case SSPPERIPHID0:
+      return 0x22;
+    case SSPPERIPHID1:
+      return 0x10;
+    case SSPPERIPHID2:
+      return 0x34;
+    case SSPPERIPHID3:
+      return 0x00;
+    case SSPPCELLID0:
+      return 0x0d;
+    case SSPPCELLID1:
+      return 0xf0;
+    case SSPPCELLID2:
+      return 0x05;
+    case SSPPCELLID3:
+      return 0xb1;
+  }
+  return BasePeripheral::readUint32(offset);
 }
 
 void RPSPI::writeUint32(uint32_t offset, uint32_t value) {
-  // TODO(port): peripherals/spi.ts
-  //   writeUint32(offset: number, value: number) {
-  //     switch (offset) {
-  //       case SSPCR0:
-  //         this.control0 = value;
-  //         return;
-  //       case SSPCR1:
-  //         this.control1 = value;
-  //         return;
-  //       case SSPDR:
-  //         if (!this.txFIFO.full) {
-  //           // decoded with respect to SSPCR0.DSS
-  //           this.txFIFO.push(value & ((1 << this.dataBits) - 1));
-  //           this.doTX();
-  //           this.fifosUpdated();
-  //         }
-  //         return;
-  //       case SSPCPSR:
-  //         this.clockDivisor = value & CPSDVSR_MASK;
-  //         return;
-  //       case SSPIMSC:
-  //         this.intEnable = value;
-  //         this.checkInterrupts();
-  //         return;
-  //       case SSPDMACR:
-  //         this.dmaControl = value;
-  //         return;
-  //       case SSPICR:
-  //         this.intRaw &= ~(value & (SSPRTINTR | SSPRORINTR));
-  //         this.checkInterrupts();
-  //         return;
-  //       default:
-  //         super.writeUint32(offset, value);
-  //     }
-  //   }
-  (void)offset;
-  (void)value;
-  TODO_PORT_ABORT("peripherals/spi.ts", "RPSPI::writeUint32");
+  switch (offset) {
+    case SSPCR0:
+      control0 = value;
+      return;
+    case SSPCR1:
+      control1 = value;
+      return;
+    case SSPDR:
+      if (!txFIFO.full()) {
+        // decoded with respect to SSPCR0.DSS
+        txFIFO.push(value & ((1u << dataBits()) - 1));
+        doTX();
+        fifosUpdated();
+      }
+      return;
+    case SSPCPSR:
+      clockDivisor = value & CPSDVSR_MASK;
+      return;
+    case SSPIMSC:
+      intEnable = value;
+      checkInterrupts();
+      return;
+    case SSPDMACR:
+      dmaControl = value;
+      return;
+    case SSPICR:
+      intRaw &= ~(value & (SSPRTINTR | SSPRORINTR));
+      checkInterrupts();
+      return;
+    default:
+      BasePeripheral::writeUint32(offset, value);
+  }
 }
 
 }  // namespace rp2040js

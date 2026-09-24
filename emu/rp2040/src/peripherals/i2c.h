@@ -86,7 +86,7 @@ class RPI2C : public BasePeripheral {
   void writeUint32(uint32_t offset, uint32_t value) override;
 
  protected:
-  void clearInterrupts(uint32_t mask);
+  uint32_t clearInterrupts(uint32_t mask);
   void setInterrupts(uint32_t mask);
   void abort(uint32_t reason);
   void nextCommand();

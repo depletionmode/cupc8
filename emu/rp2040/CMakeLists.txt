@@ -38,3 +38,8 @@ add_executable(rp2040run tools/rp2040run.cpp "${BOOTROM_INC}")
 target_include_directories(rp2040run PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_compile_options(rp2040run PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(rp2040run PRIVATE rp2040emu)
+
+# PIO differential test against rp2040js (driven by test/pio/pio_diff.mjs)
+add_executable(test_pio_diff test/pio/test_pio_diff.cpp)
+target_compile_options(test_pio_diff PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(test_pio_diff PRIVATE rp2040emu)

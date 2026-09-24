@@ -1,988 +1,882 @@
-// Port of rp2040js src/peripherals/pio.ts
+// Port of rp2040js src/peripherals/pio.ts (with the cupc8 dual-core patch).
 //
-// STUB: every body below still has to be ported from the TS shown in its
-// comment (see README.md, "Porting rules"). Bus-facing methods abort so that
-// firmware cannot run on a half-ported peripheral without noticing.
+// JS numbers: see the note on StateMachine in pio.h. Every shift below has a
+// count in 0..31 unless commented (then jsShl/jsSar or an explicit & 31).
 #include "pio.h"
+
+#include <algorithm>
 
 #include "../rp2040.h"
 #include "../utils/js.h"
 
 namespace rp2040js {
 
-// Module-level tables of pio.ts, needed to construct an RPPIO.
+// Generic registers
+static constexpr uint32_t CTRL = 0x000;
+static constexpr uint32_t FSTAT = 0x004;
+static constexpr uint32_t FDEBUG = 0x008;
+static constexpr uint32_t FLEVEL = 0x00c;
+// `IRQ` in TS; renamed: it clashes with `namespace IRQ` (irq.h)
+static constexpr uint32_t IRQ_ = 0x030;
+static constexpr uint32_t IRQ_FORCE = 0x034;
+static constexpr uint32_t INPUT_SYNC_BYPASS = 0x038;
+static constexpr uint32_t DBG_PADOUT = 0x03c;
+static constexpr uint32_t DBG_PADOE = 0x040;
+static constexpr uint32_t DBG_CFGINFO = 0x044;
+static constexpr uint32_t INSTR_MEM0 = 0x48;
+static constexpr uint32_t INSTR_MEM31 = 0x0c4;
+
+static constexpr uint32_t INTR = 0x128;       // Raw Interrupts
+static constexpr uint32_t IRQ0_INTE = 0x12c;  // Interrupt Enable for irq0
+static constexpr uint32_t IRQ0_INTF = 0x130;  // Interrupt Force for irq0
+static constexpr uint32_t IRQ0_INTS = 0x134;  // Interrupt status after masking & forcing for irq0
+static constexpr uint32_t IRQ1_INTE = 0x138;  // Interrupt Enable for irq1
+static constexpr uint32_t IRQ1_INTF = 0x13c;  // Interrupt Force for irq1
+static constexpr uint32_t IRQ1_INTS = 0x140;  // Interrupt status after masking & forcing for irq1
+
+// State-machine specific registers
+static constexpr uint32_t TXF0 = 0x010;
+static constexpr uint32_t TXF1 = 0x014;
+static constexpr uint32_t TXF2 = 0x018;
+static constexpr uint32_t TXF3 = 0x01c;
+static constexpr uint32_t RXF0 = 0x020;
+static constexpr uint32_t RXF1 = 0x024;
+static constexpr uint32_t RXF2 = 0x028;
+static constexpr uint32_t RXF3 = 0x02c;
+static constexpr uint32_t SM0_CLKDIV = 0x0c8;     // Clock divisor register for state machine 0
+static constexpr uint32_t SM0_EXECCTRL = 0x0cc;   // Execution/behavioural settings for state machine 0
+static constexpr uint32_t SM0_SHIFTCTRL = 0x0d0;  // Control behaviour of the input/output shift registers for state machine 0
+static constexpr uint32_t SM0_ADDR = 0x0d4;       // Current instruction address of state machine 0
+static constexpr uint32_t SM0_INSTR = 0x0d8;  // Write to execute an instruction immediately (including jumps) and then resume execution.
+static constexpr uint32_t SM0_PINCTRL = 0x0dc;  // State machine pin control
+static constexpr uint32_t SM1_CLKDIV = 0x0e0;
+static constexpr uint32_t SM1_PINCTRL = 0x0f4;
+static constexpr uint32_t SM2_CLKDIV = 0x0f8;
+static constexpr uint32_t SM2_PINCTRL = 0x10c;
+static constexpr uint32_t SM3_CLKDIV = 0x110;
+static constexpr uint32_t SM3_PINCTRL = 0x124;
+
+// FSTAT bits
+static constexpr uint32_t FSTAT_TXEMPTY = 1u << 24;
+static constexpr uint32_t FSTAT_TXFULL = 1u << 16;
+static constexpr uint32_t FSTAT_RXEMPTY = 1u << 8;
+static constexpr uint32_t FSTAT_RXFULL = 1u << 0;
+
+// FDEBUG bits
+static constexpr uint32_t FDEBUG_TXSTALL = 1u << 24;
+static constexpr uint32_t FDEBUG_TXOVER = 1u << 16;
+static constexpr uint32_t FDEBUG_RXUNDER = 1u << 8;
+static constexpr uint32_t FDEBUG_RXSTALL = 1u << 0;
+
+// SHIFTCTRL bits
+static constexpr uint32_t SHIFTCTRL_AUTOPUSH = 1u << 16;
+static constexpr uint32_t SHIFTCTRL_AUTOPULL = 1u << 17;
+static constexpr uint32_t SHIFTCTRL_IN_SHIFTDIR = 1u << 18;  // 1 = shift input shift register to right (data enters from left). 0 = to left
+static constexpr uint32_t SHIFTCTRL_OUT_SHIFTDIR = 1u << 19;  // 1 = shift out of output shift register to right. 0 = to left
+static constexpr uint32_t SHIFTCTRL_FJOIN_TX = 1u << 30;
+static constexpr uint32_t SHIFTCTRL_FJOIN_RX = 1u << 31;
+
+// EXECCTRL bits
+static constexpr uint32_t EXECCTRL_STATUS_SEL = 1u << 4;
+static constexpr uint32_t EXECCTRL_SIDE_PINDIR = 1u << 29;
+static constexpr uint32_t EXECCTRL_SIDE_EN = 1u << 30;
+static constexpr uint32_t EXECCTRL_EXEC_STALLED = 1u << 31;
+
+static inline uint32_t bitReverse(uint32_t x) {
+  x = ((x & 0x55555555) << 1) | ((x & 0xaaaaaaaa) >> 1);
+  x = ((x & 0x33333333) << 2) | ((x & 0xcccccccc) >> 2);
+  x = ((x & 0x0f0f0f0f) << 4) | ((x & 0xf0f0f0f0) >> 4);
+  x = ((x & 0x00ff00ff) << 8) | ((x & 0xff00ff00) >> 8);
+  x = ((x & 0x0000ffff) << 16) | ((x & 0xffff0000) >> 16);
+  return x;
+}
+
+static inline uint32_t irqIndex(uint32_t irq, uint32_t machineIndex) {
+  const bool rel = !!(irq & 0x10);
+  return rel ? (irq & 0x4) | (((irq & 0x3) + machineIndex) & 0x3) : irq & 0x7;
+}
+
 static const std::array<DREQChannel, 4> dreqRx0 = {DREQ_PIO0_RX0, DREQ_PIO0_RX1, DREQ_PIO0_RX2, DREQ_PIO0_RX3};
 static const std::array<DREQChannel, 4> dreqTx0 = {DREQ_PIO0_TX0, DREQ_PIO0_TX1, DREQ_PIO0_TX2, DREQ_PIO0_TX3};
 static const std::array<DREQChannel, 4> dreqRx1 = {DREQ_PIO1_RX0, DREQ_PIO1_RX1, DREQ_PIO1_RX2, DREQ_PIO1_RX3};
 static const std::array<DREQChannel, 4> dreqTx1 = {DREQ_PIO1_TX0, DREQ_PIO1_TX1, DREQ_PIO1_TX2, DREQ_PIO1_TX3};
 
+/** `(1 << n) - 1` for n in 0..31, as the int32 pattern JS produces (n = 31 gives 0x7fffffff). */
+static inline uint32_t lowMask(uint32_t n) { return (1u << (n & 31)) - 1u; }
+
+// ---------------------------------------------------------------------------
+// StateMachine
+
 StateMachine::StateMachine(RP2040 &rp2040, RPPIO &pio, uint32_t index)
     : rp2040(rp2040), pio(pio), index(index), dreqRx(pio.dreqRx[index]), dreqTx(pio.dreqTx[index]) {
-  // TODO(port): peripherals/pio.ts
-  //   constructor(
-  //     readonly rp2040: RP2040,
-  //     readonly pio: RPPIO,
-  //     readonly index: number,
-  //   ) {
-  //     this.updateDMARx();
-  //     this.updateDMATx();
-  //   }
+  updateDMARx();
+  updateDMATx();
 }
 
 void StateMachine::updateDMATx() {
-  // TODO(port): peripherals/pio.ts
-  //   private updateDMATx() {
-  //     if (this.txFIFO.full) {
-  //       this.rp2040.dma.clearDREQ(this.dreqTx);
-  //     } else {
-  //       this.rp2040.dma.setDREQ(this.dreqTx);
-  //     }
-  //   }
+  if (txFIFO.full()) {
+    rp2040.dma.clearDREQ(dreqTx);
+  } else {
+    rp2040.dma.setDREQ(dreqTx);
+  }
 }
 
 void StateMachine::updateDMARx() {
-  // TODO(port): peripherals/pio.ts
-  //   private updateDMARx() {
-  //     if (this.rxFIFO.empty) {
-  //       this.rp2040.dma.clearDREQ(this.dreqRx);
-  //     } else {
-  //       this.rp2040.dma.setDREQ(this.dreqRx);
-  //     }
-  //   }
+  if (rxFIFO.empty()) {
+    rp2040.dma.clearDREQ(dreqRx);
+  } else {
+    rp2040.dma.setDREQ(dreqRx);
+  }
 }
 
 void StateMachine::writeFIFO(uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   writeFIFO(value: number) {
-  //     if (this.txFIFO.full) {
-  //       this.pio.fdebug |= FDEBUG_TXOVER << this.index;
-  //       return;
-  //     }
-  //     this.txFIFO.push(value);
-  //     this.pio.txStall &= ~(FDEBUG_TXSTALL << this.index);
-  //     this.updateDMATx();
-  //     this.checkWait();
-  //     if (this.txFIFO.full) {
-  //       this.pio.checkInterrupts();
-  //     }
-  //   }
-  (void)value;
+  if (txFIFO.full()) {
+    pio.fdebug |= FDEBUG_TXOVER << index;
+    return;
+  }
+  txFIFO.push(value);
+  pio.txStall &= ~(FDEBUG_TXSTALL << index);
+  updateDMATx();
+  checkWait();
+  if (txFIFO.full()) {
+    pio.checkInterrupts();
+  }
 }
 
 uint32_t StateMachine::readFIFO() {
-  // TODO(port): peripherals/pio.ts
-  //   readFIFO() {
-  //     if (this.rxFIFO.empty) {
-  //       this.pio.fdebug |= FDEBUG_RXUNDER << this.index;
-  //       return 0;
-  //     }
-  //     const result = this.rxFIFO.pull();
-  //     this.pio.rxStall &= ~(FDEBUG_RXSTALL << this.index);
-  //     this.updateDMARx();
-  //     this.checkWait();
-  //     if (this.rxFIFO.empty) {
-  //       this.pio.checkInterrupts();
-  //     }
-  //     return result;
-  //   }
-  return 0;
+  if (rxFIFO.empty()) {
+    pio.fdebug |= FDEBUG_RXUNDER << index;
+    return 0;
+  }
+  const uint32_t result = rxFIFO.pull();
+  pio.rxStall &= ~(FDEBUG_RXSTALL << index);
+  updateDMARx();
+  checkWait();
+  if (rxFIFO.empty()) {
+    pio.checkInterrupts();
+  }
+  return result;
 }
 
 uint32_t StateMachine::status() const {
-  // TODO(port): peripherals/pio.ts
-  //   get status() {
-  //     const statusN = this.execCtrl & 0xf;
-  //     if (this.execCtrl & EXECCTRL_STATUS_SEL) {
-  //       return this.rxFIFO.itemCount < statusN ? 0xffffffff : 0;
-  //     } else {
-  //       return this.txFIFO.itemCount < statusN ? 0xffffffff : 0;
-  //     }
-  //   }
-  return 0;
+  const uint32_t statusN = execCtrl & 0xf;
+  if (execCtrl & EXECCTRL_STATUS_SEL) {
+    return rxFIFO.itemCount() < statusN ? 0xffffffff : 0;
+  } else {
+    return txFIFO.itemCount() < statusN ? 0xffffffff : 0;
+  }
 }
 
 bool StateMachine::jmpCondition(uint32_t condition) {
-  // TODO(port): peripherals/pio.ts
-  //   jmpCondition(condition: number) {
-  //     switch (condition) {
-  //       // (no condition): Always
-  //       case 0b000:
-  //         return true;
-  //
-  //       // !X: scratch X zero
-  //       case 0b001:
-  //         return this.x === 0;
-  //
-  //       // X--: scratch X non-zero, post-decrement
-  //       case 0b010: {
-  //         const oldX = this.x;
-  //         this.x = (this.x - 1) >>> 0;
-  //         return oldX !== 0;
-  //       }
-  //
-  //       // !Y: scratch Y zero
-  //       case 0b011:
-  //         return this.y === 0;
-  //
-  //       // Y--: scratch Y non-zero, post-decrement
-  //       case 0b100: {
-  //         const oldY = this.y;
-  //         this.y = (this.y - 1) >>> 0;
-  //         return oldY !== 0;
-  //       }
-  //
-  //       // X!=Y: scratch X not equal scratch Y
-  //       case 0b101:
-  //         return this.x >>> 0 !== this.y >>> 0;
-  //
-  //       // PIN: branch on input pin
-  //       case 0b110: {
-  //         const { gpio } = this.rp2040;
-  //         const { jmpPin } = this;
-  //         return jmpPin < gpio.length ? gpio[jmpPin].inputValue : false;
-  //       }
-  //
-  //       // !OSRE: output shift register not empty
-  //       case 0b111:
-  //         return this.outputShiftCount < this.pullThreshold;
-  //     }
-  //
-  //     this.pio.error(`jmpCondition with unsupported condition: ${condition}`);
-  //     return false;
-  //   }
-  (void)condition;
+  switch (condition) {
+    // (no condition): Always
+    case 0b000:
+      return true;
+
+    // !X: scratch X zero
+    case 0b001:
+      return x == 0;
+
+    // X--: scratch X non-zero, post-decrement
+    case 0b010: {
+      const uint32_t oldX = x;
+      x = x - 1;  // `(this.x - 1) >>> 0`: exact for any int32/uint32 pattern
+      return oldX != 0;
+    }
+
+    // !Y: scratch Y zero
+    case 0b011:
+      return y == 0;
+
+    // Y--: scratch Y non-zero, post-decrement
+    case 0b100: {
+      const uint32_t oldY = y;
+      y = y - 1;
+      return oldY != 0;
+    }
+
+    // X!=Y: scratch X not equal scratch Y
+    case 0b101:
+      return x != y;
+
+    // PIN: branch on input pin
+    case 0b110: {
+      auto &gpio = rp2040.gpio;
+      const uint32_t jmpPin = this->jmpPin();
+      return jmpPin < gpio.size() ? gpio[jmpPin].inputValue() : false;
+    }
+
+    // !OSRE: output shift register not empty
+    case 0b111:
+      return outputShiftCount < pullThreshold();
+  }
+
+  pio.error("jmpCondition with unsupported condition: " + std::to_string(condition));
   return false;
 }
 
 uint32_t StateMachine::inPins() const {
-  // TODO(port): peripherals/pio.ts
-  //   get inPins() {
-  //     const { gpioValues } = this.rp2040;
-  //     const { inBase } = this;
-  //     return inBase ? (gpioValues << (32 - inBase)) | (gpioValues >>> inBase) : gpioValues;
-  //   }
-  return 0;
+  const uint32_t gpioValues = rp2040.gpioValues();
+  const uint32_t inBase = this->inBase();
+  return inBase ? (gpioValues << (32 - inBase)) | (gpioValues >> inBase) : gpioValues;
 }
 
 uint32_t StateMachine::inSourceValue(uint32_t source) {
-  // TODO(port): peripherals/pio.ts
-  //   inSourceValue(source: number) {
-  //     switch (source) {
-  //       // PINS
-  //       case 0b000:
-  //         return this.inPins;
-  //
-  //       // X (scratch register X)
-  //       case 0b001:
-  //         return this.x;
-  //
-  //       // Y (scratch register Y)
-  //       case 0b010:
-  //         return this.y;
-  //
-  //       // NULL (all zeroes)
-  //       case 0b011:
-  //         return 0;
-  //
-  //       // Reserved
-  //       case 0b100:
-  //         return 0;
-  //
-  //       // Reserved for IN, STATUS for MOV
-  //       case 0b101:
-  //         return this.status;
-  //
-  //       // ISR
-  //       case 0b110:
-  //         return this.inputShiftReg;
-  //
-  //       // OSR
-  //       case 0b111:
-  //         return this.outputShiftReg;
-  //     }
-  //
-  //     this.pio.error(`inSourceValue with unsupported source: ${source}`);
-  //     return 0;
-  //   }
-  (void)source;
+  switch (source) {
+    // PINS
+    case 0b000:
+      return inPins();
+
+    // X (scratch register X)
+    case 0b001:
+      return x;
+
+    // Y (scratch register Y)
+    case 0b010:
+      return y;
+
+    // NULL (all zeroes)
+    case 0b011:
+      return 0;
+
+    // Reserved
+    case 0b100:
+      return 0;
+
+    // Reserved for IN, STATUS for MOV
+    case 0b101:
+      return status();
+
+    // ISR
+    case 0b110:
+      return inputShiftReg;
+
+    // OSR
+    case 0b111:
+      return outputShiftReg;
+  }
+
+  pio.error("inSourceValue with unsupported source: " + std::to_string(source));
   return 0;
 }
 
 void StateMachine::writeOutValue(uint32_t destination, uint32_t value, uint32_t bitCount) {
-  // TODO(port): peripherals/pio.ts
-  //   writeOutValue(destination: number, value: number, bitCount: number) {
-  //     switch (destination) {
-  //       // PINS
-  //       case 0b000:
-  //         this.setOutPins(value);
-  //         break;
-  //
-  //       // X (scratch register X)
-  //       case 0b001:
-  //         this.x = value;
-  //         break;
-  //
-  //       // Y (scratch register Y)
-  //       case 0b010:
-  //         this.y = value;
-  //         break;
-  //
-  //       // NULL (discard data)
-  //       case 0b011:
-  //         break;
-  //
-  //       // PINDIRS
-  //       case 0b100:
-  //         this.setOutPinDirs(value);
-  //         break;
-  //
-  //       // PC
-  //       case 0b101:
-  //         this.pc = value & 0x1f;
-  //         this.updatePC = false;
-  //         break;
-  //
-  //       // ISR (also sets ISR shift counter to Bit count)
-  //       case 0b110:
-  //         this.inputShiftReg = value;
-  //         this.inputShiftCount = bitCount;
-  //         break;
-  //
-  //       // EXEC (Execute OSR shift data as instruction)
-  //       case 0b111:
-  //         this.execOpcode = value;
-  //         this.execValid = true;
-  //         break;
-  //     }
-  //   }
-  (void)destination;
-  (void)value;
-  (void)bitCount;
+  switch (destination) {
+    // PINS
+    case 0b000:
+      setOutPins(value);
+      break;
+
+    // X (scratch register X)
+    case 0b001:
+      x = value;
+      break;
+
+    // Y (scratch register Y)
+    case 0b010:
+      y = value;
+      break;
+
+    // NULL (discard data)
+    case 0b011:
+      break;
+
+    // PINDIRS
+    case 0b100:
+      setOutPinDirs(value);
+      break;
+
+    // PC
+    case 0b101:
+      pc = value & 0x1f;
+      updatePC = false;
+      break;
+
+    // ISR (also sets ISR shift counter to Bit count)
+    case 0b110:
+      inputShiftReg = value;
+      inputShiftCount = bitCount;
+      break;
+
+    // EXEC (Execute OSR shift data as instruction)
+    case 0b111:
+      execOpcode = value;
+      execValid = true;
+      break;
+  }
 }
 
 uint32_t StateMachine::pushThreshold() const {
-  // TODO(port): peripherals/pio.ts
-  //   get pushThreshold() {
-  //     const value = (this.shiftCtrl >> 20) & 0x1f;
-  //     return value ? value : 32;
-  //   }
-  return 0;
+  const uint32_t value = (shiftCtrl >> 20) & 0x1f;
+  return value ? value : 32;
 }
 
 uint32_t StateMachine::pullThreshold() const {
-  // TODO(port): peripherals/pio.ts
-  //   get pullThreshold() {
-  //     const value = (this.shiftCtrl >> 25) & 0x1f;
-  //     return value ? value : 32;
-  //   }
-  return 0;
+  const uint32_t value = (shiftCtrl >> 25) & 0x1f;
+  return value ? value : 32;
 }
 
-uint32_t StateMachine::sidesetCount() const {
-  // TODO(port): peripherals/pio.ts
-  //   get sidesetCount() {
-  //     return (this.pinCtrl >> 29) & 0x7;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::sidesetCount() const { return (pinCtrl >> 29) & 0x7; }
 
-uint32_t StateMachine::setCount() const {
-  // TODO(port): peripherals/pio.ts
-  //   get setCount() {
-  //     return (this.pinCtrl >> 26) & 0x7;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::setCount() const { return (pinCtrl >> 26) & 0x7; }
 
-uint32_t StateMachine::outCount() const {
-  // TODO(port): peripherals/pio.ts
-  //   get outCount() {
-  //     return (this.pinCtrl >> 20) & 0x3f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::outCount() const { return (pinCtrl >> 20) & 0x3f; }
 
-uint32_t StateMachine::inBase() const {
-  // TODO(port): peripherals/pio.ts
-  //   get inBase() {
-  //     return (this.pinCtrl >> 15) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::inBase() const { return (pinCtrl >> 15) & 0x1f; }
 
-uint32_t StateMachine::sidesetBase() const {
-  // TODO(port): peripherals/pio.ts
-  //   get sidesetBase() {
-  //     return (this.pinCtrl >> 10) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::sidesetBase() const { return (pinCtrl >> 10) & 0x1f; }
 
-uint32_t StateMachine::setBase() const {
-  // TODO(port): peripherals/pio.ts
-  //   get setBase() {
-  //     return (this.pinCtrl >> 5) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::setBase() const { return (pinCtrl >> 5) & 0x1f; }
 
-uint32_t StateMachine::outBase() const {
-  // TODO(port): peripherals/pio.ts
-  //   get outBase() {
-  //     return (this.pinCtrl >> 0) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::outBase() const { return (pinCtrl >> 0) & 0x1f; }
 
-uint32_t StateMachine::jmpPin() const {
-  // TODO(port): peripherals/pio.ts
-  //   get jmpPin() {
-  //     return (this.execCtrl >> 24) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::jmpPin() const { return (execCtrl >> 24) & 0x1f; }
 
-uint32_t StateMachine::wrapTop() const {
-  // TODO(port): peripherals/pio.ts
-  //   get wrapTop() {
-  //     return (this.execCtrl >> 12) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::wrapTop() const { return (execCtrl >> 12) & 0x1f; }
 
-uint32_t StateMachine::wrapBottom() const {
-  // TODO(port): peripherals/pio.ts
-  //   get wrapBottom() {
-  //     return (this.execCtrl >> 7) & 0x1f;
-  //   }
-  return 0;
-}
+uint32_t StateMachine::wrapBottom() const { return (execCtrl >> 7) & 0x1f; }
 
 void StateMachine::setOutPinDirs(uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   setOutPinDirs(value: number) {
-  //     this.outPinDirection = value;
-  //     this.pio.pinDirectionsChanged(value, this.outBase, this.outCount);
-  //   }
-  (void)value;
+  outPinDirection = value;
+  pio.pinDirectionsChanged(value, outBase(), outCount());
 }
 
 void StateMachine::setOutPins(uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   setOutPins(value: number) {
-  //     this.outPinValues = value;
-  //     this.pio.pinValuesChanged(value, this.outBase, this.outCount);
-  //   }
-  (void)value;
+  outPinValues = value;
+  pio.pinValuesChanged(value, outBase(), outCount());
 }
 
 void StateMachine::outInstruction(uint32_t arg) {
-  // TODO(port): peripherals/pio.ts
-  //   outInstruction(arg: number) {
-  //     const bitCount = arg & 0x1f;
-  //     const destination = arg >> 5;
-  //
-  //     if (bitCount === 0) {
-  //       this.writeOutValue(destination, this.outputShiftReg, 32);
-  //       this.outputShiftCount = 32;
-  //     } else {
-  //       if (this.shiftCtrl & SHIFTCTRL_OUT_SHIFTDIR) {
-  //         const value = this.outputShiftReg & ((1 << bitCount) - 1);
-  //         this.outputShiftReg >>>= bitCount;
-  //         this.writeOutValue(destination, value, bitCount);
-  //       } else {
-  //         const value = this.outputShiftReg >>> (32 - bitCount);
-  //         this.outputShiftReg <<= bitCount;
-  //         this.writeOutValue(destination, value, bitCount);
-  //       }
-  //       this.outputShiftCount += bitCount;
-  //       if (this.outputShiftCount > 32) {
-  //         this.outputShiftCount = 32;
-  //       }
-  //     }
-  //   }
-  (void)arg;
+  const uint32_t bitCount = arg & 0x1f;
+  const uint32_t destination = arg >> 5;
+
+  if (bitCount == 0) {
+    writeOutValue(destination, outputShiftReg, 32);
+    outputShiftCount = 32;
+  } else {
+    if (shiftCtrl & SHIFTCTRL_OUT_SHIFTDIR) {
+      const uint32_t value = outputShiftReg & lowMask(bitCount);
+      outputShiftReg >>= bitCount;
+      writeOutValue(destination, value, bitCount);
+    } else {
+      const uint32_t value = outputShiftReg >> (32 - bitCount);
+      outputShiftReg <<= bitCount;
+      writeOutValue(destination, value, bitCount);
+    }
+    outputShiftCount += bitCount;
+    if (outputShiftCount > 32) {
+      outputShiftCount = 32;
+    }
+  }
 }
 
 void StateMachine::executeInstruction(uint32_t opcode) {
-  // TODO(port): peripherals/pio.ts
-  //   executeInstruction(opcode: number) {
-  //     const arg = opcode & 0xff;
-  //     switch (opcode >>> 13) {
-  //       /* JMP */
-  //       case 0b000:
-  //         if (this.jmpCondition(arg >> 5)) {
-  //           this.pc = arg & 0x1f;
-  //           this.updatePC = false;
-  //         }
-  //         break;
-  //
-  //       /* WAIT */
-  //       case 0b001: {
-  //         const polarity = !!(arg & 0x80);
-  //         const source = (arg >> 5) & 0x3;
-  //         const index = arg & 0x1f;
-  //         switch (source) {
-  //           // GPIO:
-  //           case 0b00:
-  //             this.wait(WaitType.Pin, polarity, index);
-  //             break;
-  //
-  //           // PIN:
-  //           case 0b01:
-  //             this.wait(WaitType.Pin, polarity, (index + this.inBase) % 32);
-  //             break;
-  //
-  //           // IRQ:
-  //           case 0b10:
-  //             this.wait(WaitType.IRQ, polarity, irqIndex(index, this.index));
-  //             break;
-  //         }
-  //         break;
-  //       }
-  //
-  //       /* IN */
-  //       case 0b010: {
-  //         const bitCount = arg & 0x1f;
-  //         let sourceValue = this.inSourceValue(arg >> 5);
-  //
-  //         if (bitCount == 0) {
-  //           this.inputShiftReg = sourceValue;
-  //           this.inputShiftCount = 32;
-  //         } else {
-  //           sourceValue &= (1 << bitCount) - 1;
-  //           if (this.shiftCtrl & SHIFTCTRL_IN_SHIFTDIR) {
-  //             this.inputShiftReg >>>= bitCount;
-  //             this.inputShiftReg |= sourceValue << (32 - bitCount);
-  //           } else {
-  //             this.inputShiftReg <<= bitCount;
-  //             this.inputShiftReg |= sourceValue;
-  //           }
-  //           this.inputShiftCount += bitCount;
-  //           if (this.inputShiftCount > 32) {
-  //             this.inputShiftCount = 32;
-  //           }
-  //         }
-  //
-  //         if (this.shiftCtrl & SHIFTCTRL_AUTOPUSH && this.inputShiftCount >= this.pushThreshold) {
-  //           if (!this.rxFIFO.full) {
-  //             this.rxFIFO.push(this.inputShiftReg);
-  //             this.updateDMARx();
-  //             this.pio.checkInterrupts();
-  //           } else {
-  //             this.pio.rxStall |= FDEBUG_RXSTALL << this.index;
-  //             this.pio.fdebug |= this.pio.rxStall;
-  //             this.wait(WaitType.rxFIFO, false, this.inputShiftReg);
-  //           }
-  //           this.inputShiftCount = 0;
-  //           this.inputShiftReg = 0;
-  //         }
-  //
-  //         break;
-  //       }
-  //
-  //       /* OUT */
-  //       case 0b011: {
-  //         if (this.shiftCtrl & SHIFTCTRL_AUTOPULL && this.outputShiftCount >= this.pullThreshold) {
-  //           this.outputShiftCount = 0;
-  //           if (!this.txFIFO.empty) {
-  //             this.outputShiftReg = this.txFIFO.pull();
-  //             this.updateDMATx();
-  //             this.pio.checkInterrupts();
-  //           } else {
-  //             this.pio.txStall |= FDEBUG_TXSTALL << this.index;
-  //             this.pio.fdebug |= this.pio.txStall;
-  //             this.wait(WaitType.Out, false, arg);
-  //           }
-  //         }
-  //
-  //         if (!this.waiting) {
-  //           this.outInstruction(arg);
-  //         }
-  //         break;
-  //       }
-  //
-  //       /* PUSH/PULL */
-  //       case 0b100: {
-  //         const block = !!(arg & (1 << 5));
-  //         const ifFullOrEmpty = !!(arg & (1 << 6));
-  //         if (arg & 0x1f) {
-  //           // Unknown instruction
-  //           break;
-  //         }
-  //         if (arg & 0x80) {
-  //           // PULL
-  //           if (
-  //             ifFullOrEmpty &&
-  //             this.shiftCtrl & SHIFTCTRL_AUTOPULL &&
-  //             this.outputShiftCount < this.pullThreshold
-  //           ) {
-  //             break;
-  //           }
-  //           if (!this.txFIFO.empty) {
-  //             this.outputShiftReg = this.txFIFO.pull();
-  //             this.updateDMATx();
-  //             this.pio.checkInterrupts();
-  //           } else {
-  //             this.pio.txStall |= FDEBUG_TXSTALL << this.index;
-  //             this.pio.fdebug |= this.pio.txStall;
-  //             if (block) {
-  //               this.wait(WaitType.txFIFO, false, 0);
-  //             } else {
-  //               this.outputShiftReg = this.x;
-  //             }
-  //           }
-  //           this.outputShiftCount = 0;
-  //         } else {
-  //           // PUSH
-  //           if (
-  //             ifFullOrEmpty &&
-  //             this.shiftCtrl & SHIFTCTRL_AUTOPUSH &&
-  //             this.inputShiftCount < this.pushThreshold
-  //           ) {
-  //             break;
-  //           }
-  //           if (!this.rxFIFO.full) {
-  //             this.rxFIFO.push(this.inputShiftReg);
-  //             this.updateDMARx();
-  //             this.pio.checkInterrupts();
-  //           } else {
-  //             this.pio.rxStall |= FDEBUG_RXSTALL << this.index;
-  //             this.pio.fdebug |= this.pio.rxStall;
-  //             if (block) {
-  //               this.wait(WaitType.rxFIFO, false, this.inputShiftReg);
-  //             }
-  //           }
-  //           this.inputShiftReg = 0;
-  //           this.inputShiftCount = 0;
-  //         }
-  //         break;
-  //       }
-  //
-  //       /* MOV */
-  //       case 0b101: {
-  //         const source = arg & 0x7;
-  //         const op = (arg >> 3) & 0x3;
-  //         const destination = (arg >> 5) & 0x7;
-  //         const value = this.inSourceValue(source);
-  //         const transformedValue = this.transformMovValue(value, op) >>> 0;
-  //         this.setMovDestination(destination, transformedValue);
-  //         break;
-  //       }
-  //
-  //       /* IRQ */
-  //       case 0b110: {
-  //         if (arg & 0x80) {
-  //           // Unknown instruction
-  //           break;
-  //         }
-  //         const clear = !!(arg & 0x40);
-  //         const wait = !!(arg & 0x20);
-  //         const irq = irqIndex(arg & 0x1f, this.index);
-  //         if (clear) {
-  //           this.pio.irq &= ~(1 << irq);
-  //           this.pio.irqUpdated();
-  //         } else {
-  //           this.pio.irq |= 1 << irq;
-  //           this.pio.irqUpdated();
-  //           if (wait) {
-  //             this.wait(WaitType.IRQ, false, irq);
-  //           }
-  //         }
-  //         break;
-  //       }
-  //
-  //       /* SET */
-  //       case 0b111: {
-  //         const data = arg & 0x1f;
-  //         const destination = arg >> 5;
-  //         switch (destination) {
-  //           case 0b000:
-  //             this.setSetPins(data);
-  //             break;
-  //           case 0b001:
-  //             this.x = data;
-  //             break;
-  //           case 0b010:
-  //             this.y = data;
-  //             break;
-  //           case 0b100:
-  //             this.setSetPinDirs(data);
-  //             break;
-  //         }
-  //         break;
-  //       }
-  //     }
-  //
-  //     this.cycles++;
-  //
-  //     const { sidesetCount, execCtrl } = this;
-  //     const delaySideset = (opcode >> 8) & 0x1f;
-  //     const sideEn = !!(execCtrl & EXECCTRL_SIDE_EN);
-  //     const delay = delaySideset & ((1 << (5 - sidesetCount)) - 1);
-  //
-  //     if (sidesetCount && (!sideEn || delaySideset & 0x10)) {
-  //       const sideset = delaySideset >> (5 - sidesetCount);
-  //       this.setSideset(sideset, sideEn ? sidesetCount - 1 : sidesetCount);
-  //     }
-  //
-  //     if (this.execValid) {
-  //       this.execValid = false;
-  //       this.executeInstruction(this.execOpcode);
-  //     } else if (this.waiting) {
-  //       if (this.waitDelay < 0) {
-  //         this.waitDelay = delay;
-  //       }
-  //       this.checkWait();
-  //     } else {
-  //       this.cycles += delay;
-  //       this.delayLeft = delay;
-  //     }
-  //   }
-  (void)opcode;
-  TODO_PORT_ABORT("peripherals/pio.ts", "StateMachine::executeInstruction");
+  const uint32_t arg = opcode & 0xff;
+  // `opcode >>> 13`: opcode is 16 bits (instructions[], `value & 0xffff`) except
+  // for EXEC, whose opcode is a 32-bit OUT/MOV value; then this is 0..0x7ffff
+  // and matches no case, exactly as in TS.
+  switch (opcode >> 13) {
+    /* JMP */
+    case 0b000:
+      if (jmpCondition(arg >> 5)) {
+        pc = arg & 0x1f;
+        updatePC = false;
+      }
+      break;
+
+    /* WAIT */
+    case 0b001: {
+      const bool polarity = !!(arg & 0x80);
+      const uint32_t source = (arg >> 5) & 0x3;
+      const uint32_t index = arg & 0x1f;
+      switch (source) {
+        // GPIO:
+        case 0b00:
+          wait(WaitType::Pin, polarity, index);
+          break;
+
+        // PIN:
+        case 0b01:
+          wait(WaitType::Pin, polarity, (index + inBase()) % 32);
+          break;
+
+        // IRQ:
+        case 0b10:
+          wait(WaitType::IRQ, polarity, irqIndex(index, this->index));
+          break;
+      }
+      break;
+    }
+
+    /* IN */
+    case 0b010: {
+      const uint32_t bitCount = arg & 0x1f;
+      uint32_t sourceValue = inSourceValue(arg >> 5);
+
+      if (bitCount == 0) {
+        inputShiftReg = sourceValue;
+        inputShiftCount = 32;
+      } else {
+        sourceValue &= lowMask(bitCount);
+        if (shiftCtrl & SHIFTCTRL_IN_SHIFTDIR) {
+          inputShiftReg >>= bitCount;
+          inputShiftReg |= sourceValue << (32 - bitCount);
+        } else {
+          inputShiftReg <<= bitCount;
+          inputShiftReg |= sourceValue;
+        }
+        inputShiftCount += bitCount;
+        if (inputShiftCount > 32) {
+          inputShiftCount = 32;
+        }
+      }
+
+      if (shiftCtrl & SHIFTCTRL_AUTOPUSH && inputShiftCount >= pushThreshold()) {
+        if (!rxFIFO.full()) {
+          rxFIFO.push(inputShiftReg);
+          updateDMARx();
+          pio.checkInterrupts();
+        } else {
+          pio.rxStall |= FDEBUG_RXSTALL << this->index;
+          pio.fdebug |= pio.rxStall;
+          wait(WaitType::rxFIFO, false, inputShiftReg);
+        }
+        inputShiftCount = 0;
+        inputShiftReg = 0;
+      }
+
+      break;
+    }
+
+    /* OUT */
+    case 0b011: {
+      if (shiftCtrl & SHIFTCTRL_AUTOPULL && outputShiftCount >= pullThreshold()) {
+        outputShiftCount = 0;
+        if (!txFIFO.empty()) {
+          outputShiftReg = txFIFO.pull();
+          updateDMATx();
+          pio.checkInterrupts();
+        } else {
+          pio.txStall |= FDEBUG_TXSTALL << this->index;
+          pio.fdebug |= pio.txStall;
+          wait(WaitType::Out, false, arg);
+        }
+      }
+
+      if (!waiting) {
+        outInstruction(arg);
+      }
+      break;
+    }
+
+    /* PUSH/PULL */
+    case 0b100: {
+      const bool block = !!(arg & (1 << 5));
+      const bool ifFullOrEmpty = !!(arg & (1 << 6));
+      if (arg & 0x1f) {
+        // Unknown instruction
+        break;
+      }
+      if (arg & 0x80) {
+        // PULL
+        if (ifFullOrEmpty && shiftCtrl & SHIFTCTRL_AUTOPULL && outputShiftCount < pullThreshold()) {
+          break;
+        }
+        if (!txFIFO.empty()) {
+          outputShiftReg = txFIFO.pull();
+          updateDMATx();
+          pio.checkInterrupts();
+        } else {
+          pio.txStall |= FDEBUG_TXSTALL << this->index;
+          pio.fdebug |= pio.txStall;
+          if (block) {
+            wait(WaitType::txFIFO, false, 0);
+          } else {
+            outputShiftReg = x;
+          }
+        }
+        outputShiftCount = 0;
+      } else {
+        // PUSH
+        if (ifFullOrEmpty && shiftCtrl & SHIFTCTRL_AUTOPUSH && inputShiftCount < pushThreshold()) {
+          break;
+        }
+        if (!rxFIFO.full()) {
+          rxFIFO.push(inputShiftReg);
+          updateDMARx();
+          pio.checkInterrupts();
+        } else {
+          pio.rxStall |= FDEBUG_RXSTALL << this->index;
+          pio.fdebug |= pio.rxStall;
+          if (block) {
+            wait(WaitType::rxFIFO, false, inputShiftReg);
+          }
+        }
+        inputShiftReg = 0;
+        inputShiftCount = 0;
+      }
+      break;
+    }
+
+    /* MOV */
+    case 0b101: {
+      const uint32_t source = arg & 0x7;
+      const uint32_t op = (arg >> 3) & 0x3;
+      const uint32_t destination = (arg >> 5) & 0x7;
+      const uint32_t value = inSourceValue(source);
+      const uint32_t transformedValue = transformMovValue(value, op);
+      setMovDestination(destination, transformedValue);
+      break;
+    }
+
+    /* IRQ */
+    case 0b110: {
+      if (arg & 0x80) {
+        // Unknown instruction
+        break;
+      }
+      const bool clear = !!(arg & 0x40);
+      const bool wait = !!(arg & 0x20);
+      const uint32_t irq = irqIndex(arg & 0x1f, this->index);
+      if (clear) {
+        pio.irq &= ~(1u << irq);
+        pio.irqUpdated();
+      } else {
+        pio.irq |= 1u << irq;
+        pio.irqUpdated();
+        if (wait) {
+          this->wait(WaitType::IRQ, false, irq);
+        }
+      }
+      break;
+    }
+
+    /* SET */
+    case 0b111: {
+      const uint32_t data = arg & 0x1f;
+      const uint32_t destination = arg >> 5;
+      switch (destination) {
+        case 0b000:
+          setSetPins(data);
+          break;
+        case 0b001:
+          x = data;
+          break;
+        case 0b010:
+          y = data;
+          break;
+        case 0b100:
+          setSetPinDirs(data);
+          break;
+      }
+      break;
+    }
+  }
+
+  cycles++;
+
+  const uint32_t sidesetCount = this->sidesetCount();
+  const uint32_t execCtrl = this->execCtrl;
+  // `opcode >> 8`: for an EXEC'd 32-bit value with bit 31 set JS gives a
+  // negative number, but `& 0x1f` only keeps bits 8..12 either way.
+  const uint32_t delaySideset = (opcode >> 8) & 0x1f;
+  const bool sideEn = !!(execCtrl & EXECCTRL_SIDE_EN);
+  // sidesetCount is 0..7: for 6 and 7 the JS shift count `5 - sidesetCount`
+  // is negative and taken & 31 (so the mask is 0x7fffffff / 0x3fffffff).
+  const int32_t delay =
+      static_cast<int32_t>(delaySideset & lowMask(static_cast<uint32_t>(5 - static_cast<int32_t>(sidesetCount))));
+
+  if (sidesetCount && (!sideEn || delaySideset & 0x10)) {
+    const uint32_t sideset = static_cast<uint32_t>(
+        jsSar(static_cast<int32_t>(delaySideset), static_cast<uint32_t>(5 - static_cast<int32_t>(sidesetCount))));
+    setSideset(sideset, sideEn ? sidesetCount - 1 : sidesetCount);
+  }
+
+  if (execValid) {
+    execValid = false;
+    executeInstruction(execOpcode);
+  } else if (waiting) {
+    if (waitDelay < 0) {
+      waitDelay = delay;
+    }
+    checkWait();
+  } else {
+    cycles += delay;
+    delayLeft = delay;
+  }
 }
 
 void StateMachine::wait(WaitType type, bool polarity, uint32_t index) {
-  // TODO(port): peripherals/pio.ts
-  //   wait(type: WaitType, polarity: boolean, index: number) {
-  //     this.waiting = true;
-  //     this.waitType = type;
-  //     this.waitPolarity = polarity;
-  //     this.waitIndex = index;
-  //     this.waitDelay = -1;
-  //     this.updatePC = false;
-  //   }
-  (void)type;
-  (void)polarity;
-  (void)index;
+  waiting = true;
+  waitType = type;
+  waitPolarity = polarity;
+  waitIndex = index;
+  waitDelay = -1;
+  updatePC = false;
 }
 
 void StateMachine::nextPC() {
-  // TODO(port): peripherals/pio.ts
-  //   nextPC() {
-  //     if (this.pc === this.wrapTop) {
-  //       this.pc = this.wrapBottom;
-  //     } else {
-  //       this.pc = (this.pc + 1) & 0x1f;
-  //     }
-  //   }
+  if (pc == wrapTop()) {
+    pc = wrapBottom();
+  } else {
+    pc = (pc + 1) & 0x1f;
+  }
 }
 
 void StateMachine::step() {
-  // TODO(port): peripherals/pio.ts
-  //   step() {
-  //     if (this.delayLeft > 0) {
-  //       this.delayLeft--;
-  //       return;
-  //     }
-  //     if (this.waiting) {
-  //       this.checkWait();
-  //       if (this.waiting) {
-  //         return;
-  //       }
-  //     }
-  //
-  //     this.updatePC = true;
-  //     this.executeInstruction(this.pio.instructions[this.pc]);
-  //     if (this.updatePC) {
-  //       this.nextPC();
-  //     }
-  //   }
-  TODO_PORT_ABORT("peripherals/pio.ts", "StateMachine::step");
+  if (delayLeft > 0) {
+    delayLeft--;
+    return;
+  }
+  if (waiting) {
+    checkWait();
+    if (waiting) {
+      return;
+    }
+  }
+
+  updatePC = true;
+  executeInstruction(pio.instructions[pc]);
+  if (updatePC) {
+    nextPC();
+  }
 }
 
-void StateMachine::setSetPinDirs(uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   setSetPinDirs(value: number) {
-  //     this.pio.pinDirectionsChanged(value, this.setBase, this.setCount);
-  //   }
-  (void)value;
-}
+void StateMachine::setSetPinDirs(uint32_t value) { pio.pinDirectionsChanged(value, setBase(), setCount()); }
 
-void StateMachine::setSetPins(uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   setSetPins(value: number) {
-  //     this.pio.pinValuesChanged(value, this.setBase, this.setCount);
-  //   }
-  (void)value;
-}
+void StateMachine::setSetPins(uint32_t value) { pio.pinValuesChanged(value, setBase(), setCount()); }
 
 void StateMachine::setSideset(uint32_t value, uint32_t count) {
-  // TODO(port): peripherals/pio.ts
-  //   setSideset(value: number, count: number) {
-  //     if (this.execCtrl & EXECCTRL_SIDE_PINDIR) {
-  //       this.pio.pinDirectionsChanged(value, this.sidesetBase, count);
-  //     } else {
-  //       this.pio.pinValuesChanged(value, this.sidesetBase, count);
-  //     }
-  //   }
-  (void)value;
-  (void)count;
+  if (execCtrl & EXECCTRL_SIDE_PINDIR) {
+    pio.pinDirectionsChanged(value, sidesetBase(), count);
+  } else {
+    pio.pinValuesChanged(value, sidesetBase(), count);
+  }
 }
 
 uint32_t StateMachine::transformMovValue(uint32_t value, uint32_t op) {
-  // TODO(port): peripherals/pio.ts
-  //   transformMovValue(value: number, op: number) {
-  //     switch (op) {
-  //       case 0b00:
-  //         return value;
-  //       case 0b01:
-  //         return ~value;
-  //       case 0b10:
-  //         return bitReverse(value);
-  //       case 0b11:
-  //       default:
-  //         return value; // reserved
-  //     }
-  //   }
-  (void)value;
-  (void)op;
-  return 0;
+  // The caller applies `>>> 0` (so `~value` is only ever seen as a pattern).
+  switch (op) {
+    case 0b00:
+      return value;
+    case 0b01:
+      return ~value;
+    case 0b10:
+      return bitReverse(value);
+    case 0b11:
+    default:
+      return value;  // reserved
+  }
 }
 
 void StateMachine::setMovDestination(uint32_t destination, uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   setMovDestination(destination: number, value: number) {
-  //     switch (destination) {
-  //       // PINS
-  //       case 0b000:
-  //         this.setOutPins(value);
-  //         break;
-  //
-  //       // X (scratch register X)
-  //       case 0b001:
-  //         this.x = value;
-  //         break;
-  //
-  //       // Y (scratch register Y)
-  //       case 0b010:
-  //         this.y = value;
-  //         break;
-  //
-  //       // reserved (discard data)
-  //       case 0b011:
-  //         break;
-  //
-  //       // EXEC
-  //       case 0b100:
-  //         this.execOpcode = value;
-  //         this.execValid = true;
-  //         break;
-  //
-  //       // PC
-  //       case 0b101:
-  //         this.pc = value & 0x1f;
-  //         this.updatePC = false;
-  //         break;
-  //
-  //       // ISR (Input shift counter is reset to 0 by this operation, i.e. empty)
-  //       case 0b110:
-  //         this.inputShiftReg = value;
-  //         this.inputShiftCount = 0;
-  //         break;
-  //
-  //       // OSR (Output shift counter is reset to 0 by this operation, i.e. full)
-  //       case 0b111:
-  //         this.outputShiftReg = value;
-  //         this.outputShiftCount = 0;
-  //         break;
-  //     }
-  //   }
-  (void)destination;
-  (void)value;
+  switch (destination) {
+    // PINS
+    case 0b000:
+      setOutPins(value);
+      break;
+
+    // X (scratch register X)
+    case 0b001:
+      x = value;
+      break;
+
+    // Y (scratch register Y)
+    case 0b010:
+      y = value;
+      break;
+
+    // reserved (discard data)
+    case 0b011:
+      break;
+
+    // EXEC
+    case 0b100:
+      execOpcode = value;
+      execValid = true;
+      break;
+
+    // PC
+    case 0b101:
+      pc = value & 0x1f;
+      updatePC = false;
+      break;
+
+    // ISR (Input shift counter is reset to 0 by this operation, i.e. empty)
+    case 0b110:
+      inputShiftReg = value;
+      inputShiftCount = 0;
+      break;
+
+    // OSR (Output shift counter is reset to 0 by this operation, i.e. full)
+    case 0b111:
+      outputShiftReg = value;
+      outputShiftCount = 0;
+      break;
+  }
 }
 
 uint32_t StateMachine::readUint32(uint32_t offset) {
-  // TODO(port): peripherals/pio.ts
-  //   readUint32(offset: number) {
-  //     switch (offset + SM0_CLKDIV) {
-  //       case SM0_CLKDIV:
-  //         return (this.clockDivInt << 16) | (this.clockDivFrac << 8);
-  //       case SM0_EXECCTRL:
-  //         return this.execCtrl;
-  //       case SM0_SHIFTCTRL:
-  //         return this.shiftCtrl;
-  //       case SM0_ADDR:
-  //         return this.pc;
-  //       case SM0_INSTR:
-  //         return this.pio.instructions[this.pc];
-  //       case SM0_PINCTRL:
-  //         return this.pinCtrl;
-  //     }
-  //     this.pio.error(`Read from invalid state machine register: ${offset}`);
-  //     return 0;
-  //   }
-  (void)offset;
-  TODO_PORT_ABORT("peripherals/pio.ts", "StateMachine::readUint32");
-}
-
-void StateMachine::writeUint32(uint32_t offset, uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   writeUint32(offset: number, value: number) {
-  //     switch (offset + SM0_CLKDIV) {
-  //       case SM0_CLKDIV:
-  //         this.clockDivFrac = (value >>> 8) & 0xff;
-  //         this.clockDivInt = value >>> 16;
-  //         break;
-  //       case SM0_EXECCTRL:
-  //         this.execCtrl = ((value & 0x7fffffff) | (this.execCtrl & 0x80000000)) >>> 0;
-  //         break;
-  //       case SM0_SHIFTCTRL: {
-  //         // Changing either join bit flushes both FIFOs (pio_sm_clear_fifos
-  //         // relies on this); joining gives one FIFO all 8 entries.
-  //         const join = SHIFTCTRL_FJOIN_TX | SHIFTCTRL_FJOIN_RX;
-  //         if ((value ^ this.shiftCtrl) & join) {
-  //           const tx = value & SHIFTCTRL_FJOIN_TX ? 8 : value & SHIFTCTRL_FJOIN_RX ? 0 : 4;
-  //           const rx = value & SHIFTCTRL_FJOIN_RX ? 8 : value & SHIFTCTRL_FJOIN_TX ? 0 : 4;
-  //           this.txFIFO.resize(tx);
-  //           this.rxFIFO.resize(rx);
-  //           this.updateDMATx();
-  //           this.updateDMARx();
-  //         }
-  //         this.shiftCtrl = value >>> 0;
-  //         break;
-  //       }
-  //       case SM0_ADDR:
-  //         /* read-only */
-  //         break;
-  //       case SM0_INSTR:
-  //         this.executeInstruction(value & 0xffff);
-  //         if (this.waiting) {
-  //           this.execCtrl |= EXECCTRL_EXEC_STALLED;
-  //         }
-  //         break;
-  //       case SM0_PINCTRL:
-  //         this.pinCtrl = value;
-  //         break;
-  //       default:
-  //         this.pio.error(`Write to invalid state machine register: ${offset}`);
-  //     }
-  //   }
-  (void)offset;
-  (void)value;
-  TODO_PORT_ABORT("peripherals/pio.ts", "StateMachine::writeUint32");
-}
-
-uint32_t StateMachine::fifoStat() const {
-  // TODO(port): peripherals/pio.ts
-  //   get fifoStat() {
-  //     const result =
-  //       (this.txFIFO.empty ? FSTAT_TXEMPTY : 0) |
-  //       (this.txFIFO.full ? FSTAT_TXFULL : 0) |
-  //       (this.rxFIFO.empty ? FSTAT_RXEMPTY : 0) |
-  //       (this.rxFIFO.full ? FSTAT_RXFULL : 0);
-  //     return result << this.index;
-  //   }
+  switch (offset + SM0_CLKDIV) {
+    case SM0_CLKDIV:
+      return (clockDivInt << 16) | (clockDivFrac << 8);
+    case SM0_EXECCTRL:
+      return execCtrl;
+    case SM0_SHIFTCTRL:
+      return shiftCtrl;
+    case SM0_ADDR:
+      return pc;
+    case SM0_INSTR:
+      return pio.instructions[pc];
+    case SM0_PINCTRL:
+      return pinCtrl;
+  }
+  pio.error("Read from invalid state machine register: " + std::to_string(offset));
   return 0;
 }
 
-void StateMachine::restart() {
-  // TODO(port): peripherals/pio.ts
-  //   restart() {
-  //     this.cycles = 0;
-  //     this.delayLeft = 0;
-  //     this.inputShiftCount = 0;
-  //     this.outputShiftCount = 32;
-  //     this.inputShiftReg = 0;
-  //     this.waiting = false;
-  //     // TODO any pin write left asserted due to OUT_STICKY.
-  //   }
+void StateMachine::writeUint32(uint32_t offset, uint32_t value) {
+  switch (offset + SM0_CLKDIV) {
+    case SM0_CLKDIV:
+      clockDivFrac = (value >> 8) & 0xff;
+      clockDivInt = value >> 16;
+      break;
+    case SM0_EXECCTRL:
+      execCtrl = (value & 0x7fffffff) | (execCtrl & 0x80000000);
+      break;
+    case SM0_SHIFTCTRL: {
+      // Changing either join bit flushes both FIFOs (pio_sm_clear_fifos
+      // relies on this); joining gives one FIFO all 8 entries.
+      const uint32_t join = SHIFTCTRL_FJOIN_TX | SHIFTCTRL_FJOIN_RX;
+      if ((value ^ shiftCtrl) & join) {
+        const uint32_t tx = value & SHIFTCTRL_FJOIN_TX ? 8 : value & SHIFTCTRL_FJOIN_RX ? 0 : 4;
+        const uint32_t rx = value & SHIFTCTRL_FJOIN_RX ? 8 : value & SHIFTCTRL_FJOIN_TX ? 0 : 4;
+        txFIFO.resize(tx);
+        rxFIFO.resize(rx);
+        updateDMATx();
+        updateDMARx();
+      }
+      shiftCtrl = value;
+      break;
+    }
+    case SM0_ADDR:
+      /* read-only */
+      break;
+    case SM0_INSTR:
+      executeInstruction(value & 0xffff);
+      if (waiting) {
+        execCtrl |= EXECCTRL_EXEC_STALLED;
+      }
+      break;
+    case SM0_PINCTRL:
+      pinCtrl = value;
+      break;
+    default:
+      pio.error("Write to invalid state machine register: " + std::to_string(offset));
+  }
 }
 
-void StateMachine::clkDivRestart() {
-  // TODO(port): peripherals/pio.ts
-  //   clkDivRestart() {
-  //     this.divPhase = 0;
-  //   }
+uint32_t StateMachine::fifoStat() const {
+  const uint32_t result = (txFIFO.empty() ? FSTAT_TXEMPTY : 0) | (txFIFO.full() ? FSTAT_TXFULL : 0) |
+                          (rxFIFO.empty() ? FSTAT_RXEMPTY : 0) | (rxFIFO.full() ? FSTAT_RXFULL : 0);
+  return result << index;
 }
+
+void StateMachine::restart() {
+  cycles = 0;
+  delayLeft = 0;
+  inputShiftCount = 0;
+  outputShiftCount = 32;
+  inputShiftReg = 0;
+  waiting = false;
+  // TODO any pin write left asserted due to OUT_STICKY.
+}
+
+void StateMachine::clkDivRestart() { divPhase = 0; }
 
 void StateMachine::clockTick() {
-  // TODO(port): peripherals/pio.ts
-  //   clockTick() {
-  //     if (!this.enabled) {
-  //       return;
-  //     }
-  //     const div = (this.clockDivInt || 65536) * 256 + this.clockDivFrac;
-  //     this.divPhase += 256;
-  //     if (this.divPhase >= div) {
-  //       this.divPhase -= div;
-  //       this.step();
-  //     }
-  //   }
-  TODO_PORT_ABORT("peripherals/pio.ts", "StateMachine::clockTick");
+  if (!enabled) {
+    return;
+  }
+  const uint32_t div = (clockDivInt ? clockDivInt : 65536) * 256 + clockDivFrac;
+  divPhase += 256;
+  if (divPhase >= div) {
+    divPhase -= div;
+    step();
+  }
 }
 
 void StateMachine::checkWait() {
-  // TODO(port): peripherals/pio.ts
-  //   checkWait() {
-  //     if (!this.waiting) {
-  //       return;
-  //     }
-  //
-  //     switch (this.waitType) {
-  //       case WaitType.IRQ: {
-  //         const irqValue = !!(this.pio.irq & (1 << this.waitIndex));
-  //         if (irqValue === this.waitPolarity) {
-  //           this.waiting = false;
-  //           if (irqValue) {
-  //             this.pio.irq &= ~(1 << this.waitIndex);
-  //           }
-  //         }
-  //         break;
-  //       }
-  //
-  //       case WaitType.Pin: {
-  //         if (
-  //           this.waitIndex < this.rp2040.gpio.length &&
-  //           this.rp2040.gpio[this.waitIndex].inputValue === this.waitPolarity
-  //         ) {
-  //           this.waiting = false;
-  //         }
-  //         break;
-  //       }
-  //
-  //       case WaitType.rxFIFO: {
-  //         if (!this.rxFIFO.full) {
-  //           this.rxFIFO.push(this.waitIndex);
-  //           this.waiting = false;
-  //           this.updateDMARx();
-  //           this.pio.checkInterrupts();
-  //         }
-  //         break;
-  //       }
-  //
-  //       case WaitType.txFIFO: {
-  //         if (!this.txFIFO.empty) {
-  //           this.outputShiftReg = this.txFIFO.pull();
-  //           this.waiting = false;
-  //           this.updateDMATx();
-  //           this.pio.checkInterrupts();
-  //         }
-  //         break;
-  //       }
-  //
-  //       case WaitType.Out: {
-  //         if (!this.txFIFO.empty) {
-  //           this.outputShiftReg = this.txFIFO.pull();
-  //           this.outInstruction(this.waitIndex);
-  //           this.waiting = false;
-  //           this.updateDMATx();
-  //           this.pio.checkInterrupts();
-  //         }
-  //         break;
-  //       }
-  //     }
-  //
-  //     if (!this.waiting) {
-  //       this.nextPC();
-  //       this.cycles += this.waitDelay;
-  //       // a stalled instruction's delay starts once it completes
-  //       this.delayLeft = Math.max(0, this.waitDelay);
-  //       this.execCtrl &= ~EXECCTRL_EXEC_STALLED;
-  //     }
-  //   }
+  if (!waiting) {
+    return;
+  }
+
+  switch (waitType) {
+    case WaitType::IRQ: {
+      // waitIndex is an IRQ number 0..7 here (irqIndex)
+      const bool irqValue = !!(pio.irq & (1u << (waitIndex & 31)));
+      if (irqValue == waitPolarity) {
+        waiting = false;
+        if (irqValue) {
+          pio.irq &= ~(1u << (waitIndex & 31));
+        }
+      }
+      break;
+    }
+
+    case WaitType::Pin: {
+      if (waitIndex < rp2040.gpio.size() && rp2040.gpio[waitIndex].inputValue() == waitPolarity) {
+        waiting = false;
+      }
+      break;
+    }
+
+    case WaitType::rxFIFO: {
+      if (!rxFIFO.full()) {
+        rxFIFO.push(waitIndex);
+        waiting = false;
+        updateDMARx();
+        pio.checkInterrupts();
+      }
+      break;
+    }
+
+    case WaitType::txFIFO: {
+      if (!txFIFO.empty()) {
+        outputShiftReg = txFIFO.pull();
+        waiting = false;
+        updateDMATx();
+        pio.checkInterrupts();
+      }
+      break;
+    }
+
+    case WaitType::Out: {
+      if (!txFIFO.empty()) {
+        outputShiftReg = txFIFO.pull();
+        outInstruction(waitIndex);
+        waiting = false;
+        updateDMATx();
+        pio.checkInterrupts();
+      }
+      break;
+    }
+
+    case WaitType::None:
+      break;
+  }
+
+  if (!waiting) {
+    nextPC();
+    cycles += waitDelay;
+    // a stalled instruction's delay starts once it completes
+    delayLeft = std::max(0, waitDelay);
+    execCtrl &= ~EXECCTRL_EXEC_STALLED;
+  }
 }
+
+// ---------------------------------------------------------------------------
+// RPPIO
 
 RPPIO::RPPIO(RP2040 &rp2040, const std::string &name, uint32_t firstIrq, uint32_t index)
     : BasePeripheral(rp2040, name),
@@ -991,338 +885,239 @@ RPPIO::RPPIO(RP2040 &rp2040, const std::string &name, uint32_t firstIrq, uint32_
       dreqRx(index ? dreqRx1 : dreqRx0),
       dreqTx(index ? dreqTx1 : dreqTx0),
       machines{{{rp2040, *this, 0}, {rp2040, *this, 1}, {rp2040, *this, 2}, {rp2040, *this, 3}}} {
-  // TODO(port): peripherals/pio.ts
-  //   constructor(
-  //     rp2040: RP2040,
-  //     name: string,
-  //     readonly firstIrq: number,
-  //     readonly index: number,
-  //   ) {
-  //     super(rp2040, name);
-  //   }
-  (void)rp2040;
-  (void)name;
-  (void)firstIrq;
-  (void)index;
-  run = [] {
-    // TODO(port): peripherals/pio.ts (no setTimeout: one batch, see pio.h)
-    //   run() {
-    //     for (let i = 0; i < 1000 && !this.stopped; i++) {
-    //       this.step();
-    //     }
-    //     if (!this.stopped) {
-    //       this.runTimer = setTimeout(() => this.run(), 0);
-    //     }
-    //   }
-    TODO_PORT_ABORT("peripherals/pio.ts", "RPPIO::run");
+  // `run()`: one batch; TS then re-arms itself with `setTimeout(() => this.run(), 0)`
+  // while not stopped (see pio.h).
+  run = [this] {
+    for (int i = 0; i < 1000 && !stopped; i++) {
+      step();
+    }
   };
 }
 
 uint32_t RPPIO::intRaw() const {
-  // TODO(port): peripherals/pio.ts
-  //   get intRaw() {
-  //     return (
-  //       ((this.irq & 0xf) << 8) |
-  //       (!this.machines[3].txFIFO.full ? 0x80 : 0) |
-  //       (!this.machines[2].txFIFO.full ? 0x40 : 0) |
-  //       (!this.machines[1].txFIFO.full ? 0x20 : 0) |
-  //       (!this.machines[0].txFIFO.full ? 0x10 : 0) |
-  //       (!this.machines[3].rxFIFO.empty ? 0x08 : 0) |
-  //       (!this.machines[2].rxFIFO.empty ? 0x04 : 0) |
-  //       (!this.machines[1].rxFIFO.empty ? 0x02 : 0) |
-  //       (!this.machines[0].rxFIFO.empty ? 0x01 : 0)
-  //     );
-  //   }
-  return 0;
+  return ((irq & 0xf) << 8) | (!machines[3].txFIFO.full() ? 0x80 : 0) | (!machines[2].txFIFO.full() ? 0x40 : 0) |
+         (!machines[1].txFIFO.full() ? 0x20 : 0) | (!machines[0].txFIFO.full() ? 0x10 : 0) |
+         (!machines[3].rxFIFO.empty() ? 0x08 : 0) | (!machines[2].rxFIFO.empty() ? 0x04 : 0) |
+         (!machines[1].rxFIFO.empty() ? 0x02 : 0) | (!machines[0].rxFIFO.empty() ? 0x01 : 0);
 }
 
-uint32_t RPPIO::irq0IntStatus() const {
-  // TODO(port): peripherals/pio.ts
-  //   get irq0IntStatus() {
-  //     return (this.intRaw & this.irq0IntEnable) | this.irq0IntForce;
-  //   }
-  return 0;
-}
+uint32_t RPPIO::irq0IntStatus() const { return (intRaw() & irq0IntEnable) | irq0IntForce; }
 
-uint32_t RPPIO::irq1IntStatus() const {
-  // TODO(port): peripherals/pio.ts
-  //   get irq1IntStatus() {
-  //     return (this.intRaw & this.irq1IntEnable) | this.irq1IntForce;
-  //   }
-  return 0;
-}
+uint32_t RPPIO::irq1IntStatus() const { return (intRaw() & irq1IntEnable) | irq1IntForce; }
 
 uint32_t RPPIO::readUint32(uint32_t offset) {
-  // TODO(port): peripherals/pio.ts
-  //   readUint32(offset: number) {
-  //     if (offset >= SM0_CLKDIV && offset <= SM0_PINCTRL) {
-  //       return this.machines[0].readUint32(offset - SM0_CLKDIV);
-  //     }
-  //     if (offset >= SM1_CLKDIV && offset <= SM1_PINCTRL) {
-  //       return this.machines[1].readUint32(offset - SM1_CLKDIV);
-  //     }
-  //     if (offset >= SM2_CLKDIV && offset <= SM2_PINCTRL) {
-  //       return this.machines[2].readUint32(offset - SM2_CLKDIV);
-  //     }
-  //     if (offset >= SM3_CLKDIV && offset <= SM3_PINCTRL) {
-  //       return this.machines[3].readUint32(offset - SM3_CLKDIV);
-  //     }
-  //
-  //     switch (offset) {
-  //       case CTRL:
-  //         return (
-  //           (this.machines[0].enabled ? 1 << 0 : 0) |
-  //           (this.machines[1].enabled ? 1 << 1 : 0) |
-  //           (this.machines[2].enabled ? 1 << 2 : 0) |
-  //           (this.machines[3].enabled ? 1 << 3 : 0)
-  //         );
-  //       case FSTAT:
-  //         return (
-  //           this.machines[0].fifoStat |
-  //           this.machines[1].fifoStat |
-  //           this.machines[2].fifoStat |
-  //           this.machines[3].fifoStat
-  //         );
-  //       case FDEBUG:
-  //         return this.fdebug;
-  //       case FLEVEL:
-  //         return (
-  //           (this.machines[0].txFIFO.itemCount & 0xf) |
-  //           ((this.machines[0].rxFIFO.itemCount & 0xf) << 4) |
-  //           ((this.machines[1].txFIFO.itemCount & 0xf) << 8) |
-  //           ((this.machines[1].rxFIFO.itemCount & 0xf) << 12) |
-  //           ((this.machines[2].txFIFO.itemCount & 0xf) << 16) |
-  //           ((this.machines[2].rxFIFO.itemCount & 0xf) << 20) |
-  //           ((this.machines[3].txFIFO.itemCount & 0xf) << 24) |
-  //           ((this.machines[3].rxFIFO.itemCount & 0xf) << 28)
-  //         );
-  //
-  //       case RXF0:
-  //         return this.machines[0].readFIFO();
-  //       case RXF1:
-  //         return this.machines[1].readFIFO();
-  //       case RXF2:
-  //         return this.machines[2].readFIFO();
-  //       case RXF3:
-  //         return this.machines[3].readFIFO();
-  //       case IRQ:
-  //         return this.irq;
-  //       case IRQ_FORCE:
-  //         return 0;
-  //       case INPUT_SYNC_BYPASS:
-  //         return this.inputSyncBypass;
-  //       case DBG_PADOUT:
-  //         return this.pinValues;
-  //       case DBG_PADOE:
-  //         return this.pinDirections;
-  //       case DBG_CFGINFO:
-  //         return 0x200404;
-  //       case INTR:
-  //         return this.intRaw;
-  //       case IRQ0_INTE:
-  //         return this.irq0IntEnable;
-  //       case IRQ0_INTF:
-  //         return this.irq0IntForce;
-  //       case IRQ0_INTS:
-  //         return this.irq0IntStatus;
-  //       case IRQ1_INTE:
-  //         return this.irq1IntEnable;
-  //       case IRQ1_INTF:
-  //         return this.irq1IntForce;
-  //       case IRQ1_INTS:
-  //         return this.irq1IntStatus;
-  //     }
-  //     return super.readUint32(offset);
-  //   }
-  (void)offset;
-  TODO_PORT_ABORT("peripherals/pio.ts", "RPPIO::readUint32");
+  if (offset >= SM0_CLKDIV && offset <= SM0_PINCTRL) {
+    return machines[0].readUint32(offset - SM0_CLKDIV);
+  }
+  if (offset >= SM1_CLKDIV && offset <= SM1_PINCTRL) {
+    return machines[1].readUint32(offset - SM1_CLKDIV);
+  }
+  if (offset >= SM2_CLKDIV && offset <= SM2_PINCTRL) {
+    return machines[2].readUint32(offset - SM2_CLKDIV);
+  }
+  if (offset >= SM3_CLKDIV && offset <= SM3_PINCTRL) {
+    return machines[3].readUint32(offset - SM3_CLKDIV);
+  }
+
+  switch (offset) {
+    case CTRL:
+      return (machines[0].enabled ? 1 << 0 : 0) | (machines[1].enabled ? 1 << 1 : 0) |
+             (machines[2].enabled ? 1 << 2 : 0) | (machines[3].enabled ? 1 << 3 : 0);
+    case FSTAT:
+      return machines[0].fifoStat() | machines[1].fifoStat() | machines[2].fifoStat() | machines[3].fifoStat();
+    case FDEBUG:
+      return fdebug;
+    case FLEVEL:
+      return (machines[0].txFIFO.itemCount() & 0xf) | ((machines[0].rxFIFO.itemCount() & 0xf) << 4) |
+             ((machines[1].txFIFO.itemCount() & 0xf) << 8) | ((machines[1].rxFIFO.itemCount() & 0xf) << 12) |
+             ((machines[2].txFIFO.itemCount() & 0xf) << 16) | ((machines[2].rxFIFO.itemCount() & 0xf) << 20) |
+             ((machines[3].txFIFO.itemCount() & 0xf) << 24) | ((machines[3].rxFIFO.itemCount() & 0xf) << 28);
+
+    case RXF0:
+      return machines[0].readFIFO();
+    case RXF1:
+      return machines[1].readFIFO();
+    case RXF2:
+      return machines[2].readFIFO();
+    case RXF3:
+      return machines[3].readFIFO();
+    case IRQ_:
+      return irq;
+    case IRQ_FORCE:
+      return 0;
+    case INPUT_SYNC_BYPASS:
+      return inputSyncBypass;
+    case DBG_PADOUT:
+      return pinValues;
+    case DBG_PADOE:
+      return pinDirections;
+    case DBG_CFGINFO:
+      return 0x200404;
+    case INTR:
+      return intRaw();
+    case IRQ0_INTE:
+      return irq0IntEnable;
+    case IRQ0_INTF:
+      return irq0IntForce;
+    case IRQ0_INTS:
+      return irq0IntStatus();
+    case IRQ1_INTE:
+      return irq1IntEnable;
+    case IRQ1_INTF:
+      return irq1IntForce;
+    case IRQ1_INTS:
+      return irq1IntStatus();
+  }
+  return BasePeripheral::readUint32(offset);
 }
 
 void RPPIO::writeUint32(uint32_t offset, uint32_t value) {
-  // TODO(port): peripherals/pio.ts
-  //   writeUint32(offset: number, value: number) {
-  //     if (offset >= INSTR_MEM0 && offset <= INSTR_MEM31) {
-  //       const index = (offset - INSTR_MEM0) >> 2;
-  //       this.instructions[index] = value & 0xffff;
-  //       return;
-  //     }
-  //     if (offset >= SM0_CLKDIV && offset <= SM0_PINCTRL) {
-  //       this.machines[0].writeUint32(offset - SM0_CLKDIV, value);
-  //       return;
-  //     }
-  //     if (offset >= SM1_CLKDIV && offset <= SM1_PINCTRL) {
-  //       this.machines[1].writeUint32(offset - SM1_CLKDIV, value);
-  //       return;
-  //     }
-  //     if (offset >= SM2_CLKDIV && offset <= SM2_PINCTRL) {
-  //       this.machines[2].writeUint32(offset - SM2_CLKDIV, value);
-  //       return;
-  //     }
-  //     if (offset >= SM3_CLKDIV && offset <= SM3_PINCTRL) {
-  //       this.machines[3].writeUint32(offset - SM3_CLKDIV, value);
-  //       return;
-  //     }
-  //     switch (offset) {
-  //       case CTRL: {
-  //         for (let index = 0; index < 4; index++) {
-  //           this.machines[index].enabled = value & (1 << index) ? true : false;
-  //           if (value & (1 << (4 + index))) {
-  //             this.machines[index].restart();
-  //           }
-  //           if (value & (1 << (8 + index))) {
-  //             this.machines[index].clkDivRestart();
-  //           }
-  //         }
-  //         const shouldRun = value & 0xf;
-  //         if (this.stopped && shouldRun) {
-  //           this.stopped = false;
-  //           this.run();
-  //         }
-  //         if (!shouldRun) {
-  //           this.stopped = true;
-  //         }
-  //         break;
-  //       }
-  //       case FDEBUG:
-  //         this.fdebug &= ~this.rawWriteValue;
-  //         this.fdebug |= this.txStall | this.rxStall;
-  //         break;
-  //       case TXF0:
-  //         this.machines[0].writeFIFO(value);
-  //         break;
-  //       case TXF1:
-  //         this.machines[1].writeFIFO(value);
-  //         break;
-  //       case TXF2:
-  //         this.machines[2].writeFIFO(value);
-  //         break;
-  //       case TXF3:
-  //         this.machines[3].writeFIFO(value);
-  //         break;
-  //       case IRQ:
-  //         this.irq &= ~this.rawWriteValue;
-  //         this.irqUpdated();
-  //         break;
-  //       case INPUT_SYNC_BYPASS:
-  //         this.inputSyncBypass = value;
-  //         break;
-  //       case IRQ_FORCE:
-  //         this.irq |= value;
-  //         this.irqUpdated();
-  //         break;
-  //       case IRQ0_INTE:
-  //         this.irq0IntEnable = value & 0xfff;
-  //         this.checkInterrupts();
-  //         break;
-  //       case IRQ0_INTF:
-  //         this.irq0IntForce = value & 0xfff;
-  //         this.checkInterrupts();
-  //         break;
-  //       case IRQ1_INTE:
-  //         this.irq1IntEnable = value & 0xfff;
-  //         this.checkInterrupts();
-  //         break;
-  //       case IRQ1_INTF:
-  //         this.irq1IntForce = value & 0xfff;
-  //         this.checkInterrupts();
-  //         break;
-  //       default:
-  //         super.writeUint32(offset, value);
-  //     }
-  //   }
-  (void)offset;
-  (void)value;
-  TODO_PORT_ABORT("peripherals/pio.ts", "RPPIO::writeUint32");
+  if (offset >= INSTR_MEM0 && offset <= INSTR_MEM31) {
+    const uint32_t index = (offset - INSTR_MEM0) >> 2;
+    instructions[index] = value & 0xffff;
+    return;
+  }
+  if (offset >= SM0_CLKDIV && offset <= SM0_PINCTRL) {
+    machines[0].writeUint32(offset - SM0_CLKDIV, value);
+    return;
+  }
+  if (offset >= SM1_CLKDIV && offset <= SM1_PINCTRL) {
+    machines[1].writeUint32(offset - SM1_CLKDIV, value);
+    return;
+  }
+  if (offset >= SM2_CLKDIV && offset <= SM2_PINCTRL) {
+    machines[2].writeUint32(offset - SM2_CLKDIV, value);
+    return;
+  }
+  if (offset >= SM3_CLKDIV && offset <= SM3_PINCTRL) {
+    machines[3].writeUint32(offset - SM3_CLKDIV, value);
+    return;
+  }
+  switch (offset) {
+    case CTRL: {
+      for (uint32_t index = 0; index < 4; index++) {
+        machines[index].enabled = value & (1u << index) ? true : false;
+        if (value & (1u << (4 + index))) {
+          machines[index].restart();
+        }
+        if (value & (1u << (8 + index))) {
+          machines[index].clkDivRestart();
+        }
+      }
+      const uint32_t shouldRun = value & 0xf;
+      if (stopped && shouldRun) {
+        stopped = false;
+        run();
+      }
+      if (!shouldRun) {
+        stopped = true;
+      }
+      break;
+    }
+    case FDEBUG:
+      fdebug &= ~rawWriteValue;
+      fdebug |= txStall | rxStall;
+      break;
+    case TXF0:
+      machines[0].writeFIFO(value);
+      break;
+    case TXF1:
+      machines[1].writeFIFO(value);
+      break;
+    case TXF2:
+      machines[2].writeFIFO(value);
+      break;
+    case TXF3:
+      machines[3].writeFIFO(value);
+      break;
+    case IRQ_:
+      irq &= ~rawWriteValue;
+      irqUpdated();
+      break;
+    case INPUT_SYNC_BYPASS:
+      inputSyncBypass = value;
+      break;
+    case IRQ_FORCE:
+      irq |= value;
+      irqUpdated();
+      break;
+    case IRQ0_INTE:
+      irq0IntEnable = value & 0xfff;
+      checkInterrupts();
+      break;
+    case IRQ0_INTF:
+      irq0IntForce = value & 0xfff;
+      checkInterrupts();
+      break;
+    case IRQ1_INTE:
+      irq1IntEnable = value & 0xfff;
+      checkInterrupts();
+      break;
+    case IRQ1_INTF:
+      irq1IntForce = value & 0xfff;
+      checkInterrupts();
+      break;
+    default:
+      BasePeripheral::writeUint32(offset, value);
+  }
 }
 
 void RPPIO::pinValuesChanged(uint32_t value, uint32_t firstPin, uint32_t count) {
-  // TODO(port): peripherals/pio.ts
-  //   pinValuesChanged(value: number, firstPin: number, count: number) {
-  //     // TODO: wrapping after pin 31
-  //     const mask = count > 31 ? 0xffffffff : ((1 << count) - 1) << firstPin;
-  //     const newValue = ((this.pinValues & ~mask) | ((value << firstPin) & mask)) & 0x3fffffff;
-  //     this.pinValues = newValue;
-  //   }
-  (void)value;
-  (void)firstPin;
-  (void)count;
+  // TODO: wrapping after pin 31
+  const uint32_t mask = count > 31 ? 0xffffffff : lowMask(count) << firstPin;
+  const uint32_t newValue = ((pinValues & ~mask) | ((value << firstPin) & mask)) & 0x3fffffff;
+  pinValues = newValue;
 }
 
 void RPPIO::pinDirectionsChanged(uint32_t value, uint32_t firstPin, uint32_t count) {
-  // TODO(port): peripherals/pio.ts
-  //   pinDirectionsChanged(value: number, firstPin: number, count: number) {
-  //     // TODO: wrapping after pin 31
-  //     const mask = count > 31 ? 0xffffffff : ((1 << count) - 1) << firstPin;
-  //     const newValue = ((this.pinDirections & ~mask) | ((value << firstPin) & mask)) & 0x3fffffff;
-  //     this.pinDirections = newValue;
-  //   }
-  (void)value;
-  (void)firstPin;
-  (void)count;
+  // TODO: wrapping after pin 31
+  const uint32_t mask = count > 31 ? 0xffffffff : lowMask(count) << firstPin;
+  const uint32_t newValue = ((pinDirections & ~mask) | ((value << firstPin) & mask)) & 0x3fffffff;
+  pinDirections = newValue;
 }
 
 void RPPIO::checkInterrupts() {
-  // TODO(port): peripherals/pio.ts
-  //   checkInterrupts() {
-  //     const { firstIrq } = this;
-  //     this.rp2040.setInterrupt(firstIrq, !!this.irq0IntStatus);
-  //     this.rp2040.setInterrupt(firstIrq + 1, !!this.irq1IntStatus);
-  //   }
+  const uint32_t firstIrq = this->firstIrq;
+  rp2040.setInterrupt(firstIrq, !!irq0IntStatus());
+  rp2040.setInterrupt(firstIrq + 1, !!irq1IntStatus());
 }
 
 void RPPIO::irqUpdated() {
-  // TODO(port): peripherals/pio.ts
-  //   irqUpdated() {
-  //     for (const machine of this.machines) {
-  //       machine.checkWait();
-  //     }
-  //     this.checkInterrupts();
-  //   }
+  for (StateMachine &machine : machines) {
+    machine.checkWait();
+  }
+  checkInterrupts();
 }
 
 void RPPIO::checkChangedPins() {
-  // TODO(port): peripherals/pio.ts
-  //   checkChangedPins() {
-  //     const changedPins =
-  //       (this.oldPinDirections ^ this.pinDirections) | (this.oldPinValues ^ this.pinValues);
-  //     if (changedPins) {
-  //       this.oldPinDirections = this.pinDirections;
-  //       this.oldPinValues = this.pinValues;
-  //
-  //       // Notify GPIO about the changed pins
-  //       const { gpio } = this.rp2040;
-  //       for (let gpioIndex = 0; gpioIndex < gpio.length; gpioIndex++) {
-  //         if (changedPins & (1 << gpioIndex)) {
-  //           gpio[gpioIndex].checkForUpdates();
-  //         }
-  //       }
-  //     }
-  //   }
+  const uint32_t changedPins = (oldPinDirections ^ pinDirections) | (oldPinValues ^ pinValues);
+  if (changedPins) {
+    oldPinDirections = pinDirections;
+    oldPinValues = pinValues;
+
+    // Notify GPIO about the changed pins
+    auto &gpio = rp2040.gpio;
+    for (uint32_t gpioIndex = 0; gpioIndex < gpio.size(); gpioIndex++) {
+      if (changedPins & (1u << gpioIndex)) {
+        gpio[gpioIndex].checkForUpdates();
+      }
+    }
+  }
 }
 
 void RPPIO::step() {
-  // TODO(port): peripherals/pio.ts
-  //   step() {
-  //     for (const machine of this.machines) {
-  //       machine.clockTick();
-  //     }
-  //     this.checkChangedPins();
-  //   }
-  TODO_PORT_ABORT("peripherals/pio.ts", "RPPIO::step");
+  for (StateMachine &machine : machines) {
+    machine.clockTick();
+  }
+  checkChangedPins();
 }
 
 void RPPIO::stop() {
-  // TODO(port): peripherals/pio.ts
-  //   stop() {
-  //     for (const machine of this.machines) {
-  //       machine.enabled = false;
-  //     }
-  //     this.stopped = true;
-  //     if (this.runTimer) {
-  //       clearTimeout(this.runTimer);
-  //       this.runTimer = null;
-  //     }
-  //   }
+  for (StateMachine &machine : machines) {
+    machine.enabled = false;
+  }
+  stopped = true;
+  // (no runTimer to clear)
 }
 
 }  // namespace rp2040js

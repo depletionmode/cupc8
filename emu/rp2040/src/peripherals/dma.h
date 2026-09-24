@@ -58,15 +58,16 @@ class RPDMAChannel {
   uint32_t ctrl = 0;
   uint32_t readAddr = 0;
   uint32_t writeAddr = 0;
-  uint32_t transCount = 0;
+  /** a JS number: `transCount--` from 0 (BUSY with a zero reload) goes negative */
+  double transCount = 0;
   uint32_t dreqCounter = 0;
   uint32_t transCountReload = 0;
   uint32_t treqValue = 0;
   uint32_t dataSize = 1;
   uint32_t chainTo = 0;
   uint32_t ringMask = 0;
-  /** `private transferFn: () => void = () => 0;` */
-  std::function<void()> transferFn = [] {};
+  /** `private transferFn: () => void = () => 0;` (a member-function pointer to one of the transfer* methods) */
+  void (RPDMAChannel::*transferFn)() = nullptr;
   std::unique_ptr<IAlarm> transferAlarm;
 };
 

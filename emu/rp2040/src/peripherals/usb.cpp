@@ -97,10 +97,6 @@ static constexpr uint32_t SIE_WRITECLEAR_MASK =
     SIE_RX_OVERFLOW | SIE_BIT_STUFF_ERROR | SIE_CONNECTED | SIE_CRC_ERROR | SIE_BUS_RESET |
     SIE_TRANS_COMPLETE | SIE_SETUP_REC | SIE_RESUME;
 
-// unused in the TS too
-static_assert(SIE_VBUS_OVER_CURR && SIE_SPEED && SOFTCON && TO_EXTPHY && SE0 == 0 && K && SE1,
-              "usb.ts constants");
-
 // `this.rp2040.usbDPRAMView.getUint32(offset, true)` / `setUint32(offset, value, true)`:
 // a DataView throws RangeError past the end.
 static uint32_t dpramGetUint32(const std::vector<uint8_t> &dpram, uint32_t offset) {

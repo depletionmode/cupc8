@@ -1036,7 +1036,9 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for attempt in range(tries):
         if os.path.exists(ses):
             os.remove(ses)
-        r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)),
+        # one optimiser thread: with a pool, the route (and whether it
+        # completes) changes from run to run
+        r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)), "-mt", "1",
                  "--gui.enabled=false"], env=env)
         with open(os.path.join(workdir, "freerouting.log"), "w") as f:
             f.write(r.stdout + r.stderr)

@@ -1,1377 +1,1274 @@
-// Port of rp2040js src/cortex-m0-core.ts
+// Port of rp2040js src/cortex-m0-core.ts (with the cupc8 dual-core patch:
+// waitingForEvent, SEV -> rp2040.sendEvent()).
 //
-// STUB: every body below still has to be ported from the TS shown in its
-// comment (see README.md, "Porting rules"). Bus-facing methods abort so that
-// firmware cannot run on a half-ported peripheral without noticing.
+// JS number notes. Registers live in a Uint32Array, so every
+// `this.registers[x] = <number>` is a ToUint32; here that is plain uint32_t
+// wrap-around wherever the TS value is an integer that the store reduces mod
+// 2**32 (sums of two registers, `SP - 4 * n`, `PC + imm`, int32 results of
+// bitwise operators). Addresses the TS computes as `reg + reg` (up to 2**33)
+// or `(pc & 0xfffffffc) + imm` (negative for pc >= 2**31) reach the bus as
+// that JS number; rp2040.readUint32/writeUint32 and cyclesIO() do `>>> 0` on
+// them, and readUint16/readUint8/writeUint16/writeUint8 end up at the same
+// wrapped address (such a number is never inside flash/SRAM, so they take
+// the aligned readUint32/writeUint32 path, whose `& 0xfffffffc` / `>>> 14`
+// wrap it), so the uint32_t address here gives the same accesses. The two
+// flag helpers take and return double: their operands can be 2**32
+// (`reg + carry`) and substractUpdateFlags returns a negative number.
 #include "cortex-m0-core.h"
 
+#include <algorithm>
+#include <string>
+
 #include "rp2040.h"
-#include "utils/logging.h"
 #include "utils/js.h"
+#include "utils/logging.h"
 
 namespace rp2040js {
 
-CortexM0Core::CortexM0Core(RP2040 &rp2040) : rp2040(rp2040) {
-  // TODO(port): cortex-m0-core.ts
-  //   constructor(readonly rp2040: RP2040) {
-  //     this.SP = 0xfffffffc;
-  //     this.bankedSP = 0xfffffffc;
-  //   }
+/* eslint-disable @typescript-eslint/no-unused-vars */
+static constexpr uint32_t EXC_RESET = 1;
+static constexpr uint32_t EXC_NMI = 2;
+static constexpr uint32_t EXC_HARDFAULT = 3;
+static constexpr uint32_t EXC_SVCALL = 11;
+static constexpr uint32_t EXC_PENDSV = 14;
+static constexpr uint32_t EXC_SYSTICK = 15;
+
+static constexpr uint32_t SYSM_APSR = 0;
+[[maybe_unused]] static constexpr uint32_t SYSM_IAPSR = 1;
+[[maybe_unused]] static constexpr uint32_t SYSM_EAPSR = 2;
+static constexpr uint32_t SYSM_XPSR = 3;
+static constexpr uint32_t SYSM_IPSR = 5;
+[[maybe_unused]] static constexpr uint32_t SYSM_EPSR = 6;
+[[maybe_unused]] static constexpr uint32_t SYSM_IEPSR = 7;
+// SYSM_MSP, SYSM_PSP, SYSM_PRIMASK, SYSM_CONTROL are exported: see the header.
+
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+// Lowest possible exception priority
+static constexpr int32_t LOWEST_PRIORITY = 4;
+
+static int32_t signExtend8(uint32_t value) {
+  return jsSar(jsShl(static_cast<int32_t>(value), 24), 24);
 }
 
-Logger &CortexM0Core::logger() {
-  // TODO(port): cortex-m0-core.ts
-  //   get logger() {
-  //     return this.rp2040.logger;
-  //   }
-  return *rp2040.logger;
+static int32_t signExtend16(uint32_t value) {
+  return jsSar(jsShl(static_cast<int32_t>(value), 16), 16);
 }
+
+static constexpr uint32_t spRegister = 13;
+static constexpr uint32_t pcRegister = 15;
+
+static const char *const LOG_NAME = "CortexM0Core";
+
+CortexM0Core::CortexM0Core(RP2040 &rp2040) : rp2040(rp2040) {
+  setSP(0xfffffffc);
+  bankedSP = 0xfffffffc;
+}
+
+Logger &CortexM0Core::logger() { return *rp2040.logger; }
 
 void CortexM0Core::reset() {
-  // TODO(port): cortex-m0-core.ts
-  //   reset() {
-  //     this.SP = this.rp2040.readUint32(this.VTOR);
-  //     this.PC = this.rp2040.readUint32(this.VTOR + 4) & 0xfffffffe;
-  //     this.cycles = 0;
-  //   }
+  setSP(rp2040.readUint32(VTOR));
+  setPC(rp2040.readUint32(VTOR + 4) & 0xfffffffe);
+  cycles = 0;
 }
 
 uint32_t CortexM0Core::APSR() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get APSR() {
-  //     return (
-  //       (this.N ? 0x80000000 : 0) |
-  //       (this.Z ? 0x40000000 : 0) |
-  //       (this.C ? 0x20000000 : 0) |
-  //       (this.V ? 0x10000000 : 0)
-  //     );
-  //   }
-  return 0;
+  return (N ? 0x80000000 : 0) | (Z ? 0x40000000 : 0) | (C ? 0x20000000 : 0) |
+         (V ? 0x10000000 : 0);
 }
 
 void CortexM0Core::setAPSR(uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   set APSR(value: number) {
-  //     this.N = !!(value & 0x80000000);
-  //     this.Z = !!(value & 0x40000000);
-  //     this.C = !!(value & 0x20000000);
-  //     this.V = !!(value & 0x10000000);
-  //   }
-  (void)value;
+  N = !!(value & 0x80000000);
+  Z = !!(value & 0x40000000);
+  C = !!(value & 0x20000000);
+  V = !!(value & 0x10000000);
 }
 
-uint32_t CortexM0Core::xPSR() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get xPSR() {
-  //     return this.APSR | this.IPSR | (1 << 24);
-  //   }
-  return 0;
-}
+uint32_t CortexM0Core::xPSR() const { return APSR() | IPSR | (1 << 24); }
 
 void CortexM0Core::setXPSR(uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   set xPSR(value: number) {
-  //     this.APSR = value;
-  //     this.IPSR = value & 0x3f;
-  //   }
-  (void)value;
+  setAPSR(value);
+  IPSR = value & 0x3f;
 }
 
 bool CortexM0Core::checkCondition(uint32_t cond) const {
-  // TODO(port): cortex-m0-core.ts
-  //   checkCondition(cond: number) {
-  //     // Evaluate base condition.
-  //     let result = false;
-  //     switch (cond >> 1) {
-  //       case 0b000:
-  //         result = this.Z;
-  //         break;
-  //       case 0b001:
-  //         result = this.C;
-  //         break;
-  //       case 0b010:
-  //         result = this.N;
-  //         break;
-  //       case 0b011:
-  //         result = this.V;
-  //         break;
-  //       case 0b100:
-  //         result = this.C && !this.Z;
-  //         break;
-  //       case 0b101:
-  //         result = this.N === this.V;
-  //         break;
-  //       case 0b110:
-  //         result = this.N === this.V && !this.Z;
-  //         break;
-  //       case 0b111:
-  //         result = true;
-  //         break;
-  //     }
-  //     return cond & 0b1 && cond != 0b1111 ? !result : result;
-  //   }
-  (void)cond;
-  return false;
+  // Evaluate base condition.
+  bool result = false;
+  switch (cond >> 1) {
+    case 0b000:
+      result = Z;
+      break;
+    case 0b001:
+      result = C;
+      break;
+    case 0b010:
+      result = N;
+      break;
+    case 0b011:
+      result = V;
+      break;
+    case 0b100:
+      result = C && !Z;
+      break;
+    case 0b101:
+      result = N == V;
+      break;
+    case 0b110:
+      result = N == V && !Z;
+      break;
+    case 0b111:
+      result = true;
+      break;
+  }
+  return (cond & 0b1) && cond != 0b1111 ? !result : result;
 }
 
-uint32_t CortexM0Core::readUint32(uint32_t address) {
-  // TODO(port): cortex-m0-core.ts
-  //   readUint32(address: number) {
-  //     return this.rp2040.readUint32(address);
-  //   }
-  (void)address;
-  return 0;
-}
+uint32_t CortexM0Core::readUint32(uint32_t address) { return rp2040.readUint32(address); }
 
-uint32_t CortexM0Core::readUint16(uint32_t address) {
-  // TODO(port): cortex-m0-core.ts
-  //   readUint16(address: number) {
-  //     return this.rp2040.readUint16(address);
-  //   }
-  (void)address;
-  return 0;
-}
+uint32_t CortexM0Core::readUint16(uint32_t address) { return rp2040.readUint16(address); }
 
-uint32_t CortexM0Core::readUint8(uint32_t address) {
-  // TODO(port): cortex-m0-core.ts
-  //   readUint8(address: number) {
-  //     return this.rp2040.readUint8(address);
-  //   }
-  (void)address;
-  return 0;
-}
+uint32_t CortexM0Core::readUint8(uint32_t address) { return rp2040.readUint8(address); }
 
 void CortexM0Core::writeUint32(uint32_t address, uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   writeUint32(address: number, value: number) {
-  //     this.rp2040.writeUint32(address, value);
-  //   }
-  (void)address;
-  (void)value;
+  rp2040.writeUint32(address, value);
 }
 
 void CortexM0Core::writeUint16(uint32_t address, uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   writeUint16(address: number, value: number) {
-  //     this.rp2040.writeUint16(address, value);
-  //   }
-  (void)address;
-  (void)value;
+  rp2040.writeUint16(address, value);
 }
 
 void CortexM0Core::writeUint8(uint32_t address, uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   writeUint8(address: number, value: number) {
-  //     this.rp2040.writeUint8(address, value);
-  //   }
-  (void)address;
-  (void)value;
+  rp2040.writeUint8(address, value);
 }
 
 void CortexM0Core::switchStack(StackPointerBank stack) {
-  // TODO(port): cortex-m0-core.ts
-  //   switchStack(stack: StackPointerBank) {
-  //     if (this.SPSEL !== stack) {
-  //       const temp = this.SP;
-  //       this.SP = this.bankedSP;
-  //       this.bankedSP = temp;
-  //       this.SPSEL = stack;
-  //     }
-  //   }
-  (void)stack;
+  if (SPSEL != stack) {
+    const uint32_t temp = SP();
+    setSP(bankedSP);
+    bankedSP = temp;
+    SPSEL = stack;
+  }
 }
 
 uint32_t CortexM0Core::SPprocess() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get SPprocess() {
-  //     return this.SPSEL === StackPointerBank.SPprocess ? this.SP : this.bankedSP;
-  //   }
-  return 0;
+  return SPSEL == StackPointerBank::SPprocess ? SP() : bankedSP;
 }
 
 void CortexM0Core::setSPprocess(uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   set SPprocess(value: number) {
-  //     if (this.SPSEL === StackPointerBank.SPprocess) {
-  //       this.SP = value;
-  //     } else {
-  //       this.bankedSP = value >>> 0;
-  //     }
-  //   }
-  (void)value;
+  if (SPSEL == StackPointerBank::SPprocess) {
+    setSP(value);
+  } else {
+    bankedSP = value >> 0;
+  }
 }
 
 uint32_t CortexM0Core::SPmain() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get SPmain() {
-  //     return this.SPSEL === StackPointerBank.SPmain ? this.SP : this.bankedSP;
-  //   }
-  return 0;
+  return SPSEL == StackPointerBank::SPmain ? SP() : bankedSP;
 }
 
 void CortexM0Core::setSPmain(uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   set SPmain(value: number) {
-  //     if (this.SPSEL === StackPointerBank.SPmain) {
-  //       this.SP = value;
-  //     } else {
-  //       this.bankedSP = value >>> 0;
-  //     }
-  //   }
-  (void)value;
+  if (SPSEL == StackPointerBank::SPmain) {
+    setSP(value);
+  } else {
+    bankedSP = value >> 0;
+  }
 }
 
 void CortexM0Core::exceptionEntry(uint32_t exceptionNumber) {
-  // TODO(port): cortex-m0-core.ts
-  //   exceptionEntry(exceptionNumber: number) {
-  //     // PushStack:
-  //     let framePtr = 0;
-  //     let framePtrAlign = 0;
-  //     if (this.SPSEL && this.currentMode === ExecutionMode.Mode_Thread) {
-  //       framePtrAlign = this.SPprocess & 0b100 ? 1 : 0;
-  //       this.SPprocess = (this.SPprocess - 0x20) & ~0b100;
-  //       framePtr = this.SPprocess;
-  //     } else {
-  //       framePtrAlign = this.SPmain & 0b100 ? 1 : 0;
-  //       this.SPmain = (this.SPmain - 0x20) & ~0b100;
-  //       framePtr = this.SPmain;
-  //     }
-  //     /* only the stack locations, not the store order, are architected */
-  //     this.writeUint32(framePtr, this.registers[0]);
-  //     this.writeUint32(framePtr + 0x4, this.registers[1]);
-  //     this.writeUint32(framePtr + 0x8, this.registers[2]);
-  //     this.writeUint32(framePtr + 0xc, this.registers[3]);
-  //     this.writeUint32(framePtr + 0x10, this.registers[12]);
-  //     this.writeUint32(framePtr + 0x14, this.LR);
-  //     this.writeUint32(framePtr + 0x18, this.PC & ~1); // ReturnAddress(ExceptionType);
-  //     this.writeUint32(framePtr + 0x1c, (this.xPSR & ~(1 << 9)) | (framePtrAlign << 9));
-  //     if (this.currentMode == ExecutionMode.Mode_Handler) {
-  //       this.LR = 0xfffffff1;
-  //     } else {
-  //       if (!this.SPSEL) {
-  //         this.LR = 0xfffffff9;
-  //       } else {
-  //         this.LR = 0xfffffffd;
-  //       }
-  //     }
-  //     // ExceptionTaken:
-  //     this.currentMode = ExecutionMode.Mode_Handler; // Enter Handler Mode, now Privileged
-  //     this.IPSR = exceptionNumber;
-  //     this.switchStack(StackPointerBank.SPmain);
-  //     this.eventRegistered = true;
-  //     const vectorTable = this.VTOR;
-  //     this.PC = this.readUint32(vectorTable + 4 * exceptionNumber);
-  //   }
-  (void)exceptionNumber;
+  // PushStack:
+  uint32_t framePtr = 0;
+  uint32_t framePtrAlign = 0;
+  if (SPSEL != StackPointerBank::SPmain && currentMode == ExecutionMode::Mode_Thread) {
+    framePtrAlign = SPprocess() & 0b100 ? 1 : 0;
+    // JS: `(SPprocess - 0x20) & ~0b100` is ToInt32 of a possibly negative number: the same bits
+    setSPprocess((SPprocess() - 0x20) & ~0b100u);
+    framePtr = SPprocess();
+  } else {
+    framePtrAlign = SPmain() & 0b100 ? 1 : 0;
+    setSPmain((SPmain() - 0x20) & ~0b100u);
+    framePtr = SPmain();
+  }
+  /* only the stack locations, not the store order, are architected */
+  writeUint32(framePtr, registers[0]);
+  writeUint32(framePtr + 0x4, registers[1]);
+  writeUint32(framePtr + 0x8, registers[2]);
+  writeUint32(framePtr + 0xc, registers[3]);
+  writeUint32(framePtr + 0x10, registers[12]);
+  writeUint32(framePtr + 0x14, LR());
+  writeUint32(framePtr + 0x18, PC() & ~1u);  // ReturnAddress(ExceptionType);
+  writeUint32(framePtr + 0x1c, (xPSR() & ~(1u << 9)) | (framePtrAlign << 9));
+  if (currentMode == ExecutionMode::Mode_Handler) {
+    setLR(0xfffffff1);
+  } else {
+    if (SPSEL == StackPointerBank::SPmain) {
+      setLR(0xfffffff9);
+    } else {
+      setLR(0xfffffffd);
+    }
+  }
+  // ExceptionTaken:
+  currentMode = ExecutionMode::Mode_Handler;  // Enter Handler Mode, now Privileged
+  IPSR = exceptionNumber;
+  switchStack(StackPointerBank::SPmain);
+  eventRegistered = true;
+  const uint32_t vectorTable = VTOR;
+  setPC(readUint32(vectorTable + 4 * exceptionNumber));
 }
 
 void CortexM0Core::exceptionReturn(uint32_t excReturn) {
-  // TODO(port): cortex-m0-core.ts
-  //   exceptionReturn(excReturn: number) {
-  //     let framePtr = this.SPmain;
-  //     switch (excReturn & 0xf) {
-  //       case 0b0001: // Return to Handler
-  //         this.currentMode = ExecutionMode.Mode_Handler;
-  //         this.switchStack(StackPointerBank.SPmain);
-  //         break;
-  //       case 0b1001: // Return to Thread using Main stack
-  //         this.currentMode = ExecutionMode.Mode_Thread;
-  //         this.switchStack(StackPointerBank.SPmain);
-  //         break;
-  //       case 0b1101: // Return to Thread using Process stack
-  //         framePtr = this.SPprocess;
-  //         this.currentMode = ExecutionMode.Mode_Thread;
-  //         this.switchStack(StackPointerBank.SPprocess);
-  //         break;
-  //       // Assigning CurrentMode to Mode_Thread causes a drop in privilege
-  //       // if CONTROL.nPRIV is set to 1
-  //     }
-  //
-  //     // PopStack:
-  //     this.registers[0] = this.readUint32(framePtr); // Stack accesses are performed as Unprivileged accesses if
-  //     this.registers[1] = this.readUint32(framePtr + 0x4); // CONTROL<0>=='1' && EXC_RETURN<3>=='1' Privileged otherwise
-  //     this.registers[2] = this.readUint32(framePtr + 0x8);
-  //     this.registers[3] = this.readUint32(framePtr + 0xc);
-  //     this.registers[12] = this.readUint32(framePtr + 0x10);
-  //     this.LR = this.readUint32(framePtr + 0x14);
-  //     this.PC = this.readUint32(framePtr + 0x18);
-  //     const psr = this.readUint32(framePtr + 0x1c);
-  //
-  //     const framePtrAlign = psr & (1 << 9) ? 0b100 : 0;
-  //
-  //     switch (excReturn & 0xf) {
-  //       case 0b0001: // Returning to Handler mode
-  //         this.SPmain = (this.SPmain + 0x20) | framePtrAlign;
-  //         break;
-  //
-  //       case 0b1001: // Returning to Thread mode using Main stack
-  //         this.SPmain = (this.SPmain + 0x20) | framePtrAlign;
-  //         break;
-  //
-  //       case 0b1101: // Returning to Thread mode using Process stack
-  //         this.SPprocess = (this.SPprocess + 0x20) | framePtrAlign;
-  //         break;
-  //     }
-  //
-  //     this.APSR = psr & 0xf0000000;
-  //     const forceThread = this.currentMode == ExecutionMode.Mode_Thread && this.nPRIV;
-  //     this.IPSR = forceThread ? 0 : psr & 0x3f;
-  //     this.interruptsUpdated = true;
-  //     // Thumb bit should always be one! EPSR<24> = psr<24>; // Load valid EPSR bits from memory
-  //     this.eventRegistered = true;
-  //     // if CurrentMode == Mode_Thread && SCR.SLEEPONEXIT == '1' then
-  //     // SleepOnExit(); // IMPLEMENTATION DEFINED
-  //   }
-  (void)excReturn;
+  uint32_t framePtr = SPmain();
+  switch (excReturn & 0xf) {
+    case 0b0001:  // Return to Handler
+      currentMode = ExecutionMode::Mode_Handler;
+      switchStack(StackPointerBank::SPmain);
+      break;
+    case 0b1001:  // Return to Thread using Main stack
+      currentMode = ExecutionMode::Mode_Thread;
+      switchStack(StackPointerBank::SPmain);
+      break;
+    case 0b1101:  // Return to Thread using Process stack
+      framePtr = SPprocess();
+      currentMode = ExecutionMode::Mode_Thread;
+      switchStack(StackPointerBank::SPprocess);
+      break;
+      // Assigning CurrentMode to Mode_Thread causes a drop in privilege
+      // if CONTROL.nPRIV is set to 1
+  }
+
+  // PopStack:
+  registers[0] = readUint32(framePtr);  // Stack accesses are performed as Unprivileged accesses if
+  registers[1] = readUint32(framePtr + 0x4);  // CONTROL<0>=='1' && EXC_RETURN<3>=='1' Privileged otherwise
+  registers[2] = readUint32(framePtr + 0x8);
+  registers[3] = readUint32(framePtr + 0xc);
+  registers[12] = readUint32(framePtr + 0x10);
+  setLR(readUint32(framePtr + 0x14));
+  setPC(readUint32(framePtr + 0x18));
+  const uint32_t psr = readUint32(framePtr + 0x1c);
+
+  const uint32_t framePtrAlign = psr & (1 << 9) ? 0b100 : 0;
+
+  switch (excReturn & 0xf) {
+    case 0b0001:  // Returning to Handler mode
+      setSPmain((SPmain() + 0x20) | framePtrAlign);
+      break;
+
+    case 0b1001:  // Returning to Thread mode using Main stack
+      setSPmain((SPmain() + 0x20) | framePtrAlign);
+      break;
+
+    case 0b1101:  // Returning to Thread mode using Process stack
+      setSPprocess((SPprocess() + 0x20) | framePtrAlign);
+      break;
+  }
+
+  setAPSR(psr & 0xf0000000);
+  const bool forceThread = currentMode == ExecutionMode::Mode_Thread && nPRIV;
+  IPSR = forceThread ? 0 : psr & 0x3f;
+  interruptsUpdated = true;
+  // Thumb bit should always be one! EPSR<24> = psr<24>; // Load valid EPSR bits from memory
+  eventRegistered = true;
+  // if CurrentMode == Mode_Thread && SCR.SLEEPONEXIT == '1' then
+  // SleepOnExit(); // IMPLEMENTATION DEFINED
 }
 
-uint32_t CortexM0Core::pendSVPriority() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get pendSVPriority() {
-  //     return (this.SHPR3 >> 22) & 0x3;
-  //   }
-  return 0;
-}
+uint32_t CortexM0Core::pendSVPriority() const { return (SHPR3 >> 22) & 0x3; }
 
-uint32_t CortexM0Core::svCallPriority() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get svCallPriority() {
-  //     return this.SHPR2 >>> 30;
-  //   }
-  return 0;
-}
+uint32_t CortexM0Core::svCallPriority() const { return SHPR2 >> 30; }
 
-uint32_t CortexM0Core::systickPriority() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get systickPriority() {
-  //     return this.SHPR3 >>> 30;
-  //   }
-  return 0;
-}
+uint32_t CortexM0Core::systickPriority() const { return SHPR3 >> 30; }
 
 int32_t CortexM0Core::exceptionPriority(uint32_t n) const {
-  // TODO(port): cortex-m0-core.ts
-  //   exceptionPriority(n: number) {
-  //     switch (n) {
-  //       case EXC_RESET:
-  //         return -3;
-  //       case EXC_NMI:
-  //         return -2;
-  //       case EXC_HARDFAULT:
-  //         return -1;
-  //       case EXC_SVCALL:
-  //         return this.svCallPriority;
-  //       case EXC_PENDSV:
-  //         return this.pendSVPriority;
-  //       case EXC_SYSTICK:
-  //         return this.systickPriority;
-  //       default: {
-  //         if (n < 16) {
-  //           return LOWEST_PRIORITY;
-  //         }
-  //         const intNum = n - 16;
-  //         for (let priority = 0; priority < 4; priority++) {
-  //           if (this.interruptPriorities[priority] & (1 << intNum)) {
-  //             return priority;
-  //           }
-  //         }
-  //         return LOWEST_PRIORITY;
-  //       }
-  //     }
-  //   }
-  (void)n;
-  return 0;
+  switch (n) {
+    case EXC_RESET:
+      return -3;
+    case EXC_NMI:
+      return -2;
+    case EXC_HARDFAULT:
+      return -1;
+    case EXC_SVCALL:
+      return static_cast<int32_t>(svCallPriority());
+    case EXC_PENDSV:
+      return static_cast<int32_t>(pendSVPriority());
+    case EXC_SYSTICK:
+      return static_cast<int32_t>(systickPriority());
+    default: {
+      if (n < 16) {
+        return LOWEST_PRIORITY;
+      }
+      // n can be any IPSR value (MSR IPSR stores all 32 bits): `1 << intNum` takes intNum & 31
+      const uint32_t intNum = n - 16;
+      for (uint32_t priority = 0; priority < 4; priority++) {
+        if (interruptPriorities[priority] & static_cast<uint32_t>(jsShl(1, intNum))) {
+          return static_cast<int32_t>(priority);
+        }
+      }
+      return LOWEST_PRIORITY;
+    }
+  }
 }
 
 uint32_t CortexM0Core::vectPending() const {
-  // TODO(port): cortex-m0-core.ts
-  //   get vectPending() {
-  //     if (this.pendingNMI) {
-  //       return EXC_NMI;
-  //     }
-  //     const { svCallPriority, systickPriority, pendSVPriority, pendingInterrupts } = this;
-  //     for (let priority = 0; priority < LOWEST_PRIORITY; priority++) {
-  //       const levelInterrupts = pendingInterrupts & this.interruptPriorities[priority];
-  //       if (this.pendingSVCall && priority === svCallPriority) {
-  //         return EXC_SVCALL;
-  //       }
-  //       if (this.pendingPendSV && priority === pendSVPriority) {
-  //         return EXC_PENDSV;
-  //       }
-  //       if (this.pendingSystick && priority === systickPriority) {
-  //         return EXC_SYSTICK;
-  //       }
-  //       if (levelInterrupts) {
-  //         for (let interruptNumber = 0; interruptNumber < 32; interruptNumber++) {
-  //           if (levelInterrupts & (1 << interruptNumber)) {
-  //             return 16 + interruptNumber;
-  //           }
-  //         }
-  //       }
-  //     }
-  //     return 0;
-  //   }
+  if (pendingNMI) {
+    return EXC_NMI;
+  }
+  const uint32_t svCallPriority = this->svCallPriority();
+  const uint32_t systickPriority = this->systickPriority();
+  const uint32_t pendSVPriority = this->pendSVPriority();
+  const uint32_t pendingInterrupts = this->pendingInterrupts;
+  for (uint32_t priority = 0; priority < static_cast<uint32_t>(LOWEST_PRIORITY); priority++) {
+    const uint32_t levelInterrupts = pendingInterrupts & interruptPriorities[priority];
+    if (pendingSVCall && priority == svCallPriority) {
+      return EXC_SVCALL;
+    }
+    if (pendingPendSV && priority == pendSVPriority) {
+      return EXC_PENDSV;
+    }
+    if (pendingSystick && priority == systickPriority) {
+      return EXC_SYSTICK;
+    }
+    if (levelInterrupts) {
+      for (uint32_t interruptNumber = 0; interruptNumber < 32; interruptNumber++) {
+        if (levelInterrupts & (1u << interruptNumber)) {
+          return 16 + interruptNumber;
+        }
+      }
+    }
+  }
   return 0;
 }
 
 void CortexM0Core::setInterrupt(uint32_t irq, bool value) {
-  // TODO(port): cortex-m0-core.ts
-  //   setInterrupt(irq: number, value: boolean) {
-  //     const irqBit = 1 << irq;
-  //     if (value && !(this.pendingInterrupts & irqBit)) {
-  //       this.pendingInterrupts |= irqBit;
-  //       this.interruptsUpdated = true;
-  //       if (this.waiting && this.checkForInterrupts()) {
-  //         this.waiting = false;
-  //         this.waitingForEvent = false;
-  //       }
-  //     } else if (!value) {
-  //       this.pendingInterrupts &= ~irqBit;
-  //     }
-  //   }
-  (void)irq;
-  (void)value;
+  const uint32_t irqBit = static_cast<uint32_t>(jsShl(1, irq));
+  if (value && !(pendingInterrupts & irqBit)) {
+    pendingInterrupts |= irqBit;
+    interruptsUpdated = true;
+    if (waiting && checkForInterrupts()) {
+      waiting = false;
+      waitingForEvent = false;
+    }
+  } else if (!value) {
+    pendingInterrupts &= ~irqBit;
+  }
 }
 
 bool CortexM0Core::checkForInterrupts() {
-  // TODO(port): cortex-m0-core.ts
-  //   checkForInterrupts() {
-  //     /* If we're waiting for an interrupt (i.e. WFI/WFE), the ARM says:
-  //        > If PRIMASK.PM is set to 1, an asynchronous exception that has a higher group priority than any
-  //        > active exception results in a WFI instruction exit. If the group priority of the exception is less than or
-  //        > equal to the execution group priority, the exception is ignored.
-  //     */
-  //     const currentPriority = this.waiting
-  //       ? this.PM
-  //         ? this.exceptionPriority(this.IPSR)
-  //         : LOWEST_PRIORITY
-  //       : Math.min(this.exceptionPriority(this.IPSR), this.PM ? 0 : LOWEST_PRIORITY);
-  //     const interruptSet = this.pendingInterrupts & this.enabledInterrupts;
-  //     const { svCallPriority, systickPriority, pendSVPriority } = this;
-  //     if (this.pendingNMI) {
-  //       this.pendingNMI = false;
-  //       this.exceptionEntry(EXC_NMI);
-  //       return true;
-  //     }
-  //     for (let priority = 0; priority < currentPriority; priority++) {
-  //       const levelInterrupts = interruptSet & this.interruptPriorities[priority];
-  //       if (this.pendingSVCall && priority === svCallPriority) {
-  //         this.pendingSVCall = false;
-  //         this.exceptionEntry(EXC_SVCALL);
-  //         return true;
-  //       }
-  //       if (this.pendingPendSV && priority === pendSVPriority) {
-  //         this.pendingPendSV = false;
-  //         this.exceptionEntry(EXC_PENDSV);
-  //         return true;
-  //       }
-  //       if (this.pendingSystick && priority === systickPriority) {
-  //         this.pendingSystick = false;
-  //         this.exceptionEntry(EXC_SYSTICK);
-  //         return true;
-  //       }
-  //       if (levelInterrupts) {
-  //         for (let interruptNumber = 0; interruptNumber < 32; interruptNumber++) {
-  //           if (levelInterrupts & (1 << interruptNumber)) {
-  //             if (interruptNumber > MAX_HARDWARE_IRQ) {
-  //               this.pendingInterrupts &= ~(1 << interruptNumber);
-  //             }
-  //             this.exceptionEntry(16 + interruptNumber);
-  //             return true;
-  //           }
-  //         }
-  //       }
-  //     }
-  //     this.interruptsUpdated = false;
-  //     return false;
-  //   }
+  /* If we're waiting for an interrupt (i.e. WFI/WFE), the ARM says:
+     > If PRIMASK.PM is set to 1, an asynchronous exception that has a higher group priority than any
+     > active exception results in a WFI instruction exit. If the group priority of the exception is less than or
+     > equal to the execution group priority, the exception is ignored.
+  */
+  const int32_t currentPriority =
+      waiting ? PM ? exceptionPriority(IPSR) : LOWEST_PRIORITY
+              : std::min(exceptionPriority(IPSR), PM ? 0 : LOWEST_PRIORITY);
+  const uint32_t interruptSet = pendingInterrupts & enabledInterrupts;
+  const int32_t svCallPriority = static_cast<int32_t>(this->svCallPriority());
+  const int32_t systickPriority = static_cast<int32_t>(this->systickPriority());
+  const int32_t pendSVPriority = static_cast<int32_t>(this->pendSVPriority());
+  if (pendingNMI) {
+    pendingNMI = false;
+    exceptionEntry(EXC_NMI);
+    return true;
+  }
+  for (int32_t priority = 0; priority < currentPriority; priority++) {
+    const uint32_t levelInterrupts = interruptSet & interruptPriorities[priority];
+    if (pendingSVCall && priority == svCallPriority) {
+      pendingSVCall = false;
+      exceptionEntry(EXC_SVCALL);
+      return true;
+    }
+    if (pendingPendSV && priority == pendSVPriority) {
+      pendingPendSV = false;
+      exceptionEntry(EXC_PENDSV);
+      return true;
+    }
+    if (pendingSystick && priority == systickPriority) {
+      pendingSystick = false;
+      exceptionEntry(EXC_SYSTICK);
+      return true;
+    }
+    if (levelInterrupts) {
+      for (uint32_t interruptNumber = 0; interruptNumber < 32; interruptNumber++) {
+        if (levelInterrupts & (1u << interruptNumber)) {
+          if (interruptNumber > MAX_HARDWARE_IRQ) {
+            pendingInterrupts &= ~(1u << interruptNumber);
+          }
+          exceptionEntry(16 + interruptNumber);
+          return true;
+        }
+      }
+    }
+  }
+  interruptsUpdated = false;
   return false;
 }
 
 uint32_t CortexM0Core::readSpecialRegister(uint32_t sysm) {
-  // TODO(port): cortex-m0-core.ts
-  //   readSpecialRegister(sysm: number) {
-  //     switch (sysm) {
-  //       case SYSM_APSR:
-  //         return this.APSR;
-  //
-  //       case SYSM_XPSR:
-  //         return this.xPSR;
-  //
-  //       case SYSM_IPSR:
-  //         return this.IPSR;
-  //
-  //       case SYSM_PRIMASK:
-  //         return this.PM ? 1 : 0;
-  //
-  //       case SYSM_MSP:
-  //         return this.SPmain;
-  //
-  //       case SYSM_PSP:
-  //         return this.SPprocess;
-  //
-  //       case SYSM_CONTROL:
-  //         return (this.SPSEL === StackPointerBank.SPprocess ? 2 : 0) | (this.nPRIV ? 1 : 0);
-  //
-  //       default:
-  //         this.logger.warn(LOG_NAME, `MRS with unimplemented SYSm value: ${sysm}`);
-  //         return 0;
-  //     }
-  //   }
-  (void)sysm;
-  return 0;
+  switch (sysm) {
+    case SYSM_APSR:
+      return APSR();
+
+    case SYSM_XPSR:
+      return xPSR();
+
+    case SYSM_IPSR:
+      return IPSR;
+
+    case SYSM_PRIMASK:
+      return PM ? 1 : 0;
+
+    case SYSM_MSP:
+      return SPmain();
+
+    case SYSM_PSP:
+      return SPprocess();
+
+    case SYSM_CONTROL:
+      return (SPSEL == StackPointerBank::SPprocess ? 2 : 0) | (nPRIV ? 1 : 0);
+
+    default:
+      logger().warn(LOG_NAME, "MRS with unimplemented SYSm value: " + std::to_string(sysm));
+      return 0;
+  }
 }
 
 void CortexM0Core::writeSpecialRegister(uint32_t sysm, uint32_t value) {
-  // TODO(port): cortex-m0-core.ts
-  //   writeSpecialRegister(sysm: number, value: number) {
-  //     switch (sysm) {
-  //       case SYSM_APSR:
-  //         this.APSR = value;
-  //         break;
-  //
-  //       case SYSM_XPSR:
-  //         this.xPSR = value;
-  //         break;
-  //
-  //       case SYSM_IPSR:
-  //         this.IPSR = value;
-  //         break;
-  //
-  //       case SYSM_PRIMASK:
-  //         this.PM = !!(value & 1);
-  //         this.interruptsUpdated = true;
-  //         break;
-  //
-  //       case SYSM_MSP:
-  //         this.SPmain = value;
-  //         break;
-  //
-  //       case SYSM_PSP:
-  //         this.SPprocess = value;
-  //         break;
-  //
-  //       case SYSM_CONTROL:
-  //         this.nPRIV = !!(value & 1);
-  //         if (this.currentMode === ExecutionMode.Mode_Thread) {
-  //           this.switchStack(value & 2 ? StackPointerBank.SPprocess : StackPointerBank.SPmain);
-  //         }
-  //         break;
-  //
-  //       default:
-  //         this.logger.warn(LOG_NAME, `MRS with unimplemented SYSm value: ${sysm}`);
-  //         return 0;
-  //     }
-  //   }
-  (void)sysm;
-  (void)value;
+  switch (sysm) {
+    case SYSM_APSR:
+      setAPSR(value);
+      break;
+
+    case SYSM_XPSR:
+      setXPSR(value);
+      break;
+
+    case SYSM_IPSR:
+      IPSR = value;
+      break;
+
+    case SYSM_PRIMASK:
+      PM = !!(value & 1);
+      interruptsUpdated = true;
+      break;
+
+    case SYSM_MSP:
+      setSPmain(value);
+      break;
+
+    case SYSM_PSP:
+      setSPprocess(value);
+      break;
+
+    case SYSM_CONTROL:
+      nPRIV = !!(value & 1);
+      if (currentMode == ExecutionMode::Mode_Thread) {
+        switchStack(value & 2 ? StackPointerBank::SPprocess : StackPointerBank::SPmain);
+      }
+      break;
+
+    default:
+      // (sic: "MRS" in the TS too)
+      logger().warn(LOG_NAME, "MRS with unimplemented SYSm value: " + std::to_string(sysm));
+      return;
+  }
 }
 
 void CortexM0Core::BXWritePC(uint32_t address) {
-  // TODO(port): cortex-m0-core.ts
-  //   BXWritePC(address: number) {
-  //     if (this.currentMode == ExecutionMode.Mode_Handler && address >>> 28 == 0b1111) {
-  //       this.exceptionReturn(address & 0x0fffffff);
-  //     } else {
-  //       this.PC = address & ~1;
-  //     }
-  //   }
-  (void)address;
+  if (currentMode == ExecutionMode::Mode_Handler && address >> 28 == 0b1111) {
+    exceptionReturn(address & 0x0fffffff);
+  } else {
+    setPC(address & ~1u);
+  }
 }
 
 double CortexM0Core::substractUpdateFlags(double minuend, double subtrahend) {
-  // TODO(port): cortex-m0-core.ts
-  //   private substractUpdateFlags(minuend: number, subtrahend: number) {
-  //     const result = minuend - subtrahend;
-  //     this.N = !!(result & 0x80000000);
-  //     this.Z = (result & 0xffffffff) === 0;
-  //     this.C = minuend >= subtrahend;
-  //     this.V =
-  //       (!!(result & 0x80000000) && !(minuend & 0x80000000) && !!(subtrahend & 0x80000000)) ||
-  //       (!(result & 0x80000000) && !!(minuend & 0x80000000) && !(subtrahend & 0x80000000));
-  //     return result;
-  //   }
-  (void)minuend;
-  (void)subtrahend;
-  return 0;
+  // JS: result may be negative (or subtrahend 2**32, from `reg + (1 - C)`); the bitwise tests
+  // see ToInt32 of each operand, the `>=` compares the unconverted numbers.
+  const double result = minuend - subtrahend;
+  N = !!(toUint32(result) & 0x80000000);
+  Z = toUint32(result) == 0;
+  C = minuend >= subtrahend;
+  V = (!!(toUint32(result) & 0x80000000) && !(toUint32(minuend) & 0x80000000) &&
+       !!(toUint32(subtrahend) & 0x80000000)) ||
+      (!(toUint32(result) & 0x80000000) && !!(toUint32(minuend) & 0x80000000) &&
+       !(toUint32(subtrahend) & 0x80000000));
+  // unmasked (possibly negative): the caller's Uint32Array store makes it 32-bit
+  return result;
 }
 
 double CortexM0Core::addUpdateFlags(double addend1, double addend2) {
-  // TODO(port): cortex-m0-core.ts
-  //   private addUpdateFlags(addend1: number, addend2: number) {
-  //     const unsignedSum = (addend1 + addend2) >>> 0;
-  //     const signedSum = (addend1 | 0) + (addend2 | 0);
-  //     const result = addend1 + addend2;
-  //     this.N = !!(result & 0x80000000);
-  //     this.Z = (result & 0xffffffff) === 0;
-  //     this.C = result === unsignedSum ? false : true;
-  //     this.V = (result | 0) === signedSum ? false : true;
-  //     return result & 0xffffffff;
-  //   }
-  (void)addend1;
-  (void)addend2;
-  return 0;
+  // JS: addend2 may be 2**32 (`reg + C`), the sum up to 2**33
+  const double unsignedSum = toUint32(addend1 + addend2);
+  const double signedSum =
+      static_cast<double>(toInt32(addend1)) + static_cast<double>(toInt32(addend2));
+  const double result = addend1 + addend2;
+  N = !!(toUint32(result) & 0x80000000);
+  Z = toUint32(result) == 0;
+  C = result == unsignedSum ? false : true;
+  V = static_cast<double>(toInt32(result)) == signedSum ? false : true;
+  // `result & 0xffffffff` is an int32
+  return toInt32(result);
 }
 
 uint32_t CortexM0Core::cyclesIO(uint32_t addr, bool write) const {
-  // TODO(port): cortex-m0-core.ts
-  //   cyclesIO(addr: number, write = false) {
-  //     addr = addr >>> 0;
-  //     if (addr >= SIO_START_ADDRESS && addr < SIO_START_ADDRESS + 0x10000000) {
-  //       return 0;
-  //     }
-  //     if (addr >= APB_START_ADDRESS && addr < APB_START_ADDRESS + 0x10000000) {
-  //       return write ? 4 : 3;
-  //     }
-  //     return 1;
-  //   }
-  (void)addr;
-  (void)write;
-  return 0;
+  addr = addr >> 0;
+  if (addr >= SIO_START_ADDRESS && addr < SIO_START_ADDRESS + 0x10000000) {
+    return 0;
+  }
+  if (addr >= APB_START_ADDRESS && addr < APB_START_ADDRESS + 0x10000000) {
+    return write ? 4 : 3;
+  }
+  return 1;
 }
 
 uint32_t CortexM0Core::executeInstruction() {
-  // TODO(port): cortex-m0-core.ts
-  //   executeInstruction() {
-  //     if (this.interruptsUpdated) {
-  //       if (this.checkForInterrupts()) {
-  //         this.waiting = false;
-  //         this.waitingForEvent = false;
-  //       }
-  //     }
-  //     // ARM Thumb instruction encoding - 16 bits / 2 bytes
-  //     const opcodePC = this.PC & ~1; //ensure no LSB set PC are executed
-  //     const opcode = this.readUint16(opcodePC);
-  //     const wideInstruction = opcode >> 12 === 0b1111 || opcode >> 11 === 0b11101;
-  //     const opcode2 = wideInstruction ? this.readUint16(opcodePC + 2) : 0;
-  //     this.PC += 2;
-  //     let deltaCycles = 1;
-  //     // ADCS
-  //     if (opcode >> 6 === 0b0100000101) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       this.registers[Rdn] = this.addUpdateFlags(
-  //         this.registers[Rm],
-  //         this.registers[Rdn] + (this.C ? 1 : 0),
-  //       );
-  //     }
-  //     // ADD (register = SP plus immediate)
-  //     else if (opcode >> 11 === 0b10101) {
-  //       const imm8 = opcode & 0xff;
-  //       const Rd = (opcode >> 8) & 0x7;
-  //       this.registers[Rd] = this.SP + (imm8 << 2);
-  //     }
-  //     // ADD (SP plus immediate)
-  //     else if (opcode >> 7 === 0b101100000) {
-  //       const imm32 = (opcode & 0x7f) << 2;
-  //       this.SP += imm32;
-  //     }
-  //     // ADDS (Encoding T1)
-  //     else if (opcode >> 9 === 0b0001110) {
-  //       const imm3 = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.addUpdateFlags(this.registers[Rn], imm3);
-  //     }
-  //     // ADDS (Encoding T2)
-  //     else if (opcode >> 11 === 0b00110) {
-  //       const imm8 = opcode & 0xff;
-  //       const Rdn = (opcode >> 8) & 0x7;
-  //       this.registers[Rdn] = this.addUpdateFlags(this.registers[Rdn], imm8);
-  //     }
-  //     // ADDS (register)
-  //     else if (opcode >> 9 === 0b0001100) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.addUpdateFlags(this.registers[Rn], this.registers[Rm]);
-  //     }
-  //     // ADD (register)
-  //     else if (opcode >> 8 === 0b01000100) {
-  //       const Rm = (opcode >> 3) & 0xf;
-  //       const Rdn = ((opcode & 0x80) >> 4) | (opcode & 0x7);
-  //       const leftValue = Rdn === pcRegister ? this.PC + 2 : this.registers[Rdn];
-  //       const rightValue = this.registers[Rm];
-  //       const result = leftValue + rightValue;
-  //       if (Rdn !== spRegister && Rdn !== pcRegister) {
-  //         this.registers[Rdn] = result;
-  //       } else if (Rdn === pcRegister) {
-  //         this.registers[Rdn] = result & ~0x1;
-  //         deltaCycles++;
-  //       } else if (Rdn === spRegister) {
-  //         this.registers[Rdn] = result & ~0x3;
-  //       }
-  //     }
-  //     // ADR
-  //     else if (opcode >> 11 === 0b10100) {
-  //       const imm8 = opcode & 0xff;
-  //       const Rd = (opcode >> 8) & 0x7;
-  //       this.registers[Rd] = (opcodePC & 0xfffffffc) + 4 + (imm8 << 2);
-  //     }
-  //     // ANDS (Encoding T2)
-  //     else if (opcode >> 6 === 0b0100000000) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const result = this.registers[Rdn] & this.registers[Rm];
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = (result & 0xffffffff) === 0;
-  //     }
-  //     // ASRS (immediate)
-  //     else if (opcode >> 11 === 0b00010) {
-  //       const imm5 = (opcode >> 6) & 0x1f;
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       const input = this.registers[Rm];
-  //       const shiftN = imm5 ? imm5 : 32;
-  //       const result = shiftN < 32 ? input >> shiftN : (input & 0x80000000) >> 31;
-  //       this.registers[Rd] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = (result & 0xffffffff) === 0;
-  //       this.C = input & (1 << (shiftN - 1)) ? true : false;
-  //     }
-  //     // ASRS (register)
-  //     else if (opcode >> 6 === 0b0100000100) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const input = this.registers[Rdn];
-  //       const shiftN = (this.registers[Rm] & 0xff) < 32 ? this.registers[Rm] & 0xff : 32;
-  //       const result = shiftN < 32 ? input >> shiftN : (input & 0x80000000) >> 31;
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = (result & 0xffffffff) === 0;
-  //       this.C = input & (1 << (shiftN - 1)) ? true : false;
-  //     }
-  //     // B (with cond)
-  //     else if (opcode >> 12 === 0b1101 && ((opcode >> 9) & 0x7) !== 0b111) {
-  //       let imm8 = (opcode & 0xff) << 1;
-  //       const cond = (opcode >> 8) & 0xf;
-  //       if (imm8 & (1 << 8)) {
-  //         imm8 = (imm8 & 0x1ff) - 0x200;
-  //       }
-  //       if (this.checkCondition(cond)) {
-  //         this.PC += imm8 + 2;
-  //         deltaCycles++;
-  //       }
-  //     }
-  //     // B
-  //     else if (opcode >> 11 === 0b11100) {
-  //       let imm11 = (opcode & 0x7ff) << 1;
-  //       if (imm11 & (1 << 11)) {
-  //         imm11 = (imm11 & 0x7ff) - 0x800;
-  //       }
-  //       this.PC += imm11 + 2;
-  //       deltaCycles++;
-  //     }
-  //     // BICS
-  //     else if (opcode >> 6 === 0b0100001110) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const result = (this.registers[Rdn] &= ~this.registers[Rm]);
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //     }
-  //     // BKPT
-  //     else if (opcode >> 8 === 0b10111110) {
-  //       const imm8 = opcode & 0xff;
-  //       this.breakRewind = 2;
-  //       this.rp2040.onBreak(imm8);
-  //     }
-  //     // BL
-  //     else if (opcode >> 11 === 0b11110 && opcode2 >> 14 === 0b11 && ((opcode2 >> 12) & 0x1) == 1) {
-  //       const imm11 = opcode2 & 0x7ff;
-  //       const J2 = (opcode2 >> 11) & 0x1;
-  //       const J1 = (opcode2 >> 13) & 0x1;
-  //       const imm10 = opcode & 0x3ff;
-  //       const S = (opcode >> 10) & 0x1;
-  //       const I1 = 1 - (S ^ J1);
-  //       const I2 = 1 - (S ^ J2);
-  //       const imm32 =
-  //         ((S ? 0b11111111 : 0) << 24) | ((I1 << 23) | (I2 << 22) | (imm10 << 12) | (imm11 << 1));
-  //       this.LR = (this.PC + 2) | 0x1;
-  //       this.PC += 2 + imm32;
-  //       deltaCycles += 2;
-  //       this.blTaken(this, false);
-  //     }
-  //     // BLX
-  //     else if (opcode >> 7 === 0b010001111 && (opcode & 0x7) === 0) {
-  //       const Rm = (opcode >> 3) & 0xf;
-  //       this.LR = this.PC | 0x1;
-  //       this.PC = this.registers[Rm] & ~1;
-  //       deltaCycles++;
-  //       this.blTaken(this, true);
-  //     }
-  //     // BX
-  //     else if (opcode >> 7 === 0b010001110 && (opcode & 0x7) === 0) {
-  //       const Rm = (opcode >> 3) & 0xf;
-  //       this.BXWritePC(this.registers[Rm]);
-  //       deltaCycles++;
-  //     }
-  //     // CMN (register)
-  //     else if (opcode >> 6 === 0b0100001011) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rn = opcode & 0x7;
-  //       this.addUpdateFlags(this.registers[Rn], this.registers[Rm]);
-  //     }
-  //     // CMP immediate
-  //     else if (opcode >> 11 === 0b00101) {
-  //       const Rn = (opcode >> 8) & 0x7;
-  //       const imm8 = opcode & 0xff;
-  //       this.substractUpdateFlags(this.registers[Rn], imm8);
-  //     }
-  //     // CMP (register)
-  //     else if (opcode >> 6 === 0b0100001010) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rn = opcode & 0x7;
-  //       this.substractUpdateFlags(this.registers[Rn], this.registers[Rm]);
-  //     }
-  //     // CMP (register) encoding T2
-  //     else if (opcode >> 8 === 0b01000101) {
-  //       const Rm = (opcode >> 3) & 0xf;
-  //       const Rn = ((opcode >> 4) & 0x8) | (opcode & 0x7);
-  //       this.substractUpdateFlags(this.registers[Rn], this.registers[Rm]);
-  //     }
-  //     // CPSID i
-  //     else if (opcode === 0xb672) {
-  //       this.PM = true;
-  //     }
-  //     // CPSIE i
-  //     else if (opcode === 0xb662) {
-  //       this.PM = false;
-  //       this.interruptsUpdated = true;
-  //     }
-  //     // DMB SY
-  //     else if (opcode === 0xf3bf && (opcode2 & 0xfff0) === 0x8f50) {
-  //       this.PC += 2;
-  //       deltaCycles += 2;
-  //     }
-  //     // DSB SY
-  //     else if (opcode === 0xf3bf && (opcode2 & 0xfff0) === 0x8f40) {
-  //       this.PC += 2;
-  //       deltaCycles += 2;
-  //     }
-  //     // EORS
-  //     else if (opcode >> 6 === 0b0100000001) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const result = this.registers[Rm] ^ this.registers[Rdn];
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //     }
-  //     // ISB SY
-  //     else if (opcode === 0xf3bf && (opcode2 & 0xfff0) === 0x8f60) {
-  //       this.PC += 2;
-  //       deltaCycles += 2;
-  //     }
-  //     // LDMIA
-  //     else if (opcode >> 11 === 0b11001) {
-  //       const Rn = (opcode >> 8) & 0x7;
-  //       const registers = opcode & 0xff;
-  //       let address = this.registers[Rn];
-  //       for (let i = 0; i < 8; i++) {
-  //         if (registers & (1 << i)) {
-  //           this.registers[i] = this.readUint32(address);
-  //           address += 4;
-  //           deltaCycles++;
-  //         }
-  //       }
-  //       // Write back
-  //       if (!(registers & (1 << Rn))) {
-  //         this.registers[Rn] = address;
-  //       }
-  //     }
-  //     // LDR (immediate)
-  //     else if (opcode >> 11 === 0b01101) {
-  //       const imm5 = ((opcode >> 6) & 0x1f) << 2;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rn] + imm5;
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint32(addr);
-  //     }
-  //     // LDR (sp + immediate)
-  //     else if (opcode >> 11 === 0b10011) {
-  //       const Rt = (opcode >> 8) & 0x7;
-  //       const imm8 = opcode & 0xff;
-  //       const addr = this.SP + (imm8 << 2);
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint32(addr);
-  //     }
-  //     // LDR (literal)
-  //     else if (opcode >> 11 === 0b01001) {
-  //       const imm8 = (opcode & 0xff) << 2;
-  //       const Rt = (opcode >> 8) & 7;
-  //       const nextPC = this.PC + 2;
-  //       const addr = (nextPC & 0xfffffffc) + imm8;
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint32(addr);
-  //     }
-  //     // LDR (register)
-  //     else if (opcode >> 9 === 0b0101100) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint32(addr);
-  //     }
-  //     // LDRB (immediate)
-  //     else if (opcode >> 11 === 0b01111) {
-  //       const imm5 = (opcode >> 6) & 0x1f;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rn] + imm5;
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint8(addr);
-  //     }
-  //     // LDRB (register)
-  //     else if (opcode >> 9 === 0b0101110) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint8(addr);
-  //     }
-  //     // LDRH (immediate)
-  //     else if (opcode >> 11 === 0b10001) {
-  //       const imm5 = (opcode >> 6) & 0x1f;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rn] + (imm5 << 1);
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint16(addr);
-  //     }
-  //     // LDRH (register)
-  //     else if (opcode >> 9 === 0b0101101) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = this.readUint16(addr);
-  //     }
-  //     // LDRSB
-  //     else if (opcode >> 9 === 0b0101011) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = signExtend8(this.readUint8(addr));
-  //     }
-  //     // LDRSH
-  //     else if (opcode >> 9 === 0b0101111) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const addr = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(addr);
-  //       this.registers[Rt] = signExtend16(this.readUint16(addr));
-  //     }
-  //     // LSLS (immediate)
-  //     else if (opcode >> 11 === 0b00000) {
-  //       const imm5 = (opcode >> 6) & 0x1f;
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       const input = this.registers[Rm];
-  //       const result = input << imm5;
-  //       this.registers[Rd] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //       this.C = imm5 ? !!(input & (1 << (32 - imm5))) : this.C;
-  //     }
-  //     // LSLS (register)
-  //     else if (opcode >> 6 === 0b0100000010) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const input = this.registers[Rdn];
-  //       const shiftCount = this.registers[Rm] & 0xff;
-  //       const result = shiftCount >= 32 ? 0 : input << shiftCount;
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //       this.C = shiftCount ? !!(input & (1 << (32 - shiftCount))) : this.C;
-  //     }
-  //     // LSRS (immediate)
-  //     else if (opcode >> 11 === 0b00001) {
-  //       const imm5 = (opcode >> 6) & 0x1f;
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       const input = this.registers[Rm];
-  //       const result = imm5 ? input >>> imm5 : 0;
-  //       this.registers[Rd] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //       this.C = !!((input >>> (imm5 ? imm5 - 1 : 31)) & 0x1);
-  //     }
-  //     // LSRS (register)
-  //     else if (opcode >> 6 === 0b0100000011) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const shiftAmount = this.registers[Rm] & 0xff;
-  //       const input = this.registers[Rdn];
-  //       const result = shiftAmount < 32 ? input >>> shiftAmount : 0;
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //       this.C = shiftAmount <= 32 ? !!((input >>> (shiftAmount - 1)) & 0x1) : false;
-  //     }
-  //     // MOV
-  //     else if (opcode >> 8 === 0b01000110) {
-  //       const Rm = (opcode >> 3) & 0xf;
-  //       const Rd = ((opcode >> 4) & 0x8) | (opcode & 0x7);
-  //       let value = Rm === pcRegister ? this.PC + 2 : this.registers[Rm];
-  //       if (Rd === pcRegister) {
-  //         deltaCycles++;
-  //         value &= ~1;
-  //       } else if (Rd === spRegister) {
-  //         value &= ~3;
-  //       }
-  //       this.registers[Rd] = value;
-  //     }
-  //     // MOVS
-  //     else if (opcode >> 11 === 0b00100) {
-  //       const value = opcode & 0xff;
-  //       const Rd = (opcode >> 8) & 7;
-  //       this.registers[Rd] = value;
-  //       this.N = !!(value & 0x80000000);
-  //       this.Z = value === 0;
-  //     }
-  //     // MRS
-  //     else if (opcode === 0b1111001111101111 && opcode2 >> 12 == 0b1000) {
-  //       const SYSm = opcode2 & 0xff;
-  //       const Rd = (opcode2 >> 8) & 0xf;
-  //       this.registers[Rd] = this.readSpecialRegister(SYSm);
-  //       this.PC += 2;
-  //       deltaCycles += 2;
-  //     }
-  //     // MSR
-  //     else if (opcode >> 4 === 0b111100111000 && opcode2 >> 8 == 0b10001000) {
-  //       const SYSm = opcode2 & 0xff;
-  //       const Rn = opcode & 0xf;
-  //       this.writeSpecialRegister(SYSm, this.registers[Rn]);
-  //       this.PC += 2;
-  //       deltaCycles += 2;
-  //     }
-  //     // MULS
-  //     else if (opcode >> 6 === 0b0100001101) {
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rdm = opcode & 0x7;
-  //       const result = Math.imul(this.registers[Rn], this.registers[Rdm]);
-  //       this.registers[Rdm] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = (result & 0xffffffff) === 0;
-  //     }
-  //     // MVNS
-  //     else if (opcode >> 6 === 0b0100001111) {
-  //       const Rm = (opcode >> 3) & 7;
-  //       const Rd = opcode & 7;
-  //       const result = ~this.registers[Rm];
-  //       this.registers[Rd] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //     }
-  //     // ORRS (Encoding T2)
-  //     else if (opcode >> 6 === 0b0100001100) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const result = this.registers[Rdn] | this.registers[Rm];
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = (result & 0xffffffff) === 0;
-  //     }
-  //     // POP
-  //     else if (opcode >> 9 === 0b1011110) {
-  //       const P = (opcode >> 8) & 1;
-  //       let address = this.SP;
-  //       for (let i = 0; i <= 7; i++) {
-  //         if (opcode & (1 << i)) {
-  //           this.registers[i] = this.readUint32(address);
-  //           address += 4;
-  //           deltaCycles++;
-  //         }
-  //       }
-  //       if (P) {
-  //         this.SP = address + 4;
-  //         this.BXWritePC(this.readUint32(address));
-  //         deltaCycles += 2;
-  //       } else {
-  //         this.SP = address;
-  //       }
-  //     }
-  //     // PUSH
-  //     else if (opcode >> 9 === 0b1011010) {
-  //       let bitCount = 0;
-  //       for (let i = 0; i <= 8; i++) {
-  //         if (opcode & (1 << i)) {
-  //           bitCount++;
-  //         }
-  //       }
-  //       let address = this.SP - 4 * bitCount;
-  //       for (let i = 0; i <= 7; i++) {
-  //         if (opcode & (1 << i)) {
-  //           this.writeUint32(address, this.registers[i]);
-  //           deltaCycles++;
-  //           address += 4;
-  //         }
-  //       }
-  //       if (opcode & (1 << 8)) {
-  //         this.writeUint32(address, this.registers[14]);
-  //       }
-  //       this.SP -= 4 * bitCount;
-  //     }
-  //     // REV
-  //     else if (opcode >> 6 === 0b1011101000) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       const input = this.registers[Rm];
-  //       this.registers[Rd] =
-  //         ((input & 0xff) << 24) |
-  //         (((input >> 8) & 0xff) << 16) |
-  //         (((input >> 16) & 0xff) << 8) |
-  //         ((input >> 24) & 0xff);
-  //     }
-  //     // REV16
-  //     else if (opcode >> 6 === 0b1011101001) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       const input = this.registers[Rm];
-  //       this.registers[Rd] =
-  //         (((input >> 16) & 0xff) << 24) |
-  //         (((input >> 24) & 0xff) << 16) |
-  //         ((input & 0xff) << 8) |
-  //         ((input >> 8) & 0xff);
-  //     }
-  //     // REVSH
-  //     else if (opcode >> 6 === 0b1011101011) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       const input = this.registers[Rm];
-  //       this.registers[Rd] = signExtend16(((input & 0xff) << 8) | ((input >> 8) & 0xff));
-  //     }
-  //     // ROR
-  //     else if (opcode >> 6 === 0b0100000111) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       const input = this.registers[Rdn];
-  //       const shift = (this.registers[Rm] & 0xff) % 32;
-  //       const result = (input >>> shift) | (input << (32 - shift));
-  //       this.registers[Rdn] = result;
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //       this.C = !!(result & 0x80000000);
-  //     }
-  //     // NEGS / RSBS
-  //     else if (opcode >> 6 === 0b0100001001) {
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.substractUpdateFlags(0, this.registers[Rn]);
-  //     }
-  //     // NOP
-  //     else if (opcode === 0b1011111100000000) {
-  //       // Do nothing!
-  //     }
-  //     // SBCS (Encoding T1)
-  //     else if (opcode >> 6 === 0b0100000110) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rdn = opcode & 0x7;
-  //       this.registers[Rdn] = this.substractUpdateFlags(
-  //         this.registers[Rdn],
-  //         this.registers[Rm] + (1 - (this.C ? 1 : 0)),
-  //       );
-  //     }
-  //     // SEV
-  //     else if (opcode === 0b1011111101000000) {
-  //       this.rp2040.sendEvent();
-  //     }
-  //     // STMIA
-  //     else if (opcode >> 11 === 0b11000) {
-  //       const Rn = (opcode >> 8) & 0x7;
-  //       const registers = opcode & 0xff;
-  //       let address = this.registers[Rn];
-  //       for (let i = 0; i < 8; i++) {
-  //         if (registers & (1 << i)) {
-  //           this.writeUint32(address, this.registers[i]);
-  //           address += 4;
-  //           deltaCycles++;
-  //         }
-  //       }
-  //       // Write back
-  //       if (!(registers & (1 << Rn))) {
-  //         this.registers[Rn] = address;
-  //       }
-  //     }
-  //     // STR (immediate)
-  //     else if (opcode >> 11 === 0b01100) {
-  //       const imm5 = ((opcode >> 6) & 0x1f) << 2;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const address = this.registers[Rn] + imm5;
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint32(address, this.registers[Rt]);
-  //     }
-  //     // STR (sp + immediate)
-  //     else if (opcode >> 11 === 0b10010) {
-  //       const Rt = (opcode >> 8) & 0x7;
-  //       const imm8 = opcode & 0xff;
-  //       const address = this.SP + (imm8 << 2);
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint32(address, this.registers[Rt]);
-  //     }
-  //     // STR (register)
-  //     else if (opcode >> 9 === 0b0101000) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const address = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint32(address, this.registers[Rt]);
-  //     }
-  //     // STRB (immediate)
-  //     else if (opcode >> 11 === 0b01110) {
-  //       const imm5 = (opcode >> 6) & 0x1f;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const address = this.registers[Rn] + imm5;
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint8(address, this.registers[Rt]);
-  //     }
-  //     // STRB (register)
-  //     else if (opcode >> 9 === 0b0101010) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const address = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint8(address, this.registers[Rt]);
-  //     }
-  //     // STRH (immediate)
-  //     else if (opcode >> 11 === 0b10000) {
-  //       const imm5 = ((opcode >> 6) & 0x1f) << 1;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const address = this.registers[Rn] + imm5;
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint16(address, this.registers[Rt]);
-  //     }
-  //     // STRH (register)
-  //     else if (opcode >> 9 === 0b0101001) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rt = opcode & 0x7;
-  //       const address = this.registers[Rm] + this.registers[Rn];
-  //       deltaCycles += this.cyclesIO(address, true);
-  //       this.writeUint16(address, this.registers[Rt]);
-  //     }
-  //     // SUB (SP minus immediate)
-  //     else if (opcode >> 7 === 0b101100001) {
-  //       const imm32 = (opcode & 0x7f) << 2;
-  //       this.SP -= imm32;
-  //     }
-  //     // SUBS (Encoding T1)
-  //     else if (opcode >> 9 === 0b0001111) {
-  //       const imm3 = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.substractUpdateFlags(this.registers[Rn], imm3);
-  //     }
-  //     // SUBS (Encoding T2)
-  //     else if (opcode >> 11 === 0b00111) {
-  //       const imm8 = opcode & 0xff;
-  //       const Rdn = (opcode >> 8) & 0x7;
-  //       this.registers[Rdn] = this.substractUpdateFlags(this.registers[Rdn], imm8);
-  //     }
-  //     // SUBS (register)
-  //     else if (opcode >> 9 === 0b0001101) {
-  //       const Rm = (opcode >> 6) & 0x7;
-  //       const Rn = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.substractUpdateFlags(this.registers[Rn], this.registers[Rm]);
-  //     }
-  //     // SVC
-  //     else if (opcode >> 8 === 0b11011111) {
-  //       this.pendingSVCall = true;
-  //       this.interruptsUpdated = true;
-  //     }
-  //     // SXTB
-  //     else if (opcode >> 6 === 0b1011001001) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = signExtend8(this.registers[Rm]);
-  //     }
-  //     // SXTH
-  //     else if (opcode >> 6 === 0b1011001000) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = signExtend16(this.registers[Rm]);
-  //     }
-  //     // TST
-  //     else if (opcode >> 6 == 0b0100001000) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rn = opcode & 0x7;
-  //       const result = this.registers[Rn] & this.registers[Rm];
-  //       this.N = !!(result & 0x80000000);
-  //       this.Z = result === 0;
-  //     }
-  //     // UDF
-  //     else if (opcode >> 8 == 0b11011110) {
-  //       const imm8 = opcode & 0xff;
-  //       this.breakRewind = 2;
-  //       this.rp2040.onBreak(imm8);
-  //     }
-  //     // UDF (Encoding T2)
-  //     else if (opcode >> 4 === 0b111101111111 && opcode2 >> 12 === 0b1010) {
-  //       const imm4 = opcode & 0xf;
-  //       const imm12 = opcode2 & 0xfff;
-  //       this.breakRewind = 4;
-  //       this.rp2040.onBreak((imm4 << 12) | imm12);
-  //       this.PC += 2;
-  //     }
-  //     // UXTB
-  //     else if (opcode >> 6 == 0b1011001011) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.registers[Rm] & 0xff;
-  //     }
-  //     // UXTH
-  //     else if (opcode >> 6 == 0b1011001010) {
-  //       const Rm = (opcode >> 3) & 0x7;
-  //       const Rd = opcode & 0x7;
-  //       this.registers[Rd] = this.registers[Rm] & 0xffff;
-  //     }
-  //     // WFE
-  //     else if (opcode === 0b1011111100100000) {
-  //       deltaCycles++;
-  //       if (this.eventRegistered) {
-  //         this.eventRegistered = false;
-  //       } else {
-  //         this.waiting = true;
-  //         this.waitingForEvent = true;
-  //       }
-  //     }
-  //     // WFI
-  //     else if (opcode === 0b1011111100110000) {
-  //       deltaCycles++;
-  //       this.waiting = true;
-  //     }
-  //     // YIELD
-  //     else if (opcode === 0b1011111100010000) {
-  //       // do nothing for now. Wait for event!
-  //       this.logger.info(LOG_NAME, 'Yield');
-  //     } else {
-  //       this.logger.warn(
-  //         LOG_NAME,
-  //         `Warning: Instruction at ${opcodePC.toString(16)} is not implemented yet!`,
-  //       );
-  //       this.logger.warn(LOG_NAME, `Opcode: 0x${opcode.toString(16)} (0x${opcode2.toString(16)})`);
-  //     }
-  //
-  //     this.cycles += deltaCycles;
-  //     return deltaCycles;
-  //   }
-  TODO_PORT_ABORT("cortex-m0-core.ts", "CortexM0Core::executeInstruction");
+  if (interruptsUpdated) {
+    if (checkForInterrupts()) {
+      waiting = false;
+      waitingForEvent = false;
+    }
+  }
+  // ARM Thumb instruction encoding - 16 bits / 2 bytes
+  // JS: `this.PC & ~1` is an int32 (negative for PC >= 2**31); only its hex in the warning shows it
+  const uint32_t opcodePC = PC() & ~1u;  // ensure no LSB set PC are executed
+  const uint32_t opcode = readUint16(opcodePC);
+  const bool wideInstruction = opcode >> 12 == 0b1111 || opcode >> 11 == 0b11101;
+  const uint32_t opcode2 = wideInstruction ? readUint16(opcodePC + 2) : 0;
+  registers[15] += 2;
+  uint32_t deltaCycles = 1;
+  // ADCS
+  if (opcode >> 6 == 0b0100000101) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    // JS: registers[Rdn] + 1 can be 2**32
+    registers[Rdn] = toUint32(addUpdateFlags(registers[Rm], static_cast<double>(registers[Rdn]) +
+                                                                (C ? 1 : 0)));
+  }
+  // ADD (register = SP plus immediate)
+  else if (opcode >> 11 == 0b10101) {
+    const uint32_t imm8 = opcode & 0xff;
+    const uint32_t Rd = (opcode >> 8) & 0x7;
+    registers[Rd] = SP() + (imm8 << 2);
+  }
+  // ADD (SP plus immediate)
+  else if (opcode >> 7 == 0b101100000) {
+    const uint32_t imm32 = (opcode & 0x7f) << 2;
+    setSP(SP() + imm32);
+  }
+  // ADDS (Encoding T1)
+  else if (opcode >> 9 == 0b0001110) {
+    const uint32_t imm3 = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = toUint32(addUpdateFlags(registers[Rn], imm3));
+  }
+  // ADDS (Encoding T2)
+  else if (opcode >> 11 == 0b00110) {
+    const uint32_t imm8 = opcode & 0xff;
+    const uint32_t Rdn = (opcode >> 8) & 0x7;
+    registers[Rdn] = toUint32(addUpdateFlags(registers[Rdn], imm8));
+  }
+  // ADDS (register)
+  else if (opcode >> 9 == 0b0001100) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = toUint32(addUpdateFlags(registers[Rn], registers[Rm]));
+  }
+  // ADD (register)
+  else if (opcode >> 8 == 0b01000100) {
+    const uint32_t Rm = (opcode >> 3) & 0xf;
+    const uint32_t Rdn = ((opcode & 0x80) >> 4) | (opcode & 0x7);
+    const uint32_t leftValue = Rdn == pcRegister ? PC() + 2 : registers[Rdn];
+    const uint32_t rightValue = registers[Rm];
+    // JS: up to 2**33; every use below is ToInt32 / ToUint32 of it
+    const uint32_t result = leftValue + rightValue;
+    if (Rdn != spRegister && Rdn != pcRegister) {
+      registers[Rdn] = result;
+    } else if (Rdn == pcRegister) {
+      registers[Rdn] = result & ~0x1u;
+      deltaCycles++;
+    } else if (Rdn == spRegister) {
+      registers[Rdn] = result & ~0x3u;
+    }
+  }
+  // ADR
+  else if (opcode >> 11 == 0b10100) {
+    const uint32_t imm8 = opcode & 0xff;
+    const uint32_t Rd = (opcode >> 8) & 0x7;
+    registers[Rd] = (opcodePC & 0xfffffffc) + 4 + (imm8 << 2);
+  }
+  // ANDS (Encoding T2)
+  else if (opcode >> 6 == 0b0100000000) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t result = registers[Rdn] & registers[Rm];
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = (result & 0xffffffff) == 0;
+  }
+  // ASRS (immediate)
+  else if (opcode >> 11 == 0b00010) {
+    const uint32_t imm5 = (opcode >> 6) & 0x1f;
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    const uint32_t input = registers[Rm];
+    const uint32_t shiftN = imm5 ? imm5 : 32;
+    // JS: `input >> shiftN` sign-extends ToInt32(input)
+    const uint32_t result =
+        static_cast<uint32_t>(shiftN < 32 ? jsSar(static_cast<int32_t>(input), shiftN)
+                                          : jsSar(static_cast<int32_t>(input & 0x80000000), 31));
+    registers[Rd] = result;
+    N = !!(result & 0x80000000);
+    Z = (result & 0xffffffff) == 0;
+    C = input & static_cast<uint32_t>(jsShl(1, shiftN - 1)) ? true : false;
+  }
+  // ASRS (register)
+  else if (opcode >> 6 == 0b0100000100) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t input = registers[Rdn];
+    const uint32_t shiftN = (registers[Rm] & 0xff) < 32 ? registers[Rm] & 0xff : 32;
+    const uint32_t result =
+        static_cast<uint32_t>(shiftN < 32 ? jsSar(static_cast<int32_t>(input), shiftN)
+                                          : jsSar(static_cast<int32_t>(input & 0x80000000), 31));
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = (result & 0xffffffff) == 0;
+    // TS bug, kept: for shiftN == 0 this is `1 << -1` == 1 << 31, so C = input bit 31
+    // (the architecture leaves C unchanged)
+    C = input & static_cast<uint32_t>(jsShl(1, shiftN - 1)) ? true : false;
+  }
+  // B (with cond)
+  else if (opcode >> 12 == 0b1101 && ((opcode >> 9) & 0x7) != 0b111) {
+    int32_t imm8 = static_cast<int32_t>((opcode & 0xff) << 1);
+    const uint32_t cond = (opcode >> 8) & 0xf;
+    if (imm8 & (1 << 8)) {
+      imm8 = (imm8 & 0x1ff) - 0x200;
+    }
+    if (checkCondition(cond)) {
+      registers[15] += static_cast<uint32_t>(imm8 + 2);
+      deltaCycles++;
+    }
+  }
+  // B
+  else if (opcode >> 11 == 0b11100) {
+    int32_t imm11 = static_cast<int32_t>((opcode & 0x7ff) << 1);
+    if (imm11 & (1 << 11)) {
+      imm11 = (imm11 & 0x7ff) - 0x800;
+    }
+    registers[15] += static_cast<uint32_t>(imm11 + 2);
+    deltaCycles++;
+  }
+  // BICS
+  else if (opcode >> 6 == 0b0100001110) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t result = (registers[Rdn] &= ~registers[Rm]);
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+  }
+  // BKPT
+  else if (opcode >> 8 == 0b10111110) {
+    const uint32_t imm8 = opcode & 0xff;
+    breakRewind = 2;
+    rp2040.onBreak(imm8);
+  }
+  // BL
+  else if (opcode >> 11 == 0b11110 && opcode2 >> 14 == 0b11 && ((opcode2 >> 12) & 0x1) == 1) {
+    const uint32_t imm11 = opcode2 & 0x7ff;
+    const uint32_t J2 = (opcode2 >> 11) & 0x1;
+    const uint32_t J1 = (opcode2 >> 13) & 0x1;
+    const uint32_t imm10 = opcode & 0x3ff;
+    const uint32_t S = (opcode >> 10) & 0x1;
+    const uint32_t I1 = 1 - (S ^ J1);
+    const uint32_t I2 = 1 - (S ^ J2);
+    const uint32_t imm32 =
+        ((S ? 0b11111111u : 0) << 24) | ((I1 << 23) | (I2 << 22) | (imm10 << 12) | (imm11 << 1));
+    setLR((PC() + 2) | 0x1);
+    registers[15] += 2 + imm32;
+    deltaCycles += 2;
+    blTaken(*this, false);
+  }
+  // BLX
+  else if (opcode >> 7 == 0b010001111 && (opcode & 0x7) == 0) {
+    const uint32_t Rm = (opcode >> 3) & 0xf;
+    setLR(PC() | 0x1);
+    setPC(registers[Rm] & ~1u);
+    deltaCycles++;
+    blTaken(*this, true);
+  }
+  // BX
+  else if (opcode >> 7 == 0b010001110 && (opcode & 0x7) == 0) {
+    const uint32_t Rm = (opcode >> 3) & 0xf;
+    BXWritePC(registers[Rm]);
+    deltaCycles++;
+  }
+  // CMN (register)
+  else if (opcode >> 6 == 0b0100001011) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rn = opcode & 0x7;
+    addUpdateFlags(registers[Rn], registers[Rm]);
+  }
+  // CMP immediate
+  else if (opcode >> 11 == 0b00101) {
+    const uint32_t Rn = (opcode >> 8) & 0x7;
+    const uint32_t imm8 = opcode & 0xff;
+    substractUpdateFlags(registers[Rn], imm8);
+  }
+  // CMP (register)
+  else if (opcode >> 6 == 0b0100001010) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rn = opcode & 0x7;
+    substractUpdateFlags(registers[Rn], registers[Rm]);
+  }
+  // CMP (register) encoding T2
+  else if (opcode >> 8 == 0b01000101) {
+    const uint32_t Rm = (opcode >> 3) & 0xf;
+    const uint32_t Rn = ((opcode >> 4) & 0x8) | (opcode & 0x7);
+    substractUpdateFlags(registers[Rn], registers[Rm]);
+  }
+  // CPSID i
+  else if (opcode == 0xb672) {
+    PM = true;
+  }
+  // CPSIE i
+  else if (opcode == 0xb662) {
+    PM = false;
+    interruptsUpdated = true;
+  }
+  // DMB SY
+  else if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f50) {
+    registers[15] += 2;
+    deltaCycles += 2;
+  }
+  // DSB SY
+  else if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f40) {
+    registers[15] += 2;
+    deltaCycles += 2;
+  }
+  // EORS
+  else if (opcode >> 6 == 0b0100000001) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t result = registers[Rm] ^ registers[Rdn];
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+  }
+  // ISB SY
+  else if (opcode == 0xf3bf && (opcode2 & 0xfff0) == 0x8f60) {
+    registers[15] += 2;
+    deltaCycles += 2;
+  }
+  // LDMIA
+  else if (opcode >> 11 == 0b11001) {
+    const uint32_t Rn = (opcode >> 8) & 0x7;
+    const uint32_t registers_ = opcode & 0xff;
+    uint32_t address = registers[Rn];
+    for (uint32_t i = 0; i < 8; i++) {
+      if (registers_ & (1u << i)) {
+        registers[i] = readUint32(address);
+        address += 4;
+        deltaCycles++;
+      }
+    }
+    // Write back
+    if (!(registers_ & (1u << Rn))) {
+      registers[Rn] = address;
+    }
+  }
+  // LDR (immediate)
+  else if (opcode >> 11 == 0b01101) {
+    const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 2;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rn] + imm5;
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint32(addr);
+  }
+  // LDR (sp + immediate)
+  else if (opcode >> 11 == 0b10011) {
+    const uint32_t Rt = (opcode >> 8) & 0x7;
+    const uint32_t imm8 = opcode & 0xff;
+    const uint32_t addr = SP() + (imm8 << 2);
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint32(addr);
+  }
+  // LDR (literal)
+  else if (opcode >> 11 == 0b01001) {
+    const uint32_t imm8 = (opcode & 0xff) << 2;
+    const uint32_t Rt = (opcode >> 8) & 7;
+    const uint32_t nextPC = PC() + 2;
+    const uint32_t addr = (nextPC & 0xfffffffc) + imm8;
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint32(addr);
+  }
+  // LDR (register)
+  else if (opcode >> 9 == 0b0101100) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint32(addr);
+  }
+  // LDRB (immediate)
+  else if (opcode >> 11 == 0b01111) {
+    const uint32_t imm5 = (opcode >> 6) & 0x1f;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rn] + imm5;
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint8(addr);
+  }
+  // LDRB (register)
+  else if (opcode >> 9 == 0b0101110) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint8(addr);
+  }
+  // LDRH (immediate)
+  else if (opcode >> 11 == 0b10001) {
+    const uint32_t imm5 = (opcode >> 6) & 0x1f;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rn] + (imm5 << 1);
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint16(addr);
+  }
+  // LDRH (register)
+  else if (opcode >> 9 == 0b0101101) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = readUint16(addr);
+  }
+  // LDRSB
+  else if (opcode >> 9 == 0b0101011) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = static_cast<uint32_t>(signExtend8(readUint8(addr)));
+  }
+  // LDRSH
+  else if (opcode >> 9 == 0b0101111) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t addr = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(addr);
+    registers[Rt] = static_cast<uint32_t>(signExtend16(readUint16(addr)));
+  }
+  // LSLS (immediate)
+  else if (opcode >> 11 == 0b00000) {
+    const uint32_t imm5 = (opcode >> 6) & 0x1f;
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    const uint32_t input = registers[Rm];
+    const uint32_t result = static_cast<uint32_t>(jsShl(static_cast<int32_t>(input), imm5));
+    registers[Rd] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+    C = imm5 ? !!(input & static_cast<uint32_t>(jsShl(1, 32 - imm5))) : C;
+  }
+  // LSLS (register)
+  else if (opcode >> 6 == 0b0100000010) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t input = registers[Rdn];
+    const uint32_t shiftCount = registers[Rm] & 0xff;
+    const uint32_t result =
+        shiftCount >= 32 ? 0 : static_cast<uint32_t>(jsShl(static_cast<int32_t>(input), shiftCount));
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+    // TS bug, kept: for shiftCount > 32, `1 << (32 - shiftCount)` takes the count mod 32,
+    // so C is some bit of input instead of 0
+    C = shiftCount ? !!(input & static_cast<uint32_t>(jsShl(1, 32 - shiftCount))) : C;
+  }
+  // LSRS (immediate)
+  else if (opcode >> 11 == 0b00001) {
+    const uint32_t imm5 = (opcode >> 6) & 0x1f;
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    const uint32_t input = registers[Rm];
+    const uint32_t result = imm5 ? input >> imm5 : 0;
+    registers[Rd] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+    C = !!((input >> (imm5 ? imm5 - 1 : 31)) & 0x1);
+  }
+  // LSRS (register)
+  else if (opcode >> 6 == 0b0100000011) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t shiftAmount = registers[Rm] & 0xff;
+    const uint32_t input = registers[Rdn];
+    const uint32_t result = shiftAmount < 32 ? input >> shiftAmount : 0;
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+    // TS bug, kept: for shiftAmount == 0 this is `input >>> -1` == input >>> 31, so C = input
+    // bit 31 (the architecture leaves C unchanged)
+    C = shiftAmount <= 32 ? !!(jsShr(input, shiftAmount - 1) & 0x1) : false;
+  }
+  // MOV
+  else if (opcode >> 8 == 0b01000110) {
+    const uint32_t Rm = (opcode >> 3) & 0xf;
+    const uint32_t Rd = ((opcode >> 4) & 0x8) | (opcode & 0x7);
+    uint32_t value = Rm == pcRegister ? PC() + 2 : registers[Rm];
+    if (Rd == pcRegister) {
+      deltaCycles++;
+      value &= ~1u;
+    } else if (Rd == spRegister) {
+      value &= ~3u;
+    }
+    registers[Rd] = value;
+  }
+  // MOVS
+  else if (opcode >> 11 == 0b00100) {
+    const uint32_t value = opcode & 0xff;
+    const uint32_t Rd = (opcode >> 8) & 7;
+    registers[Rd] = value;
+    N = !!(value & 0x80000000);
+    Z = value == 0;
+  }
+  // MRS
+  else if (opcode == 0b1111001111101111 && opcode2 >> 12 == 0b1000) {
+    const uint32_t SYSm = opcode2 & 0xff;
+    const uint32_t Rd = (opcode2 >> 8) & 0xf;
+    registers[Rd] = readSpecialRegister(SYSm);
+    registers[15] += 2;
+    deltaCycles += 2;
+  }
+  // MSR
+  else if (opcode >> 4 == 0b111100111000 && opcode2 >> 8 == 0b10001000) {
+    const uint32_t SYSm = opcode2 & 0xff;
+    const uint32_t Rn = opcode & 0xf;
+    writeSpecialRegister(SYSm, registers[Rn]);
+    registers[15] += 2;
+    deltaCycles += 2;
+  }
+  // MULS
+  else if (opcode >> 6 == 0b0100001101) {
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rdm = opcode & 0x7;
+    // Math.imul: the low 32 bits of the product
+    const uint32_t result = registers[Rn] * registers[Rdm];
+    registers[Rdm] = result;
+    N = !!(result & 0x80000000);
+    Z = (result & 0xffffffff) == 0;
+  }
+  // MVNS
+  else if (opcode >> 6 == 0b0100001111) {
+    const uint32_t Rm = (opcode >> 3) & 7;
+    const uint32_t Rd = opcode & 7;
+    const uint32_t result = ~registers[Rm];
+    registers[Rd] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+  }
+  // ORRS (Encoding T2)
+  else if (opcode >> 6 == 0b0100001100) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t result = registers[Rdn] | registers[Rm];
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = (result & 0xffffffff) == 0;
+  }
+  // POP
+  else if (opcode >> 9 == 0b1011110) {
+    const uint32_t P = (opcode >> 8) & 1;
+    uint32_t address = SP();
+    for (uint32_t i = 0; i <= 7; i++) {
+      if (opcode & (1u << i)) {
+        registers[i] = readUint32(address);
+        address += 4;
+        deltaCycles++;
+      }
+    }
+    if (P) {
+      setSP(address + 4);
+      BXWritePC(readUint32(address));
+      deltaCycles += 2;
+    } else {
+      setSP(address);
+    }
+  }
+  // PUSH
+  else if (opcode >> 9 == 0b1011010) {
+    uint32_t bitCount = 0;
+    for (uint32_t i = 0; i <= 8; i++) {
+      if (opcode & (1u << i)) {
+        bitCount++;
+      }
+    }
+    uint32_t address = SP() - 4 * bitCount;
+    for (uint32_t i = 0; i <= 7; i++) {
+      if (opcode & (1u << i)) {
+        writeUint32(address, registers[i]);
+        deltaCycles++;
+        address += 4;
+      }
+    }
+    if (opcode & (1u << 8)) {
+      writeUint32(address, registers[14]);
+    }
+    setSP(SP() - 4 * bitCount);
+  }
+  // REV
+  else if (opcode >> 6 == 0b1011101000) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    const uint32_t input = registers[Rm];
+    registers[Rd] = ((input & 0xff) << 24) | (((input >> 8) & 0xff) << 16) |
+                    (((input >> 16) & 0xff) << 8) | ((input >> 24) & 0xff);
+  }
+  // REV16
+  else if (opcode >> 6 == 0b1011101001) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    const uint32_t input = registers[Rm];
+    registers[Rd] = (((input >> 16) & 0xff) << 24) | (((input >> 24) & 0xff) << 16) |
+                    ((input & 0xff) << 8) | ((input >> 8) & 0xff);
+  }
+  // REVSH
+  else if (opcode >> 6 == 0b1011101011) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    const uint32_t input = registers[Rm];
+    registers[Rd] = static_cast<uint32_t>(signExtend16(((input & 0xff) << 8) | ((input >> 8) & 0xff)));
+  }
+  // ROR
+  else if (opcode >> 6 == 0b0100000111) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    const uint32_t input = registers[Rdn];
+    const uint32_t shift = (registers[Rm] & 0xff) % 32;
+    // shift == 0: `input << 32` is `input << 0`
+    const uint32_t result =
+        jsShr(input, shift) | static_cast<uint32_t>(jsShl(static_cast<int32_t>(input), 32 - shift));
+    registers[Rdn] = result;
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+    // TS bug, kept: C is set from the result even when (Rm & 0xff) == 0 (should be unchanged)
+    C = !!(result & 0x80000000);
+  }
+  // NEGS / RSBS
+  else if (opcode >> 6 == 0b0100001001) {
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = toUint32(substractUpdateFlags(0, registers[Rn]));
+  }
+  // NOP
+  else if (opcode == 0b1011111100000000) {
+    // Do nothing!
+  }
+  // SBCS (Encoding T1)
+  else if (opcode >> 6 == 0b0100000110) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rdn = opcode & 0x7;
+    // JS: registers[Rm] + 1 can be 2**32
+    registers[Rdn] = toUint32(substractUpdateFlags(
+        registers[Rdn], static_cast<double>(registers[Rm]) + (1 - (C ? 1 : 0))));
+  }
+  // SEV
+  else if (opcode == 0b1011111101000000) {
+    rp2040.sendEvent();
+  }
+  // STMIA
+  else if (opcode >> 11 == 0b11000) {
+    const uint32_t Rn = (opcode >> 8) & 0x7;
+    const uint32_t registers_ = opcode & 0xff;
+    uint32_t address = registers[Rn];
+    for (uint32_t i = 0; i < 8; i++) {
+      if (registers_ & (1u << i)) {
+        writeUint32(address, registers[i]);
+        address += 4;
+        deltaCycles++;
+      }
+    }
+    // Write back
+    if (!(registers_ & (1u << Rn))) {
+      registers[Rn] = address;
+    }
+  }
+  // STR (immediate)
+  else if (opcode >> 11 == 0b01100) {
+    const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 2;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t address = registers[Rn] + imm5;
+    deltaCycles += cyclesIO(address, true);
+    writeUint32(address, registers[Rt]);
+  }
+  // STR (sp + immediate)
+  else if (opcode >> 11 == 0b10010) {
+    const uint32_t Rt = (opcode >> 8) & 0x7;
+    const uint32_t imm8 = opcode & 0xff;
+    const uint32_t address = SP() + (imm8 << 2);
+    deltaCycles += cyclesIO(address, true);
+    writeUint32(address, registers[Rt]);
+  }
+  // STR (register)
+  else if (opcode >> 9 == 0b0101000) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t address = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(address, true);
+    writeUint32(address, registers[Rt]);
+  }
+  // STRB (immediate)
+  else if (opcode >> 11 == 0b01110) {
+    const uint32_t imm5 = (opcode >> 6) & 0x1f;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t address = registers[Rn] + imm5;
+    deltaCycles += cyclesIO(address, true);
+    writeUint8(address, registers[Rt]);
+  }
+  // STRB (register)
+  else if (opcode >> 9 == 0b0101010) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t address = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(address, true);
+    writeUint8(address, registers[Rt]);
+  }
+  // STRH (immediate)
+  else if (opcode >> 11 == 0b10000) {
+    const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 1;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t address = registers[Rn] + imm5;
+    deltaCycles += cyclesIO(address, true);
+    writeUint16(address, registers[Rt]);
+  }
+  // STRH (register)
+  else if (opcode >> 9 == 0b0101001) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rt = opcode & 0x7;
+    const uint32_t address = registers[Rm] + registers[Rn];
+    deltaCycles += cyclesIO(address, true);
+    writeUint16(address, registers[Rt]);
+  }
+  // SUB (SP minus immediate)
+  else if (opcode >> 7 == 0b101100001) {
+    const uint32_t imm32 = (opcode & 0x7f) << 2;
+    setSP(SP() - imm32);
+  }
+  // SUBS (Encoding T1)
+  else if (opcode >> 9 == 0b0001111) {
+    const uint32_t imm3 = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = toUint32(substractUpdateFlags(registers[Rn], imm3));
+  }
+  // SUBS (Encoding T2)
+  else if (opcode >> 11 == 0b00111) {
+    const uint32_t imm8 = opcode & 0xff;
+    const uint32_t Rdn = (opcode >> 8) & 0x7;
+    registers[Rdn] = toUint32(substractUpdateFlags(registers[Rdn], imm8));
+  }
+  // SUBS (register)
+  else if (opcode >> 9 == 0b0001101) {
+    const uint32_t Rm = (opcode >> 6) & 0x7;
+    const uint32_t Rn = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = toUint32(substractUpdateFlags(registers[Rn], registers[Rm]));
+  }
+  // SVC
+  else if (opcode >> 8 == 0b11011111) {
+    pendingSVCall = true;
+    interruptsUpdated = true;
+  }
+  // SXTB
+  else if (opcode >> 6 == 0b1011001001) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = static_cast<uint32_t>(signExtend8(registers[Rm]));
+  }
+  // SXTH
+  else if (opcode >> 6 == 0b1011001000) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = static_cast<uint32_t>(signExtend16(registers[Rm]));
+  }
+  // TST
+  else if (opcode >> 6 == 0b0100001000) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rn = opcode & 0x7;
+    const uint32_t result = registers[Rn] & registers[Rm];
+    N = !!(result & 0x80000000);
+    Z = result == 0;
+  }
+  // UDF
+  else if (opcode >> 8 == 0b11011110) {
+    const uint32_t imm8 = opcode & 0xff;
+    breakRewind = 2;
+    rp2040.onBreak(imm8);
+  }
+  // UDF (Encoding T2)
+  else if (opcode >> 4 == 0b111101111111 && opcode2 >> 12 == 0b1010) {
+    const uint32_t imm4 = opcode & 0xf;
+    const uint32_t imm12 = opcode2 & 0xfff;
+    breakRewind = 4;
+    rp2040.onBreak((imm4 << 12) | imm12);
+    registers[15] += 2;
+  }
+  // UXTB
+  else if (opcode >> 6 == 0b1011001011) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = registers[Rm] & 0xff;
+  }
+  // UXTH
+  else if (opcode >> 6 == 0b1011001010) {
+    const uint32_t Rm = (opcode >> 3) & 0x7;
+    const uint32_t Rd = opcode & 0x7;
+    registers[Rd] = registers[Rm] & 0xffff;
+  }
+  // WFE
+  else if (opcode == 0b1011111100100000) {
+    deltaCycles++;
+    if (eventRegistered) {
+      eventRegistered = false;
+    } else {
+      waiting = true;
+      waitingForEvent = true;
+    }
+  }
+  // WFI
+  else if (opcode == 0b1011111100110000) {
+    deltaCycles++;
+    waiting = true;
+  }
+  // YIELD
+  else if (opcode == 0b1011111100010000) {
+    // do nothing for now. Wait for event!
+    logger().info(LOG_NAME, "Yield");
+  } else {
+    // JS: opcodePC is an int32, so `.toString(16)` shows a '-' for PC >= 2**31
+    logger().warn(LOG_NAME, "Warning: Instruction at " +
+                                toHex(static_cast<double>(static_cast<int32_t>(opcodePC))) +
+                                " is not implemented yet!");
+    logger().warn(LOG_NAME, "Opcode: 0x" + toHex(opcode) + " (0x" + toHex(opcode2) + ")");
+  }
+
+  cycles += deltaCycles;
+  return deltaCycles;
 }
 
 }  // namespace rp2040js

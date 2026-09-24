@@ -1,83 +1,58 @@
 // Port of rp2040js src/usb/setup.ts
-//
-// STUB: every body below still has to be ported from the TS shown in its
-// comment (see README.md, "Porting rules"). Bus-facing methods abort so that
-// firmware cannot run on a half-ported peripheral without noticing.
 #include "setup.h"
-
-#include "../utils/js.h"
 
 namespace rp2040js {
 
 std::vector<uint8_t> createSetupPacket(const ISetupPacketParams &params) {
-  // TODO(port): usb/setup.ts
-  //   export function createSetupPacket(params: ISetupPacketParams) {
-  //     const setupPacket = new Uint8Array(8);
-  //     setupPacket[0] = (params.dataDirection << 7) | (params.type << 5) | params.recipient;
-  //     setupPacket[1] = params.bRequest;
-  //     setupPacket[2] = params.wValue & 0xff;
-  //     setupPacket[3] = (params.wValue >> 8) & 0xff;
-  //     setupPacket[4] = params.wIndex & 0xff;
-  //     setupPacket[5] = (params.wIndex >> 8) & 0xff;
-  //     setupPacket[6] = params.wLength & 0xff;
-  //     setupPacket[7] = (params.wLength >> 8) & 0xff;
-  //     return setupPacket;
-  //   }
-  (void)params;
-  return {};
+  std::vector<uint8_t> setupPacket(8);
+  // Uint8Array stores: ToUint8 of each value
+  setupPacket[0] = static_cast<uint8_t>((static_cast<uint32_t>(params.dataDirection) << 7) |
+                                        (static_cast<uint32_t>(params.type) << 5) |
+                                        static_cast<uint32_t>(params.recipient));
+  setupPacket[1] = static_cast<uint8_t>(params.bRequest);
+  setupPacket[2] = static_cast<uint8_t>(params.wValue & 0xff);
+  setupPacket[3] = static_cast<uint8_t>((params.wValue >> 8) & 0xff);
+  setupPacket[4] = static_cast<uint8_t>(params.wIndex & 0xff);
+  setupPacket[5] = static_cast<uint8_t>((params.wIndex >> 8) & 0xff);
+  setupPacket[6] = static_cast<uint8_t>(params.wLength & 0xff);
+  setupPacket[7] = static_cast<uint8_t>((params.wLength >> 8) & 0xff);
+  return setupPacket;
 }
 
 std::vector<uint8_t> setDeviceAddressPacket(uint32_t address) {
-  // TODO(port): usb/setup.ts
-  //   export function setDeviceAddressPacket(address: number) {
-  //     return createSetupPacket({
-  //       dataDirection: DataDirection.HostToDevice,
-  //       type: SetupType.Standard,
-  //       recipient: SetupRecipient.Device,
-  //       bRequest: SetupRequest.SetAddress,
-  //       wValue: address,
-  //       wIndex: 0,
-  //       wLength: 0,
-  //     });
-  //   }
-  (void)address;
-  return {};
+  return createSetupPacket({
+      DataDirection::HostToDevice,
+      SetupType::Standard,
+      SetupRecipient::Device,
+      static_cast<uint32_t>(SetupRequest::SetAddress),
+      address,  // wValue
+      0,        // wIndex
+      0,        // wLength
+  });
 }
 
 std::vector<uint8_t> getDescriptorPacket(DescriptorType type, uint32_t length, uint32_t index) {
-  // TODO(port): usb/setup.ts
-  //   export function getDescriptorPacket(type: DescriptorType, length: number, index = 0) {
-  //     return createSetupPacket({
-  //       dataDirection: DataDirection.DeviceToHost,
-  //       type: SetupType.Standard,
-  //       recipient: SetupRecipient.Device,
-  //       bRequest: SetupRequest.GetDescriptor,
-  //       wValue: type << 8,
-  //       wIndex: index,
-  //       wLength: length,
-  //     });
-  //   }
-  (void)type;
-  (void)length;
-  (void)index;
-  return {};
+  return createSetupPacket({
+      DataDirection::DeviceToHost,
+      SetupType::Standard,
+      SetupRecipient::Device,
+      static_cast<uint32_t>(SetupRequest::GetDescriptor),
+      static_cast<uint32_t>(type) << 8,  // wValue
+      index,                             // wIndex
+      length,                            // wLength
+  });
 }
 
 std::vector<uint8_t> setDeviceConfigurationPacket(uint32_t configurationNumber) {
-  // TODO(port): usb/setup.ts
-  //   export function setDeviceConfigurationPacket(configurationNumber: number) {
-  //     return createSetupPacket({
-  //       dataDirection: DataDirection.HostToDevice,
-  //       type: SetupType.Standard,
-  //       recipient: SetupRecipient.Device,
-  //       bRequest: SetupRequest.SetDeviceConfiguration,
-  //       wValue: configurationNumber,
-  //       wIndex: 0,
-  //       wLength: 0,
-  //     });
-  //   }
-  (void)configurationNumber;
-  return {};
+  return createSetupPacket({
+      DataDirection::HostToDevice,
+      SetupType::Standard,
+      SetupRecipient::Device,
+      static_cast<uint32_t>(SetupRequest::SetDeviceConfiguration),
+      configurationNumber,  // wValue
+      0,                    // wIndex
+      0,                    // wLength
+  });
 }
 
 }  // namespace rp2040js
