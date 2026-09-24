@@ -68,6 +68,42 @@ same UART output on the EMU-001/002 self-tests and the GPU, IO and system card
 images (`test/trace/tracediff.sh`, EMU-004). The self-tests run 20-40x faster
 than in rp2040js.
 
+## Speed without changing behaviour
+
+The port stays line for line with TS, with a few places where it takes a
+shortcut that is exact (same results, same calls, same order; EMU-004/005/006
+prove it):
+
+- **PIO fast path** (`RPPIO::sync`, pio.cpp's comments have the argument).
+  While every enabled machine of a block is either stalled on a WAIT that
+  only a syncing event can end, or a *runner* (divider 1, autopull, every
+  reachable instruction an OUT to PINS/X/Y/NULL/PINDIRS/PC/ISR with one bit
+  count and no delay: PicoDVI's `out pc, 1` serialiser), and the runners'
+  pins are disjoint, listener-free and muxed to the block, `step()` only
+  counts cycles. Its autopull cycle runs every machine's real `clockTick()`
+  (the pull's FIFO, DREQ and interrupt effects happen as they would), and a
+  TX FIFO write to a runner does not leave the fast path. What is owed —
+  the runners' registers and pins, stalled machines' divider phases, and
+  `checkForUpdates` for every pin that changed (with no listeners that only
+  sets `lastValue`) — is replayed by `sync()`, which every way in calls
+  first: the block's bus registers, `GPIOPin`'s PIO output functions,
+  `setInputValue`, `addListener`, IO_BANK0 ctrl and PADS writes. **C++ code
+  that reads PIO machine or pin fields directly must call
+  `RP2040::syncPIO()` first** (test_pio_diff does). A pull whose
+  `FIFO::onPull` is set only stays on the fast path if the hook sets
+  `onPullRecordsOnly` (it must not read or change the chip; TmdsCapture's
+  does). `RPPIO::fastPath = false` turns it off; `lazyCycles`/`lazyEvents`
+  count it (`RP2040RUN_STATS=1 rp2040run ...` prints them). `stepPIOs()` is
+  Emu.cycles' PIO loop with the lazy stretches done in bulk.
+- The Cortex-M0 decode enters its if/else chain at the first branch whose
+  opcode test can hold (a table built from the chain's own conditions).
+- `toUint32`/`jsMathRound` go through int64 where that is exact
+  (`test/js/test_js_numbers.cpp`); Timer32 keeps `baseFreq / prescaler`.
+- `RPSIO::selectCore` defers the divider/interpolator bank swap to the next
+  SIO access (code reading those fields directly calls `flushSelect()`).
+- Inline common cases: `CortexM0Core::setInterrupt`, alarm unlinking, FIFO
+  wrap-around, `checkInterrupts`' single `intRaw()`.
+
 ## Status
 
 | TS module | C++ | state |
