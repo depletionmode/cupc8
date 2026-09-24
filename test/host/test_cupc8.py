@@ -13,6 +13,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -68,6 +69,18 @@ def main():
     expect(out.startswith("CUPC8 sysctl"), "ping: %r" % out)
     _, out = sim.run("status")
     expect("chipset running" in out and "CPU card present" in out and "Type-C 1.5 A" in out, "status: %r" % out)
+
+    # a run killed after its request, before its reply: the reply is still on
+    # its way, and the next run must not take it for its own (it resyncs on a
+    # PING nonce first)
+    slow = Sim("--flashed", "--reply-delay", "400")
+    fd = os.open(slow.port, os.O_RDWR | os.O_NOCTTY)
+    body = bytes([0x01, 0, 0])                          # STATUS: its reply comes 400 ms later
+    os.write(fd, bytes([cupc8.MAGIC]) + body + bytes([cupc8.crc8(body)]))
+    os.close(fd)                                        # killed before the reply
+    _, out = slow.run("rom", "id")
+    expect("manufacturer $bf, device $d7" in out, "rom id after a killed run's late reply: %r" % out)
+    slow.stop()
     _, out = sim.run("power")
     expect(out.startswith("Type-C 1.5 A (CC 900 mV)"), "power: %r" % out)
 

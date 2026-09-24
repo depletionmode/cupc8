@@ -5,7 +5,7 @@ import os
 
 const fwDir = currentSourcePath().parentDir & "/../fw"
 
-{.passC: "-I" & fwDir & "/common -I" & fwDir & "/gpu/core -I" & fwDir & "/io/core -I" & fwDir & "/wifi/core -I" & fwDir & "/wifi/host -I" & fwDir & "/sim".}
+{.passC: "-I" & fwDir & "/common -I" & fwDir & "/gpu/core -I" & fwDir & "/io/core -I" & fwDir & "/wifi/core -I" & fwDir & "/wifi/host -I" & fwDir & "/storage/core -I" & fwDir & "/storage/host -I" & fwDir & "/third_party/fatfs -I" & fwDir & "/sim".}
 {.passC: "-D_GNU_SOURCE".}
 {.compile: fwDir & "/common/cardproto.c".}
 {.compile: fwDir & "/common/font8x8_cp437.c".}
@@ -13,12 +13,17 @@ const fwDir = currentSourcePath().parentDir & "/../fw"
 {.compile: fwDir & "/io/core/iocard.c".}
 {.compile: fwDir & "/wifi/core/wifi.c".}
 {.compile: fwDir & "/wifi/host/netposix.c".}
+{.compile: fwDir & "/storage/core/storage.c".}
+{.compile: fwDir & "/storage/core/diskio.c".}
+{.compile: fwDir & "/storage/host/imgdisk.c".}
+{.compile: fwDir & "/third_party/fatfs/ff.c".}
 {.compile: fwDir & "/sim/simcards.c".}
 
 const
   CardGpu* = 1
   CardIo* = 2
   CardWifi* = 3
+  CardStorage* = 4
   GpuOutW* = 640
   GpuOutH* = 480
 
@@ -38,5 +43,9 @@ proc simcard_gpu_pixel*(c: SimCard, x, y: cint): cint {.importc, cdecl.}
 proc simcard_gpu_mode*(c: SimCard): cint {.importc, cdecl.}
 proc simcard_type_ascii*(c: SimCard, ch: uint8, nowMs: uint32) {.importc, cdecl.}
 proc simcard_hid*(c: SimCard, report: ptr uint8, nowMs: uint32) {.importc, cdecl.}
+
+proc simcard_storage_image*(c: SimCard, path: cstring, wp: cint): cint {.importc, cdecl.}
+proc simcard_storage_latency*(c: SimCard, ms: uint32) {.importc, cdecl.}
+proc simcard_storage_status*(c: SimCard): cint {.importc, cdecl.}
 
 proc isNil*(c: SimCard): bool = pointer(c).isNil

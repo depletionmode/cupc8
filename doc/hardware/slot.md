@@ -4,11 +4,13 @@ The main board has **six I/O slots**. They are PCIe x1-style vertical
 card-edge sockets: 36 contacts, 1.0 mm pitch, with the key between pins 11
 and 12. The pinout is custom. Never plug a real PCIe card in.
 
+- **Cards are plugged or removed only with the power off.** They are not
+  hot-pluggable, and nothing is built to survive a card pulled while running.
 - **Slots are electrically identical.** Slot *n* (1–6) is SPI device *n−1*
   (see `memory-map.md`).
-- **M1 uses three slots:** graphics, IO and Wi-Fi. Slots 4–6 are free for
+- **M1 uses four slots:** graphics, IO, Wi-Fi and storage. Slots 5–6 are free for
   future cards.
-- **Card:** a 1.6 mm PCB with gold fingers (hard gold, 45° bevel), 18 per
+- **Card:** a 1.6 mm PCB with gold fingers (hard gold, 30° bevel: `milestone-1.md`), 18 per
   side.
 
 ## Pinout
@@ -99,7 +101,11 @@ chipset) is always the master.
 - **Response deadline:** a card must have its response ready within **5 ms**
   of the command frame's CS_n rising, unless the command says otherwise.
   Network operations complete asynchronously and signal through events
-  instead.
+  instead. The storage card's commands are **exempt** (`storage-card.md`):
+  an SD card can be busy for 250 ms on a write, so READ returns RESP_LEN
+  `$00` until the answer is ready, and the host retries for seconds, not
+  milliseconds. The common opcodes ($F0–$F2) keep the 5 ms deadline on every
+  card.
 - **Timing the host must meet:**
   - ≥ 2 µs from CS_n falling to the first SCK edge
   - ≥ 1 µs between bytes
@@ -129,7 +135,8 @@ table):
 | $01 | Graphics / HDMI (`gpu-protocol.md`) |
 | $02 | IO / USB keyboard (`io-card.md`) |
 | $03 | Wi-Fi networking (`wifi-card.md`) |
-| $04–$FE | reserved |
+| $04 | Storage (`storage-card.md`; M1: microSD) |
+| $05–$FE | reserved |
 
 Opcodes $00–$EF are card-specific. In every card spec, **→** marks response
 bytes, which are collected with a READ frame.
@@ -201,3 +208,18 @@ ESP ROM bootloader sync.
   of them). `hw/boards/main.py` places the holes (`RAIL_X`, `RAIL_POSTS`).
 - **Fit check:** the exact drawing is in `hw/lib/cards/card-outline.kicad_pcb`
   and is checked by the FreeCAD fit script.
+  - The script is `hw/mech/fit.py` (MECH-001…008 in `test/catalogue.toml`,
+    verification.md 4.7). It checks the outline against `IO_CARD_*` as
+    built, since `hw/lib/cards/card-outline.kicad_pcb` does not exist yet.
+    Until the main board is drawn, it places the slots from a stand-in:
+    six C404113 sockets at 20.32 mm.
+  - *Measured 2026-09-24, from the datasheets.* The x1 socket (UMAX
+    3183-10200P1T) is 11.25 mm tall, with a 1.78 mm slot 7.60 mm deep. So a
+    seated card's edge sits 3.65 mm above the main board, and the card's
+    shoulder sits 0.80 mm above the housing (the finger tab is 8.40 mm).
+  - With the Wi-Fi card in every slot: 16.28 mm between one card's tallest
+    part (the ESP32-C3 module, 2.44 mm) and the next card's back. The 20.32
+    mm pitch leaves 18.72 mm clear of the 1.6 mm board. The PCIe CEM
+    envelope is 14.47 mm on the component side and 2.67 mm on the solder side.
+  - The M3 hole axis (the rail) is 47.10 mm above the main board's top, and
+    the power LEDs are 48.10 mm above it.

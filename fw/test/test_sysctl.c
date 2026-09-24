@@ -108,6 +108,9 @@ static void sys001_protocol(void)
 
 	CHECK_EQ(req(0x00, 0, 0), ST_OK);
 	CHECK(resp_n == 16 && memcmp(resp, "CUPC8 sysctl 2.0", 16) == 0, "PING: %.*s", resp_n, resp);
+	/* a nonce comes back after the id (cupc8.py resyncs on it) */
+	CHECK_EQ(REQ(0x00, 0xA5, 0x5A, 0x01, 0x02), ST_OK);
+	CHECK(resp_n == 20 && memcmp(resp + 16, "\xA5\x5A\x01\x02", 4) == 0, "PING nonce: %d bytes", resp_n);
 
 	/* noise before a frame is skipped; a frame split into single bytes works */
 	int n = frame(f, 0x00, 0, 0);
@@ -136,7 +139,7 @@ static void sys001_protocol(void)
 	CHECK_EQ(take_reply(0, 0), ST_OK);
 
 	/* argument checks, command by command */
-	CHECK_EQ(REQ(0x00, 1), ST_ARG);                                  /* PING takes nothing */
+	CHECK_EQ(REQ(0x00, 1, 2, 3, 4, 5, 6, 7, 8, 9), ST_ARG);          /* PING takes a nonce of 8 bytes at most */
 	CHECK_EQ(REQ(0x10, 0, 0, 0), ST_ARG);                            /* RAM_READ short */
 	CHECK_EQ(REQ(0x10, 0, 0, 0, 0), ST_ARG);                         /* length 0 */
 	CHECK_EQ(REQ(0x10, 0, 0, 0x01, 0x10), ST_ARG);                   /* 4097 bytes */

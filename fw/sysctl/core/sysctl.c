@@ -78,11 +78,14 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 	switch (cmd) {
 	/* ---- no hardware needed */
 	case C_PING: {
+		/* up to 8 bytes of payload come back after the id: the host's nonce,
+		 * so it can tell its own reply from one a killed run left behind */
 		static const char id[] = "CUPC8 sysctl " SYSCTL_VERSION;
-		if (n != 0)
+		if (n > 8)
 			return ST_ARG;
 		memcpy(out, id, sizeof id - 1);
-		*rn = sizeof id - 1;
+		memcpy(out + sizeof id - 1, p, (size_t)n);
+		*rn = (int)(sizeof id - 1 + n);
 		return ST_OK;
 	}
 	case C_STATUS: {

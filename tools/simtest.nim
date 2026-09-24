@@ -1192,6 +1192,24 @@ proc testBasicJunkRam() =
 
 run testBasicJunkRam
 
+proc testBasicJunkRamVariables() =
+  ## KRN-003: RUN starts every BASIC variable at 0. ubasic_init cleared the
+  ## GOSUB and FOR stacks but not ub_variables, so on power-up junk RAM an
+  ## unset variable printed junk: `print hi` gave 223236 on the whole-machine
+  ## emulator (sim.nim zeroes RAM, so no other test saw it).
+  echo "== BASIC variables on power-up junk RAM =="
+  let rom = buildKernelRom()
+  ramJunk = true
+  let got = basicRun(rom, @["10 print a", "20 print z"])
+  ramJunk = false
+  if got == @["0", "0"]:
+    ok("BASIC variables start at 0 on junk RAM")
+  else:
+    fail("BASIC variables on junk RAM: got " & $got & ", want @[\"0\", \"0\"]")
+  ioModel = imLegacy
+
+run testBasicJunkRamVariables
+
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another
   ## card's IRQ: the kernel sleeps in WAI for keys, and every key must wake it.
@@ -1343,6 +1361,186 @@ proc testKernelNetWeakPower() =
   ioModel = imLegacy
 
 run testKernelNetWeakPower
+
+# ---------------------------------------------------------------------------
+# the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
+# ---------------------------------------------------------------------------
+
+let storeDir = rootDir / "build" / "storage"
+
+proc fatcheck(args: string): tuple[output: string, exitCode: int] =
+  execCmdEx("python3 " & quoteShell(toolsDir / "fatcheck.py") & " " & args)
+
+proc storageCard(): SimCard =
+  for c in slots:
+    if not c.isNil and simcard_type(c) == CardStorage:
+      return c
+  SimCard(nil)
+
+proc bootStorage(rom, img: string; wp = false; latencyMs = 0; fitted = true) =
+  ## Power up with the storage card in slot 4 holding the image (none: "").
+  if fitted:
+    machineCards([CardGpu, CardIo, 0, CardStorage])
+    let s = storageCard()
+    if img.len > 0 and simcard_storage_image(s, img, cint(wp)) != 0:
+      fail("cannot insert " & img)
+    simcard_storage_latency(s, uint32(latencyMs))
+  else:
+    machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+
+proc cmdOutput(cmd: string; stopAt = ">>"): seq[string] =
+  ## Type a command; the non-blank screen lines after it, up to the next
+  ## prompt (or the line starting with stopAt).
+  typeLine(cmd)
+  let g = gpuCard()
+  var rows: seq[string]
+  for row in 0..29:
+    rows.add(gpuLine(g, row))
+  var start = -1
+  for i in countdown(rows.high, 0):
+    if rows[i].endsWith(">> " & cmd):
+      start = i
+      break
+  if start < 0:
+    return @["<no " & cmd & " on screen>"]
+  for i in start + 1 .. rows.high:
+    if rows[i].startsWith(stopAt):
+      break
+    if rows[i].len > 0:
+      result.add(rows[i])
+
+proc runOutput(): seq[string] =
+  result = cmdOutput("run", "DONE.")
+
+proc testStorage() =
+  ## KRN-006: BASIC SAVE, LOAD, DIR and DEL through the storage card model
+  ## (fw/storage/core on a FAT image): a program saved, the machine powered
+  ## off and on, loaded and run; the saved file as a PC reads it; a PC's file
+  ## loaded; the error messages for no card, no storage card, a full card, a
+  ## write-protected one, a missing file and a bad name; and a card that
+  ## keeps READ "not ready" for 30 ms on every command.
+  echo "== storage card: SAVE, LOAD, DIR, DEL =="
+  let rom = buildKernelRom()
+  createDir(storeDir)
+  let img = storeDir / "card.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  # files a PC wrote: CR LF, a blank line, a line without a number, no last line end
+  writeFile(storeDir / "pc.txt", "10 print \"from a pc\"\r\n\r\nno number here\r\n20 print 5 * 5\r\n30 print \"no line end\"")
+  writeFile(storeDir / "big.dat", "x".repeat(70000))
+  discard fatcheck("put " & quoteShell(img) & " PC.BAS " & quoteShell(storeDir / "pc.txt"))
+  discard fatcheck("put " & quoteShell(img) & " BIG.DAT " & quoteShell(storeDir / "big.dat"))
+  var long = ""
+  for i in 1..9:
+    long.add($(i * 10) & " print \"" & "a".repeat(20) & "\"\r\n")    # 7 of these fit
+  writeFile(storeDir / "long.txt", long)
+  discard fatcheck("put " & quoteShell(img) & " LONG.BAS " & quoteShell(storeDir / "long.txt"))
+
+  let prog = @["10 print \"storage card test\"", "20 for i = 1 to 3", "30 print i * 11", "40 next i",
+               "50 let a = 6", "60 print a * 7",
+               "70 rem a long line so that the program is longer than one chunk", "80 print \"end\""]
+  let want = @["storage card test", "11", "22", "33", "42", "end"]
+  var text = ""
+  for line in prog:
+    text.add(line & "\r\n")
+
+  bootStorage(rom, img)
+  for line in prog:
+    typeLine(line)
+  expectTrue("SAVE", cmdOutput("save \"prog.bas\"") == @["SAVED"])
+  let expectDir = storeDir / "expect"
+  removeDir(expectDir)
+  createDir(expectDir)
+  writeFile(expectDir / "PROG.BAS", text)
+  r = fatcheck("check " & quoteShell(img) & " " & quoteShell(expectDir))
+  if r.exitCode != 0: echo r.output
+  expectTrue("the saved program as a PC reads it (text, CR LF)", r.exitCode == 0)
+
+  # off and on again: LOAD, RUN
+  bootStorage(rom, img)
+  expectTrue("LOAD after a power cycle", cmdOutput("load \"prog.bas\"") == @["LOADED"])
+  let ran = runOutput()
+  if ran != want: echo "got ", ran
+  expectTrue("the loaded program runs", ran == want)
+
+  # DIR: names and sizes (a 32-bit size too)
+  let dir = cmdOutput("dir")
+  if dir.len != 4: echo "dir ", dir
+  expectTrue("DIR lists the saved program", ("PROG.BAS     " & $text.len) in dir)
+  expectTrue("DIR lists a PC's file", ("PC.BAS       " & $getFileSize(storeDir / "pc.txt")) in dir)
+  expectTrue("DIR prints a size over 65535", "BIG.DAT      70000" in dir)
+
+  # a file a PC wrote
+  expectTrue("LOAD a PC's file", cmdOutput("load \"pc.bas\"") == @["LOADED"])
+  let pcRan = runOutput()
+  if pcRan != @["from a pc", "25", "no line end"]: echo "got ", pcRan
+  expectTrue("a PC's file runs (CR LF, blank and unnumbered lines, no last line end)",
+             pcRan == @["from a pc", "25", "no line end"])
+
+  # a file longer than the program buffer: the load stops at the first line that does not fit
+  expectTrue("LOAD more than fits", cmdOutput("load \"long.bas\"") == @["PROGRAM FULL", "LOADED"])
+  expectTrue("what fitted runs", runOutput() == newSeqWith(7, "a".repeat(20)))
+
+  # DEL
+  expectTrue("DEL", cmdOutput("del \"prog.bas\"").len == 0)
+  expectTrue("DIR after DEL", cmdOutput("dir").len == 3)
+  expectTrue("LOAD a deleted file", cmdOutput("load \"prog.bas\"") == @["file not found"])
+  expectTrue("DEL a missing file", cmdOutput("del \"nothing\"") == @["file not found"])
+  r = fatcheck("check " & quoteShell(img) & " --absent PROG.BAS --size PC.BAS=" & $getFileSize(storeDir / "pc.txt"))
+  if r.exitCode != 0: echo r.output
+  expectTrue("deleted as a PC sees it", r.exitCode == 0)
+
+  # names
+  expectTrue("SAVE without a name", cmdOutput("save") == @["SAVE, LOAD or DEL \"NAME\""])
+  expectTrue("SAVE with a bad name", cmdOutput("save \"toolongname.bas\"") == @["bad file name"])
+  expectTrue("an unquoted name", cmdOutput("save plain.bas") == @["SAVED"])
+
+  # a card busy for 30 ms on every command: READ retries until it answers
+  bootStorage(rom, img, latencyMs = 30)
+  for line in prog:
+    typeLine(line)
+  expectTrue("SAVE to a slow card", cmdOutput("save \"slow.bas\"") == @["SAVED"])
+  typeLine("new")
+  expectTrue("LOAD from a slow card", cmdOutput("load \"slow.bas\"") == @["LOADED"])
+  expectTrue("the program from the slow card runs", runOutput() == want)
+
+  # write-protected: nothing written, reading is fine
+  bootStorage(rom, img, wp = true)
+  for line in prog:
+    typeLine(line)
+  expectTrue("SAVE to a write-protected card", cmdOutput("save \"wp.bas\"") == @["write protected"])
+  expectTrue("DEL on a write-protected card", cmdOutput("del \"pc.bas\"") == @["write protected"])
+  expectTrue("LOAD from a write-protected card", cmdOutput("load \"slow.bas\"") == @["LOADED"])
+
+  # no card in the socket, and no storage card at all
+  bootStorage(rom, "")
+  for line in prog:
+    typeLine(line)
+  expectTrue("SAVE with no SD card", cmdOutput("save \"x.bas\"") == @["no SD card"])
+  expectTrue("LOAD with no SD card", cmdOutput("load \"x.bas\"") == @["no SD card"])
+  expectTrue("DIR with no SD card", cmdOutput("dir") == @["no SD card"])
+  bootStorage(rom, "", fitted = false)
+  expectTrue("SAVE with no storage card", cmdOutput("save \"x.bas\"") == @["no storage card"])
+  expectTrue("DIR with no storage card", cmdOutput("dir") == @["no storage card"])
+
+  # a full card
+  let full = storeDir / "full.img"
+  discard fatcheck("blank " & quoteShell(full) & " 128")
+  r = fatcheck("fill " & quoteShell(full))
+  if r.exitCode != 0: echo r.output
+  bootStorage(rom, full)
+  for line in prog:
+    typeLine(line)
+  expectTrue("SAVE to a full card", cmdOutput("save \"prog.bas\"") == @["card full"])
+  ioModel = imLegacy
+
+run testStorage
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

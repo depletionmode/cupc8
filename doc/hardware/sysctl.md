@@ -62,7 +62,7 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 
 | Cmd | Request payload | Reply payload |
 |---|---|---|
-| $00 PING | – | `CUPC8 sysctl <version>` |
+| $00 PING | nonce (0–8 bytes, optional) | `CUPC8 sysctl <version>`, then the nonce. Replies carry no request id, so `cupc8.py` opens every session with a PING nonce and drops replies until its echo: a run killed after its request leaves a reply that would otherwise pass for the next run's. |
 | $01 STATUS | – | bridge status (0 if the chipset is down), GPO, CDONE (bit0 chipset, bit1 CPU card), held FPGAs, USB-C class, CC mV (16), 1V2 mV (16), cards held in reset, CPU card present |
 | $10 RAM_READ | addr16, len16 | data |
 | $11 RAM_WRITE | addr16, data | – |

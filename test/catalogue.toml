@@ -538,6 +538,15 @@ vrow = "2.3"
 cmd = "tools/run_tests.sh"
 
 [[test]]
+id = "KRN-006"
+title = "Files on the storage card: SAVE, LOAD, DIR, DEL"
+checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file too long for the program buffer stops at PROGRAM FULL and what fitted runs; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); no SD card, no storage card, a full card"
+method = "tools/simtest.nim testStorage: the real kernel on sim.nim with the storage card model (the real fw/storage/core over an image file, fw/sim/simcards.c); images made and checked with tools/fatcheck.py"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testStorage"
+
+[[test]]
 id = "KRN-005"
 title = "Slot IRQ handler"
 checks = "a card holding IRQ_n low cannot hide another card's IRQ: the kernel, asleep in WAI for keys, wakes for every key while slot 3 holds its line (IRQ-002 checks the same rule on the chipset RTL)"
@@ -639,6 +648,15 @@ vrow = "2.4"
 cmd = "test/emu/backend_diff.sh"
 
 [[test]]
+id = "EMU-007"
+title = "Native whole-machine emulator: identical to machine.mjs, threaded = serial"
+checks = "boot to BASIC and a typed program (1.6 s emulated) on test/emu/machine.mjs, the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42"
+method = "test/emu/machine_diff.sh (test/emu/test_machine_native.mjs, emu/machine, tools/emu_machine_build.sh)"
+kind = "sim"
+vrow = "3.2"
+cmd = "test/emu/machine_diff.sh"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
@@ -698,6 +716,35 @@ vrow = "2.5"
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 
 # ============================================================================
+# STO: storage card firmware (doc/hardware/storage-card.md)
+# ============================================================================
+[[test]]
+id = "STO-001"
+title = "Command interpreter, handles, removal"
+checks = "every command and its malformed frames (counted, never answered); IDENT type $04; READ not ready and BUSY until the worker has run a command, a newer command's (or an IDENT's) answer never replaced by an older one, queue overflow counted; files of 0-5000 bytes around the 128-byte chunks and 512-byte sectors written and read back in several chunk sizes, end of file (n' < n, then 0), seek, append, truncate; 4 handles at once, bad and closed handles, the wrong direction, a file open for write refused on another handle, reopening a handle flushes it, SOFT_RESET flushes every file; 8.3 names (too long, paths, reserved characters, dots refused; lower case finds the upper-case file), DIR_FIRST/NEXT names and sizes and the $FF end, DEL, RENAME; a full medium (F_WRITE says full, what fitted is kept, free 0) and a full root directory; write-protect (status and ST_INFO bit, every write refused, reads fine); card detect: unmounted at once, open handles fail with $01, pulled in the middle of a write, remounted on insertion with the closed files intact; ST_EJECT flushes and unmounts, ST_MOUNT; a blank medium, a dead one, none; BLK_READ/BLK_WRITE/BUF_GET/BUF_PUT, past the end; every closed file is on the medium as an independent reader sees it"
+method = "fw/test/test_storage.c: the core (fw/storage/core) on FatFs over in-memory images (fw/storage/host/imgdisk.c), through the slot protocol engine"
+kind = "sim"
+vrow = "2.9"
+cmd = "make -s -C fw test_storage"
+
+[[test]]
+id = "STO-002"
+title = "FAT images against a PC's reader"
+checks = "an image the core wrote (created, deleted, renamed, appended across an eject and mount, 0 B to 70 KB) holds exactly the expected files for pyfatfs, and fsck.fat finds nothing to fix; files a PC wrote (mkfs.fat, pyfatfs) read correctly through the core, and the core's own writes and deletes on that PC volume are right for pyfatfs and fsck.fat"
+method = "make -C fw test_storage: tools/fatcheck.py mkimg / check (pyfatfs 1.1.0 in a venv under ~/.local/share/cupc8-sdk, fsck.fat -n)"
+kind = "sim"
+vrow = "2.9"
+cmd = "make -s -C fw test_storage"
+
+[[test]]
+id = "STO-003"
+title = "Real binary on the emulated RP2040 with an SD card model"
+checks = "the real storage.elf on the native emulator with an SD SPI-mode model on SPI1 (CMD0/8/55/ACMD41/58, single-block read and write, busy time, card detect): mounts an image, writes and reads files that tools/fatcheck.py confirms, and the reverse; the slot answers (status byte, IDENT) while core 1 writes; ACT lit ~30 ms after SD activity, CARD while mounted"
+method = "the native emulator (emu/), the SD card model (another agent's work)"
+kind = "sim"
+vrow = "2.9"
+
+# ============================================================================
 # WIFI: Wi-Fi card firmware
 # ============================================================================
 [[test]]
@@ -732,7 +779,7 @@ vrow = "2.6"
 [[test]]
 id = "WIFI-004"
 title = "Wi-Fi card board, ready for JLC"
-checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, card order spec (1.6 mm, hard-gold 45 degree fingers), the board's name and revision on the top silkscreen and in the title block"
+checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, card order spec (1.6 mm, hard-gold 30 degree fingers), the board's name and revision on the top silkscreen and in the title block"
 method = "hw/boards/wifi.py through kicadgen.pipeline: Freerouting, GND fingers tied, presence link pre-routed, GND pads fanned out, stitched pours"
 cmd = "python3 hw/boards/wifi.py"
 kind = "static"
@@ -866,7 +913,7 @@ vrow = "3.2"
 [[test]]
 id = "E2E-004"
 title = "Negative system tests"
-checks = "no CPU card, empty slots, corrupt kernel, interrupted ROM programming, card removed mid-run, low-power source: each behaves as specified"
+checks = "empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power source: each behaves as specified (a missing CPU card and hot-plugging are out of scope)"
 method = "co-sim"
 kind = "sim"
 vrow = "3.3"
@@ -889,6 +936,85 @@ kind = "static"
 vrow = "3.4"
 cmd = "python3 hw/smoke/smoke.py"
 
+
+# ============================================================================
+# MECH: the mechanical fit of every board together (verification.md 4.7).
+# One run of hw/mech/fit.py (cached in build/mech/results.json) answers all
+# of them; it picks up each board as its build appears, and uses a stand-in
+# for the six I/O slots (20.32 mm pitch, the C404113 datasheet) until the
+# main board exists. Report: build/mech/report.txt, render: overview.png.
+# ============================================================================
+[[test]]
+id = "MECH-001"
+title = "Card edge and socket fit vs PCIe CEM"
+checks = "every card's finger tab against PCIe CEM r3.0 Fig. 6-3 (tab >= 8.40, key 1.90 +/- 0.06 at 12.15, DIM B, finger 0.70 +/- 0.05 at 1.00 pitch, pad tops 5.60, leading edge 1.30 +/- 0.25, short pads A1 and pin C at 2.40, 0.50 chamfers); in its socket (datasheet): shoulder above the housing, key rib in the notch, card in the 1.78 slot, no board inside the housing; nothing within 5 mm above the tab (slot.md)"
+method = "hw/mech/fit.py: pads and outline from pcbnew; the tab in a datasheet socket solid in FreeCAD"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-001"
+
+[[test]]
+id = "MECH-002"
+title = "Finger bevel and card thickness vs PCIe CEM"
+checks = "each card's fab/order.json: thickness in 1.57 +/- 0.13, hard gold, bevel in CEM's 20 +/- 5 deg"
+method = "hw/mech/fit.py reads the order spec kicadgen writes"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-002"
+
+[[test]]
+id = "MECH-003"
+title = "Card-to-card clearance, each card in each slot"
+checks = "every I/O card in every slot next to every I/O card: no collision and >= 1.0 mm (two cards' IPC-6012 bow); each card inside the CEM envelope (14.47 component side, 2.67 solder side); clear of the other sockets and the main board's parts"
+method = "hw/mech/fit.py: STEP from kicad-cli, placed in FreeCAD; exact distances and intersection volumes"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-003"
+
+[[test]]
+id = "MECH-004"
+title = "Top-edge connectors: overhang and plug access"
+checks = "each top-edge connector's mating face at or past the card's top edge (>= -0.3 mm), and its plug's envelope clear of every other card, plug and part in every slot"
+method = "hw/mech/fit.py (FreeCAD), plug envelopes in fit.py's PLUGS"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-004"
+
+[[test]]
+id = "MECH-005"
+title = "M3 holes line up for the rail; rail keep-out clear"
+checks = "each I/O card's 3.2 mm hole at slot.md's (52, -40); sockets 20.32 mm apart, in line and the same way round; every card's hole on one axis in every slot (<= 0.05 mm); a 6.4 mm cylinder along that axis through all six slots hits no part"
+method = "hw/mech/fit.py (pcbnew + FreeCAD)"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-005"
+
+[[test]]
+id = "MECH-006"
+title = "Power LEDs in one place on every I/O card"
+checks = "the LED labelled PWR on each I/O card at slot.md's (-3, -41) on the component side, and in one row across all slots (<= 0.01 mm)"
+method = "hw/mech/fit.py (pcbnew + FreeCAD)"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-006"
+
+[[test]]
+id = "MECH-007"
+title = "Wi-Fi antenna: connector match and cable route"
+checks = "parts.md's antenna has the connector generation of the module's receptacle; the mated plug and cable, straight to the card's top edge, clear everything by >= 0.5 mm in every slot; cable long enough to leave the card"
+method = "hw/mech/fit.py: receptacle position and generation from the ESP32-C3-MINI-1U datasheet, antenna from its drawing"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-007"
+
+[[test]]
+id = "MECH-008"
+title = "CPU card and system card clearance"
+checks = "the CPU card in the x8 socket and the system card in the x4 socket: no collision with, and >= 0.5-1.0 mm from, the I/O cards in every slot, the sockets and the main board's parts; CEM envelope. Fails until the main board, CPU card and system card are built"
+method = "hw/mech/fit.py (FreeCAD), sockets from the main board's footprints (pads A1/B1)"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-008"
 
 # ============================================================================
 # POW / THM: the power tree (doc/hardware/power.md), verification 4.4 / 4.5.
@@ -1413,7 +1539,7 @@ vrow = "4.4"
 [[test]]
 id = "WC-008"
 title = "Wi-Fi card mechanical"
-checks = "x1 fingers per CEM; U.FL access; antenna cable route"
+checks = "x1 fingers per CEM; MHF III access; antenna cable route"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"

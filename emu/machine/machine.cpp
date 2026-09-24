@@ -93,7 +93,22 @@ bool Rp2040Card::irq() {
 
 // ------------------------------------------------------------ EspCard
 
-EspCard::EspCard(int tx_, int rx_) : tx(tx_), rx(rx_) { kind = "wifi"; }
+EspCard::EspCard(int tx_, int rx_) : tx(tx_), rx(rx_) {
+  kind = "wifi";
+  if (const char *f = std::getenv("CUPC8_ESP_TRACE")) trace = std::fopen(f, "w");
+}
+
+EspCard::~EspCard() {
+  if (trace) std::fclose(trace);
+}
+
+void EspCard::traceBytes(const char *dir, const uint8_t *b, size_t n) {
+  if (!trace) return;
+  std::fprintf(trace, "%.0f %s", now ? now() : 0.0, dir);
+  for (size_t i = 0; i < n; i++) std::fprintf(trace, " %02x", b[i]);
+  std::fprintf(trace, "\n");
+  std::fflush(trace);
+}
 
 void EspCard::read(uint8_t *b, size_t n) {
   for (size_t got = 0; got < n;) {
@@ -102,9 +117,11 @@ void EspCard::read(uint8_t *b, size_t n) {
     if (r <= 0) throw std::runtime_error("the Wi-Fi card's QEMU closed its UART");
     got += static_cast<size_t>(r);
   }
+  traceBytes("R", b, n);
 }
 
 void EspCard::write(const std::vector<uint8_t> &b) {
+  traceBytes("W", b.data(), b.size());
   for (size_t put = 0; put < b.size();) {
     const ssize_t r = ::write(tx, b.data() + put, b.size() - put);
     if (r < 0 && errno == EINTR) continue;
@@ -286,6 +303,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {
       auto c = std::make_unique<EspCard>(o.espTx, o.espRx);
+      c->now = [this] { return board->ns(); };
       c->slot = slot;
       cards.emplace_back(slot, std::move(c));
       continue;
@@ -679,9 +697,7 @@ std::vector<std::string> Machine::screen(std::string *error) {
 void Machine::type(const std::string &text) {
   if (!keyboard) throw std::runtime_error("no IO card (no keyboard)");
   static const std::string shifted = "~!@#$%^&*()_+{}|:\"<>?";
-  // machine.mjs writes "`1234567890-=[]\;',./": `\;` is ';' in a JS string,
-  // so the backslash is missing and ; ' , . / map one usage code early
-  static const std::string plain = "`1234567890-=[];',./";
+  static const std::string plain = "`1234567890-=[]\\;',./";
   static const int codes[] = {53, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 45, 46, 47, 48, 49, 51, 52, 54, 55, 56};
   for (char c : text) {
     uint32_t mods = 0, u = 0;  // an unknown key is `undefined`, which Uint8Array.from stores as 0

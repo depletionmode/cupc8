@@ -71,6 +71,16 @@ ubasic_init:
 	b .clear_gosub_stack
 .done_clear_gosub_stack:
 
+	; every variable starts at 0: RAM powers up with junk
+	xor r1, r1
+.clear_variables:
+	gt r1, #39
+	bzf .done_clear_variables
+	st [ub_variables]+r1, r0
+	add r1, #1
+	b .clear_variables
+.done_clear_variables:
+
 	st [ended], r0
 
 	st [ub_line_index_current], r0
@@ -1418,6 +1428,511 @@ ubasic_index_free:
 	eq r1, #255
 	bzf .done
 	b .loop
+.done:
+	pop pcl
+	pop pch
+
+; ------------------------------------------------------------ files on the storage card
+; SAVE "NAME", LOAD "NAME", DIR, DEL "NAME" (kernel/storage.s). A program is
+; saved as text, a CR LF after each line, so a PC can read and edit it.
+
+ub_ni: resb 1
+ub_si: resb 1
+ub_li: resb 1
+ub_ri: resb 1
+ub_full: resb 1
+ub_idx: resb 1
+ub_num: resb 4
+ub_rem: resb 1
+ub_bit: resb 1
+ub_carry: resb 1
+ub_dig: resb 1
+ub_digs: resb 12
+
+ub_s_saved db "\nSAVED\n"
+ub_s_loaded db "\nLOADED\n"
+ub_s_usage db "\nSAVE, LOAD or DEL \"NAME\"\n"
+
+; the name after the command word, quoted or not, into st_name; r0 = its length
+ub_get_name:
+	xor r1, r1
+.skip_word:
+	ld r0, [term_line_buf]+r1
+	gt r0, #32
+	bzf .in_word
+	b .skip_space
+.in_word:
+	add r1, #1
+	b .skip_word
+.skip_space:
+	ld r0, [term_line_buf]+r1
+	eq r0, #32
+	bzf .space
+	eq r0, #34				; an opening quote
+	bzf .quote
+	b .copy
+.space:
+	add r1, #1
+	b .skip_space
+.quote:
+	add r1, #1
+.copy:
+	xor r0, r0
+	st [ub_ni], r0
+.loop:
+	ld r0, [term_line_buf]+r1
+	gt r0, #32				; ends at a space, the CR or the terminator
+	bzf .char
+	b .end
+.char:
+	eq r0, #34				; or the closing quote
+	bzf .end
+	push r1
+	ld r1, [ub_ni]
+	eq r1, #13				; longer than 8.3 - the card refuses 13
+	bzf .next
+	st [st_name]+r1, r0
+	add r1, #1
+	st [ub_ni], r1
+.next:
+	pop r1
+	add r1, #1
+	b .loop
+.end:
+	ld r1, [ub_ni]
+	xor r0, r0
+	st [st_name]+r1, r0
+	ld r0, [ub_ni]
+	pop pcl
+	pop pch
+
+ub_cmd_save:
+	push pch
+	push pcl
+	b ub_get_name
+	eq r0, #0
+	bzf .usage
+	xor r0, r0
+	st [st_h], r0
+	mov r0, #1
+	st [st_mode], r0
+	push pch
+	push pcl
+	b st_open
+	eq r0, #0
+	bzf .opened
+	b .error
+.opened:
+	xor r0, r0
+	st [st_n], r0
+	st [ub_si], r0
+.loop:
+	ld r1, [ub_si]
+	ld r0, [term_basic_prog_buf_idx]
+	eq r1, r0
+	bzf .last
+	ld r0, [term_basic_prog_buf]+r1
+	push r0
+	ld r1, [st_n]
+	gt r1, #126				; a full chunk - room for a CR LF is left
+	bzf .flush
+.append:
+	pop r0
+	ld r1, [st_n]
+	st [st_buf]+r1, r0
+	add r1, #1
+	st [st_n], r1
+	eq r0, #13
+	bzf .lf
+	b .next
+.lf:
+	mov r0, #10
+	ld r1, [st_n]
+	st [st_buf]+r1, r0
+	add r1, #1
+	st [st_n], r1
+.next:
+	ld r1, [ub_si]
+	add r1, #1
+	st [ub_si], r1
+	b .loop
+.flush:
+	push pch
+	push pcl
+	b st_write
+	eq r0, #0
+	bzf .flushed
+	pop r1					; the byte waiting to be appended
+	b .close_error
+.flushed:
+	xor r0, r0
+	st [st_n], r0
+	b .append
+.last:
+	ld r0, [st_n]
+	eq r0, #0
+	bzf .close
+	push pch
+	push pcl
+	b st_write
+	eq r0, #0
+	bzf .close
+	b .close_error
+.close:
+	push pch
+	push pcl
+	b st_close
+	eq r0, #0
+	bzf .saved
+	b .error
+.saved:
+	mov r0, #>[ub_s_saved]
+	mov r1, #<[ub_s_saved]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.close_error:
+	push r0
+	push pch
+	push pcl
+	b st_close
+	pop r0
+.error:
+	push pch
+	push pcl
+	b st_print_err
+	b .done
+.usage:
+	mov r0, #>[ub_s_usage]
+	mov r1, #<[ub_s_usage]
+	push pch
+	push pcl
+	b str_printstr
+.done:
+	pop pcl
+	pop pch
+
+; the line gathered in term_line_buf (ub_li characters) into the program, as
+; if typed - lines that do not start with a line number are skipped
+ub_load_line:
+	ld r1, [ub_li]
+	eq r1, #0
+	bzf .done
+	mov r0, #13
+	st [term_line_buf]+r1, r0
+	add r1, #1
+	xor r0, r0
+	st [term_line_buf]+r1, r0
+	ld r0, [ub_li]
+	st [rs_i], r0
+	xor r0, r0
+	st [ub_li], r0
+	mov r0, #>[term_line_buf]
+	mov r1, #<[term_line_buf]
+	push pch
+	push pcl
+	b str_atoi
+	eq r0, #0
+	bzf .done
+	ld r0, [term_basic_prog_buf_idx]
+	st [ub_idx], r0
+	push pch
+	push pcl
+	b term_cmd_basicline
+	ld r0, [term_basic_prog_buf_idx]
+	ld r1, [ub_idx]
+	eq r0, r1				; refused - the program is full
+	bzf .full
+	b .done
+.full:
+	mov r0, #1
+	st [ub_full], r0
+.done:
+	xor r0, r0
+	st [ub_li], r0
+	pop pcl
+	pop pch
+
+ub_cmd_load:
+	push pch
+	push pcl
+	b ub_get_name
+	eq r0, #0
+	bzf .usage
+	xor r0, r0
+	st [st_h], r0
+	st [st_mode], r0
+	push pch
+	push pcl
+	b st_open
+	eq r0, #0
+	bzf .opened
+	b .error
+.opened:
+	push pch
+	push pcl
+	b term_cmd_new
+	xor r0, r0
+	st [ub_li], r0
+	st [ub_full], r0
+.read:
+	mov r0, #128
+	st [st_n], r0
+	push pch
+	push pcl
+	b st_read
+	eq r0, #0
+	bzf .got
+	b .close_error
+.got:
+	xor r0, r0
+	st [ub_ri], r0
+.byte:
+	ld r0, [ub_full]
+	eq r0, #0
+	bzf .more
+	b .close
+.more:
+	ld r1, [ub_ri]
+	ld r0, [st_n]
+	eq r1, r0
+	bzf .chunk_done
+	add r1, #1				; the data starts at st_rbuf+1
+	st [ub_ri], r1
+	ld r0, [st_rbuf]+r1
+	eq r0, #13
+	bzf .eol
+	eq r0, #10
+	bzf .eol
+	ld r1, [ub_li]
+	eq r1, #78				; the longest line that can be typed
+	bzf .byte
+	st [term_line_buf]+r1, r0
+	add r1, #1
+	st [ub_li], r1
+	b .byte
+.eol:
+	push pch
+	push pcl
+	b ub_load_line
+	b .byte
+.chunk_done:
+	ld r0, [st_n]
+	eq r0, #128				; a short chunk is the end of the file
+	bzf .read
+	push pch
+	push pcl
+	b ub_load_line			; a last line without a line end
+.close:
+	push pch
+	push pcl
+	b st_close
+	eq r0, #0
+	bzf .loaded
+	b .error
+.loaded:
+	mov r0, #>[ub_s_loaded]
+	mov r1, #<[ub_s_loaded]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.close_error:
+	push r0
+	push pch
+	push pcl
+	b st_close
+	pop r0
+.error:
+	push pch
+	push pcl
+	b st_print_err
+	b .done
+.usage:
+	mov r0, #>[ub_s_usage]
+	mov r1, #<[ub_s_usage]
+	push pch
+	push pcl
+	b str_printstr
+.done:
+	pop pcl
+	pop pch
+
+ub_cmd_del:
+	push pch
+	push pcl
+	b ub_get_name
+	eq r0, #0
+	bzf .usage
+	push pch
+	push pcl
+	b st_delete
+	eq r0, #0
+	bzf .done
+	push pch
+	push pcl
+	b st_print_err
+	b .done
+.usage:
+	mov r0, #>[ub_s_usage]
+	mov r1, #<[ub_s_usage]
+	push pch
+	push pcl
+	b str_printstr
+.done:
+	pop pcl
+	pop pch
+
+; every file - its name, then its size in bytes
+ub_cmd_dir:
+	mov r0, #10
+	push pch
+	push pcl
+	b print_ascii_char
+	push pch
+	push pcl
+	b st_dir_first
+.entry:
+	eq r0, #0
+	bzf .show
+	eq r0, #255				; after the last file
+	bzf .done
+	push pch
+	push pcl
+	b st_print_err
+	b .done
+.show:
+	xor r1, r1
+.name:
+	ld r0, [st_rbuf+5]		; the name's length
+	eq r1, r0
+	bzf .pad
+	push r1
+	ld r0, [st_rbuf+6]+r1
+	push pch
+	push pcl
+	b print_ascii_char
+	pop r1
+	add r1, #1
+	b .name
+.pad:
+	gt r1, #12
+	bzf .size
+	push r1
+	mov r0, #32
+	push pch
+	push pcl
+	b print_ascii_char
+	pop r1
+	add r1, #1
+	b .pad
+.size:
+	ld r0, [st_rbuf]
+	st [ub_num], r0
+	ld r0, [st_rbuf+1]
+	st [ub_num+1], r0
+	ld r0, [st_rbuf+2]
+	st [ub_num+2], r0
+	ld r0, [st_rbuf+3]
+	st [ub_num+3], r0
+	push pch
+	push pcl
+	b ub_print_u32
+	mov r0, #10
+	push pch
+	push pcl
+	b print_ascii_char
+	push pch
+	push pcl
+	b st_dir_next
+	b .entry
+.done:
+	pop pcl
+	pop pch
+
+; print ub_num (4 bytes, low first) in decimal - each digit is the remainder
+; of a 32-step shift-and-subtract division by 10
+ub_print_u32:
+	xor r0, r0
+	st [ub_dig], r0
+.digit:
+	xor r0, r0
+	st [ub_rem], r0
+	mov r0, #32
+	st [ub_bit], r0
+.bit:
+	ld r0, [ub_num+3]
+	shr r0, #7
+	st [ub_carry], r0
+	ld r0, [ub_num+2]
+	shr r0, #7
+	ld r1, [ub_num+3]
+	shl r1, #1
+	or r1, r0
+	st [ub_num+3], r1
+	ld r0, [ub_num+1]
+	shr r0, #7
+	ld r1, [ub_num+2]
+	shl r1, #1
+	or r1, r0
+	st [ub_num+2], r1
+	ld r0, [ub_num]
+	shr r0, #7
+	ld r1, [ub_num+1]
+	shl r1, #1
+	or r1, r0
+	st [ub_num+1], r1
+	ld r1, [ub_num]
+	shl r1, #1
+	st [ub_num], r1
+	ld r0, [ub_rem]
+	shl r0, #1
+	ld r1, [ub_carry]
+	or r0, r1
+	st [ub_rem], r0
+	lt r0, #10
+	bzf .no_sub
+	sub r0, #10
+	st [ub_rem], r0
+	ld r0, [ub_num]
+	or r0, #1
+	st [ub_num], r0
+.no_sub:
+	ld r0, [ub_bit]
+	sub r0, #1
+	st [ub_bit], r0
+	eq r0, #0
+	bzf .digit_done
+	b .bit
+.digit_done:
+	ld r0, [ub_rem]
+	add r0, #48
+	ld r1, [ub_dig]
+	st [ub_digs]+r1, r0
+	add r1, #1
+	st [ub_dig], r1
+	ld r0, [ub_num]
+	ld r1, [ub_num+1]
+	or r0, r1
+	ld r1, [ub_num+2]
+	or r0, r1
+	ld r1, [ub_num+3]
+	or r0, r1
+	eq r0, #0
+	bzf .print
+	b .digit
+.print:
+	ld r1, [ub_dig]
+	eq r1, #0
+	bzf .done
+	sub r1, #1
+	st [ub_dig], r1
+	ld r0, [ub_digs]+r1
+	push pch
+	push pcl
+	b print_ascii_char
+	b .print
 .done:
 	pop pcl
 	pop pch

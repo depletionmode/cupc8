@@ -362,7 +362,7 @@ export class Machine {
   // type on the USB keyboard: one report per key, then a release
   type(text) {
     const shifted = '~!@#$%^&*()_+{}|:"<>?';
-    const plain = "`1234567890-=[]\;',./";
+    const plain = "`1234567890-=[]\\;',./";
     for (const c of text) {
       let mods = 0, u;
       if (c >= 'a' && c <= 'z') u = 4 + c.charCodeAt(0) - 97;

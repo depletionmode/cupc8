@@ -50,7 +50,8 @@ extras. Stock checked 2026-09-23.
 | USB-A receptacle | USB-302S-T (SMD right angle) | C112455 | 3,791 | 2 | IO |
 | Wi-Fi module | ESP32-C3-MINI-1U-N4 | C2911374 | 2,225 | 2 | Wi-Fi |
 | Wi-Fi MISO buffer | 74LVC1G125GW | C52140430 | 9,721 | 2 | Wi-Fi: releases MISO when not selected |
-| Wi-Fi antenna (loose, not assembled) | KH-FPC2.4G-1.13IPEX-240 | C4943394 | 50 | 2 | buy with the order, plug in by hand |
+| Wi-Fi antenna lead (loose, not assembled) | KH-IPEX3-SMA-RG081-150mm, MHF III (IPEX gen 3) to SMA, 150 mm | C709347 | 162 | 2 | the module's receptacle is MHF III: a 1st-gen U.FL antenna (C4943394, first listed here) does not mate (MECH-007). Buy with the order, plug in by hand |
+| Wi-Fi antenna (loose, not assembled) | HJ-2.4GHz-SMA, 2.45 GHz rubber duck | C1509156 | 329 | 2 | screws onto the lead's SMA; check the lead is SMA female (jack) and the antenna SMA male, not RP-SMA, when ordering |
 
 All of the key parts above have a JLC minimum purchase of 1. The small parts
 have a minimum of 2–5 plus 1–4 attrition spares, which costs cents.
