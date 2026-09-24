@@ -3,14 +3,18 @@
 // firmware, the GPU's HDMI (TMDS) output decoded to pixels, and the browser's
 // keyboard on the IO card's USB keyboard.
 //
-//   node tools/machine_view.mjs [--port 8640] [--slots gpu,io[,wifi]] [--every 250]
+//   node tools/machine_view.mjs [--port 8640] [--slots gpu,io[,wifi]] [--every 250] [--native]
 //
 // then open http://127.0.0.1:8640. --every is the emulated time between
-// captured frames, in ms; the emulator runs ~50x slower than real time, so
-// the boot to the BASIC prompt takes about a minute of wall time.
+// captured frames, in ms. --native (or CUPC8_EMU=native) runs the native
+// emulator (emu/machine, built by tools/emu_machine_build.sh; about 15x slower
+// than real time) instead of test/emu/machine.mjs (~100x slower): the same
+// machine, cycle for cycle (EMU-007), just faster.
 
 import http from 'node:http';
-import { Machine } from '../test/emu/machine.mjs';
+
+const native = process.argv.includes('--native') || process.env.CUPC8_EMU === 'native';
+const { Machine } = await import(native ? '../test/emu/machinenative.mjs' : '../test/emu/machine.mjs');
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf('--' + name);
@@ -105,7 +109,7 @@ http.createServer((req, res) => {
     res.end();
   }
 }).listen(port, '127.0.0.1', () => {
-  console.log(`CUPC/8 emulator (slots: ${kinds.join(', ')}): open http://127.0.0.1:${port}`);
+  console.log(`CUPC/8 emulator (${native ? 'native' : 'machine.mjs'}, slots: ${kinds.join(', ')}): open http://127.0.0.1:${port}`);
 });
 
 // ------------------------------------------------------------- the emulator
