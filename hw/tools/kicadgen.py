@@ -1361,10 +1361,27 @@ def fill_zones(board):
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 
 
+# ------------------------------------------------------ the I/O card outline
+# doc/hardware/slot.md, Mechanical: every I/O card is this shape, in the
+# frame of KiCad's BUS_PCIexpress_x1 (finger B1 at the origin, fingers +y)
+IO_CARD_BODY = (-6.0, -44.0, 56.0, -4.95)
+IO_CARD_EDGE = [(-0.65, -4.95), (-6.0, -4.95), (-6.0, -44.0), (56.0, -44.0), (56.0, -4.95), (19.65, -4.95)]
+IO_CARD_TAB = (-0.65, 19.65)
+IO_CARD_HOLE = (52.0, -40.0)             # M3, non-plated
+IO_CARD_PWR_LED = (-3.0, -41.0)          # the power LED, the same on every board: 3 mm in from top-left
+MOUNTING_HOLE = "MountingHole:MountingHole_3.2mm_M3"
+
+
+def power_led_at(body):
+    """Where a board's power LED goes: 3 mm in from its body's top-left
+    corner (milestone-1.md, Indicator LEDs)."""
+    return (body[0] + 3.0, body[1] + 3.0)
+
+
 # ---------------------------------------------------------------- pipeline
 
 # footprints that are not parts: nothing to buy, nothing for JLC to place
-NOT_PARTS = ("Connector_PCBEdge:", "cupc8:KaplanLabs_Logo", "cupc8:TestPad", "TestPoint:")
+NOT_PARTS = ("Connector_PCBEdge:", "cupc8:KaplanLabs_Logo", "cupc8:TestPad", "TestPoint:", "MountingHole:")
 
 
 def jlc_fab(sch, pcb, comps, fab):
@@ -1404,24 +1421,25 @@ def jlc_fab(sch, pcb, comps, fab):
     return counts
 
 
-def check_stock(counts, boards, spare=5):
-    """Every part in JLC's assembly library with stock for the order: `boards`
-    assembled, each part's count per board, plus `spare` for attrition.
-    CUPC8_OFFLINE=1 skips it (and says so)."""
+def check_stock(counts, boards, margin=2):
+    """Every part in JLC's assembly library with `margin` times the stock the
+    order needs (`boards` assembled, each part's count per board):
+    verification.md 4.8. CUPC8_OFFLINE=1 skips it (and says so)."""
     if os.environ.get("CUPC8_OFFLINE"):
         return "skipped: CUPC8_OFFLINE"
     import jlcparts
     short = []
     for code, n in sorted(counts.items()):
-        need = n * boards + spare
+        need = n * boards * margin
         hits = [p for p in jlcparts.query(code, 5) if p["componentCode"] == code]
         if not hits:
             short.append("%s not in JLC's library" % code)
         elif hits[0]["stockCount"] < need:
-            short.append("%s: %d in stock, the order needs %d" % (code, hits[0]["stockCount"], need))
+            short.append("%s: %d in stock, under %dx the %d the order places"
+                         % (code, hits[0]["stockCount"], margin, n * boards))
     if short:
         raise SystemExit("JLC stock:\n  " + "\n  ".join(short))
-    return "%d parts, stock for %d boards" % (len(counts), boards)
+    return "%d parts, %dx stock for %d boards" % (len(counts), margin, boards)
 
 
 def order_spec(layers, card_edge):
