@@ -46,7 +46,7 @@ Bin in gnd i = max(0, i(Vsense)) + {IQ}
 .ends LDO_BEH
 
 * ---------------------------------------------------------------------------
-* SW_BEH: a current-limited, soft-started load switch (SY6280 class).
+* SW_BEH: a current-limited, soft-started load switch or eFuse (the input TPS25947).
 *
 *   TDLY after t = 0 (IN is applied at t = 0 in every deck) the gate ramps,
 *   and the output follows it from 0 to IN over TON (SY6280: 120 us). The
