@@ -20,6 +20,26 @@ build/emu-native/rp2040run build/rp2040/emu_nested.elf \
     --until 'NEST (PASS|FAIL)[^\n]*\n' --max-ns 500e6 --toggle-gpio 2:997
 ```
 
+Build options (plain `cmake` + `ninja` needs none of them). The library is
+compiled twice: `rp2040emu` (plain `-O2`; what `emu/machine` links, and
+`test_periph_diff`, whose `-Wl,--wrap` of `RP2040::setInterrupt` needs the
+calls between object files) and `rp2040emu_fast`, which `rp2040run`,
+`rp2040emu.node` (through `rp2040harness_fast`) and the other test drivers
+link, with
+
+- `-DRP2040EMU_LTO=ON` (the default where the compiler supports it):
+  link-time optimisation;
+- `-DRP2040EMU_NATIVE=ON`: `-march=native` (off by default: the binaries then
+  need this kind of CPU);
+- `-DRP2040EMU_PGO=generate|use` with `RP2040EMU_PGO_DIR`: profile-guided
+  optimisation (GCC). `emu/rp2040/tools/pgo.sh [build dir] [-D...]` does it
+  all: an instrumented build in `<dir>-pgogen`, trained by `rp2040run` on the
+  gpu (also with the slot pins moving), io, sysctl and self-test images, then
+  `<dir>` rebuilt with the profile.
+
+Everything is compiled with `-ffp-contract=off`: the float arithmetic must
+round as JS's does, so no fused multiply-adds (which `-march=native` offers).
+
 `rp2040run <elf> --until <regex> --max-ns <ns> [--mhz N] [--core1-slow F]
 [--toggle-gpio PIN:EVERY_N_CYCLES] [--trace-every N]` is
 `test/emu/rp2040emu.mjs` in C++: B1 bootrom (extracted from
