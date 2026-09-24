@@ -70,7 +70,7 @@ ROTATIONS = os.path.join(PARTS, "jlc_rotation.yaml")
 RECORDS = os.path.join(PARTS, "easyeda")
 CACHE = os.path.join(ROOT, "build", "parts", "easyeda")
 PAD_TOLERANCE = 0.2          # mm: 0402 pads are 0.27 mm off 0603's, 0603's 0.04 off EasyEDA's
-POLAR = {"K": "K", "A": "A", "CATHODE": "K", "ANODE": "A", "-": "K", "+": "A"}   # 2-pin names
+POLAR = {"K": "K", "A": "A", "CATHODE": "K", "ANODE": "A", "-": "K", "+": "A", "C": "K"}   # 2-pin names (C: EasyEDA diodes)
 
 
 def rotations():
@@ -220,6 +220,19 @@ def package_ok(pkg, fp_name):
         return (a, b) in body or (b, a) in body
     if p.isdigit():                                  # chip sizes: 0402, 0603, 0805 ...
         return ("_%s_" % p) in name or name.startswith(p) or ("_%s" % p) in name
+    m = re.fullmatch(r"(\d{4})X(\d)", p)             # "0603x4": an array of n chips, 2n pads
+    if m:
+        return ("_%s" % m.group(1)) in name and ("-%dP" % (2 * int(m.group(2))) in name or p in name)
+    m = re.fullmatch(r"(.+)\((\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)\)", p)   # "TQFP-144(20x20)": and its body
+    if m:
+        body = ["%.1f" % float(v) for v in m.group(2, 3)]
+        return name.startswith(m.group(1)) and "L%s-W%s" % tuple(body) in name
+    m = re.fullmatch(r"(.+)-(150|208)MIL", p)        # "SOIC-8-208mil": the body width in mils
+    if m:
+        return name.startswith(m.group(1)) and "-W%s-" % {"150": "3.9", "208": "5.3"}[m.group(2)] in name
+    m = re.fullmatch(r"(SOT-23-\d)L", p)             # "SOT-23-6L": JLC's name for a plain SOT-23-6
+    if m:
+        return name.startswith(m.group(1) + "_")
     return name.startswith(p) or ("_%s" % p) in name or ("_%s_" % p) in name
 
 

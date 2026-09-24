@@ -1,0 +1,12 @@
+# TLV62569PDDCR (TI), 2 A buck with power good, SOT-23-6 (DDC)
+datasheet: https://www.ti.com/lit/ds/symlink/tlv62569.pdf
+source: "TI TLV62569 datasheet, 5 Pin Configuration and Functions: DDC package (SOT23-6, top view) and Pin Functions (SOT23-6 column)"
+package: SOT-23-THIN-6
+pins:
+  1: EN
+  2: GND
+  3: SW
+  4: VIN
+  5: PG
+  6: FB
+ccw: [1, 6]

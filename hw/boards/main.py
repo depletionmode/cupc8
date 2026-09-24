@@ -206,16 +206,18 @@ def build_parts():
 
     # ---- power in: USB-C sink, fuse, TVS, current-limited switch (power.md)
     group("power")
-    part("J1", "Connector:USB_C_Receptacle_USB2.0_16P", "USB-C power", "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
-         "C165948", {"A4": "VBUS", "A1": "GND", "SH": "GND", "A5": "CC1", "B5": "CC2",
-                     "A6": None, "A7": None, "B6": None, "B7": None, "A8": None, "B8": None})
+    # JLC's own footprint for C165948 (its pads are what JLC places: bomcheck)
+    part("J1", "jlc:TYPE-C-31-M-12", "USB-C power", "jlc:USB-C_SMD-TYPE-C-31-M-12_1", "C165948",
+         {"A4B9": "VBUS", "B4A9": "VBUS", "A1B12": "GND", "B1A12": "GND", "1": "GND", "2": "GND", "3": "GND",
+          "4": "GND", "A5": "CC1", "B5": "CC2",
+          "A6": None, "A7": None, "B6": None, "B7": None, "A8": None, "B8": None})   # power only
     R("R1", "5.1k", "CC1", "GND")
     R("R2", "5.1k", "CC2", "GND")
     part("U1", "jlc:USBLC6-2SC6", "USBLC6-2SC6", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "C7519",
          {1: "CC1", 6: "CC1", 3: "CC2", 4: "CC2", 2: "GND", 5: "VBUS_F"})
     # the input path, all values from POWER (hw/power/design.py decides them)
     part("F1", "Device:Polyfuse", "3.5A", "Fuse:Fuse_1812_4532Metric", POWER["FUSE_IN"][1], {1: "VBUS", 2: "VBUS_F"})
-    part("D1", "Device:D_Zener", "SMF5.0A", "Diode_SMD:D_SOD-123F", POWER["TVS"][1],
+    part("D1", "Device:D_Zener", "SMF5.0A", "cupc8:D_SOD-123FL", POWER["TVS"][1],
          {"K": "VBUS_F", "A": "GND"})              # a unidirectional TVS
     C("C1", "1u", "VBUS_F")                        # the only capacitance ahead of the eFuse (POW-004)
     part("U2", "jlc:TPS259470ARPWR", "TPS259470ARPWR", "jlc:VQFN-10_L2.0-W2.0-P0.45-TL", POWER["EFUSE"][1],
@@ -318,7 +320,7 @@ def build_parts():
                 conns[num] = "GND"
             else:
                 conns[num] = None                   # NC and unused I/O
-        part("U7", "cupc8_main:ICE40HX4K-TQ144", "ICE40HX4K-TQ144", "Package_QFP:TQFP-144_20x20mm_P0.5mm",
+        part("U7", "cupc8_main:ICE40HX4K-TQ144", "ICE40HX4K-TQ144", "jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL",
              "C1521989", conns, unit=unit)
     for i, sig in enumerate(s for s in sorted(set(chip.values()), key=str) if s and s.endswith("_SRC")):
         base = sig[:-4]
@@ -704,7 +706,7 @@ def wanted(parts):
     at["U7"] = (fx, fy, 0)
     at["U10"] = (88.5, 21.0, 0)                  # ROM, north of the chipset's memory pins
     at["U9"] = (104.5, 24.0, 90)                 # SRAM
-    at["J1"] = (70.0, H - 3.19, 0)               # USB-C, opening south (smoke.py: edge 3.19 mm off the pegs)
+    at["J1"] = (70.0, H - 4.58, 0)               # USB-C, opening south: the edge 5.79 mm off the pegs (y -1.21)
     at["J4"] = (116.6, 107.0, 0)                 # AUX SPI header, east edge
     at["SW1"] = (119.5, 140.0, 0)
     at["D6"] = kg.power_led_at(OUTLINE) + (0,)   # the power LED, where every board has it
