@@ -54,7 +54,7 @@ function golden(name, text) {
   const file = path.join(ROOT, 'test/emu/golden', name + '.txt');
   if (record) fs.writeFileSync(file, text + '\n');
   const want = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\n$/, '') : null;
-  expect(want !== null, `${name}: no recorded golden screen (run with --record once checked)`);
+  if (!expect(want !== null, `${name}: no recorded golden screen (run with --record once checked)`)) console.log('---- screen\n' + text + '\n----');
   if (want !== null && !expect(text === want, `${name}: the screen differs from ${path.relative(ROOT, file)}`)) {
     console.log('---- screen\n' + text + '\n---- golden\n' + want + '\n----');
   }
