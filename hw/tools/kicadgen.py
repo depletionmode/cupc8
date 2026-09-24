@@ -384,11 +384,20 @@ class Schematic:
               (box[0] - off, box[1], box[2] - off, box[3])
         self.labels.append((box, net, part))
 
-    def nc(self, part, pin):
+    def nc(self, part, pin, stub=0):
+        """A no-connect cross on the pin, or `stub` mm out on a wire from it:
+        short library pins (KiCad's FPGA symbols) leave no room for the cross
+        beside the pin number."""
         num = part.pin(pin)
         for n in self._stacked(part, num):
             part.used[n] = None
-        (x, y), _ = part.pin_xy(num)
+        (x, y), (dx, dy) = part.pin_xy(num)
+        if stub:
+            ex, ey = round(x + dx * stub, 4), round(y + dy * stub, 4)
+            self.items.append(["wire", ["pts", ["xy", x, y], ["xy", ex, ey]],
+                               ["stroke", ["width", 0], ["type", "default"]], ["uuid", uid()]])
+            self.wires.append((x, y, ex, ey, part, None))
+            x, y = ex, ey
         self.items.append(["no_connect", ["at", x, y], ["uuid", uid()]])
         self.ncs.append(((x - 0.65, y - 0.65, x + 0.65, y + 0.65), part))
 
@@ -641,6 +650,8 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
     outline:   (x0, y0, x1, y1) in mm
     graphics:  board-only footprints such as logos: ("lib:name", x, y, rot)
+    zones:     nets poured on F.Cu and B.Cu, or (net, (layer names)) for
+               chosen layers; an inner layer with a zone becomes a plane
     edge:      Edge.Cuts as an open polyline [(x, y), ...] in place of the
                outline rectangle - for a card whose edge-connector footprint
                draws its own tab. Silk, designators and zones still keep
@@ -721,8 +732,15 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline)
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
-    for net in zones:
-        for layer in copper:
+    for zone in zones:
+        # a zone is a net on both outer layers, or (net, ("In1.Cu", ...)):
+        # inner layers named that way become planes (power layers), which
+        # Freerouting reaches with vias and never routes signals on
+        net, names = (zone, None) if isinstance(zone, str) else zone
+        layers = [board.GetLayerID(n) for n in names] if names else copper
+        for layer in layers:
+            if layer not in copper:
+                board.SetLayerType(layer, pcbnew.LT_POWER)
             z = pcbnew.ZONE(board)
             z.SetLayer(layer)
             z.SetNet(netinfo[net])
