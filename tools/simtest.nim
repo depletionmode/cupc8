@@ -313,8 +313,14 @@ proc testSymbolsAndKernelDecode() =
              table.lineFor[termAddress].file == "term.s")
   let source = table.sourceLines("term.s")
   expectTrue("source loader", source.len > 8 and source[6].strip == "term_do:")
+  # the instruction after term_do's first, whatever that one's length
+  var nextIns = -1
+  for a in table.insAddrs:
+    if a > termAddress:
+      nextIns = a
+      break
   expectTrue("previous instruction anchor",
-             table.prevInsAddr(termAddress + 2, 1) == termAddress)
+             nextIns > termAddress and table.prevInsAddr(nextIns, 1) == termAddress)
 
   cpuReset()
   cpuLoadFile(kernelDir / "kernel.o")
