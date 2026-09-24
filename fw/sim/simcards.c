@@ -5,8 +5,10 @@
 
 #include "cardproto.h"
 #include "gpu.h"
+#include "imgdisk.h"
 #include "iocard.h"
 #include "netposix.h"
+#include "storage.h"
 #include "wifi.h"
 
 struct simcard {
@@ -15,6 +17,10 @@ struct simcard {
 	gpu_t *gpu;
 	iocard_t *io;
 	wifi_t *wifi;
+	storage_t *st;
+	imgdisk_t *disk;                   /* the storage card's medium, 0 = none */
+	uint32_t st_latency_ms, st_busy_since;
+	int st_was_busy;
 	uint32_t last_vsync_ms;
 };
 
@@ -33,6 +39,12 @@ simcard_t *simcard_new(int type)
 		io_init(c->io);
 		io_connected(c->io, 1);
 		c->card = &c->io->card;
+	} else if (type == CARD_TYPE_STORAGE) {
+		/* no medium until simcard_storage_image(); FatFs has one volume, so
+		 * one storage card per process */
+		c->st = malloc(sizeof *c->st);
+		st_init(c->st, &imgdisk_ops, 0, false);
+		c->card = &c->st->card;
 	} else if (type == CARD_TYPE_WIFI) {
 		c->wifi = malloc(sizeof *c->wifi);
 		wifi_init(c->wifi, &netposix_ops, netposix_new());
@@ -51,6 +63,12 @@ void simcard_free(simcard_t *c)
 	free(c->gpu);
 	free(c->io);
 	free(c->wifi);
+	if (c->st) {
+		st_detect(c->st, false);        /* FatFs lets go of the volume before it is freed */
+		st_poll(c->st);
+	}
+	free(c->st);
+	imgdisk_free(c->disk);
 	free(c);
 }
 
@@ -78,6 +96,49 @@ void simcard_tick(simcard_t *c, uint32_t now_ms)
 		io_poll(c->io, now_ms);
 	if (c->wifi)
 		wifi_poll(c->wifi);
+	if (c->st) {
+		/* the medium's time: commands wait st_latency_ms before they run
+		 * (READ says not ready meanwhile), as an SD card's writes do */
+		int busy = st_busy(c->st);
+		if (busy && !c->st_was_busy)
+			c->st_busy_since = now_ms;
+		c->st_was_busy = busy;
+		if (!busy || now_ms - c->st_busy_since >= c->st_latency_ms) {
+			st_poll(c->st);
+			c->st_was_busy = 0;
+		}
+	}
+}
+
+int simcard_storage_image(simcard_t *c, const char *path, int wp)
+{
+	if (!c->st)
+		return -1;
+	st_detect(c->st, false);
+	st_poll(c->st);
+	imgdisk_free(c->disk);
+	c->disk = 0;
+	c->st->ctx = 0;
+	if (!path)
+		return 0;
+	c->disk = imgdisk_open(path);
+	if (!c->disk)
+		return -1;
+	c->disk->wp = wp != 0;
+	c->st->ctx = c->disk;
+	st_detect(c->st, true);
+	st_poll(c->st);
+	return 0;
+}
+
+void simcard_storage_latency(simcard_t *c, uint32_t ms)
+{
+	c->st_latency_ms = ms;
+}
+
+int simcard_storage_status(simcard_t *c)
+{
+	return c->st ? st_status(c->st) : -1;
 }
 
 void simcard_render(simcard_t *c, uint32_t *rgb)

@@ -8,7 +8,7 @@ and 12. The pinout is custom. Never plug a real PCIe card in.
   hot-pluggable, and nothing is built to survive a card pulled while running.
 - **Slots are electrically identical.** Slot *n* (1–6) is SPI device *n−1*
   (see `memory-map.md`).
-- **M1 uses three slots:** graphics, IO and Wi-Fi. Slots 4–6 are free for
+- **M1 uses four slots:** graphics, IO, Wi-Fi and storage. Slots 5–6 are free for
   future cards.
 - **Card:** a 1.6 mm PCB with gold fingers (hard gold, 30° bevel: `milestone-1.md`), 18 per
   side.
@@ -101,7 +101,11 @@ chipset) is always the master.
 - **Response deadline:** a card must have its response ready within **5 ms**
   of the command frame's CS_n rising, unless the command says otherwise.
   Network operations complete asynchronously and signal through events
-  instead.
+  instead. The storage card's commands are **exempt** (`storage-card.md`):
+  an SD card can be busy for 250 ms on a write, so READ returns RESP_LEN
+  `$00` until the answer is ready, and the host retries for seconds, not
+  milliseconds. The common opcodes ($F0–$F2) keep the 5 ms deadline on every
+  card.
 - **Timing the host must meet:**
   - ≥ 2 µs from CS_n falling to the first SCK edge
   - ≥ 1 µs between bytes
@@ -131,7 +135,8 @@ table):
 | $01 | Graphics / HDMI (`gpu-protocol.md`) |
 | $02 | IO / USB keyboard (`io-card.md`) |
 | $03 | Wi-Fi networking (`wifi-card.md`) |
-| $04–$FE | reserved |
+| $04 | Storage (`storage-card.md`; M1: microSD) |
+| $05–$FE | reserved |
 
 Opcodes $00–$EF are card-specific. In every card spec, **→** marks response
 bytes, which are collected with a READ frame.

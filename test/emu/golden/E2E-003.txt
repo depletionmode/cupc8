@@ -1,0 +1,16 @@
+
+      CUPC/8 BASIC 2015.10
+
+>> net join cupc8 password
+
+joined, address 10.0.2.15
+
+>> net get 10.0.2.2 PORT
+
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Connection: close
+
+HELLO FROM THE HOST
+
+>>

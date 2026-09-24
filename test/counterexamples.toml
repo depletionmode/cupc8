@@ -287,3 +287,58 @@ fixed_in = "871f985"
 revert = [["tools/cupc8.py", "        self.buf = b\"\"\n        self.resync()\n", "        self.buf = b\"\"\n"]]
 cmd = "make -C fw sysctl_sim && python3 test/host/test_cupc8.py"
 must_fail = ["FAIL rom id after a killed run's late reply"]
+
+[[bug]]
+name = "kernel BASIC: variables were never cleared, so on power-up junk RAM an unset one printed junk"
+fixed_in = "f9150e6"
+revert = [["kernel/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
+	xor r1, r1
+.clear_variables:
+	gt r1, #39
+	bzf .done_clear_variables
+	st [ub_variables]+r1, r0
+	add r1, #1
+	b .clear_variables
+.done_clear_variables:
+
+""", ""]]
+cmd = "tools/run_tests.sh testBasicJunkRamVariables"
+must_fail = ["FAIL: BASIC variables on junk RAM"]
+
+[[bug]]
+name = "storage card: F_CLOSE forgot the handle without f_close - the last partial sector and the directory entry never reached the card"
+fixed_in = "a0cdfa3"
+revert = [["fw/storage/core/storage.c", """	s->hmode[h] = H_CLOSED;
+	return fr_err(s, f_close(&s->fil[h]));""", """	s->hmode[h] = H_CLOSED;
+	return ST_OK;"""]]
+cmd = "make -s -C fw test_storage"
+must_fail = ["FAIL (long)(size_on_medium(name)) == (long)(sizes[i])", "STO-001/002 storage card core"]
+
+[[bug]]
+name = "kernel SAVE: the last chunk (under 128 bytes) was never written - the saved program lost its tail"
+fixed_in = "e4eeda1"
+revert = [["kernel/ubasic.s", """.last:
+	ld r0, [st_n]
+	eq r0, #0
+	bzf .close
+""", """.last:
+	b .close
+"""]]
+cmd = "tools/run_tests.sh testStorage"
+must_fail = ["FAIL: the saved program as a PC reads it (text, CR LF)", "FAIL: the loaded program runs"]
+
+[[bug]]
+name = "kernel SAVE: no F_CLOSE, so nothing flushed the file - a PC, or the machine after a power cycle, found it empty"
+fixed_in = "e4eeda1"
+revert = [["kernel/ubasic.s", """.close:
+	push pch
+	push pcl
+	b st_close
+	eq r0, #0
+	bzf .saved
+	b .error
+.saved:""", """.close:
+	b .saved
+.saved:"""]]
+cmd = "tools/run_tests.sh testStorage"
+must_fail = ["FAIL: the saved program as a PC reads it (text, CR LF)", "FAIL: the loaded program runs"]

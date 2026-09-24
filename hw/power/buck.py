@@ -14,7 +14,8 @@ DC-bias derated) plus the least decoupling the main board must fit
 (design.C_3V3_DECOUPLE_MIN).
 
 Runs:
-  low, high   5V_SYS applied at t = 0 (ramping in 120 us, as the SY6280 does),
+  low, high   5V_SYS applied at t = 0 (ramping in 120 us: the attach itself, with
+              the eFuse's slower dVdt ramp, is POW-004's),
               10 mA load; at 1.3 ms a 0 -> 500 mA step (1 us edge), released
               at 1.6 ms
   full        start-up at the low corner into the full M1 3V3 load and all
@@ -37,6 +38,7 @@ import design as d
 import spice
 from spice import Checks
 
+T_APPLY = 120e-6         # 5V_SYS rise in these decks (see the docstring)
 T_STEP, T_REL, T_END = 1.3e-3, 1.6e-3, 1.9e-3
 I_LIGHT, I_STEP = 0.010, 0.500
 
@@ -59,7 +61,7 @@ R2 fb 0 {r2}
 run
 wrdata {{name}}.dat v(out) v(sw) v(vin)
 .endc
-""".format(v5=v5_src, ton=d.SY6280_TON, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
+""".format(v5=v5_src, ton=T_APPLY, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
            iother=i_other, l=d.BUCK_L, cout=cout, r1=d.BUCK_R1, r2=d.BUCK_R2, load=load, tend="{tend}")
 
 
@@ -67,7 +69,7 @@ def corner(name):
     """(source V, input R, other 5 V loads A) so that 5V_SYS lands where budget.py puts it."""
     worst = budget.chain("worst")
     if name in ("low", "full"):
-        r_in = d.CABLE_R_VBUS + d.CABLE_R_GND + d.R_RECEPTACLE + d.FUSE_IN_R_MAX + d.SY6280_RON_MAX + d.R_5VSYS
+        r_in = d.r_in(True)
         i_other = worst["itot"] - budget.i_buck_in(worst["v5"])
         return d.VBUS_MIN, r_in, i_other
     return d.VBUS_MAX, 0.05, 0.0
@@ -105,10 +107,7 @@ def wifi_deck(corner):
     will."""
     ch = budget.chain(corner)
     worst = corner == "worst"
-    k = 1.0 if worst else 0.5
-    r_in = (k * (d.CABLE_R_VBUS + d.CABLE_R_GND) + d.R_RECEPTACLE
-            + (d.FUSE_IN_R_MAX if worst else d.FUSE_IN_R_MIN)
-            + (d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP) + d.R_5VSYS)
+    r_in = d.r_in(worst)
     i0, i1 = d.ESP32_I_IDLE + d.WIFI_I_LEDS, d.WIFI_I_3V3
     return """
 Vs src 0 PWL(0 0 {ton} {vbus})
@@ -130,7 +129,7 @@ Iesp out 0 PWL(0 {i0} {t1} {i0} {t1e} {i1} {t2} {i1} {t2e} {i0})
 run
 wrdata {{name}}.dat v(out) v(sw) v(card)
 .endc
-""".format(vbus=ch["vbus"], ton=d.SY6280_TON, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
+""".format(vbus=ch["vbus"], ton=T_APPLY, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
            iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], cin=d.WIFI_CIN * d.CERAMIC_DERATE,
            l=d.WIFI_BUCK_L, cout=d.WIFI_COUT * d.CERAMIC_DERATE, chf=d.WIFI_COUT_HF, r1=d.WIFI_BUCK_R1,
            r2=d.WIFI_BUCK_R2, i0=i0, i1=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6, tend=T_END)
