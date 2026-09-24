@@ -125,10 +125,12 @@ prove it):
   checks the table exhaustively (all opcodes; all second halfwords of the
   32-bit ones) and executes every opcode through the table and through the
   plain chain (`executeInstructionChain()`, the reference) from the same state.
+  The table is `constexpr` (built at compile time).
 - Instruction fetch (`CortexM0Core::fetch16`) reads SRAM, flash, its XIP
   mirrors (0x11-0x13) and the bootrom directly, as `readUint16`'s own fast
   paths and its aligned-word fallback do (no side effects there); anything
-  else, including a halfword at the end of a memory, takes `readUint16`.
+  else (and, to keep the bounds simple, the last halfword of flash and of
+  the bootrom) takes `readUint16`.
   Nothing is cached, so writes need no invalidation. core-diff runs blocks
   from SRAM, flash, the three mirrors and the bootrom, and now and then
   fetches at the end of a memory or outside every memory.
