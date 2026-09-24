@@ -4,6 +4,10 @@
 //
 //   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004] [--record]
 //
+// CUPC8_EMU=native runs them on the native emulator (emu/machine,
+// test/emu/machinenative.mjs: the same machine, cycle for cycle, faster);
+// the default is machine.mjs.
+//
 // Screens are compared with recorded text (test/emu/golden/*.txt); --record
 // rewrites them after a human has checked the run.
 
@@ -11,7 +15,8 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { Machine } from './machine.mjs';
+const backend = process.env.CUPC8_EMU === 'native' ? 'native' : 'js';
+const { Machine } = await import(backend === 'native' ? './machinenative.mjs' : './machine.mjs');
 import { kernelRom, ROOT } from './romimage.mjs';
 
 const only = process.argv.slice(2).find((a) => a.startsWith('E2E-'));
@@ -122,6 +127,7 @@ async function e2e003() {
 }
 
 const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003 };
+log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (!only || only === id) await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

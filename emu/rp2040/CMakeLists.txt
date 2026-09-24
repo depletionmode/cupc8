@@ -8,19 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Link-time optimisation: the per-cycle paths cross files (PIO -> GPIO pin ->
-# pads, core -> bus -> peripheral) and inlining them is ~25% faster on the
-# card images. No fast-math: the float time arithmetic is exact JS semantics
-# (EMU-004's traces are byte-identical either way).
-option(RP2040EMU_LTO "build with link-time optimisation" ON)
-if(RP2040EMU_LTO)
-  include(CheckIPOSupported)
-  check_ipo_supported(RESULT _rp2040emu_ipo OUTPUT _rp2040emu_ipo_msg LANGUAGES CXX)
-  if(_rp2040emu_ipo)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-  endif()
-endif()
-
 if(DEFINED ENV{CUPC8_SDK})
   set(_sdk "$ENV{CUPC8_SDK}")
 else()
