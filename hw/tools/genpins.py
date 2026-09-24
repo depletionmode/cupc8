@@ -86,6 +86,7 @@ def outputs(pins):
         os.path.join(ROOT, "fw", "gpu", "pins.h"): header(devs["gpu_mcu"], "GPU_PINS_H"),
         os.path.join(ROOT, "fw", "io", "pins.h"): header(devs["io_mcu"], "IO_PINS_H"),
         os.path.join(ROOT, "fw", "wifi", "pins.h"): header(devs["wifi_mcu"], "WIFI_PINS_H"),
+        os.path.join(ROOT, "fw", "storage", "pins.h"): header(devs["storage_mcu"], "STORAGE_PINS_H"),
     }
     nets = {}
     for dname, dev in devs.items():

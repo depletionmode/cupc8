@@ -8,7 +8,7 @@ and 12. The pinout is custom. Never plug a real PCIe card in.
   hot-pluggable, and nothing is built to survive a card pulled while running.
 - **Slots are electrically identical.** Slot *n* (1–6) is SPI device *n−1*
   (see `memory-map.md`).
-- **M1 uses three slots:** graphics, IO and Wi-Fi. Slots 4–6 are free for
+- **M1 uses four slots:** graphics, IO, Wi-Fi and storage. Slots 5–6 are free for
   future cards.
 - **Card:** a 1.6 mm PCB with gold fingers (hard gold, 30° bevel: `milestone-1.md`), 18 per
   side.
@@ -131,7 +131,8 @@ table):
 | $01 | Graphics / HDMI (`gpu-protocol.md`) |
 | $02 | IO / USB keyboard (`io-card.md`) |
 | $03 | Wi-Fi networking (`wifi-card.md`) |
-| $04–$FE | reserved |
+| $04 | Storage (`storage-card.md`; M1: microSD) |
+| $05–$FE | reserved |
 
 Opcodes $00–$EF are card-specific. In every card spec, **→** marks response
 bytes, which are collected with a READ frame.
