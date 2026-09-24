@@ -1925,8 +1925,15 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
-            presence_link(b, outline[3], across=pcbnew.In2_Cu if layers == 4 else None)
-            tab_via_keepout(b, outline[3])
+            if layers == 4:
+                # across on In2.Cu inside the tab, just below the body, where
+                # no route needs In2 (the tab has no vias), so it walls off
+                # nothing; the via keepout starts below it
+                presence_link(b, outline[3], rise=-0.8, across=pcbnew.In2_Cu)
+                tab_via_keepout(b, outline[3] + 1.5)
+            else:
+                presence_link(b, outline[3])
+                tab_via_keepout(b, outline[3])
             state["escaped"] = key_escapes(b, outline[3], skip=zones)
         state["fanout"] = ground_fanout(b, zones[0])
         pcbnew.SaveBoard(pcb, b, True)
