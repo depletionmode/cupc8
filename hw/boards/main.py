@@ -642,6 +642,13 @@ LABELS.update({"D%d" % (11 + i): str(i) for i in range(8)})
 FPGA = (97.0, 47.0)                               # centre of U7
 LOGO_MM = 12
 LOGO_AT = (108.0, 160.0)
+TITLE, REVISION = "CUPC/8 main board", "A"
+REV_AT = (W - 10.0, H - 1.5)                       # bottom-right of "<title> rev <rev>", clear of H4
+
+
+def rev_box():
+    w, h = _text_w("%s rev %s" % (TITLE, REVISION))
+    return (REV_AT[0] - w, REV_AT[1] - h, REV_AT[0], REV_AT[1])
 # the I/O cards' M3 hole is 52 mm east of contact B1 and 40 mm up (slot.md,
 # Mechanical), so all six line up on x = RAIL_X: a mounting rail there carries
 # a standoff per card, on two posts screwed to the board beyond slots 1 and 6
@@ -852,7 +859,7 @@ def legalize(parts, at, margin=0.35, extra=None):
                 lib, name = s.fp.split(":")
                 _FP_CACHE[s.ref] = pcbnew.FootprintLoad(kg.footprint_dir(lib), name)
             fps[s.ref] = _FP_CACHE[s.ref]
-    placed = []
+    placed = [rev_box()]
     placed.append((LOGO_AT[0] - LOGO_MM / 2 - 0.5, LOGO_AT[1] - LOGO_MM / 2 - 0.5,
                    LOGO_AT[0] + LOGO_MM / 2 + 0.5, LOGO_AT[1] + LOGO_MM / 2 + 0.5))
     out = {}
@@ -935,6 +942,7 @@ def _designators(parts, pl):
         pads += [box(p.GetBoundingBox(), 0.15) for p in fp.Pads()]
     lx, ly = LOGO_AT
     courts["G1"] = (lx - LOGO_MM / 2, ly - LOGO_MM / 2, lx + LOGO_MM / 2, ly + LOGO_MM / 2)
+    courts["REV"] = rev_box()
     x0, y0, x1, y1 = OUTLINE
     inside = (x0 + 0.3, y0 + 0.3, x1 - 0.3, y1 - 0.3)
     placed, bad, gap = [], [], 0.3
@@ -1009,7 +1017,8 @@ def main():
     pl = placement()
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=4, zones=("/GND",), planes=PLANES,
-                       power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3)
+                       power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3,
+                       title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
     n = pincheck.check_mainboard(load_pins(), net)
     if pincheck.errors:
