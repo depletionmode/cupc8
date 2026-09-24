@@ -600,6 +600,11 @@ function generate(seed, nOps) {
   for (let pin = 0; pin < 30; pin++) {
     if (r.chance(0.85)) ops.push(`W ${hex8(IO_BANK0 + 8 * pin + 4)} 4`);
   }
+  // DMA addresses start at 0 (the bootrom), where an unaligned 32-bit read is undefined in TS
+  for (let ch = 0; ch < 12; ch++) {
+    ops.push(`W ${hex8(DMA_BASE + ch * 0x40)} ${hex8(dmaReadSource(r))}`);
+    ops.push(`W ${hex8(DMA_BASE + ch * 0x40 + 4)} ${hex8(dmaWriteTarget(r))}`);
+  }
   for (let s = 0; s < 2; s++) ops.push(`SM ${s} ${r.below(3)}`);
   for (let i = 0; i < 2; i++) ops.push(`IM ${i} ${r.below(3)}`);
 
@@ -886,7 +891,7 @@ function runJS(ops) {
     }
   } catch (e) {
     if (e instanceof RunawayError) log('RUNAWAY');
-    else log(`EXCEPTION ${e.message}`);
+    else log(`EXCEPTION ${e.name}: ${e.message}`);
   }
   return out;
 }
@@ -913,7 +918,9 @@ const seeds = ONLY_SEED !== null ? [Number(ONLY_SEED)] : Array.from({ length: SE
 let totalLines = 0,
   totalOps = 0,
   runaways = 0,
-  failures = 0;
+  failures = 0,
+  exceptions = 0;
+const ckValues = new Set();
 const stats = { A: 0, I: 0, r: 0, B: 0, X: 0, G: 0, L: 0, IS: 0, IC: 0, IW: 0, IR: 0, IP: 0, AR: 0, WD: 0 };
 for (const seed of seeds) {
   const ops = generate(seed, OPS);
@@ -929,6 +936,8 @@ for (const seed of seeds) {
     if (k in stats) stats[k]++;
   }
   if (js[js.length - 1] === 'RUNAWAY') runaways++;
+  if (js[js.length - 1].startsWith('EXCEPTION')) exceptions++;
+  for (const l of js) if (l.startsWith('CK ')) ckValues.add(l);
   let bad = -1;
   const n = Math.max(js.length, cx.length);
   for (let i = 0; i < n; i++) {
@@ -960,7 +969,7 @@ const summary =
   `${seeds.length} seeds, ${totalOps} ops, ${totalLines} trace lines compared ` +
   `(${stats.r} reads, ${stats.A} alarms, ${stats.I} IRQ changes, ${stats.G} GPIO changes, ` +
   `${stats.B} UART bytes, ${stats.X} SPI bytes, ${stats.IS + stats.IC + stats.IW + stats.IR + stats.IP} I2C callbacks, ` +
-  `${stats.AR} ADC reads, ${stats.WD} watchdog triggers, ${stats.L} log messages, ${runaways} runaway scenarios)`;
+  `${stats.AR} ADC reads, ${stats.WD} watchdog triggers, ${stats.L} log messages, ${ckValues.size} distinct DMA-window checksums, ${runaways} scenarios ended by a runaway, ${exceptions} by a JS exception)`;
 if (failures) {
   console.log(`PERIPH DIFF FAIL ${failures} seed(s) mismatched; ${summary}`);
   process.exit(1);
