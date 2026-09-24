@@ -686,7 +686,7 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None):
+                zone_outline=None, labels=None, plane=False):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -776,6 +776,11 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
+    if plane and layers == 4:
+        # In1.Cu is a solid plane of the pour net: a power layer, which
+        # the Specctra export marks so Freerouting routes nothing on it
+        board.SetLayerType(pcbnew.In1_Cu, pcbnew.LT_POWER)
+        copper.append(pcbnew.In1_Cu)
     for net in zones:
         for layer in copper:
             z = pcbnew.ZONE(board)
@@ -1358,8 +1363,9 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     others = []                                   # other nets' pads, grown for a via / a track
     for p, _ in pads:
         # not paste-only apertures (a QFN's exposed-pad stencil windows): no
-        # copper, no net, but they would keep every via off the exposed pad
-        if p.GetNetname() != net and p.IsOnCopperLayer():
+        # copper, no hole, no net, but they would keep every via off the
+        # exposed pad. Holes (NPTH pegs) still count.
+        if p.GetNetname() != net and (p.IsOnCopperLayer() or p.GetDrillSize().x > 0):
             bb = p.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []
@@ -1861,7 +1867,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, fine_nets=()):
+             io_card=False, fine_nets=(), plane=False):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1914,7 +1920,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
-                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels)
+                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
+                        plane=plane)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
