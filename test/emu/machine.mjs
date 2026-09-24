@@ -268,6 +268,12 @@ export class Machine {
       const cs = (out >> 2) & 0x7f;
       if (this.sysctl) this.br = this.sysctl.bridgePins((out >> 9) & 1);
       const busy = cs !== 0x7f || (this.br && (!this.br.ncs || this.sysctl.pending));
+      // A card reacts to the pins it was given at the last clock during the
+      // clock that follows, so it runs up to the next edge before the core
+      // samples MISO there. (Advancing it only afterwards gave it no time at
+      // all: at SCK = 6 MHz, one clock per half period, every MISO bit came
+      // a whole bit late.)
+      if (cs !== 0x7f) for (const card of Object.values(this.cards)) card.advance(core.ns() + NS_PER_CLOCK);
       core.run(busy ? 1 : IDLE_CLOCKS, this.inputs());
       const t = core.ns();
       this.sysctl?.advance(t);
