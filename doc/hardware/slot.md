@@ -168,7 +168,19 @@ ESP ROM bootloader sync.
 ## Mechanical
 
 - **Slot pitch:** 20.32 mm, for the full-height cards. Six slots take ≈ 122 mm.
-- **Card outline:** max 100 mm × 60 mm above the socket.
+- **Card outline:** every I/O card has the **same outline**, so that cards
+  line up in the case and their power LEDs sit in one row. In KiCad's
+  `BUS_PCIexpress_x1` footprint frame (finger B1 at the origin, fingers
+  pointing +y):
+  - the body is x −6.0 … 56.0 mm, y −44.0 … −4.95 mm (62 × 39.05 mm above the
+    finger tab);
+  - **M3 mounting hole** (3.2 mm, non-plated, 6.4 mm keep-out) centred at
+    (52.0, −40.0), 4 mm in from the top-right corner;
+  - **power LED** (0603, lit from the card's own 3.3 V rail) centred at
+    (−3.0, −41.0), 3 mm in from the top-left corner, the same on every card;
+  - nothing but the fingers' ground ties within 5 mm above the tab.
+  `hw/tools/kicadgen.py` carries these as `IO_CARD_*`, and every card's
+  script uses them.
 - **Connectors:** on the card's top edge, facing away from the main board.
 - **Mounting:** each card has an M3 hole that lines up with a standoff on a
   main board mounting rail.
