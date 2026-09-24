@@ -4,6 +4,9 @@ An RP2040 runs TinyUSB in **host** mode on its native USB port, with a USB-A
 receptacle. It turns a HID keyboard into a byte stream for the CPU, over the
 common SPI framing in `slot.md`.
 
+*Proposed for M1, not implemented yet:* a microSD slot on this card, with
+file commands at $10–$1F (`../proposals/io-microsd.md`).
+
 ## Hardware
 
 - **USB-A receptacle.** D+/D− go straight to the RP2040's USB pins, with 27 Ω
