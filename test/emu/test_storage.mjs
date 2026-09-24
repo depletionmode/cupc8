@@ -334,7 +334,21 @@ if (section('slow')) {
   expect(polled.early[1] === 0 && (polled.early[0] & S.BUSY), `slow card: a READ during the write gives RESP_LEN 0 with BUSY set (${polled.early})`);
   expect(polled.answered === polled.n, `slow card: every status frame answered while the card writes (${polled.answered}/${polled.n})`);
   expect(polled.busy >= 1000, `slow card: BUSY stays set through the write (${polled.busy} polls x 200 us)`);
+  // a raw block written, then ST_EJECT: once EJECT has answered, the user
+  // may pull the card, so the block must be programmed by then (the card
+  // stores a block only when its busy time ends)
+  const total = fs.statSync(img).size / 512;
+  const blk = Buffer.alloc(512, 0x5a);
+  const saved = fs.readFileSync(img).subarray((total - 1) * 512, total * 512);
+  for (let off = 0; off < 512; off += 128) post([0x23, off & 255, off >> 8, 128, ...blk.subarray(off, off + 128)]);
+  expect(err(cmd([0x21, ...le32(total - 1)])) === 0, 'slow card: BLK_WRITE of the last sector');
+  expect(err(cmd([0x03])) === 0, 'slow card: ST_EJECT');
   const card = pull();
+  const onCard = fs.readFileSync(img).subarray((total - 1) * 512, total * 512);
+  expect(onCard.equals(blk), 'slow card: a block written before ST_EJECT is on the card when it is pulled right after');
+  const fd = fs.openSync(img, 'r+');
+  fs.writeSync(fd, saved, 0, 512, (total - 1) * 512);
+  fs.closeSync(fd);
   expect(card.stats.busyNs >= 250e6, `the model was busy ${card.stats.busyNs / 1e6} ms`);
   noViolations(card, 'slow card');
   expect(fatGet(img, 'SLOW.TXT')?.equals(data), 'slow card: the host reads SLOW.TXT');
