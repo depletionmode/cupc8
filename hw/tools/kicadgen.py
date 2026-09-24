@@ -1220,7 +1220,9 @@ def remove_dangling(board, pours=()):
             return False
         gone = []
         for v in vias:
-            layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
+            # any copper layer: a via can join an outer track to an inner-layer run
+            copper = [board.GetLayerID(board.GetLayerName(l)) for l in board.GetEnabledLayers().CuStack()]
+            layers = [l for l in copper if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(pcbnew.F_Cu) // 2, skip=v)]
             if len(layers) < 2:
                 gone.append(v)
         for t in segs:
