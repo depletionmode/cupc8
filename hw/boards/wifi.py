@@ -54,6 +54,14 @@ def schematic(path, footprint_libs):
     r6 = passive("R", "R6", "100", R0603, "C22775", (146 * G, 70 * G))     # link LED
     d2 = s.add("Device:LED", "D2", "green", "LED_SMD:LED_0603_1608Metric", at=(146 * G, 80 * G), rot=90,
                fields={"LCSC": "C12624"})
+    # TX/RX: socket data sent and received (milestone-1.md, Indicator LEDs), green like LINK
+    r7 = passive("R", "R7", "100", R0603, "C22775", (40 * G, 82 * G))       # TX LED
+    d3 = s.add("Device:LED", "D3", "green", "LED_SMD:LED_0603_1608Metric", at=(40 * G, 92 * G), rot=90,
+               fields={"LCSC": "C12624"})
+    r8 = passive("R", "R8", "100", R0603, "C22775", (56 * G, 82 * G))       # RX LED
+    d4 = s.add("Device:LED", "D4", "green", "LED_SMD:LED_0603_1608Metric", at=(56 * G, 92 * G), rot=90,
+               fields={"LCSC": "C12624"})
+    h1 = s.add("Mechanical:MountingHole", "H1", "M3", kg.MOUNTING_HOLE, at=(20 * G, 100 * G))
     tp1 = s.add("Connector:TestPoint", "TP1", "USB_D-", "cupc8:TestPad_D1.0mm", at=(152 * G, 50 * G),
                 rot=90)
     tp2 = s.add("Connector:TestPoint", "TP2", "USB_D+", "cupc8:TestPad_D1.0mm", at=(152 * G, 56 * G),
@@ -114,8 +122,6 @@ def schematic(path, footprint_libs):
     s.connect(u1, "IO4", "LED_LINK")
     s.connect(u1, "IO18", "USB_DN")
     s.connect(u1, "IO19", "USB_DP")
-    for p in ("IO0", "IO1"):
-        s.nc(u1, p)
 
     # EN: RC per Espressif; CARD_RST_n pulls it low
     s.connect(r1, 1, "3V3")
@@ -144,6 +150,15 @@ def schematic(path, footprint_libs):
     s.connect(d2, "A", "LED_LINK_A")
     s.connect(d2, "K", "GND")
 
+    s.connect(u1, "IO0", "LED_TX")
+    s.connect(u1, "IO1", "LED_RX")
+    for r, d, net in ((r7, d3, "LED_TX"), (r8, d4, "LED_RX")):
+        s.connect(r, 1, net)
+        s.connect(r, 2, net + "_A")
+        s.connect(d, "A", net + "_A")
+        s.connect(d, "K", "GND")
+    del h1                                     # a hole: no pins
+
     # native USB-Serial/JTAG, for debugging only
     s.connect(tp1, 1, "USB_DN")
     s.connect(tp2, 1, "USB_DP")
@@ -156,26 +171,31 @@ def schematic(path, footprint_libs):
 
 # Board coordinates (mm). The finger tab is the footprint's: x -0.65..19.65,
 # meeting the body at y = -4.95; the body extends up (negative y).
-BODY = (-6, -44, 56, -4.95)
-EDGE = [(-0.65, -4.95), (-6, -4.95), (-6, -44), (56, -44), (56, -4.95), (19.65, -4.95)]
+BODY = kg.IO_CARD_BODY                      # every I/O card's outline (slot.md, Mechanical)
+EDGE = kg.IO_CARD_EDGE
 PLACEMENT = {
+    "H1": kg.IO_CARD_HOLE + (0,),
+    "D1": kg.IO_CARD_PWR_LED + (0,),           # the power LED: the same place on every board
+    "R5": (-3, -38.5, 0),
     "J1": (0, 0, 0),
     "U3": (26, -15, 0),
     "C4": (26, -18.5, 0),
     "U2": (4, -14, 0),
     "C1": (-2.5, -9, 90),
     "C2": (11, -12.5, 90),                 # clear of the fingers' GND ties (up to y = -9.45)
-    "U1": (44, -31, 0),                    # the U.FL end at the top edge
-    "C3": (34, -20, 90),
+    "U1": (41, -29, 0),                    # the U.FL end towards the top edge, clear of H1
+    "C3": (32.5, -31.4, 0),                # beside U1's 3V3 pin (pin 3)
     "R1": (30, -14, 90),
     "C5": (32, -14, 90),
     "R2": (52, -20, 90),
     "R3": (50, -20, 90),
     "R4": (48, -20, 90),
-    "R5": (2, -22, 0),
-    "D1": (2, -24.5, 0),
-    "R6": (28, -24, 0),
-    "D2": (28, -26.5, 0),
+    "R6": (19, -24, 0),
+    "D2": (19, -26.5, 0),                  # LINK, TX, RX in a row
+    "R7": (25, -24, 0),
+    "D3": (25, -26.5, 0),
+    "R8": (31, -24, 0),
+    "D4": (31, -26.5, 0),
     "TP1": (34, -38, 0),
     "TP2": (28, -38, 0),
 }
@@ -185,8 +205,9 @@ LOGO_MM = 12
 def main():
     logo.footprint(LOGO_MM)
     lcsc = kg.pipeline("wifi", schematic, PLACEMENT, BODY, out=sys.argv[1] if len(sys.argv) > 1 else None,
-                       edge=EDGE, card_edge=True, zone_outline=kg.card_zone(BODY, (-0.65, 19.65), -1.5), power_nets=("/+5V", "/3V3", "/GND"),
-                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 10, -35, 0)])
+                       edge=EDGE, card_edge=True, zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5), power_nets=("/+5V", "/3V3", "/GND"),
+                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 10, -35, 0)],
+                       labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"})
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

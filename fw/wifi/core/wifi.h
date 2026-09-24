@@ -81,6 +81,7 @@ struct wifi {
 	bool resolve_ok;
 	uint8_t resolve_ip[4];
 	uint8_t link;                     /* last link state seen */
+	uint32_t tx_bytes, rx_bytes;      /* socket data sent and received: the TX/RX LEDs */
 };
 
 void wifi_init(wifi_t *w, const wifi_net_ops *net, void *ctx);
