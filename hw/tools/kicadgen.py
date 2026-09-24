@@ -643,9 +643,9 @@ NET_CLASSES = [
     ("Power", 0.5, 0.2, 0.8, 0.4),
     # nets on 0.4 mm pitch pads (QFN): 0.15 mm tracks and 0.15 mm clearance
     # (JLC: 0.127), or a track can't turn out of a pad beside its neighbour
-    # (a pad gap is 0.2). Its vias are 0.7 mm, so two of them 0.15 apart
-    # still keep their 0.3 mm holes 0.55 apart (JLC: 0.5)
-    ("Fine", 0.15, 0.15, 0.7, 0.3),
+    # (a pad gap is 0.2). Its vias are 0.65 mm, so two of them 0.15 apart
+    # still keep their 0.3 mm holes 0.5 apart (JLC: 0.5)
+    ("Fine", 0.15, 0.15, 0.65, 0.3),
 ]
 
 
