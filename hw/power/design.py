@@ -81,9 +81,13 @@ SLOT_CARD_MAX = 1.0                             # slot.md: <= 1 A per card, +5V 
 BUCK_L = assume("main", "3V3 buck inductor 2.2 uH (TI's standard LC), Isat >= 2.5 A, DCR <= 50 mOhm", 2.2e-6)
 BUCK_COUT = assume("main", "3V3 buck output: 22 uF X5R/X7R 10 V at the buck (TI table 4: 2.2 uH + 22 uF)", 22e-6)
 BUCK_COUT_EFF = 0.6         # DC-bias derating of an 0805 22 uF at 3.3 V (TI table 4 allows -50%)
+C_3V3_DECOUPLE_MIN = assume("main", "3V3 decoupling besides the buck's own 22 uF: >= 20 uF effective "
+                            "(after DC-bias derating), spread over the loads", 20e-6)
 BUCK_CIN = assume("main", "3V3 buck input: 10 uF at the VIN pin", 10e-6)
-BUCK_R1, BUCK_R2 = assume("main", "3V3 feedback divider 453k / 100k, 1% (VOUT = 3.318 V)", (453e3, 100e3))
-BUCK_RES_TOL = 0.01
+BUCK_R1, BUCK_R2 = assume("main", "3V3 feedback divider 453k / 100k (VOUT = 3.318 V)", (453e3, 100e3))
+# 1 % resistors put the light-load (power-save) 3V3 9 mV over 3.465 V at the
+# high corner (POW-001 P3/P5) and leave the MAX811T 29 mV (P1)
+BUCK_RES_TOL = assume("main", "3V3 feedback divider resistors 0.1 % (1 % fails POW-001 P3/P5 by 6-9 mV)", 0.001)
 BUCK_VFB_NOM, BUCK_VFB_TOL = 0.600, 0.020       # DS 0.588..0.612
 BUCK_RHS, BUCK_RLS = 0.100, 0.060               # DS typ RDS(on)
 BUCK_RDS_HOT = 1.4 * 1.2    # Tj 100 C (~1.4x) and process spread (1.2x): no max in the datasheet
@@ -101,6 +105,8 @@ V3V3_MIN = 3.135            # 3.3 V - 5 %: iCE40 VCCIO (3.3 V LVCMOS), RP2040 US
 V3V3_MAX = 3.465
 MAX811T_VTH_MAX = 3.17      # MAX811T reset threshold, -40..85 C: 2.98-3.17 V. From the ADI
                             # datasheet table; not re-fetched (LCSC and ADI unavailable 2026-09-24)
+MAX811_GLITCH_S = 10e-6     # dips shorter than this don't reset it. ASSUMED: the datasheet's
+                            # transient-immunity curve (tens of us at small overdrive) not re-fetched
 
 # ---------------------------------------------------------------------------
 # 1V2 LDO: RT9013-12 (main board chipset core; the CPU card has its own)
@@ -115,6 +121,10 @@ RT9013_TOL = 0.02           # DS output accuracy
 RT9013_THETA_JA = 250.0     # DS SOT-23-5
 RT9013_COUT = assume("main/CPU", "1V2 LDO output: 1 uF at the LDO + 4 x 100 nF at the iCE40 VCC pins", 1.0e-6 + 4 * 100e-9)
 V1V2_MIN, V1V2_MAX = 1.14, 1.26                 # iCE40 HX VCC recommended range
+# the 3V3 ripple the 1V2 LDO sees: (Hz, Vpp). POW-001 measures 10-17 mVpp at
+# 17-30 kHz in power-save (10 mA) and 1.5-1.6 mVpp at 1.1-1.4 MHz in PWM;
+# these are those with a 2-3x allowance
+BUCK_RIPPLE = [(17e3, 0.030), (30e3, 0.030), (1.1e6, 0.005), (1.5e6, 0.005)]
 I_1V2_MAX = 0.040                               # power.md (chipset core)
 
 # ---------------------------------------------------------------------------
