@@ -74,3 +74,15 @@ target_include_directories(sysctl PRIVATE sysctl ${FW}/sysctl ${FW}/sysctl/core)
 target_compile_definitions(sysctl PRIVATE PICO_DEFAULT_UART_TX_PIN=0 PICO_DEFAULT_UART_RX_PIN=1)
 target_link_libraries(sysctl pico_stdlib pico_unique_id tinyusb_device hardware_spi hardware_i2c hardware_adc hardware_pio hardware_dma)
 pico_generate_pio_header(sysctl ${CMAKE_CURRENT_LIST_DIR}/sysctl/uart.pio)
+
+# e-ink graphics card: the graphics core with mode 2's buffer, the e-ink
+# core, the panel on SPI1 (eink.elf: 5.83" GDEY0583T81; eink750.elf: 7.5")
+foreach(_eink eink eink750)
+	add_executable(${_eink} eink/main.c ${FW}/eink/core/eink.c ${FW}/eink/core/uc8179.c
+		${FW}/gpu/core/gpu.c ${FW}/common/font8x8_cp437.c)
+	target_include_directories(${_eink} PRIVATE ${FW}/eink ${FW}/eink/core ${FW}/gpu/core)
+	target_compile_definitions(${_eink} PRIVATE GPU_GFX_BYTES=96000)
+	target_link_libraries(${_eink} pico_stdlib hardware_spi slotspi)
+endforeach()
+cupc8_strict(eink/main.c ${FW}/eink/core/eink.c ${FW}/eink/core/uc8179.c)
+target_compile_definitions(eink750 PRIVATE EINK_PANEL_750)
