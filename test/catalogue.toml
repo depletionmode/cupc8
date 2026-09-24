@@ -724,15 +724,6 @@ kind = "sim"
 vrow = "2.5"
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 
-[[test]]
-id = "STO-010"
-title = "Storage card real binary: files on the SD card model, checked on the host"
-checks = "the real storage.elf with the SD card model on its SPI1 (EMU-008), driven through the slot pins: IDENT type $04; no card: MEDIA clear, ST_INFO media 0, F_OPEN 'no medium'; an SDSC FAT16 and an SDHC FAT32 card made on the host mount on insertion; ST_INFO sizes; DIR; files written on the host read on the card, files the card writes (chunks, a partial chunk, append, two handles at once, rename, delete) read on the host with pyfatfs and pass fsck.fat; F_SEEK; not found, bad name, bad handle, exists; raw BLK_READ/BUF_GET of the boot sector, BUF_PUT/BLK_WRITE; ST_EJECT; a 250 ms-per-block card: every status frame answered with BUSY set and READ not ready until F_CLOSE completes; hot removal mid-write: MEDIA/MOUNTED clear, the open handle fails 'no medium', closed files intact after re-insertion; write-protected: WP in the status byte, writes and deletes refused, image unchanged; a full card: free 0, writes refused 'full', volume consistent; the firmware breaks no SD protocol rule and initialises at <= 400 kHz"
-method = "test/emu/test_storage.mjs on the native emulator (emu/rp2040/harness/sdcard.h, rp2040native.mjs SdSocket); host FAT: test/emu/fatimg.py (pyfatfs 1.1.0 in the SDK venv, fsck.fat)"
-kind = "sim"
-vrow = "2.5"
-cmd = "tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs"
-
 # ============================================================================
 # STO: storage card firmware (doc/hardware/storage-card.md)
 # ============================================================================
@@ -757,10 +748,11 @@ cmd = "make -s -C fw test_storage"
 [[test]]
 id = "STO-003"
 title = "Real binary on the emulated RP2040 with an SD card model"
-checks = "the real storage.elf on the native emulator with an SD SPI-mode model on SPI1 (CMD0/8/55/ACMD41/58, single-block read and write, busy time, card detect): mounts an image, writes and reads files that tools/fatcheck.py confirms, and the reverse; the slot answers (status byte, IDENT) while core 1 writes; ACT lit ~30 ms after SD activity, CARD while mounted"
-method = "the native emulator (emu/), the SD card model (another agent's work)"
+checks = "the real storage.elf with the SD card model on its SPI1 (EMU-008), driven through the slot pins: IDENT type $04; no card: MEDIA clear, ST_INFO media 0, F_OPEN 'no medium'; an SDSC FAT16 and an SDHC FAT32 card made on the host mount on insertion; ST_INFO sizes; DIR; files written on the host read on the card, files the card writes (chunks, a partial chunk, append, two handles at once, rename, delete) read on the host with pyfatfs and pass fsck.fat; F_SEEK; not found, bad name, bad handle, exists; raw BLK_READ/BUF_GET of the boot sector, BUF_PUT/BLK_WRITE; ST_EJECT; a 250 ms-per-block card: every status frame answered with BUSY set and READ not ready until F_CLOSE completes; the ACT LED lit after an access and dark 50 ms later, CARD lit while mounted; hot removal mid-write: MEDIA/MOUNTED clear, the open handle fails 'no medium', closed files intact after re-insertion; write-protected: WP in the status byte, writes and deletes refused, image unchanged; a full card: free 0, writes refused 'full', volume consistent; the firmware breaks no SD protocol rule and initialises at <= 400 kHz"
+method = "test/emu/test_storage.mjs on the native emulator (emu/rp2040/harness/sdcard.h, rp2040native.mjs SdSocket); host FAT: test/emu/fatimg.py (pyfatfs 1.1.0 in the SDK venv, fsck.fat)"
 kind = "sim"
 vrow = "2.9"
+cmd = "tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs"
 
 # ============================================================================
 # WIFI: Wi-Fi card firmware

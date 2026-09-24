@@ -1,4 +1,4 @@
-// STO-010: the real storage card firmware (build/rp2040/storage.elf) on the
+// STO-003: the real storage card firmware (build/rp2040/storage.elf) on the
 // native RP2040 emulator with the SD card model in its microSD socket
 // (emu/rp2040/harness/sdcard.h, SPI1), driven through its slot pins by the
 // CPU-side slot host with CUPC/8 SPI timing, as IOC-004 drives the IO card.
@@ -23,7 +23,7 @@ const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8
 const PY = path.join(SDK, 'pyfat/bin/python');
 const only = process.argv[2];
 if (!NATIVE) {
-  console.log('STO-010: needs the native emulator (CUPC8_EMU=native)');
+  console.log('STO-003: needs the native emulator (CUPC8_EMU=native)');
   process.exit(1);
 }
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-storage-'));
@@ -172,11 +172,17 @@ function insert(img, opts = {}) {
   sd.insert(img, opts);
   return until(S.MEDIA | S.MOUNTED, true);
 }
+// pull the card out, and wait until the firmware has seen it go (card
+// detect is debounced: a card swapped within 20 ms is never missed by a
+// person, only by a test)
 function pull() {
   const card = sd.card();
   sd.remove();
+  until(S.MEDIA, false, 200);
   return card;
 }
+const LED_ACT = 24, LED_CARD = 25;
+const led = (n) => emu.mcu.gpio[n].outputEnable && emu.mcu.gpio[n].outputValue;
 function noViolations(card, what) {
   expect(card && card.violations.length === 0, `${what}: the firmware keeps to the SD protocol (${card?.violations.join('; ')})`);
   expect(card && card.stats.maxHzBeforeInit <= 400e3, `${what}: SCK <= 400 kHz until initialised (${card?.stats.maxHzBeforeInit} Hz)`);
@@ -205,7 +211,11 @@ if (section('fat16')) {
   const img = image('fat16.img', 16, 16, { 'HOST.TXT': hostText, 'EMPTY.TXT': Buffer.alloc(0) });
   const st = insert(img, { highCapacity: false });
   expect((st & (S.MEDIA | S.MOUNTED)) === (S.MEDIA | S.MOUNTED), `SDSC: mounted on insertion (status $${st.toString(16)})`);
+  expect(led(LED_CARD), 'CARD LED lit while a card is mounted');
+  wait(50e6);
+  expect(!led(LED_ACT), 'ACT LED dark 50 ms after the last access');
   inf = info();
+  expect(led(LED_ACT), 'ACT LED lit right after an access (ST_INFO)');
   expect(inf && inf.media === 1 && inf.err === 0, `ST_INFO: media 1 (microSD), err 0 (${JSON.stringify(inf)})`);
   expect(inf && inf.total > 15000 && inf.total <= 16384 && inf.free > 14000 && inf.free < inf.total, `ST_INFO: total ${inf?.total} KB, free ${inf?.free} KB of a 16 MB FAT16 card`);
   const d = listDir();
@@ -276,8 +286,9 @@ if (section('fat16')) {
   expect(fatGet(img, 'UNO.TXT')?.equals(b), 'the host reads UNO.TXT (renamed) as written');
   const chk = fatCheck(img);
   expect(chk.startsWith('ok'), `the host's FAT check passes on the card's writes (${chk.trim()})`);
-  const s1 = until(S.MEDIA, false);
+  const s1 = status();
   expect(!(s1 & (S.MEDIA | S.MOUNTED)), `card out: MEDIA and MOUNTED clear (status $${s1.toString(16)})`);
+  expect(!led(LED_CARD), 'CARD LED dark with no card');
 }
 
 // ------------------------------------------------ an SDHC FAT32 card
@@ -386,6 +397,6 @@ if (section('full')) {
 const torn = host.log.filter((f) => f.miso.length && f.miso[0] & 0x80 && f.miso[0] !== 0xff);
 expect(torn.length === 0, `the status byte's bit 7 is always 0 (slot.md): ${torn.length} frames had ${[...new Set(torn.map((f) => '$' + f.miso[0].toString(16)))].slice(0, 8).join(' ')}`);
 fs.rmSync(dir, { recursive: true, force: true });
-console.log(`STO-010: real storage.elf with the SD card model, ${checks} checks, ${bad} failures ` +
+console.log(`STO-003: real storage.elf with the SD card model, ${checks} checks, ${bad} failures ` +
   `(${(emu.ns / 1e9).toFixed(2)} s emulated in ${((performance.now() - t0) / 1e3).toFixed(1)} s)`);
 process.exit(bad ? 1 : 0);
