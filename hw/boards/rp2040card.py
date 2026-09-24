@@ -18,6 +18,7 @@ import kicadgen as kg  # noqa: E402
 
 G = kg.GRID
 R0402 = "Resistor_SMD:R_0402_1005Metric"
+R0603 = "Resistor_SMD:R_0603_1608Metric"
 C0402 = "Capacitor_SMD:C_0402_1005Metric"
 C0805 = "Capacitor_SMD:C_0805_2012Metric"
 C1206 = "Capacitor_SMD:C_1206_3216Metric"
@@ -45,11 +46,12 @@ IOVDD = ("1", "10", "22", "33", "42", "49")
 DVDD = ("23", "50")
 
 
-def passive(s, kind, ref, value, at, rot=0, fp=None):
-    """A resistor or capacitor by value; the LCSC number follows the value."""
+def passive(s, kind, ref, value, at, rot=0, fp=None, lcsc=None):
+    """A resistor or capacitor by value; the LCSC number follows the value
+    (0402, and the bulk caps), or is given with another footprint."""
     if fp is None:
         fp = {"R": R0402, "C": C0805 if value in ("10u", "22u") else C1206 if value == "100u" else C0402}[kind]
-    return s.add("Device:" + kind, ref, value, fp, at=at, rot=rot, fields={"LCSC": LCSC[value]})
+    return s.add("Device:" + kind, ref, value, fp, at=at, rot=rot, fields={"LCSC": lcsc or LCSC[value]})
 
 
 def hide_pin_numbers(s, lib_id):
@@ -67,11 +69,14 @@ def two(s, part, a, b):
 
 
 
-# Board coordinates (mm), as the Wi-Fi card: the finger tab is the edge
-# footprint's (x -0.65..19.65, meeting the body at y = -4.95); the body
-# extends up (negative y), and its top edge carries the connector.
-BODY = (-6, -44, 56, -4.95)
-EDGE = [(-0.65, -4.95), (-6, -4.95), (-6, -44), (56, -44), (56, -4.95), (19.65, -4.95)]
+# Board coordinates (mm): every I/O card's outline (slot.md, Mechanical),
+# the finger tab at the bottom, the connector on the top edge. The power LED
+# sits at kg.IO_CARD_PWR_LED with its resistor below it, as on the Wi-Fi
+# card; the M3 hole at kg.IO_CARD_HOLE.
+BODY, EDGE = kg.IO_CARD_BODY, kg.IO_CARD_EDGE
+OUTLINE_PLACEMENT = {"D1": kg.IO_CARD_PWR_LED + (0,),
+                     "R4": (kg.IO_CARD_PWR_LED[0], kg.IO_CARD_PWR_LED[1] + 2.5, 0),
+                     "H1": kg.IO_CARD_HOLE + (0,)}
 POWER_NETS = ("/+5V", "/3V3", "/1V1", "/GND")
 
 
@@ -112,11 +117,11 @@ def core_placement(cx, cy, turn=0):
     return {r: (cx + x, cy + y, rot) for r, (x, y, rot) in rel.items()}
 
 
-def core(s, gpios, card, usb=False):
+def core(s, gpios, leds=(), usb=False):
     """The shared circuit. Sheet origin: the slot at the left, the RP2040 in
     the middle of an A2 sheet. `gpios` {gpio: net} are the card's own pins
     (the slot pins GPIO2-6 are wired here); every other GPIO is left
-    unconnected. `card` names the card on the LEDs' nets. `usb`: the native
+    unconnected. `leds`: the card's own LEDs [(net, "red"/"green")]. `usb`: the native
     USB port is used (nets USB_DP, USB_DM). Returns the parts."""
     p = {}
     # ---- the slot
@@ -246,17 +251,28 @@ def core(s, gpios, card, usb=False):
     p["C18"] = passive(s, "C", "C18", "100n", (48 * G, 80 * G))
     two(s, p["C18"], "3V3", "GND")
 
-    # ---- LEDs: power, and the card's GPIO25 LED
-    p["R4"] = passive(s, "R", "R4", "1k", (8 * G, 96 * G))
+    # ---- LEDs (milestone-1.md, Indicator LEDs): the power LED, lit from the
+    # card's own 3V3, in the same place on every card; then the card's own
+    # (`leds`: [(net, colour)])
+    p["R4"] = passive(s, "R", "R4", "1k", (8 * G, 96 * G), fp=R0603, lcsc="C21190")
     p["D1"] = s.add("Device:LED", "D1", "red", LED0603, at=(8 * G, 112 * G), rot=90, fields={"LCSC": "C2286"})
     two(s, p["R4"], "3V3", "LED_PWR")
     s.connect(p["D1"], "A", "LED_PWR")
     s.connect(p["D1"], "K", "GND")
-    p["R5"] = passive(s, "R", "R5", "1k", (22 * G, 96 * G))
-    p["D2"] = s.add("Device:LED", "D2", "red", LED0603, at=(22 * G, 112 * G), rot=90, fields={"LCSC": "C2286"})
-    two(s, p["R5"], gpios[25], "LED_%s_A" % card)
-    s.connect(p["D2"], "A", "LED_%s_A" % card)
-    s.connect(p["D2"], "K", "GND")
+    for i, (net, colour) in enumerate(leds):
+        r, d = "R%d" % (5 + i), "D%d" % (2 + i)
+        # red KT-0603R (Vf ~2 V) takes 1k from 3V3; green KT-0603G (Vf ~2.9 V) 100R
+        red = colour == "red"
+        p[r] = passive(s, "R", r, "1k" if red else "100R", ((22 + 12 * i) * G, 96 * G), fp=R0603,
+                       lcsc="C21190" if red else "C22775")
+        p[d] = s.add("Device:LED", d, colour, LED0603, at=((22 + 12 * i) * G, 112 * G), rot=90,
+                     fields={"LCSC": "C2286" if red else "C12624"})
+        two(s, p[r], net, net + "_A")
+        s.connect(p[d], "A", net + "_A")
+        s.connect(p[d], "K", "GND")
+
+    # ---- the M3 mounting hole every I/O card has (slot.md, Mechanical)
+    p["H1"] = s.add("Mechanical:MountingHole", "H1", "M3", kg.MOUNTING_HOLE, at=(60 * G, 112 * G))
 
     # ---- bring-up pads (slot.md: "a BOOTSEL pad and SWD test pads")
     for i, net in enumerate(("BOOTSEL", "SWCLK", "SWDIO", "RUN", "UART_TX", "GND")):
@@ -266,13 +282,14 @@ def core(s, gpios, card, usb=False):
     return p
 
 
-def build(name, schematic, placement, body, edge, power_nets, graphics, layers=2):
+def build(name, schematic, placement, power_nets, graphics, layers=2):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
         if fpid.startswith("cupc8:KaplanLabs_Logo_"):
             logo.footprint(float(fpid.rsplit("_", 1)[1][:-2]))
-    lcsc = kg.pipeline(name, schematic, placement, body, out=sys.argv[1] if len(sys.argv) > 1 else None,
-                       edge=edge, card_edge=True, zone_outline=kg.card_zone(body, (-0.65, 19.65), -1.5),
+    lcsc = kg.pipeline(name, schematic, dict(placement, **OUTLINE_PLACEMENT), BODY,
+                       out=sys.argv[1] if len(sys.argv) > 1 else None, edge=EDGE, card_edge=True,
+                       zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5),
                        power_nets=power_nets, graphics=graphics, layers=layers)
     print("LCSC:", " ".join(sorted(lcsc)))

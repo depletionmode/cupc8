@@ -18,12 +18,14 @@ import rp2040card as rc  # noqa: E402
 G = kg.GRID
 
 # io_mcu in hw/pins.yaml (the slot pins, GPIO2-6, are rp2040card's)
-GPIOS = {7: "VBUS_EN", 8: "VBUS_nFAULT", 16: "UART_TX", 25: "LED_KBD"}
+GPIOS = {7: "VBUS_EN", 8: "VBUS_nFAULT", 16: "UART_TX", 24: "LED_KEY", 25: "LED_KBD"}
 
 
 def schematic(path, footprint_libs):
     s = kg.Schematic("io", "CUPC/8 IO card (USB keyboard)", paper="A2")
-    rc.core(s, GPIOS, "KBD", usb=True)
+    # LEDs: keyboard connected (GPIO25), and keyboard activity (GPIO24), the
+    # one TX/RX-style LED an input-only link needs (milestone-1.md)
+    rc.core(s, GPIOS, leds=[("LED_KBD", "red"), ("LED_KEY", "green")], usb=True)
 
     # ---- VBUS: SY6280AAC switch from the slot's +5V. Ilim = 6800 / Rset:
     # 12k -> 0.57 A nominal (0.42-0.71 A over the +-25% spread), so a
@@ -78,7 +80,7 @@ def schematic(path, footprint_libs):
     s.write(path, footprint_libs=footprint_libs)
 
 
-BODY, EDGE, POWER_NETS = rc.BODY, rc.EDGE, rc.POWER_NETS + ("/VBUS",)
+POWER_NETS = rc.POWER_NETS + ("/VBUS",)
 # J2's opening is 12.04 mm in front of its footprint origin (the pegs are
 # 2.54 mm in front, the shell face 9.5 mm beyond them: C112455 drawing), so
 # turned to face up, the origin sits 12.04 mm below the top edge
@@ -87,14 +89,14 @@ PLACEMENT = dict(rc.core_placement(20, -24), **{
     "U2": (1.5, -13.5, 0),
     "C1": (-4.5, -13.5, 90),
     "C2": (7.5, -13.5, 90),
-    "U4": (17, -10, 0),
-    "C18": (20.5, -10, 90),
-    "R4": (-2.5, -38, 0),
-    "D1": (-2.5, -40.5, 0),
-    "R5": (1.5, -38, 0),
-    "D2": (1.5, -40.5, 0),
-    "J2": (40, -44 + 12.04, 180),
-    "U6": (40, -25, 0),
+    "U4": (17, -12, 0),
+    "C18": (20.5, -12, 90),
+    "R5": (20.5, -39.5, 0),
+    "D2": (20.5, -42, 0),
+    "R6": (26, -39.5, 0),
+    "D3": (26, -42, 0),
+    "J2": (39.5, -44 + 12.04, 180),
+    "U6": (39.5, -25, 0),
     "R14": (33, -25.5, 90),
     "R15": (35.5, -25.5, 90),
     "U5": (50, -22, 0),
@@ -113,4 +115,4 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 49.5, -10, 0)]
 
 
 if __name__ == "__main__":
-    rc.build("io", schematic, PLACEMENT, BODY, EDGE, POWER_NETS, GRAPHICS)
+    rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS)
