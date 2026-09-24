@@ -191,6 +191,11 @@ int main(int argc, char **argv) {
       hash.mix(v);
     }
   };
+  // Sync every pin's lastValue first, so that GPIO state left by other
+  // peripherals' reset() (PWM touches pin 1) does not enter the comparison.
+  for (GPIOPin &pin : mcu.gpio) {
+    pin.checkForUpdates();
+  }
   for (uint32_t pin = 0; pin < mcu.gpio.size(); pin++) {
     mcu.gpio[pin].addListener([&, pin](GPIOPinState state, GPIOPinState) {
       observe("gpio", pin, static_cast<uint32_t>(state));

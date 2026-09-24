@@ -43,3 +43,15 @@ target_link_libraries(rp2040run PRIVATE rp2040emu)
 add_executable(test_pio_diff test/pio/test_pio_diff.cpp)
 target_compile_options(test_pio_diff PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(test_pio_diff PRIVATE rp2040emu)
+
+# USB differential test: test/usb/usb_diff.mjs drives rp2040js and this replay
+# driver with the same ops and compares traces:
+#   node emu/rp2040/test/usb/usb_diff.mjs build/emu-native/test_usb_diff
+add_executable(test_usb_diff test/usb/test_usb_diff.cpp)
+target_compile_options(test_usb_diff PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(test_usb_diff PRIVATE rp2040emu)
+
+# differential test of the CortexM0Core / PPB port against rp2040js (driven by test/core/core-diff.mjs)
+add_executable(test_core_diff test/core/test_core_diff.cpp)
+target_compile_options(test_core_diff PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(test_core_diff PRIVATE rp2040emu)
