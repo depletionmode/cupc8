@@ -93,17 +93,18 @@ def closest(items_a, items_b, limit=1e9):
                     worst = (0.0, na, nb, c, c, common.Volume)
     if worst:
         return worst
-    # otherwise one exact distance between the two sets (OCC prunes by box)
-    ca = Part.makeCompound([s for _, s in items_a])
-    cb = Part.makeCompound([s for _, s in items_b])
-    d, pts, _ = ca.distToShape(cb)
-    pa, pb = pts[0]
-
-    def owner(items, p):
-        v = Part.Vertex(p)
-        near = [(n, s) for n, s in items if bb_gap(s.BoundBox, v.BoundBox) < 0.01]
-        return min(near or items, key=lambda it: it[1].distToShape(v)[0])[0]
-    return (d, owner(items_a, pa), owner(items_b, pb), pa, pb, 0.0)
+    # otherwise the exact distance, nearest boxes first: a pair whose boxes
+    # are further apart than the best so far can't beat it
+    pairs = sorted(((bb_gap(sa.BoundBox, sb.BoundBox), na, sa, nb, sb)
+                    for na, sa in items_a for nb, sb in items_b), key=lambda p: p[0])
+    best = (limit, None, None, None, None, 0.0)
+    for g, na, sa, nb, sb in pairs:
+        if g >= best[0]:
+            break
+        d, pts, _ = sa.distToShape(sb)
+        if d < best[0]:
+            best = (d, na, nb, pts[0][0], pts[0][1], 0.0)
+    return best
 
 
 # ------------------------------------------------------------------- cards
@@ -119,8 +120,12 @@ def read_assembly(path):
     for root in roots:
         for o in root.Group:
             if o.TypeId == "App::Part":
-                if o.Shape.Solids:
-                    comps.append((o.Placement.Base, o.Shape.copy()))
+                # markings are solids 1 um thick (the module's printed
+                # label): they cost seconds per distance and move nothing
+                solids = [x for x in o.Shape.Solids if min(x.BoundBox.XLength, x.BoundBox.YLength,
+                                                           x.BoundBox.ZLength) > 0.005]
+                if solids:
+                    comps.append((o.Placement.Base, Part.makeCompound(solids)))
             elif o.TypeId == "Part::Feature" and o.Shape.Solids:
                 bodies += o.Shape.Solids
     body = max(bodies, key=lambda s: s.Volume)
@@ -181,7 +186,6 @@ class Card:
         return max(dot((v.Point.x, v.Point.y), self.up_s) for v in self.slab.Vertexes)
 
 
-T0 = __import__("time").time()
 cards = {}
 for name, c in JOB["cards"].items():
     c["edge_ref"] = next((fp["ref"] for fp in c["fps"] if "PCBEdge:BUS_PCIexpress" in fp["fpid"]), None)
@@ -253,9 +257,7 @@ class Placed:
         return "%s in %s" % (self.card.name, self.slot)
 
 
-print("load %.1f" % (__import__("time").time() - T0))
 placed = [Placed(p) for p in JOB["placements"]]
-print("placed %.1f" % (__import__("time").time() - T0))
 frame_by_ref = {f["ref"]: f for f in frames}
 
 
@@ -297,11 +299,16 @@ def mech_003_008():
         add(cid, down <= cem["solder_side_max"] + 1e-6,
             "%s: deepest on the solder side %.2f mm (%s), CEM max %.2f" % (c.name, down, rd, cem["solder_side_max"]))
     worst = {}
+    pair_cache = {}
     for i, p in enumerate(placed):
         for q in placed[i + 1:]:
             if p.slot == q.slot or bb_gap(p.bb, q.bb) > 25:
                 continue
-            d, na, nb, pa, pb, vol = closest(p.items, q.items)
+            rel = p.m.inverse().multiply(q.m)
+            ck = (p.card.name, q.card.name, tuple(round(v, 4) for v in rel.A))
+            if ck not in pair_cache:
+                pair_cache[ck] = closest(p.items, q.items)
+            d, na, nb, pa, pb, vol = pair_cache[ck]
             cid = "MECH-003" if p.kind == "io" and q.kind == "io" else "MECH-008"
             key = (cid,) + tuple(sorted((p.card.name, q.card.name)))
             if key not in worst or d < worst[key][0]:
@@ -507,7 +514,8 @@ def mech_007():
             for p in [p for p in placed if p.card is c]:
                 r = moved(route, p.m)
                 cables.append((p, r))
-                others = [(n, s) for n, s in p.items if n != fp["ref"]]
+                # its own card's parts it passes over, not the board it lies along
+                others = [(n, s) for n, s in p.items if n not in (fp["ref"], "board")]
                 others += [(q.label() + " " + n, s) for q in placed if q is not p and bb_gap(q.bb, r.BoundBox) < 5
                            for n, s in q.items]
                 others += rails + [("socket " + k, s) for k, s in sockets.items()] + main_items
@@ -621,15 +629,11 @@ try:
     import time
     t0 = time.time()
     mech_001()
-    print("001 %.1f" % (time.time() - t0))
     gaps = mech_003_008()
-    print("003 %.1f" % (time.time() - t0))
     mech_004()
     mech_005()
-    print("005 %.1f" % (time.time() - t0))
     mech_006()
     mech_007()
-    print("007 %.1f" % (time.time() - t0))
     t1 = time.time()
     render(gaps)
     print("geometry %.1f s, render %.1f s" % (t1 - t0, time.time() - t1))
