@@ -630,6 +630,15 @@ vrow = "2.4"
 cmd = "emu/rp2040/test/diffs.sh"
 
 [[test]]
+id = "EMU-006"
+title = "Native emulator backend: the card tests give byte-identical results"
+checks = "GPU-004/005, IOC-004 and SYS-006 pass on both rp2040js and the native emulator (CUPC8_EMU=js|native), with identical stdout and an identical trace of every runUntil end time, every slot-host frame (MOSI/MISO) and a digest of every TMDS capture"
+method = "test/emu/backend_diff.sh (test/emu/emu_backend.mjs, test/emu/rp2040native.mjs, emu/rp2040/node)"
+kind = "sim"
+vrow = "2.4"
+cmd = "test/emu/backend_diff.sh"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
