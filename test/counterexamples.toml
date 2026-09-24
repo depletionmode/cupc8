@@ -268,7 +268,7 @@ must_fail = ["FAIL race sweep: every READ framed"]
 
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
-fixed_in = "uncommitted"
+fixed_in = "52423fa"
 revert = [["kernel/term.s", """term_do:
 	; start with an empty program: .bss is not cleared, and the SRAM
 	; powers up with junk
