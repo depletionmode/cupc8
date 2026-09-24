@@ -702,6 +702,15 @@ cmd = "tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
 kind = "sim"
 vrow = "2.6"
 
+[[test]]
+id = "WIFI-004"
+title = "Wi-Fi card board, ready for JLC"
+checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, card order spec (1.6 mm, hard-gold 45 degree fingers)"
+method = "hw/boards/wifi.py through kicadgen.pipeline: Freerouting, GND fingers tied, presence link pre-routed, GND pads fanned out, stitched pours"
+cmd = "python3 hw/boards/wifi.py"
+kind = "static"
+vrow = "3.4"
+
 # ============================================================================
 # SYS: sysctl firmware
 # ============================================================================

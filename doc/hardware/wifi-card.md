@@ -41,7 +41,7 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   hand, because JLC doesn't assemble cable antennas. It mounts on the case or
   the card's top edge, away from the card stack. Any slot works. The mechanical
   fit check covers the cable route.
-- **Debug:** LEDs for power, link and activity. Test pads for the ESP32-C3
+- **Debug:** LEDs for power and link (GPIO4, lit while LINK is up). Test pads for the ESP32-C3
   native USB-Serial/JTAG (GPIO18/19), for debugging only.
 
 ## Status byte
