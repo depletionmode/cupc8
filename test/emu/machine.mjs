@@ -43,13 +43,13 @@ class Rp2040Card {
   drive(sck, mosi, selected) {
     if (this.log) {
       // record every frame: its MOSI bytes, and the time it ended
-      if (selected && !this.sel) { this.bits = []; this.rbits = []; }
+      if (selected && !this.sel) { this.bits = []; this.rbits = []; this.t0 = this.emu.ns; }
       if (selected && sck && !this.sck) { this.bits.push(mosi); this.rbits.push(this.miso()); }
       if (!selected && this.sel && this.bits.length) {
         const bytes = [];
         for (let i = 0; i + 8 <= this.bits.length; i += 8) bytes.push(this.bits.slice(i, i + 8).reduce((v, b) => (v << 1) | b, 0));
         const pack = (bits) => { const out = []; for (let i = 0; i + 8 <= bits.length; i += 8) out.push(bits.slice(i, i + 8).reduce((v, b) => (v << 1) | b, 0)); return out; };
-        this.log.push({ ns: this.emu.ns, bytes, miso: pack(this.rbits), extra: this.bits.length % 8 });
+        this.log.push({ start: this.t0, ns: this.emu.ns, bytes, miso: pack(this.rbits), extra: this.bits.length % 8 });
       }
       this.sel = selected;
       this.sck = sck;
