@@ -4,12 +4,15 @@
  * (sysmachine.c) and speaks its USB protocol on a pseudo-terminal, which
  * cupc8.py opens like the card's USB serial port.
  *
- *   sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR]
+ *   sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR] [--reply-delay MS]
  *
  * It prints the pty's path, then serves until killed. --flashed starts with
  * both FPGA flashes holding their bitstreams. --esp puts an ESP32 card in
  * SLOT whose UART is at HOST:PORT (Espressif QEMU in download mode); slot 2
  * always holds an RP2040 card (swdtarget.h). --cc sets the USB-C CC voltage.
+ * --reply-delay holds every reply MS milliseconds, as a slow command (a chip
+ * erase) does: a host killed after its request finds the reply arriving in
+ * the next host's session (HOST-002 checks cupc8.py resyncs past it).
  * --dump writes, when it is stopped (SIGTERM or SIGINT), what the models
  * hold: rom.bin, fl0.bin, fl1.bin and card3.bin, for the tests to check.
  */
@@ -52,6 +55,8 @@ static void dump(const char *name, const void *data, size_t n)
 static int esp_slot = -1, esp_fd = -1;
 static char esp_host[64];
 static int esp_port;
+
+static int reply_delay_ms;
 
 static void usb_out(const uint8_t *d, int n)
 {
@@ -113,13 +118,15 @@ int main(int argc, char **argv)
 			flashed = true;
 		else if (!strcmp(argv[i], "--cc") && i + 1 < argc)
 			cc_mv = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--reply-delay") && i + 1 < argc)
+			reply_delay_ms = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--dump") && i + 1 < argc)
 			dump_dir = argv[++i];
 		else if (!strcmp(argv[i], "--esp") && i + 1 < argc &&
 			 sscanf(argv[++i], "%d=%63[^:]:%d", &esp_slot, esp_host, &esp_port) == 3)
 			;
 		else {
-			fprintf(stderr, "usage: sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR]\n");
+			fprintf(stderr, "usage: sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR] [--reply-delay MS]\n");
 			return 2;
 		}
 	}
@@ -170,8 +177,11 @@ int main(int argc, char **argv)
 		for (ssize_t i = 0; i < n; i++) {
 			M.usb_n = 0;
 			sysctl_rx(&S, buf + i, 1);
-			if (M.usb_n)
+			if (M.usb_n) {
+				if (reply_delay_ms)
+					usleep((useconds_t)reply_delay_ms * 1000);
 				usb_out(M.usb, M.usb_n);
+			}
 		}
 		sysctl_poll(&S);
 	}

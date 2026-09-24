@@ -89,6 +89,7 @@ class Sysctl:
             termios.tcsetattr(self.fd, termios.TCSANOW, attrs)
         self.timeout = timeout
         self.buf = b""
+        self.resync()
 
     def close(self):
         if self.sock:
@@ -105,13 +106,16 @@ class Sysctl:
         out, self.buf = self.buf[:n], self.buf[n:]
         return out
 
-    def request(self, cmd, payload=b"", timeout=None):
+    def _send(self, cmd, payload, timeout):
         payload = bytes(payload)
         body = bytes([cmd]) + struct.pack("<H", len(payload)) + payload
         os.write(self.fd, bytes([MAGIC]) + body + bytes([crc8(body)]))
         # CUPC8_TIMEOUT_SCALE: the whole-machine emulator runs slower than real time
         scale = float(os.environ.get("CUPC8_TIMEOUT_SCALE", "1"))
-        deadline = time.monotonic() + (timeout or self.timeout) * scale
+        return time.monotonic() + (timeout or self.timeout) * scale
+
+    def _reply(self, deadline):
+        """(status, payload) of the next reply frame."""
         while self._read(1, deadline)[0] != MAGIC:
             pass
         head = self._read(3, deadline)
@@ -119,9 +123,25 @@ class Sysctl:
         rest = self._read(n + 1, deadline)
         if crc8(head + rest[:n]) != rest[n]:
             raise SysctlError(1)
-        if head[0]:
-            raise SysctlError(head[0], rest[:n])
-        return rest[:n]
+        return head[0], rest[:n]
+
+    def resync(self):
+        """Replies carry no request id, so a run killed after its request
+        leaves a reply that would pass for the next run's: PING with a nonce
+        (sysctl.md) and drop every reply until the one that echoes it."""
+        nonce = os.urandom(4)
+        deadline = self._send(0x00, nonce, None)
+        while True:
+            st, data = self._reply(deadline)
+            if st == 0 and data.endswith(nonce):
+                return
+
+    def request(self, cmd, payload=b"", timeout=None):
+        deadline = self._send(cmd, payload, timeout)
+        st, data = self._reply(deadline)
+        if st:
+            raise SysctlError(st, data)
+        return data
 
     # ---------------------------------------------------------------- commands
     def ping(self):
