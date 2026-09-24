@@ -74,7 +74,7 @@ INSW_THETA_JA = 74.5        # DS RPW, JEDEC board (41.7 on TI's EVM)
 # Must stay above vSafe5V max and below the 6 V absolute maximum of what 5V_SYS feeds
 # (TLV62569 VIN, the IO card's SY6280)
 INSW_OVLO_R = assume("main", "eFuse OVLO divider 37.4k / 10.0k 0.1 % from IN (1 % puts the trip up to "
-                     "6.00 V; see budget.py B17)", (37.4e3, 10.0e3))
+                     "6.00 V; see budget.py B20)", (37.4e3, 10.0e3))
 INSW_OVLO_TOL = 0.001
 INSW_OVLO_VTH = (1.183, 1.223)
 DOWNSTREAM_ABS_MAX = 6.0    # DS TLV62569, SY6280: VIN absolute maximum
