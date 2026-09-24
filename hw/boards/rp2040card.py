@@ -160,11 +160,13 @@ def core(s, gpios, leds=(), usb=False):
     s.connect(j1, "B15", "MOSI")
     s.connect(j1, "B16", "MISO")
 
-    # ---- 3V3: AMS1117-3.3 from the slot's +5V (datasheet: 10 uF in, 22 uF out)
-    u2 = p["U2"] = s.add("Regulator_Linear:AMS1117-3.3", "U2", "AMS1117-3.3",
-                         "Package_TO_SOT_SMD:SOT-223-3_TabPin2", at=(30 * G, 12 * G), fields={"LCSC": "C6186"})
-    s.connect(u2, "VI", "+5V")
-    s.connect(u2, "VO", "3V3")
+    # ---- 3V3: AMS1117-3.3 from the slot's +5V (datasheet: 10 uF in, 22 uF
+    # out). JLC's own footprint: KiCad's SOT-223 numbers its tab 2, EasyEDA's 4
+    u2 = p["U2"] = s.add("jlc:AMS1117-3.3", "U2", "AMS1117-3.3", "jlc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR",
+                         at=(30 * G, 12 * G), fields={"LCSC": "C6186"})
+    s.connect(u2, "VIN", "+5V")
+    s.connect(u2, "2", "3V3")                  # the tab (4) is stacked on VOUT
+    s.connect(u2, "4", "3V3")
     s.connect(u2, "GND", "GND")
     p["C1"] = passive(s, "C", "C1", "10u", (16 * G, 14 * G))
     p["C2"] = passive(s, "C", "C2", "22u", (44 * G, 14 * G))
