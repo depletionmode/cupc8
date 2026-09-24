@@ -10,7 +10,7 @@ and 12. The pinout is custom. Never plug a real PCIe card in.
   (see `memory-map.md`).
 - **M1 uses three slots:** graphics, IO and Wi-Fi. Slots 4–6 are free for
   future cards.
-- **Card:** a 1.6 mm PCB with gold fingers (hard gold, 45° bevel), 18 per
+- **Card:** a 1.6 mm PCB with gold fingers (hard gold, 30° bevel: `milestone-1.md`), 18 per
   side.
 
 ## Pinout

@@ -8,7 +8,7 @@ over the common SPI framing in `slot.md`, and never touches a packet.
 ## Hardware
 
 - **Module:** **ESP32-C3-MINI-1U-N4** (LCSC C2911374). It is pre-certified,
-  with a **U.FL connector for an external antenna** and 4 MB of flash. The
+  with an **MHF III (IPEX gen 3) receptacle for an external antenna** and 4 MB of flash. The
   external antenna means our layout can't detune the radio, which can't be
   simulated (see `verification.md` §5). There is no separate MCU: the ESP32-C3
   is both the SPI slave and the network stack.
@@ -40,11 +40,13 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   nothing else: a strapping pin is sampled at reset, and a signal from the
   slot (the shared MISO line, say) could be low at that moment. So the SPI
   slave's MISO is on GPIO5, not GPIO2.
-- **Antenna:** a 2.4 GHz adhesive FPC antenna with a U.FL lead (e.g.
-  KH-FPC2.4G-1.13IPEX, LCSC C4943394). It is ordered loose and plugged in by
-  hand, because JLC doesn't assemble cable antennas. It mounts on the case or
-  the card's top edge, away from the card stack. Any slot works. The mechanical
-  fit check covers the cable route.
+- **Antenna:** a 150 mm MHF III-to-SMA lead (KH-IPEX3-SMA-RG081-150mm, LCSC
+  C709347) and a 2.4 GHz SMA rubber-duck antenna (HJ-2.4GHz-SMA, C1509156),
+  both ordered loose from JLC and plugged in by hand (JLC doesn't assemble
+  cable parts). The module's receptacle is MHF III, not U.FL: MECH-007 found
+  the U.FL antenna first listed would not mate. Plug the lead in before the
+  card goes into its slot (about 16 mm to the next card); the SMA end mounts
+  on the case.
 - **Debug:** LEDs for power and link (GPIO4, lit while LINK is up). Test pads for the ESP32-C3
   native USB-Serial/JTAG (GPIO18/19), for debugging only.
 

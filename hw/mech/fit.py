@@ -63,6 +63,7 @@ CEM = {
     "b1_to_b11": 10.00,               # basic
     "chamfer": 0.50,                  # tab corners, 0.50 x 45 deg
     "bevel_deg": (20.0, 5.0),         # edge bevel 20.0 +/- 5.0 deg (side view)
+    "bevel_waiver_deg": 30,           # milestone-1.md: JLC's nearest (30 or 45 only), a written waiver
     "thick": (1.57, 0.13),            # across pads
     "comp_side_max": 14.47,           # Figure 9-1: primary side component height, MAX
     "solder_side_max": 2.67,          # Figure 9-1: secondary side, MAX
@@ -388,8 +389,10 @@ def check_order(b, res):
     res.add(cid, order.get("finger_finish") == "hard gold",
             "%s: finger finish %s (hard gold required, milestone-1.md)" % (name, order.get("finger_finish")))
     bev = order.get("finger_chamfer_deg")
-    ok = bev is not None and within(bev, *CEM["bevel_deg"])
-    res.add(cid, ok, "%s: finger bevel %s deg ordered, CEM Fig. 6-3 %.1f +/- %.1f deg" % (name, bev, *CEM["bevel_deg"]))
+    ok = bev is not None and (within(bev, *CEM["bevel_deg"]) or bev == CEM["bevel_waiver_deg"])
+    res.add(cid, ok, "%s: finger bevel %s deg ordered, CEM Fig. 6-3 %.1f +/- %.1f deg%s" % (
+        name, bev, *CEM["bevel_deg"],
+        " (waived: JLC's nearest, milestone-1.md)" if bev == CEM["bevel_waiver_deg"] else ""))
     if not ok:
         res.note(cid, "JLC offers 30 and 45 deg bevels only (jlcpcb.com/help/article/jlcpcb-gold-fingers).")
         res.note(cid, "30 deg is the nearest to CEM (5 deg over its 25 deg max) and JLC's own recommendation")

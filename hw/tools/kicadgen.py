@@ -1737,12 +1737,12 @@ def check_stock(counts, boards, margin=2):
 
 def order_spec(layers, card_edge):
     """The JLC order options, written next to the Gerbers as order.json.
-    Cards (card_edge) are 1.6 mm with hard-gold fingers and a 45 degree
+    Cards (card_edge) are 1.6 mm with hard-gold fingers and a 30 degree
     chamfer (milestone-1.md, Board thickness); check_order enforces it."""
     spec = {"layers": layers, "thickness_mm": 1.6, "surface_finish": "ENIG", "min_hole_mm": 0.3,
             "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
             "gold_fingers": card_edge, "finger_finish": "hard gold" if card_edge else None,
-            "finger_chamfer_deg": 45 if card_edge else None}
+            "finger_chamfer_deg": 30 if card_edge else None}
     if layers == 4:
         spec["stackup"] = "JLC04161H-7628"
     return spec
@@ -1753,8 +1753,8 @@ def check_order(spec, card_edge):
     if spec["thickness_mm"] != 1.6:
         bad.append("thickness %s mm, cards must be 1.6" % spec["thickness_mm"])
     if card_edge and (not spec["gold_fingers"] or spec["finger_finish"] != "hard gold"
-                      or spec["finger_chamfer_deg"] != 45):
-        bad.append("card edge needs hard-gold fingers with a 45 degree chamfer")
+                      or spec["finger_chamfer_deg"] != 30):
+        bad.append("card edge needs hard-gold fingers with a 30 degree chamfer")
     if bad:
         raise SystemExit("fab order: " + "; ".join(bad))
 
