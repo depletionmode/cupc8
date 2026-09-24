@@ -381,7 +381,7 @@ def check_mainboard(pins, path=MAINBOARD_NET):
         expanders[addr] = r
     muxes = {by_func(r, "A"): r for r in parts_of("CD74HC4051PWR")}
     supervisor = (parts_of("MAX811TEUS+T") or [None])[0]
-    usbc = [r for r, c in comps.items() if c[1].startswith("USB_C_Receptacle")]
+    usbc = [r for r, c in comps.items() if c[1].startswith(("USB_C_Receptacle", "TYPE-C"))]
 
     socket = {"CUPC8_CPUSocket": [], "CUPC8_SystemSlot": [], "CUPC8_Slot": []}
     for r, c in comps.items():
