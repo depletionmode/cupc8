@@ -694,7 +694,9 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     zone_outline: the copper pours' polygon, if not `outline` less 0.5 mm
     labels:    {ref: word}: the word (what an LED shows) printed where the part's
                designator would go, in its place
-    planes:    inner-layer pours, [(net, "In1.Cu"), ...]: whole-board planes
+    planes:    inner-layer pours, [(net, "In1.Cu"), ...]: whole-board planes;
+               (net, layer, "routed") is a pour on a layer that still carries
+               signals, filled after routing
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -773,7 +775,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     pours = [(net, layer) for net in zones for layer in copper]
-    pours += [(net, board.GetLayerID(layer)) for net, layer in planes]
+    pours += [(p[0], board.GetLayerID(p[1])) for p in planes]
     for net, layer in pours:
         z = pcbnew.ZONE(board)
         z.SetLayer(layer)
@@ -1779,7 +1781,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     renders. `schematic(path, footprint_libs)` writes the sheet. `planes` are
     whole-board inner-layer pours [(net, "In1.Cu"), ...]: their SMD pads get
     a via each, as the first zone net's do, and Freerouting keeps signals off
-    their layers. Returns {LCSC number: count per board}.
+    their layers; (net, layer, "routed") pours a layer that also carries
+    signals, and the net is routed as any other. Returns {LCSC number: count per board}.
 
     Every board carries its name and revision (doc/milestone-1.md, Board
     revision): `title` and `revision` are printed as "<title> rev <revision>"
@@ -1833,15 +1836,17 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
+        solid = [p for p in planes if len(p) == 2]          # planes Freerouting keeps signals off
         state["fanout"] = sum(ground_fanout(b, net) for net in
-                              [zones[0]] + sorted({n for n, _ in planes} - {zones[0]}))
+                              [zones[0]] + sorted({p[0] for p in solid} - {zones[0]}))
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=tuple(zones) + tuple(n for n, _ in planes),
-                                        power_layers=[layer for _, layer in planes]))
+    solid = [p for p in planes if len(p) == 2]
+    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=tuple(zones) + tuple(p[0] for p in solid),
+                                        power_layers=[p[1] for p in solid]))
 
     def fill():
         x0, y0, x1, y1 = outline
