@@ -1168,6 +1168,24 @@ proc testBasicLeds() =
 
 run testBasicLeds
 
+proc testBasicJunkRam() =
+  ## KRN-003: the kernel must not rely on RAM being zero at power-up (the
+  ## SRAM comes up with junk). Its .bss (the BASIC program buffer and its
+  ## index) was never cleared: on the whole-machine emulator the typed line
+  ## went in after junk and RUN gave "TOKENIZER ERROR!".
+  echo "== BASIC on power-up junk RAM =="
+  let rom = buildKernelRom()
+  ramJunk = true
+  let got = basicRun(rom, @["10 print 6*7"])
+  ramJunk = false
+  if got == @["42"]:
+    ok("BASIC on junk RAM")
+  else:
+    fail("BASIC on junk RAM: got " & $got & ", want @[\"42\"]")
+  ioModel = imLegacy
+
+run testBasicJunkRam
+
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another
   ## card's IRQ: the kernel sleeps in WAI for keys, and every key must wake it.

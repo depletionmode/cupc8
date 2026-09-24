@@ -265,3 +265,18 @@ revert = [["fw/rp2040/common/slotspi.c", """	/* Swap the preload for the current
 """]]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 must_fail = ["FAIL race sweep: every READ framed"]
+
+[[bug]]
+name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
+fixed_in = "uncommitted"
+revert = [["kernel/term.s", """term_do:
+	; start with an empty program: .bss is not cleared, and the SRAM
+	; powers up with junk
+	xor r0, r0
+	st [term_basic_prog_buf_idx], r0
+	st [term_basic_prog_buf], r0
+
+""", """term_do:
+"""]]
+cmd = "tools/run_tests.sh testBasicJunkRam"
+must_fail = ["FAIL: BASIC on junk RAM"]
