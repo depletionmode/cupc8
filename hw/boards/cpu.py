@@ -303,6 +303,8 @@ def placement():
     # the PLL filter caps sit between these and their pins' neighbours
     p["C11"] = beside(123, along=-0.75)
     p["C8"] = beside(57, along=-0.5)
+    # VCC_SPI's decap slides past the corner, out of pin 71's (FL1_nCS) lane to the flash
+    p["C13"] = beside(72, along=-2.0)
     # the top side's sit a little further out: room for U1's designator
     for ref in ("C3", "C9", "C10", "C14"):
         p[ref] = beside(DECOUPLING[ref][2], dist=4.5)
