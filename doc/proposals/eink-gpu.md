@@ -2,6 +2,34 @@
 
 **Status: proposal, for exploration — not scheduled; raised 2026-09-24 by David.**
 
+## Decisions (David, 2026-09-24)
+
+These settle the open questions at the end; where the text below still
+argues for an option, these win.
+
+1. **A replacement for the HDMI graphics card, never fitted with it.** A
+   machine has one or the other. It takes the **same card type, $01**
+   (graphics / the console), so the boot ROM finds it the same way; it
+   says what it is in `INFO`, and the kernel may carry a driver for each and
+   choose by `INFO`.
+2. **Connection: the panel on its driver module, by cable to one header on
+   the card** (the module carries the booster). The header is a **2.54 mm
+   9-pin header, with a TVS array** on its lines (it is touched from
+   outside).
+3. **Panel: the 5.83" 648 × 480** (Good Display GDEY0583T81 with the
+   DESPI-C02 adapter, UC8179 controller): 80 × 30 text in the 8 × 16 font
+   fills it almost exactly (640 × 480). The firmware keeps the 7.5"
+   800 × 480 (same controller) working too, as `INFO` reports the panel.
+4. **Text layout: 80 × 30, centred** (4 blank pixels each side on the
+   5.83").
+5. **Ink rule as proposed:** each text cell's brighter colour becomes ink,
+   so the console is black text on white; GFX pixels keep their brightness.
+6. **The native 4-grey graphics mode at the panel's full resolution is in
+   the first version** (the 16-bit-coordinate commands below).
+7. **Refresh defaults:** partial refresh after 150 ms idle, at least once a
+   second under continuous output, a full refresh after 30 partials (to tune
+   on a real panel).
+
 **Hardware and software:** a new I/O card, the **e-ink card**, that drives an
 e-paper display instead of HDMI. It plugs into any I/O slot and speaks the
 same slot SPI, the same common card protocol and, as far as it makes sense,

@@ -36,7 +36,7 @@ survives a lost session. Newest first within each section. Specs live in
 | Main board | agent worktree | routing (the largest board) |
 | Storage firmware (`fw/storage`), kernel `storage.s`, BASIC SAVE/LOAD/DIR/DEL, tests | agent worktree | started (retargeted from the IO card) |
 | SD card model in the native emulator, card and end-to-end tests | agent worktree | started (attaches to the storage card) |
-| E-ink graphics card proposal | `proposals/eink-gpu.md` | written; open questions for David at its end (recommended: 7.5" 800×480 UC8179 panel on its driver module, RP2040 card with one header, 26 parts, card type $01) |
+| E-ink graphics card proposal | `proposals/eink-gpu.md` | written; David's decisions recorded at its top (a replacement for the HDMI card, card type $01, 5.83" 648×480 panel on its driver module via a 2.54 mm header + TVS, native 4-grey mode from the start). Not scheduled. |
 
 ## Done (recent)
 
