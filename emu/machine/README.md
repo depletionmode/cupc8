@@ -1,0 +1,103 @@
+# emu/machine: the whole machine, natively
+
+The native whole-machine emulator of `doc/milestone-1.md` ("Whole-machine
+emulator", "Emulator speed"): `test/emu/machine.mjs` in C++, cycle for cycle.
+The main board is the Verilated CPU + chipset (`soc/emu/board.h`, shared with
+`build/emu/core.node`) with the SRAM and the SST39 ROM model
+(`fw/test/sysmodels.c`); the GPU, IO and system cards run their real firmware
+on the native RP2040 (`emu/rp2040`, its card-test harness for the `Emu` step
+loop and TMDS capture); the Wi-Fi card is Espressif's QEMU over pipes with
+machine.mjs's `$A6`/`$A5` protocol.
+
+| file | what |
+|---|---|
+| `machine.h`, `machine.cpp` | the cards (`Rp2040Card`, `SysctlCard`, `EspCard`), TMDS frame decoding and font matching, `Machine` (the loop, the card threads, `screen()`, `type()`) |
+| `addon.cpp` | `machine.node`, wrapped by `test/emu/machinenative.mjs` into machine.mjs's `Machine` API |
+| `machinerun.cpp` | the machine from the command line: speed runs, serial vs threaded digests |
+| `../../soc/emu/board.h` | the main board (also used by `soc/emu/core.cpp`) |
+
+## Build and run
+
+```sh
+tools/emu_machine_build.sh          # tools/emu_build.sh, then cmake + ninja into build/emu-machine
+CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002
+test/emu/machine_diff.sh            # equivalence with machine.mjs and serial/threaded determinism
+build/emu-machine/machinerun --root . --rom ROM --mode both \
+    --until '>>' 6e9 --type '10 print 6*7\nrun\n' --until 42 3e9 --run 200e6
+```
+
+`machinenative.mjs` has the same API as machine.mjs (`create({slots, rom,
+sysctl})`, `powerOn`, `runFor`, `runAsync`, `runUntil`, `ns`, `state`,
+`frame`, `screen`, `type`, `keyboard.press`, `stop`, `sysctlPort`), plus
+`setThreaded`, `stats`, `cards`, `spiLog` and the `spiLog`/`threaded` create
+options. `CUPC8_EMU_THREADS=0` runs serially. `runFor` runs on the calling
+thread's call and returns; `runAsync`/`runUntil` yield to Node's event loop
+between slices exactly as machine.mjs does, so cupc8.py can talk to the
+system card's TCP port. The system card's CDC output is collected during a
+slice and written to the socket at its end; input from the socket is queued
+between slices, as in machine.mjs (where both only move when the event loop
+turns). `-DMACHINE_LTO=ON` builds this tree's copy of the RP2040 library with
+`-O3` and LTO (about 10% faster, same traces); off by default.
+
+## The loop
+
+`Machine::iterate()` is machine.mjs's `runFor` loop body, statement for
+statement: `bridgePins` (the system card's SPI byte clocked into BR_* at
+1 MHz); *busy* if a slot or the bridge is selected; while busy, every card is
+advanced to the next clock edge, the board runs one clock, the system card
+and then each slot card (slot order) advance to the board's time and are
+driven; otherwise the board runs up to 120 clocks (stopping early when a
+watched output changes) with its inputs sampled once, and the cards are
+advanced and driven afterwards.
+
+## Threads, and why they change nothing
+
+Each RP2040 card has a thread. In an idle iteration nothing is advanced before
+the board runs, the board's inputs (the cards' IRQ pins, the bridge pins,
+`sysReset`) are sampled once at the start, and each card is then advanced to
+the board's end time `t` (`while (ns < t) step()`) and driven with the
+board's end outputs. So:
+
+- The cards' work in the window depends only on `t`, the end outputs and the
+  card's own state; it touches only that card (no RP2040 state is shared:
+  emu/rp2040 has no globals). The order of cards within a window cannot
+  matter, so they may run concurrently.
+- A card's step sequence does not depend on its target. A card that steps
+  while `ns < c * 1000/12`, for a clock count `c` the board has already
+  reached in this window, takes a prefix of the steps `advance(t)` takes,
+  because `t >= c * 1000/12` (the same double expression). So each card
+  *chases* the board's clock count while the board runs, and finishes at
+  `t` once the board marks the window FINAL: exactly the serial state.
+- Nothing flows back until the window ends: the next iteration starts only
+  when every card has arrived at the barrier; only then are the pins read.
+- Busy iterations run serially, in machine.mjs's order, on one thread (every
+  card is sampled each clock there: IRQ pins of unselected cards reach the
+  chipset clock by clock, and the shared SCK/MOSI lines re-set their GPIO
+  edge bits, so no card may run ahead).
+
+There is no board thread: the last card thread to arrive leads the next
+iteration (the serial part, and the board's run while the others chase),
+then does its own card's share; `runFor` hands the run to the threads and
+waits. The slow card (the GPU) is usually last, so it goes on without a
+hand-off. Waits spin briefly and then sleep on a futex. `machinerun --mode
+both` and `test/emu/machine_diff.sh` check the result: identical board
+clocks, CPU state, RAM, every card's time, cycle counts and UART, a hash over
+(board clocks, outputs, every card's time) after every iteration, every SPI
+frame, and the screen.
+
+Harness hooks used in emu/rp2040: `FIFO::onPull` (TMDS capture), the SPI
+`onTransmit`/`completeTransmit` callbacks, USBCDC and UsbKeyboard; nothing in
+emu/rp2040 was changed for this directory.
+
+## Speed
+
+The machine's speed is the GPU card's: at 252 MHz with three DVI serialiser
+state machines running every cycle it takes about 700 host instructions per
+emulated cycle and runs ~30x slower than real time on its own (rp2040run,
+quiet 2.1 GHz Xeon), against ~4x for the IO card, ~3x for the system card and
+~2-3x for the main board. Threads take the other cards and the board off the
+critical path, so the whole machine runs at nearly the GPU's own speed; the
+"few times slower than real time" target needs a faster RP2040 core/PIO/GPIO
+path in emu/rp2040 (not changed here: it must stay structure-preserving).
+Measured numbers are in the report of the change that added this directory
+and in `test/emu/machine_diff.sh`'s output.

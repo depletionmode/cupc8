@@ -13,6 +13,12 @@ does everything except KiCad.
 | ngspice, TI PSpice models | POW-*, THM-001 | apt; the TI models are fetched from www.ti.com by `hw/power/models/fetch.py` (pinned by SHA-256; not redistributable) |
 | KiCad 10, Freerouting | the board tests (BRD-001, WIFI-004, E2E-006, the board rows) | below |
 
+The whole-machine emulator the end-to-end tests run on (`test/emu/test_e2e.mjs`)
+has two backends giving identical results: `test/emu/machine.mjs` (rp2040js
+cards, the default) and the native one in `emu/machine`
+(`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; about twice as
+fast, see its README). `test/emu/machine_diff.sh` checks that they agree.
+
 ## KiCad 10
 
 The board scripts write KiCad 8 files, which Ubuntu's KiCad 7 cannot read.
