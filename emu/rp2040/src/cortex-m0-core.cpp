@@ -617,8 +617,8 @@ uint32_t CortexM0Core::cyclesIO(uint32_t addr, bool write) const {
 // decodeEntry[opcode] is that branch (the chain's own conditions, in order,
 // without their opcode2 terms; generated from them), and the switch falls
 // through the rest of the chain exactly as the if/else-if did.
-static const std::array<uint8_t, 0x10000> &decodeEntry() {
-  static const std::array<uint8_t, 0x10000> table = [] {
+// (computed at compile time: constexpr)
+static constexpr std::array<uint8_t, 0x10000> decodeEntries = [] {
     std::array<uint8_t, 0x10000> t{};
     for (uint32_t opcode = 0; opcode < 0x10000; opcode++) {
       uint8_t k = 83;  // the final else
@@ -710,9 +710,9 @@ static const std::array<uint8_t, 0x10000> &decodeEntry() {
       t[opcode] = k;
     }
     return t;
-  }();
-  return table;
-}
+}();
+
+static const std::array<uint8_t, 0x10000> &decodeEntry() { return decodeEntries; }
 
 // The decode chain, split into its branches (generated from the if/else-if
 // chain of cortex-m0-core.ts, which executeInstruction was, by a script that
@@ -2834,11 +2834,13 @@ constexpr std::array<CortexM0Core::DecodeHandler, 84> decodeHandlers(std::index_
   return {&CortexM0Core::decodeHandler<static_cast<int>(K)>...};
 }
 
-const std::array<CortexM0Core::DecodeHandler, 0x10000> CortexM0Core::decodeTable = [] {
-  const auto handlers = decodeHandlers(std::make_index_sequence<84>());
+// constexpr: built at compile time, so it is there before any static
+// initialiser could run an instruction
+constexpr std::array<CortexM0Core::DecodeHandler, 0x10000> CortexM0Core::decodeTable = [] {
+  constexpr auto handlers = decodeHandlers(std::make_index_sequence<84>());
   std::array<DecodeHandler, 0x10000> t{};
   for (uint32_t opcode = 0; opcode < 0x10000; opcode++) {
-    t[opcode] = handlers[decodeEntry()[opcode]];
+    t[opcode] = handlers[decodeEntries[opcode]];
   }
   return t;
 }();
