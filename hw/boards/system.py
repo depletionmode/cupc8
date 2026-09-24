@@ -213,7 +213,7 @@ EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33
 LOGO_MM = 12
 REVISION = "A"            # doc/milestone-1.md, Board revision: bump for every board sent to be made
 LABELS = {"D1": "PWR", "D2": "STAT", "D3": "TX", "D4": "RX"}   # silkscreen says what each LED shows
-LOGO_AT = (48.8, 28.6)
+LOGO_AT = (49, 22)
 
 PLACEMENT = {
     "J2": (EDGE_AT[0], EDGE_AT[1], 0),
@@ -246,15 +246,16 @@ PLACEMENT = {
     "D4": (21, 3, 0), "R21": (21, 5.5, 0),
 }
 for _i, _n in enumerate(TERMINATED):
-    PLACEMENT["R%d" % (11 + _i)] = (14 + 3.4 * _i, 31, 90)
+    PLACEMENT["R%d" % (11 + _i)] = (21.5 + 3.3 * _i, 31, 90)   # over the fingers they drive
 for _i, (_ref, _) in enumerate(TEST_PADS):
     PLACEMENT[_ref] = (2.5, 9 + 2.9 * _i, 0)
 
 
-# every net on the RP2040's 0.4 mm-pitch pads routes in 0.15 mm track (kicadgen "Fine")
+# every net on the RP2040's 0.4 mm-pitch pads routes in kicadgen's "Fine" class
 FINE_NETS = sorted({"/" + n for n in list(GPIO.values()) + [
     "+3V3", "1V1", "GND", "RUN", "SWCLK", "SWDIO", "XIN", "XOUT", "USB_DP_MCU", "USB_DM_MCU",
-    "QSPI_SCLK", "QSPI_nSS", "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3"]})
+    "QSPI_SCLK", "QSPI_nSS", "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3",
+    "USB_DP", "USB_DM", "USB_CC1", "USB_CC2"]})   # and J1's 0.5 mm-pitch contacts
 
 
 def main():
