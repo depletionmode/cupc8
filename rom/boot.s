@@ -502,6 +502,10 @@ spi_xfer:
 	st $f100+r0, r1
 	mov r1, #1
 	st $f102+r0, r1
+.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
+	ld r1, $f103+r0
+	eq r1, #0
+	bzf .spi_wait
 	ld r1, $f101+r0
 	pop pcl
 	pop pch
@@ -520,9 +524,10 @@ cs_off:
 	pop pcl
 	pop pch
 
-; busy-wait at least 5 ms (V_TMP x 256 inner loops at 12 MHz)
+; busy-wait at least 5 ms: 7 x 256 inner loops, ~0.87 ms each at 12 MHz
+; (measured in the whole-machine emulator: 24 passes took 20.8 ms)
 wait_5ms:
-	mov r0, #24
+	mov r0, #7
 	st V_TMP, r0
 .outer:
 	mov r0, #0
@@ -545,6 +550,8 @@ probe_slot:
 	ld r0, V_DEV
 	shl r0, #4					; SPI register offset = slot * 16
 	st V_SPI, r0
+	mov r1, #16					; SPI_CFG = clk_div 2 (3 MHz), mode 0 (slot.md, probe step 1)
+	st $f10f+r0, r1
 
 	push pch
 	push pcl

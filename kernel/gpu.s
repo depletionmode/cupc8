@@ -64,6 +64,10 @@ gpu_send:
 	st $f100+r0, r1
 	mov r1, #1
 	st $f102+r0, r1
+.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
+	ld r1, $f103+r0
+	eq r1, #0
+	bzf .spi_wait
 	ld r1, $f101+r0
 	st [gpu_tmp], r1
 	ld r0, [gpu_tmp]
