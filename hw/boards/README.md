@@ -164,3 +164,24 @@ Spec: `doc/hardware/gpu-protocol.md`.
   tolerant; the monitor's EEPROM wants 0.7 × 5 V for a high.
 - **LEDs:** only PWR. GPIO25 (LED_ACT in pins.yaml) is left unconnected.
 - **UART TX** (GPIO0) on a test pad. CEC and the utility pin are unconnected.
+
+## Storage card (`storage.py`)
+
+Spec: `doc/hardware/storage-card.md` (card type $04).
+
+- The RP2040 core of the other two cards (`rp2040card.py`), turned round as
+  on the GPU card so its SD pins (GPIO12–19) face the socket. Four layers,
+  In1 a GND plane.
+- **J2, TF-01A** (C91145, 206k in stock): push-push microSD with a
+  card-detect contact, JLC's own footprint. It sits on the top edge with its
+  opening flush with the edge; a card sticks out by the push-push travel.
+  The card-detect contact closes to the shell (GND) with a card in, so
+  SD_nDETECT (GPIO17) reads low (as `hw/pins.yaml` expects).
+- SD in SPI mode on SPI1 (`storage_mcu` in `hw/pins.yaml`): SCK GPIO14, CMD
+  GPIO15, DAT0 GPIO12, DAT3/CS GPIO13; DAT1/DAT2 routed to GPIO18/19.
+- **Pull-ups:** 10 kΩ on CMD, DAT0, DAT1, DAT2 (a 4 × 0603 array, C29718,
+  basic) and on DAT3 and card detect (0402).
+- **At the socket:** 10 µF + 100 nF on VDD (the card's 3V3, from the slot).
+- **ESD:** two TPD4E05U06DQAR on the seven signal lines.
+- **LEDs:** PWR at the common spot, then ACT (GPIO24) and CARD (GPIO25),
+  green with 100 Ω, along the top edge.

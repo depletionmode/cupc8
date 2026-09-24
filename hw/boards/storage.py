@@ -86,7 +86,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "C12": (CX - 0.7, CY - 5.3, 90),     # DVDD 23
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 3.2, CY + 7.2, 90),      # IOVDD 49
-    "C5": (CX + 0.3, CY - 5.3, 90),      # IOVDD 22
+    "C5": (CX + 5.6, CY + 4.4, 0),       # IOVDD 22: out of the pocket, so XIN/XOUT can leave it
     "Y1": (CX - 8.5, CY - 4.0, 0),
     "C16": (CX - 11.2, CY - 4.0, 90),
     "C17": (CX - 8.5, CY - 1.4, 0),
