@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,13 +67,30 @@ class Emu {
     clock.tick(n * nsPerCycle);
   }
 
+  // n calls of step() (one loop, RP2040::runSteps, when there is no onCycle hook)
+  void steps(uint64_t n) {
+    if (onCycle) {
+      for (uint64_t i = 0; i < n; i++) step();
+    } else {
+      mcu->runSteps(n, std::numeric_limits<double>::infinity(), clock, nsPerCycle);
+    }
+  }
+  // `while (ns() < t) step();`
+  void runTo(double t) {
+    if (onCycle) {
+      while (clock.nanos() < t) step();
+    } else {
+      mcu->runSteps(std::numeric_limits<uint64_t>::max(), t, clock, nsPerCycle);
+    }
+  }
+
   // run until cond() is true; false if `ns` of emulated time pass first
   template <class Cond>
   bool runUntil(Cond &&cond, double ns) {
     const double end = clock.nanos() + ns;
     while (clock.nanos() < end) {
       if (cond()) return true;
-      for (int i = 0; i < 64; i++) step();
+      steps(64);  // for (let i = 0; i < 64; i++) this.step();
     }
     return cond();
   }

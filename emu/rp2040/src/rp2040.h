@@ -221,6 +221,17 @@ class RP2040 {
     return delta;
   }
 
+  /**
+   * Not in TS: up to `limit` steps of the card-test Emu loop without an onCycle
+   * hook (test/emu/rp2040emu.mjs: `step()`, then `cycles(n)`), stopping before a
+   * step once clock.nanos() >= stopNanos; returns the steps taken. Each is
+   * exactly one Emu step: with both cores asleep, idle() to the next alarm (at
+   * most 1000 ns, at least one cycle), else step(); then, for the n cycles by
+   * which the chip's time moved, stepPIOs(pio, n) and clock.tick(n * nsPerCycle).
+   * `clock` must be this chip's clock. (One loop with the instruction inline.)
+   */
+  uint64_t runSteps(uint64_t limit, double stopNanos, SimulationClock &clock, double nsPerCycle);
+
   /** Both cores asleep: the chip's time moves on by `cycles`. */
   void idle(double cycles) { now += cycles; }
 

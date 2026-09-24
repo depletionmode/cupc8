@@ -132,6 +132,17 @@ prove it):
   Nothing is cached, so writes need no invalidation. core-diff runs blocks
   from SRAM, flash, the three mirrors and the bootrom, and now and then
   fetches at the end of a memory or outside every memory.
+- `RP2040::runSteps(limit, stopNanos, clock, nsPerCycle)` is the Emu loop
+  (rp2040emu.mjs's `step()` and `cycles(n)` without an `onCycle` hook: the
+  idle path, `step()`, `stepPIOs`, `clock.tick`) as one function with the
+  instruction inline; `Emu::runUntil` (`Emu::steps(64)`), `Emu::runTo(t)`
+  (`while (ns() < t) step()`) and rp2040run (runs of steps between trace
+  points) use it. `test_runsteps` (EMU-005 `steps`) runs every card image
+  by `Emu::step()` and by runSteps in random runs and compares the chips.
+  There is no decoded-instruction cache: decoding is one table load and the
+  fetch one direct load, and an idealised cache (SRAM, never invalidated)
+  measured 0.4% fewer instructions and ~1% less time on gpu.elf, not worth
+  an invalidation scheme.
 - `toUint32`/`jsMathRound` go through int64 where that is exact
   (`test/js/test_js_numbers.cpp`); Timer32 keeps `baseFreq / prescaler`.
 - `RPSIO::selectCore` defers the divider/interpolator bank swap to the next

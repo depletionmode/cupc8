@@ -165,6 +165,13 @@ target_link_libraries(rp2040harness PUBLIC rp2040emu)
 rp2040emu_fast_target(rp2040harness_fast)
 target_link_libraries(rp2040harness_fast PUBLIC rp2040emu_fast)
 
+# RP2040::runSteps (the Emu loop in one function) against Emu::step() on the card images
+add_executable(test_runsteps test/core/test_runsteps.cpp)
+set_target_properties(test_runsteps PROPERTIES CXX_STANDARD 20)
+target_compile_options(test_runsteps PRIVATE ${RP2040EMU_WARN})
+rp2040emu_fast_target(test_runsteps)
+target_link_libraries(test_runsteps PRIVATE rp2040harness_fast)
+
 find_program(NODE_EXECUTABLE node)
 if(NODE_EXECUTABLE)
   get_filename_component(_node_bin "${NODE_EXECUTABLE}" REALPATH)

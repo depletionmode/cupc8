@@ -2869,7 +2869,7 @@ RP2040_ALWAYS_INLINE uint32_t CortexM0Core::fetch16(uint32_t address) {
   return readUint16(address);
 }
 
-uint32_t CortexM0Core::executeInstruction() {
+RP2040_ALWAYS_INLINE uint32_t CortexM0Core::executeInline() {
   if (interruptsUpdated) {
     if (checkForInterrupts()) {
       waiting = false;
@@ -2888,6 +2888,71 @@ uint32_t CortexM0Core::executeInstruction() {
   const uint32_t deltaCycles = decodeTable[opcode](*this, opcode, opcode2, opcodePC);
   cycles += deltaCycles;
   return deltaCycles;
+}
+
+uint32_t CortexM0Core::executeInstruction() { return executeInline(); }
+
+// RP2040::runSteps is here, next to executeInline, so that the instruction
+// is inlined into the loop without LTO too.
+uint64_t RP2040::runSteps(uint64_t limit, double stopNanos, SimulationClock &clock, double nsPerCycle) {
+  uint64_t done = 0;
+  if (core0.executeInstructionOverride || core1.executeInstructionOverride) {
+    // (--core1-slow) the Emu loop as it is
+    for (; done < limit && clock.SimulationClock::nanos() < stopNanos; done++) {
+      double n;
+      if (waiting()) {
+        const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
+        n = std::max(1.0, jsMathRound(ns / nsPerCycle));
+        idle(n);
+      } else {
+        n = step();
+        if (!n) continue;
+      }
+      stepPIOs(pio, n);
+      clock.tick(n * nsPerCycle);
+    }
+    return done;
+  }
+  for (; done < limit && clock.SimulationClock::nanos() < stopNanos; done++) {
+    double n;
+    const bool run0 = !core0.waiting, run1 = !core1.waiting && !core1Held;
+    if (!run0 && !run1) {
+      // Emu.step() with both cores asleep: skip to the next timer alarm, but no
+      // further than one microsecond so PIO and the test bench still see time pass
+      const double ns = std::min(clock.nanosToNextAlarm(), 1000.0);
+      n = std::max(1.0, jsMathRound(ns / nsPerCycle));
+      idle(n);
+    } else {
+      // step(), with the instruction inline
+      const uint32_t i = run0 && run1 ? (coreTime[0] <= coreTime[1] ? 0 : 1) : run0 ? 0 : 1;
+      double ti = coreTime[i];
+      if (ti < now) {
+        coreTime[i] = ti = now;
+      }
+      coreIndex = i;
+      sio.selectCore(i);
+      ti += (i ? core1 : core0).executeInline();
+      coreTime[i] = ti;
+      coreIndex = 0;
+      sio.selectCore(0);
+      const bool r0 = !core0.waiting, r1 = !core1.waiting && !core1Held;
+      double t;
+      if (r0 && r1) {
+        t = std::min(coreTime[0], coreTime[1]);
+      } else if (r0 || r1) {
+        t = r0 ? coreTime[0] : coreTime[1];
+      } else {
+        t = ti;
+      }
+      n = std::max(0.0, t - now);
+      now += n;
+      if (!n) continue;  // the core that ran is still behind the other
+    }
+    // Emu.cycles(n) without an onCycle hook
+    stepPIOs(pio, n);
+    clock.tick(n * nsPerCycle);
+  }
+  return done;
 }
 
 }  // namespace rp2040js

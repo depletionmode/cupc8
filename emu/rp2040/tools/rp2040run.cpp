@@ -19,6 +19,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <regex>
 #include <string>
@@ -167,9 +168,23 @@ class Emu {
     const double end = clock.nanos() + ns;
     while (clock.nanos() < end) {
       if (cond()) return true;
-      for (int i = 0; i < 64; i++) {
-        step();
-        afterStep();
+      // for (let i = 0; i < 64; i++) { this.step(); afterStep(); }, the steps
+      // between two trace points in one loop (RP2040::runSteps) unless onCycle
+      for (uint64_t i = 0; i < 64;) {
+        uint64_t k = 64 - i;
+        if (traceEvery) k = std::min(k, traceEvery - steps % traceEvery);
+        if (onCycle) {
+          step();
+          k = 1;
+        } else {
+          mcu->runSteps(k, std::numeric_limits<double>::infinity(), clock, nsPerCycle);
+        }
+        i += k;
+        steps += k;
+        if (traceEvery && steps % traceEvery == 0) {
+          std::fprintf(stderr, "%s %08x %08x\n", jsNumber(clock.nanos()).c_str(), mcu->core0.PC(),
+                       mcu->core1.PC());
+        }
       }
     }
     return cond();
@@ -178,14 +193,6 @@ class Emu {
   // --trace-every
   uint64_t traceEvery = 0;
   uint64_t steps = 0;
-
- private:
-  void afterStep() {
-    if (traceEvery && ++steps % traceEvery == 0) {
-      std::fprintf(stderr, "%s %08x %08x\n", jsNumber(clock.nanos()).c_str(), mcu->core0.PC(),
-                   mcu->core1.PC());
-    }
-  }
 };
 
 // process.stdout.write(string): the UART text is one UTF-16 unit per byte
