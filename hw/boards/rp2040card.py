@@ -94,8 +94,8 @@ def core_placement(cx, cy, turn=0):
         "U1": (0, 0, 0),
         "C3": (-5.8, -1.6, 0),        # IOVDD 1
         "C4": (-5.2, 3.2, 0),         # IOVDD 10, below the slot pins' fan-out
-        "C12": (0.4, 5.4, 90),        # DVDD 23
-        "C5": (0.4, 7.6, 90),         # IOVDD 22
+        "C12": (0.6, 5.4, 270),       # DVDD 23: pad 1 (1V1) to the pin
+        "C5": (0.4, 7.6, 270),        # IOVDD 22
         "C6": (5.2, 1.2, 0),          # IOVDD 33
         "C7": (5.2, -2.6, 0),         # IOVDD 42
         "C9": (5.2, -4.4, 0),         # ADC_AVDD 43
@@ -391,3 +391,11 @@ def pocket_escapes(board):
     for pin in (25, 23, 21):                  # SWDIO, DVDD, XOUT: out, one row
         escape(board, pin, 1.16)
     escape(board, 20, 2.26, side=0.3)         # XIN: the next row out, clear of XOUT's via
+
+
+def io_preroute(board):
+    """The unturned card (IO): TESTEN in, and DVDD 23 straight down to its
+    cap, which Freerouting kept walling in with the SWD fan-out."""
+    tie_testen(board)
+    (ax, ay), (bx, by) = pad_at(board, "U1", 23), pad_at(board, "C12", 1)
+    track(board, "/1V1", (ax, ay), (bx, by), width=0.15)
