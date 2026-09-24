@@ -252,13 +252,13 @@ def schematic(path, footprint_libs):
 
 # ------------------------------------------------------------------- board
 #
-# Card body 72 x 52 mm above the PCIe x8 finger tab (the footprint draws the
-# tab's Edge.Cuts; its ends meet the body at y = 52). The FPGA is turned a
+# Card body 72 x 60 mm above the PCIe x8 finger tab (the footprint draws the
+# tab's Edge.Cuts; its ends meet the body at y = 60). The FPGA is turned a
 # quarter so its bank-3 side (A[15:0], IRQ) faces the fingers and its bank-2
 # side (D, control, config) faces right; the 33 ohm arrays sit between each
 # side and the fingers, the flash beside the config pins.
 
-W, H = 72.0, 52.0
+W, H = 72.0, 60.0
 EDGE_X = 11.0                        # finger A1/B1 centre
 FPGA = (38.0, 22.0, 90)
 OUTLINE = (0, 0, W, H)
@@ -299,12 +299,12 @@ def placement():
     p["C11"] = beside(123, along=-0.75)
     p["C8"] = beside(57, along=-0.5)
     p.update({
-        "C15": (16, 44, 90), "C16": (63, 40, 90),              # 3V3 bulk: finger entry, right side
+        "C15": (16, 44, 90), "C16": (66, 44, 90),              # 3V3 bulk: finger entry, right side
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
         "C18": (51.9, 22.5, 270), "C17": (58.5, 22.5, 270), "R6": (58.5, 26.5, 90),
         "C20": (24.1, 22.0, 90), "C19": (16.5, 22.0, 90), "R7": (16.5, 26.0, 90),
         # 33 ohm arrays: A below the FPGA, D and control to its right
-        "RN1": (29.0, 41.5, 90), "RN2": (33.6, 41.5, 90), "RN3": (38.2, 41.5, 90), "RN4": (42.8, 41.5, 90),
+        "RN1": (29.0, 40.5, 90), "RN2": (33.6, 40.5, 90), "RN3": (38.2, 40.5, 90), "RN4": (42.8, 40.5, 90),
         "RN5": (64.0, 31.5, 180), "RN6": (64.0, 27.0, 180), "RN7": (64.0, 22.5, 180), "RN8": (64.0, 18.0, 180),
         # config flash and its pull-ups, top right by the config pins, clear
         # of the mounting hole's keep-out
@@ -331,7 +331,8 @@ def main():
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), OUTLINE, out=out, edge=EDGE, card_edge=True, layers=4,
         zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
-        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 40.0, 0)])
+        labels={"D1": "1V2", "D2": "PWR"},
+        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 46.0, 0)])
     print("LCSC:", " ".join(sorted(lcsc)))
 
 
