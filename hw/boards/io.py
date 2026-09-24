@@ -88,6 +88,11 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up: by its finger, clear of the SWD pins
+    # the crystal right of the finger tab: nothing but its ground ties within
+    # 5 mm above the tab (slot.md, Mechanical)
+    "Y1": (22.6, -8.2, 0),
+    "C16": (20.5, -12.6, 90),
+    "C17": (25.4, -8.2, 90),
     "U4": (16.5, -18, 0),
     "C18": (13.3, -18, 90),
     "R5": (19, -38.5, 0),

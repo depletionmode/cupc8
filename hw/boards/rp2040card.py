@@ -290,7 +290,7 @@ def core(s, gpios, leds=(), usb=False):
 
 
 def build(name, schematic, placement, power_nets, graphics, labels, gpios, title, revision, usb=False,
-          layers=2, passes=40):
+          layers=2, passes=40, preroute=None):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
@@ -300,5 +300,50 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb))
+                       fine_nets=u1_nets(gpios, usb), preroute=preroute or tie_testen)
     print("LCSC:", " ".join(sorted(lcsc)))
+
+
+# ---- hand-laid copper, before Freerouting (kicadgen.pipeline's `preroute`)
+
+def track(board, net, a, b, width=0.2, layer=None):
+    """A locked track from a to b (mm) on `net`, top layer unless given."""
+    import pcbnew
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(a[0]), pcbnew.FromMM(a[1])))
+    t.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(b[0]), pcbnew.FromMM(b[1])))
+    t.SetWidth(pcbnew.FromMM(width))
+    t.SetLayer(pcbnew.F_Cu if layer is None else layer)
+    t.SetNet(board.FindNet(net))
+    t.SetLocked(True)
+    board.Add(t)
+
+
+def via(board, net, at, size=0.6, drill=0.3):
+    import pcbnew
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(at[0]), pcbnew.FromMM(at[1])))
+    v.SetWidth(pcbnew.FromMM(size))
+    v.SetDrill(pcbnew.FromMM(drill))
+    v.SetNet(board.FindNet(net))
+    v.SetLocked(True)
+    board.Add(v)
+
+
+def pad_at(board, ref, num):
+    """(x, y) mm of a pad."""
+    import pcbnew
+    fp = board.FindFootprintByReference(ref)
+    p = [q for q in fp.Pads() if q.GetNumber() == str(num)][0].GetPosition()
+    return pcbnew.ToMM(p.x), pcbnew.ToMM(p.y)
+
+
+def tie_testen(board):
+    """TESTEN (pin 19) is a GND pin between two signal pins: a track straight
+    in from its pad to the exposed GND pad, which the fan-out vias join to
+    the pours (nothing else reaches it: the pour can't get between pins)."""
+    tx, ty = pad_at(board, "U1", 19)
+    cx, cy = pad_at(board, "U1", 57)
+    # to 1.2 mm short of the centre along the pin's axis: inside the 3.2 mm pad
+    k = 1.2 / max(abs(tx - cx), abs(ty - cy))
+    track(board, "/GND", (tx, ty), (cx + (tx - cx) * k, cy + (ty - cy) * k))

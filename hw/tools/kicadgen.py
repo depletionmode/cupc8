@@ -643,8 +643,9 @@ NET_CLASSES = [
     ("Power", 0.5, 0.2, 0.8, 0.4),
     # nets on 0.4 mm pitch pads (QFN): 0.15 mm tracks and 0.15 mm clearance
     # (JLC: 0.127), or a track can't turn out of a pad beside its neighbour
-    # (a pad gap is 0.2); DRC still holds via holes 0.5 mm apart
-    ("Fine", 0.15, 0.15, 0.6, 0.3),
+    # (a pad gap is 0.2). Its vias are 0.7 mm, so two of them 0.15 apart
+    # still keep their 0.3 mm holes 0.55 apart (JLC: 0.5)
+    ("Fine", 0.15, 0.15, 0.7, 0.3),
 ]
 
 
@@ -1784,7 +1785,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, fine_nets=()):
+             io_card=False, fine_nets=(), preroute=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1843,6 +1844,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
         state["fanout"] = ground_fanout(b, zones[0])
+        if preroute:                 # the board script's own locked tracks and vias, before Freerouting
+            preroute(b)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \

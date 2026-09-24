@@ -139,10 +139,10 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "U4": (14, -12.5, 0),
     "C18": (10.5, -12.5, 90),
     "J2": (HX, -44 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin
-    "U5": (HX - 3.5, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
+    "U5": (HX - 3.8, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
     "U6": (HX, -31.0, 90),
-    "RN1": (HX - 4, -28.2, 90),
-    "RN2": (HX, -28.2, 90),
+    "RN1": (HX - 3.8, -27.0, 90),       # 1.4 mm below the ESD GND vias (preroute)
+    "RN2": (HX, -27.0, 90),
     "F1": (39, -42.5, 0),
     "D3": (38.5, -39.5, 0),
     "C20": (36.8, -36.5, 90),
@@ -163,6 +163,26 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0)]
 TITLE, REVISION = "CUPC/8 GPU", "A"
 
 
+def preroute(board):
+    """GND the router can't give room to, between the TMDS lines:
+    - the receptacle's shield and DDC-ground pins (2, 5, 8, 11, 17) sit
+      between signal pins: each gets a via 2 mm behind its pad, under the
+      receptacle's body, on a track along the pad
+    - each ESD's GND pins (3 and 8) are in the middle of its rows, between
+      two pairs: a track joins them through the package and on to a via
+      1.4 mm towards the chip, and the lines pass either side of it
+    - TESTEN, as on every RP2040 card"""
+    rc.tie_testen(board)
+    for pin in (2, 5, 8, 11, 17):
+        x, y = rc.pad_at(board, "J2", pin)
+        rc.via(board, "/GND", (x, y - 2.0))
+        rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
+    for ref in ("U5", "U6"):
+        (x8, y8), (x3, y3) = rc.pad_at(board, ref, 8), rc.pad_at(board, ref, 3)
+        rc.via(board, "/GND", (x3, y3 + 1.4))
+        rc.track(board, "/GND", (x8, y8), (x3, y3 + 1.4), width=0.2)
+
+
 if __name__ == "__main__":
     rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
-             layers=LAYERS, passes=100)
+             layers=LAYERS, passes=100, preroute=preroute)
