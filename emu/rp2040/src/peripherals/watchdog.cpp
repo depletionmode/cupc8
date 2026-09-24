@@ -53,7 +53,6 @@ static constexpr double TICK_FREQUENCY =
 
 RPWatchdog::RPWatchdog(RP2040 &rp2040, const std::string &name)
     : BasePeripheral(rp2040, name),
-      /** Called when the watchdog triggers - override with your own soft reset implementation */
       onWatchdogTrigger([this] {
         this->rp2040.logger->warn(this->name, "Watchdog triggered, but no reset handler provided");
       }) {

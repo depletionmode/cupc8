@@ -6,10 +6,11 @@
 // few Date operations used (the ECMAScript MakeDay / MakeTime / MakeDate /
 // UTC / LocalTime / TimeClip algorithms), taking the local time zone offset
 // from the C library (localtime_r's tm_gmtoff, the same tz database node
-// uses). Identical for any zone at times away from a DST/offset transition;
-// for a local time that falls inside a transition gap or overlap (which
-// `new Date(y, m, d, h, min, s)` must resolve) V8's choice may differ.
-// On a UTC host (the build machines) the offset is always 0.
+// uses), resolving local times in a DST gap or overlap as V8 does. On a UTC
+// host (the build machines) the offset is always 0; the differential test
+// also passes under TZ=America/New_York, Europe/London, Australia/Lord_Howe
+// and Asia/Kolkata with RTC dates around their transitions. Zones with more
+// than one offset change within two days could still resolve differently.
 #include "rtc.h"
 
 #include <cmath>
@@ -142,13 +143,32 @@ double offsetAtUtc(double t) {
   return static_cast<double>(tm.tm_gmtoff) * 1000;
 }
 
-/** UTC(t): a local time value to a UTC one. */
+/**
+ * UTC(t): a local time value to a UTC one, disambiguated as V8 does
+ * ("compatible"): a local time that occurs twice (an overlap) takes the
+ * earlier instant; one that does not exist (a gap) is taken with the offset
+ * in effect before the transition, i.e. moved forward by the gap.
+ */
 double utcFromLocal(double t) {
   if (!std::isfinite(t)) {
     return t;
   }
-  const double guess = offsetAtUtc(t);
-  return t - offsetAtUtc(t - guess);
+  const double offsetBefore = offsetAtUtc(t - msPerDay);
+  const double offsetAfter = offsetAtUtc(t + msPerDay);
+  const double c1 = t - offsetBefore;
+  const double c2 = t - offsetAfter;
+  const bool v1 = offsetAtUtc(c1) == offsetBefore;
+  const bool v2 = offsetAtUtc(c2) == offsetAfter;
+  if (v1 && v2) {
+    return std::fmin(c1, c2);
+  }
+  if (v1) {
+    return c1;
+  }
+  if (v2) {
+    return c2;
+  }
+  return c1;  // in a gap
 }
 
 /** LocalTime(t) */

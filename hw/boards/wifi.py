@@ -217,6 +217,8 @@ PLACEMENT = {
     "TP2": (28, -38, 0),
 }
 LOGO_MM = 12
+# doc/milestone-1.md, Board revision: bump for every board sent to be made
+TITLE, REVISION = "CUPC/8 Wi-Fi", "A"
 
 
 def main():
@@ -224,7 +226,8 @@ def main():
     lcsc = kg.pipeline("wifi", schematic, PLACEMENT, BODY, out=sys.argv[1] if len(sys.argv) > 1 else None,
                        edge=EDGE, card_edge=True, zone_outline=kg.card_zone(BODY, kg.IO_CARD_TAB, -1.5), power_nets=("/+5V", "/3V3", "/GND"),
                        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 10, -35, 0)],
-                       labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"})
+                       labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
+                       title=TITLE, revision=REVISION, revision_at=(10, -29.5))   # under the logo
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

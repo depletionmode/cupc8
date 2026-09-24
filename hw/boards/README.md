@@ -19,6 +19,7 @@ python3 hw/boards/wifi.py
 ```
 
 Shared rules:
+- **Revision:** every board passes `title`, `revision` and `revision_at` to `pipeline()`, which prints `<title> rev <revision>` on the top silkscreen and puts the revision in the title block (and so in the Gerbers). Bump the board script's `REVISION` (A, B, ...) for every order that changes the board (`doc/milestone-1.md`, Board revision).
 - **Cards:** 1.6 mm, with hard-gold fingers and a 45° chamfer. These are
   order options, written in `fab/order.json` and checked there.
 - **Card edge:** each card's finger tab is KiCad's `BUS_PCIexpress_*`

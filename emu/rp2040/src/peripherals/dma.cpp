@@ -96,7 +96,8 @@ void RPDMAChannel::start() {
 
 uint32_t RPDMAChannel::treq() const { return treqValue; }
 
-uint32_t RPDMAChannel::active() const { return ctrl & EN && ctrl & BUSY; }
+// `this.ctrl & EN && this.ctrl & BUSY`: the value of `&&` (BUSY or 0)
+uint32_t RPDMAChannel::active() const { return ctrl & EN ? ctrl & BUSY : 0; }
 
 // In each transfer the TS evaluates `this.writeAddr` before calling the read
 // (left-to-right argument evaluation); C++ does not fix the order, so the

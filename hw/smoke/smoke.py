@@ -136,6 +136,7 @@ def main():
         logo.footprint(LOGO_MM)
         b = kg.build_board(comps, nets["n"], PLACEMENT, OUTLINE, zones=("/GND",),
                            graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 22.5, 32.5, 0)])
+        kg.mark_revision(b, "CUPC/8 smoke", "A", (22.5, 26))      # as every board carries
         # save without settings (a plain save writes, and caches, a default
         # project), then reload so the board picks up the project's rules
         kg.write_project(pro, power_nets=("/VBUS", "/3V3", "/GND"))

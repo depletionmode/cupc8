@@ -158,6 +158,9 @@ function dmaReadSource(r) {
   }
 }
 
+/** long-time scenarios keep PWM off: a running PWM makes a 1000 s tick fire ~1e11 alarms */
+let longTimeScenario = false;
+
 function dmaWriteTarget(r) {
   switch (r.below(10)) {
     case 0:
@@ -174,7 +177,7 @@ function dmaWriteTarget(r) {
     case 7:
       // (not I2C DATA_CMD: 32-bit transfers with INCR_WRITE reach IC_FS_SPKLEN, a JS-SIGN register.
       // PWM registers rarely: a TOP of 0 there ends the scenario, see pwmOp)
-      return r.chance(0.3) ? PWM_BASE + 0x0c + 0x14 * r.below(8) : SRAM + 0x200 + (r.below(0x100) & ~3);
+      return r.chance(0.3) && !longTimeScenario ? PWM_BASE + 0x0c + 0x14 * r.below(8) : SRAM + 0x200 + (r.below(0x100) & ~3);
     case 8:
       return WATCHDOG_BASE + 0x0c + 4 * r.below(8);
     default:
@@ -244,7 +247,9 @@ function dmaOp(r, ops) {
     case 7:
     case 8: {
       const alias = r.chance(0.8) ? 0 : r.pick([0x1000, 0x2000, 0x3000]);
-      ops.push(`W ${hex8(base + r.pick(CTRL_OFFS) + alias)} ${hex8(dmaCtrl(r, ch))}`);
+      // an XOR/SET/CLR alias write leaves CHAIN_TO alone (a lower CHAIN_TO could close a cycle)
+      const v = alias ? dmaCtrl(r, ch) & ~(0xf << 11) : dmaCtrl(r, ch);
+      ops.push(`W ${hex8(base + r.pick(CTRL_OFFS) + alias)} ${hex8(v >>> 0)}`);
       break;
     }
     case 9: {
@@ -548,16 +553,21 @@ function watchdogOp(r, ops) {
 }
 
 function rtcOp(r, ops) {
-  switch (r.below(7)) {
+  switch (r.below(8)) {
     case 0: {
-      const v = r.chance(0.7)
+      // dates around DST transitions (host-TZ dependent in TS), then anything
+      const v = r.chance(0.3)
+        ? ((2019 + r.below(4)) << 12) | (r.pick([3, 4, 10, 11]) << 8) | (1 + r.below(31))
+        : r.chance(0.6)
         ? ((r.chance(0.5) ? 1900 + r.below(300) : r.below(0x1000)) << 12) | ((r.chance(0.8) ? 1 + r.below(12) : r.below(16)) << 8) | r.below(32)
         : r.next();
       busWrite(r, ops, RTC_BASE + 4, v >>> 0);
       break;
     }
     case 1: {
-      const v = r.chance(0.7)
+      const v = r.chance(0.3)
+        ? (r.below(7) << 24) | (r.below(4) << 16) | (r.pick([0, 29, 30, 59, r.below(60)]) << 8) | r.below(60)
+        : r.chance(0.6)
         ? (r.below(7) << 24) | (r.below(32) << 16) | (r.below(64) << 8) | r.below(64)
         : r.next();
       busWrite(r, ops, RTC_BASE + 8, v >>> 0);
@@ -569,6 +579,24 @@ function rtcOp(r, ops) {
     case 3:
       busWrite(r, ops, RTC_BASE + r.pick([0x10, 0x14, 0x18, 0x1c, 0x00]), genericValue(r));
       break;
+    case 4: {
+      // load a local time at a DST transition (US, EU, Lord Howe; 2021) or any field values
+      // (years 0..99 are 1900 + year in `new Date`), then read it back
+      if (r.chance(0.5)) {
+        const [m, d] = r.pick([[3, 14], [11, 7], [3, 28], [10, 31], [4, 4], [10, 3]]);
+        ops.push(`W ${hex8(RTC_BASE + 4)} ${hex8((2021 << 12) | (m << 8) | d)}`);
+        ops.push(`W ${hex8(RTC_BASE + 8)} ${hex8((r.below(4) << 16) | (r.below(60) << 8) | r.below(60))}`);
+      } else {
+        const y = r.pick([r.below(100), r.below(0x1000), 1970 + r.below(100)]);
+        ops.push(`W ${hex8(RTC_BASE + 4)} ${hex8((y << 12) | (r.below(16) << 8) | r.below(32))}`);
+        ops.push(`W ${hex8(RTC_BASE + 8)} ${hex8(r.next())}`);
+      }
+      ops.push(`W ${hex8(RTC_BASE + 0xc)} 10`);
+      ops.push(`W ${hex8(RTC_BASE + 0xc)} 1`);
+      ops.push(`R ${hex8(RTC_BASE + 0x1c)}`);
+      ops.push(`R ${hex8(RTC_BASE + 0x18)}`);
+      break;
+    }
     default:
       busRead(r, ops, RTC_BASE + r.pick([0x18, 0x1c, 0x18, 0x1c, ...RTC_REGS]));
   }
@@ -593,9 +621,19 @@ function generate(seed, nOps) {
   // scenario flavour: 0 = everything, 1 = long times (no PWM/ADC multi-shot), 2..6 = one peripheral emphasised
   const flavour = seed % 7;
   const longTime = flavour === 1;
+  longTimeScenario = longTime;
   ops.push(`S ${hex8(r.next())}`);
   // SRAM / flash contents
   ops.push(`FILL ${hex8(r.next())}`);
+  // Every pin's state right after construction (RP2040.reset() -> pwm.reset() leaves
+  // gpio[1].lastValue = InputPullDown in TS): force each pin high and back, so the
+  // listener reports the old state of all 30 pins.
+  for (let pin = 0; pin < 30; pin++) ops.push(`W ${hex8(IO_BANK0 + 8 * pin + 4)} ${hex8((3 << 8) | (3 << 12) | 0x1f)}`);
+  for (let pin = 0; pin < 30; pin++) ops.push(`W ${hex8(IO_BANK0 + 8 * pin + 4)} 1f`);
+  // Pads: input enable on most pins (the reset value has IE clear, so inputs would read 0)
+  for (let pin = 0; pin < 30; pin++) {
+    if (r.chance(0.85)) ops.push(`W ${hex8(0x4001c004 + 4 * pin)} ${hex8(0x40 | r.pick([0x36, 0x32, 0x3a, 0x30]))}`);
+  }
   // GPIO functions: mostly PWM
   for (let pin = 0; pin < 30; pin++) {
     if (r.chance(0.85)) ops.push(`W ${hex8(IO_BANK0 + 8 * pin + 4)} 4`);
