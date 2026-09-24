@@ -1,14 +1,14 @@
-/* EINK-001..004: the e-ink card core (doc/hardware/eink-card.md) with its
+/* GPU-006..008: the e-ink card core (doc/hardware/eink-card.md) with its
  * panel, the UC8179 model (fw/test/epdmodel.c), on a fake clock.
  *
- *   EINK-001  every e-paper and mode-2 command, valid, boundary and malformed
- *   EINK-002  the ink rule, the dither, and the pictures the controller
+ *   GPU-006   every e-paper and mode-2 command, valid, boundary and malformed
+ *   GPU-007   the ink rule, the dither, and the pictures the controller
  *             model shows after each refresh, against golden images
  *             (test/eink/golden, PBM and PGM) and against the core's raster
- *   EINK-003  the refresh policy's timing, the partial window, AUTO 0 and
- *             REFRESH, FENCE after REFRESH, deep sleep, a dead panel
- *   EINK-004  the UC8179 command stream: the model counts every command the
- *             chip would ignore or mishandle; it must count none
+ *   GPU-008   the refresh policy's timing, the partial window, AUTO 0 and
+ *             REFRESH, FENCE after REFRESH, deep sleep, a dead panel; and in
+ *             all of them, the UC8179 command stream: the model counts every
+ *             command the chip would ignore or mishandle; it must count none
  *
  * EINK_RECORD=1 rewrites the golden images (after a human has looked at
  * them: they are also written to build/fw as .pgm). */
@@ -232,7 +232,7 @@ static void check_picture(const char *name, bool grey)
 
 static uint8_t glass(int x, int y) { return model.glass[y * W() + x]; }
 
-/* ------------------------------------------------------------------ EINK-001 */
+/* ------------------------------------------------------------------ GPU-006 */
 
 static void test_commands(void)
 {
@@ -365,7 +365,7 @@ static void test_commands(void)
 	CHECK_EQ(model.errors, 0);
 }
 
-/* ------------------------------------------------------------------ EINK-002 */
+/* ------------------------------------------------------------------ GPU-007 */
 
 static void test_pictures(void)
 {
@@ -474,7 +474,7 @@ static void test_pictures(void)
 	CHECK_EQ(model.errors, 0);
 }
 
-/* ------------------------------------------------------------------ EINK-003 */
+/* ------------------------------------------------------------------ GPU-008 */
 
 static void test_policy(void)
 {
@@ -646,5 +646,5 @@ int main(void)
 	test_policy();
 	CHECK(model.errors == 0, "the UC8179 model saw nothing the chip would ignore (%u errors: %s)", model.errors,
 	      model.error);
-	return check_report("EINK-001..004 e-ink card core");
+	return check_report("GPU-006..008 e-ink card core");
 }
