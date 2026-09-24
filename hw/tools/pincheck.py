@@ -10,7 +10,10 @@ Checks, without needing the boards to exist yet:
   5. the firmware's pin macros match the ones the firmware source uses
   6. FPGA pin counts fit the package, with the config pins left free, and
      every FPGA pin is a real I/O of the TQ144, unique, clocks on GBIN pins
-Once the KiCad projects exist it also checks their netlists.
+Once the KiCad projects exist it also checks their netlists:
+  7. the main board (build/hw/main/main.net): every socket contact reaches
+     what cpu-bus.md, slot.md, system-slot.md and pins.yaml say, and the
+     SRAM and ROM pins are on their chipset memory-bus signals
 """
 import os
 import re
@@ -278,6 +281,250 @@ def check_firmware_macros(pins):
             err("%s uses %s, which pins.yaml does not define" % (hdr, macro))
 
 
+# ------------------------------------------------ the main board's netlist
+
+MAINBOARD_NET = os.path.join(ROOT, "build", "hw", "main", "main.net")
+# the chipset's configuration pins (iCE40 TQ144), by the system-slot signal on them
+CHIPSET_CONFIG = {"FL0_SCK": 70, "FL0_MOSI": 67, "FL0_MISO": 68, "FL0_nCS": 71,
+                  "CHIPSET_nCRESET": 66, "CHIPSET_CDONE": 65}
+
+
+def read_netlist(path):
+    """({ref: (lib, part, value)}, {(ref, pin): net}, {(ref, pin): pinfunction})"""
+    sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
+    import kicadgen as kg
+    net = kg.parse(open(path).read())
+    comps = {}
+    for c in kg.find(kg.find1(net, "components"), "comp"):
+        ls = kg.find1(c, "libsource")
+        comps[str(kg.find1(c, "ref")[1])] = (str(kg.find1(ls, "lib")[1]), str(kg.find1(ls, "part")[1]),
+                                             str(kg.find1(c, "value")[1]))
+    pin_net, func = {}, {}
+    for n in kg.find(kg.find1(net, "nets"), "net"):
+        name = str(kg.find1(n, "name")[1]).lstrip("/")
+        for nd in kg.find(n, "node"):
+            key = (str(kg.find1(nd, "ref")[1]), str(kg.find1(nd, "pin")[1]))
+            pin_net[key] = name
+            f = kg.find1(nd, "pinfunction")
+            func[key] = str(f[1]) if f else ""
+    return comps, pin_net, func
+
+
+def check_mainboard(pins, path=MAINBOARD_NET):
+    """The connectors of the main board (hw/boards/main.py) against the pinout
+    docs and pins.yaml: every contact of every socket must reach the part the
+    doc and the pin map say, directly or through one series resistor (the
+    33 ohm terminations). Returns the number of contacts checked."""
+    if not os.path.exists(path):
+        print("pincheck: %s not built, main board netlist not checked" % os.path.relpath(path, ROOT))
+        return 0
+    sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
+    import edgesym
+    comps, pin_net, func = read_netlist(path)
+    nodes = {}
+    for (ref, pin), n in pin_net.items():
+        nodes.setdefault(n, []).append((ref, pin))
+
+    # nets joined by a series termination (a resistor of 100 ohm or less) are one signal
+    parent = {}
+
+    def root(n):
+        while parent.get(n, n) != n:
+            n = parent[n]
+        return n
+    for ref, (lib, part, value) in comps.items():
+        if part == "R" and value in ("33", "22", "0"):
+            a, b = pin_net.get((ref, "1")), pin_net.get((ref, "2"))
+            if a and b and value != "0":
+                parent[root(a)] = root(b)
+
+    def same(a, b):
+        return a is not None and b is not None and root(a) == root(b)
+
+    def parts_of(part):
+        return sorted(r for r, c in comps.items() if c[1] == part)
+
+    def by_func(ref, f):
+        # KiCad writes a pin that shares its net with others as NAME_<number>
+        hits = [n for (r, p), n in pin_net.items() if r == ref and func[(r, p)] in (f, "%s_%s" % (f, p))]
+        return hits[0] if hits else None
+
+    fpga = [r for r, c in comps.items() if c[1].startswith("ICE40HX4K")]
+    if len(fpga) != 1:
+        err("main board: expected one chipset FPGA, found %s" % fpga)
+        return 0
+    fpga = fpga[0]
+    chip_pin = {}
+    for _, name, sig, _ in flat(pins["devices"]["chipset"]):
+        width = sig.get("width", 1)
+        p = sig["pin"]
+        idx = int(name.split("[")[1][:-1]) if "[" in name else 0
+        chip_pin[name] = p[idx] if isinstance(p, list) else p
+
+    def chip_net(signal):
+        return pin_net.get((fpga, str(chip_pin[signal])))
+
+    expanders = {}
+    for r in parts_of("TCA9555PWR"):
+        a = (by_func(r, "A2"), by_func(r, "A1"), by_func(r, "A0"))
+        addr = 0x20 + sum(4 >> i for i, n in enumerate(a) if n == "+3V3")
+        expanders[addr] = r
+    muxes = {by_func(r, "A"): r for r in parts_of("CD74HC4051PWR")}
+    supervisor = (parts_of("MAX811TEUS+T") or [None])[0]
+    usbc = [r for r, c in comps.items() if c[1].startswith("USB_C_Receptacle")]
+
+    socket = {"CUPC8_CPUSocket": [], "CUPC8_SystemSlot": [], "CUPC8_Slot": []}
+    for r, c in comps.items():
+        if c[1] in socket:
+            socket[c[1]].append(r)
+    if len(socket["CUPC8_CPUSocket"]) != 1 or len(socket["CUPC8_SystemSlot"]) != 1 or \
+            len(socket["CUPC8_Slot"]) != 6:
+        err("main board: sockets %s, expected 1 CPU, 1 system, 6 slots" % socket)
+        return 0
+    cpu, sysj = socket["CUPC8_CPUSocket"][0], socket["CUPC8_SystemSlot"][0]
+    slots = sorted(socket["CUPC8_Slot"], key=lambda r: int(r[1:]))
+    docs = {cpu: "doc/hardware/cpu-bus.md", sysj: "doc/hardware/system-slot.md"}
+    docs.update({r: "doc/hardware/slot.md" for r in slots})
+    sys_pin = {name.split(" ")[0]: num for num, name in edgesym.pinout(docs[sysj]).items()}
+
+    def sys_net(name):
+        return pin_net.get((sysj, sys_pin[name]))
+
+    def via_parts(net, target, depth=3):
+        """net reaches target through at most `depth` two-pin series parts."""
+        seen, front = {net}, {net}
+        for _ in range(depth):
+            nxt = set()
+            for n in front:
+                for ref, pin in nodes.get(n, []):
+                    if comps.get(ref, ("", "", ""))[1] in ("R", "Polyfuse"):
+                        other = pin_net.get((ref, "2" if pin == "1" else "1"))
+                        if other and other not in seen:
+                            nxt.add(other)
+            if target in nxt:
+                return True
+            seen |= nxt
+            front = nxt
+        return False
+
+    checked = 0
+    for j in [cpu, sysj] + slots:
+        n_slot = slots.index(j) if j in slots else None
+        for num, doc_name in edgesym.pinout(docs[j]).items():
+            name = doc_name.split(" ")[0]
+            net = pin_net.get((j, num))
+            want, how, ok = None, None, None
+            if name in ("GND", "PRSNT1_n"):
+                ok = net == "GND"
+            elif name == "+3V3":
+                ok = net == "+3V3"
+            elif name == "+5V":
+                ok = net == "+5V" or via_parts(net, "+5V")
+            elif name.startswith("RSVD") or (j == sysj and name == "PRSNT2_n"):
+                others = [r for r, p in nodes.get(net, []) if r != j]
+                allowed = ("TestPoint",) if name.startswith("RSVD") else ("TestPoint", "R")   # PRSNT2_n: a pull-up
+                ok = net is not None and all(comps[r][1] in allowed for r in others) and \
+                    sum(1 for (r, p) in nodes[net] if r == j) == 1
+                how = "a test pad only"
+            elif j == cpu:
+                if name in CPU_SOCKET_EXPANDER:
+                    bit = {"PRSNT2_n": "P10", "CARD_ID0": "P11", "CARD_ID1": "P12"}[name]
+                    want, how = by_func(expanders.get(0x21), bit), "expander $21 " + bit
+                elif name.startswith("FL1_"):
+                    want, how = sys_net(name), "system slot " + name
+                elif name == "CRESET_n":
+                    want, how = sys_net("CPUCARD_nCRESET"), "system slot CPUCARD_nCRESET"
+                elif name == "CPU_CLK":
+                    osc = pin_net.get((fpga, str(chip_pin["CLK12"])))
+                    ok = net is not None and same_via(net, osc, comps, pin_net)
+                    how = "the oscillator, as CLK12"
+                else:
+                    sig = CPU_SOCKET_MAP[name]
+                    want, how = chip_net(sig), "chipset %s (pin %s)" % (sig, chip_pin[sig])
+                    if name == "CDONE" and not same(net, sys_net("CPUCARD_CDONE")):
+                        err("main board: CPU socket CDONE is not system slot CPUCARD_CDONE")
+            elif j == sysj:
+                if name in CHIPSET_CONFIG:
+                    want, how = pin_net.get((fpga, str(CHIPSET_CONFIG[name]))), "chipset config pin %d" % \
+                        CHIPSET_CONFIG[name]
+                elif name.startswith("BR_"):
+                    want, how = chip_net(name), "chipset %s" % name
+                elif name.startswith("FL1_") or name in ("CPUCARD_nCRESET", "CPUCARD_CDONE"):
+                    cpu_name = {"CPUCARD_nCRESET": "CRESET_n", "CPUCARD_CDONE": "CDONE"}.get(name, name)
+                    cpu_pin = [k for k, v in edgesym.pinout(docs[cpu]).items() if v == cpu_name][0]
+                    want, how = pin_net.get((cpu, cpu_pin)), "CPU socket " + cpu_name
+                elif name in ("I2C_SDA", "I2C_SCL"):
+                    f = name[4:]
+                    ok = all(by_func(r, f) == net for r in expanders.values()) and len(expanders) == 2
+                    how = "both expanders' " + f
+                elif name.startswith("MUX_SEL"):
+                    f = "S" + name[-1]
+                    ok = all(by_func(r, f) == net for r in muxes.values()) and len(muxes) == 2
+                    how = "both muxes' " + f
+                elif name in ("PROG_CLK", "PROG_IO"):
+                    ok = net in muxes
+                    how = "a mux common pin"
+                elif name in ("CC1", "CC2"):
+                    want = by_func(usbc[0], name) if usbc else None
+                    how = "USB-C " + name
+                elif name == "SYS_nRST":
+                    want, how = by_func(supervisor, "~{MR}"), "the supervisor's manual reset"
+                elif name == "V1V2_SENSE":
+                    ok, how = via_parts(net, "+1V2", 1), "+1V2 through a resistor"
+                else:
+                    err("main board: system slot contact %s (%s) is not known to the checker" % (num, name))
+                    continue
+            else:
+                k = n_slot
+                if name in SLOT_MAP and name not in ("SWCLK", "SWDIO"):
+                    sig = SLOT_MAP[name].replace("[0]", "[%d]" % k)
+                    want, how = chip_net(sig), "chipset %s (pin %s)" % (sig, chip_pin[sig])
+                elif name in ("SWCLK", "SWDIO"):
+                    common = sys_net("PROG_CLK" if name == "SWCLK" else "PROG_IO")
+                    mux = muxes.get(common)
+                    want, how = (by_func(mux, "A%d" % k) if mux else None), "mux channel %d of %s" % (k, name)
+                elif name in ("CARD_RST_n", "PROG_n"):
+                    bit = ("P0%d" if name == "CARD_RST_n" else "P1%d") % k
+                    want, how = by_func(expanders.get(0x20), bit), "expander $20 " + bit
+                elif name == "PRSNT2_n":
+                    want, how = by_func(expanders.get(0x21), "P0%d" % k), "expander $21 P0%d" % k
+                else:
+                    err("main board: slot contact %s (%s) is not known to the checker" % (num, name))
+                    continue
+            if ok is None:
+                ok = same(net, want)
+            if not ok:
+                err("main board: %s %s (%s) is on %s, should reach %s" % (j, num, name, net, how or name))
+            checked += 1
+
+    # the memory bus: every chip pin on its chipset signal
+    for chip_ref, dq in [(r, "I/O") for r in parts_of("IS62WV5128EBLL-45HLI")] + \
+                        [(r, "DQ") for r in parts_of("SST39VF040-70-4I-NHE")]:
+        rom = dq == "DQ"
+        for i in range(19 if rom else 16):
+            if not same(by_func(chip_ref, "A%d" % i), chip_net("MEM_A[%d]" % i)):
+                err("main board: %s A%d is not chipset MEM_A[%d]" % (chip_ref, i, i))
+        for i in range(8):
+            if not same(by_func(chip_ref, "%s%d" % (dq, i)), chip_net("MEM_D[%d]" % i)):
+                err("main board: %s %s%d is not chipset MEM_D[%d]" % (chip_ref, dq, i, i))
+        for f, sig in (("~{OE}", "MEM_nOE"), ("~{WE}", "MEM_nWE"),
+                       ("~{CE}" if rom else "~{CS}", "MEM_nCE_ROM" if rom else "MEM_nCE_RAM")):
+            if not same(by_func(chip_ref, f), chip_net(sig)):
+                err("main board: %s %s is not chipset %s" % (chip_ref, f, sig))
+        checked += 1
+    return checked
+
+
+def same_via(a, b, comps, pin_net):
+    """a and b are the two ends of one resistor, or two resistors from a common net."""
+    ends = {}
+    for (ref, pin), n in pin_net.items():
+        if comps.get(ref, ("", "", ""))[1] == "R":
+            ends.setdefault(ref, {})[pin] = n
+    nbr = lambda x: {v for e in ends.values() if x in e.values() for v in e.values()} - {x}   # noqa: E731
+    return b in nbr(a) or bool(nbr(a) & nbr(b))
+
+
 def main():
     pins = yaml.safe_load(open(os.path.join(ROOT, "hw", "pins.yaml")))
     check_generated()
@@ -286,6 +533,9 @@ def main():
     check_cpu_bus(pins)
     check_docs(pins)
     check_firmware_macros(pins)
+    contacts = check_mainboard(pins)
+    if contacts:
+        print("pincheck: main board netlist, %d socket contacts and memory chips checked" % contacts)
 
     for e in errors:
         print("FAIL", e)

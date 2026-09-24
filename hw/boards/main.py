@@ -400,6 +400,9 @@ def build_parts():
                        8: "AUX_CS_n", 9: "+5V", 10: "GND"})
     for net in ("SPI_SCK", "SPI_MOSI", "SPI_MISO"):
         TP(net)
+    group("misc")
+    for i in range(len(HOLES)):                     # M3, plain: not on any net
+        part("H%d" % (i + 1), "Mechanical:MountingHole", "M3", "MountingHole:MountingHole_3.2mm_M3", "", {})
 
     # ---- the six I/O slots (slot.md)
     names = edgesym.pinout("doc/hardware/slot.md")
@@ -543,6 +546,311 @@ def schematic(path, footprint_libs=("cupc8",)):
     if left:
         raise SystemExit("unconnected pins: %s" % left)
     s.write(path, footprint_libs=footprint_libs)
+
+
+# ------------------------------------------------------------------ board
+#
+# Mechanics (doc/hardware/slot.md): the sockets lie east-west, 20.32 mm
+# apart, all with contact 1 at x = PIN1_X, so every card stands in the same
+# place along its socket and extends east over the board. North to south: the
+# CPU socket, the system slot, then I/O slots 1-6. Each card's component (B)
+# side faces south. The chipset, memory and clock sit east of the CPU socket
+# and system slot, the slot expanders and mux east of the I/O slots, power
+# in along the south edge. The debug LEDs, reset button and AUX header are on
+# the east edge, beyond the cards.
+
+W, H = 125.0, 178.0
+OUTLINE = (0, 0, W, H)
+PIN1_X = 12.0
+ROW_CPU, ROW_SYS = 12.0, 32.32
+SLOT_PITCH = 20.32
+
+
+def row_slot(n):
+    return ROW_SYS + SLOT_PITCH * n
+
+
+FPGA = (97.0, 47.0)                               # centre of U7
+LOGO_MM = 12
+LOGO_AT = (108.0, 160.0)
+HOLES = [(4.5, 4.5), (W - 4.5, 4.5), (4.5, H - 4.5), (W - 4.5, H - 4.5), (W - 4.5, 56.0), (W - 4.5, 128.0)]
+
+
+def wanted(parts):
+    """ref -> (x, y, rot): where each part should go. legalize() then moves
+    the small parts to the nearest free spot."""
+    import pcbnew
+    by_net = {}
+    for p in parts:
+        for n in set(p.conns.values()):
+            if n:
+                by_net.setdefault(n, []).append(p.ref)
+
+    def refs(prefix, net):
+        return sorted((r for r in by_net.get(net, []) if r.startswith(prefix) and not r.startswith("TP")),
+                      key=lambda r: int(r[len(prefix):]))
+
+    def tp(net):
+        return [r for r in by_net[net] if r.startswith("TP")][0]
+
+    def pin1_offset(fpid):
+        lib, name = fpid.split(":")
+        fp = pcbnew.FootprintLoad(kg.footprint_dir(lib), name)
+        return -pcbnew.ToMM([q for q in fp.Pads() if q.GetNumber() == "A1"][0].GetPosition().x)
+
+    at = {}
+    at["J2"] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_CPUSocket"][0]), ROW_CPU, 0)
+    at["J3"] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_SystemSlot"][0]), ROW_SYS, 0)
+    for n in range(1, 7):
+        at["J%d" % (10 + n)] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_Slot"][0]), row_slot(n), 0)
+    fx, fy = FPGA
+    at["U7"] = (fx, fy, 0)
+    at["U10"] = (88.5, 21.0, 0)                  # ROM, north of the chipset's memory pins
+    at["U9"] = (104.5, 24.0, 90)                 # SRAM
+    at["J1"] = (70.0, H - 3.19, 0)               # USB-C, opening south (smoke.py: edge 3.19 mm off the pegs)
+    at["J4"] = (116.6, 107.0, 0)                 # AUX SPI header, east edge
+    at["SW1"] = (119.5, 140.0, 0)
+    for i, (x, y) in enumerate(HOLES):
+        at["H%d" % (i + 1)] = (x, y, 0)
+
+    # TQFP-144 pad positions around U7, for its decoupling and series parts
+    def pin_xy(n, out=0.0):
+        d = 10.85 + out
+        if n <= 36:
+            return fx - d, fy - 8.75 + (n - 1) * 0.5
+        if n <= 72:
+            return fx - 8.75 + (n - 37) * 0.5, fy + d
+        if n <= 108:
+            return fx + d, fy + 8.75 - (n - 73) * 0.5
+        return fx + 8.75 - (n - 109) * 0.5, fy - d
+
+    def side_rot(n):
+        return 90 if n <= 36 or 73 <= n <= 108 else 0
+
+    chip = {}
+    for spec in parts:
+        if spec.ref == "U7":
+            for num, net in spec.conns.items():
+                chip.setdefault(net, []).append(int(num))
+    decap = {"+1V2": [27, 40, 92, 111], "+3V3": [6, 30, 46, 57, 72, 89, 100, 108, 123, 131]}
+    for net, pins_ in decap.items():
+        caps = [r for r in refs("C", net) if 20 <= int(r[1:]) <= 33]
+        for r, n in zip(caps, pins_):
+            x, y = pin_xy(n, 2.9)
+            at[r] = (x, y, side_rot(n))
+    x, y = pin_xy(54, 2.9)
+    at["C37"] = (x, y, 0)
+    x, y = pin_xy(126, 2.9)
+    at["C38"] = (x, y, 0)
+    at["R50"] = (fx - 1.0, fy + 17.0, 0)
+    at["C36"] = (fx - 1.0, fy + 20.0, 0)
+    at["C34"] = (fx - 16.5, fy + 8.0, 90)
+    at["C35"] = (fx + 16.5, fy - 8.0, 90)
+    # series resistors next to their chipset pin, one step further out
+    for spec in parts:
+        if spec.ref.startswith("R") and 20 <= int(spec.ref[1:]) <= 43:
+            src = [n for n in spec.conns.values() if n.endswith("_SRC")][0]
+            n = chip[src][0]
+            x, y = pin_xy(n, 7.0)
+            at[spec.ref] = (x, y, 0 if side_rot(n) == 90 else 90)
+    # configuration flash and pulls, below the config pins
+    at["U8"] = (104.5, 69.0, 0)
+    at["C39"] = (104.5, 74.0, 0)
+    for i, r in enumerate(("R51", "R52", "R53", "R54")):
+        at[r] = (111.0, 64.0 + 2.2 * i, 0)
+    # clock and reset
+    at["Y1"] = (78.0, 30.0, 0)
+    at["C14"] = (78.0, 26.5, 0)
+    at["R17"] = (80.0, 38.0, 0)
+    at["R18"] = (72.5, 30.0, 0)
+    at["U6"] = (112.0, 141.0, 0)
+    at["C13"] = (112.0, 144.5, 0)
+    # memory decoupling and pulls
+    at["C41"] = (88.5, 12.0, 0)
+    at["C40"] = (104.5, 16.5, 0)
+    for i, r in enumerate(("R70", "R71", "R72")):
+        at[r] = (112.0, 19.0 + 2.2 * i, 0)
+    # east edge: GPO LEDs (the POST code), CDONE and rail LEDs
+    for i in range(8):
+        at["D%d" % (11 + i)] = (120.0, 70.0 + 2.6 * i, 0)
+        at["R%d" % (60 + i)] = (115.5, 70.0 + 2.6 * i, 0)
+    at["D5"] = (120.0, 92.0, 0)
+    at["R56"] = (115.5, 92.0, 0)
+    at["Q2"] = (115.5, 88.5, 0)
+    at["R55"] = (111.0, 88.5, 0)
+    # CPU socket channel (between the CPU socket and the system slot)
+    cpu_r = ["R%d" % i for i in list(range(80, 88)) + list(range(90, 98))]
+    for i, r in enumerate(cpu_r):
+        at[r] = (22.0 + 3.4 * i, ROW_CPU + 8.6, 0)
+    for i, r in enumerate(("C42", "C43", "C44")):
+        at[r] = (8.0 + 3.6 * i, ROW_CPU + 8.6, 0)
+    cpu_tp = [tp(n) for n in ("CPU_nRST", "CPU_CDONE", "CPUCARD_nCRESET", "FL1_SCK", "FL1_MOSI", "FL1_MISO",
+                              "FL1_nCS")]
+    cpu_tp += [tp("CPU_RSVD_A%d" % k) for k in range(2, 9)] + [tp("CPU_RSVD_B1")]
+    for i, r in enumerate(cpu_tp):
+        at[r] = (10.0 + 2.6 * i, ROW_CPU + 12.8, 0)
+    # system slot channel
+    sys_parts = ["R100", "R101", "R102", "R103", "R104", "R105", "R106", "C45", "C46"]
+    for i, r in enumerate(sys_parts):
+        at[r] = (8.0 + 3.4 * i, ROW_SYS + 9.0, 0)
+    sys_tp = [tp(n) for n in ("SYS_PRSNT2_n", "I2C_SDA", "I2C_SCL", "PROG_CLK", "PROG_IO", "MUX_SEL0", "MUX_SEL1",
+                              "MUX_SEL2", "SYS_RSVD_A1", "SYS_RSVD_A2", "SYS_RSVD_A3", "SYS_RSVD_B1", "SYS_RSVD_B2")]
+    for i, r in enumerate(sys_tp):
+        at[r] = (8.0 + 2.6 * i, ROW_SYS + 12.6, 0)
+    for i, net in enumerate(("CHIPSET_nCRESET", "CHIPSET_CDONE", "FL0_SCK", "FL0_MOSI", "FL0_MISO", "FL0_nCS",
+                             "BR_SCK", "BR_MOSI", "BR_MISO", "BR_nCS", "MEM_nCE_RAM", "CLK12", "CPU_CLK", "nPOR",
+                             "nMR", "SPI_SCK", "SPI_MOSI", "SPI_MISO")):
+        at[tp(net)] = (60.0 + 2.6 * (i % 9), ROW_SYS + 9.0 + 3.0 * (i // 9), 0)
+    # each I/O slot: its feed, pulls and pads in the channel south of it
+    for n in range(1, 7):
+        y0 = row_slot(n)
+        b = 100 * (n + 1)
+        rowa = ["F%d" % b, "R%d" % (b + 1), "R%d" % (b + 2), "C%d" % (b + 1), "C%d" % (b + 2), "C%d" % (b + 3),
+                "R%d" % (b + 7), "R%d" % (b + 8)]
+        xs = [7.5, 13.2, 18.8, 24.4, 28.6, 32.8, 37.0, 41.2]
+        for r, x in zip(rowa, xs):
+            at[r] = (x, y0 + 8.2, 0)
+        for i, r in enumerate(["R%d" % (b + k) for k in (3, 4, 5, 6)]):
+            at[r] = (6.5 + 4.2 * i, y0 + 12.4, 0)
+        pads = [tp("SLOT%d_5V_L" % n), tp("SLOT%d_5V" % n), tp("SLOT%d_CS_n" % n)] + \
+               [tp("SLOT%d_RSVD_A%d" % (n, k)) for k in range(1, 6)]
+        for i, r in enumerate(pads):
+            at[r] = (24.0 + 3.0 * i, y0 + 12.4, 0)
+    # slot expanders, programming-port mux and their pulls: east of the slots
+    at["U13"] = (60.0, row_slot(1) + 2, 90)
+    at["U14"] = (60.0, row_slot(2) + 2, 90)
+    at["U11"] = (60.0, row_slot(3) + 2, 90)
+    at["U12"] = (60.0, row_slot(4) + 2, 90)
+    for r, u in (("C49", "U13"), ("C50", "U14"), ("C47", "U11"), ("C48", "U12")):
+        at[r] = (at[u][0] + 6.0, at[u][1], 90)
+    at["R107"] = (70.0, row_slot(5), 0)
+    # power: south edge, around the USB-C inlet
+    y = H - 12.0
+    power = {"R1": (62.0, y - 2), "R2": (78.0, y - 2), "U1": (70.0, y - 9, 0), "F1": (58.0, y - 9, 90),
+             "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "C2": (65.5, y - 14), "U2": (58.0, y - 19),
+             "R3": (58.0, y - 23), "C3": (51.0, y - 19, 90), "C4": (47.5, y - 19, 90),
+             "R4": (51.0, y - 27, 0), "U3": (78.0, y - 19, 90), "L1": (83.0, y - 19), "R5": (86.5, y - 15),
+             "R6": (86.5, y - 12), "C5": (74.0, y - 19, 90), "C6": (72.0, y - 23), "C7": (88.0, y - 19, 90),
+             "C8": (91.5, y - 19, 90), "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),
+             "C10": (101.0, y - 13, 0), "R8": (101.0, y - 25), "R9": (115.5, 95.2), "D2": (120.0, 95.2),
+             "R10": (115.5, 98.4), "D3": (120.0, 98.4), "R11": (107.0, 101.6), "Q1": (111.0, 101.6),
+             "R12": (115.5, 101.6), "D4": (120.0, 101.6), "R13": (84.0, y - 5), "R14": (84.0, y - 2),
+             "C11": (88.0, y - 5), "R15": (91.5, y - 5), "R16": (91.5, y - 2), "U5": (95.0, y - 5, 90),
+             "C12": (95.0, y - 1)}
+    for r, v in power.items():
+        at[r] = (v[0], v[1], v[2] if len(v) > 2 else 0)
+    for i, net in enumerate(("VBUS_F", "5V_SYS", "+5V", "3V3_BUCK", "+3V3", "1V2_LDO", "+1V2", "CC1", "CC2",
+                             "PWR_HI")):
+        at[tp(net)] = (46.0 + 2.6 * i, y - 32.0, 0)
+    return at
+
+
+def _box(fp):
+    """Courtyard and pads of a placed footprint, mm."""
+    import pcbnew
+    to = pcbnew.ToMM
+    cy = fp.GetCourtyard(pcbnew.B_CrtYd if fp.IsFlipped() else pcbnew.F_CrtYd)
+    bb = cy.BBox() if cy.OutlineCount() else fp.GetBoundingBox(False)
+    for p in fp.Pads():
+        bb.Merge(p.GetBoundingBox())
+    return (to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom()))
+
+
+_FP_CACHE = {}
+_BOARDS = []
+
+
+def legalize(parts, at, margin=0.35, extra=None):
+    """Sockets, the chipset and the memory stay where they are put; every
+    other part moves to the nearest spot where its courtyard and pads clear
+    everything placed before it (a spiral search)."""
+    import math
+    import pcbnew
+    mm = pcbnew.FromMM
+    fixed = ("J", "U7", "U9", "U10", "H")
+    order = sorted(at, key=lambda r: (not r.startswith(fixed), r))
+    fps = {}
+    for s in parts:
+        if s.fp and s.ref not in fps:
+            if s.ref not in _FP_CACHE:
+                lib, name = s.fp.split(":")
+                _FP_CACHE[s.ref] = pcbnew.FootprintLoad(kg.footprint_dir(lib), name)
+            fps[s.ref] = _FP_CACHE[s.ref]
+    placed = []
+    placed.append((LOGO_AT[0] - LOGO_MM / 2 - 0.5, LOGO_AT[1] - LOGO_MM / 2 - 0.5,
+                   LOGO_AT[0] + LOGO_MM / 2 + 0.5, LOGO_AT[1] + LOGO_MM / 2 + 0.5))
+    out = {}
+    for r in order:
+        x, y, rot = at[r]
+        fp = fps[r]
+        fp.SetOrientationDegrees(rot)
+        found = None
+        for k in range(0, 6000):
+            a, rad = k * 0.5, 0.25 * math.sqrt(k)
+            dx, dy = rad * math.cos(a), rad * math.sin(a)
+            fp.SetPosition(pcbnew.VECTOR2I(mm(x + dx), mm(y + dy)))
+            b = _box(fp)
+            e = (extra or {}).get(r, 0.0)
+            b = (b[0] - e, b[1] - e, b[2] + e, b[3] + e)
+            if r != "J1" and (b[0] < 0.6 or b[1] < 0.6 or b[2] > W - 0.6 or b[3] > H - 0.6):
+                continue
+            if any(kg.overlap(b, o, margin) for o in placed):
+                continue
+            found = (round(x + dx, 3), round(y + dy, 3), rot)
+            placed.append(b)
+            break
+        if found is None or (r.startswith(fixed) and found[:2] != (round(x, 3), round(y, 3))):
+            raise SystemExit("%s: no room at (%.1f, %.1f)" % (r, x, y))
+        out[r] = found
+    return out
+
+
+def placement():
+    """legalize(), then make room wherever kicadgen cannot fit a designator:
+    that part gets a wider berth and everything is legalized again."""
+    import re
+    parts = build_parts()
+    at = wanted(parts)
+    missing = sorted({s.ref for s in parts if s.fp} - set(at))
+    if missing:
+        raise SystemExit("no placement for: %s" % ", ".join(missing))
+    extra = {}
+    for _ in range(200):
+        pl = legalize(parts, at, extra=extra)
+        try:
+            _designators(parts, pl)
+            return pl
+        except ValueError as e:
+            m = re.match(r"(\S+): no room for its designator", str(e))
+            if not m:
+                raise
+            extra[m.group(1)] = extra.get(m.group(1), 0.0) + 0.5
+    raise SystemExit("placement: designators still do not fit")
+
+
+def _designators(parts, pl):
+    """kicadgen's designator placement on the footprints alone. The board is
+    kept: freeing a pcbnew BOARD breaks later SWIG calls in this process."""
+    import pcbnew
+    board = pcbnew.BOARD()
+    _BOARDS.append(board)
+    seen = set()
+    items = [(s.ref, s.fp) for s in parts if s.fp and not (s.ref in seen or seen.add(s.ref))]
+    items += [("G%d" % (i + 1), g[0]) for i, g in enumerate(_graphics())]
+    where = dict(pl, **{"G%d" % (i + 1): (g[1], g[2], g[3]) for i, g in enumerate(_graphics())})
+    for ref, fpid in items:
+        lib, name = fpid.split(":")
+        fp = pcbnew.FootprintLoad(kg.footprint_dir(lib), name)
+        fp.SetReference(ref)
+        board.Add(fp)
+        x, y, rot = where[ref][:3]
+        fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
+        fp.SetOrientationDegrees(rot)
+    kg.place_designators(board, OUTLINE)
+
+
+def _graphics():
+    return [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)]
 
 
 if __name__ == "__main__":

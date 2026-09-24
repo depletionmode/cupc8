@@ -752,7 +752,7 @@ def clip_silk_to_board(board, outline, gap=0.15):
         for g in [gi[i].Cast() for i in range(len(gi))]:
             if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
                 continue
-            w = to(g.GetWidth()) / 2 + gap
+            w = (to(g.GetWidth()) if isinstance(g, pcbnew.PCB_SHAPE) else 0) / 2 + gap   # texts have no width
             lo_x, lo_y, hi_x, hi_y = x0 + w, y0 + w, x1 - w, y1 - w
             if not (isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT):
                 b = g.GetBoundingBox()
