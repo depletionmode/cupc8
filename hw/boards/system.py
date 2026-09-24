@@ -37,7 +37,7 @@ TP = "cupc8:TestPad_D1.0mm"
 # Outputs that drive a slot SPI bus go through 33 Ohm source termination
 # (the "_MCU" nets), as every card driver on the CPU bus has (cpu-bus.md).
 GPIO = {
-    0: "DBG_TX", 1: "DBG_RX",
+    0: "LED_USB_TX", 1: "LED_USB_RX",
     2: "BR_SCK_MCU", 3: "BR_MOSI_MCU", 4: "BR_MISO", 5: "BR_nCS_MCU",
     6: "CHIPSET_nCRESET", 7: "CHIPSET_CDONE",
     8: "FL1_MISO", 9: "FL1_nCS_MCU",
@@ -73,19 +73,24 @@ PASSIVES = (
      ("R6", "Device:R", "1k", R0603, "C21190", "QSPI_nSS", "BOOTSEL"),  # short TP to GND
      ("R7", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SDA"),
      ("R8", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SCL"),
+     # power LED (milestone-1.md, Indicator LEDs): red, 1 kOhm from 3V3
      ("R9", "Device:R", "1k", R0603, "C21190", "+3V3", "LED_PWR"),
      # green drops ~3 V, so 100 Ohm for a few mA from 3.3 V (as the Wi-Fi card)
      ("R10", "Device:R", "100", R0603, "C22775", "LED_STATUS", "LED_ST"),
      ("D1", "Device:LED", "red", LED0603, "C2286", "LED_PWR", "GND"),        # power
-     ("D2", "Device:LED", "green", LED0603, "C12624", "LED_ST", "GND")] +    # status, GPIO29
+     ("D2", "Device:LED", "green", LED0603, "C12624", "LED_ST", "GND"),      # status, GPIO29
+     # USB activity to (TX) and from (RX) the host, lit ~30 ms by the firmware
+     ("R20", "Device:R", "100", R0603, "C22775", "LED_USB_TX", "LED_TX"),
+     ("D3", "Device:LED", "green", LED0603, "C12624", "LED_TX", "GND"),
+     ("R21", "Device:R", "100", R0603, "C22775", "LED_USB_RX", "LED_RX"),
+     ("D4", "Device:LED", "green", LED0603, "C12624", "LED_RX", "GND")] +
     [("R%d" % (11 + i), "Device:R", "33", R0603, "C23140", n + "_MCU", n) for i, n in enumerate(TERMINATED)]
 )
 
 # test pads: SWD and RUN for bring-up of the card itself, BOOTSEL (short to
-# GND at power-up for the USB boot ROM), the debug UART, and the rails
+# GND at power-up for the USB boot ROM), and the rails
 TEST_PADS = [("TP1", "SWCLK"), ("TP2", "SWDIO"), ("TP3", "RUN"), ("TP4", "BOOTSEL"),
-             ("TP5", "DBG_TX"), ("TP6", "DBG_RX"), ("TP7", "+3V3"), ("TP8", "GND"), ("TP9", "1V1"),
-             ("TP10", "RSVD_B1"), ("TP11", "RSVD_B2")]
+             ("TP5", "+3V3"), ("TP6", "GND"), ("TP7", "1V1"), ("TP8", "RSVD_B1"), ("TP9", "RSVD_B2")]
 
 
 def schematic(path, footprint_libs):
@@ -234,13 +239,15 @@ PLACEMENT = {
     "C12": (33.6, 10.3, 90),
     "C14": (9, 27, 90),
     "R7": (38, 22, 90), "R8": (40, 22, 90),
-    "D1": (51, 13, 0), "R9": (51, 15.5, 0),
-    "D2": (51, 19, 0), "R10": (51, 21.5, 0),
+    "D1": kg.power_led_at(OUTLINE) + (0,), "R9": (6.5, 3, 0),
+    "D3": (51, 12, 0), "R20": (51, 14.5, 0),
+    "D4": (51, 17, 0), "R21": (51, 19.5, 0),
+    "D2": (45, 19, 0), "R10": (45, 21.5, 0),
 }
 for _i, _n in enumerate(TERMINATED):
     PLACEMENT["R%d" % (11 + _i)] = (14 + 3.4 * _i, 31, 90)
 for _i, (_ref, _) in enumerate(TEST_PADS):
-    PLACEMENT[_ref] = (2.5, 2.5 + 2.9 * _i, 0)
+    PLACEMENT[_ref] = (2.5, 7.5 + 3 * _i, 0)
 
 
 def main():
