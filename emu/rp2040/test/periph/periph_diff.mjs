@@ -150,7 +150,9 @@ function dmaReadSource(r) {
     case 6:
       return DMA_BASE + 0x400 + (r.below(0x40) & ~3);
     case 7:
-      return r.below(0x4000) & ~3; // bootrom
+      // (not the bootrom: an unaligned readUint32 there is `bootrom[address / 4]`, undefined in
+      // TS, which then crashes a logger message; the C++ bus reads 0 -- a bus-level difference)
+      return 0x10000000 + r.below(0x100);
     default:
       return SRAM + r.below(0x800);
   }
@@ -170,7 +172,9 @@ function dmaWriteTarget(r) {
     case 6:
       return r.pick([SPI_BASE[0] + 8, SPI_BASE[1] + 8]);
     case 7:
-      return r.pick([I2C_BASE[0] + 0x10, PWM_BASE + 0x0c + 0x14 * r.below(8), PWM_BASE + 0x10]);
+      // (not I2C DATA_CMD: 32-bit transfers with INCR_WRITE reach IC_FS_SPKLEN, a JS-SIGN register.
+      // PWM registers rarely: a TOP of 0 there ends the scenario, see pwmOp)
+      return r.chance(0.3) ? PWM_BASE + 0x0c + 0x14 * r.below(8) : SRAM + 0x200 + (r.below(0x100) & ~3);
     case 8:
       return WATCHDOG_BASE + 0x0c + 4 * r.below(8);
     default:
@@ -187,8 +191,9 @@ function dmaCtrl(r, ch) {
   if (r.chance(0.6)) v |= 1 << 5; // INCR_WRITE
   if (r.chance(0.3)) v |= (1 + r.below(10)) << 6; // RING_SIZE 1..10
   if (r.chance(0.5)) v |= 1 << 10; // RING_SEL
-  const chain = r.chance(0.5) ? ch : ch + 1 + r.below(15 - ch + (ch === 15 ? 1 : 0));
-  v |= (Math.min(chain, 15) & 0xf) << 11;
+  // chain only to itself or upwards: a chain cycle of permanent-TREQ channels never ends
+  const chain = r.chance(0.5) ? ch : ch + 1 + r.below(15 - ch);
+  v |= chain << 11;
   let treq;
   switch (r.below(10)) {
     case 0:
@@ -307,7 +312,9 @@ function pwmOp(r, ops) {
       break;
     }
     case 6: {
-      const top = r.chance(0.05) ? r.below(8) : r.chance(0.1) ? 0xffff : 40 + r.below(0x3c0);
+      // (TOP 0 with PH_CORRECT makes TS's ZigZag `% (top * 2)` NaN and the wrap alarm
+      // re-fire at the same instant forever: reproduced, but it ends the scenario)
+      const top = r.chance(0.03) ? 1 + r.below(8) : r.chance(0.1) ? 0xffff : 40 + r.below(0x3c0);
       ops.push(`W ${hex8(base + 0x10)} ${hex8(top | (r.chance(0.05) ? r.next() & 0xffff0000 : 0))}`);
       break;
     }
@@ -575,7 +582,7 @@ function tickOp(r, ops, longTime) {
   else if (k < 80) d = r.below(1000) + r.below(1000) / 1000;
   else if (k < 95) d = r.below(20000) + r.next() / 4294967296;
   else if (k < 99) d = r.below(200000) / 3;
-  else d = longTime ? r.below(2000) * 1e9 + r.next() / 1024 : r.below(1000000) + 0.5;
+  else d = longTime ? r.below(2000) * 1e9 + r.next() / 1024 : r.below(100000) + 0.5;
   ops.push(`T ${hexd(d)}`);
   return d;
 }
@@ -660,7 +667,8 @@ function generate(seed, nOps) {
 
 // ---------------------------------------------------------------- the JS executor
 class RunawayError extends Error {}
-const ALARM_BUDGET = 3000000;
+/** alarm firings allowed per op: more means a runaway scenario (e.g. a DMA chain cycle); both sides stop there */
+const ALARM_BUDGET = 500000;
 
 function fnv(bytes, start, end) {
   let h = 0x811c9dc5;
@@ -767,7 +775,14 @@ function runJS(ops) {
     adcRead(ch);
   };
   const wd = mcu.peripherals[(0x40058000 >>> 14) << 2];
-  wd.onWatchdogTrigger = () => log(`WD ${hexd(clock.nanos)}`);
+  // Once the watchdog counter has expired, TS's alarm re-fires at the same
+  // instant forever (a real reset handler never returns); the "handler" here
+  // either disables the watchdog or reloads it.
+  wd.onWatchdogTrigger = () => {
+    log(`WD ${hexd(clock.nanos)}`);
+    if (cb.below(2)) mcu.writeUint32(0x40058000, 0);
+    else mcu.writeUint32(0x40058004, 1 + cb.below(0x1000));
+  };
   for (let pin = 0; pin < 30; pin++) {
     mcu.gpio[pin].addListener((state, old) => log(`G ${pin} ${state} ${old} ${hexd(clock.nanos)}`));
   }
@@ -779,6 +794,7 @@ function runJS(ops) {
 
   try {
     for (const line of ops) {
+      clock.fired = 0;
       const f = line.split(' ');
       const a = (k) => parseInt(f[k], 16);
       switch (f[0]) {
@@ -866,7 +882,7 @@ function runJS(ops) {
         default:
           throw new Error('bad op ' + line);
       }
-      log(`N ${hexd(clock.nanosToNextAlarm())} ${hexd(clock.nanos)}`);
+      log(`N ${hexd(clock.nanosToNextAlarm)} ${hexd(clock.nanos)}`);
     }
   } catch (e) {
     if (e instanceof RunawayError) log('RUNAWAY');

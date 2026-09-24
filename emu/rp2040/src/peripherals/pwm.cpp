@@ -336,8 +336,10 @@ void RPPWM::gpioSet(uint32_t index, bool value) {
 void RPPWM::gpioSetDir(uint32_t index, bool output) {
   const uint32_t bit = static_cast<uint32_t>(jsShl(1, index));
   const uint32_t newGpioDirection = output ? gpioDirection | bit : gpioDirection & ~bit;
-  if (gpioDirection != newGpioDirection) {
+  // `this.gpioDirection != newGpioDirection` compares numbers: see gpioDirectionIsUint32
+  if (gpioDirection != newGpioDirection || gpioDirectionIsUint32) {
     gpioDirection = newGpioDirection;
+    gpioDirectionIsUint32 = false;
     rp2040.gpio[index].checkForUpdates();
   }
 }
@@ -360,6 +362,7 @@ void RPPWM::gpioOnInput(uint32_t index) {
 
 void RPPWM::reset() {
   gpioDirection = 0xffffffff;
+  gpioDirectionIsUint32 = true;  // the number 4294967295, not the int32 -1
   for (PWMChannel &channel : channels) {
     channel.reset();
   }

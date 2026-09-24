@@ -108,6 +108,13 @@ void stateVector(const RP2040 &mcu, bool irqLines, std::vector<uint32_t> &out) {
   out.clear();
   pioState(mcu.pio[0], out);
   pioState(mcu.pio[1], out);
+  uint32_t dreq = 0;
+  for (uint32_t i = 0; i < 16; i++) {  // DREQ_PIO0_TX0..DREQ_PIO1_RX3
+    if (mcu.dma.dreq[i]) {
+      dreq |= 1u << i;
+    }
+  }
+  out.push_back(dreq);
   if (irqLines) {
     out.push_back((mcu.core0.pendingInterrupts >> 7) & 0xf);
   }
@@ -196,7 +203,7 @@ int main(int argc, char **argv) {
   for (GPIOPin &pin : mcu.gpio) {
     pin.checkForUpdates();
   }
-  for (uint32_t pin = 0; pin < mcu.gpio.size(); pin++) {
+  for (uint32_t pin = 0; pin < mcu.gpio.size() && !bench; pin++) {
     mcu.gpio[pin].addListener([&, pin](GPIOPinState state, GPIOPinState) {
       observe("gpio", pin, static_cast<uint32_t>(state));
     });

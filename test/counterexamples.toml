@@ -239,7 +239,7 @@ must_fail = ["silkscreen of J1 touches pad SH of J1"]
 
 [[bug]]
 name = "slot SPI: CS_n falling during slotspi_refresh sent two status bytes (host read the second as RESP_LEN)"
-fixed_in = "this commit"
+fixed_in = "a9ba773"
 revert = [["fw/rp2040/common/slotspi.c", """	/* Swap the preload for the current status and response only while the
 	 * SM is still waiting for CS_n: stopped, it cannot move on, and at
 	 * `start` it has pulled nothing. (Checking the CS_n pin instead raced a

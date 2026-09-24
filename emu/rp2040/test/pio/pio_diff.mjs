@@ -138,6 +138,9 @@ function stateVector(mcu, irqLines, out) {
   out.length = 0;
   pioState(mcu.pio[0], out);
   pioState(mcu.pio[1], out);
+  let dreq = 0;
+  for (let i = 0; i < 16; i++) if (mcu.dma.dreq[i]) dreq |= 1 << i; // DREQ_PIO0_TX0..DREQ_PIO1_RX3
+  out.push(dreq >>> 0);
   if (irqLines) {
     out.push((mcu.core0.pendingInterrupts >>> 7) & 0xf);
   }
@@ -165,6 +168,7 @@ function stateLabels(irqLines) {
     for (let m = 0; m < 4; m++) for (const n of sm) labels.push(`pio${p}.sm${m}.${n}`);
     for (const n of pio) labels.push(`pio${p}.${n}`);
   }
+  labels.push('dma.dreq[0..15]');
   if (irqLines) labels.push('core0.pendingInterrupts[7..10]');
   return labels;
 }

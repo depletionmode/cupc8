@@ -142,6 +142,7 @@ struct Side {
   std::unique_ptr<UsbKeyboard> kbd;
   uint32_t lastInts = 0;
   uint32_t lastHash = 0;
+  std::string lastIrq = "00";
 
   Side(const std::string &mode, uint32_t kspeed, uint32_t kinterval) : mode(mode) {
     mcu = std::make_unique<RP2040>(clock);
@@ -191,6 +192,13 @@ struct Side {
     if (v != lastInts) {
       emitLine("ints " + hex(v));
       lastInts = v;
+    }
+    // IRQ.USBCTRL (5) as the cores see it, through RP2040::setInterrupt
+    const std::string irq = std::to_string((mcu->core0.pendingInterrupts >> 5) & 1) +
+                            std::to_string((mcu->core1.pendingInterrupts >> 5) & 1);
+    if (irq != lastIrq) {
+      emitLine("irq " + irq);
+      lastIrq = irq;
     }
     const uint32_t h = fnv(mcu->usbDPRAM);
     if (h != lastHash) {

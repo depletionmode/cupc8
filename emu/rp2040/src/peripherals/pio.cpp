@@ -5,6 +5,8 @@
 #include "pio.h"
 
 #include <algorithm>
+#include <tuple>
+#include <type_traits>
 
 #include "../rp2040.h"
 #include "../utils/js.h"
@@ -1096,11 +1098,12 @@ void RPPIO::checkChangedPins() {
     oldPinValues = pinValues;
 
     // Notify GPIO about the changed pins
+    // (`for gpioIndex < gpio.length: if (changedPins & (1 << gpioIndex))`,
+    // visiting only the set bits, in the same ascending order)
     auto &gpio = rp2040.gpio;
-    for (uint32_t gpioIndex = 0; gpioIndex < gpio.size(); gpioIndex++) {
-      if (changedPins & (1u << gpioIndex)) {
-        gpio[gpioIndex].checkForUpdates();
-      }
+    static_assert(std::tuple_size<std::remove_reference_t<decltype(gpio)>>::value < 32, "gpio.length < 32");
+    for (uint32_t bits = changedPins & ((1u << gpio.size()) - 1); bits; bits &= bits - 1) {
+      gpio[static_cast<uint32_t>(__builtin_ctz(bits))].checkForUpdates();
     }
   }
 }

@@ -152,6 +152,7 @@ class JsSide {
     };
     if (mode === 'host') this.kbd = new UsbKeyboard({ speed: kspeed, interval: kinterval });
     this.lastInts = 0;
+    this.lastIrq = '00';
     this.lastHash = fnv(this.mcu.usbDPRAM);
   }
 
@@ -160,6 +161,12 @@ class JsSide {
     if (v !== this.lastInts) {
       trace.push(`ints ${hex(v)}`);
       this.lastInts = v;
+    }
+    // IRQ.USBCTRL (5) as the cores see it, through RP2040.setInterrupt
+    const irq = `${(this.mcu.core0.pendingInterrupts >>> 5) & 1}${(this.mcu.core1.pendingInterrupts >>> 5) & 1}`;
+    if (irq !== this.lastIrq) {
+      trace.push(`irq ${irq}`);
+      this.lastIrq = irq;
     }
     const h = fnv(this.mcu.usbDPRAM);
     if (h !== this.lastHash) {

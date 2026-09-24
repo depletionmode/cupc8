@@ -48,6 +48,7 @@ const seedsArg = opt('--seeds', '1-10');
 const stepsPerSeed = Number(opt('--steps', '50000'));
 const blockLen = Number(opt('--block', '256'));
 const systickMode = args.includes('--systick');
+const statsMode = args.includes('--stats');
 if (!driver) {
   console.log('FAIL core-diff: --driver <path to test_core_diff> is required');
   process.exit(2);
@@ -633,6 +634,102 @@ function excReturn() {
     : (0xf0000000 | (rnd() & 0x0fffffff)) >>> 0;
 }
 
+// ---- coverage (--stats) --------------------------------------------------------
+// The branches of CortexM0Core.executeInstruction, in its order.
+const DECODE = [
+  ['ADCS', (o) => o >> 6 === 0b0100000101],
+  ['ADD Rd,SP,#', (o) => o >> 11 === 0b10101],
+  ['ADD SP,#', (o) => o >> 7 === 0b101100000],
+  ['ADDS T1', (o) => o >> 9 === 0b0001110],
+  ['ADDS T2', (o) => o >> 11 === 0b00110],
+  ['ADDS reg', (o) => o >> 9 === 0b0001100],
+  ['ADD reg', (o) => o >> 8 === 0b01000100],
+  ['ADR', (o) => o >> 11 === 0b10100],
+  ['ANDS', (o) => o >> 6 === 0b0100000000],
+  ['ASRS imm', (o) => o >> 11 === 0b00010],
+  ['ASRS reg', (o) => o >> 6 === 0b0100000100],
+  ['B cond', (o) => o >> 12 === 0b1101 && ((o >> 9) & 0x7) !== 0b111],
+  ['B', (o) => o >> 11 === 0b11100],
+  ['BICS', (o) => o >> 6 === 0b0100001110],
+  ['BKPT', (o) => o >> 8 === 0b10111110],
+  ['BL', (o, o2) => o >> 11 === 0b11110 && o2 >> 14 === 0b11 && ((o2 >> 12) & 0x1) == 1],
+  ['BLX', (o) => o >> 7 === 0b010001111 && (o & 0x7) === 0],
+  ['BX', (o) => o >> 7 === 0b010001110 && (o & 0x7) === 0],
+  ['CMN', (o) => o >> 6 === 0b0100001011],
+  ['CMP imm', (o) => o >> 11 === 0b00101],
+  ['CMP reg', (o) => o >> 6 === 0b0100001010],
+  ['CMP T2', (o) => o >> 8 === 0b01000101],
+  ['CPSID', (o) => o === 0xb672],
+  ['CPSIE', (o) => o === 0xb662],
+  ['DMB', (o, o2) => o === 0xf3bf && (o2 & 0xfff0) === 0x8f50],
+  ['DSB', (o, o2) => o === 0xf3bf && (o2 & 0xfff0) === 0x8f40],
+  ['EORS', (o) => o >> 6 === 0b0100000001],
+  ['ISB', (o, o2) => o === 0xf3bf && (o2 & 0xfff0) === 0x8f60],
+  ['LDMIA', (o) => o >> 11 === 0b11001],
+  ['LDR imm', (o) => o >> 11 === 0b01101],
+  ['LDR sp', (o) => o >> 11 === 0b10011],
+  ['LDR lit', (o) => o >> 11 === 0b01001],
+  ['LDR reg', (o) => o >> 9 === 0b0101100],
+  ['LDRB imm', (o) => o >> 11 === 0b01111],
+  ['LDRB reg', (o) => o >> 9 === 0b0101110],
+  ['LDRH imm', (o) => o >> 11 === 0b10001],
+  ['LDRH reg', (o) => o >> 9 === 0b0101101],
+  ['LDRSB', (o) => o >> 9 === 0b0101011],
+  ['LDRSH', (o) => o >> 9 === 0b0101111],
+  ['LSLS imm', (o) => o >> 11 === 0b00000],
+  ['LSLS reg', (o) => o >> 6 === 0b0100000010],
+  ['LSRS imm', (o) => o >> 11 === 0b00001],
+  ['LSRS reg', (o) => o >> 6 === 0b0100000011],
+  ['MOV', (o) => o >> 8 === 0b01000110],
+  ['MOVS', (o) => o >> 11 === 0b00100],
+  ['MRS', (o, o2) => o === 0b1111001111101111 && o2 >> 12 == 0b1000],
+  ['MSR', (o, o2) => o >> 4 === 0b111100111000 && o2 >> 8 == 0b10001000],
+  ['MULS', (o) => o >> 6 === 0b0100001101],
+  ['MVNS', (o) => o >> 6 === 0b0100001111],
+  ['ORRS', (o) => o >> 6 === 0b0100001100],
+  ['POP', (o) => o >> 9 === 0b1011110],
+  ['PUSH', (o) => o >> 9 === 0b1011010],
+  ['REV', (o) => o >> 6 === 0b1011101000],
+  ['REV16', (o) => o >> 6 === 0b1011101001],
+  ['REVSH', (o) => o >> 6 === 0b1011101011],
+  ['ROR', (o) => o >> 6 === 0b0100000111],
+  ['RSBS', (o) => o >> 6 === 0b0100001001],
+  ['NOP', (o) => o === 0b1011111100000000],
+  ['SBCS', (o) => o >> 6 === 0b0100000110],
+  ['SEV', (o) => o === 0b1011111101000000],
+  ['STMIA', (o) => o >> 11 === 0b11000],
+  ['STR imm', (o) => o >> 11 === 0b01100],
+  ['STR sp', (o) => o >> 11 === 0b10010],
+  ['STR reg', (o) => o >> 9 === 0b0101000],
+  ['STRB imm', (o) => o >> 11 === 0b01110],
+  ['STRB reg', (o) => o >> 9 === 0b0101010],
+  ['STRH imm', (o) => o >> 11 === 0b10000],
+  ['STRH reg', (o) => o >> 9 === 0b0101001],
+  ['SUB SP,#', (o) => o >> 7 === 0b101100001],
+  ['SUBS T1', (o) => o >> 9 === 0b0001111],
+  ['SUBS T2', (o) => o >> 11 === 0b00111],
+  ['SUBS reg', (o) => o >> 9 === 0b0001101],
+  ['SVC', (o) => o >> 8 === 0b11011111],
+  ['SXTB', (o) => o >> 6 === 0b1011001001],
+  ['SXTH', (o) => o >> 6 === 0b1011001000],
+  ['TST', (o) => o >> 6 == 0b0100001000],
+  ['UDF', (o) => o >> 8 == 0b11011110],
+  ['UDF.W', (o, o2) => o >> 4 === 0b111101111111 && o2 >> 12 === 0b1010],
+  ['UXTB', (o) => o >> 6 == 0b1011001011],
+  ['UXTH', (o) => o >> 6 == 0b1011001010],
+  ['WFE', (o) => o === 0b1011111100100000],
+  ['WFI', (o) => o === 0b1011111100110000],
+  ['YIELD', (o) => o === 0b1011111100010000],
+];
+const stats = new Map();
+const count = (k) => stats.set(k, (stats.get(k) ?? 0) + 1);
+function classify(pc) {
+  const o = mcu.readUint16(pc & ~1);
+  const o2 = isWide(o) ? mcu.readUint16((pc & ~1) + 2) : 0;
+  for (const [name, test] of DECODE) if (test(o, o2)) return name;
+  return 'unimplemented';
+}
+
 // ---- test --------------------------------------------------------------------
 async function newBlock() {
   // memory
@@ -743,9 +840,41 @@ async function step() {
   await poke16(opcodePC, ins[0]);
   if (ins.length > 1) await poke16(opcodePC + 2, ins[1]);
 
-  const delta = core.executeInstruction();
+  let fetchPC = core.PC;
+  let entered = null;
+  if (statsMode) {
+    const entry = core.exceptionEntry;
+    core.exceptionEntry = function (n) {
+      entry.call(this, n);
+      count(`exception entry ${n < 16 ? n : 'IRQ'}`);
+      fetchPC = core.PC;
+      entered = n;
+    };
+    const ret = core.exceptionReturn;
+    core.exceptionReturn = function (r) {
+      count(`exception return ${hex(r & 0xf)}`);
+      ret.call(this, r);
+    };
+  }
+  const fetched = statsMode ? classify(fetchPC) : null;
+  let delta;
+  try {
+    delta = core.executeInstruction();
+  } catch (e) {
+    // a DataView RangeError (STRH at reg + reg >= 2**32 with address & 3 == 3) ends a JS run;
+    // compare the state it leaves and go on
+    if (!(e instanceof RangeError)) throw e;
+    delta = 'RangeError';
+  }
+  if (statsMode) {
+    // (an entry inside the instruction's own checkForInterrupts runs the handler's instruction)
+    count(entered === null ? fetched : classify(fetchPC));
+    if (delta === 'RangeError') count('RangeError');
+    delete core.exceptionEntry;
+    delete core.exceptionReturn;
+  }
   await emit('X ' + stateLine(delta));
-  if (systickMode) await tick(delta * 8);
+  if (systickMode && typeof delta === 'number') await tick(delta * 8);
 }
 
 let total = 0;
@@ -792,6 +921,10 @@ const [code] = await childExit;
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 const m = /steps=(\d+) mismatches=(\d+)/.exec(childOut);
 const desc = `${total} instructions, seeds ${seedsArg}, ${stepsPerSeed}/seed${systickMode ? ', systick' : ''}, ${secs}s`;
+if (statsMode) {
+  for (const [name] of DECODE) if (!stats.has(name)) stats.set(name, 0);
+  for (const [k, v] of [...stats].sort()) process.stderr.write(`${k.padEnd(24)} ${v}\n`);
+}
 if (code === 0 && m && Number(m[1]) === total && m[2] === '0') {
   console.log(`PASS core-diff: ${desc}, 0 mismatches`);
   process.exit(0);

@@ -8,15 +8,19 @@
 // bitwise operators). Addresses the TS computes as `reg + reg` (up to 2**33)
 // or `(pc & 0xfffffffc) + imm` (negative for pc >= 2**31) reach the bus as
 // that JS number; rp2040.readUint32/writeUint32 and cyclesIO() do `>>> 0` on
-// them, and readUint16/readUint8/writeUint16/writeUint8 end up at the same
-// wrapped address (such a number is never inside flash/SRAM, so they take
-// the aligned readUint32/writeUint32 path, whose `& 0xfffffffc` / `>>> 14`
-// wrap it), so the uint32_t address here gives the same accesses. The two
-// flag helpers take and return double: their operands can be 2**32
-// (`reg + carry`) and substractUpdateFlags returns a negative number.
+// them, and readUint8/writeUint8 end up with the same bytes as for the
+// wrapped address (such a number is never inside flash/SRAM, so they take the
+// aligned readUint32/writeUint32 path, whose `& 0xfffffffc` / `>>> 14` wrap
+// it), so a uint32_t address gives the same accesses. readUint16/writeUint16
+// are the exception: their slow path is not the same for an odd address in
+// SRAM/flash, so the halfword loads/stores go through readUint16Number /
+// writeUint16Number. The two flag helpers take and return double: their
+// operands can be 2**32 (`reg + carry`) and substractUpdateFlags returns a
+// negative number.
 #include "cortex-m0-core.h"
 
 #include <algorithm>
+#include <stdexcept>
 #include <string>
 
 #include "rp2040.h"
@@ -140,6 +144,33 @@ void CortexM0Core::writeUint16(uint32_t address, uint32_t value) {
 
 void CortexM0Core::writeUint8(uint32_t address, uint32_t value) {
   rp2040.writeUint8(address, value);
+}
+
+// rp2040.readUint16(address) for a JS number address >= 2**32 (`reg + reg`): its flash and
+// SRAM fast paths compare the unwrapped number and fail, so it reads the aligned word
+// (`readUint32(address & 0xfffffffc)`) and picks a half by bit 1. For an odd address in flash
+// or SRAM that is not the halfword at the wrapped address.
+uint32_t CortexM0Core::readUint16Number(double address) {
+  const uint32_t wrapped = toUint32(address);
+  if (address >= 4294967296.0 &&
+      ((wrapped >= FLASH_START_ADDRESS && wrapped - FLASH_START_ADDRESS < rp2040.flash.size()) ||
+       (wrapped >= RAM_START_ADDRESS && wrapped - RAM_START_ADDRESS < rp2040.sram.size()))) {
+    const uint32_t value = rp2040.readUint32(wrapped & 0xfffffffc);
+    return wrapped & 0x2 ? (value & 0xffff0000) >> 16 : value & 0xffff;
+  }
+  return readUint16(wrapped);
+}
+
+// rp2040.writeUint16(address, value) for a JS number address >= 2**32: its SRAM fast path
+// fails, so an SRAM address takes the read-modify-write path, which has the same effect except
+// that `DataView.setUint16(3, ...)` throws a RangeError when address & 3 == 3.
+void CortexM0Core::writeUint16Number(double address, uint32_t value) {
+  const uint32_t wrapped = toUint32(address);
+  if (address >= 4294967296.0 && wrapped >= RAM_START_ADDRESS &&
+      wrapped - RAM_START_ADDRESS < rp2040.sram.size() && (wrapped & 0x3) == 3) {
+    throw std::range_error("RangeError: Offset is outside the bounds of the DataView");
+  }
+  writeUint16(wrapped, value);
 }
 
 void CortexM0Core::switchStack(StackPointerBank stack) {
@@ -836,18 +867,18 @@ uint32_t CortexM0Core::executeInstruction() {
     const uint32_t imm5 = (opcode >> 6) & 0x1f;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
-    const uint32_t addr = registers[Rn] + (imm5 << 1);
-    deltaCycles += cyclesIO(addr);
-    registers[Rt] = readUint16(addr);
+    const double addr = static_cast<double>(registers[Rn]) + (imm5 << 1);  // JS: can be >= 2**32
+    deltaCycles += cyclesIO(toUint32(addr));
+    registers[Rt] = readUint16Number(addr);
   }
   // LDRH (register)
   else if (opcode >> 9 == 0b0101101) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
-    const uint32_t addr = registers[Rm] + registers[Rn];
-    deltaCycles += cyclesIO(addr);
-    registers[Rt] = readUint16(addr);
+    const double addr = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
+    deltaCycles += cyclesIO(toUint32(addr));
+    registers[Rt] = readUint16Number(addr);
   }
   // LDRSB
   else if (opcode >> 9 == 0b0101011) {
@@ -863,9 +894,9 @@ uint32_t CortexM0Core::executeInstruction() {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
-    const uint32_t addr = registers[Rm] + registers[Rn];
-    deltaCycles += cyclesIO(addr);
-    registers[Rt] = static_cast<uint32_t>(signExtend16(readUint16(addr)));
+    const double addr = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
+    deltaCycles += cyclesIO(toUint32(addr));
+    registers[Rt] = static_cast<uint32_t>(signExtend16(readUint16Number(addr)));
   }
   // LSLS (immediate)
   else if (opcode >> 11 == 0b00000) {
@@ -1151,18 +1182,18 @@ uint32_t CortexM0Core::executeInstruction() {
     const uint32_t imm5 = ((opcode >> 6) & 0x1f) << 1;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
-    const uint32_t address = registers[Rn] + imm5;
-    deltaCycles += cyclesIO(address, true);
-    writeUint16(address, registers[Rt]);
+    const double address = static_cast<double>(registers[Rn]) + imm5;  // JS: can be >= 2**32
+    deltaCycles += cyclesIO(toUint32(address), true);
+    writeUint16Number(address, registers[Rt]);
   }
   // STRH (register)
   else if (opcode >> 9 == 0b0101001) {
     const uint32_t Rm = (opcode >> 6) & 0x7;
     const uint32_t Rn = (opcode >> 3) & 0x7;
     const uint32_t Rt = opcode & 0x7;
-    const uint32_t address = registers[Rm] + registers[Rn];
-    deltaCycles += cyclesIO(address, true);
-    writeUint16(address, registers[Rt]);
+    const double address = static_cast<double>(registers[Rm]) + registers[Rn];  // JS: can be >= 2**32
+    deltaCycles += cyclesIO(toUint32(address), true);
+    writeUint16Number(address, registers[Rt]);
   }
   // SUB (SP minus immediate)
   else if (opcode >> 7 == 0b101100001) {

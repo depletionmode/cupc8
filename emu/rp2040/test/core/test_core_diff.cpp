@@ -25,6 +25,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -117,7 +118,7 @@ struct Harness {
     mcu->core0.blTaken = [this](CortexM0Core &, bool) { blCount++; };
   }
 
-  std::string state(uint32_t delta) {
+  std::string state(const std::string &delta) {
     CortexM0Core &c = mcu->core0;
     CortexM0Core &c1 = mcu->core1;
     RPPPB &ppb = mcu->ppb;
@@ -138,7 +139,7 @@ struct Harness {
     char cyc[64];
     snprintf(cyc, sizeof cyc, "%.0f", c.cycles);
     add(cyc);
-    add(std::to_string(delta));
+    add(delta);
     add(hex(c.pendingInterrupts));
     add(hex(c.enabledInterrupts));
     for (uint32_t p : c.interruptPriorities) add(hex(p));
@@ -299,7 +300,12 @@ int main() {
         case 'X': {
           steps++;
           seedStep++;
-          const uint32_t delta = hx.mcu->core0.executeInstruction();
+          std::string delta;
+          try {
+            delta = std::to_string(hx.mcu->core0.executeInstruction());
+          } catch (const std::range_error &) {
+            delta = "RangeError";  // as core-diff.mjs catches the JS RangeError
+          }
           const std::string got = hx.state(delta);
           const std::string want = line.substr(2);
           if (got != want) {

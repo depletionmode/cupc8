@@ -104,6 +104,14 @@ class RPPWM : public BasePeripheral {
   uint32_t intRaw = 0;
   uint32_t intEnable = 0;
   uint32_t intForce = 0;
+  /**
+   * JS numbers: reset() stores the number 4294967295 in gpioDirection, while
+   * gpioSetDir computes an int32 (`gpioDirection | bit` is -1). So the first
+   * gpioSetDir after a reset sees `4294967295 != -1` and counts as a change
+   * even when the bit is already set. True while gpioDirection holds that
+   * non-int32 value.
+   */
+  bool gpioDirectionIsUint32 = false;
 };
 
 }  // namespace rp2040js

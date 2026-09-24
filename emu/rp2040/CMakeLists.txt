@@ -55,3 +55,12 @@ target_link_libraries(test_usb_diff PRIVATE rp2040emu)
 add_executable(test_core_diff test/core/test_core_diff.cpp)
 target_compile_options(test_core_diff PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(test_core_diff PRIVATE rp2040emu)
+
+# Peripheral differential test (dma, uart, spi, i2c, timer, watchdog, rtc, adc,
+# pwm, timer32) against rp2040js, driven by test/periph/periph_diff.mjs:
+#   node emu/rp2040/test/periph/periph_diff.mjs --cxx build/emu-native/test_periph_diff
+# RP2040::setInterrupt is wrapped at link time so the test can trace IRQ changes.
+add_executable(test_periph_diff test/periph/test_periph_diff.cpp)
+target_compile_options(test_periph_diff PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(test_periph_diff PRIVATE rp2040emu)
+target_link_options(test_periph_diff PRIVATE "-Wl,--wrap=_ZN8rp2040js6RP204012setInterruptEjb")

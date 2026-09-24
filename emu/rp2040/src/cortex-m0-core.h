@@ -152,6 +152,11 @@ class CortexM0Core {
   // registers[Rdn] + carry == 2**32), hence double in and out, as in TS.
   double substractUpdateFlags(double minuend, double subtrahend);
   double addUpdateFlags(double addend1, double addend2);
+
+  // Not in TS: this.readUint16(addr) / this.writeUint16(addr, v) where addr is the JS number
+  // `reg + reg` or `reg + imm`, which can be >= 2**32; see the .cpp.
+  uint32_t readUint16Number(double address);
+  void writeUint16Number(double address, uint32_t value);
 };
 
 }  // namespace rp2040js
