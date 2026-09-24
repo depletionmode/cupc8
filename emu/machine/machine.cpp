@@ -2,7 +2,11 @@
 // machine.mjs / tmds.mjs function of the same name, in the same order.
 #include "machine.h"
 
+#include <linux/futex.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+
+#include <climits>
 
 #include <algorithm>
 #include <cctype>
@@ -349,7 +353,18 @@ double Machine::ns() const { return board->ns(); }
 // run the machine for `ns` of emulated time
 void Machine::runFor(double ns) {
   const double end = board->ns() + ns;
-  while (board->ns() < end) iterate();
+  if (workers.empty()) {
+    while (board->ns() < end) iterate();
+    return;
+  }
+  // the card threads run it (the first iteration led by worker 0) and say
+  // when they have reached `end`
+  runEnd = end;
+  const uint32_t r = runSeq.fetch_add(1, std::memory_order_seq_cst) + 1;
+  epoch.v.fetch_add(1, std::memory_order_seq_cst);
+  epoch.wake();
+  for (uint32_t d = runDone.v.load(std::memory_order_acquire); d != r; d = runDone.v.load(std::memory_order_acquire))
+    runDone.waitWhile(d, 2000);
 }
 
 void Machine::iterate() {
@@ -357,10 +372,7 @@ void Machine::iterate() {
   const uint32_t cs = (out >> 2) & 0x7f;
   if (sysctl) br = sysctl->bridgePins((out >> 9) & 1);
   const bool busy = cs != 0x7f || (sysctl && (!br.ncs || sysctl->pending));
-  if (busy || workers.empty())
-    iterateSerial(busy, cs);
-  else
-    iterateThreaded();
+  iterateSerial(busy, cs);
   stats.busyIterations += busy;
   stats.idleWindows += !busy;
   if (stats.traceOn) traceStep();
@@ -384,62 +396,123 @@ void Machine::iterateSerial(bool busy, uint32_t cs) {
   }
 }
 
-// An idle window (no slot or bridge selected, so no card is advanced before
-// the board runs): the board runs up to IDLE_CLOCKS with the inputs sampled
-// now while every card thread chases its clock count, then each card takes
-// its end-of-window drive() on its own thread.
-void Machine::iterateThreaded() {
-  const uint32_t in = inputs();
-  progress.store(board->clocks, std::memory_order_relaxed);
-  const uint64_t w = go.fetch_add(1, std::memory_order_release) + 1;
-  go.notify_all();
-  const uint32_t n = board->run(IDLE_CLOCKS, in, [this] { progress.store(board->clocks, std::memory_order_release); });
-  stats.idleClocks += n;
-  windowOut = board->outputs();
-  progress.store(board->clocks | FINAL, std::memory_order_release);
-  const uint32_t sck = windowOut & 1, mosi = (windowOut >> 1) & 1, ncs = (windowOut >> 2) & 0x7f;
-  for (Card *c : mainCards) c->drive(sck, mosi, !((ncs >> (c->slot - 1)) & 1));
-  for (auto &wk : workers) {
-    for (unsigned spins = 0; wk->done.load(std::memory_order_acquire) != w; spins++) {
-      if (spins < 20000)
-        cpuRelax();
-      else
-        std::this_thread::yield();
+// ------------------------------------------------------------ Threads
+//
+// Each RP2040 card has a thread. There is no board thread: the last card
+// thread to finish a window is the leader for what follows. It runs the
+// serial part of the loop exactly as iterate() does (bridgePins, busy
+// iterations in lockstep with every card, the board's run for an idle
+// window), then does its own card's share of the window like the others.
+// While the leader runs the board for an idle window, the other cards chase
+// its clock count; each advances to the window's end and takes its drive()
+// once the leader marks the window FINAL. The slowest card (the GPU) is
+// usually the last to finish, so it goes straight on with no hand-off.
+
+void Machine::Word::wake() {
+  if (sleepers.load(std::memory_order_seq_cst))
+    syscall(SYS_futex, &v, FUTEX_WAKE_PRIVATE, INT32_MAX, nullptr, nullptr, 0);
+}
+
+uint32_t Machine::Word::waitWhile(uint32_t old, unsigned spins) {
+  for (unsigned i = 0; i < spins; i++) {
+    const uint32_t now = v.load(std::memory_order_acquire);
+    if (now != old) return now;
+    cpuRelax();
+  }
+  sleepers.fetch_add(1, std::memory_order_seq_cst);
+  while (v.load(std::memory_order_seq_cst) == old)
+    syscall(SYS_futex, &v, FUTEX_WAIT_PRIVATE, old, nullptr, nullptr, 0);
+  sleepers.fetch_sub(1, std::memory_order_seq_cst);
+  return v.load(std::memory_order_acquire);
+}
+
+// The serial part, up to the start of the next idle window (true), or to the
+// end of the run (false: the run is over and every card thread parks).
+bool Machine::leadNext() {
+  if (pendingTrace) {
+    traceStep();
+    pendingTrace = false;
+  }
+  for (;;) {
+    if (!(board->ns() < runEnd) || quit.load(std::memory_order_relaxed)) {
+      runDone.v.store(runSeq.load(std::memory_order_relaxed), std::memory_order_seq_cst);
+      runDone.wake();
+      return false;
     }
+    const uint32_t out = board->outputs();
+    const uint32_t cs = (out >> 2) & 0x7f;
+    if (sysctl) br = sysctl->bridgePins((out >> 9) & 1);
+    const bool busy = cs != 0x7f || (sysctl && (!br.ncs || sysctl->pending));
+    if (busy) {
+      iterateSerial(busy, cs);
+      stats.busyIterations++;
+      if (stats.traceOn) traceStep();
+      continue;
+    }
+    // an idle window: nothing is advanced before the board runs
+    const uint32_t in = inputs();
+    windowStart = board->clocks;
+    progress.v.store(0, std::memory_order_relaxed);
+    arrived.store(0, std::memory_order_relaxed);
+    window.fetch_add(1, std::memory_order_release);
+    epoch.v.fetch_add(1, std::memory_order_seq_cst);
+    epoch.wake();
+    // (the chasers spin on this; one that has gone to sleep is woken at FINAL)
+    const uint32_t n = board->run(IDLE_CLOCKS, in, [this] {
+      progress.v.store(static_cast<uint32_t>(board->clocks - windowStart), std::memory_order_release);
+    });
+    stats.idleClocks += n;
+    windowOut = board->outputs();
+    progress.v.store(static_cast<uint32_t>(board->clocks - windowStart) | FINAL, std::memory_order_seq_cst);
+    progress.wake();
+    const uint32_t sck = windowOut & 1, mosi = (windowOut >> 1) & 1, ncs = (windowOut >> 2) & 0x7f;
+    for (Card *c : mainCards) c->drive(sck, mosi, !((ncs >> (c->slot - 1)) & 1));
+    stats.idleWindows++;
+    pendingTrace = stats.traceOn;
+    return true;
   }
 }
 
-void Machine::workerLoop(Worker &w) {
-  uint64_t seen = 0;
+// one card's share of an idle window: SysctlCard.advance / Rp2040Card.advance
+// to the window's end, chasing the board, then drive()
+void Machine::cardWindow(Worker &w) {
   Emu &e = w.sys ? w.sys->e : *w.card->emu();
+  if (w.sys) w.sys->feed();  // the first half of SysctlCard.advance
+  for (uint32_t p = progress.v.load(std::memory_order_acquire);;) {
+    // the board has run this far, so the window ends no earlier: advance(t)
+    // would take every one of these steps
+    const double target = static_cast<double>(windowStart + (p & ~FINAL)) * NS_PER_CLOCK;
+    while (e.ns() < target) e.step();
+    if (p & FINAL) break;
+    p = progress.waitWhile(p, 300);
+  }
+  if (w.card) {
+    const uint32_t out = windowOut;
+    w.card->drive(out & 1, (out >> 1) & 1, !((((out >> 2) & 0x7f) >> (w.card->slot - 1)) & 1));
+  }
+}
+
+void Machine::workerLoop(size_t index, uint32_t seenWindow, uint32_t seenRun) {
+  Worker &w = *workers[index];
+  const uint32_t n = static_cast<uint32_t>(workers.size());
   for (;;) {
-    for (unsigned spins = 0;; spins++) {
-      const uint64_t g = go.load(std::memory_order_acquire);
-      if (g != seen) {
-        seen = g;
+    bool lead = false;
+    for (uint32_t ep = epoch.v.load(std::memory_order_acquire);; ep = epoch.waitWhile(ep, 200)) {
+      if (quit.load(std::memory_order_acquire)) return;
+      if (window.load(std::memory_order_acquire) != seenWindow) break;
+      if (index == 0 && runSeq.load(std::memory_order_acquire) != seenRun) {
+        seenRun = runSeq.load(std::memory_order_acquire);
+        lead = true;
         break;
       }
-      if (spins < 20000)
-        cpuRelax();
-      else
-        go.wait(g, std::memory_order_acquire);
     }
-    if (quit) return;
-    if (w.sys) w.sys->feed();  // the first half of SysctlCard.advance
+    if (lead && !leadNext()) continue;
     for (;;) {
-      const uint64_t p = progress.load(std::memory_order_acquire);
-      // the board has run this far, so the window ends no earlier:
-      // advance(t) would take every one of these steps
-      const double target = static_cast<double>(p & ~FINAL) * NS_PER_CLOCK;
-      while (e.ns() < target) e.step();
-      if (p & FINAL) break;
-      while (progress.load(std::memory_order_acquire) == p) cpuRelax();
+      seenWindow = window.load(std::memory_order_acquire);
+      cardWindow(w);
+      if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 != n) break;  // not the last: wait for the next window
+      if (!leadNext()) break;                                                  // the run is over
     }
-    if (w.card) {
-      const uint32_t out = windowOut;
-      w.card->drive(out & 1, (out >> 1) & 1, !((((out >> 2) & 0x7f) >> (w.card->slot - 1)) & 1));
-    }
-    w.done.store(seen, std::memory_order_release);
   }
 }
 
@@ -447,32 +520,30 @@ void Machine::startWorkers() {
   if (!workers.empty()) return;
   quit = false;
   mainCards.clear();
-  const uint64_t g = go.load();
-  auto add = [&](Card *c, SysctlCard *s) {
+  if (sysctl) {
     auto w = std::make_unique<Worker>();
-    w->card = c;
-    w->sys = s;
-    w->done.store(g);
+    w->sys = sysctl.get();
     workers.push_back(std::move(w));
-  };
-  if (sysctl) add(nullptr, sysctl.get());
+  }
   for (auto &[slot, card] : cards) {
-    if (card->emu())
-      add(card.get(), nullptr);
-    else
+    if (card->emu()) {
+      auto w = std::make_unique<Worker>();
+      w->card = card.get();
+      workers.push_back(std::move(w));
+    } else {
       mainCards.push_back(card.get());
+    }
   }
-  for (auto &w : workers) {
-    Worker *wp = w.get();
-    w->th = std::thread([this, wp] { workerLoop(*wp); });
-  }
+  // what the threads have seen so far, taken now: a thread may start after the first run()
+  const uint32_t w0 = window.load(), r0 = runSeq.load();
+  for (size_t i = 0; i < workers.size(); i++) workers[i]->th = std::thread([this, i, w0, r0] { workerLoop(i, w0, r0); });
 }
 
 void Machine::stopWorkers() {
   if (workers.empty()) return;
-  quit = true;
-  go.fetch_add(1, std::memory_order_release);
-  go.notify_all();
+  quit.store(true, std::memory_order_seq_cst);
+  epoch.v.fetch_add(1, std::memory_order_seq_cst);
+  epoch.wake();
   for (auto &w : workers) w->th.join();
   workers.clear();
   mainCards.clear();

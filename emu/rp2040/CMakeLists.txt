@@ -8,6 +8,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Link-time optimisation: the per-cycle paths cross files (PIO -> GPIO pin ->
+# pads, core -> bus -> peripheral) and inlining them is ~25% faster on the
+# card images. No fast-math: the float time arithmetic is exact JS semantics
+# (EMU-004's traces are byte-identical either way).
+option(RP2040EMU_LTO "build with link-time optimisation" ON)
+if(RP2040EMU_LTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT _rp2040emu_ipo OUTPUT _rp2040emu_ipo_msg LANGUAGES CXX)
+  if(_rp2040emu_ipo)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+  endif()
+endif()
+
 if(DEFINED ENV{CUPC8_SDK})
   set(_sdk "$ENV{CUPC8_SDK}")
 else()
@@ -17,8 +30,12 @@ set(RP2040JS_DIR "${_sdk}/rp2040js" CACHE PATH "patched rp2040js checkout (for d
 
 file(GLOB_RECURSE RP2040EMU_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_library(rp2040emu STATIC ${RP2040EMU_SOURCES})
-# position-independent so that the Node addon below can link it
-set_target_properties(rp2040emu PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# position-independent so that the Node addon below can link it; hidden
+# visibility so that, inside a shared object, calls between its functions are
+# direct and can be inlined (default visibility makes every one interposable,
+# which made the addon ~1.7x slower than rp2040run)
+set_target_properties(rp2040emu PROPERTIES POSITION_INDEPENDENT_CODE ON
+                      CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 target_include_directories(rp2040emu PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_options(rp2040emu PRIVATE -O2 -Wall -Wextra)
 
@@ -72,7 +89,8 @@ target_link_options(test_periph_diff PRIVATE "-Wl,--wrap=_ZN8rp2040js6RP204012se
 # test/emu/rp2040native.mjs (CUPC8_EMU=native). The harness needs C++20
 # (coroutines); the addon is built only if Node's headers are found.
 add_library(rp2040harness STATIC harness/emu.cpp harness/slothost.cpp "${BOOTROM_INC}")
-set_target_properties(rp2040harness PROPERTIES CXX_STANDARD 20 POSITION_INDEPENDENT_CODE ON)
+set_target_properties(rp2040harness PROPERTIES CXX_STANDARD 20 POSITION_INDEPENDENT_CODE ON
+                      CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 target_include_directories(rp2040harness PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/harness"
                            PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_compile_options(rp2040harness PRIVATE -O2 -Wall -Wextra)
@@ -87,7 +105,8 @@ if(NODE_EXECUTABLE)
 endif()
 if(NODE_INCLUDE_DIR AND EXISTS "${NODE_INCLUDE_DIR}/node_api.h")
   add_library(rp2040emu_node MODULE node/rp2040emu_node.cpp)
-  set_target_properties(rp2040emu_node PROPERTIES CXX_STANDARD 20 PREFIX "" OUTPUT_NAME rp2040emu SUFFIX ".node")
+  set_target_properties(rp2040emu_node PROPERTIES CXX_STANDARD 20 PREFIX "" OUTPUT_NAME rp2040emu SUFFIX ".node"
+                        CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
   target_include_directories(rp2040emu_node PRIVATE "${NODE_INCLUDE_DIR}")
   target_compile_definitions(rp2040emu_node PRIVATE NODE_GYP_MODULE_NAME=rp2040emu)
   target_compile_options(rp2040emu_node PRIVATE -O2 -Wall -Wextra)

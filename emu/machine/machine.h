@@ -207,26 +207,42 @@ class Machine {
   uint32_t inputs(bool por = true);
   void iterate();
   void iterateSerial(bool busy, uint32_t cs);
-  void iterateThreaded();
   void traceStep();
 
-  // --- the card threads
+  // --- the card threads (see machine.cpp, "Threads")
   struct Worker {
     Card *card = nullptr;          // a slot card, or
     SysctlCard *sys = nullptr;     // the system card
     std::thread th;
-    std::atomic<uint64_t> done{0};
+  };
+  // a 32-bit word threads can sleep on (futex), with a count of sleepers so
+  // that waking costs nothing while nobody sleeps
+  struct Word {
+    alignas(64) std::atomic<uint32_t> v{0};
+    std::atomic<uint32_t> sleepers{0};
+    void wake();
+    // wait while v == old: spin `spins` times, then sleep
+    uint32_t waitWhile(uint32_t old, unsigned spins);
   };
   std::vector<std::unique_ptr<Worker>> workers;
-  std::vector<Card *> mainCards;   // cards with no emulator here (the Wi-Fi card): driven on this thread
-  std::atomic<uint64_t> go{0};     // window number
-  std::atomic<uint64_t> progress{0};  // the board's clock count this window; FINAL when the window has ended
+  std::vector<Card *> mainCards;   // cards with no emulator (the Wi-Fi card): driven by the leader
+  Word epoch;                      // bumped when a window or a run starts, or on quit
+  Word progress;                   // board clocks run in this window; FINAL once it has ended
+  Word runDone;                    // the last run() that has finished
+  alignas(64) std::atomic<uint32_t> window{0};   // window number
+  std::atomic<uint32_t> arrived{0};              // cards done with this window
+  std::atomic<uint32_t> runSeq{0};               // run() requests
+  uint64_t windowStart = 0;        // the board's clock count at the window's start
   uint32_t windowOut = 0;          // the board's outputs at the window's end
-  bool quit = false;
-  static constexpr uint64_t FINAL = 1ull << 63;
+  double runEnd = 0;
+  bool pendingTrace = false;
+  std::atomic<bool> quit{false};
+  static constexpr uint32_t FINAL = 1u << 31;
   void startWorkers();
   void stopWorkers();
-  void workerLoop(Worker &w);
+  void workerLoop(size_t index, uint32_t seenWindow, uint32_t seenRun);
+  bool leadNext();
+  void cardWindow(Worker &w);
 };
 
 }  // namespace machine
