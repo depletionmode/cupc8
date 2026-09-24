@@ -90,10 +90,14 @@ void Emu::step() {
 }
 
 void Emu::cycles(double n) {
-  for (double i = 0; i < n; i++) {
-    for (RPPIO &pio : mcu->pio)
-      if (!pio.stopped) pio.step();
-    if (onCycle) onCycle();
+  if (onCycle) {
+    for (double i = 0; i < n; i++) {
+      for (RPPIO &pio : mcu->pio)
+        if (!pio.stopped) pio.step();
+      onCycle();
+    }
+  } else {
+    stepPIOs(mcu->pio, n);  // the same loop, with lazy PIO cycles in bulk
   }
   clock.tick(n * nsPerCycle);
 }

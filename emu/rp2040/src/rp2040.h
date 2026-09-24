@@ -175,6 +175,7 @@ class RP2040 {
     pio[1].sync();
   }
 
+  /** (out of line: test_periph_diff observes it with ld --wrap) */
   void setInterrupt(uint32_t irq, bool value);
 
   /** Core 1 restarts in the bootrom, where it waits for the FIFO launch sequence. */

@@ -369,17 +369,16 @@ uint32_t CortexM0Core::vectPending() const {
   return 0;
 }
 
-void CortexM0Core::setInterrupt(uint32_t irq, bool value) {
-  const uint32_t irqBit = static_cast<uint32_t>(jsShl(1, irq));
-  if (value && !(pendingInterrupts & irqBit)) {
-    pendingInterrupts |= irqBit;
-    interruptsUpdated = true;
-    if (waiting && checkForInterrupts()) {
-      waiting = false;
-      waitingForEvent = false;
-    }
-  } else if (!value) {
-    pendingInterrupts &= ~irqBit;
+// setInterrupt(irq, value) (inline in the header):
+//   const irqBit = 1 << irq;
+//   if (value && !(this.pendingInterrupts & irqBit)) { ...raiseInterrupt... }
+//   else if (!value) { this.pendingInterrupts &= ~irqBit; }
+void CortexM0Core::raiseInterrupt(uint32_t irqBit) {
+  pendingInterrupts |= irqBit;
+  interruptsUpdated = true;
+  if (waiting && checkForInterrupts()) {
+    waiting = false;
+    waitingForEvent = false;
   }
 }
 

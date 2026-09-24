@@ -16,6 +16,10 @@ class ClockAlarm : public IAlarm {
   ClockAlarm *next = nullptr;
   double nanos = 0;
   bool scheduled = false;
+  /** Not in TS: whether the alarm is in the clock's list (a fired alarm is
+   * not, but keeps `scheduled`), so that unlinking one that is not in the
+   * list skips the search that would not find it. */
+  bool linked = false;
 
   ClockAlarm(SimulationClock &clock, AlarmCallback callback);
   /** Not in TS (GC): unlinks the alarm so the clock never holds a dangling pointer. */
