@@ -1416,11 +1416,12 @@ def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
     notch: a locked track on the finger's own layer from its top to `rise` mm
     above the tab. Those pads sit 0.2 mm from the notch's edge, which
     Freerouting treats as a clearance violation, so it never starts a route
-    from them; it joins the track's end instead. `skip`: nets tied some other
-    way (the pour). Returns the count."""
+    from them; it joins the track's end instead, but still reports the pad
+    unconnected (DRC's connectivity check is the judge of these). `skip`: nets
+    tied some other way (the pour). Returns the nets escaped."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
-    n = 0
+    nets = []
     for fp in board.GetFootprints():
         if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
             continue
@@ -1440,8 +1441,8 @@ def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
             tr.SetNet(pad.GetNet())
             tr.SetLocked(True)
             board.Add(tr)
-            n += 1
-    return n
+            nets.append(pad.GetNetname())
+    return nets
 
 
 def tab_via_keepout(board, tab_top, margin=1.0):
@@ -1893,14 +1894,15 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3], across=pcbnew.In2_Cu if layers == 4 else None)
             tab_via_keepout(b, outline[3])
-            key_escapes(b, outline[3], skip=zones)
+            state["escaped"] = key_escapes(b, outline[3], skip=zones)
         state["fanout"] = ground_fanout(b, zones[0])
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones))
+    step("autoroute", lambda: autoroute(state["b"], out, passes,
+                                        pours=tuple(zones) + tuple(state.get("escaped", ()))))
 
     def fill():
         x0, y0, x1, y1 = outline
