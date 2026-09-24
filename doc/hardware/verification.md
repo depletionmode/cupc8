@@ -47,7 +47,7 @@ Rules for the matrix:
 |---|---|---|---|
 | 3.1 | **The schematics themselves** | The co-sim's top level is **generated from the KiCad netlists** of all five boards. Every connection between FPGA netlists, SRAM/ROM timing models, connectors and card models comes from the schematic. Pull-ups become weak pulls, and series resistors become delays. A swapped or missing wire fails the simulation. | the end-to-end tests below pass on the netlist-generated top level |
 | 3.2 | End-to-end | Blank ROM → program over modelled USB → boot → BASIC → type a program → run it → Wi-Fi join → TCP fetch from a local test server → golden HDMI frame | all pass |
-| 3.3 | Negative end-to-end | No CPU card, empty slots, corrupt kernel, interrupted ROM programming, card unplugged mid-run, low-power USB source | each behaves as specified |
+| 3.3 | Negative end-to-end | Empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power USB source. Out of scope: a missing CPU card (broken hardware) and cards plugged or pulled while powered (cards change only with the power off, `slot.md`) | each behaves as specified |
 | 3.4 | Pin consistency | `pins.yaml` ↔ `.pcf` ↔ firmware `pins.h` ↔ KiCad netlists, and iCE40 pin roles ↔ the Lattice pinout CSV | zero differences |
 
 ## 4. Electrical and board

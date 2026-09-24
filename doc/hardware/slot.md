@@ -4,6 +4,8 @@ The main board has **six I/O slots**. They are PCIe x1-style vertical
 card-edge sockets: 36 contacts, 1.0 mm pitch, with the key between pins 11
 and 12. The pinout is custom. Never plug a real PCIe card in.
 
+- **Cards are plugged or removed only with the power off.** They are not
+  hot-pluggable, and nothing is built to survive a card pulled while running.
 - **Slots are electrically identical.** Slot *n* (1–6) is SPI device *n−1*
   (see `memory-map.md`).
 - **M1 uses three slots:** graphics, IO and Wi-Fi. Slots 4–6 are free for
