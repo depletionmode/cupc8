@@ -900,6 +900,85 @@ cmd = "python3 hw/smoke/smoke.py"
 
 
 # ============================================================================
+# MECH: the mechanical fit of every board together (verification.md 4.7).
+# One run of hw/mech/fit.py (cached in build/mech/results.json) answers all
+# of them; it picks up each board as its build appears, and uses a stand-in
+# for the six I/O slots (20.32 mm pitch, the C404113 datasheet) until the
+# main board exists. Report: build/mech/report.txt, render: overview.png.
+# =====================================================================
+# ============================================================================
+[[test]]
+id = "MECH-001"
+title = "Card edge and socket fit vs PCIe CEM"
+checks = "every card's finger tab against PCIe CEM r3.0 Fig. 6-3 (tab >= 8.40, key 1.90 +/- 0.06 at 12.15, DIM B, finger 0.70 +/- 0.05 at 1.00 pitch, pad tops 5.60, leading edge 1.30 +/- 0.25, short pads A1 and pin C at 2.40, 0.50 chamfers); in its socket (datasheet): shoulder above the housing, key rib in the notch, card in the 1.78 slot, no board inside the housing; nothing within 5 mm above the tab (slot.md)"
+method = "hw/mech/fit.py: pads and outline from pcbnew; the tab in a datasheet socket solid in FreeCAD"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-001"
+
+[[test]]
+id = "MECH-002"
+title = "Finger bevel and card thickness vs PCIe CEM"
+checks = "each card's fab/order.json: thickness in 1.57 +/- 0.13, hard gold, bevel in CEM's 20 +/- 5 deg"
+method = "hw/mech/fit.py reads the order spec kicadgen writes"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-002"
+
+[[test]]
+id = "MECH-003"
+title = "Card-to-card clearance, each card in each slot"
+checks = "every I/O card in every slot next to every I/O card: no collision and >= 1.0 mm (two cards' IPC-6012 bow); each card inside the CEM envelope (14.47 component side, 2.67 solder side); clear of the other sockets and the main board's parts"
+method = "hw/mech/fit.py: STEP from kicad-cli, placed in FreeCAD; exact distances and intersection volumes"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-003"
+
+[[test]]
+id = "MECH-004"
+title = "Top-edge connectors: overhang and plug access"
+checks = "each top-edge connector's mating face at or past the card's top edge (>= -0.3 mm), and its plug's envelope clear of every other card, plug and part in every slot"
+method = "hw/mech/fit.py (FreeCAD), plug envelopes in fit.py's PLUGS"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-004"
+
+[[test]]
+id = "MECH-005"
+title = "M3 holes line up for the rail; rail keep-out clear"
+checks = "each I/O card's 3.2 mm hole at slot.md's (52, -40); sockets 20.32 mm apart, in line and the same way round; every card's hole on one axis in every slot (<= 0.05 mm); a 6.4 mm cylinder along that axis through all six slots hits no part"
+method = "hw/mech/fit.py (pcbnew + FreeCAD)"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-005"
+
+[[test]]
+id = "MECH-006"
+title = "Power LEDs in one place on every I/O card"
+checks = "the LED labelled PWR on each I/O card at slot.md's (-3, -41) on the component side, and in one row across all slots (<= 0.01 mm)"
+method = "hw/mech/fit.py (pcbnew + FreeCAD)"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-006"
+
+[[test]]
+id = "MECH-007"
+title = "Wi-Fi antenna: connector match and cable route"
+checks = "parts.md's antenna has the connector generation of the module's receptacle; the mated plug and cable, straight to the card's top edge, clear everything by >= 0.5 mm in every slot; cable long enough to leave the card"
+method = "hw/mech/fit.py: receptacle position and generation from the ESP32-C3-MINI-1U datasheet, antenna from its drawing"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-007"
+
+[[test]]
+id = "MECH-008"
+title = "CPU card and system card clearance"
+checks = "the CPU card in the x8 socket and the system card in the x4 socket: no collision with, and >= 0.5-1.0 mm from, the I/O cards in every slot, the sockets and the main board's parts; CEM envelope. Fails until the main board, CPU card and system card are built"
+method = "hw/mech/fit.py (FreeCAD), sockets from the main board's footprints (pads A1/B1)"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/mech/fit.py --check MECH-008"
+=======
 # POW / THM: the power tree (doc/hardware/power.md), verification 4.4 / 4.5.
 # Values and assumptions: hw/power/design.py. The main board isn't drawn
 # yet, so these check power.md's design plus the listed assumptions; the
