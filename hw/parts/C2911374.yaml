@@ -1,0 +1,63 @@
+# ESP32-C3-MINI-1U-N4 (Espressif), Wi-Fi/BLE module, 13.2 x 12.5 mm
+datasheet: https://www.espressif.com/sites/default/files/documentation/esp32-c3-mini-1_datasheet_en.pdf
+source: "ESP32-C3-MINI-1 & MINI-1U datasheet v2.2, page 10: Figure 3-1 Pin Layout (top view), page 11: Table 3-1 Pin Definitions"
+package: SMD,13.2x12.5mm
+pins:
+  1: GND
+  2: GND
+  3: 3V3
+  4: NC
+  5: IO2
+  6: IO3
+  7: NC
+  8: EN
+  9: NC
+  10: NC
+  11: GND
+  12: IO0
+  13: IO1
+  14: GND
+  15: NC
+  16: IO10
+  17: NC
+  18: IO4
+  19: IO5
+  20: IO6
+  21: IO7
+  22: IO8
+  23: IO9
+  24: NC
+  25: NC
+  26: IO18
+  27: IO19
+  28: NC
+  29: NC
+  30: RXD0
+  31: TXD0
+  32: NC
+  33: NC
+  34: NC
+  35: NC
+  36: GND
+  37: GND
+  38: GND
+  39: GND
+  40: GND
+  41: GND
+  42: GND
+  43: GND
+  44: GND
+  45: GND
+  46: GND
+  47: GND
+  48: GND
+  49: GND            # the centre: nine GND pads, all "Pin 49" in Figure 3-1
+  50: GND            # 50-53: the corner GND pads
+  51: GND
+  52: GND
+  53: GND
+# EasyEDA's footprint numbers all nine centre pads 49; hw/tools/jlcimport.py
+# (PAD_RENUMBER) makes the other eight 54-61 so the symbol can wire each one
+pad_copies:
+  49: [54, 55, 56, 57, 58, 59, 60, 61]
+ccw: [1, 48]         # Figure 3-1: 1-11 down one side, 12-24 across, 25-35 up, 36-48 back
