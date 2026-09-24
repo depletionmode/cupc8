@@ -610,10 +610,14 @@ NET_CLASSES = [
     # name, track, clearance, via diameter, via drill
     ("Default", 0.2, 0.2, 0.6, 0.3),        # 0.2: two 0.6/0.3 vias then keep holes 0.5 apart (JLC)
     ("Power", 0.5, 0.2, 0.8, 0.4),
+    # 0.15 mm tracks for nets on a 0.4 mm-pitch part (the RP2040's QFN-56):
+    # a 0.2 mm track leaving a 0.2 mm pad has exactly 0.2 mm to the next pad,
+    # and Freerouting will not route it. Clearances stay 0.2.
+    ("Fine", 0.15, 0.2, 0.6, 0.3),
 ]
 
 
-def write_project(path, power_nets=(), rules=None):
+def write_project(path, power_nets=(), rules=None, fine_nets=()):
     """A .kicad_pro with the design rules and net classes kicad-cli DRC uses."""
     import json
     classes = [{"name": n, "track_width": w, "clearance": c, "via_diameter": vd, "via_drill": vdr,
@@ -631,7 +635,8 @@ def write_project(path, power_nets=(), rules=None):
             "rule_severities": {"lib_footprint_mismatch": "ignore"},
         }},
         "net_settings": {"classes": classes, "meta": {"version": 4},
-                         "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets]},
+                         "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets] +
+                                              [{"netclass": "Fine", "pattern": n} for n in fine_nets]},
         "meta": {"filename": os.path.basename(path), "version": 3},
     }
     with open(path, "w") as f:
@@ -1498,7 +1503,7 @@ def check_order(spec, card_edge):
 
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
-             zone_outline=None, boards=2, labels=None):
+             zone_outline=None, boards=2, labels=None, fine_nets=()):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1516,7 +1521,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def sheet():
         schematic(sch, footprint_libs)
-        write_project(pro, power_nets=power_nets)   # before ERC: it carries the library tables
+        write_project(pro, power_nets=power_nets, fine_nets=fine_nets)   # before ERC: it carries the library tables
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)

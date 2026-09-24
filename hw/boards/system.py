@@ -247,6 +247,12 @@ for _i, (_ref, _) in enumerate(TEST_PADS):
     PLACEMENT[_ref] = (2.5, 7.5 + 3 * _i, 0)
 
 
+# every net on the RP2040's 0.4 mm-pitch pads routes in 0.15 mm track (kicadgen "Fine")
+FINE_NETS = sorted({"/" + n for n in list(GPIO.values()) + [
+    "+3V3", "1V1", "GND", "RUN", "SWCLK", "SWDIO", "XIN", "XOUT", "USB_DP_MCU", "USB_DM_MCU",
+    "QSPI_SCLK", "QSPI_nSS", "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3"]})
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     logo.footprint(LOGO_MM)
@@ -254,7 +260,7 @@ def main():
         "system", schematic, PLACEMENT, OUTLINE, out=sys.argv[1] if len(sys.argv) > 1 else None,
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
-        power_nets=(), edge=EDGE, card_edge=True, layers=4,
+        power_nets=(), edge=EDGE, card_edge=True, layers=4, fine_nets=FINE_NETS,
         # the pour reaches over the finger tops, so GND fingers join it
         zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)], labels=LABELS)
