@@ -989,7 +989,9 @@ function genLazyDvi(seed, cycles, programs) {
   for (let c = 3; c < cycles; c++) {
     for (let lane = 0; lane < 3; lane++) {
       if (c >= next[lane]) {
-        S.at(c, 't', lane, R.u32() & 0xfffff);
+        // a plain bus write (as the DMA does; TXOVER if full) or one that checks for space
+        if (R.chance(0.7)) S.w(c, PIO_BASE[0] + R_TXF0 + 4 * lane, R.u32() & 0xfffff);
+        else S.at(c, 't', lane, R.u32() & 0xfffff);
         next[lane] = c + (R.chance(0.998) ? period + R.int(3) : 100 + R.int(400));
       }
     }
@@ -1051,8 +1053,10 @@ function genLazyRandom(seed, cycles) {
       } else w = randInstr(R);
       S.w(0, PIO_BASE[p] + R_INSTR_MEM0 + 4 * i, w);
     }
+    // a block of runners and stalled machines only can stay lazy through autopulls
+    const kinds = R.chance(0.6) ? ['run', 'run', 'stall', 'off'] : ['run', 'run', 'stall', 'random', 'off'];
     for (let m = 0; m < 4; m++) {
-      const kind = R.pick(['run', 'run', 'stall', 'random', 'off']);
+      const kind = R.pick(kinds);
       const top = kind === 'run' ? runLen - 1 : 31;
       const bottom = kind === 'run' ? 0 : R.int(32);
       const exec =
@@ -1091,7 +1095,10 @@ function genLazyRandom(seed, cycles) {
   const feed = R.pick([0.02, 0.1, 0.4]);
   for (let c = 1; c < cycles; c++) {
     const p = R.int(2);
-    if (R.float() < feed) S.at(c, 't', p * 4 + R.int(4), R.u32());
+    if (R.float() < feed) {
+      if (R.chance(0.5)) S.w(c, PIO_BASE[p] + R_TXF0 + 4 * R.int(4), R.u32());
+      else S.at(c, 't', p * 4 + R.int(4), R.u32());
+    }
     if (R.float() < feed / 4) S.at(c, 'x', p * 4 + R.int(4));
     if (R.float() < 0.0005) S.g(c, R.int(30), R.int(2));
     lazyPokes(S, R, c, p, rate, pins);

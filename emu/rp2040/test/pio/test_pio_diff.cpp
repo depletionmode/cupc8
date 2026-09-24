@@ -330,8 +330,9 @@ int main(int argc, char **argv) {
   }
   if (std::getenv("PIO_DIFF_STATS")) {
     mcu.syncPIO();
-    std::fprintf(stderr, "lazy cycles: pio0 %llu pio1 %llu of %u\n", (unsigned long long)mcu.pio[0].lazyCycles,
-                 (unsigned long long)mcu.pio[1].lazyCycles, cycles);
+    std::fprintf(stderr, "lazy cycles: pio0 %llu pio1 %llu of %u; lazy autopulls %llu %llu\n",
+                 (unsigned long long)mcu.pio[0].lazyCycles, (unsigned long long)mcu.pio[1].lazyCycles, cycles,
+                 (unsigned long long)mcu.pio[0].lazyEvents, (unsigned long long)mcu.pio[1].lazyEvents);
   }
   if (bench) {
     const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
