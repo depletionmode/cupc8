@@ -202,10 +202,11 @@ def schematic(path, footprint_libs):
     s.write(path, footprint_libs=footprint_libs)
 
 
-# Board: a 56 x 38 mm body above the x4 card-edge tab (mm, y down). The
+# Board: a 56 x 44 mm body above the x4 card-edge tab (mm, y down). The
 # edge footprint draws the tab's own Edge.Cuts; it meets the body at its
-# (-0.65, -4.95) and (33.65, -4.95), so at y = 38 with the tab centred.
-W, H = 56, 38
+# (-0.65, -4.95) and (33.65, -4.95), so at y = 44 with the tab centred. The
+# 6 mm band above the parts is for the 50-odd slot nets fanning out of the tab.
+W, H = 56, 44
 EDGE_AT = (W / 2 - 16.5, H + 4.95)
 OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
