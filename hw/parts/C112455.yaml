@@ -1,0 +1,12 @@
+# USB-302S-T (SOFNG), USB-A receptacle, SMD right angle
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/673b9399cd7c338ea53cf47796511f25.pdf
+source: "SOFNG USB-302S datasheet, page 1: PIN SIGNAL table (1 VCC, 2 -DATA0, 3 +DATA0, 4 GND) and P.C.B LAYOUT (the two shell pads)"
+package: SMD
+footprints: [USB_A_SOFNG_USB-302S-T]   # hw/lib/cupc8.pretty, drawn from the P.C.B LAYOUT
+pins:
+  1: VCC
+  2: [D-, -DATA0]
+  3: [D+, +DATA0]
+  4: GND
+  5: [GND, shell]
+  6: [GND, shell]

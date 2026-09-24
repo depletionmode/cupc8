@@ -15,6 +15,9 @@ static uint8_t kbd_addr, kbd_instance;
 static bool have_kbd;
 static uint8_t led_report;            /* must outlive the control transfer */
 static bool changed;                  /* status or response may differ: re-arm the preload */
+static uint32_t key_led_until;        /* LED_KEY (activity) stays lit until then, in ms */
+
+#define KEY_LED_MS 30                 /* activity LED on-time after each HID report */
 
 static uint32_t now_ms(void)
 {
@@ -58,6 +61,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 {
 	if (have_kbd && dev_addr == kbd_addr && instance == kbd_instance && len >= 8) {
 		io_report(&io, report, now_ms());
+		key_led_until = now_ms() + KEY_LED_MS;
 		changed = true;
 	}
 	tuh_hid_receive_report(dev_addr, instance);
@@ -99,6 +103,8 @@ int main(void)
 	gpio_pull_up(PIN_VBUS_NFAULT);
 	gpio_init(PIN_LED_KBD);
 	gpio_set_dir(PIN_LED_KBD, true);
+	gpio_init(PIN_LED_KEY);
+	gpio_set_dir(PIN_LED_KEY, true);
 
 	slotspi_init(&io.card, status);
 	tuh_init(0);                    /* the native port */
@@ -119,6 +125,7 @@ int main(void)
 			changed = true;
 		}
 		gpio_put(PIN_LED_KBD, have_kbd);
+		gpio_put(PIN_LED_KEY, (int32_t)(key_led_until - now_ms()) > 0);
 		if (changed) {
 			changed = false;
 			slotspi_refresh();

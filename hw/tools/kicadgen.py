@@ -641,10 +641,15 @@ NET_CLASSES = [
     # name, track, clearance, via diameter, via drill
     ("Default", 0.2, 0.2, 0.6, 0.3),        # 0.2: two 0.6/0.3 vias then keep holes 0.5 apart (JLC)
     ("Power", 0.5, 0.2, 0.8, 0.4),
+    # nets on 0.4 mm pitch pads (QFN): 0.15 mm tracks and 0.15 mm clearance
+    # (JLC: 0.127), or a track can't turn out of a pad beside its neighbour
+    # (a pad gap is 0.2). Its vias are 0.65 mm, so two of them 0.15 apart
+    # still keep their 0.3 mm holes 0.5 apart (JLC: 0.5)
+    ("Fine", 0.15, 0.15, 0.65, 0.3),
 ]
 
 
-def write_project(path, power_nets=(), rules=None):
+def write_project(path, power_nets=(), rules=None, fine_nets=()):
     """A .kicad_pro with the design rules and net classes kicad-cli DRC uses."""
     import json
     classes = [{"name": n, "track_width": w, "clearance": c, "via_diameter": vd, "via_drill": vdr,
@@ -662,7 +667,8 @@ def write_project(path, power_nets=(), rules=None):
             "rule_severities": {"lib_footprint_mismatch": "ignore"},
         }},
         "net_settings": {"classes": classes, "meta": {"version": 4},
-                         "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets]},
+                         "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets] +
+                                              [{"netclass": "Fine", "pattern": n} for n in fine_nets]},
         "meta": {"filename": os.path.basename(path), "version": 3},
     }
     with open(path, "w") as f:
@@ -769,6 +775,11 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
+    if layers == 4:
+        # In1 is a solid plane of the first pour net (Freerouting routes no
+        # power layer), under the top layer's signals; In2 routes, and pours
+        board.SetLayerType(pcbnew.In1_Cu, pcbnew.LT_POWER)
+        copper += [pcbnew.In1_Cu, pcbnew.In2_Cu]
     for net in zones:
         for layer in copper:
             z = pcbnew.ZONE(board)
@@ -1170,6 +1181,7 @@ def remove_dangling(board, pours=()):
     are not filled yet, so their vias would look dangling. Returns the count."""
     import pcbnew
     removed = 0
+    copper = [pcbnew.F_Cu, pcbnew.B_Cu] + ([pcbnew.In1_Cu, pcbnew.In2_Cu] if board.GetCopperLayerCount() == 4 else [])
     while True:
         tracks = board.Tracks()                  # indexed: iterating it breaks on Python 3.14
         items = [tracks[i].Cast() for i in range(len(tracks))]
@@ -1199,7 +1211,8 @@ def remove_dangling(board, pours=()):
             return False
         gone = []
         for v in vias:
-            layers = [l for l in (pcbnew.F_Cu, pcbnew.B_Cu) if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
+            # every copper layer: on 4 layers a via can carry a track to In2
+            layers = [l for l in copper if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(l) // 2, skip=v)]
             if len(layers) < 2:
                 gone.append(v)
         for t in segs:
@@ -1258,6 +1271,14 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
+    # Freerouting can hand back a track at 3/4 of its class's width (0.1124
+    # mm for 0.15, out of a QFN's side pads), under JLC's minimum: each goes
+    # back to the minimum, and DRC judges the clearance
+    want = pcbnew.FromMM(JLC_RULES["min_track_width"])
+    tracks = board.Tracks()
+    for t in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_TRACE_T]:
+        if t.GetWidth() < want:
+            t.SetWidth(want)
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
@@ -1333,7 +1354,9 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge")]
     others = []                                   # other nets' pads, grown for a via / a track
     for p, _ in pads:
-        if p.GetNetname() != net:
+        # paste-only pads (a QFN's exposed pad is printed in pieces) have no
+        # copper and no net: not obstacles, or the exposed pad gets no via
+        if p.GetNetname() != net and p.IsOnCopperLayer():
             bb = p.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []
@@ -1762,7 +1785,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False):
+             io_card=False, fine_nets=(), preroute=None, route_tries=3):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1801,7 +1824,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def sheet():
         schematic(sch, footprint_libs)
-        write_project(pro, power_nets=power_nets)   # before ERC: it carries the library tables
+        write_project(pro, power_nets=power_nets, fine_nets=fine_nets)   # before ERC: it carries the library tables
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
@@ -1821,12 +1844,14 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
             presence_link(b, outline[3])
         state["fanout"] = ground_fanout(b, zones[0])
+        if preroute:                 # the board script's own locked tracks and vias, before Freerouting
+            preroute(b)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones))
+    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=zones, tries=route_tries))
 
     def fill():
         x0, y0, x1, y1 = outline

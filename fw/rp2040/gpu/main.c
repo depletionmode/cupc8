@@ -29,13 +29,14 @@
 #define WORDS_PER_LANE (GPU_OUT_W / DVI_SYMBOLS_PER_WORD)
 #define COLOUR_WORDS (GPU_TEXT_COLS * 4 / 32)          /* one plane of one text row */
 
-/* our TMDS pins (hw/pins.yaml): lanes blue, green, red; GPIO n is P */
+/* our TMDS pins (hw/pins.yaml): lanes blue, green, red; GPIO n+1 is P (the
+ * pads invert), which puts the pairs in the HDMI receptacle's order */
 static const struct dvi_serialiser_cfg gpu_dvi_cfg = {
 	.pio = pio0,
 	.sm_tmds = { 0, 1, 2 },
 	.pins_tmds = { PIN_TMDS_D00, PIN_TMDS_D10, PIN_TMDS_D20 },
 	.pins_clk = PIN_TMDS_CLK0,
-	.invert_diffpairs = false,
+	.invert_diffpairs = true,
 };
 
 static gpu_t gpu;

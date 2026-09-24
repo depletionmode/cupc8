@@ -185,6 +185,10 @@ class Card:
         """How far 'up' (away from the fingers) the card reaches, in STEP x, y."""
         return max(dot((v.Point.x, v.Point.y), self.up_s) for v in self.slab.Vertexes)
 
+    def edge(self, d):
+        """How far the card reaches along direction d (STEP x, y)."""
+        return max(dot((v.Point.x, v.Point.y), d) for v in self.slab.Vertexes)
+
 
 cards = {}
 for name, c in JOB["cards"].items():
@@ -360,30 +364,35 @@ def mech_004():
             if part is None:
                 add("MECH-004", False, "%s %s: no 3D model, so its overhang can't be checked" % (c.name, fp["ref"]))
                 continue
-            face = max(dot((v.Point.x, v.Point.y), c.up_s) for v in part.Vertexes)
-            over = face - top
+            # a connector faces out of the top edge, or out of the back edge
+            # (the B1 end, slot.md Mechanical): whichever it reaches past more
+            back_s = (-c.a_s[0], -c.a_s[1])
+            ups = [(max(dot((v.Point.x, v.Point.y), d) for v in part.Vertexes) - c.edge(d), d, side, across)
+                   for d, side, across in ((c.up_s, "top", c.a_s), (back_s, "back", c.up_s))]
+            over, out_s, side, across_s = max(ups, key=lambda u: u[0])
+            face = over + c.edge(out_s)
             add("MECH-004", over >= JOB["min_overhang"],
-                "%s %s (%s): mating face %+.2f mm past the top edge (>= %.1f: flush within routing tolerance)"
-                % (c.name, fp["ref"], fp["value"], over, JOB["min_overhang"]))
+                "%s %s (%s): mating face %+.2f mm past the %s edge (>= %.1f: flush within routing tolerance)"
+                % (c.name, fp["ref"], fp["value"], over, side, JOB["min_overhang"]))
             plug = JOB["plugs"].get(fp["lcsc"])
             if not plug:
                 note("MECH-004", "%s %s: no plug envelope known for %s" % (c.name, fp["ref"], fp["lcsc"] or fp["value"]))
                 continue
             what, w, t = plug
             bb = part.BoundBox
-            cx = dot((bb.Center.x, bb.Center.y), c.a_s)
+            cx = dot((bb.Center.x, bb.Center.y), across_s)
             cz = (max(bb.ZMin, c.top) + bb.ZMax) / 2
-            # a box in the card's frame: across the row (a), up (up_s), across the card (z)
+            # a box in the card's frame: along the edge (across_s), out of it (out_s), across the card (z)
             loc = Part.makeBox(w, 40, t, V(-w / 2, 0, -t / 2))
-            m = App.Matrix(c.a_s[0], c.up_s[0], 0, cx * c.a_s[0] + face * c.up_s[0],
-                           c.a_s[1], c.up_s[1], 0, cx * c.a_s[1] + face * c.up_s[1],
+            m = App.Matrix(across_s[0], out_s[0], 0, cx * across_s[0] + face * out_s[0],
+                           across_s[1], out_s[1], 0, cx * across_s[1] + face * out_s[1],
                            0, 0, 1, cz, 0, 0, 0, 1)
             env = moved(loc, m)
             for p in placed:
                 if p.card is c:
                     plug_envelopes.append((p, fp["ref"], what, moved(env, p.m)))
     if not any_conn:
-        add("MECH-004", True, "no top-edge connectors on %s (the Wi-Fi antenna plug is MECH-007)"
+        add("MECH-004", True, "no top- or back-edge connectors on %s (the Wi-Fi antenna plug is MECH-007)"
             % ", ".join(cards) if cards else "no cards")
         return
     for p, ref, what, env in plug_envelopes:
