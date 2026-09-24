@@ -1328,7 +1328,7 @@ proc testKernelNetwork() =
 run testKernelNetwork
 
 proc testKernelNetWeakPower() =
-  ## KRN-004: on a USB source under 1.5 A (SYSCTL.PWR_HI = 0) the "net"
+  ## KRN-004: on a USB source under 3 A (SYSCTL.PWR_HI = 0) the "net"
   ## command refuses to start the radio, and says why.
   echo "== kernel networking on a weak USB source =="
   let rom = buildKernelRom()
@@ -1355,7 +1355,7 @@ proc testKernelNetWeakPower() =
   while n < 400_000 and gpuFind(g, "net off") < 0:
     if cpuStep() != sOk: break
     inc n
-  expectTrue("weak source refused with a message", gpuFind(g, "USB power under 1.5A: net off") >= 0)
+  expectTrue("weak source refused with a message", gpuFind(g, "USB power under 3A: net off") >= 0)
   expectTrue("no network timeout (the radio was never used)", gpuFind(g, "net timeout") < 0)
   pwrHi = true
   ioModel = imLegacy
@@ -1517,6 +1517,22 @@ proc testStorage() =
   expectTrue("SAVE to a write-protected card", cmdOutput("save \"wp.bas\"") == @["write protected"])
   expectTrue("DEL on a write-protected card", cmdOutput("del \"pc.bas\"") == @["write protected"])
   expectTrue("LOAD from a write-protected card", cmdOutput("load \"slow.bas\"") == @["LOADED"])
+
+  # a USB source under 3 A (PWR_HI low): writes refused, reading is fine
+  pwrHi = false
+  bootStorage(rom, img)
+  for line in prog:
+    typeLine(line)
+  expectTrue("SAVE below 3 A", cmdOutput("save \"weak.bas\"") == @["USB power under 3A: SD writes off"])
+  expectTrue("DEL below 3 A", cmdOutput("del \"slow.bas\"") == @["USB power under 3A: SD writes off"])
+  expectTrue("LOAD below 3 A", cmdOutput("load \"slow.bas\"") == @["LOADED"])
+  expectTrue("the file loaded below 3 A runs", runOutput() == want)
+  expectTrue("DIR below 3 A lists the card", cmdOutput("dir").len > 1)
+  pwrHi = true
+  bootStorage(rom, img)
+  expectTrue("the card as it was: no WEAK.BAS, SLOW.BAS still there",
+             cmdOutput("load \"weak.bas\"") == @["file not found"] and
+             cmdOutput("load \"slow.bas\"") == @["LOADED"])
 
   # no card in the socket, and no storage card at all
   bootStorage(rom, "")

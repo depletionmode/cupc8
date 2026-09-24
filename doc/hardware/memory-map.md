@@ -38,7 +38,7 @@ in the SRAM but are never selected.
 | $f200 | R/W1C | IRQ_PEND | pending IRQ bits 3:0; bits 7:4 read 0 |
 | $f201 | R/W | IRQ_MASK | bits 3:0, 1 = enabled; bits 7:4 read 0 |
 | $f202 | R | **SLOT_IRQ** (new) | bit n = SPI dev n (slots 1–6 → bits 0–5) is currently asserting IRQ_n (level, live). Bits 7:6 read 0. |
-| $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bit 1 `PWR_HI`, read-only: the USB-C source advertises at least 1.5 A (a comparator on CC, so it works without the system card). The kernel's `net` command refuses to start the radio when it is 0. Bits 7:2 reserved, read 0. |
+| $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bit 1 `PWR_HI`, read-only: the USB-C source advertises 3.0 A (a comparator on CC, so it works without the system card; `power.md`). When it is 0 the kernel's `net` command refuses to start the radio, and SAVE and DEL refuse to write the SD card. Bits 7:2 reserved, read 0. |
 | $f204 | R/W | **ROM_BANK** (new) | Bank for the $e800 window, 0–255 (reset 0) |
 
 ### SPI devices
