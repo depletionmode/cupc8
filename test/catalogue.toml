@@ -371,6 +371,36 @@ vrow = "1.1"
 cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-001"
 
 
+[[test]]
+id = "IRQ-003"
+title = "The chipset tick (IRQ_PEND bit 4)"
+checks = "IRQ_MASK is 0 at reset (the tick masked); the tick is pending as the millisecond counter reaches a multiple of 50, not before 50 ms after the last, and never reaches the CPU masked; W1C clears it; unmasked it raises CPU IRQ line 3, which SPI complete shares, each only through its own mask bit; nothing pending with all unmasked raises no line"
+method = "GHDL testbench section IRQ-003"
+kind = "sim"
+vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-003"
+
+# ============================================================================
+# CLK: the chipset's millisecond counter
+# ============================================================================
+[[test]]
+id = "CLK-001"
+title = "Millisecond counter (MS_COUNT, $f206-$f209)"
+checks = "near 0 after reset; from a step the next comes 12000 clocks later (+-20, three times) and 50 ms is 600000 clocks (+-20); a read of MS_COUNT0 at $ff latches MS_COUNT1-3, which still read the latched value after the low byte carried, and MS_COUNT0 then MS_COUNT1 read the new value; writes are ignored; reading MS_COUNT1 alone does not re-latch; a power-on reset clears it and it counts again"
+method = "GHDL testbench section CLK-001"
+kind = "sim"
+vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=CLK-001"
+
+[[test]]
+id = "CLK-002"
+title = "Millisecond counter and tick formal"
+checks = "the divider stays in 0..11999 and the counter steps by exactly one as it wraps (clk_ms_rate); reset clears both; a read of MS_COUNT0 answers bits 7:0 and latches bits 31:8 of the same value, nothing else moves the latch, MS_COUNT1-3 read it; the tick is set only as the counter steps at a multiple of 50 and always then (unless that clock's W1C clears it); CPU IRQ line 3 is (SPI and its mask) or (tick and its mask), lines 0-2 as before; the tick is masked after reset"
+method = "SymbiYosys unbounded proof (k-induction, bitwuzla) of soc/formal/chipset_props.vhd (CLK-002 section), PSL bound to chipset.vhd; tools/formal.py runs it with the ghdl-enabled yosys"
+kind = "formal"
+vrow = "1.4"
+cmd = "python3 tools/formal.py chipset prove"
+
 # ============================================================================
 # BRG / DBG: bus bridge, stop/step/trace (sysctl ↔ chipset)
 # ============================================================================
@@ -449,7 +479,7 @@ cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chips
 id = "MUT-001"
 title = "Counterexamples: fixed bugs stay caught"
 checks = "each mutant puts a fixed bug (or a property's target fault) back into a copy of the RTL; its formal property and its simulation test must then fail"
-method = "tools/formal.py --mutants (the reset race: bus_rdy_in_cycle and RST-002; RAM+ROM enabled together; a two-clock /RDY; the RAM window ignoring RAM_BANK: mmu_ram_window and MMU-005; RAM_BANK resetting to 0: mmu_ram_bank_reset and MMU-005; the bridge's 24-bit RAM commands cut to 16 bits: BRG-004)"
+method = "tools/formal.py --mutants (the reset race: bus_rdy_in_cycle and RST-002; RAM+ROM enabled together; a two-clock /RDY; the RAM window ignoring RAM_BANK: mmu_ram_window and MMU-005; RAM_BANK resetting to 0: mmu_ram_bank_reset and MMU-005; the bridge's 24-bit RAM commands cut to 16 bits: BRG-004; MS_COUNT1 read live instead of latched and a 12001-clock millisecond: CLK-001; the tick reaching the CPU masked: IRQ-003. These three are beyond a 60-clock BMC from reset, so the testbench catches them; the CLK-002 properties fail on them under induction)"
 kind = "formal"
 vrow = "1.4"
 cmd = "python3 tools/formal.py --mutants"
