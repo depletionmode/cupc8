@@ -134,7 +134,7 @@ cmd = "python3 tools/cpudirected.py CPU-004"
 [[test]]
 id = "CPU-005"
 title = "Interrupt entry and return"
-checks = "IRQ taken only at instruction boundaries with I=1, lowest number first; push order pch, pcl, f; I cleared; vector read; pop f/pcl/pch returns exactly"
+checks = "IRQ taken only at instruction boundaries with I=1, lowest number first, and never right after POP pcl (a timer due as POP pcl retires is taken after the POP pch; simtest testIrqPopPcl checks sim.nim the same way); push order pch, pcl, f; I cleared; vector read; pop f/pcl/pch returns exactly"
 method = "soc/tb/tb_cpu_directed.vhd running test/cpu/directed.s (labels passed in by tools/cpudirected.py)"
 kind = "sim"
 vrow = "1.3"
@@ -567,11 +567,20 @@ cmd = "tools/run_tests.sh testBasicPrograms"
 [[test]]
 id = "KRN-004"
 title = "Networking"
-checks = "join, resolve and TCP fetch through the Wi-Fi card model; output matches"
-method = "tools/simtest.nim testKernelNetwork: the kernel's net command, Wi-Fi core on host sockets, server on 127.0.0.1:8088"
+checks = "join, resolve (the kernel's DNS client) and TCP fetch through the Wi-Fi card model; output matches; a weak USB source refuses net"
+method = "tools/simtest.nim testKernelNetwork, testKernelNetWeakPower: the kernel's net command, Wi-Fi core on host sockets, a DNS server in the test answering localhost, an HTTP server on 127.0.0.1:8088"
 kind = "sim"
 vrow = "2.3"
-cmd = "tools/run_tests.sh"
+cmd = "tools/run_tests.sh testKernelNetwork testKernelNetWeakPower"
+
+[[test]]
+id = "KRN-014"
+title = "Networking in assembly: DNS client, ping, net config"
+checks = "routines on the CPU: the Internet checksum equals RFC 1071 (odd and even lengths, many carries), ping's echo request, reply matching (identifier, sequence, type, checksum, sender, an IPv4 header in front), the DNS query's bytes, the answer parser (a compressed name, a CNAME then its A through a pointer to a pointer, a name in full, AAAA skipped, NXDOMAIN, SERVFAIL, no answer, class not IN, another id, not a response, truncated, a pointer loop, a pointer, label, RDATA or record past the end), dotted quads and numbers; the whole kernel against a scripted DNS server on host sockets: net config (show, dns IP [PORT], ip IP MASK GW, dhcp, save, bad arguments), net lookup (each answer above; an answer with another id ignored before the right one; only wrong ids and silence time out after exactly one retry with a new id; one answered only the second time; a dotted quad asks nothing), net ping to the host's loopback (replies, times, summary), by name, to an address that never answers (timeouts), of a name that does not exist; the clock (TMR1) is off afterwards; the example TCP and UDP echo servers (examples/net, user programs at $7000 on the net API) serve two TCP clients in turn and UDP datagrams from two ports"
+method = "tools/simtest.nim testNetRoutines (kernel routines called directly, kernel/kernel.map), testKernelDnsPing (Wi-Fi core on host sockets: netposix.c, Linux ping socket), testNetExamples (the programs assembled after kernel/api.inc, or API_NET_* names for api_net_* until it exists)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testNetRoutines testKernelDnsPing testNetExamples"
 
 [[test]]
 id = "KRN-007"
@@ -608,6 +617,42 @@ method = "tools/simtest.nim testKernelBanks (tools/testdata/bank_pattern.s; the 
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testKernelBanks"
+
+[[test]]
+id = "KRN-010"
+title = "Kernel memory layout and the API jump table"
+checks = "the kernel is assembled for code $1000, data $5000, bss $6000 and its code, data and bss end by $4fff, $5fff and $6eff (the API block $6f00 and the user program $7000- stay free); the jump table from $1003 is 8 x 16 B instructions, each entry kernel/api.inc names goes to api_<name> (api_none for a stub) and every other to api_none, api_none follows at $1183; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc's entries are still at the same addresses (entries are only added)"
+method = "tools/simtest.nim testKernelLayout and testKernelApi on the kernel's map and image (every committed version of kernel/api.inc)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testKernelLayout testKernelApi"
+
+[[test]]
+id = "KRN-011"
+title = "Kernel API: a program at $7000 calls every group"
+checks = "tools/testdata/api_prog.s (tools/mkprg.py) put at $7000 with API_RUN = 1 as cupc8.py run does, on HDMI with the storage card: the terminal starts it from its key wait (API_RUN 2 while it runs, 0 after); it gets the version, API block and slot table; GFX pixel and filled rectangle read back with GETPIXEL, VSYNC; the e-ink calls give $ff on HDMI and leave $ff; storage INFO, OPEN/WRITE/CLOSE, OPEN/SEEK/READ (the bytes after the seek), RENAME, DIR_FIRST/NEXT, DELETE (a PC no longer sees the files), OPEN of the deleted file says not found; an empty net or reserved entry gives $ff and API_ERR $ff; WAIT_MS 20 is 18-30 ms of TICKS; PUTS/PUTC/GOTOXY/ATTR/GETXY/POLLKEY/POKE on the screen; it returns and the terminal prompts with its stack as before. API_EXIT from a nested call with 6 bytes left on the stack does the same, and BASIC still works; a header of another version is refused"
+method = "tools/simtest.nim testApiProgram: the real kernel on sim.nim's M1 machine (runProgram), fw/*/core cards"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testApiProgram"
+
+[[test]]
+id = "KRN-012"
+title = "exec \"NAME\" from the storage card"
+checks = "a program file (header \"C8P\", version 1) spanning three 128-byte chunks is loaded at $7000 byte for byte and runs; one filling $7000-$dfff exactly runs (its last byte at $dfff); a file without the header runs as BASIC (LOAD, then RUN); a header of version 2, a header cut short (\"bad program header\") and a body one byte too big (\"program too big\") run nothing; a missing file, no name (usage) and no storage card give their messages; the terminal's stack is as before throughout; help lists EXEC"
+method = "tools/simtest.nim testExec: the storage card model on an image made with tools/fatcheck.py"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testExec"
+
+[[test]]
+id = "KRN-013"
+title = "Kernel API: the e-ink entries"
+checks = "tools/testdata/eink_prog.s on the simulator's e-ink card: API_EINK_AUTO (on 1, idle10 5, full_after 2, cap10 50, full_kind 3, sleep_s 3) answers 0, API_EINK_GET reads the six back, API_EINK_STATUS answers, the program prints them, and the panel model sees no command the chip would ignore; on HDMI every call gives $ff and leaves $ff"
+method = "tools/simtest.nim testEinkApi (fw/eink/core with AUTO_EXT/AUTO_GET in fw/sim/simcards.c)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testEinkApi"
 
 # ============================================================================
 # CARD: common card protocol (every card firmware)
@@ -712,8 +757,8 @@ cmd = "test/emu/backend_diff.sh"
 
 [[test]]
 id = "EMU-007"
-title = "Native whole-machine emulator: identical to machine.mjs, threaded = serial"
-checks = "boot to BASIC and a typed program (1.6 s emulated) on test/emu/machine.mjs, the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42"
+title = "Native whole-machine emulator: threaded = serial"
+checks = "boot to BASIC and a typed program (1.6 s emulated) on the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42. No longer compared with test/emu/machine.mjs: the legacy JS emulator is not maintained (David, 2026-09-25) and still has the CS_n edge bug the native machine's E2E-011 fix removed, so the two differ"
 method = "test/emu/machine_diff.sh (test/emu/test_machine_native.mjs, emu/machine, tools/emu_machine_build.sh)"
 kind = "sim"
 vrow = "3.2"
@@ -1012,7 +1057,7 @@ cmd = "python3 test/host/test_jlcparts.py"
 [[test]]
 id = "HOST-002"
 title = "cupc8.py end to end"
-checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read across $ffff, far RAM by address and BANK:OFFSET up to $7ffff (and refused past it, or for bank 32), CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; the results checked in the models' memory"
+checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read across $ffff, far RAM by address and BANK:OFFSET up to $7ffff (and refused past it, or for bank 32), run (a .prg's body at $7000 with its header left out, or a bare binary, then API_RUN = 1; refused while API_RUN is 1 or 2, for a version 2 header and for 28673 bytes), CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; the results checked in the models' memory"
 method = "test/host/test_cupc8.py with build/fw/sysctl_sim --dump"
 cmd = "make -s -C fw sysctl_sim && python3 test/host/test_cupc8.py"
 kind = "sim"
@@ -1054,6 +1099,15 @@ checks = "Wi-Fi join → TCP fetch from a local server → page shown"
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
+
+[[test]]
+id = "E2E-013"
+title = "Networking in assembly on the real Wi-Fi firmware"
+checks = "the kernel's DNS client asks a DNS server on the PC (net config dns 10.0.2.2 PORT, the settings shown), net lookup prints its address and NXDOMAIN's message, net get NAME PORT resolves the name itself and fetches from the PC (Host header is the name), net ping 10.0.2.2 gets QEMU's echo replies over the card's raw ICMP socket with times and the summary, net config shows the settings"
+method = "test/emu/test_e2e.mjs E2E-013 (CUPC8_EMU=native): the native emulator, esp32c3 firmware in QEMU, a Node DNS server and HTTP server on 127.0.0.1"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
 
 [[test]]
 id = "E2E-004"
@@ -1098,6 +1152,33 @@ method = "test/emu/test_e2e.mjs E2E-009 (machinenative.mjs, sysctl: true)"
 kind = "sim"
 vrow = "3.2"
 cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-009"
+
+[[test]]
+id = "E2E-010"
+title = "cupc8.py run: a program over USB into RAM at $7000"
+checks = "on the native emulator (HDMI, IO, the system card): cupc8.py run eink_prog.prg writes the body at $7000 through the bridge while the CPU runs, then API_RUN; the terminal starts it from its key wait; its e-ink calls on HDMI print AUTO FF, GET FF x7, ST FF x4; it returns to the prompt; the bare binary runs a second time; a typed BASIC program still runs"
+method = "test/emu/test_e2e.mjs E2E-010 (tools/cupc8.py against the emulated system card)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-010"
+
+[[test]]
+id = "E2E-011"
+title = "exec from the SD card: a program at $7000 and a BASIC file"
+checks = "on the native emulator with the storage card and a FAT image in the SD card model: exec \"prog.prg\" (the \"C8P\" header, three chunks) prints NATIVE OK; exec of a BASIC file loads and runs it (42, BASIC OK); exec of a missing file says file not found; the storage firmware keeps to the SD protocol"
+method = "test/emu/test_e2e.mjs E2E-011 (machinenative.mjs m.sd, test/emu/fatimg.py)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-011"
+
+[[test]]
+id = "E2E-012"
+title = "The e-ink API on the e-ink card"
+checks = "on the native emulator with the real eink.elf and the UC8179 panel model, a program run with cupc8.py run: API_EINK_AUTO (on 1, idle10 5, full_after 2, cap10 50, full_kind 3, sleep_s 3) answers 0 and API_EINK_GET reads the six back (on the panel's glass); API_EINK_STATUS answers; then two partial refreshes are followed by a greyscale full refresh and no fast one; the controller is awake 2 s after the last refresh and in deep sleep by 4.5 s; the panel model sees nothing the chip would ignore"
+method = "test/emu/test_e2e.mjs E2E-012 (machinenative.mjs m.panel(), which gives asleep)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-012"
 
 [[test]]
 id = "E2E-006"

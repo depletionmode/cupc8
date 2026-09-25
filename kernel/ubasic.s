@@ -1660,6 +1660,35 @@ ub_cmd_load:
 	b ub_get_name
 	eq r0, #0
 	bzf .usage
+	push pch
+	push pcl
+	b ub_load_file
+	eq r0, #0
+	bzf .loaded
+	push pch
+	push pcl
+	b st_print_err
+	b .done
+.loaded:
+	mov r0, #>[ub_s_loaded]
+	mov r1, #<[ub_s_loaded]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.usage:
+	mov r0, #>[ub_s_usage]
+	mov r1, #<[ub_s_usage]
+	push pch
+	push pcl
+	b str_printstr
+.done:
+	pop pcl
+	pop pch
+
+; LOAD's work (also exec's): NEW, then the file st_name's lines as if typed.
+; r0 = 0, or the error
+ub_load_file:
 	xor r0, r0
 	st [st_h], r0
 	st [st_mode], r0
@@ -1668,7 +1697,7 @@ ub_cmd_load:
 	b st_open
 	eq r0, #0
 	bzf .opened
-	b .error
+	b .done
 .opened:
 	push pch
 	push pcl
@@ -1728,15 +1757,6 @@ ub_cmd_load:
 	push pch
 	push pcl
 	b st_close
-	eq r0, #0
-	bzf .loaded
-	b .error
-.loaded:
-	mov r0, #>[ub_s_loaded]
-	mov r1, #<[ub_s_loaded]
-	push pch
-	push pcl
-	b str_printstr
 	b .done
 .close_error:
 	push r0
@@ -1744,17 +1764,6 @@ ub_cmd_load:
 	push pcl
 	b st_close
 	pop r0
-.error:
-	push pch
-	push pcl
-	b st_print_err
-	b .done
-.usage:
-	mov r0, #>[ub_s_usage]
-	mov r1, #<[ub_s_usage]
-	push pch
-	push pcl
-	b str_printstr
 .done:
 	pop pcl
 	pop pch

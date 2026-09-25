@@ -729,6 +729,14 @@ proc testIrqTimer() =
   discard runFile(testdata / "irq_timer.s")
   expect("timer handler wrote $aa", mem[0x2000], 0xaa)
 
+proc testIrqPopPcl() =
+  ## CPU-005 (sim.nim): an IRQ is not taken between POP pcl and POP pch
+  echo "== no IRQ between pop pcl and pop pch =="
+  discard runFile(testdata / "irq_popret.s")
+  expect("the timer handler ran", mem[0x2001], 0x11)
+  expect("the call returned where it should", mem[0x2000], 0x55)
+  expect("SP back at the bottom", SP, 0x0100, 4)
+
 proc testIrqFlags() =
   echo "== pop f restores Z =="
   discard runFile(testdata / "irq_flags.s")
@@ -766,6 +774,7 @@ proc testIrqMaskMmio() =
 
 run testIrqOps
 run testIrqTimer
+run testIrqPopPcl
 run testIrqFlags
 run testIrqCli
 run testIrqKeyb
@@ -787,7 +796,7 @@ proc testKernelKeybWaits() =
     inc n
   expectTrue("kernel waiting for key", waiting)
   expectTrue("I enabled while waiting", IF)
-  expect("slot and SPI IRQs unmasked", irqMask, 9)
+  expect("slot, timer 0 and SPI IRQs unmasked", irqMask, 11)
 
 run testKernelKeybWaits
 
@@ -1318,10 +1327,71 @@ proc testSlotIrqShared() =
 
 run testSlotIrqShared
 
+# DNS messages and a scripted DNS server on host sockets (KRN-004, KRN-014)
+
+proc dnsName(name: string): seq[int] =
+  for part in name.split('.'):
+    result.add(part.len)
+    for c in part: result.add(ord(c))
+  result.add(0)
+
+proc dnsHeader(id, flags, qd, an: int): seq[int] =
+  @[id shr 8, id and 0xff, flags shr 8, flags and 0xff, qd shr 8, qd and 0xff,
+    an shr 8, an and 0xff, 0, 0, 0, 0]
+
+proc dnsRR(name: seq[int]; typ, class, rdata: seq[int]): seq[int] =
+  ## a resource record: name, TYPE, CLASS, TTL 60, RDLENGTH, RDATA
+  result = name & @[0, typ[0]] & @[0, class[0]] & @[0, 0, 0, 60] &
+           @[rdata.len shr 8, rdata.len and 0xff] & rdata
+
+proc dnsQname(q: seq[int]): string =
+  var i = 12
+  while i < q.len and q[i] != 0:
+    if result.len > 0: result.add('.')
+    for j in 1..q[i]: result.add(chr(q[i + j]))
+    i += q[i] + 1
+
+proc dnsAnswerTo(q: seq[int]; rcode = 0; answers: seq[seq[int]] = @[]; idDelta = 0): seq[int] =
+  ## a response to query q: its id (plus idDelta), QR RD RA, its question
+  let id = (((q[0] shl 8) or q[1]) + idDelta) and 0xffff
+  result = dnsHeader(id, 0x8180 or rcode, 1, answers.len) & q[12 .. ^1]
+  for a in answers: result &= a
+
+type DnsBench = ref object
+  sock: Socket
+  port: int
+  queries: seq[seq[int]]
+  script: proc(q: seq[int]; nth: int): seq[seq[int]]
+
+proc newDnsBench(script: proc(q: seq[int]; nth: int): seq[seq[int]]): DnsBench =
+  ## A DNS server on 127.0.0.1 (a free UDP port) that answers each query with
+  ## what the script gives for it (nth: how many before it had its name)
+  result = DnsBench(script: script)
+  result.sock = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+  result.sock.bindAddr(Port(0), "127.0.0.1")
+  result.port = int(result.sock.getLocalAddr()[1])
+  result.sock.getFd.setBlocking(false)
+
+proc service(b: DnsBench) =
+  var readable = @[b.sock.getFd]
+  while selectRead(readable, 0) > 0:
+    var data, address: string
+    var port: Port
+    if b.sock.recvFrom(data, 512, address, port) <= 0: break
+    let q = data.mapIt(ord(it))
+    var nth = 0
+    for old in b.queries:
+      if dnsQname(old) == dnsQname(q): inc nth
+    b.queries.add(q)
+    for r in b.script(q, nth):
+      b.sock.sendTo(address, port, r.mapIt(chr(it)).join)
+    readable = @[b.sock.getFd]
+
 proc testKernelNetwork() =
   ## KRN-004: the kernel's "net" command. "net join SSID PASSWORD" joins
   ## through the Wi-Fi card and prints the address; "net get HOST PORT"
-  ## sends an HTTP/1.0 GET to a server running in this process and prints
+  ## resolves HOST with the kernel's DNS client (a DNS server in this
+  ## process), then sends an HTTP/1.0 GET to a server running here and prints
   ## the reply until the server closes; "net" shows the link; anything else
   ## prints the usage.
   echo "== kernel networking =="
@@ -1341,6 +1411,12 @@ proc testKernelNetwork() =
     ioModel = imLegacy
     return
   server.listen()
+  # net get resolves the name with the kernel's DNS client: this server
+  # answers localhost
+  let dns = newDnsBench(proc(q: seq[int]; nth: int): seq[seq[int]] =
+    if dnsQname(q) == "localhost":
+      @[dnsAnswerTo(q, answers = @[dnsRR(@[0xc0, 12], @[1], @[1], @[127, 0, 0, 1])])]
+    else: @[dnsAnswerTo(q, rcode = 3)])
 
   proc runUntilShown(want: string, limit = 8_000_000): bool =
     var n = 0
@@ -1363,6 +1439,7 @@ proc testKernelNetwork() =
   typeLine("net")
   expectTrue("net shows the link", runUntilShown("link up, address 127.0.0.1", 2_000_000))
   settle()
+  typeLine("net config dns 127.0.0.1 " & $dns.port)
 
   # serve the request while the machine keeps running (never block: the CPU
   # only advances in this loop)
@@ -1382,6 +1459,7 @@ proc testKernelNetwork() =
     if cpuStep() != sOk: break
     inc n
     if (n mod 1000) == 0:
+      dns.service()
       if gpuFind(g, "CUPC8-OK") >= 0 or gpuFind(g, "net timeout") >= 0:
         break
       if not accepted:
@@ -1409,7 +1487,9 @@ proc testKernelNetwork() =
       let line = gpuLine(g, row)
       if line.len > 0: echo "  |" & line
   expectTrue("the reply is printed up to the server closing", gpuFind(g, "CUPC8-OK") >= 0 and gpuFind(g, "HTTP/1.0 200 OK") >= 0)
+  expectTrue("the name was resolved by the kernel's DNS client", dns.queries.len == 1)
   server.close()
+  dns.sock.close()
   ioModel = imLegacy
 
 run testKernelNetwork
@@ -1448,6 +1528,501 @@ proc testKernelNetWeakPower() =
   ioModel = imLegacy
 
 run testKernelNetWeakPower
+
+# ---------------------------------------------------------------------------
+# KRN-014: networking in CUPC/8 assembly (doc/proposals/kernel-api.md,
+# "Networking"): the DNS client (kernel/resolv.s), ping's checksum and reply
+# matching (kernel/ping.s), and the parsing behind "net config" (kernel/net.s)
+# ---------------------------------------------------------------------------
+
+const
+  netEOk = 0
+  netENxdomain = 6
+  netENoAnswer = 7
+  netEMalformed = 8
+  netEBadArg = 9
+  netEDnsErr = 12
+  netNotOurs = 0xff
+
+proc kernelSyms(): Table[string, int] =
+  ## Code labels, data and bss of the kernel just built (kernel/kernel.map).
+  for line in lines(kernelDir / "kernel.map"):
+    let f = line.splitWhitespace
+    if f.len >= 3 and f[0] == "sym": result[f[2]] = parseHexInt(f[1])
+    elif f.len >= 4 and f[0] in ["bss", "data"]: result[f[3]] = parseHexInt(f[1])
+
+proc callKernel(sym: Table[string, int]; name: string; r0 = 0, r1 = 0; maxSteps = 3_000_000): bool =
+  ## Call a kernel routine as the kernel does (push pch, push pcl, b) with a
+  ## HALT to return to; true when it returned with the stack as it was.
+  mem[0x0e00] = 0xf8
+  SP = 0x0100
+  mem[0x0100] = 0x0e
+  mem[0x0101] = 0x00
+  SP = 0x0102
+  PC = sym[name]
+  R0 = r0
+  R1 = r1
+  HF = false
+  var n = 0
+  while n < maxSteps and not HF:
+    if cpuStep() != sOk: break
+    inc n
+  HF and PC == 0x0e01 and SP == 0x0100
+
+proc putBytes(a: int; b: openArray[int]) =
+  for i, v in b: mem[a + i] = v and 0xff
+
+proc putStr(a: int; s: string) =
+  for i, c in s: mem[a + i] = ord(c)
+  mem[a + s.len] = 0
+
+proc cksumRef(b: openArray[int]): int =
+  ## RFC 1071, in Nim
+  var s = 0
+  var i = 0
+  while i < b.len:
+    s += (b[i] shl 8) + (if i + 1 < b.len: b[i + 1] else: 0)
+    i += 2
+  while (s shr 16) != 0: s = (s and 0xffff) + (s shr 16)
+  (not s) and 0xffff
+
+proc testNetRoutines() =
+  ## KRN-014: the kernel's networking routines called one by one on the CPU:
+  ## the Internet checksum against RFC 1071 (lengths odd and even, sums that
+  ## carry many times), the DNS query's bytes, the DNS answer parser
+  ## (compression, a CNAME before the A record, NXDOMAIN, no answer, another
+  ## id, not a response, malformed answers: truncated, a pointer loop, a label
+  ## or RDATA past the end), and the dotted-quad and number parsers.
+  echo "== kernel networking routines =="
+  discard buildKernelRom()
+  let sym = kernelSyms()
+  ioModel = imLegacy
+  cpuReset()
+  cpuLoadFile(kernelDir / "kernel.o")
+  let pkt = sym["net_pkt"]
+
+  # ---- the Internet checksum
+  var seed = 12345
+  proc rnd(): int =
+    seed = (seed * 1103515245 + 12345) and 0x7fffffff
+    (seed shr 16) and 0xff
+  var cases: seq[seq[int]] = @[
+    @[0x00, 0x01, 0xf2, 0x03, 0xf4, 0xf5, 0xf6, 0xf7],   # RFC 1071's example
+    @[0xff], @[0xff, 0xff], newSeqWith(255, 0xff), newSeqWith(254, 0xff),
+    @[], @[0x45, 0x00, 0x00, 0x73, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11, 0, 0,
+           0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7]]
+  for len in [1, 2, 3, 39, 40, 41, 100, 201]:
+    var b: seq[int]
+    for i in 0..<len: b.add(rnd())
+    cases.add(b)
+  var ckBad = 0
+  for b in cases:
+    putBytes(pkt, b)
+    mem[sym["net_ptr"]] = pkt and 0xff
+    mem[sym["net_ptr"] + 1] = pkt shr 8
+    mem[sym["net_count"]] = b.len
+    let ret = callKernel(sym, "net_cksum")
+    let got = (mem[sym["net_ck"]] shl 8) or mem[sym["net_ck"] + 1]
+    if not ret or got != cksumRef(b):
+      inc ckBad
+      echo "  checksum of ", b.len, " bytes: got ", toHex(got, 4), " want ", toHex(cksumRef(b), 4)
+  expectTrue("net_cksum equals RFC 1071 on " & $cases.len & " buffers", ckBad == 0)
+  # a message with its checksum in place sums to 0
+  var echoReq = @[8, 0, 0, 0, 0xc8, 7, 0, 1]
+  for i in 0..31: echoReq.add(64 + i)
+  let ck = cksumRef(echoReq)
+  echoReq[2] = ck shr 8
+  echoReq[3] = ck and 0xff
+  putBytes(pkt, echoReq)
+  mem[sym["net_ptr"]] = pkt and 0xff
+  mem[sym["net_ptr"] + 1] = pkt shr 8
+  mem[sym["net_count"]] = echoReq.len
+  discard callKernel(sym, "net_cksum")
+  expectTrue("net_cksum over a message with its checksum is 0",
+             mem[sym["net_ck"]] == 0 and mem[sym["net_ck"] + 1] == 0)
+
+  # ping_build makes that same echo request (identifier $c8, the run's number,
+  # the sequence, 32 bytes of payload)
+  mem[sym["ping_id"]] = 7
+  mem[sym["ping_seq"]] = 1
+  discard callKernel(sym, "ping_build")
+  var built: seq[int]
+  for i in 0..<40: built.add(mem[pkt + i])
+  expectTrue("ping_build: an echo request with its checksum", built == echoReq)
+
+  # ping_match: only the echo reply to that request, from the host pinged
+  for i in 0..3: mem[sym["ping_ip"] + i] = [10, 0, 2, 2][i]
+  proc match(msg: seq[int]; src = @[10, 0, 2, 2]): int =
+    putBytes(pkt, msg)
+    mem[sym["ping_len"]] = msg.len
+    putBytes(sym["net_buf"], src & @[0, 0, msg.len])
+    if not callKernel(sym, "ping_match"): return -1
+    R0
+  proc reply(id, seq: int; typ = 0; payload = 32): seq[int] =
+    result = @[typ, 0, 0, 0, 0xc8, id, 0, seq]
+    for i in 0..<payload: result.add(64 + i)
+    let c = cksumRef(result)
+    result[2] = c shr 8
+    result[3] = c and 0xff
+  let good = reply(7, 1)
+  var ipHdr = @[0x45, 0, 0, 20 + good.len, 0, 0, 0, 0, 64, 1, 0, 0, 10, 0, 2, 2, 10, 0, 2, 15]
+  expect("ping_match: the echo reply", match(good), 1)
+  expect("ping_match: the echo reply behind an IPv4 header", match(ipHdr & good), 1)
+  expect("ping_match: another identifier", match(reply(8, 1)), 0)
+  expect("ping_match: another sequence", match(reply(7, 2)), 0)
+  expect("ping_match: an echo request, not a reply", match(reply(7, 1, typ = 8)), 0)
+  var badSum = good
+  badSum[20] = badSum[20] xor 1
+  expect("ping_match: a bad checksum", match(badSum), 0)
+  expect("ping_match: from another host", match(good, @[10, 0, 2, 3]), 0)
+  expect("ping_match: shorter than an ICMP header", match(good[0..6]), 0)
+  expect("ping_match: an 8-byte reply (no payload)", match(reply(7, 1, payload = 0)), 1)
+
+  # ---- the DNS query
+  proc build(host: string): (int, seq[int]) =
+    putStr(sym["net_host"], host)
+    discard callKernel(sym, "dns_build")
+    var q: seq[int]
+    for i in 0..<mem[sym["dns_qlen"]]: q.add(mem[sym["dns_q"] + i])
+    (R0, q)
+  let wantQ = @[0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0] & dnsName("www.example.com") & @[0, 1, 0, 1]
+  var (r, q) = build("www.example.com")
+  expectTrue("dns_build: RD, one A question of class IN",
+             r == 0 and q[2 .. ^1] == wantQ[2 .. ^1])
+  (r, q) = build("a.b.")
+  expectTrue("dns_build: a trailing dot ends the name", r == 0 and q[12 .. ^1] == dnsName("a.b") & @[0, 1, 0, 1])
+  for bad in ["", ".a", "a..b", "x".repeat(64) & ".com"]:
+    (r, q) = build(bad)
+    expect("dns_build refuses \"" & bad & "\"", r, netEBadArg)
+  (r, q) = build("x".repeat(63))
+  expectTrue("dns_build takes a 63-character label", r == 0 and q[12] == 63)
+
+  # ---- DNS answers
+  let id = 0x4c31
+  let question = dnsName("www.example.com") & @[0, 1, 0, 1]
+  proc parse(answer: seq[int]; ip: var seq[int]): int =
+    mem[sym["dns_q"]] = id shr 8
+    mem[sym["dns_q"] + 1] = id and 0xff
+    putBytes(pkt, answer)
+    mem[sym["dns_n"]] = answer.len
+    for i in 0..3: mem[sym["net_ip"] + i] = 0
+    if not callKernel(sym, "dns_parse"): return -1
+    ip = @[mem[sym["net_ip"]], mem[sym["net_ip"] + 1], mem[sym["net_ip"] + 2], mem[sym["net_ip"] + 3]]
+    R0
+  var ip: seq[int]
+  let ptrQ = @[0xc0, 12]                  # the question's name
+  let simple = dnsHeader(id, 0x8180, 1, 1) & question & dnsRR(ptrQ, @[1], @[1], @[93, 184, 216, 34])
+  expectTrue("DNS: an A answer named by a pointer to the question",
+             parse(simple, ip) == netEOk and ip == @[93, 184, 216, 34])
+  # a CNAME first (its target partly compressed), then the target's A record
+  # named by a pointer into the CNAME's data (a pointer to a pointer)
+  let cnameAt = 12 + question.len + 12
+  let cname = dnsHeader(id, 0x8180, 1, 2) & question &
+    dnsRR(ptrQ, @[5], @[1], @[4] & "edge".mapIt(ord(it)) & @[0xc0, 16]) &
+    dnsRR(@[0xc0, cnameAt], @[1], @[1], @[10, 0, 2, 99])
+  expectTrue("DNS: CNAME, then its A record (name compression followed)",
+             parse(cname, ip) == netEOk and ip == @[10, 0, 2, 99])
+  let full = dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(dnsName("www.example.com"), @[1], @[1], @[1, 2, 3, 4])
+  expectTrue("DNS: an A answer with its name in full", parse(full, ip) == netEOk and ip == @[1, 2, 3, 4])
+  let aaaaThenA = dnsHeader(id, 0x8180, 1, 2) & question &
+    dnsRR(ptrQ, @[28], @[1], newSeqWith(16, 0x20)) & dnsRR(ptrQ, @[1], @[1], @[5, 6, 7, 8])
+  expectTrue("DNS: an AAAA record is skipped for the A after it", parse(aaaaThenA, ip) == netEOk and ip == @[5, 6, 7, 8])
+  expect("DNS: NXDOMAIN", parse(dnsHeader(id, 0x8183, 1, 0) & question, ip), netENxdomain)
+  expect("DNS: SERVFAIL is a server error", parse(dnsHeader(id, 0x8182, 1, 0) & question, ip), netEDnsErr)
+  expect("DNS: no answer records", parse(dnsHeader(id, 0x8180, 1, 0) & question, ip), netENoAnswer)
+  expect("DNS: only a CNAME, no A", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(ptrQ, @[5], @[1], dnsName("x.org")), ip), netENoAnswer)
+  expect("DNS: an A record of class CHAOS is not taken", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(ptrQ, @[1], @[3], @[1, 1, 1, 1]), ip), netENoAnswer)
+  expect("DNS: another id is not the answer", parse(dnsHeader(id + 1, 0x8180, 1, 1) & question &
+    dnsRR(ptrQ, @[1], @[1], @[6, 6, 6, 6]), ip), netNotOurs)
+  expect("DNS: a query (QR clear) is not the answer", parse(dnsHeader(id, 0x0100, 1, 1) & question &
+    dnsRR(ptrQ, @[1], @[1], @[6, 6, 6, 6]), ip), netNotOurs)
+  expect("DNS: shorter than a header", parse(@[id shr 8, id and 0xff, 0x81, 0x80, 0, 1], ip), netEMalformed)
+  expect("DNS: a pointer loop", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(@[0xc0, 12 + question.len], @[1], @[1], @[6, 6, 6, 6]), ip), netEMalformed)
+  expect("DNS: a pointer past the end", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(@[0xc0, 250], @[1], @[1], @[6, 6, 6, 6]), ip), netEMalformed)
+  expect("DNS: a label past the end", parse(dnsHeader(id, 0x8180, 1, 1) & @[40, 97, 98], ip), netEMalformed)
+  var cut = simple
+  cut.setLen(cut.len - 2)
+  expect("DNS: RDATA past the end", parse(cut, ip), netEMalformed)
+  cut = simple
+  cut.setLen(12 + question.len + 5)
+  expect("DNS: a record cut short", parse(cut, ip), netEMalformed)
+  expect("DNS: a question cut short", parse(dnsHeader(id, 0x8180, 1, 1) & dnsName("www.example.com") & @[0, 1], ip), netEMalformed)
+
+  # ---- dotted quads and numbers (net config, net get, net ping)
+  proc quad(s: string): (int, seq[int]) =
+    putStr(sym["net_wbuf"], s)
+    mem[sym["net_ptr"]] = sym["net_wbuf"] and 0xff
+    mem[sym["net_ptr"] + 1] = sym["net_wbuf"] shr 8
+    discard callKernel(sym, "net_parse_ip")
+    (R0, @[mem[sym["net_ip"]], mem[sym["net_ip"] + 1], mem[sym["net_ip"] + 2], mem[sym["net_ip"] + 3]])
+  expectTrue("net_parse_ip 10.0.2.2", quad("10.0.2.2") == (1, @[10, 0, 2, 2]))
+  expectTrue("net_parse_ip 255.255.255.0", quad("255.255.255.0") == (1, @[255, 255, 255, 0]))
+  var quadBad = 0
+  for s in ["", "1.2.3", "1.2.3.4.5", "256.1.1.1", "1.2.3.260", "1..2.3", "1.2.3.", ".1.2.3",
+            "1.2.3.a", "0001.2.3.4", "example.com", "1.2.3.4 "]:
+    if quad(s)[0] != 0:
+      inc quadBad
+      echo "  net_parse_ip took \"", s, "\""
+  expectTrue("net_parse_ip refuses what is not a dotted quad", quadBad == 0)
+  proc num(s: string): (int, int) =
+    putStr(sym["net_wbuf"], s)
+    mem[sym["net_ptr"]] = sym["net_wbuf"] and 0xff
+    mem[sym["net_ptr"] + 1] = sym["net_wbuf"] shr 8
+    discard callKernel(sym, "net_parse_u16")
+    (R0, mem[sym["net_u16"]] or (mem[sym["net_u16"] + 1] shl 8))
+  expectTrue("net_parse_u16 0, 53, 5353, 65535",
+             num("0") == (1, 0) and num("53") == (1, 53) and num("5353") == (1, 5353) and num("65535") == (1, 65535))
+  expectTrue("net_parse_u16 refuses 65536, 99999, 12a, and nothing",
+             num("65536")[0] == 0 and num("99999")[0] == 0 and num("12a")[0] == 0 and num("")[0] == 0)
+
+run testNetRoutines
+
+proc check(name: string; cond: bool): bool =
+  ## expectTrue, and the result
+  expectTrue(name, cond)
+  cond
+
+proc screenText(g: SimCard): string =
+  for row in 0..29:
+    let line = gpuLine(g, row)
+    if line.len > 0: result.add(line & "\n")
+
+proc netCommand(g: SimCard; b: DnsBench; cmd: string; limit = 30_000_000): string =
+  ## Clear the screen, type cmd, and run (serving DNS) until the kernel waits
+  ## for a key again; the screen
+  typeLine("clr")
+  for ch in cmd:
+    pushKey(ord(ch))
+    settle(400_000)
+    if waiting: discard cpuStep()
+  pushKey(13)
+  var n = 0
+  discard cpuStep()
+  while n < limit:
+    if cpuStep() != sOk: break
+    inc n
+    if (n mod 1000) == 0:
+      if not b.isNil: b.service()
+      if waiting: break
+  screenText(g)
+
+proc testKernelDnsPing() =
+  ## KRN-014: the kernel's DNS client, net lookup, net config and net ping on
+  ## the Wi-Fi card core over host sockets. A DNS server in this process
+  ## answers from a script: an A record behind a compressed name, a CNAME and
+  ## its A (compression through a pointer to a pointer), NXDOMAIN, no answer,
+  ## an answer with another id (ignored) before the right one, only answers
+  ## with another id, no answer at all (a timeout after one retry), one
+  ## answered only the second time, a malformed answer. Ping goes to the
+  ## host's loopback (Linux answers) and to an address nobody answers.
+  echo "== kernel DNS client, net config, ping =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo, CardWifi])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+  let ptrQ = @[0xc0, 12]
+  proc a(ip: seq[int]): seq[int] = dnsRR(ptrQ, @[1], @[1], ip)
+  let bench = newDnsBench(proc(q: seq[int]; nth: int): seq[seq[int]] =
+    case dnsQname(q)
+    of "www.example.com": @[dnsAnswerTo(q, answers = @[a(@[93, 184, 216, 34])])]
+    of "cdn.example.com":
+      # CNAME edge.example.com ("edge" + a pointer into the question), then
+      # the A record named by a pointer to the CNAME's data
+      let at = 12 + (q.len - 12) + 12
+      @[dnsAnswerTo(q, answers = @[dnsRR(ptrQ, @[5], @[1], @[4] & "edge".mapIt(ord(it)) & @[0xc0, 16]),
+                                   dnsRR(@[0xc0, at], @[1], @[1], @[10, 0, 2, 99])])]
+    of "nx.example.com": @[dnsAnswerTo(q, rcode = 3)]
+    of "empty.example.com": @[dnsAnswerTo(q)]
+    of "late.example.com": @[dnsAnswerTo(q, answers = @[a(@[6, 6, 6, 6])], idDelta = 1),
+                             dnsAnswerTo(q, answers = @[a(@[1, 2, 3, 4])])]
+    of "wrongid.example.com": @[dnsAnswerTo(q, answers = @[a(@[6, 6, 6, 6])], idDelta = 0x100)]
+    of "silent.example.com": @[]
+    of "retry.example.com": (if nth == 0: @[] else: @[dnsAnswerTo(q, answers = @[a(@[5, 6, 7, 8])])])
+    of "bad.example.com": @[dnsHeader((q[0] shl 8) or q[1], 0x8180, 1, 1) & @[40, 97, 98]]
+    of "localhost": @[dnsAnswerTo(q, answers = @[a(@[127, 0, 0, 1])])]
+    else: @[dnsAnswerTo(q, rcode = 3)])
+
+  settle(6_000_000)
+  typeLine("net join cupc8 password")
+  settle()
+  var s = netCommand(g, bench, "net config")
+  expectTrue("net config: DHCP, DHCP's DNS server, port 53, not saved",
+             "mode dhcp" in s and "dns from dhcp port 53" in s and "not saved" in s)
+  if "mode dhcp" notin s: echo s
+  s = netCommand(g, bench, "net config dns 127.0.0.1 " & $bench.port)
+  expectTrue("net config dns IP PORT", ("dns 127.0.0.1 port " & $bench.port) in s)
+  if "dns 127.0.0.1" notin s: echo s
+
+  proc lookup(name, want: string; queries = 1) =
+    let before = bench.queries.len
+    let s = netCommand(g, bench, "net lookup " & name)
+    let asked = bench.queries.len - before
+    if not check("net lookup " & name & ": " & want & " (" & $queries & " queries)",
+                      want in s and asked == queries):
+      echo "  queries: ", asked, "\n", s
+  lookup("www.example.com", "www.example.com 93.184.216.34")
+  let q = bench.queries[^1]
+  expectTrue("the query: RD, one question, A, IN, the name in labels",
+             q[2] == 1 and q[3] == 0 and q[4 .. 11] == @[0, 1, 0, 0, 0, 0, 0, 0] and
+             q[12 .. ^1] == dnsName("www.example.com") & @[0, 1, 0, 1])
+  lookup("cdn.example.com", "cdn.example.com 10.0.2.99")
+  lookup("nx.example.com", "name not found")
+  lookup("empty.example.com", "no address for that name")
+  lookup("late.example.com", "late.example.com 1.2.3.4")
+  lookup("wrongid.example.com", "DNS server not answering", 2)
+  lookup("silent.example.com", "DNS server not answering", 2)
+  let ids = bench.queries[^2 .. ^1].mapIt((it[0] shl 8) or it[1])
+  expectTrue("the retry is a new query (another id)", ids[0] != ids[1])
+  lookup("retry.example.com", "retry.example.com 5.6.7.8", 2)
+  lookup("bad.example.com", "bad answer from the DNS server")
+  lookup("10.1.2.3", "10.1.2.3 10.1.2.3", 0)
+  lookup("a..b", "net lookup NAME", 0)
+  expectTrue("the clock is stopped after the lookups (TMR1 masked and off)",
+             (irqMask and 4) == 0 and tmr1 == 0)
+
+  # ping: the host's loopback answers (Linux's ping socket, fw/wifi/host)
+  s = netCommand(g, bench, "net ping 127.0.0.1 3")
+  if not check("net ping 127.0.0.1 3: three replies with their times, the summary",
+                    "ping 127.0.0.1" in s and "seq 1 time " in s and "seq 3 time " in s and
+                    "3 sent, 3 received, " in s and " ms" in s):
+    echo s
+  s = netCommand(g, bench, "net ping localhost 1")
+  expectTrue("net ping NAME resolves it with the DNS client", "ping 127.0.0.1" in s and "1 sent, 1 received" in s)
+  s = netCommand(g, bench, "net ping 192.0.2.1 2")
+  if not check("net ping to an address that never answers: timeouts, then 2 sent, 0 received",
+                    "seq 1 timeout" in s and "seq 2 timeout" in s and "2 sent, 0 received" in s):
+    echo s
+  s = netCommand(g, bench, "net ping nx.example.com")
+  expectTrue("net ping of a name that does not exist", "name not found" in s)
+  expectTrue("the clock is stopped after ping", (irqMask and 4) == 0 and tmr1 == 0)
+
+  # static address, back to DHCP, save
+  s = netCommand(g, bench, "net config ip 10.0.2.50 255.255.255.0 10.0.2.2")
+  expectTrue("net config ip IP MASK GW",
+             "mode static, ip 10.0.2.50 mask 255.255.255.0 gw 10.0.2.2" in s and "not saved" in s)
+  if "mode static" notin s: echo s
+  s = netCommand(g, bench, "net config ip 10.0.2.50 255.255.255.0")
+  expectTrue("net config ip without the gateway prints the usage", "net config [dns IP" in s)
+  s = netCommand(g, bench, "net config dhcp")
+  expectTrue("net config dhcp", "mode dhcp" in s)
+  s = netCommand(g, bench, "net config dns 10.0.2.3")
+  expectTrue("net config dns IP: port 53", "dns 10.0.2.3 port 53" in s)
+  s = netCommand(g, bench, "net config dns 10.0.2.3 70000")
+  expectTrue("net config dns IP PORT refuses a port over 65535", "net config [dns IP" in s)
+  s = netCommand(g, bench, "net config save")
+  expectTrue("net config save", "dns 10.0.2.3 port 53" in s and "\nsaved" in "\n" & s)
+  bench.sock.close()
+  ioModel = imLegacy
+
+run testKernelDnsPing
+
+const apiNetEntries = ["status", "join", "open", "connect", "connect_host", "listen", "send", "recv",
+                       "sock_status", "close", "udp_bind", "sendto", "recvfrom", "events", "resolve", "config"]
+
+proc buildNetExample(name: string; sym: Table[string, int]): string =
+  ## examples/net/NAME.s assembled for $7000, after kernel/api.inc when it
+  ## exists, else after API_NET_* names for the kernel's api_net_* routines
+  let outDir = rootDir / "build" / "examples"
+  createDir(outDir)
+  var head = ""
+  if fileExists(kernelDir / "api.inc"):
+    head = readFile(kernelDir / "api.inc")
+  else:
+    for e in apiNetEntries:
+      head.add("%define API_NET_" & e.toUpperAscii & " $" & toHex(sym["api_net_" & e], 4).toLowerAscii & "\n")
+  let src = outDir / name & ".ss"
+  writeFile(src, head & "\n" & readFile(rootDir / "examples" / "net" / name & ".s"))
+  result = outDir / name & ".bin"
+  let r = execCmdEx("python3 " & quoteShell(asPy) & " " & quoteShell(src) & " " & quoteShell(result) & " 0x7000,0x7400,0x7800")
+  if r.exitCode != 0: raise newException(IOError, "example " & name & ": " & r.output)
+
+proc startProgram(bin: string) =
+  ## the program at $7000, called from where the kernel waits for a key (a
+  ## return lands on a HALT)
+  let code = readFile(bin)
+  for i, c in code: mem[0x7000 + i] = ord(c)
+  mem[0x0e00] = 0xf8
+  mem[SP] = 0x0e
+  mem[SP + 1] = 0x00
+  SP += 2
+  PC = 0x7000
+  waiting = false
+
+proc testNetExamples() =
+  ## KRN-014: the example TCP and UDP echo servers (examples/net), user
+  ## programs at $7000 on the net API, serve clients on this host: two TCP
+  ## clients one after the other, and UDP datagrams from two ports.
+  echo "== example echo servers on the net API =="
+  let rom = buildKernelRom()
+  let sym = kernelSyms()
+  proc boot() =
+    machineCards([CardGpu, CardIo, CardWifi])
+    cpuReset()
+    cpuLoadRom(rom)
+    cpuBootRom()
+    settle(6_000_000)
+    typeLine("net join cupc8 password")
+    settle()
+  proc steps(n: int) =
+    for i in 0..<n:
+      if cpuStep() != sOk: break
+
+  boot()
+  startProgram(buildNetExample("tcpecho", sym))
+  steps(1_000_000)
+  for msg in ["hello cupc8\n", "second client, a longer line of text to echo back\n"]:
+    var c = newSocket()
+    try:
+      c.connect("127.0.0.1", Port(7007))
+    except OSError:
+      fail("tcpecho: no server on 127.0.0.1:7007")
+      break
+    c.send(msg)
+    c.getFd.setBlocking(false)
+    var got = ""
+    var n = 0
+    while n < 400 and got.len < msg.len:
+      steps(10_000)
+      var buf = newString(256)
+      let k = c.getFd.recv(addr buf[0], 256, 0)
+      if k > 0: got.add(buf[0 ..< k])
+      inc n
+    expectTrue("tcpecho: \"" & msg.strip & "\" comes back", got == msg)
+    c.close()
+    steps(500_000)
+  expectTrue("tcpecho: still running (not halted)", not HF)
+
+  boot()
+  startProgram(buildNetExample("udpecho", sym))
+  steps(1_000_000)
+  for msg in ["ping over UDP", "another datagram"]:
+    var u = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+    u.bindAddr(Port(0), "127.0.0.1")
+    u.getFd.setBlocking(false)
+    u.sendTo("127.0.0.1", Port(7007), msg)
+    var got = ""
+    var n = 0
+    while n < 400 and got.len == 0:
+      steps(10_000)
+      var readable = @[u.getFd]
+      if selectRead(readable, 0) > 0:
+        var address: string
+        var port: Port
+        discard u.recvFrom(got, 512, address, port)
+      inc n
+    expectTrue("udpecho: \"" & msg & "\" comes back to its sender", got == msg)
+    u.close()
+  expectTrue("udpecho: still running (not halted)", not HF)
+  ioModel = imLegacy
+
+run testNetExamples
 
 # ---------------------------------------------------------------------------
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
@@ -1857,6 +2432,342 @@ proc testKernelBanks() =
   ioModel = imLegacy
 
 run testKernelBanks
+# ---------------------------------------------------------------------------
+# the kernel API, programs at $7000 (kernel/api.s, sys.s; kernel-api.md)
+# ---------------------------------------------------------------------------
+
+proc kernelMap(): tuple[syms: Table[int, string], lines: seq[string]] =
+  for line in lines(kernelDir / "kernel.map"):
+    result.lines.add(line)
+    let f = line.splitWhitespace()
+    if f.len >= 3 and f[0] == "sym":
+      result.syms[parseHexInt(f[1])] = f[2]
+
+proc incDefines(text: string): seq[(string, int)] =
+  ## the `%define NAME $hex` lines of an api.inc
+  for line in text.splitLines():
+    let f = line.splitWhitespace()
+    if f.len >= 3 and f[0] == "%define" and f[2].startsWith("$"):
+      result.add((f[1], parseHexInt(f[2][1 .. ^1])))
+
+proc defineOf(defs: seq[(string, int)]; name: string): int =
+  result = -1
+  for (n, v) in defs:
+    if n == name: return v
+
+proc testKernelLayout() =
+  ## KRN-010: the kernel's code, data and bss stay in their areas
+  ## (memory-map.md): code $1000-$4fff, data $5000-$5fff, bss $6000-$6eff;
+  ## $6f00 is the API block and $7000- the user program's.
+  echo "== kernel memory layout =="
+  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
+  if assembled.exitCode != 0:
+    fail("kernel assembly failed: " & assembled.output)
+    return
+  var codeEnd, dataEnd, bssEnd = 0
+  var bases = ""
+  for line in kernelMap().lines:
+    let f = line.splitWhitespace()
+    if f.len == 0: continue
+    case f[0]
+    of "base": bases = line
+    of "line": codeEnd = max(codeEnd, parseHexInt(f[1]) + 3)     # an instruction is at most 3 bytes
+    of "data": dataEnd = max(dataEnd, parseHexInt(f[1]) + parseInt(f[2]))
+    of "bss": bssEnd = max(bssEnd, parseHexInt(f[1]) + parseInt(f[2]))
+    else: discard
+  expectTrue("assembled for code $1000, data $5000, bss $6000 (" & bases & ")",
+             bases == "base 0x1000 data 0x5000 bss 0x6000")
+  expectTrue("code ends by $4fff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x5000)
+  expectTrue("data ends by $5fff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6000)
+  expectTrue("bss ends by $6eff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0x6f00)
+
+run testKernelLayout
+
+proc testKernelApi() =
+  ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 16 entries
+  ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
+  ## goes to api_<name> (or api_none, a stub for now); every other to
+  ## api_none. Entries are only added: every committed api.inc's entries are
+  ## still there at the same addresses.
+  echo "== kernel API table =="
+  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
+  if assembled.exitCode != 0:
+    fail("kernel assembly failed: " & assembled.output)
+    return
+  let image = readFile(kernelDir / "kernel.o")
+  let syms = kernelMap().syms
+  let defs = incDefines(readFile(kernelDir / "api.inc"))
+  var named = initTable[int, string]()
+  for (name, value) in defs:
+    if value >= 0x1003 and value < 0x1183:
+      if (value - 0x1003) mod 3 != 0:
+        fail(name & " $" & toHex(value, 4) & " is not an entry's address")
+      elif named.hasKey(value):
+        fail(name & " and " & named[value] & " share $" & toHex(value, 4))
+      else:
+        named[value] = name
+  var bad: seq[string]
+  var stubs: seq[string]
+  for g in 0..7:
+    for n in 0..15:
+      let a = 0x1003 + 48 * g + 3 * n
+      let o = a - 0x1000
+      if image[o].ord != 0xb0:
+        bad.add("$" & toHex(a, 4) & " is not a B")
+        continue
+      let target = image[o + 1].ord or (image[o + 2].ord shl 8)
+      let sym = syms.getOrDefault(target, "$" & toHex(target, 4))
+      if named.hasKey(a):
+        let want = "api_" & named[a][4 .. ^1].toLowerAscii
+        if sym == "api_none":
+          stubs.add(named[a])
+        elif sym != want:
+          bad.add(named[a] & " ($" & toHex(a, 4) & ") goes to " & sym & ", not " & want)
+      elif sym != "api_none":
+        bad.add("$" & toHex(a, 4) & " goes to " & sym & " but api.inc names no entry there")
+  for b in bad: echo "  ", b
+  expectTrue("the table matches api.inc (" & $named.len & " entries named)", bad.len == 0)
+  if stubs.len > 0: echo "  stubs (api_none for now): ", stubs.join(" ")
+  expectTrue("the table ends at $1182: api_none follows it",
+             syms.getOrDefault(0x1183, "") == "api_none")
+  # the API block's addresses: the kernel's (api.s) and the programs' (api.inc)
+  for (name, value) in incDefines(readFile(kernelDir / "api.s")):
+    expect(name & " in api.inc as in api.s", defineOf(defs, name), value, 4)
+  # only added, never moved: every committed api.inc against this one
+  let log = execCmdEx("git log --format=%H -- kernel/api.inc", workingDir = rootDir)
+  var versions = 0
+  var moved: seq[string]
+  for commit in log.output.splitLines():
+    if commit.len != 40: continue
+    let old = execCmdEx("git show " & commit & ":kernel/api.inc", workingDir = rootDir)
+    if old.exitCode != 0: continue
+    inc versions
+    for (name, value) in incDefines(old.output):
+      let now = defineOf(defs, name)
+      if now != value:
+        moved.add(name & " was $" & toHex(value, 4) & " in " & commit[0 .. 6] & ", now " &
+                  (if now < 0: "gone" else: "$" & toHex(now, 4)))
+  for m in moved: echo "  ", m
+  expectTrue("no entry of " & $versions & " committed api.inc versions moved or went", moved.len == 0)
+
+run testKernelApi
+
+proc mkprg(src, dest: string) =
+  let r = execCmdEx("python3 " & quoteShell(toolsDir / "mkprg.py") & " " & quoteShell(src) &
+                    " -o " & quoteShell(dest))
+  if r.exitCode != 0:
+    raise newException(IOError, "mkprg " & src & ": " & r.output)
+
+proc runUntil(cond: proc (): bool; limit: int): bool =
+  var n = 0
+  while n < limit:
+    if cond(): return true
+    if cpuStep() != sOk: break
+    inc n
+  cond()
+
+proc testApiProgram() =
+  ## KRN-011: a program at $7000 (tools/testdata/api_prog.s) calling entries
+  ## of every API group, started the way `cupc8.py run` does (the body at
+  ## $7000, then API_RUN = 1, which the terminal takes while it waits for a
+  ## key), on HDMI with the storage card; it returns to the terminal, whose
+  ## stack is as before. Then one that calls API_EXIT with bytes still on
+  ## the stack.
+  echo "== kernel API: a program calling every group =="
+  let rom = buildKernelRom()
+  createDir(storeDir)
+  let img = storeDir / "api.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  let prg = testdata / "api_prog.prg"
+  mkprg(testdata / "api_prog.s", prg)
+  bootStorage(rom, img)
+  expectTrue("the terminal waits for a key", waiting)
+  let sp0 = SP
+  expect("API_RUN is 0 after power-up", mem[ApiRun], 0)
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("the program ran to its end",
+             runUntil(proc (): bool = mem[0x7e3f] == 0xa5, 30_000_000))
+  expect("API_RUN 2 while it ran", mem[0x7e30], 2)
+  settle(2_000_000)
+  expect("API_RUN 0 again at the prompt", mem[ApiRun], 0)
+  let g = gpuCard()
+  expectTrue("back at the prompt", waiting and gpuFind(g, ">>") >= 0)
+  expect("the terminal's stack as before", SP, sp0, 4)
+  # group 0
+  expect("API_VERSION", mem[0x7e00], 1)
+  expect("API_BLOCK low", mem[0x7e01], 0x00)
+  expect("API_BLOCK high", mem[0x7e02], 0x6f)
+  expect("API_SLOTS low", mem[0x7e03], 0x02)
+  expect("API_SLOTS high", mem[0x7e04], 0x00)
+  # group 1
+  expectTrue("API_PUTS and API_PUTC (" & gpuLine(g, 0) & ")", gpuLine(g, 0).startsWith("API HELLO!"))
+  let x = int(simcard_gpu_cell(g, 10, 20))
+  expect("API_GOTOXY then API_PUTC: X at 10,20", x and 0xff, ord('X'))
+  expect("API_ATTR: its attribute", (x shr 8) and 0xff, 0x1e)
+  expect("API_GETXY ok", mem[0x7e05], 0)
+  expect("API_GETXY column", mem[0x7e06], 11)
+  expect("API_GETXY row", mem[0x7e07], 20)
+  expect("API_POLLKEY with no key", mem[0x7e08], 0xff)
+  let p = int(simcard_gpu_cell(g, 0, 29))
+  expectTrue("API_POKE: P at 0,29 in $4e", (p and 0xff) == ord('P') and ((p shr 8) and 0xff) == 0x4e)
+  # group 2
+  expect("API_GFX_GETPIXEL ok", mem[0x7e09], 0)
+  expect("API_GFX_PIXEL then GETPIXEL", mem[0x7e0a], 42)
+  expect("API_GFX_FILL_RECT then GETPIXEL", mem[0x7e0b], 7)
+  expect("API_GFX_VSYNC ok", mem[0x7e0c], 0)
+  # group 3, on HDMI: nothing, $ff
+  expect("API_EINK_GET on HDMI", mem[0x7e0d], 0xff)
+  expect("API_EINK_GET leaves $ff (first)", mem[0x7e0e], 0xff)
+  expect("API_EINK_GET leaves $ff (last)", mem[0x7e0f], 0xff)
+  expect("API_EINK_STATUS on HDMI", mem[0x7e10], 0xff)
+  expect("API_EINK_STATUS leaves $ff", mem[0x7e11], 0xff)
+  expect("API_EINK_AUTO on HDMI", mem[0x7e12], 0xff)
+  # group 4
+  expect("API_ST_INFO", mem[0x7e13], 0)
+  expect("API_ST_INFO media: SD", mem[0x7e14], 1)
+  expect("API_ST_OPEN to write", mem[0x7e15], 0)
+  expect("API_ST_WRITE", mem[0x7e16], 0)
+  expect("API_ST_CLOSE", mem[0x7e17], 0)
+  expect("API_ST_OPEN to read", mem[0x7e18], 0)
+  expect("API_ST_SEEK", mem[0x7e19], 0)
+  expect("API_ST_READ", mem[0x7e1a], 0)
+  expect("API_ST_READ read the 4 bytes after the seek", mem[0x7e1b], 4)
+  var got = ""
+  for i in 0..3: got.add(char(mem[0x7e40 + i]))
+  expectTrue("API_ST_READ data: ello (" & got & ")", got == "ello")
+  expect("API_ST_RENAME", mem[0x7e1c], 0)
+  expect("API_ST_DIR_FIRST", mem[0x7e1d], 0)
+  expect("API_ST_DIR_FIRST size", mem[0x7e1e], 5)
+  expect("API_ST_DIR_FIRST name length", mem[0x7e1f], 8)
+  expect("API_ST_DIR_FIRST the renamed name", mem[0x7e20], ord('2'))
+  expect("API_ST_DIR_NEXT: no more", mem[0x7e21], 0xff)
+  expect("API_ST_DELETE", mem[0x7e22], 0)
+  expect("API_ST_OPEN a deleted file: not found", mem[0x7e23], 3)
+  r = fatcheck("check " & quoteShell(img) & " --absent API.TXT --absent API2.TXT")
+  if r.exitCode != 0: echo r.output
+  expectTrue("the card as a PC sees it: nothing left", r.exitCode == 0)
+  # groups 5 and 7: not there yet
+  expect("an empty net entry: $ff", mem[0x7e24], 0xff)
+  expect("... and API_ERR $ff", mem[0x7e25], 0xff)
+  expect("an empty reserved entry: $ff", mem[0x7e27], 0xff)
+  # group 6
+  expect("API_WAIT_MS", mem[0x7e26], 0)
+  let t0 = mem[0x7e28] or (mem[0x7e29] shl 8)
+  let t1 = mem[0x7e2c] or (mem[0x7e2d] shl 8)
+  expectTrue("API_TICKS counts the 20 ms API_WAIT_MS waited (" & $t0 & " to " & $t1 & ")",
+             t1 - t0 >= 18 and t1 - t0 <= 30)
+
+  echo "== kernel API: API_EXIT =="
+  let ex = testdata / "api_exit.prg"
+  mkprg(testdata / "api_exit.s", ex)
+  expectTrue("the program goes in", runProgram(readFile(ex)))
+  expectTrue("it ran", runUntil(proc (): bool = mem[0x7e00] == 0x5a and mem[ApiRun] == 0, 2_000_000))
+  settle(2_000_000)
+  expect("API_EXIT does not return", mem[0x7e00], 0x5a)
+  expectTrue("back at the prompt", waiting)
+  expect("the terminal's stack as before, 6 bytes left behind", SP, sp0, 4)
+  expectTrue("the terminal still works", cmdOutput("10 print 7*6").len == 0 and runOutput() == @["42"])
+  expectTrue("a bad header is refused", not runProgram("C8P\x02" & "junk"))
+  ioModel = imLegacy
+
+run testApiProgram
+
+proc testExec() =
+  ## KRN-012: `exec "NAME"` from the storage card: a program file (the "C8P"
+  ## header, version 1) loaded at $7000 over several chunks and run; one
+  ## that fills $7000-$dfff exactly; any other file as BASIC (LOAD, RUN); a
+  ## bad header version, a header cut short and one too big are refused
+  ## with a message and nothing runs; a missing file; no name.
+  echo "== exec from the storage card =="
+  let rom = buildKernelRom()
+  createDir(storeDir)
+  let img = storeDir / "exec.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  let prg = storeDir / "exec.prg"
+  mkprg(testdata / "exec_prog.s", prg)
+  let file = readFile(prg)
+  let body = file[4 .. ^1]
+  var full = body
+  while full.len < 0x7000 - 1: full.add('\0')
+  full.add('\x5a')                              # the last byte, at $dfff
+  proc put(name, data: string) =
+    writeFile(storeDir / "put.bin", data)
+    let r = fatcheck("put " & quoteShell(img) & " " & name & " " & quoteShell(storeDir / "put.bin"))
+    if r.exitCode != 0: fail("fatcheck put " & name & ": " & r.output)
+  put("PROG.PRG", file)
+  put("FULL.PRG", "C8P\x01" & full)
+  put("BIG.PRG", "C8P\x01" & full & "x")
+  put("BADVER.PRG", "C8P\x02" & body)
+  put("CUT.PRG", "C8P")
+  put("BAS", "10 print 6*7\r\n20 print \"BASIC OK\"\r\n")
+  bootStorage(rom, img)
+  let sp0 = SP
+  expectTrue("exec a program", cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"])
+  var same = true
+  for i in 0 ..< body.len:
+    if mem[0x7000 + i] != body[i].ord: same = false
+  expectTrue("its " & $body.len & " bytes at $7000 (three chunks)", same)
+  expect("the terminal's stack as before", SP, sp0, 4)
+  mem[0xdfff] = 0
+  expectTrue("exec one that fills $7000-$dfff", cmdOutput("exec full.prg") == @["NATIVE OK"])
+  expect("its last byte at $dfff", mem[0xdfff], 0x5a)
+  let bas = cmdOutput("exec \"bas\"", "DONE.")
+  expectTrue("exec a BASIC program (" & $bas & ")", bas == @["42", "BASIC OK"])
+  for i in 0x7000 .. 0x7010: mem[i] = 0          # anything run from here now would not print
+  expectTrue("a bad header version is refused",
+             cmdOutput("exec \"badver.prg\"") == @["bad program header"])
+  expectTrue("a header cut short is refused", cmdOutput("exec \"cut.prg\"") == @["bad program header"])
+  expectTrue("one byte too big is refused", cmdOutput("exec \"big.prg\"") == @["program too big"])
+  expectTrue("a missing file", cmdOutput("exec \"nothing\"") == @["file not found"])
+  expectTrue("no name", cmdOutput("exec") == @["EXEC \"NAME\""])
+  expect("the terminal's stack as before, after all that", SP, sp0, 4)
+  let help = cmdOutput("help")
+  expectTrue("help lists exec", help.len > 0 and help[0].endsWith("EXEC"))
+  bootStorage(rom, "", fitted = false)
+  expectTrue("no storage card", cmdOutput("exec \"prog.prg\"") == @["no storage card"])
+  ioModel = imLegacy
+
+run testExec
+
+proc testEinkApi() =
+  ## KRN-013: the e-ink API entries (kernel/eink.s eink_auto, eink_get,
+  ## eink_status) on the simulator's e-ink card (fw/eink/core, AUTO_EXT and
+  ## AUTO_GET): tools/testdata/eink_prog.s sets on 1, idle10 5, full_after 2,
+  ## cap10 50, full_kind 3, sleep_s 3 and reads them back; on HDMI the same
+  ## calls give $ff and leave $ff.
+  echo "== kernel API: the e-ink entries =="
+  let rom = buildKernelRom()
+  let prg = testdata / "eink_prog.prg"
+  mkprg(testdata / "eink_prog.s", prg)
+  for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
+    machineCards([card, CardIo])
+    cpuReset()
+    cpuLoadRom(rom)
+    cpuBootRom()
+    settle(6_000_000)
+    for a in 0x7e00 .. 0x7e0b: mem[a] = 0x55
+    expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
+    expectTrue(name & ": it ran", runUntil(proc (): bool = mem[ApiRun] == 0, 20_000_000))
+    var got: seq[int]
+    for a in 0x7e00 .. 0x7e0b: got.add(mem[a])
+    let want = if card == CardGpu: @[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+               else: @[0, 0, 1, 5, 2, 50, 3, 3, 0, got[9], got[10], got[11]]
+    expectTrue(name & ": AUTO, GET (the settings back), STATUS: " & $got, got == want)
+    let g = gpuCard()
+    let shown = if card == CardGpu: "GET FF FF FF FF FF FF FF" else: "GET 00 01 05 02 32 03 03"
+    settle(2_000_000)
+    expectTrue(name & ": printed " & shown, gpuFind(g, shown) >= 0)
+    if card != CardGpu:
+      expect(name & ": the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
+  ioModel = imLegacy
+
+run testEinkApi
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

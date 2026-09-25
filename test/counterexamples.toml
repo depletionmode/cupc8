@@ -520,3 +520,87 @@ revert = [["fw/gpu/core/gpu.c", """		if (g->cx > 0) {
 cmd = "make -s -C fw test_gpu"
 must_fail = ["BS at column 0"]
 
+name = "sim: an IRQ taken between POP pcl and POP pch lost the return (the kernel's timer tick crashed it at boot)"
+fixed_in = "51c8e35"
+revert = [["tools/sim.nim", """  if lastOp == 0x9f:
+    return
+""", ""]]
+cmd = "tools/run_tests.sh testIrqPopPcl testKernelOnCards"
+must_fail = ["FAIL: the call returned where it should", "FAIL: BASIC banner on screen"]
+
+[[bug]]
+name = "cpu: an IRQ taken between POP pcl and POP pch lost the return"
+fixed_in = "51c8e35"
+revert = [["soc/cpu.vhd", """if iflag = '1' and irq /= "0000" and ir /= x"9f" then""", """if iflag = '1' and irq /= "0000" then"""]]
+cmd = "python3 tools/cpudirected.py CPU-005"
+must_fail = ["an IRQ due at POP pcl pushed"]
+
+[[bug]]
+name = "emu/machine: a card's CS_n set high again on every sync latched a rising edge each time; slotspi restarted mid-frame and exec's chunk reads went unanswered"
+fixed_in = "08496f0"
+# timing-bound, as the slotspi entry above: it shows with exec's chunk loop
+# of 6c88ad2's kernel; if a later layout hides it, this entry says so
+revert = [["emu/machine/machine.cpp", """  if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
+  if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
+  if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);""", """  g[P::MOSI].setInputValue(!!mosi);
+  g[P::SCK].setInputValue(!!sck);
+  g[P::NCS].setInputValue(!selected);"""]]
+cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-011"
+must_fail = ["FAIL exec a program file: it prints NATIVE OK"]
+
+[[bug]]
+name = "kernel net: the clock's tick IRQ, taken between pop pcl and pop pch, returned with its own pop pcl (the CPU does not save the pcl latch), so the interrupted return jumped elsewhere (a DNS answer read half from a dropped frame)"
+fixed_in = "c5b0012"
+revert = [["kernel/ping.s", """	pop r0				; the flags
+	st [net_irq_f], r0
+	pop r0				; the return address, low
+	st [net_irq_a], r0
+	pop r0				; and high
+	st [net_irq_a+1], r0
+	ldd r0, [net_irq_a]
+	eq r0, #0x9e
+	bzf .in_return
+	ld r0, [net_irq_a+1]
+	push r0
+	ld r0, [net_irq_a]
+	push r0
+	ld r0, [net_irq_f]
+	push r0
+	ld r0, [net_irq_r0]
+	pop f
+	pop pcl
+	pop pch
+.in_return:
+	ld r0, [net_irq_f]
+	push r0
+	ld r0, [net_irq_r0]
+	pop f
+	pop pch
+""", """	ld r0, [net_irq_r0]
+	pop f
+	pop pcl
+	pop pch
+"""]]
+cmd = "tools/run_tests.sh testKernelDnsPing"
+must_fail = ["FAIL: net lookup www.example.com"]
+
+[[bug]]
+name = "kernel net: net config ip counted its words in net_pn, which net_parse_ip uses too"
+fixed_in = "c5b0012"
+revert = [["kernel/net.s", """	ld r0, [net_wi]
+	push pch
+	push pcl
+	b net_word_ip""", """	ld r0, [net_pn]
+	push pch
+	push pcl
+	b net_word_ip"""], ["kernel/net.s", "\tld r0, [net_wi]\t\t; net_cfg + 4", "\tld r0, [net_pn]\t\t; net_cfg + 4"], ["kernel/net.s", "\tld r0, [net_wi]\n\tadd r0, #1\n\tst [net_wi], r0", "\tld r0, [net_pn]\n\tadd r0, #1\n\tst [net_pn], r0"]]
+cmd = "tools/run_tests.sh testKernelDnsPing"
+must_fail = ["FAIL: net config ip IP MASK GW"]
+
+[[bug]]
+name = "assembler: any line with a lower-case \"db\" (or \"resb\") in it was taken for data (a %define of $10db, an address, a comment)"
+fixed_in = "HEAD"
+revert = [["tools/as.py", """            if directive == 'resb':""", """            if l.find('resb') > -1:"""],
+          ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
+cmd = "python3 test/asm/test_asm.py"
+must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'", "FAIL 'mov r0, #1"]

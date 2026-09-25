@@ -35,8 +35,13 @@ The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1
 Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen), `refresh` (on the e-ink card, a clean full refresh of the panel, which clears the faint ghosts partial refreshes leave; on HDMI it does nothing) and `net`, for the Wi-Fi card:
 
 - `net join SSID PASSWORD` joins that network, keeps the credentials on the card (it joins them again at power-up) and prints the address it was given.
-- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. A name that doesn't resolve or a refused connection prints `connect failed`.
+- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. HOST is a name, looked up by the kernel's own DNS client, or a dotted address used as it is. A refused connection prints `connect failed`.
+- `net lookup NAME` prints the address the DNS client finds for NAME. It asks the DNS server `net config` names (or the one DHCP gave), waits about a second, asks once more, and takes the first A record of the answer. It says `name not found` (the server has no such name), `no address for that name` (the name exists, with no IPv4 address), `DNS server not answering`, `DNS server error`, `bad answer from the DNS server` or `no DNS server`.
+- `net ping HOST [COUNT]` sends COUNT (4 unless given, up to 255) ICMP echo requests to HOST (a name or an address), one after the other, and prints each reply's round-trip time in milliseconds (`seq 1 time 3 ms`), or `seq 2 timeout` when none comes within about a second, then `4 sent, 3 received, 2-5 ms` (the shortest and longest).
+- `net config` shows the card's settings: `mode dhcp` or `mode static` with its address, mask and gateway; the DNS server (`from dhcp`, or an address) and its port; whether they are saved on the card. `net config dns IP [PORT]` sets the DNS server (port 53 unless given), `net config ip IP MASK GW` a static address, `net config dhcp` goes back to DHCP, and `net config save` keeps the settings on the card, applied at power-up (until then they last until the card is powered off).
 - `net` on its own shows whether the link is up, and the address.
+
+The times come from a clock the kernel runs only while it waits for the network: timer 1 counting instructions, so a millisecond is about a thousand instructions and the times are approximate.
 
 `net` refuses to start the radio on a USB source under 3 A (see the power budget).
 
@@ -46,6 +51,7 @@ Files, on the storage card's microSD card (`doc/hardware/storage-card.md`). A ca
 - `load "NAME"` clears the program (`new`), then takes the file's lines as if they were typed: a line that does not start with a line number (a blank line, say) is skipped, and a line longer than 78 characters is cut. A line that does not fit stops the load with `PROGRAM FULL`.
 - `dir` lists every file with its size in bytes.
 - `del "NAME"` deletes a file.
+- `exec "NAME"` runs a file: a program for $7000 (it starts with the header `C8P` and version 1; `tools/mkprg.py` makes one, and it calls the kernel through `kernel/api.inc`), which comes back to the prompt when it returns or calls `API_EXIT`, or else a BASIC program, which it loads and runs. `cupc8.py run PROG` does the same from the PC through the system card.
 
 They print `SAVED` or `LOADED` when done, or what went wrong: `no SD card`, `no storage card` (none fitted), `file not found`, `card full`, `write protected`, `bad file name` (not 8.3), `no file system on the card` (not formatted) or `card error`. On a USB source under 3 A, `save` and `del` print `USB power under 3A: SD writes off` and leave the card as it was; `load` and `dir` still work.
 
@@ -99,6 +105,8 @@ Return is the same as a call return plus one extra pop for the flags:
 	pop f
 	pop pcl
 	pop pch
+
+An IRQ is never taken right after *POP pcl*: it and the *POP pch* after it are one return. (Taken between them, the IRQ's frame would go over the byte just popped, and its handler's own *POP pcl* would replace **pcl**, so the return would go astray.)
 
 *POP f* restores **I**, so an IRQ still pending is taken right after it, inside the epilogue and before the return. This nests correctly: the new handler pushes the address of the *POP pcl* (three more stack bytes), and its own return lands back in the epilogue, which then completes. Interrupts can therefore nest one level per pending source; leave room on the stack for it.
 

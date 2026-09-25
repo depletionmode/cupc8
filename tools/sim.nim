@@ -74,6 +74,7 @@ var
   IF*: bool = false
   waiting*: bool = false
   pcl*: int = 0
+  lastOp: int = 0                # the opcode of the instruction that retired last
   mem*: array[0..0x10000, int]
   imageEnd*: int = 0
   irqPending*: int = 0
@@ -731,12 +732,18 @@ proc tickTimers() =
 proc serviceIrq() =
   if not IF:
     return
+  # POP pcl and the POP pch after it are one return: an IRQ taken between
+  # them would push over the popped byte and its handler's own POP pcl would
+  # replace the pcl register, so the return would go astray (cpu.vhd)
+  if lastOp == 0x9f:
+    return
   let n = irqReady()
   if n >= 0:
     takeIrq(n)
 
 proc decode() =
   var op = fetch()
+  lastOp = op
   var ins = op and 0xf8
   var r = op and 7
   case ins:
@@ -780,6 +787,7 @@ proc cpuReset*() =
   IF = false
   waiting = false
   pcl = 0
+  lastOp = 0
   imageEnd = 0
   ins_retired = 0
   last_gpo = ""
@@ -837,6 +845,28 @@ proc cpuBootRom*() =
 
 proc cpuLoadFile*(path: string) =
   cpuLoadImage(readFile(path))
+
+const
+  ProgramBase* = 0x7000          ## user programs (memory-map.md)
+  ProgramEnd* = 0xe000
+  ApiRun* = 0x6f21               ## the API block's API_RUN mailbox (kernel/api.s)
+
+proc runProgram*(data: string): bool =
+  ## What `cupc8.py run` does through the system card: the program's body at
+  ## $7000, then API_RUN = 1; the kernel's terminal starts it while it waits
+  ## for a key. A file with the "C8P" header must be version 1; a file
+  ## without one is the body itself. False (nothing written) otherwise.
+  var body = data
+  if body.len >= 3 and body[0 .. 2] == "C8P":
+    if body.len < 4 or body[3] != '\x01':
+      return false
+    body = body[4 .. ^1]
+  if body.len > ProgramEnd - ProgramBase:
+    return false
+  for i, c in body:
+    mem[ProgramBase + i] = ord(c)
+  mem[ApiRun] = 1
+  true
 
 proc cpuStep*(): StepResult =
   ## Fetch/decode/execute one instruction and report why execution stopped.
