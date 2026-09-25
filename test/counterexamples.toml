@@ -486,3 +486,12 @@ revert = [
 ]
 cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
 must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
+
+[[bug]]
+name = "sim: headless --type hung when no card took the key (no IO card)"
+fixed_in = "000d63c"
+revert = [["tools/sim.nim", """        if not ranSinceKey and ins_retired - keyAt >= settleMs * 1000:
+          ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
+""", ""]]
+cmd = "python3 test/sim/test_cli.py"
+must_fail = ["FAIL: --type with no IO card: headless still exits"]
