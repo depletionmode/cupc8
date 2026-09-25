@@ -3,6 +3,12 @@
 The RP2040 on the removable **system card** ([system-slot.md](system-slot.md)),
 with its own USB port. The host side is `tools/cupc8.py`.
 
+The card runs from the slot's +3V3 and only listens on USB while the host's
+VBUS is there (GPIO29, USB_nVBUS, low): until then the USB controller is off
+and D+ is not pulled up, and it lets go of D+ whenever VBUS goes. GPIO0/1
+light its TX and RX LEDs for ~30 ms after USB data out and in. It has no
+debug UART; its USB link and SWD test pads are the ways in.
+
 The machine does not need it to run. Each FPGA boots from its own flash, and
 the main board has its own clock, reset supervisor and USB-C power sensing.
 sysctl programs, resets and debugs: nothing more. At start-up it touches
