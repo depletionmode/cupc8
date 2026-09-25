@@ -38,6 +38,15 @@ slice and written to the socket at its end; input from the socket is queued
 between slices, as in machine.mjs (where both only move when the event loop
 turns). `-DMACHINE_LTO=ON`: see Speed.
 
+The system card is a composite USB device with two CDC ports (`sysctl.md`);
+the host side is `rp2040js::CdcHost` (`emu/rp2040/src/usb/cdchost.cpp`, the
+port of `test/emu/cdchost.mjs`). Port 0 is the TCP port above; port 1, the
+USB console (`../../doc/proposals/usb-console.md`), is `m.console` in
+machinenative.mjs: `open()`/`close()` set and clear DTR on it (between
+runs), `write()` queues bytes, `read()` returns what arrived, `listen(port)`
+serves it on TCP (a connection opens it). The addon's `cdcWrite`/`cdcRead`
+take the port as their last argument, and `consoleOpen(h, on)` sets DTR.
+
 ## The loop
 
 `Machine::iterate()` is machine.mjs's `runFor` loop body, statement for

@@ -23,7 +23,11 @@ Display is piped over the SPI bus. Theoretically any display that works over SPI
 The M1 machine's console is its graphics card, one of two (a machine has one or the other): the **HDMI card**, 80 x 30 text or 320 x 240 graphics in 256 colours on a monitor (`doc/hardware/gpu-protocol.md`), or the **e-ink card**, the same text and graphics on an e-paper panel on the card's cable, a 5.83" 648 x 480 panel (or a 7.5" 800 x 480), plus the panel's own resolution in 4 greys (`doc/hardware/eink-card.md`). On e-paper the text is black on white (each cell's brighter colour is the ink), the cursor does not blink, and the card refreshes the panel by itself: a line typed reaches the panel about half a second later, and continuous output updates it about once a second. The kernel asks the card which it is and drives either.
 
 #### 2.4. Input
-*[TODO]*
+Keys come from a USB keyboard on the IO card (`doc/hardware/io-card.md`).
+
+**The USB console.** With the system card fitted, its USB port is also a terminal for the machine: a PC sees two serial ports (Linux: `/dev/ttyACM0`, the programming port `cupc8.py` uses, and `/dev/ttyACM1`, the console). Open the console with `cupc8.py console`, or any terminal program (`picocom /dev/ttyACM1`, PuTTY; the baud rate does not matter), and everything the terminal prints appears there as well as on the screen, and what you type there is typed into the machine, as on its own keyboard. A BASIC program can be pasted in. Enter is CR (a pasted LF works too), Backspace or DEL takes a character back.
+
+The kernel keeps two small rings in the API block for this (`doc/hardware/memory-map.md`), and the system card moves them to and from the PC every 2 ms, but only while a PC has the console open. Then the terminal waits for the PC when it prints faster than the PC reads; with the console closed, or no system card, nothing waits and the machine runs as without it. A program can see whether a PC is listening: bit 0 of `CON_FLAGS` ($6f26).
 
 #### 2.5. Software Stack
 The software stack consists of a monolithic kernel which provides drivers for the SPI peripherals and filesystem, handles interrupts, etc. It also provides a limited set of fixed-vector 'libc-like' functions and graphic routines that can be used by applications. There is no separation between kernel- and user-space (it's more of a convention) and any application has full access to the entire memory space at any time. Ideally applications would take care not to overwrite kernel regions but there is nothing stopping them from doing so.

@@ -180,22 +180,32 @@ uint32_t EspCard::miso() { return selected ? (bit < bits.size() ? bits[bit] : 0)
 
 static constexpr int BR_NCS = 5, SYS_NRST = 23, CHIPSET_CDONE = 7, CPUCARD_CDONE = 17;
 
-SysctlCard::SysctlCard(const std::string &elf) : e(elf, 125), cdc(e.mcu->usbCtrl) {
+SysctlCard::SysctlCard(const std::string &elf) : e(elf, 125), cdc(e.mcu->usbCtrl, 2) {
   auto &g = e.mcu->gpio;
   g[CHIPSET_CDONE].setInputValue(true);  // both FPGAs configured
   g[CPUCARD_CDONE].setInputValue(true);
   g[8].setInputValue(true);
   e.mcu->spi[0].onTransmit = [this](uint32_t b) { pending = Pending{b, 0, 0, 0}; };
-  cdc.onSerialData = [this](const std::vector<uint8_t> &buf) {
-    fromCard.insert(fromCard.end(), buf.begin(), buf.end());
-  };
+  for (size_t p = 0; p < 2; p++) {
+    cdc.ports[p].onSerialData = [this, p](const std::vector<uint8_t> &buf) {
+      fromCard[p].insert(fromCard[p].end(), buf.begin(), buf.end());
+    };
+  }
 }
 
 void SysctlCard::feed() {
-  while (!toCard.empty() && cdc.txFIFO.itemCount() < 256) {
-    cdc.sendSerialByte(toCard.front());
-    toCard.pop_front();
+  for (size_t p = 0; p < 2; p++) {
+    while (!toCard[p].empty() && cdc.ports[p].txFIFO.itemCount() < 256) {
+      cdc.sendSerialByte(toCard[p].front(), p);
+      toCard[p].pop_front();
+    }
   }
+}
+
+void SysctlCard::openConsole(bool on) {
+  if (on == consoleOpen) return;
+  consoleOpen = on;
+  cdc.open(CONSOLE, on);
 }
 
 // the bridge pins, as they are this clock (called once per core clock while busy)

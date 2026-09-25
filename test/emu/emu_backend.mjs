@@ -3,7 +3,7 @@
 // CUPC8_EMU=native, the cycle-identical C++ port (rp2040native.mjs, needs
 // build/emu-native/rp2040emu.node). Both give the same classes:
 //
-//   import { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC } from './emu_backend.mjs';
+//   import { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, CdcHost } from './emu_backend.mjs';
 //
 // CUPC8_EMU_TRACE=1 prints, on stderr, one line per runUntil() (its result
 // and the emulated ns), every slot-host frame (MOSI and MISO) and a digest of
@@ -26,7 +26,8 @@ if (NATIVE) {
   const { TmdsCapture } = await import('./tmds.mjs');
   const { UsbKeyboard } = await import('./usbkbd.mjs');
   const rp = await import(path.join(SDK, 'rp2040js/dist/esm/index.js'));
-  m = { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC: rp.USBCDC };
+  const { CdcHost } = await import('./cdchost.mjs');
+  m = { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC: rp.USBCDC, CdcHost };
   m.SdSocket = class {
     constructor() {
       throw new Error('SdSocket: the SD card model is native only (CUPC8_EMU=native)');
@@ -34,7 +35,7 @@ if (NATIVE) {
   };
 }
 
-let { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, SdSocket } = m;
+let { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, CdcHost, SdSocket } = m;
 
 if (process.env.CUPC8_EMU_TRACE) {
   const hosts = [];
@@ -73,4 +74,4 @@ if (process.env.CUPC8_EMU_TRACE) {
   };
 }
 
-export { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, SdSocket };
+export { Emu, SlotHost, TmdsCapture, UsbKeyboard, USBCDC, CdcHost, SdSocket };

@@ -2900,6 +2900,133 @@ proc testHello() =
   ioModel = imLegacy
 
 run testHello
+# ------------------------------------------------------------ the USB console
+# KRN-030 (doc/proposals/usb-console.md): the test plays the system card on
+# the API block's rings, as fw/sysctl/core/console.c does.
+const
+  ConOutHead = 0x6f22
+  ConOutTail = 0x6f23
+  ConInHead = 0x6f24
+  ConInTail = 0x6f25
+  ConFlags = 0x6f26
+  ConOut = 0x6f40
+  ConIn = 0x6fc0
+
+proc conDrain(): string =
+  ## the card's poll: take everything in CON_OUT, then move the tail
+  var t = mem[ConOutTail]
+  let h = mem[ConOutHead]
+  while t != h:
+    result.add(chr(mem[ConOut + t]))
+    t = (t + 1) and 127
+  mem[ConOutTail] = t
+
+proc conType(s: string) =
+  ## the card's poll: bytes into CON_IN (the caller keeps them under 64),
+  ## then the head
+  var h = mem[ConInHead]
+  for c in s:
+    mem[ConIn + h] = ord(c)
+    h = (h + 1) and 63
+  mem[ConInHead] = h
+
+proc conRun(ms: int; drain: bool): string =
+  ## ms of guest time pass; with `drain`, the card polls every 2 ms of it
+  var n = 0
+  while n < ms:
+    runGuest(2)
+    n += 2
+    if drain: result.add(conDrain())
+
+proc conLine(line: string; drain = true): string =
+  ## a line typed on the PC, a key's worth of guest time per key
+  conType(line & "\r")
+  conRun(1500, drain)
+
+proc testKernelConsole() =
+  ## KRN-030: the kernel's side of the USB console. Boot zeroes the indices
+  ## and CON_FLAGS (junk RAM had HOST set and a ring near full: without it the
+  ## banner would wait for ever); the terminal's output reaches CON_OUT and
+  ## wraps; with HOST set a full ring holds the kernel until the card takes
+  ## it, with HOST clear the kernel drops and goes on; typed input from
+  ## CON_IN reaches the prompt and BASIC.
+  echo "== the USB console, the kernel's side =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo])
+  ramJunk = true
+  cpuReset()
+  ramJunk = false
+  cpuLoadRom(rom)
+  expectTrue("junk RAM: HOST set, the ring nearly full, before boot",
+             (mem[ConFlags] and 1) == 1 and mem[ConOutHead] != mem[ConOutTail])
+  cpuBootRom()
+  let g = gpuCard()
+  settle(6_000_000)
+  expectTrue("the prompt on the graphics card", gpuFind(g, ">>") >= 0)
+  expect("boot zeroed CON_OUT_TAIL", mem[ConOutTail], 0)
+  expect("boot zeroed CON_IN_HEAD", mem[ConInHead], 0)
+  expect("boot zeroed CON_IN_TAIL", mem[ConInTail], 0)
+  expect("boot zeroed CON_FLAGS", mem[ConFlags], 0)
+  let banner = conDrain()
+  expectTrue("the banner and the prompt in CON_OUT: " & escape(banner),
+             "CUPC/8 BASIC" in banner and banner.endsWith(">> "))
+
+  # a PC opens the port: HOST. A command typed there reaches the terminal
+  mem[ConFlags] = 1
+  var got = conLine("help")
+  expectTrue("help from CON_IN runs (graphics card)", gpuFind(g, "NEW RUN CLR") >= 0)
+  expectTrue("its echo and output in CON_OUT: " & escape(got), got.startsWith("help\n") and "NEW RUN CLR" in got)
+  expect("CON_IN taken: its tail caught up", mem[ConInTail], mem[ConInHead])
+
+  # idle at the prompt, a key from the PC is taken by the key wait's next
+  # wake-up: the 20 Hz tick bounds the latency
+  var worst = 0
+  for i in 0..4:
+    discard conRun(37, true)          # somewhere in the tick's period
+    let t0 = msCount()
+    conType("x")
+    while mem[ConInTail] != mem[ConInHead] and msCount() - t0 < 500:
+      runGuest(1)
+    worst = max(worst, msCount() - t0)
+    conType("\x7f")                   # and take it back
+    discard conRun(100, true)
+  expectTrue("idle, a key in CON_IN is taken within the tick's 50 ms (worst " & $worst & " ms)", worst <= 51)
+
+  # BASIC from CON_IN; its output (well over the ring's 128 bytes) comes out
+  # whole and in order while the card keeps taking it: the ring wraps
+  discard conLine("new")
+  discard conLine("10 for i = 1 to 12")
+  discard conLine("20 print \"line \"; i; \" of the ring test\"")
+  discard conLine("30 next i")
+  got = conLine("run")
+  var want = "run\n"
+  for i in 1..12: want.add("line " & $i & " of the ring test\n")
+  expectTrue("BASIC typed on the PC runs; its output wraps the ring whole: " & escape(got),
+             got.startsWith(want) and "DONE." in got)
+
+  # HOST set and nobody taking: the kernel waits at the full ring
+  conType("run\r")
+  discard conRun(1500, false)
+  expectTrue("HOST set, ring full: the kernel waits (not back at the prompt)",
+             ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail] and not waiting)
+  got = conRun(1500, true)
+  expectTrue("the card takes it: the rest comes, and the prompt", "line 12 of" in got and got.endsWith(">> "))
+
+  # HOST clear (the port closed): the kernel drops what does not fit
+  mem[ConFlags] = 0
+  discard conDrain()
+  let before = mem[ConOutTail]
+  conType("run\r")
+  let clrAt = mem[ConInHead]
+  discard conRun(1500, false)
+  settle(2_000_000)
+  expectTrue("HOST clear: the program runs to the prompt without the card",
+             waiting and mem[ConInTail] == clrAt and gpuFind(g, "DONE.") >= 0)
+  expectTrue("the ring full, the rest dropped", ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail] and
+             mem[ConOutTail] == before)
+  ioModel = imLegacy
+
+run testKernelConsole
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

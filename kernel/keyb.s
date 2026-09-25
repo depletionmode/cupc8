@@ -95,8 +95,16 @@ keyb_cs_off:
 	pop pcl
 	pop pch
 
-; r0 = the next key, or $ff when the FIFO is empty
+; r0 = the next key, or $ff when none is waiting: the USB console's CON_IN
+; first (console.s), then the IO card's FIFO
 keyb_poll:
+	push pch
+	push pcl
+	b con_getc
+	eq r0, #0xff
+	bzf .card
+	b .done
+.card:
 	ld r0, [keyb_spi]
 	eq r0, #0xff
 	bzf .none
@@ -177,6 +185,12 @@ keyb_read_char:
 .run:
 	b sys_run
 .key:
+	ld r0, CON_IN_TAIL		; a key from the USB console (console.s)
+	ld r1, CON_IN_HEAD
+	eq r0, r1
+	bzf .card
+	b keyb_read_char
+.card:
 	ld r0, $f202			; the keyboard's line, live
 	ld r1, [keyb_bit]
 	and r0, r1

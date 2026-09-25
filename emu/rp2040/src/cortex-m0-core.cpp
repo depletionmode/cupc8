@@ -266,6 +266,10 @@ void CortexM0Core::setSPmain(uint32_t value) {
 }
 
 void CortexM0Core::exceptionEntry(uint32_t exceptionNumber) {
+  if (exceptionNumber >= 16) {  // instrumentation only (irqMaxWait)
+    const uint32_t irq = exceptionNumber - 16;
+    irqMaxWait[irq] = std::max(irqMaxWait[irq], cycles - irqPendingSince[irq]);
+  }
   // PushStack:
   uint32_t framePtr = 0;
   uint32_t framePtrAlign = 0;
@@ -433,6 +437,7 @@ uint32_t CortexM0Core::vectPending() const {
 //   if (value && !(this.pendingInterrupts & irqBit)) { ...raiseInterrupt... }
 //   else if (!value) { this.pendingInterrupts &= ~irqBit; }
 void CortexM0Core::raiseInterrupt(uint32_t irqBit) {
+  irqPendingSince[__builtin_ctz(irqBit)] = cycles;  // instrumentation only (irqMaxWait)
   pendingInterrupts |= irqBit;
   interruptsUpdated = true;
   if (waiting && checkForInterrupts()) {

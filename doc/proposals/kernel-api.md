@@ -71,7 +71,19 @@ comment in `api.s` is its contract.
 
 **API block ($6f00–$6fff):** `API_ARGS` $6f00 (32 bytes of arguments and
 results), `API_ERR` $6f20, `API_RUN` $6f21 (the PC loader's mailbox), the
+USB console's rings and indices $6f22–$6f26 and $6f40–$6fff
+(`usb-console.md`, `memory-map.md`), the
 rest reserved.
+
+**The USB console.** The console group reaches a PC's terminal through the
+system card with no change to it: everything `API_PUTC`/`API_PUTS` print
+(and the terminal's own output) is also put in `CON_OUT`, and
+`API_GETKEY`/`API_POLLKEY` take keys from `CON_IN` before the IO card's.
+The key wait's 20 Hz tick bounds how long a key from the PC waits when the
+kernel is idle. While a PC has the console open (`CON_FLAGS` bit 0, HOST,
+`%define CON_FLAGS` in `api.inc`) a program that prints faster than the PC
+reads waits for it; otherwise nothing waits and what does not fit in the
+ring is dropped.
 
 ## Loading and running programs
 

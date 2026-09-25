@@ -13,12 +13,20 @@
     fpga flash chipset|cpu FILE | fpga hold chipset|cpu | fpga boot chipset|cpu
     flash id chipset|cpu | flash read chipset|cpu ADDR LEN -o FILE
     card reset SLOT [--hold|--release] | card flash SLOT FILE [--esp] [--addr A]
+    console [PORT] [--idle S]     (the kernel's terminal: Ctrl-] quits)
 
 The port is --port, or $CUPC8_PORT, or the first system card found on USB
-(VID:PID 1209:C8C8). tcp:HOST:PORT reaches the system card in the
+(VID:PID 1209:C8C8, its first serial port: interface 0). tcp:HOST:PORT reaches the system card in the
 whole-machine emulator (test/emu/machine.mjs). tools/../build/fw/sysctl_sim serves a pseudo-terminal
 that stands in for the card (HOST-002, SYS-004). Slots are numbered 1-6 on
 the command line, as on the board; the protocol numbers them 0-5.
+
+console is the card's second serial port (interface 2; doc/proposals/
+usb-console.md): what the kernel's terminal prints, and keys typed into it.
+Its PORT is the argument, or $CUPC8_CONSOLE, or the card's on USB;
+tcp:HOST:PORT is the emulator's (tools/machine_view.mjs --console-port N).
+With stdin not a terminal (a pipe, a file: a BASIC program to paste) it sends
+it all, then quits once the machine has been quiet for --idle seconds.
 """
 
 import argparse
@@ -58,19 +66,79 @@ def crc8(data):
     return c
 
 
-def find_port():
-    if os.environ.get("CUPC8_PORT"):
-        return os.environ["CUPC8_PORT"]
+def find_port(env="CUPC8_PORT", interface=0):
+    """The system card's serial port on USB: interface 0 is the sysctl
+    protocol, interface 2 the console (usb-console.md)."""
+    if os.environ.get(env):
+        return os.environ[env]
     for dev in sorted(glob.glob("/sys/class/tty/ttyACM*")):
-        usb = os.path.realpath(os.path.join(dev, "device", ".."))
+        itf = os.path.realpath(os.path.join(dev, "device"))
+        usb = os.path.dirname(itf)
         try:
             vid = open(os.path.join(usb, "idVendor")).read().strip()
             pid = open(os.path.join(usb, "idProduct")).read().strip()
-        except OSError:
+            num = int(open(os.path.join(itf, "bInterfaceNumber")).read().strip(), 16)
+        except (OSError, ValueError):
             continue
-        if (vid, pid) == ("1209", "c8c8"):
+        if (vid, pid) == ("1209", "c8c8") and num == interface:
             return "/dev/" + os.path.basename(dev)
     sys.exit("cupc8.py: no system card found (plug it in, or use --port)")
+
+
+def open_port(port):
+    """A raw file descriptor on a serial port, or a TCP connection (the emulator)."""
+    if port.startswith("tcp:"):
+        host, _, p = port[4:].rpartition(":")
+        sock = socket.create_connection((host or "127.0.0.1", int(p)))
+        return sock, sock.fileno()
+    fd = os.open(port, os.O_RDWR | os.O_NOCTTY)
+    if os.isatty(fd):
+        tty.setraw(fd)
+        attrs = termios.tcgetattr(fd)
+        attrs[2] |= termios.CLOCAL
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    return None, fd
+
+
+def console(port, idle=1.0):
+    """The kernel's terminal on the console port. Opening it (DTR) is what
+    makes the card set HOST and carry the rings; closing it clears HOST."""
+    sock, fd = open_port(port)
+    stdin, stdout = sys.stdin.fileno(), sys.stdout.fileno()
+    interactive = os.isatty(stdin)
+    saved = termios.tcgetattr(stdin) if interactive else None
+    if interactive:
+        tty.setraw(stdin)
+        os.write(stdout, b"cupc8.py console on %s: Ctrl-] quits\r\n" % port.encode())
+    scale = float(os.environ.get("CUPC8_TIMEOUT_SCALE", "1"))
+    inputs, last = [fd, stdin], time.monotonic()
+    try:
+        while True:
+            ready = select.select(inputs, [], [], 0.05)[0]
+            if fd in ready:
+                data = os.read(fd, 4096)
+                if not data:
+                    return 0                       # the emulator went away
+                os.write(stdout, data)
+                last = time.monotonic()
+            if stdin in ready:
+                data = os.read(stdin, 4096)
+                if interactive and b"\x1d" in data:
+                    return 0
+                if not data:
+                    inputs.remove(stdin)           # sent it all: wait for the machine to go quiet
+                    last = time.monotonic()
+                else:
+                    os.write(fd, data)
+            if stdin not in inputs and time.monotonic() - last > idle * scale:
+                return 0
+    finally:
+        if saved:
+            termios.tcsetattr(stdin, termios.TCSADRAIN, saved)
+        if sock:
+            sock.close()
+        else:
+            os.close(fd)
 
 
 class Sysctl:
@@ -652,7 +720,13 @@ def main(argv=None):
     p.add_argument("--esp", action="store_true", help="an ESP32 card (else: tries SWD, then the ESP bootloader)")
     p.add_argument("--addr", type=num, default=0)
     p.add_argument("--no-stub", action="store_true", help="ESP32: the ROM loader alone (esptool's stub crashes in QEMU)")
+    p = sub.add_parser("console", help="the kernel's terminal on the card's second serial port")
+    p.add_argument("port", nargs="?", help="the console port (default $CUPC8_CONSOLE, or the card's)")
+    p.add_argument("--idle", type=float, default=1.0, help="with stdin not a terminal: quit after this long quiet")
     a = ap.parse_args(argv)
+
+    if a.cmd == "console":
+        return console(a.port or find_port("CUPC8_CONSOLE", 2), a.idle)
 
     sc = Sysctl(a.port or find_port())
     try:

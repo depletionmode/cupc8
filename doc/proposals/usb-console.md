@@ -1,9 +1,9 @@
 # USB console through the system card
 
 Status: **decided 2026-09-25 by David** ("build it; it's fine for the system
-card to have this functionality"), being implemented. Both directions: the
-terminal's text goes to the PC, and what is typed on the PC comes in as
-keys.
+card to have this functionality"), **built** (2026-09-25; "As built" at the
+end). Both directions: the terminal's text goes to the PC, and what is typed
+on the PC comes in as keys.
 
 ## What it is
 
@@ -80,3 +80,49 @@ bytes, `sysctl.md`), so no lock is needed.
   read from the console port; a BASIC program pasted through it runs; no
   console open: nothing waits.
 - Every bug found: a test and a counterexample.
+
+## As built
+
+- **System card** (`fw/sysctl/core/console.c`, `fw/rp2040/sysctl`): a
+  composite device, VID:PID 1209:C8C8, two CDC functions with their
+  interface associations: interfaces 0/1 the protocol ("CUPC/8 sysctl"),
+  2/3 the console ("CUPC/8 console"); `PING` says `CUPC8 sysctl 2.1`. The
+  poll runs from the main loop (`sysctl_poll`), every `CON_POLL_MS` = 2 ms
+  while DTR is set on interface 2 and the chipset is up: one 5-byte
+  `RAM_RD` of the indices and flags, `HOST` written if clear, up to the
+  USB buffer's room from `CON_OUT` (never half a CR LF), then its tail;
+  up to CON_IN's room from the PC (CR Enter, CR LF one Enter, a lone LF
+  Enter), then its head. Closed: `HOST` cleared once, then no bridge
+  traffic. `CON_FLAGS` with a bit other than `HOST` set is power-up junk
+  (the kernel has not zeroed it yet): the card drops both rings, moving
+  only its own indices, so a terminal open across power-on sees the banner
+  first (found in the emulator's viewer: a ring of junk came before it). A PC that holds the port open without reading holds up the
+  terminal, as flow control on a serial line would (`sysctl.md`).
+- **Kernel** (`kernel/console.s`): `con_init` zeroes $6f22–$6f26 first
+  thing at boot; `gpu_putc`, which everything the terminal and the console
+  API print goes through, calls `con_putc` first (so it works with no
+  graphics card too); `keyb_poll` takes `CON_IN` before the IO card, and
+  the key wait looks at `CON_IN` each time the 20 Hz tick wakes it. A $ff
+  byte from the PC is dropped (it reads as "no key").
+- **cupc8.py** finds each port by its interface number; `cupc8.py console
+  [PORT]` is a raw terminal on the console (`Ctrl-]` quits; piped, it types
+  its input and quits after `--idle` seconds of quiet).
+- **Native emulator**: the host side of both ports is `CdcHost`
+  (`test/emu/cdchost.mjs`, C++ `emu/rp2040/src/usb/cdchost.cpp`), which
+  enumerates like rp2040js's one-port `USBCDC` and then opens and closes
+  each port with SET_CONTROL_LINE_STATE on its interface. `m.console`
+  (`open`, `close`, `write`, `read`, `listen`) in machinenative.mjs;
+  `tools/machine_view.mjs --native --console` shows a pane,
+  `--console-port N` serves it on TCP for `cupc8.py console tcp:...`.
+- **Simulator**: `tools/sim --console` (every 2 guest ms, as the card; input
+  only once the kernel has reached its first WAI, so its boot does not zero
+  what was typed ahead).
+- **Tests**: SYS-008 (the core against the bridge model), SYS-006 (the real
+  binary: two ports, polling only while open and the chipset up), HOST-002
+  (`cupc8.py console` against `sysctl_sim --console`), KRN-030 (the kernel
+  on the simulator), SIM-020 (`--console`), E2E-020 (the whole machine).
+- **Known limit**: if the machine resets while the card is between reading
+  `CON_OUT_HEAD` and writing `CON_OUT_TAIL` (a window of ~100 µs in each
+  2 ms poll), the kernel's zeroed indices meet the card's late tail, and up
+  to a ring's worth of stale bytes can reach the PC once. Nothing waits
+  because of it.

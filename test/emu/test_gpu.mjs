@@ -286,6 +286,28 @@ if (!only || only === 'GPU-005') {
   });
   for (let i = 0; i < 200; i += 2) sent.push([0x00]);
   compare('GPU-005-traffic', captureFrame(), golden(), false);
+
+  // ... and PicoDVI's DMA interrupt is never held up by the slot's: whether
+  // a late one still makes its porch depends on how long the slot SPI's
+  // handler runs, so check the cause, not the picture. CS_n rises (a READ,
+  // which changes nothing) come one scanline + 50 ns apart, so over 635 of
+  // them the slot interrupt starts at every point of the line, 50 ns (13
+  // cycles) apart, and some always start just before the DVI one is due. The
+  // DVI interrupt, at the top priority, preempts it; the one thing that may
+  // hold it is slotspi_refresh's swap with every interrupt masked (113
+  // cycles). At the slot's priority or below, it waited for the whole CS_n
+  // handler instead (~570 cycles), and could miss a porch.
+  const DMA_IRQ_0 = 11, LINE_NS = (800 / 25.2e6) * 1e9, STEP_NS = 50;
+  emu.irqMaxWait(DMA_IRQ_0, true);
+  const t0 = emu.ns, sweep = Math.ceil(LINE_NS / STEP_NS);
+  run(function* () {
+    for (let i = 1; i <= sweep; i++) {
+      yield* this.frame([0xfe]);
+      yield t0 + i * (LINE_NS + STEP_NS) - this.emu.ns;
+    }
+  });
+  const dviWait = emu.irqMaxWait(DMA_IRQ_0);
+  expect(dviWait <= 250, `PicoDVI's DMA interrupt waits at most 250 cycles (1 us) with CS_n rising at every point of a scanline (waited ${dviWait})`);
 }
 
 console.log(`${only ?? 'GPU-004/005'}: real gpu.elf on the emulated RP2040, ${checks} checks, ${bad} failures`);

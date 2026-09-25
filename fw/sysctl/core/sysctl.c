@@ -57,7 +57,7 @@ static int cc_mv(sysctl_t *s)
 }
 
 /* the bridge is chipset logic: it answers only while the chipset runs */
-static bool chipset_up(sysctl_t *s)
+bool sysctl_chipset_up(sysctl_t *s)
 {
 	return !(s->held & (1u << FPGA_CHIPSET)) && fpga_done(s, FPGA_CHIPSET);
 }
@@ -92,7 +92,7 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 	case C_STATUS: {
 		if (n != 0)
 			return ST_ARG;
-		bool up = chipset_up(s);
+		bool up = sysctl_chipset_up(s);
 		int cc = cc_mv(s), v12 = s->hal->adc_mv(s->ctx, ADC_V1V2);
 		out[0] = up ? br_status(s) : 0;
 		out[1] = up ? br_gpo(s) : 0;
@@ -236,7 +236,7 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 	case C_RAM_READ: case C_RAM_WRITE: case C_RAM_READ_FAR: case C_RAM_WRITE_FAR:
 	case C_ROM_READ: case C_ROM_ERASE:
 	case C_ROM_PROGRAM: case C_ROM_ID: case C_CPU_CTL: case C_TRACE:
-		if (!chipset_up(s))
+		if (!sysctl_chipset_up(s))
 			return ST_NOCHIPSET;
 		switch (cmd) {
 		case C_RAM_READ: {
@@ -359,11 +359,13 @@ void sysctl_poll(sysctl_t *s)
 {
 	if (s->rx_len && s->hal->now_ms(s->ctx) - s->rx_last_ms > FRAME_MS)
 		s->rx_len = 0;
+	con_poll(s);
 }
 
 void sysctl_init(sysctl_t *s, const sysctl_hal *hal, void *ctx)
 {
-	/* touches nothing on the machine: it runs whether or not sysctl is here */
+	/* touches nothing on the machine: it runs whether or not sysctl is here
+	 * (the console reads and writes RAM only once a PC opens its port) */
 	memset(s, 0, sizeof *s);
 	s->hal = hal;
 	s->ctx = ctx;
