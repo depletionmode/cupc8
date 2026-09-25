@@ -1045,7 +1045,9 @@ ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/+3V3", ("In4.Cu",)))
 # the CPU card: at the Default 0.2 mm no track passes between two 0.5 mm-pitch
 # pins of the TQ144 or the sTSOP-32
 FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
-ROUTE_PASSES, ROUTE_TRIES = 30, 2          # at most 30 + 60 passes
+# at most 30 + 60 + 90 passes. On 6 layers try 1 left 4 connections
+# (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
+ROUTE_PASSES, ROUTE_TRIES = 30, 3
 
 
 def fine_nets():
