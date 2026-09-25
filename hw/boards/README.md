@@ -201,14 +201,14 @@ Spec: `doc/hardware/gpu-protocol.md`.
 - **+5V to the sink** (HDMI: 4.8–5.3 V, ≥ 55 mA at the source's pin), the
   circuit power.md decides ("GPU card HDMI +5V"): the slot's +5V is 4.1 V
   at the card at the worst corner and up to 5.4 V at vSafe5V max, so U7, a
-  **TPS63802DLAR buck-boost** (C2845237), holds the pin at 5.03 V either
-  way (4.87–5.20 V over VFB, the 1 % divider and the power-save ripple).
+  **TPS63802DLAR buck-boost** (C2845237), holds the pin at 5.045 V either
+  way (4.88–5.21 V over VFB, the 1 % divider and the power-save ripple).
   Slot +5V → F1, a 200 mA PTC SMD0805P020TF (C20976), **ahead** of the
   converter (after it, its drop would take the pin to 4.67 V; ahead, it
   still trips on a shorted cable) → 10 µF (C21) at VIN → U7 (VIN and EN
   on the PTC's output, MODE to GND for power save, PG unconnected), L1
-  0.47 µH FXL0420-R47-M (C167200), 2 × 22 µF out (C22, C23), FB 825k
-  (C25823) / 91k (C23265) → HDMI pin 18, with the DDC pull-ups and the HPD
+  0.47 µH FXL0420-R47-M (C167200), 2 × 22 µF out (C22, C23), FB 300k
+  (C23024) / 33k (C4216), both basic → HDMI pin 18, with the DDC pull-ups and the HPD
   divider. No Schottky: the TPS63802 disconnects its output from its input
   when off. It draws 95 mA from the slot's +5V at the worst corner
   (POW-008; POW-006 B9b). `hw/power/design.py` `GPU_BOARD` lists these
