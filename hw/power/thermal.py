@@ -98,6 +98,11 @@ def main():
         fmt="%.1f")
 
     # the GPU card's buck-boost: everything its efficiency loses, all in the IC
+    bad = d.gpu_board_mismatches()
+    for ref, want, got in bad:
+        c.info(ref, "hw/boards/gpu.py has %s, these checks model %s (design.GPU_BOARD)" % (got, want))
+    c.check("T0g", "GPU card HDMI +5V parts in hw/boards/gpu.py that differ from the model", len(bad), 0, "<=",
+            "", fmt="%d")
     vout = d.gpub_vout_range()[2]
     p = vout * d.I_HDMI_PIN * (1 / d.GPUB_ETA - 1)
     c.check("T6", "TPS63802 GPU card HDMI buck-boost, 55 mA at %.2f V, %.0f %% efficient: %.0f mW x %.0f C/W" % (

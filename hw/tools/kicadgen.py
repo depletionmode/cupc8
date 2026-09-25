@@ -703,8 +703,36 @@ def run(cmd, **kw):
     return r
 
 
+LOGO = "KaplanLabs_Logo"                 # the logo footprints hw/tools/logo.py writes
+
+
+def silk_keepout(board, fp, margin=0.3):
+    """A rule area with no tracks and no vias on the artwork's copper side
+    (F.Cu for top silkscreen) over a board-only graphic (the logo): a track
+    under it shows through the mask as a ridge across the artwork. The
+    pour still fills under it, so the artwork sits on even copper."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    bb = fp.GetBoundingBox(False)
+    x0, y0 = to(bb.GetLeft()) - margin, to(bb.GetTop()) - margin
+    x1, y1 = to(bb.GetRight()) + margin, to(bb.GetBottom()) + margin
+    z = pcbnew.ZONE(board)
+    z.SetIsRuleArea(True)
+    z.SetDoNotAllowTracks(True)
+    z.SetDoNotAllowVias(True)
+    z.SetDoNotAllowPads(False)
+    z.SetDoNotAllowZoneFills(False)
+    z.SetDoNotAllowFootprints(False)
+    z.SetLayer(pcbnew.B_Cu if fp.IsFlipped() else pcbnew.F_Cu)
+    ol = z.Outline()
+    ol.NewOutline()
+    for px, py in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+        ol.Append(mm(px), mm(py))
+    board.Add(z)
+
+
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None, plane=False, silk_text=None):
+                zone_outline=None, labels=None, plane=False, silk_text=None, logo_keepout=False):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -719,6 +747,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     zone_outline: the copper pours' polygon, if not `outline` less 0.5 mm
     labels:    {ref: word}: the word (what an LED shows) printed where the part's
                designator would go, in its place
+    logo_keepout: no tracks or vias on the copper under the logo (silk_keepout)
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -779,6 +808,8 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
         board.Add(fp)
         fp.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
         fp.SetOrientationDegrees(rot)
+        if logo_keepout and name.startswith(LOGO):
+            silk_keepout(board, fp)
 
     x0, y0, x1, y1 = outline
     corners = edge or [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]
@@ -1032,9 +1063,10 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None):
             raise ValueError("%s: no room for its designator; move parts apart" % fp.GetReference())
 
 
-def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from pads
+def check_silk(board, clearance=0.15, artwork=False):          # JLC: silkscreen 0.15 mm from pads
     """Silkscreen lines and texts that touch a pad (KiCad's DRC does not check
-    a footprint's silkscreen against its own pads). Returns problems."""
+    a footprint's silkscreen against its own pads), and with `artwork`, tracks
+    and vias under a board-only graphic (the logo). Returns problems."""
     import pcbnew
     mm = pcbnew.FromMM
     pads = []
@@ -1101,6 +1133,30 @@ def check_silk(board, clearance=0.15):          # JLC: silkscreen 0.15 mm from p
                 for ref, on_f, cb in courts:
                     if on_f == front and cb.Intersects(gb):
                         bad.append("label %r overlaps the courtyard of %s" % (d.GetText(), ref))
+    if artwork:
+        # no track or via on the copper under the artwork (the logo): it
+        # would show through the mask as a ridge across it (silk_keepout)
+        tr = board.Tracks()
+        tracks = [tr[i].Cast() for i in range(len(tr))]
+        for fp in board.GetFootprints():
+            if not str(fp.GetFPID().GetLibItemName()).startswith(LOGO):
+                continue
+            layer = pcbnew.B_Cu if fp.IsFlipped() else pcbnew.F_Cu
+            fb = fp.GetBoundingBox(False)
+            for t in tracks:
+                if not t.IsOnLayer(layer) or not t.GetBoundingBox().Intersects(fb):
+                    continue
+                # the track itself, not its bounding box (a diagonal past a corner)
+                a, b = t.GetStart(), t.GetEnd()
+                half = t.GetWidth() // 2
+                grown = pcbnew.BOX2I(fb.GetPosition() - pcbnew.VECTOR2I(half, half),
+                                     fb.GetSize() + pcbnew.VECTOR2L(2 * half, 2 * half))
+                steps = max(1, int(pcbnew.ToMM((b - a).EuclideanNorm()) / 0.05))
+                if any(grown.Contains(pcbnew.VECTOR2I(int(a.x + (b.x - a.x) * k / steps),
+                                                      int(a.y + (b.y - a.y) * k / steps)))
+                       for k in range(steps + 1)):
+                    bad.append("a %s of %s runs under the artwork %s" % (
+                        "via" if t.Type() == pcbnew.PCB_VIA_T else "track", t.GetNetname(), fp.GetFPID().GetLibItemName()))
     return sorted(set(bad))
 
 
@@ -1463,6 +1519,12 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
         # exposed pad. Holes (NPTH pegs) still count.
         if p.GetNetname() != net and (p.IsOnCopperLayer() or p.GetDrillSize().x > 0):
             bb = p.GetBoundingBox()
+            others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
+    zs = board.Zones()
+    for z in [zs[i] for i in range(len(zs))]:
+        # the artwork keep-outs (silk_keepout): no fan-out via or track under the logo
+        if z.GetIsRuleArea() and z.GetDoNotAllowTracks() and z.GetDoNotAllowVias():
+            bb = z.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []
     edge = board.GetBoardEdgesBoundingBox()
@@ -2059,7 +2121,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
-             tab=IO_CARD_TAB, silk_text=None):
+             tab=IO_CARD_TAB, silk_text=None, logo_keepout=False):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2075,7 +2137,10 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     Freerouting: a board's own locked pre-routing (layer changes the router
     would otherwise scatter). The nets it returns, if any, are finger escapes
     of its own, which Freerouting may report open: they are checked on KiCad's
-    connectivity after routing, as the key-notch escapes are."""
+    connectivity after routing, as the key-notch escapes are.
+
+    `logo_keepout`: no tracks or vias on the copper under the logo (silk_keepout),
+    and the silkscreen step fails on any there."""
     import pcbnew
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
@@ -2122,7 +2187,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
-                        plane=plane, silk_text=silk_text)
+                        plane=plane, silk_text=silk_text, logo_keepout=logo_keepout)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, pour_nets[0], outline[3])
@@ -2192,7 +2257,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     step("stitch + zones + save", fill)
 
     def silk():
-        bad = check_silk(state["b"]) + check_models()
+        bad = check_silk(state["b"], artwork=logo_keepout) + check_models()
         if bad:
             raise SystemExit("silkscreen / 3D models:\n  " + "\n  ".join(bad))
     step("silkscreen, 3D models", silk)

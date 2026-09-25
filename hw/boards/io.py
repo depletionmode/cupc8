@@ -147,7 +147,7 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
 })
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LOGO_MM = 12
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, -24, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7, -25, 0)]
 TITLE, REVISION = "CUPC/8 IO", "A"
 
 

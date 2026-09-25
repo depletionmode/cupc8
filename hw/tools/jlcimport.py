@@ -28,6 +28,9 @@ Checks, per imported part:
     MODEL_TOLERANCE of the courtyard's. EasyEDA models are sometimes offset
     (C165948's was 2 mm out), which hides real fit problems. A part that
     fails needs its model fixed, or KiCad's own footprint if it has one.
+  - every STEP sits where its WRL does (hw/tools/modelcheck.py, MECH-009):
+    each STEP is first moved onto its WRL, since EasyEDA's two files are
+    not always in one frame and KiCad's STEP export (MECH) uses the STEP
 """
 
 import math
@@ -278,6 +281,13 @@ def main():
     for lcsc in sys.argv[1:]:
         sym, fp, n = check(lcsc)
         print("%s: jlc:%s, footprint jlc:%s, %d pins match their pads" % (lcsc, sym, fp, n))
+    # EasyEDA's STEP and WRL are not always in one frame: move each STEP onto
+    # its WRL (which the courtyard check above vouches for), then check them all
+    for mode in ("--fix", ""):
+        r = subprocess.run(["freecadcmd", os.path.join(HERE, "modelcheck.py")], cwd=ROOT, capture_output=True,
+                           text=True, env=dict(os.environ, MODELCHECK=mode))
+        if r.returncode:
+            raise SystemExit("3D models (hw/tools/modelcheck.py):\n" + r.stdout[-2000:])
 
 
 if __name__ == "__main__":

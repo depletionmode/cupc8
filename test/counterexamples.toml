@@ -634,3 +634,41 @@ fixed_in = "6a6b470"
 revert = [["fw/sysctl/core/console.c", """	if (ix[4] & ~CON_HOST) {""", """	if (0) {"""]]
 cmd = "make -s -C fw test_sysctl"
 must_fail = ["power-up junk in the rings: nothing sent"]
+
+[[bug]]
+name = "GPU card: the board kept the TPS61023 boost and 100 mA PTC after POW-008 moved to the TPS63802 buck-boost"
+fixed_in = "9316238"
+before = "74f1293"
+files = ["hw/boards/gpu.py"]
+cmd = "python3 hw/power/thermal.py"
+must_fail = ["FAIL T0g", "hw/boards/gpu.py has TPS61023DRLR, these checks model TPS63802DLAR"]
+
+[[bug]]
+name = "bomcheck: JLC's 'VSON-10(2x3)' refused for a footprint named L3.0-W2.0 (body read one way round only)"
+fixed_in = "9316238"
+revert = [["hw/tools/bomcheck.py", """        return name.startswith(m.group(1)) and ("L%s-W%s" % tuple(body) in name
+                                                or "L%s-W%s" % tuple(body[::-1]) in name)""", """        return name.startswith(m.group(1)) and "L%s-W%s" % tuple(body) in name"""]]
+cmd = "python3 hw/tools/bomcheck.py gpu"
+must_fail = ["C2845237 jlc:VSON-10_L3.0-W2.0-P0.50-TL (U7): JLC's package is 'VSON-10(2x3)', the footprint is VSON-10_L3.0-W2.0-P0.50-TL"]
+
+[[bug]]
+name = "cards: signal tracks routed across the Kaplan Labs logo (ridges through the mask over the artwork)"
+fixed_in = "ef9ae93"
+revert = [["hw/tools/kicadgen.py", "        if logo_keepout and name.startswith(LOGO):\n            silk_keepout(board, fp)\n", ""]]
+cmd = "python3 hw/boards/storage.py"
+must_fail = ["runs under the artwork KaplanLabs_Logo_12mm"]
+
+[[bug]]
+name = "3D models: EasyEDA STEPs off their WRLs (MECH saw the HDMI legs 3.8 mm under the GPU card, the microSD face 5 mm inside the edge)"
+fixed_in = "ec4df47"
+before = "1d162fc"
+files = ["hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.step", "hw/lib/jlc.3dshapes/TF-SMD_TF-01A.step"]
+cmd = "freecadcmd hw/tools/modelcheck.py"
+must_fail = ["FAIL HDMI-SMD_HDMI-9PIN-043: the STEP is 3.89 mm from the WRL", "FAIL TF-SMD_TF-01A: the STEP is 5.28 mm from the WRL"]
+
+[[bug]]
+name = "fabready: the GPU, IO, storage and e-ink cards missing from fab-readiness.md's Boards table"
+fixed_in = "c63e125"
+revert = [["tools/fabready.py", "\"__main__\" not in open(script).read()", "\"def main\" not in open(script).read()"]]
+cmd = "python3 tools/fabready.py && python3 -c \"import sys; t = open('doc/hardware/fab-readiness.md').read(); m = [b for b in ('gpu', 'io', 'storage', 'eink') if '| %s |' % b not in t]; sys.exit('boards missing from fab-readiness: %s' % m if m else 0)\""
+must_fail = ["boards missing from fab-readiness: ['gpu', 'io', 'storage', 'eink']"]

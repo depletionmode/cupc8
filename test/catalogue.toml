@@ -1381,6 +1381,15 @@ kind = "static"
 vrow = "4.7"
 cmd = "python3 hw/mech/fit.py --check MECH-008"
 
+[[test]]
+id = "MECH-009"
+title = "3D models: each STEP where its WRL is"
+checks = "every imported model in hw/lib/jlc.3dshapes: the STEP's surface centroid within 0.2 mm of the WRL's and the same surface area (KiCad renders and check_models the WRL; its STEP export, which MECH-001..008 measure, swaps in the STEP)"
+method = "hw/tools/modelcheck.py under freecadcmd: area-weighted surface centroids of both files"
+kind = "static"
+vrow = "4.7"
+cmd = "freecadcmd hw/tools/modelcheck.py"
+
 # ============================================================================
 # POW / THM: the power tree (doc/hardware/power.md), verification 4.4 / 4.5.
 # Values and assumptions: hw/power/design.py. The main board isn't drawn

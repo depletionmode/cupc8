@@ -5,6 +5,7 @@ PicoDVI, 640x480 DVI on an HDMI type-A receptacle at the card's top edge.
     python3 hw/boards/gpu.py [outdir]      (default build/hw/gpu)
 """
 
+import math
 import os
 import sys
 
@@ -74,31 +75,37 @@ def schematic(path, footprint_libs):
         s.connect(u, "8", "GND")
 
     # ---- +5V to the sink (its EDID ROM and hot-plug detect; HDMI: 4.8-5.3 V,
-    # >= 55 mA). The slot's +5V is 4.1 V at the card at the worst corner, so
-    # the IO card's boost (power.md): TPS61023 to 5.06 V (4.84 V at the low
-    # tolerance corner). The 100 mA PTC is ahead of it, so its drop doesn't
-    # come off the pin, and it still trips on a shorted cable (the boost then
-    # draws from its input). No diode: with the machine off the boost's
-    # high-side FET body diode points SW -> VOUT, so a monitor can't back-feed.
-    f1 = s.add("Device:Polyfuse", "F1", "100mA", "Fuse:Fuse_0805_2012Metric", at=(160 * G, 104 * G),
-               fields={"LCSC": "C20975"})
+    # >= 55 mA). The slot's +5V is 4.1 V at the card at the worst corner and
+    # up to 5.4 V at vSafe5V max, so a TPS63802 buck-boost holds the pin at
+    # 5.03 V either way (power.md, GPU card HDMI +5V; POW-008). The 200 mA
+    # PTC is ahead of it, so its drop doesn't come off the pin, and it still
+    # trips on a shorted cable (the converter's current limit pulls far more
+    # through it). No Schottky: the TPS63802 disconnects its output from its
+    # input when it is off, so a monitor can't back-feed the card.
+    f1 = s.add("Device:Polyfuse", "F1", "200mA", "Fuse:Fuse_0805_2012Metric", at=(160 * G, 104 * G),
+               fields={"LCSC": "C20976"})
     rc.two(s, f1, "+5V", "HDMI_5V_F")
-    u7 = s.add("jlc:TPS61023DRLR", "U7", "TPS61023DRLR", "jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR",
-               at=(160 * G, 132 * G), fields={"LCSC": "C919459"})
+    u7 = s.add("jlc:TPS63802DLAR", "U7", "TPS63802DLAR", "jlc:VSON-10_L3.0-W2.0-P0.50-TL",
+               at=(152 * G, 132 * G), fields={"LCSC": "C2845237"})
     s.connect(u7, "VIN", "HDMI_5V_F")
-    s.connect(u7, "EN", "HDMI_5V_F")
+    s.connect(u7, "EN", "HDMI_5V_F")          # on whenever the card has power
+    s.connect(u7, "MODE", "GND")              # power save: it never sinks current from the pin
+    s.connect(u7, "AGND", "GND")
     s.connect(u7, "GND", "GND")
-    s.connect(u7, "SW", "BOOST_SW")
+    s.nc(u7, "PG")
+    s.connect(u7, "L1", "BB_L1")
+    s.connect(u7, "L2", "BB_L2")
     s.connect(u7, "VOUT", "HDMI_5V")
-    s.connect(u7, "FB", "BOOST_FB")
-    l1 = s.add("Device:L", "L1", "1u", "jlc:IND-SMD_L4.4-W4.2", at=(146 * G, 132 * G), fields={"LCSC": "C167203"})
-    rc.two(s, l1, "HDMI_5V_F", "BOOST_SW")
+    s.connect(u7, "FB", "BB_FB")
+    l1 = s.add("Device:L", "L1", "470n", "jlc:IND-SMD_L4.4-W4.2", at=(136 * G, 132 * G), fields={"LCSC": "C167200"})
+    rc.two(s, l1, "BB_L1", "BB_L2")
     c21 = rc.passive(s, "C", "C21", "10u", (150 * G, 104 * G))
     rc.two(s, c21, "HDMI_5V_F", "GND")
-    r26 = rc.passive(s, "R", "R26", "750k", (172 * G, 126 * G), fp=rc.R0603, lcsc="C23240")
-    r27 = rc.passive(s, "R", "R27", "100k", (172 * G, 142 * G), fp=rc.R0603, lcsc="C25803")
-    rc.two(s, r26, "HDMI_5V", "BOOST_FB")
-    rc.two(s, r27, "BOOST_FB", "GND")
+    # 825k / 91k 1 %: 0.5 V x (1 + 825/91) = 5.03 V
+    r26 = rc.passive(s, "R", "R26", "825k", (172 * G, 126 * G), fp=rc.R0603, lcsc="C25823")
+    r27 = rc.passive(s, "R", "R27", "91k", (172 * G, 142 * G), fp=rc.R0603, lcsc="C23265")
+    rc.two(s, r26, "HDMI_5V", "BB_FB")
+    rc.two(s, r27, "BB_FB", "GND")
     c22 = rc.passive(s, "C", "C22", "22u", (180 * G, 142 * G))
     c23 = rc.passive(s, "C", "C23", "22u", (186 * G, 142 * G))
     rc.two(s, c22, "HDMI_5V", "GND")
@@ -163,18 +170,19 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "U6": (HX, -31.0, 90),
     "RN1": (HX - 3.8, -27.0, 90),       # 1.4 mm below the ESD GND vias (preroute)
     "RN2": (HX, -27.0, 90),
-    # the HDMI +5V boost in the open area left of the receptacle, near the
-    # slot's +5V fingers; its 5.06 V runs over to pin 18 (55 mA). The loops
-    # are as tight as the IO card's: SW pin to the inductor, VIN and VOUT
-    # pins to their caps
-    "U7": (9.0, -33.0, 0),
-    "L1": (6.1, -35.0, 90),           # its SW pad by U7's SW pin
-    "C21": (11.0, -36.0, 90),         # VIN
-    "F1": (11.0, -39.4, 180),
-    "C22": (8.0, -30.4, 0),           # VOUT
-    "C23": (8.0, -28.4, 0),
-    "R26": (11.8, -30.4, 90),
-    "R27": (13.6, -30.4, 90),
+    # the HDMI +5V buck-boost in the open area left of the receptacle; its
+    # 5.03 V runs over to pin 18 (55 mA). TI's layout (SLVSEU9D, 12): U7
+    # turned so its power pins (VIN, L1, GND, L2, VOUT) face up in a row, the
+    # inductor across them above, the input cap left and the output caps
+    # right, each at its pin; the FB divider below, by FB, away from L1/L2
+    "U7": (9.0, -35.0, 90),
+    "L1": (9.0, -38.8, 180),          # pad 1 (L1) over pin 9, pad 2 (L2) over pin 7
+    "C21": (6.35, -34.95, 270),       # VIN: pad 1 level with pin 10
+    "F1": (4.1, -34.95, 90),          # ahead of it
+    "C22": (11.65, -34.95, 270),      # VOUT: pad 1 level with pin 6
+    "C23": (13.7, -34.95, 270),
+    "R27": (8.0, -30.85, 180),        # FB (pad 1) to GND
+    "R26": (11.2, -30.85, 180),       # VOUT (pad 1) to FB; U7's designator between them and U7
     "C20": (33.4, -28.4, 90),         # HDMI_5V at the receptacle's pin 18
     "R20": (37.2, -31.4, 0),          # HPD divider
     "R21": (37.2, -29.8, 0),
@@ -193,6 +201,66 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 48.5, -16.5, 0)]
 TITLE, REVISION = "CUPC/8 GPU", "A"
 
 
+def buck_boost(board):
+    """The TPS63802's copper, per TI's layout (SLVSEU9D, 12): its pads are
+    0.3 mm at 0.5 mm pitch, too tight for the router to lay the loops short.
+    The power row (VIN, L1, GND, L2, VOUT) faces up: VIN and VOUT straight
+    out to their caps, L1 and L2 up to the inductor. EN goes up under the
+    package to VIN; MODE (GND) joins AGND, which joins GND pin 8 through
+    the package's middle, and takes them down by a via that also ties in the
+    input cap's ground. FB runs down to its divider, away from L1/L2. The
+    GND pad fan-out's vias for U7 are taken off first: they would sit where
+    this copper goes."""
+    import pcbnew
+    fp = board.FindFootprintByReference("U7")
+    pads = {(p.GetPosition().x, p.GetPosition().y) for p in fp.Pads()}
+    tr = board.Tracks()                       # indexed: iterating it breaks on Python 3.14
+    items = [tr[i].Cast() for i in range(len(tr))]
+    ends = {(t.GetEnd().x, t.GetEnd().y) for t in items
+            if t.Type() == pcbnew.PCB_TRACE_T and (t.GetStart().x, t.GetStart().y) in pads}
+    for t in items:
+        if (t.Type() == pcbnew.PCB_TRACE_T and (t.GetStart().x, t.GetStart().y) in pads) or \
+           (t.Type() == pcbnew.PCB_VIA_T and (t.GetPosition().x, t.GetPosition().y) in ends):
+            board.Remove(t)
+
+    at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
+    en, mode, agnd, fb = at("U7", 1), at("U7", 2), at("U7", 3), at("U7", 4)
+    vout, l2, gnd, l1, vin = at("U7", 6), at("U7", 7), at("U7", 8), at("U7", 9), at("U7", 10)
+    cin, cout = at("C21", 1), at("C22", 1)
+    rc.track(board, "/HDMI_5V_F", at("F1", 2), cin, width=0.4)
+    rc.track(board, "/HDMI_5V_F", vin, (cin[0], vin[1]), width=0.3)
+    rc.track(board, "/HDMI_5V_F", en, vin, width=0.2)
+    rc.track(board, "/HDMI_5V", vout, (cout[0], vout[1]), width=0.3)
+    rc.track(board, "/HDMI_5V", cout, at("C23", 1), width=0.4)
+    # L1 and L2: straight up off the pin, then out at 45 degrees into the
+    # inductor's pad, at its inner bottom corner
+    for pin, pad, net in ((l1, at("L1", 1), "/BB_L1"), (l2, at("L1", 2), "/BB_L2")):
+        side = math.copysign(1, pad[0] - pin[0])
+        corner = (pad[0] - side * 0.33, pad[1] + 1.0)
+        rise = (pin[0], corner[1] + abs(corner[0] - pin[0]))
+        rc.track(board, net, pin, rise, width=0.25)
+        rc.track(board, net, rise, corner, width=0.4)
+    # GND: pin 8 through the middle to AGND, MODE beside it, down and out
+    # to a via below EN, and on to the input cap's GND pad (the designator
+    # sits under the package, clear of this copper)
+    down = (mode[0], mode[1] + 0.57)
+    gvia = (mode[0] - 1.05, mode[1] + 1.17)
+    rc.track(board, "/GND", gnd, agnd, width=0.2)
+    rc.track(board, "/GND", mode, agnd, width=0.25)
+    rc.track(board, "/GND", mode, down, width=0.25)
+    rc.track(board, "/GND", down, gvia, width=0.25)
+    rc.via(board, "/GND", gvia)
+    rc.track(board, "/GND", gvia, at("C21", 2), width=0.3)
+    # FB: under PG and down to R26's FB pad, then across to R27's; the
+    # divider's VOUT end (R26 pad 1) the router takes to the output caps
+    r27, r26 = at("R27", 1), at("R26", 2)
+    turn = fb[1] + 0.62
+    rc.track(board, "/BB_FB", fb, (fb[0], turn), width=0.2)
+    rc.track(board, "/BB_FB", (fb[0], turn), (r26[0], turn), width=0.2)
+    rc.track(board, "/BB_FB", (r26[0], turn), r26, width=0.2)
+    rc.track(board, "/BB_FB", r26, r27, width=0.2)
+
+
 def preroute(board):
     """GND the router can't give room to, between the TMDS lines:
     - the receptacle's shield and DDC-ground pins (2, 5, 8, 11, 17) sit
@@ -202,20 +270,9 @@ def preroute(board):
       two pairs: a track joins them through the package, and pin 3's
       fan-out via (or one of ours, 1.4 mm towards the chip) takes them down
     - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)
-    - the HDMI +5V boost's pins"""
+    - the HDMI +5V buck-boost (buck_boost)"""
     rc.pocket_escapes(board)
-    # the HDMI +5V boost's pins, as on the IO card: 0.3 mm pads the power
-    # class can't reach; the loops kept short (TPS61023 layout guide)
-    at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
-    vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)
-    sw, vout = at("U7", 5), at("U7", 6)
-    rc.track(board, "/HDMI_5V_F", vin, at("C21", 1), width=0.3)
-    rc.track(board, "/HDMI_5V_F", en, vin, width=0.25)
-    rc.track(board, "/BOOST_SW", sw, (at("L1", 2)[0], sw[1]), width=0.3)
-    rc.track(board, "/HDMI_5V", vout, at("C22", 1), width=0.3)
-    rc.track(board, "/HDMI_5V", at("C22", 1), at("C23", 1), width=0.3)
-    rc.track(board, "/BOOST_FB", fb, at("R26", 2), width=0.2)
-    rc.track(board, "/BOOST_FB", at("R26", 2), at("R27", 1), width=0.2)
+    buck_boost(board)
     import pcbnew
 
     def gnd_via_near(x, y, dx, dy):

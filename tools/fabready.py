@@ -93,7 +93,8 @@ def main():
 
     lines += ["## Boards", "", "| Board | Rev | Fab outputs | Parts | Order |", "|---|---|---|---|---|"]
     for script in sorted(glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))):
-        if os.path.basename(script).startswith("_") or "def main" not in open(script).read():
+        # a board script runs as a program (rp2040card.py, the RP2040 cards' shared part, does not)
+        if os.path.basename(script).startswith("_") or "__main__" not in open(script).read():
             continue
         lines.append("| %s | %s | %s | %s | %s |" % board_status(script))
     lines.append("")

@@ -107,6 +107,11 @@ meas tran vmin min v(out) from=700u to=900u
 
 def main():
     c = Checks("POW-008 GPU card HDMI +5V, TPS63802 buck-boost, behavioural model (hw/power/hdmi.py)")
+    bad = d.gpu_board_mismatches()
+    for ref, want, got in bad:
+        c.info(ref, "hw/boards/gpu.py has %s, these checks model %s (design.GPU_BOARD)" % (got, want))
+    c.check("B0", "GPU card HDMI +5V parts in hw/boards/gpu.py that differ from the model", len(bad), 0, "<=",
+            "", fmt="%d")
     model_check(c)
     lo, nom, hi = d.gpub_vout_range()
     name, lcsc, rmin, rmax, hold = d.GPU_PTCS[d.GPU_PTC]
