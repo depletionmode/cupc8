@@ -312,6 +312,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     c->slot = slot;
     c->logging = o.spiLog;
     if (kind == "gpu") tmds = std::make_unique<TmdsCapture>(c->e);
+    if (kind == "storage") c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
     if (kind == "io") {
       c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
       keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
@@ -691,6 +692,12 @@ std::vector<std::string> Machine::screen(std::string *error) {
     rows.push_back(line);
   }
   return rows;
+}
+
+rp2040js::harness::SdSocket *Machine::sd() {
+  for (auto &[slot, c] : cards)
+    if (c->kind == "storage") return static_cast<Rp2040Card *>(c.get())->sd.get();
+  return nullptr;
 }
 
 // type on the USB keyboard: one report per key, then a release

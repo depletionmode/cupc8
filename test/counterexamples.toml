@@ -342,3 +342,10 @@ revert = [["kernel/ubasic.s", """.close:
 .saved:"""]]
 cmd = "tools/run_tests.sh testStorage"
 must_fail = ["FAIL: the saved program as a PC reads it (text, CR LF)", "FAIL: the loaded program runs"]
+
+[[bug]]
+name = "romimage.mjs: the kernel assembled with as.py's default bases after its data moved to $4000 (every whole-machine E2E test lost its ROM)"
+fixed_in = "199387e"
+revert = [["test/emu/romimage.mjs", """'kernel.o', ...(bases ? [bases[1]] : []), '--map']""", """'kernel.o', '--map']"""]]
+cmd = "node --input-type=module -e \"import { kernelRom } from './test/emu/romimage.mjs'; kernelRom(); console.log('kernel ROM built')\""
+must_fail = ["negative count"]

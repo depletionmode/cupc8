@@ -1,0 +1,16 @@
+# JLC's part C179173 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C179173
+jlc_package: SOIC-8-208mil
+easyeda_footprint: SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL
+pins: {'1': '~{CS}', '2': DO(IO1), '3': WP#(IO2), '4': GND, '5': DI(IO0), '6': CLK, '7': HOLD#orRESET#(IO3), '8': VCC}
+pads:
+- ['1', -1.9, -3.53]
+- ['2', -0.63, -3.53]
+- ['3', 0.63, -3.53]
+- ['4', 1.9, -3.53]
+- ['8', -1.9, 3.53]
+- ['7', -0.63, 3.53]
+- ['6', 0.63, 3.53]
+- ['5', 1.9, 3.53]

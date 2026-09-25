@@ -44,6 +44,16 @@ if [ ! -d "$SDK/rp2040js/dist" ]; then
 	(cd "$SDK/rp2040js" && npm run --silent build)
 fi
 
+# a host FAT reader for the storage card tests (IOC/E2E: images written by the
+# card's FatFs checked on the host, and the reverse): pyfatfs in a venv, pinned
+# (setuptools < 81: pyfilesystem2 still needs pkg_resources)
+if [ ! -f "$SDK/pyfat/.cupc8-pyfatfs-1.1.0" ]; then
+	python3 -m venv "$SDK/pyfat"
+	"$SDK/pyfat/bin/pip" install --quiet pyfatfs==1.1.0 fs==2.4.16 appdirs==1.4.4 six==1.17.0 setuptools==80.9.0
+	touch "$SDK/pyfat/.cupc8-pyfatfs-1.1.0"
+fi
+echo "pyfatfs @ 1.1.0 ($SDK/pyfat)"
+
 # ESP-IDF for the Wi-Fi card (ESP32-C3), with its RISC-V toolchain and
 # Espressif's QEMU; tools under $SDK/espressif, not ~/.espressif
 if [ "${CUPC8_SKIP_IDF:-0}" != 1 ]; then

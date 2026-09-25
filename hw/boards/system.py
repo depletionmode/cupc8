@@ -267,6 +267,10 @@ def main():
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=80,
         title="CUPC/8 system", revision=REVISION,
+        # the presence link crosses on In2.Cu just above the tab (the key notch
+        # reaches the body) and above the GND ties' vias: on B.Cu it would wall
+        # off the A-side fingers' escapes
+        presence={"layer": "In2.Cu", "rise": 1.8},
         # the pour reaches over the finger tops, so GND fingers join it
         zone_outline=kg.card_zone(OUTLINE, (EDGE_AT[0] - 0.65, EDGE_AT[0] + 33.65), EDGE_AT[1] - 1.5),
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, LOGO_AT[0], LOGO_AT[1], 0)], labels=LABELS)
