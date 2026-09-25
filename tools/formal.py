@@ -63,6 +63,25 @@ MUTANTS = [
      ('cmd = x"03" or cmd = x"04" or cmd = x"09" or cmd = x"0a"\n',
       'cmd = x"03" or cmd = x"04"\n')],
      None, ["BRG-004"]),
+    # the millisecond counter and its tick (memory-map.md). A BMC run from
+    # reset reaches neither the counter's first carry out of bits 7:0 (256 ms)
+    # nor the first tick (50 ms) in 60 clocks, so the testbench catches these
+    # (the CLK-002 properties hold for every state: the induction in
+    # `chipset prove`). MS_COUNT1 read live instead of latched ...
+    ("ms-latch-live", "chipset.vhd", [
+     ("""								when x"07" =>
+									rd := ms_lat(7 downto 0);""",
+      """								when x"07" =>
+									rd := std_logic_vector(ms_cnt(15 downto 8));""")],
+     None, ["CLK-001"]),
+    # ... a millisecond of 12001 clocks ...
+    ("ms-12001", "chipset.vhd", [
+     ("if ms_div = MS_CLOCKS - 1 then", "if ms_div = MS_CLOCKS then")],
+     None, ["CLK-001"]),
+    # ... and the tick reaching the CPU with its mask bit clear
+    ("tick-unmasked", "chipset.vhd", [
+     ("or (pending(4) and mask(4))) &", "or pending(4)) &")],
+     None, ["IRQ-003"]),
 ]
 
 

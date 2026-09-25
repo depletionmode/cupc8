@@ -109,8 +109,13 @@ class Rp2040Card : public Card {
   uint32_t miso() override;
   bool irq() override;
   Emu *emu() override { return &e; }
+  // the chipset's deselects of this card (CS_n going high), and the rising
+  // CS_n edges the card's GPIO latched: a pin has an edge only when it
+  // changes, so csEdges <= csRises (E2E-011 checks it)
+  uint64_t csRises = 0, csEdges = 0;
 
  private:
+  bool selNow = false;
   bool sel = false, sck_ = false;
   std::vector<uint8_t> bits, rbits;
   double t0 = 0;

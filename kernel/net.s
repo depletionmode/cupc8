@@ -129,18 +129,12 @@ net_wi: resb 1                  ; net config ip- the word
 net_pkt: resb 256               ; a datagram- DNS answers, ICMP messages
 net_a0: resb 1                  ; the API caller's r0 and r1
 net_a1: resb 1
-net_ticks: resb 2               ; ping.s's clock- quarter milliseconds while it runs
-net_clk_n: resb 1               ;   how many use it
-net_irq_r0: resb 1               ; ping.s's tick handler
-net_irq_f: resb 1
-net_irq_a: resb 2
 net_ck: resb 3                  ; ping.s's checksum- sum high, low, carries
 
 net_init:
 	mov r0, #0xff
 	st [net_spi], r0
 	xor r0, r0
-	st [net_clk_n], r0		; RAM powers up with junk
 	st [net_tmp], r0
 .scan:
 	ld r0, [net_tmp]

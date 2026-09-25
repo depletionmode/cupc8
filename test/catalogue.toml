@@ -38,7 +38,7 @@ cmd = "tools/run_tests.sh"
 [[test]]
 id = "SIM-010"
 title = "The simulator CLI runs the M1 machine with its slot cards"
-checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000"
+checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000; interactively (SDL's dummy video driver) a guest woken from WAI by timer 0 every 50 instructions keeps its 12 MHz clock on the speed line (11-13 MHz: no sleep per WAI while the guest is behind the host clock)"
 method = "test/sim/test_cli.py builds tools/sim and runs it as a user would; the HTTP server runs in the test"
 kind = "sim"
 vrow = "2.1"
@@ -47,7 +47,7 @@ cmd = "python3 test/sim/test_cli.py"
 [[test]]
 id = "SIM-011"
 title = "Simulator timers count in WAI as the CPU does"
-checks = "parked in WAI, cpu.vhd counts its timers every 3 clocks (tick, settle, check): 4 counts in each of the sim's microsecond steps, so tmr0 #200 wakes WAI 50 steps later; the code after WAI runs"
+checks = "parked in WAI, cpu.vhd counts its timers once a turn of 3 clocks (tick, settle, check), 4 counts a microsecond: tmr0 #200 (counted down as TMR0 and WAI retire) wakes WAI after 198 turns, 594 clocks and the IRQ entry's 20; the code after WAI runs"
 method = "tools/simtest.nim testWaiTimer (tools/testdata/wai_timer.s)"
 kind = "sim"
 vrow = "2.1"
@@ -61,6 +61,25 @@ method = "test/sim/test_console.py builds tools/sim and runs it on a pipe and on
 kind = "sim"
 vrow = "2.1"
 cmd = "python3 test/sim/test_console.py"
+
+[[test]]
+id = "SIM-012"
+title = "The simulator runs a program for $7000 (--run)"
+checks = "tools/sim --run:PROG, once the kernel is at its prompt, does what cupc8.py run does (the body at $7000, then API_RUN = 1): tools/testdata/exec_prog.prg prints NATIVE OK and the prompt is back, and so does its bare binary; a header of version 2 is refused (exit 1, nothing runs); examples/hello (mkprg.py with kernel/api.inc) counts seconds headless (to at least 6 in 8 M instructions, with the guest ms on the status line); in the interactive sim (SDL's dummy video driver: the real-time loop without a window) hello's light steps once a wall-clock second (five steps, mean 0.98-1.04 s); net config and net ping 127.0.0.1 run on the sim's Wi-Fi card"
+method = "test/sim/test_cli.py (builds tools/sim; the interactive check reads the sim's GPO lines against the host clock)"
+kind = "sim"
+vrow = "2.1"
+cmd = "python3 test/sim/test_cli.py"
+
+[[test]]
+id = "SIM-013"
+title = "The simulator's millisecond counter and tick"
+checks = "sim.nim counts the CPU's clocks as cpu.vhd and the chipset spend them (4 a memory cycle, 2 an I/O cycle, 4 more an instruction, 3 a WAI idle turn, 20 an IRQ entry), the one guest time (the chipset's counter and the cards' ms): a program parked in WAI with only the tick unmasked takes two ticks on the SPI vector (CPU line 3) with IRQ_PEND $10, the second at MS_COUNT 100 and 1200000 clocks (+400); masked by bit 4 (SPI's bit 3 set) three ticks' worth leave it waiting, unmasked the pending tick is taken; MS_COUNT0 latches MS_COUNT1-3 across a carry of the low byte and at $12345678; IRQ_MASK reads back bits 4:0"
+method = "tools/simtest.nim testMsCounter (tools/testdata/ms_tick.s; cardsLoadTest for the registers)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testMsCounter"
+
 
 [[test]]
 id = "SIM-005"
@@ -389,6 +408,36 @@ vrow = "1.1"
 cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-001"
 
 
+[[test]]
+id = "IRQ-003"
+title = "The chipset tick (IRQ_PEND bit 4)"
+checks = "IRQ_MASK is 0 at reset (the tick masked); the tick is pending as the millisecond counter reaches a multiple of 50, not before 50 ms after the last, and never reaches the CPU masked; W1C clears it; unmasked it raises CPU IRQ line 3, which SPI complete shares, each only through its own mask bit; nothing pending with all unmasked raises no line"
+method = "GHDL testbench section IRQ-003"
+kind = "sim"
+vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=IRQ-003"
+
+# ============================================================================
+# CLK: the chipset's millisecond counter
+# ============================================================================
+[[test]]
+id = "CLK-001"
+title = "Millisecond counter (MS_COUNT, $f206-$f209)"
+checks = "near 0 after reset; from a step the next comes 12000 clocks later (+-20, three times) and 50 ms is 600000 clocks (+-20); a read of MS_COUNT0 at $ff latches MS_COUNT1-3, which still read the latched value after the low byte carried, and MS_COUNT0 then MS_COUNT1 read the new value; writes are ignored; reading MS_COUNT1 alone does not re-latch; a power-on reset clears it and it counts again"
+method = "GHDL testbench section CLK-001"
+kind = "sim"
+vrow = "1.1"
+cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chipset.vhd soc/tb/models/sram_model.vhd soc/tb/models/sst39_model.vhd soc/tb/tb_chipset.vhd -- -gONLY=CLK-001"
+
+[[test]]
+id = "CLK-002"
+title = "Millisecond counter and tick formal"
+checks = "the divider stays in 0..11999 and the counter steps by exactly one as it wraps (clk_ms_rate); reset clears both; a read of MS_COUNT0 answers bits 7:0 and latches bits 31:8 of the same value, nothing else moves the latch, MS_COUNT1-3 read it; the tick is set only as the counter steps at a multiple of 50 and always then (unless that clock's W1C clears it); CPU IRQ line 3 is (SPI and its mask) or (tick and its mask), lines 0-2 as before; the tick is masked after reset"
+method = "SymbiYosys unbounded proof (k-induction, bitwuzla) of soc/formal/chipset_props.vhd (CLK-002 section), PSL bound to chipset.vhd; tools/formal.py runs it with the ghdl-enabled yosys"
+kind = "formal"
+vrow = "1.4"
+cmd = "python3 tools/formal.py chipset prove"
+
 # ============================================================================
 # BRG / DBG: bus bridge, stop/step/trace (sysctl ↔ chipset)
 # ============================================================================
@@ -467,7 +516,7 @@ cmd = "soc/tb/run_ghdl.sh tb_chipset soc/spi_master.vhd soc/bridge.vhd soc/chips
 id = "MUT-001"
 title = "Counterexamples: fixed bugs stay caught"
 checks = "each mutant puts a fixed bug (or a property's target fault) back into a copy of the RTL; its formal property and its simulation test must then fail"
-method = "tools/formal.py --mutants (the reset race: bus_rdy_in_cycle and RST-002; RAM+ROM enabled together; a two-clock /RDY; the RAM window ignoring RAM_BANK: mmu_ram_window and MMU-005; RAM_BANK resetting to 0: mmu_ram_bank_reset and MMU-005; the bridge's 24-bit RAM commands cut to 16 bits: BRG-004)"
+method = "tools/formal.py --mutants (the reset race: bus_rdy_in_cycle and RST-002; RAM+ROM enabled together; a two-clock /RDY; the RAM window ignoring RAM_BANK: mmu_ram_window and MMU-005; RAM_BANK resetting to 0: mmu_ram_bank_reset and MMU-005; the bridge's 24-bit RAM commands cut to 16 bits: BRG-004; MS_COUNT1 read live instead of latched and a 12001-clock millisecond: CLK-001; the tick reaching the CPU masked: IRQ-003. These three are beyond a 60-clock BMC from reset, so the testbench catches them; the CLK-002 properties fail on them under induction)"
 kind = "formal"
 vrow = "1.4"
 cmd = "python3 tools/formal.py --mutants"
@@ -594,7 +643,7 @@ cmd = "tools/run_tests.sh testKernelNetwork testKernelNetWeakPower"
 [[test]]
 id = "KRN-014"
 title = "Networking in assembly: DNS client, ping, net config"
-checks = "routines on the CPU: the Internet checksum equals RFC 1071 (odd and even lengths, many carries), ping's echo request, reply matching (identifier, sequence, type, checksum, sender, an IPv4 header in front), the DNS query's bytes, the answer parser (a compressed name, a CNAME then its A through a pointer to a pointer, a name in full, AAAA skipped, NXDOMAIN, SERVFAIL, no answer, class not IN, another id, not a response, truncated, a pointer loop, a pointer, label, RDATA or record past the end), dotted quads and numbers; the whole kernel against a scripted DNS server on host sockets: net config (show, dns IP [PORT], ip IP MASK GW, dhcp, save, bad arguments), net lookup (each answer above; an answer with another id ignored before the right one; only wrong ids and silence time out after exactly one retry with a new id; one answered only the second time; a dotted quad asks nothing), net ping to the host's loopback (replies, times, summary), by name, to an address that never answers (timeouts), of a name that does not exist; the clock (TMR1) is off afterwards; the example TCP and UDP echo servers (examples/net, user programs at $7000 on the net API) serve two TCP clients in turn and UDP datagrams from two ports"
+checks = "routines on the CPU: the Internet checksum equals RFC 1071 (odd and even lengths, many carries), ping's echo request, reply matching (identifier, sequence, type, checksum, sender, an IPv4 header in front), the DNS query's bytes, the answer parser (a compressed name, a CNAME then its A through a pointer to a pointer, a name in full, AAAA skipped, NXDOMAIN, SERVFAIL, no answer, class not IN, another id, not a response, truncated, a pointer loop, a pointer, label, RDATA or record past the end), dotted quads and numbers; the whole kernel against a scripted DNS server on host sockets: net config (show, dns IP [PORT], ip IP MASK GW, dhcp, save, bad arguments), net lookup (each answer above; an answer with another id ignored before the right one; only wrong ids and silence time out after exactly one retry with a new id; one answered only the second time; a dotted quad asks nothing), net ping to the host's loopback (replies, times, summary), by name, to an address that never answers (timeouts), of a name that does not exist; a silent DNS server and two unanswered echo requests each take 1000 ms of the chipset's millisecond counter (2000-2050 ms for two, from Enter); the CPU timers stay off and masked (the programs'); the example TCP and UDP echo servers (examples/net, user programs at $7000 on the net API) serve two TCP clients in turn and UDP datagrams from two ports"
 method = "tools/simtest.nim testNetRoutines (kernel routines called directly, kernel/kernel.map), testKernelDnsPing (Wi-Fi core on host sockets: netposix.c, Linux ping socket), testNetExamples (the programs assembled after kernel/api.inc, or API_NET_* names for api_net_* until it exists)"
 kind = "sim"
 vrow = "2.3"
@@ -639,7 +688,7 @@ cmd = "tools/run_tests.sh testKernelBanks"
 [[test]]
 id = "KRN-010"
 title = "Kernel memory layout and the API jump table"
-checks = "the kernel is assembled for code $1000, data $5000, bss $6000 and its code, data and bss end by $4fff, $5fff and $6eff (the API block $6f00 and the user program $7000- stay free); the jump table from $1003 is 8 x 16 B instructions, each entry kernel/api.inc names goes to api_<name> (api_none for a stub) and every other to api_none, api_none follows at $1183; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc's entries are still at the same addresses (entries are only added)"
+checks = "the kernel is assembled for code $1000, data $6000, bss $e000 and its code, data and bss end by $5fff, $6eff and $efff (the API block $6f00 and the user program $7000-$dfff stay free); the jump table from $1003 is 8 groups x 32 B instructions, each entry kernel/api.inc names goes to api_<name> (the bank entries to kernel/bank.s, the net group's 16 to kernel/net.s; api_none for a stub) and every other to api_none, api_none follows at $1303; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc of the 32-entry table still has its entries at the same addresses (entries are only added)"
 method = "tools/simtest.nim testKernelLayout and testKernelApi on the kernel's map and image (every committed version of kernel/api.inc)"
 kind = "sim"
 vrow = "2.3"
@@ -648,7 +697,7 @@ cmd = "tools/run_tests.sh testKernelLayout testKernelApi"
 [[test]]
 id = "KRN-011"
 title = "Kernel API: a program at $7000 calls every group"
-checks = "tools/testdata/api_prog.s (tools/mkprg.py) put at $7000 with API_RUN = 1 as cupc8.py run does, on HDMI with the storage card: the terminal starts it from its key wait (API_RUN 2 while it runs, 0 after); it gets the version, API block and slot table; GFX pixel and filled rectangle read back with GETPIXEL, VSYNC; the e-ink calls give $ff on HDMI and leave $ff; storage INFO, OPEN/WRITE/CLOSE, OPEN/SEEK/READ (the bytes after the seek), RENAME, DIR_FIRST/NEXT, DELETE (a PC no longer sees the files), OPEN of the deleted file says not found; an empty net or reserved entry gives $ff and API_ERR $ff; WAIT_MS 20 is 18-30 ms of TICKS; PUTS/PUTC/GOTOXY/ATTR/GETXY/POLLKEY/POKE on the screen; it returns and the terminal prompts with its stack as before. API_EXIT from a nested call with 6 bytes left on the stack does the same, and BASIC still works; a header of another version is refused"
+checks = "tools/testdata/api_prog.s (tools/mkprg.py) put at $7000 with API_RUN = 1 as cupc8.py run does, on HDMI with the storage card: the terminal starts it from its key wait (API_RUN 2 while it runs, 0 after); it gets the version, API block and slot table; GFX pixel and filled rectangle read back with GETPIXEL, VSYNC; the e-ink calls give $ff on HDMI and leave $ff; storage INFO, OPEN/WRITE/CLOSE, OPEN/SEEK/READ (the bytes after the seek), RENAME, DIR_FIRST/NEXT, DELETE (a PC no longer sees the files), OPEN of the deleted file says not found; a blank entry of the net group and a reserved one give $ff and API_ERR $ff; WAIT_MS 20 is 21 or 22 steps of TICKS (the chipset's millisecond counter: to its next step, then 20); PUTS/PUTC/GOTOXY/ATTR/GETXY/POLLKEY/POKE on the screen; it returns and the terminal prompts with its stack as before. API_EXIT from a nested call with 6 bytes left on the stack does the same, and BASIC still works; a header of another version is refused"
 method = "tools/simtest.nim testApiProgram: the real kernel on sim.nim's M1 machine (runProgram), fw/*/core cards"
 kind = "sim"
 vrow = "2.3"
@@ -662,6 +711,15 @@ method = "tools/simtest.nim testExec: the storage card model on an image made wi
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testExec"
+
+[[test]]
+id = "KRN-015"
+title = "examples/hello on the kernel API"
+checks = "examples/hello/hello.s built by tools/mkprg.py after kernel/api.inc (the 32-entry table) and run as cupc8.py run does on the HDMI machine: its banner and API version 1; seconds 000 to 004 appear 1000-1015 ms of the chipset's millisecond counter apart (ten API_WAIT_MS 100, each 100-101 ms, and its printing); the LEDs step 1, 2, 4, 8, 16; a key stops it, the LEDs go off and the terminal is back (API_RUN 0)"
+method = "tools/simtest.nim testHello"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testHello"
 
 [[test]]
 id = "KRN-013"
@@ -785,7 +843,7 @@ cmd = "test/emu/backend_diff.sh"
 [[test]]
 id = "EMU-007"
 title = "Native whole-machine emulator: threaded = serial"
-checks = "boot to BASIC and a typed program (1.6 s emulated) on the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42. No longer compared with test/emu/machine.mjs: the legacy JS emulator is not maintained (David, 2026-09-25) and still has the CS_n edge bug the native machine's E2E-011 fix removed, so the two differ"
+checks = "boot to BASIC and a typed program (2.4 s emulated: the boot ROM's copy of the kernel body, 21.7 KB since the layout moved data to $6000, takes 1.3 s of it) on the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42. No longer compared with test/emu/machine.mjs: the legacy JS emulator is not maintained (David, 2026-09-25) and still has the CS_n edge bug the native machine's E2E-011 fix removed, so the two differ"
 method = "test/emu/machine_diff.sh (test/emu/test_machine_native.mjs, emu/machine, tools/emu_machine_build.sh)"
 kind = "sim"
 vrow = "3.2"
@@ -1155,6 +1213,15 @@ vrow = "3.2"
 cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-020"
 
 [[test]]
+id = "E2E-014"
+title = "The example TCP and UDP echo servers from the PC"
+checks = "on the native emulator (HDMI, IO, the Wi-Fi card's real firmware in QEMU, the system card): examples/net/tcpecho.s and udpecho.s, built by tools/mkprg.py with kernel/api.inc, go in with cupc8.py run after net join; through QEMU port forwards (Machine.create({ forward })) two TCP clients in turn each get their line back and the CPU keeps running; on a second machine two UDP datagrams from two ports each come back to their sender"
+method = "test/emu/test_e2e.mjs E2E-014 (CUPC8_EMU=native): Node's net and dgram sockets on 127.0.0.1, free host ports forwarded to the card's port 7007"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
+
+[[test]]
 id = "E2E-004"
 title = "Negative system tests"
 checks = "empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power source: each behaves as specified (a missing CPU card and hot-plugging are out of scope)"
@@ -1201,7 +1268,7 @@ cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node
 [[test]]
 id = "E2E-010"
 title = "cupc8.py run: a program over USB into RAM at $7000"
-checks = "on the native emulator (HDMI, IO, the system card): cupc8.py run eink_prog.prg writes the body at $7000 through the bridge while the CPU runs, then API_RUN; the terminal starts it from its key wait; its e-ink calls on HDMI print AUTO FF, GET FF x7, ST FF x4; it returns to the prompt; the bare binary runs a second time; a typed BASIC program still runs"
+checks = "on the native emulator (HDMI, IO, the system card): cupc8.py run eink_prog.prg writes the body at $7000 through the bridge while the CPU runs, then API_RUN; the terminal starts it from its key wait; its e-ink calls on HDMI print AUTO FF, GET FF x7, ST FF x4; it returns to the prompt; the bare binary runs a second time; a typed BASIC program still runs; examples/hello (mkprg.py with api.inc) run the same way steps its LEDs every 1000-1015 ms of emulated time (the chipset's millisecond counter on the RTL; 1013 ms measured, the sim gives 1012-1013) and a key stops it"
 method = "test/emu/test_e2e.mjs E2E-010 (tools/cupc8.py against the emulated system card)"
 kind = "sim"
 vrow = "3.2"
@@ -1210,7 +1277,7 @@ cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node
 [[test]]
 id = "E2E-011"
 title = "exec from the SD card: a program at $7000 and a BASIC file"
-checks = "on the native emulator with the storage card and a FAT image in the SD card model: exec \"prog.prg\" (the \"C8P\" header, three chunks) prints NATIVE OK; exec of a BASIC file loads and runs it (42, BASIC OK); exec of a missing file says file not found; the storage firmware keeps to the SD protocol"
+checks = "on the native emulator with the storage card and a FAT image in the SD card model: exec \"prog.prg\" (the \"C8P\" header, three chunks) prints NATIVE OK, and so does the same program with 24 KB after it (192 chunk reads back to back); exec of a BASIC file loads and runs it (42, BASIC OK); exec of a missing file says file not found; the storage firmware keeps to the SD protocol; on every card every rising CS_n edge its GPIO latched was a real deselect by the chipset (the emulator's pins have edges only when they change)"
 method = "test/emu/test_e2e.mjs E2E-011 (machinenative.mjs m.sd, test/emu/fatimg.py)"
 kind = "sim"
 vrow = "3.2"

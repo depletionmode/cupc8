@@ -772,13 +772,58 @@ proc testIrqMaskMmio() =
   expect("mask register", irqMask, 5)
   expect("mask readable", mem[0xf201], 5)
 
+proc testMsCounter() =
+  ## SIM-013: the chipset's millisecond counter and tick in sim.nim, as
+  ## memory-map.md and chipset.vhd (CLK-001, IRQ-003) have them
+  echo "== the millisecond counter and the tick =="
+  loadProgram(testdata / "ms_tick.s")
+  var n = 0
+  while n < 2_000_000 and not HF:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("the program halted after two ticks", HF)
+  expect("the counter at the start", mem[0x2000] or (mem[0x2001] shl 8), 0, 4)
+  expect("two ticks taken on the SPI vector (CPU line 3)", mem[0x2005], 2)
+  expect("IRQ_PEND in the handler: the tick, bit 4", mem[0x2004], 0x10)
+  expect("the second tick came at 100 ms", mem[0x2002] or (mem[0x2003] shl 8), 100, 4)
+  expectTrue("100 ms is 1200000 clocks (" & $simClocks & ")",
+             simClocks >= 1_200_000 and simClocks < 1_200_000 + 400)
+  # masked by bit 4, the tick does not wake a WAI, even with SPI's bit 3 set
+  HF = false
+  irqMask = 0x08
+  IF = true
+  waiting = true
+  let at = PC
+  for i in 0..<700_000: discard cpuStep()     # 2.1 M clocks: three ticks' worth
+  expectTrue("masked, three ticks later the CPU still waits", waiting and PC == at and (irqPending and 0x10) != 0)
+  irqMask = 0x10
+  discard cpuStep()
+  expectTrue("unmasked, the pending tick is taken", not waiting and PC == (mem[0x16] or (mem[0x17] shl 8)))
+  # MS_COUNT0 latches MS_COUNT1-3: one value across a carry of the low byte
+  machineCards([])
+  cpuReset()
+  simClocks = 0x1ff * MsClocks + MsClocks - 10   # $1ff ms, 10 clocks before $200
+  expect("MS_COUNT0 at $1ff ms", cardsLoadTest(0xf206), 0xff)
+  simClocks += 20                                # the counter is at $200 now
+  expect("MS_COUNT1 still the latched $01", cardsLoadTest(0xf207), 0x01)
+  expect("MS_COUNT0 after the carry", cardsLoadTest(0xf206), 0x00)
+  expect("MS_COUNT1 once MS_COUNT0 was read again", cardsLoadTest(0xf207), 0x02)
+  simClocks = 0x12345678 * MsClocks
+  discard cardsLoadTest(0xf206)
+  expect("MS_COUNT1-3 of $12345678", cardsLoadTest(0xf207) or (cardsLoadTest(0xf208) shl 8) or
+         (cardsLoadTest(0xf209) shl 16), 0x123456, 6)
+  cardsStoreTest(0xf201, 0xff)
+  expect("IRQ_MASK: bits 4:0", cardsLoadTest(0xf201), 0x1f)
+  ioModel = imLegacy
+
 run testIrqOps
 run testIrqTimer
+run testMsCounter
 run testIrqPopPcl
 
 proc testWaiTimer() =
-  ## SIM-011: parked in WAI the timers count every 3 clocks, as cpu.vhd's
-  ## tick/settle/check loop does: 4 counts a microsecond step
+  ## SIM-011: parked in WAI the timers count once a turn of 3 clocks, as
+  ## cpu.vhd's tick/settle/check loop does: 4 counts a microsecond
   echo "== timers in WAI =="
   loadProgram(testdata / "wai_timer.s")
   var n = 0
@@ -787,10 +832,14 @@ proc testWaiTimer() =
     inc n
   expectTrue("parked in wai", waiting)
   var steps = 0
+  let clocks0 = simClocks
   while steps < 1000 and waiting:
     discard cpuStep()
     inc steps
-  expectTrue("tmr0 #200 wakes WAI after 50 steps (4 counts each), not " & $steps, steps >= 49 and steps <= 51)
+  # TMR0 and WAI count it as they retire (the manual): 198 turns are left
+  expect("tmr0 #200 wakes WAI after 198 idle turns", steps, 198, 4)
+  expect("... 594 clocks, 49.5 us (4 counts a microsecond), and the IRQ entry's 20",
+         simClocks - clocks0, 614, 4)
   discard runToHalt()
   expect("the code after WAI ran", mem[0x2000], 0x55)
 
@@ -816,7 +865,7 @@ proc testKernelKeybWaits() =
     inc n
   expectTrue("kernel waiting for key", waiting)
   expectTrue("I enabled while waiting", IF)
-  expect("slot, timer 0 and SPI IRQs unmasked", irqMask, 11)
+  expect("slot, SPI and the chipset tick unmasked; the CPU timers masked", irqMask, 0x19)
 
 run testKernelKeybWaits
 
@@ -1151,9 +1200,11 @@ proc testBasicPrograms() =
 
 run testBasicPrograms
 
-proc runGuest(steps: int) =
-  ## guest time passes (the kernel waits in WAI; the cards tick)
-  for i in 0..<steps:
+proc runGuest(ms: int) =
+  ## ms of guest time pass (the machine's clocks; the kernel waits in WAI,
+  ## the cards tick)
+  let until = msCount() + ms
+  while msCount() < until:
     if cpuStep() != sOk: break
 
 proc testKernelOnEink() =
@@ -1176,7 +1227,7 @@ proc testKernelOnEink() =
     settle(6_000_000)
     expectTrue(name & ": prompt in the card's text", gpuFind(g, ">>") >= 0)
     expect(name & ": INFO says e-paper", mem[kindAt], 1)
-    runGuest(1_500_000)                      # 1.5 s: the power-on clean refresh (x0.1)
+    runGuest(1500)                           # the power-on clean refresh (x0.1)
     expect(name & ": one clean refresh at power-on", int(simcard_eink_refreshes(g, 0)), 1)
     # the glass: the banner's row (row 1, text in the middle) has ink
     var frame = newSeq[uint32](GpuOutW * GpuOutH)
@@ -1190,7 +1241,7 @@ proc testKernelOnEink() =
     typeLine("run")
     expectTrue(name & ": the program ran", gpuFind(g, "42") >= 0)
     typeLine("refresh")
-    runGuest(1_500_000)
+    runGuest(1500)
     expect(name & ": refresh asks for a clean refresh", int(simcard_eink_refreshes(g, 0)), 2)
     expectTrue(name & ": partial refreshes for the typing", simcard_eink_refreshes(g, 3) >= 1)
     expect(name & ": the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
@@ -1812,6 +1863,8 @@ proc screenText(g: SimCard): string =
     let line = gpuLine(g, row)
     if line.len > 0: result.add(line & "\n")
 
+var netCmdMs = 0                  ## the millisecond counter when netCommand pressed Enter
+
 proc netCommand(g: SimCard; b: DnsBench; cmd: string; limit = 30_000_000): string =
   ## Clear the screen, type cmd, and run (serving DNS) until the kernel waits
   ## for a key again; the screen
@@ -1820,6 +1873,7 @@ proc netCommand(g: SimCard; b: DnsBench; cmd: string; limit = 30_000_000): strin
     pushKey(ord(ch))
     settle(400_000)
     if waiting: discard cpuStep()
+  netCmdMs = msCount()
   pushKey(13)
   var n = 0
   discard cpuStep()
@@ -1898,14 +1952,18 @@ proc testKernelDnsPing() =
   lookup("late.example.com", "late.example.com 1.2.3.4")
   lookup("wrongid.example.com", "DNS server not answering", 2)
   lookup("silent.example.com", "DNS server not answering", 2)
+  # two waits of 1000 ms on the chipset's millisecond counter, and the
+  # command's own few ms
+  expectTrue("a silent server: two 1000 ms waits (" & $(msCount() - netCmdMs) & " ms)",
+             msCount() - netCmdMs >= 2000 and msCount() - netCmdMs <= 2050)
   let ids = bench.queries[^2 .. ^1].mapIt((it[0] shl 8) or it[1])
   expectTrue("the retry is a new query (another id)", ids[0] != ids[1])
   lookup("retry.example.com", "retry.example.com 5.6.7.8", 2)
   lookup("bad.example.com", "bad answer from the DNS server")
   lookup("10.1.2.3", "10.1.2.3 10.1.2.3", 0)
   lookup("a..b", "net lookup NAME", 0)
-  expectTrue("the clock is stopped after the lookups (TMR1 masked and off)",
-             (irqMask and 4) == 0 and tmr1 == 0)
+  expectTrue("the CPU timers are left to programs (TMR0, TMR1 off and masked)",
+             (irqMask and 6) == 0 and tmr0 == 0 and tmr1 == 0)
 
   # ping: the host's loopback answers (Linux's ping socket, fw/wifi/host)
   s = netCommand(g, bench, "net ping 127.0.0.1 3")
@@ -1919,9 +1977,12 @@ proc testKernelDnsPing() =
   if not check("net ping to an address that never answers: timeouts, then 2 sent, 0 received",
                     "seq 1 timeout" in s and "seq 2 timeout" in s and "2 sent, 0 received" in s):
     echo s
+  expectTrue("each unanswered request waits 1000 ms (" & $(msCount() - netCmdMs) & " ms for 2)",
+             msCount() - netCmdMs >= 2000 and msCount() - netCmdMs <= 2050)
   s = netCommand(g, bench, "net ping nx.example.com")
   expectTrue("net ping of a name that does not exist", "name not found" in s)
-  expectTrue("the clock is stopped after ping", (irqMask and 4) == 0 and tmr1 == 0)
+  expectTrue("the CPU timers are still left to programs after ping",
+             (irqMask and 6) == 0 and tmr0 == 0 and tmr1 == 0)
 
   # static address, back to DHCP, save
   s = netCommand(g, bench, "net config ip 10.0.2.50 255.255.255.0 10.0.2.2")
@@ -2504,11 +2565,13 @@ proc testKernelLayout() =
 run testKernelLayout
 
 proc testKernelApi() =
-  ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 16 entries
+  ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 32 entries
   ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
   ## goes to api_<name> (or api_none, a stub for now); every other to
   ## api_none. Entries are only added: every committed api.inc's entries are
-  ## still there at the same addresses.
+  ## still there at the same addresses, from the 32-entry table on (David
+  ## widened the groups from 16 on 2026-09-25, before any release; the
+  ## 16-entry drafts, API_PUTC $1033, are not held to it).
   echo "== kernel API table =="
   let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
   if assembled.exitCode != 0:
@@ -2519,7 +2582,7 @@ proc testKernelApi() =
   let defs = incDefines(readFile(kernelDir / "api.inc"))
   var named = initTable[int, string]()
   for (name, value) in defs:
-    if value >= 0x1003 and value < 0x1183:
+    if value >= 0x1003 and value < 0x1303:
       if (value - 0x1003) mod 3 != 0:
         fail(name & " $" & toHex(value, 4) & " is not an entry's address")
       elif named.hasKey(value):
@@ -2529,8 +2592,8 @@ proc testKernelApi() =
   var bad: seq[string]
   var stubs: seq[string]
   for g in 0..7:
-    for n in 0..15:
-      let a = 0x1003 + 48 * g + 3 * n
+    for n in 0..31:
+      let a = 0x1003 + 96 * g + 3 * n
       let o = a - 0x1000
       if image[o].ord != 0xb0:
         bad.add("$" & toHex(a, 4) & " is not a B")
@@ -2548,8 +2611,8 @@ proc testKernelApi() =
   for b in bad: echo "  ", b
   expectTrue("the table matches api.inc (" & $named.len & " entries named)", bad.len == 0)
   if stubs.len > 0: echo "  stubs (api_none for now): ", stubs.join(" ")
-  expectTrue("the table ends at $1182: api_none follows it",
-             syms.getOrDefault(0x1183, "") == "api_none")
+  expectTrue("the table ends at $1302: api_none follows it",
+             syms.getOrDefault(0x1303, "") == "api_none")
   # the API block's addresses: the kernel's (api.s) and the programs' (api.inc)
   for (name, value) in incDefines(readFile(kernelDir / "api.s")):
     expect(name & " in api.inc as in api.s", defineOf(defs, name), value, 4)
@@ -2561,6 +2624,7 @@ proc testKernelApi() =
     if commit.len != 40: continue
     let old = execCmdEx("git show " & commit & ":kernel/api.inc", workingDir = rootDir)
     if old.exitCode != 0: continue
+    if defineOf(incDefines(old.output), "API_PUTC") != 0x1063: continue   # a 16-entry draft
     inc versions
     for (name, value) in incDefines(old.output):
       let now = defineOf(defs, name)
@@ -2669,16 +2733,19 @@ proc testApiProgram() =
   r = fatcheck("check " & quoteShell(img) & " --absent API.TXT --absent API2.TXT")
   if r.exitCode != 0: echo r.output
   expectTrue("the card as a PC sees it: nothing left", r.exitCode == 0)
-  # groups 5 and 7: not there yet
-  expect("an empty net entry: $ff", mem[0x7e24], 0xff)
+  # a blank entry of group 5 (after the 16 net routines), and group 7
+  expect("a blank net entry: $ff", mem[0x7e24], 0xff)
   expect("... and API_ERR $ff", mem[0x7e25], 0xff)
   expect("an empty reserved entry: $ff", mem[0x7e27], 0xff)
   # group 6
   expect("API_WAIT_MS", mem[0x7e26], 0)
   let t0 = mem[0x7e28] or (mem[0x7e29] shl 8)
   let t1 = mem[0x7e2c] or (mem[0x7e2d] shl 8)
+  # the wait is to the counter's next step, then 20 more (20 to 21 ms), so
+  # the counter moves 21 between the two TICKS (22 if it stepped between
+  # the first TICKS and the wait's first look)
   expectTrue("API_TICKS counts the 20 ms API_WAIT_MS waited (" & $t0 & " to " & $t1 & ")",
-             t1 - t0 >= 18 and t1 - t0 <= 30)
+             t1 - t0 >= 21 and t1 - t0 <= 22)
 
   echo "== kernel API: API_EXIT =="
   let ex = testdata / "api_exit.prg"
@@ -2789,6 +2856,50 @@ proc testEinkApi() =
 
 run testEinkApi
 
+proc testHello() =
+  ## KRN-015: examples/hello (tools/mkprg.py: kernel/api.inc, then the
+  ## program, for $7000) on the HDMI machine: its banner and API version,
+  ## then a light stepping across the LEDs once a second. A "second" is ten
+  ## API_WAIT_MS 100 (each more than 100 ms, at most 101, on the chipset's
+  ## millisecond counter) and the printing, so the steps are 1000-1015 ms
+  ## apart. A key stops it, and the terminal is back.
+  echo "== examples/hello =="
+  let rom = buildKernelRom()
+  let prg = rootDir / "build" / "examples" / "hello.prg"
+  createDir(rootDir / "build" / "examples")
+  mkprg(rootDir / "examples" / "hello" / "hello.s", prg)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  let g = gpuCard()
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("its banner and API version 1", runUntil(proc (): bool =
+    gpuFind(g, "Hello from a native CUPC/8 program!") >= 0 and gpuFind(g, "API version 1") >= 0, 5_000_000))
+  var at: seq[int]                          # guest ms as each "seconds N" appears
+  var leds: seq[int]
+  for n in 0..4:
+    let want = "seconds " & align($n, 3, '0')
+    var k = 0
+    while gpuFind(g, want) < 0 and k < 10_000:
+      for i in 0..<500:
+        if cpuStep() != sOk: break
+      inc k
+    at.add(msCount())
+    leds.add(mem[0xf000])
+  expectTrue("seconds 000 to 004 on screen", gpuFind(g, "seconds 004") >= 0)
+  var gaps: seq[int]
+  for i in 1..<at.len: gaps.add(at[i] - at[i - 1])
+  expectTrue("a step every 1000-1015 ms of the counter " & $gaps, gaps.allIt(it >= 1000 and it <= 1015))
+  expectTrue("the LEDs step 1, 2, 4, 8, 16 " & $leds, leds == @[1, 2, 4, 8, 16])
+  pushKey(ord('x'))
+  expectTrue("a key stops it; the terminal is back",
+             runUntil(proc (): bool = gpuFind(g, "You pressed 'x'") >= 0 and mem[ApiRun] == 0 and waiting, 5_000_000))
+  expect("the LEDs off", mem[0xf000], 0)
+  ioModel = imLegacy
+
+run testHello
 # ------------------------------------------------------------ the USB console
 # KRN-030 (doc/proposals/usb-console.md): the test plays the system card on
 # the API block's rings, as fw/sysctl/core/console.c does.

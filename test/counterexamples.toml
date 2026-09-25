@@ -20,12 +20,16 @@ must_fail = ["FAIL tmr0 r1"]
 name = "kernel BASIC: tokenizer, mem_cmp, precedence, strings, FOR/NEXT, jumps, REM, ELSE, 0, /0, long lines"
 fixed_in = "e635dbd"
 before = "f811788"
-files = ["kernel/ubasic.s", "kernel/ubasic_tokenizer.s", "kernel/printf.s", "kernel/math.s", "kernel/term.s"]
-cmd = "tools/run_tests.sh testBasicPrograms"
-must_fail = ["BASIC precedence", "BASIC string", "BASIC for/next", "BASIC if/then/else", "BASIC goto loop",
-             "BASIC gosub", "BASIC nested for", "BASIC parentheses", "BASIC equals", "BASIC zero",
-             "BASIC rem", "BASIC mod, divide by 0", "BASIC let in then", "BASIC gosub nest",
-             "BASIC longest line"]
+# The fix touched ubasic.s, ubasic_tokenizer.s, printf.s, math.s and term.s;
+# those old files no longer assemble with today's kernel (sys.s, the API,
+# calls routines they lack), so the whole kernel as it was goes back, and
+# the files added since go.
+files = ["kernel"]
+cmd = "rm -f kernel/api.inc kernel/api.s kernel/bank.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
+must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/next", "FAIL: BASIC if/then/else",
+             "FAIL: BASIC goto loop", "FAIL: BASIC gosub", "FAIL: BASIC nested for", "FAIL: BASIC parentheses",
+             "FAIL: BASIC equals", "FAIL: BASIC zero", "FAIL: BASIC rem", "FAIL: BASIC mod, divide by 0",
+             "FAIL: BASIC let in then", "FAIL: BASIC gosub nest", "FAIL: BASIC longest line"]
 
 [[bug]]
 name = "kernel: the BASIC program buffer overflowed"
@@ -333,15 +337,11 @@ must_fail = ["FAIL race sweep: every READ framed"]
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
 fixed_in = "52423fa"
-revert = [["kernel/term.s", """term_do:
-	; start with an empty program: .bss is not cleared, and the SRAM
-	; powers up with junk
-	xor r0, r0
+revert = [["kernel/term.s", """	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
 	st [term_basic_prog_buf], r0
-
-""", """term_do:
-"""]]
+	st API_RUN, r0""", """	xor r0, r0
+	st API_RUN, r0"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
 must_fail = ["FAIL: BASIC on junk RAM"]
 
@@ -490,11 +490,13 @@ must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
 [[bug]]
 name = "sim: headless --type hung when no card took the key (no IO card)"
 fixed_in = "000d63c"
-revert = [["tools/sim.nim", """        if not ranSinceKey and ins_retired - keyAt >= settleMs * 1000:
+revert = [["tools/sim.nim", """        if not ranSinceKey and msCount() - keyAt >= settleMs:
           ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
 """, ""]]
 cmd = "python3 test/sim/test_cli.py"
-must_fail = ["FAIL: --type with no IO card: headless still exits"]
+# (at the kernel's prompt the chipset's tick wakes the CPU every 50 ms now,
+# so it is the parked program that hangs)
+must_fail = ["FAIL: --type at a program parked with nothing to wake it: headless still exits"]
 
 [[bug]]
 name = "kernel: Backspace at the prompt was stored in the line and only moved the cursor"
@@ -521,13 +523,16 @@ cmd = "make -s -C fw test_gpu"
 must_fail = ["BS at column 0"]
 
 [[bug]]
-name = "sim: an IRQ taken between POP pcl and POP pch lost the return (the kernel's timer tick crashed it at boot)"
+name = "sim: an IRQ taken between POP pcl and POP pch lost the return"
 fixed_in = "51c8e35"
+# (it also crashed the kernel at boot while the kernel's clock was a timer-0
+# tick every 250 instructions; the chipset's 50 ms tick meets a POP pcl
+# too rarely for testKernelOnCards to show it)
 revert = [["tools/sim.nim", """  if lastOp == 0x9f:
     return
 """, ""]]
-cmd = "tools/run_tests.sh testIrqPopPcl testKernelOnCards"
-must_fail = ["FAIL: the call returned where it should", "FAIL: BASIC banner on screen"]
+cmd = "tools/run_tests.sh testIrqPopPcl"
+must_fail = ["FAIL: the call returned where it should"]
 
 [[bug]]
 name = "cpu: an IRQ taken between POP pcl and POP pch lost the return"
@@ -539,51 +544,16 @@ must_fail = ["an IRQ due at POP pcl pushed"]
 [[bug]]
 name = "emu/machine: a card's CS_n set high again on every sync latched a rising edge each time; slotspi restarted mid-frame and exec's chunk reads went unanswered"
 fixed_in = "08496f0"
-# timing-bound, as the slotspi entry above: it shows with exec's chunk loop
-# of 6c88ad2's kernel; if a later layout hides it, this entry says so
+# exec's chunk reads showed it only by timing (6c88ad2's kernel; later ones
+# hide it), so E2E-011 counts, per card, the rising CS_n edges its GPIO
+# latched against the chipset's deselects (Rp2040Card::csEdges, csRises)
 revert = [["emu/machine/machine.cpp", """  if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
   if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
   if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);""", """  g[P::MOSI].setInputValue(!!mosi);
   g[P::SCK].setInputValue(!!sck);
   g[P::NCS].setInputValue(!selected);"""]]
 cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-011"
-must_fail = ["FAIL exec a program file: it prints NATIVE OK"]
-
-[[bug]]
-name = "kernel net: the clock's tick IRQ, taken between pop pcl and pop pch, returned with its own pop pcl (the CPU does not save the pcl latch), so the interrupted return jumped elsewhere (a DNS answer read half from a dropped frame)"
-fixed_in = "c5b0012"
-revert = [["kernel/ping.s", """	pop r0				; the flags
-	st [net_irq_f], r0
-	pop r0				; the return address, low
-	st [net_irq_a], r0
-	pop r0				; and high
-	st [net_irq_a+1], r0
-	ldd r0, [net_irq_a]
-	eq r0, #0x9e
-	bzf .in_return
-	ld r0, [net_irq_a+1]
-	push r0
-	ld r0, [net_irq_a]
-	push r0
-	ld r0, [net_irq_f]
-	push r0
-	ld r0, [net_irq_r0]
-	pop f
-	pop pcl
-	pop pch
-.in_return:
-	ld r0, [net_irq_f]
-	push r0
-	ld r0, [net_irq_r0]
-	pop f
-	pop pch
-""", """	ld r0, [net_irq_r0]
-	pop f
-	pop pcl
-	pop pch
-"""]]
-cmd = "tools/run_tests.sh testKernelDnsPing"
-must_fail = ["FAIL: net lookup www.example.com"]
+must_fail = ["FAIL slot 1 (hdmi):", "FAIL slot 2 (io):", "FAIL slot 3 (storage):", "rising CS_n edges latched for"]
 
 [[bug]]
 name = "kernel net: net config ip counted its words in net_pn, which net_parse_ip uses too"
@@ -600,7 +570,7 @@ must_fail = ["FAIL: net config ip IP MASK GW"]
 
 [[bug]]
 name = "assembler: any line with a lower-case \"db\" (or \"resb\") in it was taken for data (a %define of $10db, an address, a comment)"
-fixed_in = "HEAD"
+fixed_in = "2149249"
 revert = [["tools/as.py", """            if directive == 'resb':""", """            if l.find('resb') > -1:"""],
           ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
 cmd = "python3 test/asm/test_asm.py"
@@ -609,28 +579,29 @@ must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'"
 [[bug]]
 name = "sim: an interactive run slept a millisecond per WAI (0.17 MHz with a timer tick)"
 fixed_in = "ced7599"
-revert = [["tools/sim.nim", """          let behind = insStart + int((epochTime() - realStart) * 1_000_000) - ins_retired
+# (as merged with the clock model: guest time is simClocks, held to the host clock)
+revert = [["tools/sim.nim", """          let behind = hostClocks() - simClocks
           if behind <= 0:
             sleep(1)
-            steps = 1000
+            steps = 0
           else:
-            steps = min(behind, 100_000)""", """          sleep(1)
-          steps = clamp(int((epochTime() - lastReal) * 1_000_000), 1, 100_000)"""]]
+            steps = min(behind div 3 + 1, 400_000)""", """          sleep(1)
+          steps = clamp((hostClocks() - simClocks) div 3, 1, 400_000)"""]]
 cmd = "python3 test/sim/test_cli.py"
-must_fail = ["FAIL: interactive: WAI-heavy guest runs at ~1 MIPS"]
+must_fail = ["FAIL: interactive: a WAI-heavy guest keeps its 12 MHz clock"]
 
 [[bug]]
-name = "sim: timers counted once a microsecond in WAI, not every 3 clocks (API_WAIT_MS ~4x slow)"
+name = "sim: a WAI turn was a microsecond, not 3 clocks, so its timer counts ran 4x slow (API_WAIT_MS ~4x slow)"
 fixed_in = "514c86a"
-revert = [["tools/sim.nim", """    for k in 0..3:
-      tickTimers()
-      serviceIrq()
-      if not waiting: break
-    inc ins_retired""", """    tickTimers()
-    serviceIrq()
-    inc ins_retired"""]]
+# (as merged with the clock model: a turn is 3 of simClocks; the bug puts
+# a microsecond, 12, back)
+revert = [["tools/sim.nim", """    tickTimers()
+    inc ins_retired
+    simClocks += 3""", """    tickTimers()
+    inc ins_retired
+    simClocks += 12"""]]
 cmd = "tools/run_tests.sh testWaiTimer"
-must_fail = ["tmr0 #200 wakes WAI after 50 steps"]
+must_fail = ["FAIL: ... 594 clocks, 49.5 us (4 counts a microsecond)"]
 
 
 [[bug]]

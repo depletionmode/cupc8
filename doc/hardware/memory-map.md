@@ -63,7 +63,7 @@ bridge's 24-bit RAM commands.
 
 | Range | Use |
 |---|---|
-| $1000–$5fff | kernel code (`b main` at $1000, then the API jump table $1003–$1182) |
+| $1000–$5fff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
 | $6000–$6eff | kernel data |
 | $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
 | $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
@@ -111,12 +111,39 @@ bare body.
 | $f1X3 | R | SPI_STAT | bit 0: 1 = idle/done, 0 = busy |
 | $f1X4 | R/W | **SPI_CS** (new) | bit 0 = 1 holds this device's CS_n asserted across bytes, which frames a card command. Writing 0 releases CS_n. With bit 0 = 0, CS_n is asserted only for the duration of each SPI_GO byte, as today. |
 | $f1Xf | W | SPI_CFG | `clk_div[7:3] cpha[2] cpol[1] cont[0]`. `clk_div` = 0 is treated as 1. SCK = CPU_CLK / (2 × clk_div), so the fastest is 6 MHz at 12 MHz. `cont` is kept for compatibility, but new code frames with SPI_CS instead. |
-| $f200 | R/W1C | IRQ_PEND | pending IRQ bits 3:0; bits 7:4 read 0 |
-| $f201 | R/W | IRQ_MASK | bits 3:0, 1 = enabled; bits 7:4 read 0 |
+| $f200 | R/W1C | IRQ_PEND | pending IRQ bits 4:0 (bit 4: the chipset tick, see "Interrupts"); bits 7:5 read 0 |
+| $f201 | R/W | IRQ_MASK | bits 4:0, 1 = enabled (reset 0); bits 7:5 read 0 |
 | $f202 | R | **SLOT_IRQ** (new) | bit n = SPI dev n (slots 1–6 → bits 0–5) is currently asserting IRQ_n (level, live). Bits 7:6 read 0. |
 | $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bit 1 `PWR_HI`, read-only: the USB-C source advertises 3.0 A (a comparator on CC, so it works without the system card; `power.md`). When it is 0 the kernel's `net` command refuses to start the radio, and SAVE and DEL refuse to write the SD card. Bits 7:2 reserved, read 0. |
 | $f204 | R/W | **ROM_BANK** (new) | Bank for the $e800 window, 0–255 (reset 0) |
 | $f205 | R/W | **RAM_BANK** (new) | SRAM bank for the RAM window at $8000–$bfff, 0–31 (reset 2, the identity map); bits 7:5 read 0. See "RAM banks". |
+| $f206 | R | **MS_COUNT0** (new) | The millisecond counter, bits 7:0. Reading it also latches bits 31:8 into MS_COUNT1–3. See "Millisecond counter". |
+| $f207 | R | **MS_COUNT1** (new) | Bits 15:8 of the counter as latched by the last read of MS_COUNT0 |
+| $f208 | R | **MS_COUNT2** (new) | Bits 23:16, latched likewise |
+| $f209 | R | **MS_COUNT3** (new) | Bits 31:24, latched likewise |
+
+$f20a–$f2ff read 0 and ignore writes.
+
+### Millisecond counter
+
+The chipset counts milliseconds from its own 12 MHz clock (the same
+oscillator as CPU_CLK, `cpu-bus.md`): a divider counts 12000 clocks, then
+the 32-bit counter goes up by one. Both are 0 after the chipset's own
+reset (n_POR); holding only the CPU in reset (`CPU_CTL` bit 6, or waiting
+for CDONE) neither stops nor clears them. The counter wraps after 2^32 ms
+(49.7 days). Writes are ignored.
+
+A multi-byte read is consistent when it starts with MS_COUNT0: that read
+returns bits 7:0 and, in the same clock, copies bits 31:8 into the latch
+that MS_COUNT1–3 read. So "MS_COUNT0, then MS_COUNT1 (then 2, 3)" is one
+value even when the counter steps (or carries) in between. Read MS_COUNT0
+alone for an 8-bit time (256 ms wrap), MS_COUNT0 and 1 for 16 bits (65.5
+s). An interrupt handler that reads the counter between another routine's
+MS_COUNT0 and MS_COUNT1 re-latches it, so code that reads it from both
+places reads it with interrupts off (the kernel's handlers never read it).
+
+The CPU's own timers (`TMR0`, `TMR1`) count instructions and are left to
+programs; the kernel's clock is this counter.
 
 ### SPI devices
 
@@ -133,12 +160,24 @@ The cards are not fixed to slots. Software identifies them with `IDENT` (see
 
 ### Interrupts
 
-| IRQ | Vector | Source |
-|---|---|---|
-| 0 | $0010 | **Slot IRQ**: a new assertion on any slot's IRQ_n (was: keyboard). The handler reads $f202 to find the slot. |
-| 1 | $0012 | Timer 0 |
-| 2 | $0014 | Timer 1 |
-| 3 | $0016 | SPI transaction complete |
+| IRQ_PEND bit | CPU IRQ line | Vector | Source |
+|---|---|---|---|
+| 0 | 0 | $0010 | **Slot IRQ**: a new assertion on any slot's IRQ_n (was: keyboard). The handler reads $f202 to find the slot. |
+| 1 | 1 | $0012 | Timer 0 (the CPU's `TMR0`) |
+| 2 | 2 | $0014 | Timer 1 (the CPU's `TMR1`) |
+| 3 | 3 | $0016 | SPI transaction complete |
+| 4 | 3 | $0016 | **Tick** (new): every 50 ms (20 Hz) of the millisecond counter |
+
+The CPU has four IRQ lines (`cpu-bus.md`), so the tick shares line 3 with
+SPI complete: `IRQ3 = (IRQ_PEND[3] and IRQ_MASK[3]) or (IRQ_PEND[4] and
+IRQ_MASK[4])`, and lines 0–2 are `IRQ_PEND[n] and IRQ_MASK[n]` as before.
+The handler at $0016 reads IRQ_PEND to tell the two apart and clears what
+it serviced (the kernel's clears both: it only needs the wake-up). The tick
+is set when the millisecond counter reaches a multiple of 50 (it counts from
+the same divider, so ticks are exactly 600,000 clocks apart), and is masked
+at reset. It exists to wake a CPU parked in `WAI` a few times a second: the
+kernel's terminal looks at `API_RUN` (a program the PC left at $7000) each
+time its key wait wakes.
 
 A card holds IRQ_n low until its condition clears. IRQ0 latches when any
 slot line goes from released to asserted, each line on its own, so a card

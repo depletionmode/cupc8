@@ -4,8 +4,8 @@
 ; the kernel sleeps in WAI instead of spinning. Keys are ASCII, with $ff
 ; meaning "nothing waiting". The wait polls the card whenever its line is
 ; asserted (SLOT_IRQ, $f202, the live level), so a key is never missed
-; between a poll and the WAI; the kernel's clock (irq.s) wakes the WAI
-; often enough for that.
+; between a poll and the WAI; the chipset's tick (irq.s) wakes the WAI
+; every 50 ms, which bounds that.
 
 %define SLOT_TABLE $0002
 %define KEYB_CFG_DIV2 16
@@ -165,12 +165,8 @@ keyb_read_char:
 	bzf .wait
 	b .done
 .wait:
-	; sleep until an IRQ - the IO card's while it has keys, or the clock
-	mov r0, #1
-	st [tick_idle], r0
+	; sleep until an IRQ - the IO card's while it has keys, or the tick
 	wai
-	xor r0, r0
-	st [tick_idle], r0
 	ld r0, [keyb_term]
 	eq r0, #0
 	bzf .key

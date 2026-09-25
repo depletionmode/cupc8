@@ -22,6 +22,13 @@ when isMainModule:
 var log_mask* = 9
 var last_gpo*: string = ""
 var ins_retired*: int = 0
+## The CPU's 12 MHz clocks since reset, as cpu.vhd and the chipset spend
+## them: 4 a memory bus cycle (every byte fetched, a load or store, a push or
+## pop, a pointer byte), 2 an I/O register cycle ($f000-$ffff), 4 more an
+## instruction (exec, tick, settle, check), 3 a WAI idle turn, 20 an IRQ
+## entry (3 pushes, 2 vector bytes). The chipset's millisecond counter and
+## its tick run from it (memory-map.md).
+var simClocks*: int = 0
 
 var statusShown = false  ## the speed line is on screen, without its newline
 
@@ -49,11 +56,12 @@ proc log(lvl : int, msg : string) =
         writeLine(stdout, msg)
         resetAttributes()
 
-proc speedLine(ips: float): string =
-  ## instructions per second, and the CPU clock that is: the sim counts one
-  ## instruction per microsecond, ~12 clocks of the real 12 MHz CPU
-  "$1 MIPS, as a $2 MHz CUPC/8 (the real one: 12 MHz, ~1 MIPS)" %
-    [formatFloat(ips / 1_000_000, ffDecimal, 2), formatFloat(ips * 12 / 1_000_000, ffDecimal, 1)]
+proc speedLine(ips, cps: float): string =
+  ## instructions per second (WAI idle turns included), and the CPU clocks a
+  ## second they came to (simClocks: the real CPU runs 12 MHz, so an
+  ## interactive run held to the host clock shows 12)
+  "$1 MIPS, $2 MHz of CUPC/8 clock (the real one: 12 MHz)" %
+    [formatFloat(ips / 1_000_000, ffDecimal, 2), formatFloat(cps / 1_000_000, ffDecimal, 1)]
 
 proc status(msg: string) =
   ## the speed line: rewritten in place, not one line per second
@@ -85,8 +93,10 @@ var
   lastOp: int = 0                # the opcode of the instruction that retired last
   mem*: array[0..0x10000, int]
   imageEnd*: int = 0
-  irqPending*: int = 0
+  irqPending*: int = 0           # IRQ_PEND bits 4:0 (bit 4: the tick, on CPU line 3)
   irqMask*: int = 0
+  msLatch: int = 0               # MS_COUNT1-3: bits 31:8 latched by a read of MS_COUNT0
+  ticksSeen: int = 0             # 50 ms ticks raised so far
   tmr0*: int = 0
   tmr1*: int = 0
 
@@ -142,9 +152,30 @@ var
   slotIrqPrev: int = 0
   lastCardTick: int = 0
 
+const
+  MsClocks* = 12000              ## the chipset's clocks a millisecond
+  TickMs* = 50                   ## the tick IRQ's period (20 Hz)
+
 proc simMillis*(): uint32 =
-  ## Guest time: about one instruction per microsecond at 12 MHz.
-  uint32(ins_retired div 1000)
+  ## The machine's time in ms, for the cards: the CPU's clocks, as the
+  ## chipset's millisecond counter counts them.
+  uint32((simClocks div MsClocks) and 0xffffffff)
+
+proc msCount*(): int =
+  ## The chipset's millisecond counter (MS_COUNT, $f206-$f209), 32 bits.
+  (simClocks div MsClocks) and 0xffffffff
+
+proc msRead(reg: int): int =
+  ## A CPU read of MS_COUNT0-3: MS_COUNT0 latches bits 31:8 for the others.
+  let c = msCount()
+  case reg
+  of 6:
+    msLatch = c shr 8
+    c and 0xff
+  of 7: msLatch and 0xff
+  of 8: (msLatch shr 8) and 0xff
+  of 9: (msLatch shr 16) and 0xff
+  else: 0
 
 var heldSlotIrq*: int = 0       ## test hook: slots whose IRQ_n is held low (another card's)
 
@@ -174,8 +205,16 @@ proc cpuLoadRom*(path: string) =
     rom[i] = if i < data.len: uint8(data[i]) else: 0xff'u8
 
 proc raiseIrq*(bit: int) =
-  irqPending = (irqPending or (1 shl bit)) and 0x0f
+  irqPending = (irqPending or (1 shl bit)) and 0x1f
   mem[0xf200] = irqPending
+
+proc clockTick() =
+  ## The chipset's tick: IRQ_PEND bit 4 each time the millisecond counter
+  ## reaches a multiple of 50.
+  let t = simClocks div (MsClocks * TickMs)
+  if t != ticksSeen:
+    ticksSeen = t
+    raiseIrq(4)
 
 proc cardsTick*() =
   ## Let the cards do background work, and latch IRQ0 on a new slot IRQ.
@@ -269,6 +308,7 @@ proc memRead(a: int): int =
 proc fetch(): int =
   result = memRead(PC)
   PC = (PC + 1) and 0xffff
+  simClocks += 4
 
 proc reg_write(operands, val: int) =
   if (operands and 1) == 1:
@@ -390,8 +430,8 @@ proc cardsStore(address, value: int) =
       cardsTick()
   of 0x2:
     case address and 0xff
-    of 0: irqPending = irqPending and not v and 0x0f
-    of 1: irqMask = v and 0x0f
+    of 0: irqPending = irqPending and not v and 0x1f
+    of 1: irqMask = v and 0x1f
     of 3: romOff = (v and 1) == 1
     of 4: romBank = v
     of 5: ramBank = v and 0x1f
@@ -421,6 +461,7 @@ proc cardsLoad(address: int): int =
     of 3: (if romOff: 1 else: 0) or (if pwrHi: 2 else: 0)
     of 4: romBank
     of 5: ramBank
+    of 6, 7, 8, 9: msRead(address and 0xff)
     else: 0
   else: 0
 
@@ -433,6 +474,7 @@ proc ins_st_do(o: int, a: int) =
     var ra = reg_read(o, true)
     address += ra
   address = address and 0xffff
+  simClocks += (if address >= 0xf000: 2 else: 4)
   let
     value = reg_read(o, false)
     oldValue = mem[address]
@@ -454,7 +496,7 @@ proc ins_st_do(o: int, a: int) =
           irqPending = irqPending and not value
           mem[address] = irqPending
         of 1:
-          irqMask = value and 0x0f      # 4 IRQs; bits 7:4 read 0 (memory-map.md)
+          irqMask = value and 0x1f      # 5 IRQ_PEND bits; bits 7:5 read 0 (memory-map.md)
           mem[address] = irqMask
         else:
           discard
@@ -497,6 +539,7 @@ proc ins_st(o: int) =
 proc ins_std(o: int) =
   var address = fetch() or (fetch() shl 8)
   var address_d = memRead(address) or (memRead(address + 1) shl 8)
+  simClocks += 8
   ins_st_do(o, address_d)
 
 proc ins_ld_do(o: int, a: int) =
@@ -505,6 +548,7 @@ proc ins_ld_do(o: int, a: int) =
     var rb = reg_read(o, false)
     address += rb
   address = address and 0xffff
+  simClocks += (if address >= 0xf000: 2 else: 4)
   if ioModel == imCards:
     let value = cardsLoad(address)
     reg_write(o, value)
@@ -520,6 +564,8 @@ proc ins_ld_do(o: int, a: int) =
           value = irqPending
         of 1:
           value = irqMask
+        of 6, 7, 8, 9:
+          value = msRead(address and 0xff)
         else:
           discard
     of 0xf1:    #spi
@@ -556,6 +602,7 @@ proc ins_ld(o: int) =
 proc ins_ldd(o: int) =
   var address = fetch() or (fetch() shl 8)
   var address_d = memRead(address) or (memRead(address + 1) shl 8)
+  simClocks += 8
   ins_ld_do(o, address_d)
 
 proc ins_gt(o: int) =
@@ -642,6 +689,7 @@ proc ins_push(o: int) =
   if not memHook.isNil:
     memHook(maWrite, SP, rb and 0xff, oldValue)
   SP += 1
+  simClocks += 4
 
 proc flagsNibble(): int =
   (if ZF: 1 else: 0) or (if IF: 2 else: 0)
@@ -652,6 +700,7 @@ proc setFlags(n: int) =
 
 proc ins_pop(o: int) =
   SP -= 1
+  simClocks += 4
   if (o and 7) == 7:
     pcl = ramRead(SP)
   elif (o and 6) == 6:
@@ -709,11 +758,14 @@ proc pushByte(v: int) =
   SP += 1
 
 proc irqReady(): int =
+  ## The CPU IRQ line to take: lines 0-2 are IRQ_PEND bits 0-2, line 3 is
+  ## bit 3 (SPI complete) or bit 4 (the tick), each by its own mask bit.
   let bits = irqPending and irqMask
-  if bits == 0:
+  let lines = (bits and 0x0f) or (if (bits and 0x10) != 0: 0x08 else: 0)
+  if lines == 0:
     return -1
   for i in 0..3:
-    if (bits and (1 shl i)) != 0:
+    if (lines and (1 shl i)) != 0:
       return i
   -1
 
@@ -723,6 +775,7 @@ proc takeIrq(n: int) =
   pushByte(ret shr 8)
   pushByte(ret and 0xff)
   pushByte(flagsNibble())
+  simClocks += 20                     # 3 pushes and 2 vector bytes
   IF = false
   let va = 0x0010 + n * 2
   PC = (mem[va] and 0xff) or ((mem[va + 1] and 0xff) shl 8)
@@ -798,6 +851,9 @@ proc cpuReset*() =
   lastOp = 0
   imageEnd = 0
   ins_retired = 0
+  simClocks = 0
+  msLatch = 0
+  ticksSeen = 0
   last_gpo = ""
   display_active = false
   has_key = false
@@ -885,18 +941,20 @@ proc cpuStep*(): StepResult =
   if ioModel == imCards and ins_retired - lastCardTick >= 64:
     cardsTick()
   if waiting:
-    # parked in WAI the CPU loops tick, settle, check: 3 clocks per timer
-    # count (cpu.vhd), so 4 counts in each microsecond step of the sim's clock
-    for k in 0..3:
-      tickTimers()
-      serviceIrq()
-      if not waiting: break
+    # parked in WAI the CPU loops tick, settle, check: one timer count and 3
+    # clocks a turn (cpu.vhd), so 4 counts a microsecond
+    tickTimers()
     inc ins_retired
+    simClocks += 3
+    clockTick()
+    serviceIrq()
     return sOk
   if PC >= imageEnd:
     return sPastImage
   decode()
   ins_retired += 1
+  simClocks += 4
+  clockTick()
   tickTimers()
   if HF:
     return sHalted
@@ -935,6 +993,8 @@ proc cpuRun*(maxSteps: int): RunExit =
     if ioModel == imCards:
       cardsTick()
     tickTimers()
+    simClocks += 3
+    clockTick()
     serviceIrq()
     if waiting:
       return reCount
@@ -955,6 +1015,8 @@ proc cpuRun*(maxSteps: int): RunExit =
       resumeBreak = -1
       decode()
       inc ins_retired
+      simClocks += 4
+      clockTick()
       tickTimers()
       if HF:
         return reHalted
@@ -965,8 +1027,8 @@ proc cpuRun*(maxSteps: int): RunExit =
   reCount
 
 proc cpuStatusLine*(): string =
-  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7" % [
-    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF]
+  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7 ms=$8" % [
+    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF, $msCount()]
 
 when defined(emscripten):
   proc emscripten_set_main_loop(fun: proc() {.cdecl.}, fps,
@@ -996,6 +1058,7 @@ when isMainModule:
   var dumpText = ""
   var settleMs = 2000
   var scaleSet = false
+  var runPath = ""               # --run: a program for $7000
 
   const usage = """usage: sim [options] [kernel.o]
 
@@ -1013,6 +1076,10 @@ the kernel from the ROM chip; the slot cards run the real card firmware cores.
   --dump-text:PATH  at exit, write the console's text (- = stdout)
   --settle:MS       headless: guest ms to run on once the typed text is used up
                     and the machine is idle again (default 2000); then exit
+  --run:PROG        run PROG, a program for $7000 (a .prg from tools/mkprg.py,
+                    or the bare binary), once the kernel is at its prompt: as
+                    `cupc8.py run` does on the machine (the body at $7000,
+                    then API_RUN = 1; the terminal starts it)
   --console         the USB console (doc/proposals/usb-console.md) on this
                     terminal, as the system card carries it to a PC: the
                     kernel's terminal output on stdout (\n as CR LF), stdin
@@ -1077,6 +1144,8 @@ Both:
         dumpText = val
       of "settle":
         settleMs = parseInt(val)
+      of "run":
+        runPath = val
       of "console":
         consoleOn = true
         log_mask = 0                 # no GPO lines or speed line in the console's stream
@@ -1273,26 +1342,41 @@ Both:
   # Hooks for later features (a program to load and run, ...): each runs
   # once, when the kernel first parks in WAI (it is at its prompt).
   var onKernelReady: seq[proc()] = @[]
+  if runPath.len > 0:
+    if legacy:
+      die("--run needs the M1 machine (not --legacy)")
+    var prog = ""
+    try:
+      prog = readFile(runPath)
+    except IOError:
+      die("cannot read " & runPath)
+    onKernelReady.add(proc() =
+      if not runProgram(prog):
+        die(runPath & ": not a program for $7000 (a \"C8P\" header of another version, or over 28672 bytes)")
+      echo "sim: ", runPath, " at $7000, API_RUN = 1")
 
   proc runCards() =
-    ## The M1 machine's main loop. The CPU runs flat out; while it is parked
-    ## in WAI, guest time follows the host clock (interactive) or runs on
-    ## without sleeping (headless). --type keys go in one at a time, each
-    ## once the CPU has run and parked in WAI again.
+    ## The M1 machine's main loop. Guest time is the CPU's clocks (sim.nim's
+    ## simClocks, which the chipset's millisecond counter and the cards
+    ## follow). Interactive, it is held to the host clock: the CPU runs until
+    ## it is ahead of it, then the loop sleeps, and a CPU parked in WAI idles
+    ## (3 clocks a turn) up to it; a CPU slower than the machine falls behind
+    ## and the clock starts again from where it is. Headless, nothing sleeps.
+    ## --type keys go in one at a time, each once the CPU has run and parked
+    ## in WAI again.
     var pos = 0                       # next key of `typed`
     var ranSinceKey = true
-    var keyAt = 0                     # ins_retired when the last key went in
+    var keyAt = 0                     # guest ms when the last key went in
     var readyDone = false
-    var idleAt = -1                   # ins_retired when the typed text was used up and the CPU parked
-    var lastReal = epochTime()
-    # guest time is one microsecond per instruction (WAI steps included);
-    # interactive runs keep it level with the host clock from here
-    let realStart = lastReal
-    let insStart = ins_retired
+    var idleAt = -1                   # guest ms when the typed text was used up and the CPU parked
+    var realAt = epochTime()          # the host time ...
+    var clocksAt = simClocks          # ... that these guest clocks stood for
+    proc hostClocks(): int = clocksAt + int((epochTime() - realAt) * float(MsClocks * 1000))
     var lastPresent = 0.0
-    var lastMhz = lastReal
+    var lastMhz = realAt
     var lastMhzIns = 0
-    var conLast = 0                   # ins_retired at the last console poll
+    var lastMhzClocks = simClocks
+    var conLast = 0                   # msCount() at the last console poll
     if consoleOn: consoleStart()
     while not atend:
       if HF or PC >= imageEnd:
@@ -1300,37 +1384,40 @@ Both:
         break
       if maxIns > 0 and ins_retired >= maxIns:
         break
-      if consoleOn and ins_retired - conLast >= 2000:
-        conLast = ins_retired         # every 2 guest ms, as the card polls
+      if consoleOn and msCount() - conLast >= 2:
+        conLast = msCount()           # every 2 guest ms, as the card polls
         if consolePoll(readyDone) or conPending.len > 0 or not conEof:
           idleAt = -1                 # still typing, or printing: not idle
-      if headless and idleAt >= 0 and ins_retired - idleAt >= settleMs * 1000:
+      if headless and idleAt >= 0 and msCount() - idleAt >= settleMs:
         break
       if waiting:
         if not readyDone:
           readyDone = true
           for hook in onKernelReady: hook()
-        if not ranSinceKey and ins_retired - keyAt >= settleMs * 1000:
+        if not ranSinceKey and msCount() - keyAt >= settleMs:
           ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
         if ranSinceKey:
           if pos < typed.len:
             pushKey(ord(typed[pos]))
             inc pos
             ranSinceKey = false
-            keyAt = ins_retired
-          elif idleAt < 0:
-            idleAt = ins_retired
+            keyAt = msCount()
+          elif idleAt < 0 and mem[ApiRun] != 1:
+            idleAt = msCount()        # (not while a --run program waits to start)
+        if mem[ApiRun] == 1:
+          idleAt = -1
         var steps = 1000
         if not headless:
-          # sleep only while the guest is ahead of the host clock: a sleep per
-          # WAI would cap a machine that wakes often (a timer tick) at a few
-          # hundred instructions per millisecond
-          let behind = insStart + int((epochTime() - realStart) * 1_000_000) - ins_retired
+          # idle turns (3 clocks each) up to the host clock, at most 100 ms
+          # of them at once; sleep only while the guest is ahead of it: a
+          # sleep per WAI would cap a machine that wakes often (a timer tick)
+          # at a few hundred instructions per millisecond
+          let behind = hostClocks() - simClocks
           if behind <= 0:
             sleep(1)
-            steps = 1000
+            steps = 0
           else:
-            steps = min(behind, 100_000)
+            steps = min(behind div 3 + 1, 400_000)
         if maxIns > 0:
           steps = min(steps, maxIns - ins_retired)
         var i = 0
@@ -1346,7 +1433,15 @@ Both:
           echo "TRACE pc=$1 op=$2" % [toHex(PC, 4), toHex(memRead(PC), 2)]
           batch = 1
         discard cpuRun(batch)
+        if not headless:
+          let ahead = simClocks - hostClocks()
+          if ahead > 2 * MsClocks:
+            sleep(ahead div MsClocks)
       if not headless:
+        let behind = hostClocks() - simClocks
+        if behind > 100 * MsClocks:   # slower than the machine: start the clock again here
+          realAt = epochTime()
+          clocksAt = simClocks
         let now = epochTime()
         if now - lastPresent >= 0.016:
           pumpInput()
@@ -1354,10 +1449,11 @@ Both:
           display_render()
           lastPresent = now
         if now - lastMhz >= 1.0:
-          status(speedLine(float(ins_retired - lastMhzIns) / (now - lastMhz)))
+          status(speedLine(float(ins_retired - lastMhzIns) / (now - lastMhz),
+                           float(simClocks - lastMhzClocks) / (now - lastMhz)))
           lastMhz = now
           lastMhzIns = ins_retired
-      lastReal = epochTime()
+          lastMhzClocks = simClocks
     note(cpuStatusLine())
     if dumpText.len > 0:
       let g = gpuCard()
@@ -1412,6 +1508,7 @@ Both:
     var lastPresent = start
     var lastMhz = start
     var lastMhzIns = 0
+    var lastMhzClocks = simClocks
     if wantDisplay:
       display_render()
     while not atend:
@@ -1430,9 +1527,10 @@ Both:
             lastPresent = now
           if now - lastMhz >= 1.0:
             let dt = now - lastMhz
-            status(speedLine(float(ins_retired - lastMhzIns) / dt))
+            status(speedLine(float(ins_retired - lastMhzIns) / dt, float(simClocks - lastMhzClocks) / dt))
             lastMhz = now
             lastMhzIns = ins_retired
+            lastMhzClocks = simClocks
     if dumpFb.len > 0:
       display_dumpPpm(dumpFb)
       echo "wrote framebuffer ", dumpFb

@@ -223,16 +223,16 @@ main:
 	b API_ST_OPEN
 	st $7e23, r0
 
-	; ------------------------------------------------ group 5: net (not yet), group 7
+	; ------------------------------------------------ group 5's first blank entry, group 7
 	push pch
 	push pcl
-	b $10f3
+	b $1213
 	st $7e24, r0
 	ld r0, API_ERR
 	st $7e25, r0
 	push pch
 	push pcl
-	b $1153
+	b $12a3
 	st $7e27, r0
 
 	; ------------------------------------------------ group 6: timers

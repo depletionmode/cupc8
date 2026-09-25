@@ -370,11 +370,15 @@ ENTRY(js_cards, {
   napi_value arr;
   napi_create_array(env, &arr);
   uint32_t i = 0;
-  auto add = [&](int slot, const std::string &kind, machine::Emu *e) {
+  auto add = [&](int slot, const std::string &kind, machine::Emu *e, const machine::Rp2040Card *rc = nullptr) {
     napi_value o;
     napi_create_object(env, &o);
     set(env, o, "slot", num(env, slot));
     set(env, o, "kind", jsstr(env, kind));
+    if (rc) {
+      set(env, o, "csRises", num(env, static_cast<double>(rc->csRises)));
+      set(env, o, "csEdges", num(env, static_cast<double>(rc->csEdges)));
+    }
     if (e) {
       set(env, o, "ns", num(env, e->ns()));
       set(env, o, "uart", jsstr(env, e->uart));
@@ -389,7 +393,7 @@ ENTRY(js_cards, {
     napi_set_element(env, arr, i++, o);
   };
   if (m->sysctl) add(0, "sysctl", &m->sysctl->e);
-  for (auto &[slot, c] : m->cards) add(slot, c->kind, c->emu());
+  for (auto &[slot, c] : m->cards) add(slot, c->kind, c->emu(), dynamic_cast<const machine::Rp2040Card *>(c.get()));
   return arr;
 })
 

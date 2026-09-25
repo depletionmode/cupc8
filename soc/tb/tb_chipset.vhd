@@ -1,4 +1,4 @@
--- Chipset testbench (MMU, ROM, SPI, IRQ, BRG, DBG, XRAM tests).
+-- Chipset testbench (MMU, ROM, SPI, IRQ, BRG, DBG, XRAM, CLK tests).
 --
 -- A CPU-bus BFM stands in for the CPU card and a bridge BFM for sysctl; the
 -- memory bus has the SRAM and SST39 timing models, and slot 4 (dev 3) has an
@@ -168,7 +168,7 @@ begin
 		variable errors: natural := 0;
 		variable d, s: std_logic_vector(7 downto 0);
 		variable ok: boolean;
-		variable n: natural;
+		variable n, m: natural;
 		type bytes_t is array(0 to 300) of std_logic_vector(7 downto 0);
 		variable buf: bytes_t;
 
@@ -303,6 +303,29 @@ begin
 				br_read(x"03", 0, 2);
 				exit when buf(0) = buf(1);
 			end loop;
+		end procedure;
+
+		-- the millisecond counter, MS_COUNT0 first (it latches the rest)
+		procedure ms_read(v: out natural) is
+			variable b0, b1, b2, b3: std_logic_vector(7 downto 0);
+		begin
+			rd(16#f206#, b0); rd(16#f207#, b1); rd(16#f208#, b2); rd(16#f209#, b3);
+			v := ((to_integer(unsigned(b3(6 downto 0))) * 256 + to_integer(unsigned(b2))) * 256 +
+				  to_integer(unsigned(b1))) * 256 + to_integer(unsigned(b0));
+		end procedure;
+
+		-- wait for MS_COUNT0 to step: returns right after the read that saw it
+		-- (the step came in the last few clocks)
+		procedure ms_edge(v: out std_logic_vector(7 downto 0)) is
+			variable a, b: std_logic_vector(7 downto 0);
+		begin
+			rd(16#f206#, a);
+			for i in 1 to 20000 loop
+				rd(16#f206#, b);
+				exit when b /= a;
+			end loop;
+			check(b /= a, "MS_COUNT0 did not step in 20000 reads");
+			v := b;
 		end procedure;
 
 		procedure models_clean(section: string) is
@@ -504,7 +527,7 @@ begin
 
 		---------------------------------------------------------------- IRQ-001 / IRQ-002
 		if run("IRQ-001") or run("IRQ-002") then
-			wr(16#f200#, x"0f");
+			wr(16#f200#, x"1f");
 			expect(16#f200#, x"00", "pending after clear");
 			-- timer expiry pulses latch bits 1/2
 			wait until falling_edge(clk); cpu_tmr_exp <= "01";
@@ -523,7 +546,7 @@ begin
 			wr(16#f200#, x"f4");						-- upper bits ignored
 			expect(16#f200#, x"00", "W1C of bit 2");
 			wr(16#f201#, x"ff");
-			expect(16#f201#, x"0f", "mask upper bits read 0");
+			expect(16#f201#, x"1f", "mask bits 7:5 read 0");
 			-- slot IRQs: $f202 is live; IRQ0 latches a new assertion on any line
 			slot_n_irq <= "111011";						-- slot 3 (dev 2)
 			wait for 5 * T;
@@ -545,7 +568,7 @@ begin
 			wait for 5 * T;
 			expect(16#f200#, x"01", "a new assertion after all released");
 			slot_n_irq <= "111111";
-			wr(16#f200#, x"0f");
+			wr(16#f200#, x"1f");
 			wr(16#f201#, x"00");
 			models_clean("IRQ-001");
 		end if;
@@ -806,6 +829,109 @@ begin
 			wait until rising_edge(clk);
 			check(cpu_n_rst = '1', "CPU reset not released");
 			models_clean("DBG-001");
+		end if;
+
+		---------------------------------------------------------------- CLK-001
+		if run("CLK-001") then
+			-- the millisecond counter ($f206-$f209, memory-map.md): 12000
+			-- clocks a ms, counted from reset
+			ms_read(n);
+			check(n < 1000, "MS_COUNT after reset: " & integer'image(n));
+			-- the rate: from a step, the next is 12000 clocks later (+-20:
+			-- each read takes a few clocks), and 50 ms is 600000 clocks
+			for k in 1 to 3 loop
+				ms_edge(d);
+				wait for (12000 - 20) * T;
+				expect(16#f206#, d, "MS_COUNT0 12000 clocks after a step, less 20");
+				wait for 40 * T;
+				expect(16#f206#, b8(to_integer(unsigned(d)) + 1), "MS_COUNT0 12000 clocks after a step, and 20");
+			end loop;
+			-- (timed from the read that saw the step: a 12001-clock ms is 50
+			-- clocks late here)
+			ms_edge(d);
+			wait for (50 * 12000 - 20) * T;
+			expect(16#f206#, b8(to_integer(unsigned(d)) + 49), "MS_COUNT0 50 ms after a step, less 20 clocks");
+			wait for 40 * T;
+			expect(16#f206#, b8(to_integer(unsigned(d)) + 50), "MS_COUNT0 50 ms after a step, and 20 clocks");
+			-- a read that starts with MS_COUNT0 is one value: MS_COUNT1 is
+			-- latched when MS_COUNT0 is read, even when the low byte carries
+			-- ($xxff to $xx00) before MS_COUNT1 is read
+			ms_read(n);
+			wait for (255 - n mod 256) * 12000 * T - 200 * T;
+			for i in 1 to 20000 loop
+				rd(16#f206#, d);
+				exit when d = x"ff";
+			end loop;
+			check(d = x"ff", "MS_COUNT0 never read $ff");
+			rd(16#f207#, s);
+			wait for 12100 * T;						-- the counter has carried meanwhile
+			expect(16#f207#, s, "MS_COUNT1 read after the carry: the value latched with $ff");
+			expect(16#f208#, x"00", "MS_COUNT2 latched");
+			expect(16#f209#, x"00", "MS_COUNT3 latched");
+			expect(16#f206#, x"00", "MS_COUNT0 after the carry");
+			expect(16#f207#, b8(to_integer(unsigned(s)) + 1), "MS_COUNT1 after the carry, once MS_COUNT0 was read again");
+			-- writes are ignored; reading MS_COUNT1-3 does not latch
+			ms_read(n);
+			wr(16#f206#, x"55"); wr(16#f207#, x"aa"); wr(16#f208#, x"77"); wr(16#f209#, x"33");
+			ms_read(m);
+			check(m = n or m = n + 1, "writes moved the counter: " & integer'image(n) & " then " & integer'image(m));
+			wait for 12100 * T;
+			rd(16#f207#, d);
+			check(d = b8(m / 256), "MS_COUNT1 read alone re-latched: $" & to_hstring(d));
+			-- a power-on reset clears it
+			n_por <= '0';
+			wait for 5 * T;
+			n_por <= '1';
+			wait for 60 * T;						-- the CPU is released after 33 clocks
+			ms_read(n);
+			check(n = 0, "MS_COUNT 60 clocks after a power-on reset: " & integer'image(n));
+			wait for 12000 * T;
+			ms_read(n);
+			check(n = 1, "MS_COUNT 1 ms after a power-on reset: " & integer'image(n));
+			models_clean("CLK-001");
+		end if;
+
+		---------------------------------------------------------------- IRQ-003
+		if run("IRQ-003") then
+			-- the tick: IRQ_PEND bit 4 every 50 ms of the counter, masked at
+			-- reset, on CPU IRQ line 3 with SPI complete
+			expect(16#f201#, x"00", "IRQ_MASK at reset (the tick masked)");
+			ms_read(n);
+			wait for ((50 - n mod 50) * 12000 + 200) * T;	-- past the next multiple of 50
+			rd(16#f200#, d);
+			check(d(4) = '1', "no tick at the counter's multiple of 50: IRQ_PEND $" & to_hstring(d));
+			check(cpu_irq = "0000", "a masked tick reached the CPU");
+			wr(16#f200#, x"10");
+			expect(16#f200#, x"00", "W1C of the tick");
+			-- the next comes 50 ms after the last, as the counter reaches a multiple of 50
+			wait for (49 * 12000) * T;
+			ms_read(n);
+			rd(16#f200#, d);
+			check(d(4) = '0', "a tick before 50 ms: IRQ_PEND $" & to_hstring(d) & " at " & integer'image(n) & " ms");
+			for i in 1 to 20000 loop
+				rd(16#f200#, d);
+				exit when d(4) = '1';
+			end loop;
+			ms_read(n);
+			check(d(4) = '1' and n mod 50 = 0, "the tick came at " & integer'image(n) & " ms (a multiple of 50)");
+			-- unmasked: CPU line 3; SPI complete shares it, each by its own mask bit
+			wr(16#f201#, x"10");
+			expect(16#f201#, x"10", "IRQ_MASK bit 4");
+			check(cpu_irq = "1000", "unmasked tick: CPU IRQ lines " & to_hstring(cpu_irq));
+			wr(16#f201#, x"08");
+			check(cpu_irq = "0000", "the tick with only SPI's mask bit reached the CPU");
+			wr(16#f200#, x"10");
+			wr(16#f13f#, b8(2 * 8)); wr(16#f130#, x"00"); wr(16#f132#, x"01");
+			for i in 1 to 200 loop rd(16#f133#, d); exit when d = x"01"; end loop;
+			expect(16#f200#, x"08", "SPI complete pending");
+			check(cpu_irq = "1000", "SPI complete: CPU IRQ lines " & to_hstring(cpu_irq));
+			wr(16#f201#, x"10");
+			check(cpu_irq = "0000", "SPI complete with only the tick's mask bit reached the CPU");
+			wr(16#f200#, x"08");
+			wr(16#f201#, x"17");
+			check(cpu_irq = "0000", "nothing pending, all unmasked: CPU IRQ lines " & to_hstring(cpu_irq));
+			wr(16#f201#, x"00");
+			models_clean("IRQ-003");
 		end if;
 
 		check(b_bad_oe = 0, "chipset did not drive D with /RDY on " & integer'image(b_bad_oe) & " reads");

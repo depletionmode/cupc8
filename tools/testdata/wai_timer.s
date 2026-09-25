@@ -1,6 +1,7 @@
-; Timer 0 armed with 200, then WAI: parked, the CPU counts the timer every
-; 3 clocks (cpu.vhd: tick, settle, check), 4 counts a microsecond, so the
-; handler runs 50 of the sim's microsecond steps later, not 200.
+; Timer 0 armed with 200, then WAI: parked, the CPU counts the timer once a
+; turn of 3 clocks (cpu.vhd: tick, settle, check), 4 counts a microsecond,
+; so the handler runs 198 turns (TMR0 and WAI count it as they retire),
+; 594 clocks, 49.5 us later.
 main:
 	mov r0, #<handler
 	st $0012, r0

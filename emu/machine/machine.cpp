@@ -84,9 +84,14 @@ void Rp2040Card::drive(uint32_t sck, uint32_t mosi, bool selected) {
   // host's next frame the frame lost its first byte (exec's quick chunk
   // reads went unanswered, E2E-011).
   auto &g = e.mcu->gpio;
+  constexpr uint32_t EDGE_HIGH = 1u << 3;  // the GPIO's latched rising edge (INTR)
+  const bool edgeWas = g[P::NCS].irqStatus & EDGE_HIGH;
   if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
   if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
   if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);
+  if (!edgeWas && (g[P::NCS].irqStatus & EDGE_HIGH)) csEdges++;
+  if (!selected && selNow) csRises++;
+  selNow = selected;
 }
 
 uint32_t Rp2040Card::miso() {
