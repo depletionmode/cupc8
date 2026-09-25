@@ -197,10 +197,10 @@ static void frame_end(card_t *c)
 static int arg_len(uint8_t op, const uint8_t *a, int avail)
 {
 	switch (op) {
-	case 0x00: case 0x04: case 0x06: case 0x07: case 0x16: case 0x18: return 0;
-	case 0x01: case 0x02: case 0x05: case 0x10: case 0x13: case 0x14: case 0x15: return 1;
+	case 0x00: case 0x04: case 0x06: case 0x07: case 0x08: case 0x0B: case 0x16: case 0x18: return 0;
+	case 0x01: case 0x02: case 0x05: case 0x09: case 0x10: case 0x13: case 0x14: case 0x15: return 1;
 	case 0x12: case 0x27: return 2;
-	case 0x28: return 3;
+	case 0x0A: case 0x28: return 3;
 	case 0x03: case 0x17: case 0x20: return 4;
 	case 0x21: case 0x22: case 0x23: return 7;
 	case 0x29: return 9;
@@ -224,6 +224,8 @@ static void execute(gpu_t *g, const uint8_t *f, int len, bool respond)
 	int need = arg_len(op, a, avail);
 	uint8_t r[2];
 
+	if (g->ext && g->ext->command(g, f, len, respond))
+		return;
 	if (need < 0 || avail < need) {
 		g->errors++;                        /* unknown opcode or short frame */
 		return;
@@ -231,7 +233,9 @@ static void execute(gpu_t *g, const uint8_t *f, int len, bool respond)
 	switch (op) {
 	case 0x00: break;
 	case 0x01:
-		g->mode = a[0] ? GPU_MODE_GFX : GPU_MODE_TEXT;
+		if (a[0] > GPU_MODE_GFX)
+			break;                          /* not a mode of this card: ignored */
+		g->mode = a[0];
 		if (g->mode == GPU_MODE_TEXT) {
 			text_clear_rows(g, 0, GPU_TEXT_ROWS, g->attr);
 			g->cx = g->cy = 0;
@@ -255,6 +259,14 @@ static void execute(gpu_t *g, const uint8_t *f, int len, bool respond)
 		if (respond) card_respond(&g->card, &g->fence_tag, 1);
 		break;
 	case 0x07: if (respond) card_respond(&g->card, &g->vsync_count, 1); break;
+	case 0x08: {
+		/* INFO: HDMI, 640x480, colour, no e-paper features, 80x30 text */
+		static const uint8_t info[9] = {0, 640 & 0xFF, 640 >> 8, 480 & 0xFF, 480 >> 8, 0, 0,
+						GPU_TEXT_COLS, GPU_TEXT_ROWS};
+		if (respond) card_respond(&g->card, info, sizeof info);
+		break;
+	}
+	case 0x09: case 0x0A: case 0x0B: break;    /* REFRESH, AUTO, EPD_STATUS: e-paper only */
 
 	case 0x10: text_putc(g, a[0]); break;
 	case 0x11: for (int i = 0; i < a[0]; i++) text_putc(g, a[1 + i]); break;
@@ -344,7 +356,7 @@ static void execute(gpu_t *g, const uint8_t *f, int len, bool respond)
 int gpu_run(gpu_t *g, int max_frames)
 {
 	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);
@@ -403,6 +415,9 @@ void gpu_reset(gpu_t *g)
 	g->fence_tag = 0;
 	g->fence_irq = false;
 	g->errors = 0;
+	g->hold = false;
+	if (g->ext && g->ext->reset)
+		g->ext->reset(g);
 }
 
 void gpu_init(gpu_t *g)

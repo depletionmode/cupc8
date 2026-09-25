@@ -369,3 +369,15 @@ before = "e9d8141"
 files = ["fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
 must_fail = ["FAIL full-speed: held 700 ms gives 1 + ~7 repeats"]
+
+[[bug]]
+name = "eink firmware: the wait for BUSY timed from before the picture went out (POF sent to a refreshing panel)"
+fixed_in = "d1e25e1"
+revert = [["fw/eink/core/eink.c", """	if (e->t0_fresh) {
+		e->t0 = now;
+		e->t0_fresh = false;
+	}""", """	if (e->t0_fresh) {
+		e->t0_fresh = false;
+	}"""]]
+cmd = "make -s -C fw test_eink"
+must_fail = ["while BUSY", "the UC8179 model saw nothing the chip would ignore"]

@@ -1146,6 +1146,63 @@ proc testBasicPrograms() =
 
 run testBasicPrograms
 
+proc runGuest(steps: int) =
+  ## guest time passes (the kernel waits in WAI; the cards tick)
+  for i in 0..<steps:
+    if cpuStep() != sOk: break
+
+proc testKernelOnEink() =
+  ## KRN-007: the e-ink graphics card (fw/eink/core with the UC8179 model
+  ## as its panel) as the console: the kernel finds it by INFO, BASIC runs on
+  ## it, the panel shows the prompt after the card's own refresh, and the
+  ## terminal's `refresh` asks for a clean full refresh; on HDMI, INFO says
+  ## HDMI and `refresh` does nothing.
+  echo "== kernel on the e-ink card =="
+  let rom = buildKernelRom()
+  let table = loadMap(kernelDir / "kernel.map")
+  let kindAt = table.resolve("gpu_kind")
+  expectTrue("gpu_kind in the kernel map", kindAt >= 0)
+  for (card, name) in [(CardEink, "5.83in"), (CardEink750, "7.5in")]:
+    machineCards([card, CardIo])
+    cpuReset()
+    cpuLoadRom(rom)
+    cpuBootRom()
+    let g = gpuCard()
+    settle(6_000_000)
+    expectTrue(name & ": prompt in the card's text", gpuFind(g, ">>") >= 0)
+    expect(name & ": INFO says e-paper", mem[kindAt], 1)
+    runGuest(1_500_000)                      # 1.5 s: the power-on clean refresh (x0.1)
+    expect(name & ": one clean refresh at power-on", int(simcard_eink_refreshes(g, 0)), 1)
+    # the glass: the banner's row (row 1, text in the middle) has ink
+    var frame = newSeq[uint32](GpuOutW * GpuOutH)
+    simcard_render(g, addr frame[0])
+    var ink = 0
+    for y in 16..31:
+      for x in 0..<GpuOutW:
+        if frame[y * GpuOutW + x] == 0: inc ink
+    expectTrue(name & ": the banner is on the glass", ink > 200)
+    typeLine("10 print 6*7")
+    typeLine("run")
+    expectTrue(name & ": the program ran", gpuFind(g, "42") >= 0)
+    typeLine("refresh")
+    runGuest(1_500_000)
+    expect(name & ": refresh asks for a clean refresh", int(simcard_eink_refreshes(g, 0)), 2)
+    expectTrue(name & ": partial refreshes for the typing", simcard_eink_refreshes(g, 3) >= 1)
+    expect(name & ": the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
+  # HDMI: INFO says so, and refresh is harmless
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  expect("HDMI: INFO says HDMI", mem[kindAt], 0)
+  typeLine("refresh")
+  expectTrue("HDMI: refresh does nothing and the prompt returns", gpuFind(gpuCard(), "refresh") >= 0 and
+             gpuFind(gpuCard(), "ERROR") < 0)
+  ioModel = imLegacy
+
+run testKernelOnEink
+
 proc testProgramFull() =
   ## KRN-003: the 256-byte program buffer refuses a line that does not fit
   ## ("PROGRAM FULL") instead of overwriting memory, and keeps working. Each

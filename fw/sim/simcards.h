@@ -10,7 +10,11 @@
 
 typedef struct simcard simcard_t;
 
-simcard_t *simcard_new(int type);          /* CARD_TYPE_GPU / _IO / _WIFI / _STORAGE */
+/* the e-ink graphics card (card type $01 on the slot) with its 5.83" or 7.5" panel */
+#define SIMCARD_EINK    0x101
+#define SIMCARD_EINK750 0x102
+
+simcard_t *simcard_new(int type);          /* CARD_TYPE_GPU / _IO / _WIFI / _STORAGE, SIMCARD_EINK[750] */
 void simcard_free(simcard_t *c);
 int simcard_type(const simcard_t *c);
 
@@ -30,6 +34,10 @@ void simcard_render(simcard_t *c, uint32_t *rgb);
 int simcard_gpu_cell(simcard_t *c, int x, int y);
 int simcard_gpu_pixel(simcard_t *c, int x, int y);
 int simcard_gpu_mode(simcard_t *c);
+/* the e-ink card's panel: refreshes by waveform (0 clean, 1 fast, 2 grey,
+ * 3 partial) and the UC8179 model's error count; -1 on other cards */
+int simcard_eink_refreshes(simcard_t *c, int waveform);
+int simcard_eink_errors(simcard_t *c);
 
 /* IO: type an ASCII character (press + release of the matching US key) */
 void simcard_type_ascii(simcard_t *c, uint8_t ch, uint32_t now_ms);

@@ -9,7 +9,15 @@
 #include "font8x8_cp437.h"
 #include "gpu.h"
 
+#ifdef TEST_EINK
+/* the same suite on the e-ink card's build (EINK-001): TEXT and GFX behave
+ * exactly as on HDMI */
+#include "eink.h"
+static eink_t eink;
+#define gpu (eink.gpu)
+#else
 static gpu_t gpu;
+#endif
 static uint32_t frame[GPU_OUT_W * GPU_OUT_H];
 
 /* send one command frame and let the card execute it */
@@ -258,7 +266,7 @@ static void test_gfx(void)
 
 static void test_general(void)
 {
-	uint8_t r[4];
+	uint8_t r[16];
 	/* FENCE / FENCE_READ with the IRQ */
 	SEND(CARD_OP_IRQ_EN, 1);
 	SEND(0x05, 0x5A);
@@ -280,6 +288,23 @@ static void test_general(void)
 	CHECK_EQ(gpu.errors, e + 2);
 	SEND(0x10, 'q', 1, 2, 3);
 	CHECK_EQ(gpu.errors, e + 2);
+#ifndef TEST_EINK
+	/* INFO: HDMI, 640x480, colour, 80x30; REFRESH, AUTO and EPD_STATUS are
+	 * NOPs here (eink-card.md), MODE 2 is not a mode of this card */
+	uint8_t info[9];
+	SEND(0x08);
+	CHECK_EQ(read_resp(info, 9), 9);
+	CHECK(info[0] == 0 && (info[1] | info[2] << 8) == 640 && (info[3] | info[4] << 8) == 480 &&
+	      info[5] == 0 && info[6] == 0 && info[7] == 80 && info[8] == 30, "INFO");
+	e = gpu.errors;
+	SEND(0x09, 0);
+	SEND(0x0A, 1, 15, 30);
+	SEND(0x0B);
+	CHECK_EQ(read_resp(r, 1), 0);
+	SEND(0x01, 2);
+	CHECK_EQ(gpu.mode, GPU_MODE_TEXT);
+	CHECK_EQ(gpu.errors, e);
+#endif
 	/* IDENT */
 	SEND(CARD_OP_IDENT);
 	CHECK_EQ(read_resp(r, 4), 4);
@@ -347,10 +372,18 @@ static void test_fifo(void)
 
 int main(void)
 {
+#ifdef TEST_EINK
+	eink_init(&eink, &eink_panel_583, &(epd_bus_t){0});      /* the panel loop is not run */
+#else
 	gpu_init(&gpu);
+#endif
 	test_text();
 	test_gfx();
 	test_general();
 	test_fifo();
+#ifdef TEST_EINK
+	return check_report("GPU-001/002/003 gpu core, e-ink build");
+#else
 	return check_report("GPU-001/002/003 gpu core");
+#endif
 }

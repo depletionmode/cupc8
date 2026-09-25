@@ -132,7 +132,7 @@ table):
 | Type | Card |
 |---|---|
 | $00 | empty slot (IDENT failed) |
-| $01 | Graphics / HDMI (`gpu-protocol.md`) |
+| $01 | Graphics: HDMI (`gpu-protocol.md`) or e-paper (`eink-card.md`); `INFO` says which |
 | $02 | IO / USB keyboard (`io-card.md`) |
 | $03 | Wi-Fi networking (`wifi-card.md`) |
 | $04 | Storage (`storage-card.md`; M1: microSD) |
