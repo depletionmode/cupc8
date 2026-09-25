@@ -86,15 +86,15 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # (pocket_escapes) and the crystal sits to the left, the flash by the
     # QSPI pins (now at the bottom)
     "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23
-    "C3": (CX + 5.8, CY + 0.2, 0),       # IOVDD 1, clear of the flash
-    "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
+    "C3": (CX + 5.8, CY - 0.2, 0),       # IOVDD 1, clear of the flash
+    "C5": (CX - 4.4, CY - 5.2, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
-    "Y1": (CX - 13.0, CY - 3.0, 0),
-    "C16": (CX - 15.7, CY - 3.0, 90),
-    "C17": (CX - 13.0, CY - 0.4, 0),
-    "R2": (CX - 13.0, CY - 5.6, 0),      # XOUT
-    "U3": (CX + 8.2, CY + 6.2, 90),
+    "Y1": (CX - 8.5, CY - 4.0, 0),
+    "C16": (CX - 11.2, CY - 4.0, 90),
+    "C17": (CX - 8.5, CY - 1.4, 0),
+    "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
+    "U3": (CX + 8.2, CY + 5.6, 90),
     "C15": (CX + 12.0, CY + 3.4, 90),
     "R1": (CX + 12.0, CY + 7.4, 90),
     "J1": (0, 0, 0),
@@ -125,6 +125,13 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 9, -29, 0)]
 TITLE, REVISION = "CUPC/8 storage", "A"
 
 
+def prepare(board):
+    """rp2040card.pocket_escapes, with SWDIO's via a row further out and
+    towards the fingers: from the first row Freerouting found no way past the
+    SD lines to finger B7."""
+    rc.pocket_escapes(board, swdio=(2.26, -0.6))
+
+
 if __name__ == "__main__":
     rc.build("storage", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "ACT", "D3": "CARD"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=100, preroute=rc.pocket_escapes)
+             TITLE, REVISION, layers=LAYERS, passes=150, preroute=prepare)

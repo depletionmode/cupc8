@@ -301,7 +301,10 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb), preroute=preroute or tie_testen, route_tries=6)
+                       fine_nets=u1_nets(gpios, usb), prepare=preroute or tie_testen, route_tries=6,
+                       # four layers: GND poured on both outer layers, In1 a
+                       # solid GND plane; In2 routes signals
+                       zones=("/GND", ("/GND", ("In1.Cu",))) if layers == 4 else ("/GND",))
     print("LCSC:", " ".join(sorted(lcsc)))
 
 
@@ -378,7 +381,7 @@ def escape(board, pin, out, side=0.0, net=None):
     via(board, netname, (vx, vy), size=0.65)
 
 
-def pocket_escapes(board):
+def pocket_escapes(board, swdio=(1.16, 0.0)):
     """The turned cards (GPU, storage): the middle of the chip's top edge,
     between the pins that fan out to the edge connector, has seven pins to
     get out: RUN, SWCLK and IOVDD 22 through vias in the ring under the chip,
@@ -388,7 +391,8 @@ def pocket_escapes(board):
     tie_testen(board)
     for pin in (26, 24, 22):                  # RUN, SWCLK, IOVDD: in
         escape(board, pin, -1.14)
-    for pin in (25, 23, 21):                  # SWDIO, DVDD, XOUT: out, one row
+    escape(board, 25, *swdio)                 # SWDIO: out, one row (or where the board says)
+    for pin in (23, 21):                      # DVDD, XOUT: out, one row
         escape(board, pin, 1.16)
     escape(board, 20, 2.26, side=0.3)         # XIN: the next row out, clear of XOUT's via
 

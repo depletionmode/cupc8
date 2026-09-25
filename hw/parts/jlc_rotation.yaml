@@ -9,6 +9,7 @@
 # resistors and capacitors) and fails when an entry here disagrees or is
 # missing; `bomcheck.py <board> --update-rotations` adds new footprints.
 # Every footprint in a BOM needs an entry, 0 included, so none is unchecked.
+
 Capacitor_SMD:C_0402_1005Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s C0402 (C1525, C1562, C52923)'
@@ -72,6 +73,9 @@ jlc:HDR-TH_9P-P2.54-H-M-W10.4:
 jlc:IND-SMD_L3.0-W3.0_FNR30XXS:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s IND-SMD_L3.0-W3.0_FNR30XXS (C167747)'
+jlc:IND-SMD_L4.4-W4.2:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s IND-SMD_L4.4-W4.2 (C167203)'
 jlc:RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL (C25508)'
@@ -90,6 +94,9 @@ jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR:
 jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL (C52140430)'
+jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-563_L1.6-W1.2-P0.50-LS1.6-BR (C919459)'
 jlc:TF-SMD_TF-01A:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TF-SMD_TF-01A (C91145)'

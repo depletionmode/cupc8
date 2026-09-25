@@ -218,6 +218,30 @@ USB_PORT_MIN = 4.40         # SPEC USB 2.0 low-power port (a high-power port: 4.
 USB_PORT_MAX = VBUS_MAX     # SPEC vSafe5V max (USB 2.0 alone: 5.25 V)
 
 # ---------------------------------------------------------------------------
+# GPU card HDMI +5V pin (David, 2026-09-25): the same TPS61023 circuit as the
+# IO card's (IOB_* above), from the slot's +5V, feeding HDMI pin 18. As built
+# (+5V -> 100 mA PTC -> B5819W -> pin) the pin was 3.73 V at the worst corner.
+# The PTC's place is what POW-008 decides: ahead of the boost or after it.
+# ---------------------------------------------------------------------------
+HDMI_PIN_MIN, HDMI_PIN_MAX = 4.8, 5.3           # SPEC HDMI: +5V power at the source, 4.8..5.3 V
+I_HDMI_PIN = 0.055                              # SPEC HDMI: the source supplies >= 55 mA
+# the card's PTCs (Ruilon, DS sha256 7ac532af..., fetched 2026-09-25):
+#   (name, LCSC, Rmin, R1max, hold at 40 C)
+GPU_PTCS = {
+    "P010": ("SMD0805P010TF", "C20975", 0.75, 6.0, 0.08),     # on the card as built
+    "P020": ("SMD0805P020TF", "C20976", 0.50, 3.5, 0.17),
+}
+GPU_PTC = assume("GPU", "HDMI +5V: slot +5V -> PTC SMD0805P020TF (C20976) -> TPS61023 (the IO card's circuit) -> "
+                 "pin 18; no Schottky (the boost disconnects its output when off)", "P020")
+GPU_PTC_POS = "ahead"       # of the boost: POW-008 shows why not after it
+# HDMI's 4.8-5.3 V window is tighter than USB's: with the IO card's 750k/100k
+# 1 % the pin reaches 5.37-5.40 V at the high corner in power-save (POW-008).
+# TI's own 732k with 0.1 % parts: 4.81 / 4.95 / 5.08 V
+GPUB_R1, GPUB_R2 = assume("GPU", "HDMI boost feedback 732k (C2849083) / 100k (C122538), 0.1 %: 4.95 V",
+                          (732e3, 100e3))
+GPUB_RES_TOL = 0.001
+
+# ---------------------------------------------------------------------------
 # Loads (power.md budget, max column), in A
 # ---------------------------------------------------------------------------
 LOADS_3V3 = {
@@ -253,7 +277,7 @@ EINK_CARD_3V3 = 0.095       # proposals/eink-gpu.md: ~45 mA typ, ~95 mA max, not
 STORAGE_CARD_3V3 = LOADS_3V3["storage card RP2040 + flash"] + LOADS_3V3["storage card microSD (writing)"]
 I_SD_WRITE = LOADS_3V3["storage card microSD (writing)"]
 I_KEYBOARD = 0.500          # USB 2.0 high-power device (IO card's switch limits it)
-I_HDMI_5V = 0.055           # HDMI +5V pin, per spec
+
 FUTURE_SLOTS = 2            # slots 5-6 (slot 4 holds the storage card in M1)
 
 # Capacitance on 5V_SYS, charged through the SY6280 at attach
@@ -338,24 +362,40 @@ def wifi_i_5v(v_card, i3=WIFI_I_3V3):
     return i3 * wifi_vout_range()[1] / (BUCK_ETA_BUDGET * v_card)
 
 
-def iob_vout_range():
-    """The keyboard boost's regulated output (min, nom, max): VREF and 1 % divider."""
-    r1, r2, t = IOB_R1, IOB_R2, IOB_RES_TOL
+def boost_divider(card="io"):
+    """(R1, R2, tolerance) of a TPS61023's feedback divider."""
+    return (IOB_R1, IOB_R2, IOB_RES_TOL) if card == "io" else (GPUB_R1, GPUB_R2, GPUB_RES_TOL)
+
+
+def iob_vout_range(card="io"):
+    """A TPS61023's regulated output (min, nom, max): VREF and its divider."""
+    r1, r2, t = boost_divider(card)
     return (IOB_VREF[0] * (1 + r1 * (1 - t) / (r2 * (1 + t))), IOB_VREF[1] * (1 + r1 / r2),
             IOB_VREF[2] * (1 + r1 * (1 + t) / (r2 * (1 - t))))
 
 
-def iob_i_in(v_in, i_out):
+def iob_i_in(v_in, i_out, card="io"):
     """The boost's input current for i_out: at its highest set point (the most
     it draws), or i_out itself in pass-through (v_in above the set point)."""
-    vset = iob_vout_range()[2]
+    vset = iob_vout_range(card)[2]
     return i_out if v_in >= vset * 1.01 else vset * i_out / (IOB_ETA * v_in)
 
 
-def iob_vout(v_in, i_out, corner):
-    """The port side of the boost: regulated at the corner's set point, or
+def gpu_i_5v(v_card, i_pin=I_HDMI_PIN, worst=True):
+    """The GPU card's +5V draw for its HDMI pin: through the PTC (ahead of the
+    boost) and the boost. Returns (current, the boost's input voltage)."""
+    r = GPU_PTCS[GPU_PTC][3 if worst else 2]
+    i = 0.0
+    for _ in range(40):
+        v_b = v_card - i * r
+        i = iob_i_in(v_b, i_pin, "gpu")
+    return i, v_card - i * r
+
+
+def iob_vout(v_in, i_out, corner, card="io"):
+    """The output side of the boost: regulated at the corner's set point, or
     v_in less the inductor and high-side drop in pass-through."""
-    lo, nom, hi = iob_vout_range()
+    lo, nom, hi = iob_vout_range(card)
     vset = {"lo": lo, "nom": nom, "hi": hi}[corner]
     through = v_in - i_out * (IOB_L_DCR + IOB_RHS * BUCK_RDS_HOT)
     return max(vset, through) if v_in >= vset * 1.01 else vset

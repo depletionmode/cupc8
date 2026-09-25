@@ -73,17 +73,37 @@ def schematic(path, footprint_libs):
         s.connect(u, "3", "GND")
         s.connect(u, "8", "GND")
 
-    # ---- +5V to the sink (its EDID ROM and hot-plug detect): a 100 mA PTC
-    # against a shorted cable, and a Schottky so a monitor can't back-feed
-    # the slot's +5V when the machine is off
+    # ---- +5V to the sink (its EDID ROM and hot-plug detect; HDMI: 4.8-5.3 V,
+    # >= 55 mA). The slot's +5V is 4.1 V at the card at the worst corner, so
+    # the IO card's boost (power.md): TPS61023 to 5.06 V (4.84 V at the low
+    # tolerance corner). The 100 mA PTC is ahead of it, so its drop doesn't
+    # come off the pin, and it still trips on a shorted cable (the boost then
+    # draws from its input). No diode: with the machine off the boost's
+    # high-side FET body diode points SW -> VOUT, so a monitor can't back-feed.
     f1 = s.add("Device:Polyfuse", "F1", "100mA", "Fuse:Fuse_0805_2012Metric", at=(160 * G, 104 * G),
                fields={"LCSC": "C20975"})
     rc.two(s, f1, "+5V", "HDMI_5V_F")
-    d3 = s.add("Device:D_Schottky", "D3", "B5819W", "Diode_SMD:D_SOD-123", at=(160 * G, 122 * G),
-               fields={"LCSC": "C8598"})
-    s.connect(d3, "A", "HDMI_5V_F")
-    s.connect(d3, "K", "HDMI_5V")
-    c20 = rc.passive(s, "C", "C20", "100n", (172 * G, 122 * G))
+    u7 = s.add("jlc:TPS61023DRLR", "U7", "TPS61023DRLR", "jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR",
+               at=(160 * G, 132 * G), fields={"LCSC": "C919459"})
+    s.connect(u7, "VIN", "HDMI_5V_F")
+    s.connect(u7, "EN", "HDMI_5V_F")
+    s.connect(u7, "GND", "GND")
+    s.connect(u7, "SW", "BOOST_SW")
+    s.connect(u7, "VOUT", "HDMI_5V")
+    s.connect(u7, "FB", "BOOST_FB")
+    l1 = s.add("Device:L", "L1", "1u", "jlc:IND-SMD_L4.4-W4.2", at=(146 * G, 132 * G), fields={"LCSC": "C167203"})
+    rc.two(s, l1, "HDMI_5V_F", "BOOST_SW")
+    c21 = rc.passive(s, "C", "C21", "10u", (150 * G, 104 * G))
+    rc.two(s, c21, "HDMI_5V_F", "GND")
+    r26 = rc.passive(s, "R", "R26", "750k", (172 * G, 126 * G), fp=rc.R0603, lcsc="C23240")
+    r27 = rc.passive(s, "R", "R27", "100k", (172 * G, 142 * G), fp=rc.R0603, lcsc="C25803")
+    rc.two(s, r26, "HDMI_5V", "BOOST_FB")
+    rc.two(s, r27, "BOOST_FB", "GND")
+    c22 = rc.passive(s, "C", "C22", "22u", (180 * G, 142 * G))
+    c23 = rc.passive(s, "C", "C23", "22u", (186 * G, 142 * G))
+    rc.two(s, c22, "HDMI_5V", "GND")
+    rc.two(s, c23, "HDMI_5V", "GND")
+    c20 = rc.passive(s, "C", "C20", "100n", (172 * G, 108 * G))
     rc.two(s, c20, "HDMI_5V", "GND")
 
     # ---- hot-plug detect: the sink pulls HPD to its +5V through 1k; the
@@ -143,23 +163,33 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "U6": (HX, -31.0, 90),
     "RN1": (HX - 3.8, -27.0, 90),       # 1.4 mm below the ESD GND vias (preroute)
     "RN2": (HX, -27.0, 90),
-    "F1": (39, -42.5, 0),
-    "D3": (38.5, -39.5, 0),
-    "C20": (36.8, -36.5, 90),
-    "R20": (44.5, -42, 90),
-    "R21": (44.5, -38.5, 90),
-    "Q1": (44, -33, 0),
-    "Q2": (44, -28, 0),
-    "R22": (40.5, -30.5, 90),
-    "R23": (47.5, -33, 90),
-    "R24": (40.5, -25.5, 90),
-    "R25": (47.5, -28, 90),
+    # the HDMI +5V boost in the open area left of the receptacle, near the
+    # slot's +5V fingers; its 5.06 V runs over to pin 18 (55 mA). The loops
+    # are as tight as the IO card's: SW pin to the inductor, VIN and VOUT
+    # pins to their caps
+    "U7": (9.0, -33.0, 0),
+    "L1": (6.1, -35.0, 90),           # its SW pad by U7's SW pin
+    "C21": (11.0, -36.0, 90),         # VIN
+    "F1": (11.0, -39.4, 180),
+    "C22": (8.0, -30.4, 0),           # VOUT
+    "C23": (8.0, -28.4, 0),
+    "R26": (11.8, -30.4, 90),
+    "R27": (13.6, -30.4, 90),
+    "C20": (33.4, -28.4, 90),         # HDMI_5V at the receptacle's pin 18
+    "R20": (37.2, -31.4, 0),          # HPD divider
+    "R21": (37.2, -29.8, 0),
+    "Q1": (44, -29.0, 0),
+    "Q2": (44, -24.5, 0),
+    "R22": (40.6, -26.9, 90),
+    "R23": (47.5, -29.0, 90),
+    "R24": (40.6, -23.1, 90),
+    "R25": (47.5, -24.5, 90),
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LAYERS = 4
 LOGO_MM = 12
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 48, -19, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 48.5, -16.5, 0)]
 TITLE, REVISION = "CUPC/8 GPU", "A"
 
 
@@ -171,27 +201,42 @@ def preroute(board):
     - each ESD's GND pins (3 and 8) are in the middle of its rows, between
       two pairs: a track joins them through the package, and pin 3's
       fan-out via (or one of ours, 1.4 mm towards the chip) takes them down
-    - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)"""
+    - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)
+    - the HDMI +5V boost's pins"""
     rc.pocket_escapes(board)
+    # the HDMI +5V boost's pins, as on the IO card: 0.3 mm pads the power
+    # class can't reach; the loops kept short (TPS61023 layout guide)
+    at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
+    vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)
+    sw, vout = at("U7", 5), at("U7", 6)
+    rc.track(board, "/HDMI_5V_F", vin, at("C21", 1), width=0.3)
+    rc.track(board, "/HDMI_5V_F", en, vin, width=0.25)
+    rc.track(board, "/BOOST_SW", sw, (at("L1", 2)[0], sw[1]), width=0.3)
+    rc.track(board, "/HDMI_5V", vout, at("C22", 1), width=0.3)
+    rc.track(board, "/HDMI_5V", at("C22", 1), at("C23", 1), width=0.3)
+    rc.track(board, "/BOOST_FB", fb, at("R26", 2), width=0.2)
+    rc.track(board, "/BOOST_FB", at("R26", 2), at("R27", 1), width=0.2)
+    import pcbnew
+
+    def gnd_via_near(x, y, dx, dy):
+        tracks = board.Tracks()
+        return any(tracks[i].Type() == pcbnew.PCB_VIA_T and tracks[i].GetNetname() == "/GND" and
+                   abs(pcbnew.ToMM(tracks[i].GetPosition().x) - x) < dx and
+                   abs(pcbnew.ToMM(tracks[i].GetPosition().y) - y) < dy for i in range(len(tracks)))
     for pin in (2, 5, 8, 11, 17):
         x, y = rc.pad_at(board, "J2", pin)
-        rc.via(board, "/GND", (x, y - 2.0))
-        rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
-    import pcbnew
+        if not gnd_via_near(x, y - 2.0, 0.3, 0.3):       # unless the fan-out put one there
+            rc.via(board, "/GND", (x, y - 2.0))
+            rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
     for ref in ("U5", "U6"):
         (x8, y8), (x3, y3) = rc.pad_at(board, ref, 8), rc.pad_at(board, ref, 3)
         rc.track(board, "/GND", (x8, y8), (x3, y3), width=0.2)
         # a via 1.4 mm towards the chip, unless the fan-out gave pin 3 one
-        tracks = board.Tracks()
-        near = [tracks[i] for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T and
-                tracks[i].GetNetname() == "/GND" and
-                abs(pcbnew.ToMM(tracks[i].GetPosition().x) - x3) < 1.0 and
-                abs(pcbnew.ToMM(tracks[i].GetPosition().y) - y3) < 2.0]
-        if not near:
+        if not gnd_via_near(x3, y3, 1.0, 2.0):
             rc.via(board, "/GND", (x3, y3 + 1.4))
             rc.track(board, "/GND", (x3, y3), (x3, y3 + 1.4), width=0.2)
 
 
 if __name__ == "__main__":
     rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
-             layers=LAYERS, passes=100, preroute=preroute)
+             layers=LAYERS, passes=90, preroute=preroute)

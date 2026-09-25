@@ -7,6 +7,7 @@ only through cupc8.py's read-back.
     python3 test/host/test_cupc8.py        (make -C fw sysctl_sim first)
 """
 
+import atexit
 import os
 import random
 import signal
@@ -37,6 +38,10 @@ class Sim:
     def __init__(self, *args):
         self.dir = tempfile.mkdtemp(prefix="sysctl_sim-")
         self.p = subprocess.Popen([SIM, "--dump", self.dir, *args], stdout=subprocess.PIPE, text=True)
+        # a check that fails or raises before stop() must not leave the sim
+        # running: it holds our stdout, and a caller reading to EOF
+        # (tools/counterexamples.py) would wait for it forever
+        atexit.register(self.p.kill)
         self.port = self.p.stdout.readline().strip()
 
     def run(self, *args, ok=True):
