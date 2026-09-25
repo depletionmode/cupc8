@@ -11,6 +11,7 @@ from the schematic, so the board can only contain what the schematic says.
 """
 
 import math
+import copy
 import os
 import re
 import subprocess
@@ -160,7 +161,10 @@ def load_symbol(lib_id):
     if parent:
         base = load_symbol(lib + ":" + parent[1])
         own = {p[1]: p for p in find(sym, "property")}
-        flat = [e for e in base if not (isinstance(e, list) and e[0] == "property")]
+        # copies: the sub-symbols are renamed below, and `base` shares them
+        # with the cached parent (a second symbol extending it, or the same
+        # one loaded again in this process, would find them renamed already)
+        flat = [copy.deepcopy(e) for e in base if not (isinstance(e, list) and e[0] == "property")]
         props = [own.get(p[1], p) for p in find(base, "property")]
         props += [p for k, p in own.items() if k not in {q[1] for q in props}]
         flat = flat[:2] + props + flat[2:]
