@@ -2,11 +2,12 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013] [--record]
 //
-// E2E-007 (files on the storage card's microSD), E2E-008 (the e-ink card)
-// and E2E-010..012 (programs at $7000) need CUPC8_EMU=native: the SD card
-// and panel models are only in the native emulator.
+// E2E-007 (files on the storage card's microSD), E2E-008 (the e-ink card),
+// E2E-010..012 (programs at $7000) and E2E-013 (networking) need
+// CUPC8_EMU=native: the SD card, panel and Wi-Fi models are only in the
+// native emulator.
 //
 // CUPC8_EMU=native runs them on the native emulator (emu/machine,
 // test/emu/machinenative.mjs: the same machine, cycle for cycle, faster);
@@ -474,9 +475,91 @@ async function e2e012() {
   m.stop();
 }
 
+// ------------------------------------------------------------------ E2E-013
+// Networking in CUPC/8 assembly (doc/proposals/kernel-api.md, "Networking")
+// on the real Wi-Fi firmware in QEMU: the kernel's DNS client asks a DNS
+// server this test runs on the PC (`net config dns 10.0.2.2 PORT`),
+// `net lookup` prints the address (and NXDOMAIN), `net get NAME PORT`
+// resolves the name itself and fetches from the PC, `net ping 10.0.2.2`
+// gets QEMU's echo replies over the card's raw ICMP socket. Native only.
+function dnsAnswer(q, rcode, ip) {
+  // q's id and question; QR RD RA; one A record named by a pointer to it
+  let end = 12;
+  while (q[end] !== 0) end += q[end] + 1;
+  const question = q.subarray(12, end + 5);
+  const head = Buffer.from([q[0], q[1], 0x81, 0x80 | rcode, 0, 1, 0, ip ? 1 : 0, 0, 0, 0, 0]);
+  const rr = ip ? Buffer.from([0xc0, 12, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, ...ip]) : Buffer.alloc(0);
+  return Buffer.concat([head, question, rr]);
+}
+
+function dnsName(q) {
+  const parts = [];
+  for (let i = 12; q[i] !== 0; i += q[i] + 1) parts.push(q.subarray(i + 1, i + 1 + q[i]).toString('latin1'));
+  return parts.join('.');
+}
+
+async function e2e013() {
+  log('E2E-013: net config, net lookup, net get NAME, net ping on the real Wi-Fi firmware');
+  if (!expect(backend === 'native', 'E2E-013 needs the native emulator (CUPC8_EMU=native)')) return;
+  const dgram = await import('node:dgram');
+  const asked = [];
+  const dns = dgram.createSocket('udp4');
+  dns.on('message', (q, from) => {
+    const name = dnsName(q);
+    asked.push(name);
+    const reply = name === 'host.cupc8.test' ? dnsAnswer(q, 0, [10, 0, 2, 2]) : dnsAnswer(q, 3, null);
+    dns.send(reply, from.port, from.address);
+  });
+  await new Promise((r) => dns.bind(0, '127.0.0.1', r));
+  const dnsPort = dns.address().port;
+  const page = 'FETCHED BY NAME';
+  let hostHeader = null;
+  const server = http.createServer((req, res) => {
+    hostHeader = req.headers.host;
+    res.sendDate = false;
+    res.writeHead(200, { 'Content-Type': 'text/plain', Connection: 'close' });
+    res.end(page + '\n');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const httpPort = server.address().port;
+
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' } });
+  m.powerOn();
+  expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+  // each command on a clear screen, run until its prompt (or `want`)
+  const run = async (cmd, want, ns = 30e9) => {
+    m.type('clr\n');
+    await m.runUntil(() => !screenText(m).includes(cmd) && /^>> ?_?$/m.test(screenText(m)), 3e9, 50e6);
+    m.type(cmd + '\n');
+    const ok = await m.runUntil(() => {
+      const t = screenText(m);
+      const i = t.indexOf(cmd);
+      return i >= 0 && t.slice(i + cmd.length).includes(want);
+    }, ns, 50e6);
+    if (!ok) console.log('---- screen\n' + screenText(m) + '\n----');
+    return ok;
+  };
+  expect(await run('net join cupc8 password', 'joined, address 10.0.2.15'), 'net join');
+  expect(await run(`net config dns 10.0.2.2 ${dnsPort}`, `dns 10.0.2.2 port ${dnsPort}`),
+    'net config dns 10.0.2.2 PORT: the settings shown');
+  expect(await run('net lookup host.cupc8.test', 'host.cupc8.test 10.0.2.2'), 'net lookup: the address the PC\'s DNS server gave');
+  expect(asked.includes('host.cupc8.test'), `the PC's DNS server was asked (${asked})`);
+  expect(await run('net lookup nx.cupc8.test', 'name not found'), 'net lookup of a name that does not exist: NXDOMAIN');
+  expect(await run(`net get host.cupc8.test ${httpPort}`, page), 'net get NAME PORT: resolved by the kernel, fetched from the PC');
+  expect(hostHeader === 'host.cupc8.test', `the request's Host header is the name (${hostHeader})`);
+  expect(await run('net ping 10.0.2.2 2', 'received'), 'net ping 10.0.2.2 finishes');
+  const t = screenText(m);
+  expect(/seq 1 time \d+ ms/.test(t) && /seq 2 time \d+ ms/.test(t) && t.includes('2 sent, 2 received'),
+    'net ping 10.0.2.2: QEMU answers both echo requests, times and the summary');
+  expect(await run('net config', 'not saved'), 'net config shows the settings');
+  m.stop();
+  server.close();
+  dns.close();
+}
+
 const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009,
-  'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012 };
-const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012'];
+  'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012, 'E2E-013': e2e013 };
+const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013'];
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !nativeOnly.includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);

@@ -567,11 +567,20 @@ cmd = "tools/run_tests.sh testBasicPrograms"
 [[test]]
 id = "KRN-004"
 title = "Networking"
-checks = "join, resolve and TCP fetch through the Wi-Fi card model; output matches"
-method = "tools/simtest.nim testKernelNetwork: the kernel's net command, Wi-Fi core on host sockets, server on 127.0.0.1:8088"
+checks = "join, resolve (the kernel's DNS client) and TCP fetch through the Wi-Fi card model; output matches; a weak USB source refuses net"
+method = "tools/simtest.nim testKernelNetwork, testKernelNetWeakPower: the kernel's net command, Wi-Fi core on host sockets, a DNS server in the test answering localhost, an HTTP server on 127.0.0.1:8088"
 kind = "sim"
 vrow = "2.3"
-cmd = "tools/run_tests.sh"
+cmd = "tools/run_tests.sh testKernelNetwork testKernelNetWeakPower"
+
+[[test]]
+id = "KRN-014"
+title = "Networking in assembly: DNS client, ping, net config"
+checks = "routines on the CPU: the Internet checksum equals RFC 1071 (odd and even lengths, many carries), ping's echo request, reply matching (identifier, sequence, type, checksum, sender, an IPv4 header in front), the DNS query's bytes, the answer parser (a compressed name, a CNAME then its A through a pointer to a pointer, a name in full, AAAA skipped, NXDOMAIN, SERVFAIL, no answer, class not IN, another id, not a response, truncated, a pointer loop, a pointer, label, RDATA or record past the end), dotted quads and numbers; the whole kernel against a scripted DNS server on host sockets: net config (show, dns IP [PORT], ip IP MASK GW, dhcp, save, bad arguments), net lookup (each answer above; an answer with another id ignored before the right one; only wrong ids and silence time out after exactly one retry with a new id; one answered only the second time; a dotted quad asks nothing), net ping to the host's loopback (replies, times, summary), by name, to an address that never answers (timeouts), of a name that does not exist; the clock (TMR1) is off afterwards; the example TCP and UDP echo servers (examples/net, user programs at $7000 on the net API) serve two TCP clients in turn and UDP datagrams from two ports"
+method = "tools/simtest.nim testNetRoutines (kernel routines called directly, kernel/kernel.map), testKernelDnsPing (Wi-Fi core on host sockets: netposix.c, Linux ping socket), testNetExamples (the programs assembled after kernel/api.inc, or API_NET_* names for api_net_* until it exists)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testNetRoutines testKernelDnsPing testNetExamples"
 
 [[test]]
 id = "KRN-007"
@@ -1081,6 +1090,15 @@ checks = "Wi-Fi join → TCP fetch from a local server → page shown"
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
+
+[[test]]
+id = "E2E-013"
+title = "Networking in assembly on the real Wi-Fi firmware"
+checks = "the kernel's DNS client asks a DNS server on the PC (net config dns 10.0.2.2 PORT, the settings shown), net lookup prints its address and NXDOMAIN's message, net get NAME PORT resolves the name itself and fetches from the PC (Host header is the name), net ping 10.0.2.2 gets QEMU's echo replies over the card's raw ICMP socket with times and the summary, net config shows the settings"
+method = "test/emu/test_e2e.mjs E2E-013 (CUPC8_EMU=native): the native emulator, esp32c3 firmware in QEMU, a Node DNS server and HTTP server on 127.0.0.1"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
 
 [[test]]
 id = "E2E-004"
