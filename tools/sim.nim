@@ -99,6 +99,9 @@ var
   romOff*: bool = false
   pwrHi*: bool = true            # USB-C source >= 3.0 A (a board input, kept across reset)
   romBank*: int = 0
+  ramBank*: int = 2              # RAM_BANK ($f205): the $8000-$bfff window's SRAM bank
+  xram*: seq[int]                # SRAM $0f000-$7ffff; mem[] holds $00000-$0efff (its
+                                 # $f000-$ffff are the I/O registers' shadows)
   ramJunk*: bool = false         # cpuReset leaves RAM as the SRAM powers up (the
                                  # emulator's pattern, soc/emu/board.h), not zeroed
   spiTxR, spiRxR, spiCfgR: array[8, int]
@@ -200,12 +203,35 @@ proc romWindow(a: int): int =
   if a < 0xe800: a and 0x7ff
   else: (romBank shl 11) or (a and 0x7ff)
 
+proc physRead*(p: int): int =
+  ## The 512 KB SRAM by physical address (extended-ram.md).
+  if p < 0xf000: mem[p] and 0xff
+  else: xram[p - 0xf000] and 0xff
+
+proc physWrite*(p, v: int) =
+  if p < 0xf000: mem[p] = v and 0xff
+  else: xram[p - 0xf000] = v and 0xff
+
+proc ramRead(a: int): int =
+  ## RAM at CPU address a: the window at $8000-$bfff shows bank RAM_BANK
+  ## (M1 machine only; bank 2 is the identity map).
+  if ioModel == imCards and ramBank != 2 and (a and 0xc000) == 0x8000:
+    physRead((ramBank shl 14) or (a and 0x3fff))
+  else:
+    mem[a]
+
+proc ramWrite(a, v: int) =
+  if ioModel == imCards and ramBank != 2 and (a and 0xc000) == 0x8000:
+    physWrite((ramBank shl 14) or (a and 0x3fff), v)
+  else:
+    mem[a] = v
+
 proc memRead(a: int): int =
   let a = a and 0xffff
   let r = romWindow(a)
   if r >= 0:
     return int(rom[r mod rom.len])
-  mem[a] and 0xff
+  ramRead(a) and 0xff
 
 proc fetch(): int =
   result = memRead(PC)
@@ -298,7 +324,7 @@ proc cardsStore(address, value: int) =
   if address >= 0xe000 and address <= 0xefff and not romOff:
     return                                   # CPU writes to the ROM windows are ignored
   if address < 0xf000:
-    mem[address] = v
+    ramWrite(address, v)
     return
   case (address shr 8) and 0xf
   of 0x0:
@@ -335,6 +361,7 @@ proc cardsStore(address, value: int) =
     of 1: irqMask = v and 0x0f
     of 3: romOff = (v and 1) == 1
     of 4: romBank = v
+    of 5: ramBank = v and 0x1f
     else: discard
   else:
     discard
@@ -360,10 +387,12 @@ proc cardsLoad(address: int): int =
     of 2: slotIrqBits()
     of 3: (if romOff: 1 else: 0) or (if pwrHi: 2 else: 0)
     of 4: romBank
+    of 5: ramBank
     else: 0
   else: 0
 
 proc cardsLoadTest*(address: int): int = cardsLoad(address)
+proc cardsStoreTest*(address, value: int) = cardsStore(address, value)
 
 proc ins_st_do(o: int, a: int) =
   var address = a
@@ -575,8 +604,8 @@ proc ins_push(o: int) =
 
   # Manual 3.1/3.2: SP points to the next free byte ([SP] <= Rb; SP <= SP + 1),
   # matching cpu.vhd.
-  let oldValue = mem[SP]
-  mem[SP] = rb and 0xff
+  let oldValue = ramRead(SP)
+  ramWrite(SP, rb and 0xff)
   if not memHook.isNil:
     memHook(maWrite, SP, rb and 0xff, oldValue)
   SP += 1
@@ -591,16 +620,16 @@ proc setFlags(n: int) =
 proc ins_pop(o: int) =
   SP -= 1
   if (o and 7) == 7:
-    pcl = mem[SP]
+    pcl = ramRead(SP)
   elif (o and 6) == 6:
-    PC = pcl or (mem[SP] shl 8)
+    PC = pcl or (ramRead(SP) shl 8)
     if stepOutArmed and SP <= stepOutSP:
       stepOutArmed = false
       stopRequest = true
   elif (o and 7) == 4:
-    setFlags(mem[SP])
+    setFlags(ramRead(SP))
   else:
-    reg_write(o, mem[SP])
+    reg_write(o, ramRead(SP))
 
 proc ins_b(o: int) =
   PC = fetch() or (fetch() shl 8)
@@ -640,8 +669,8 @@ proc ins_wai(o: int) =
 proc pushByte(v: int) =
   let
     value = v and 0xff
-    oldValue = mem[SP]
-  mem[SP] = value
+    oldValue = ramRead(SP)
+  ramWrite(SP, value)
   if not memHook.isNil:
     memHook(maWrite, SP, value, oldValue)
   SP += 1
@@ -756,6 +785,11 @@ proc cpuReset*() =
     spiCfgR[i] = 0
   romOff = false
   romBank = 0
+  ramBank = 2
+  if xram.len == 0:
+    xram = newSeq[int](0x80000 - 0xf000)
+  for i in 0..xram.high:
+    xram[i] = if ramJunk: ((i + 0xf000) * 13 + 5) and 0xff else: 0
   slotIrqPrev = 0
   lastCardTick = 0
 
