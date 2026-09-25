@@ -77,7 +77,7 @@ def schematic(path, footprint_libs):
 
 
 POWER_NETS = rc.POWER_NETS
-CX, CY = 26, -19               # the RP2040, turned round: its SD pins (GPIO12-19) face the socket
+CX, CY = 26, -16               # the RP2040, turned round: its SD pins (GPIO12-19) face the socket
 SX = 40                        # the socket: its opening on the top edge
 PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # the chip's top edge after the turn: SD pins at its right end and on the
@@ -86,16 +86,17 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # (pocket_escapes) and the crystal sits to the left, the flash by the
     # QSPI pins (now at the bottom)
     "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23
+    "C3": (CX + 5.8, CY + 0.2, 0),       # IOVDD 1, clear of the flash
     "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
-    "C8": (CX - 3.2, CY + 7.2, 90),      # IOVDD 49
+    "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
     "Y1": (CX - 13.0, CY - 3.0, 0),
     "C16": (CX - 15.7, CY - 3.0, 90),
     "C17": (CX - 13.0, CY - 0.4, 0),
     "R2": (CX - 13.0, CY - 5.6, 0),      # XOUT
-    "U3": (CX + 7, CY + 9.5, 0),
-    "C15": (CX + 7, CY + 5.6, 0),
-    "R1": (CX + 12.5, CY + 9.5, 90),
+    "U3": (CX + 8.2, CY + 6.2, 90),
+    "C15": (CX + 12.0, CY + 3.4, 90),
+    "R1": (CX + 12.0, CY + 7.4, 90),
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up, by its finger
@@ -120,7 +121,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LAYERS = 4
 LOGO_MM = 12
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 9, -29, 0)]
 TITLE, REVISION = "CUPC/8 storage", "A"
 
 
