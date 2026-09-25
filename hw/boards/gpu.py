@@ -173,21 +173,23 @@ def preroute(board):
       fan-out via (or one of ours, 1.4 mm towards the chip) takes them down
     - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)"""
     rc.pocket_escapes(board)
+    import pcbnew
+
+    def gnd_via_near(x, y, dx, dy):
+        tracks = board.Tracks()
+        return any(tracks[i].Type() == pcbnew.PCB_VIA_T and tracks[i].GetNetname() == "/GND" and
+                   abs(pcbnew.ToMM(tracks[i].GetPosition().x) - x) < dx and
+                   abs(pcbnew.ToMM(tracks[i].GetPosition().y) - y) < dy for i in range(len(tracks)))
     for pin in (2, 5, 8, 11, 17):
         x, y = rc.pad_at(board, "J2", pin)
-        rc.via(board, "/GND", (x, y - 2.0))
-        rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
-    import pcbnew
+        if not gnd_via_near(x, y - 2.0, 0.3, 0.3):       # unless the fan-out put one there
+            rc.via(board, "/GND", (x, y - 2.0))
+            rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
     for ref in ("U5", "U6"):
         (x8, y8), (x3, y3) = rc.pad_at(board, ref, 8), rc.pad_at(board, ref, 3)
         rc.track(board, "/GND", (x8, y8), (x3, y3), width=0.2)
         # a via 1.4 mm towards the chip, unless the fan-out gave pin 3 one
-        tracks = board.Tracks()
-        near = [tracks[i] for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T and
-                tracks[i].GetNetname() == "/GND" and
-                abs(pcbnew.ToMM(tracks[i].GetPosition().x) - x3) < 1.0 and
-                abs(pcbnew.ToMM(tracks[i].GetPosition().y) - y3) < 2.0]
-        if not near:
+        if not gnd_via_near(x3, y3, 1.0, 2.0):
             rc.via(board, "/GND", (x3, y3 + 1.4))
             rc.track(board, "/GND", (x3, y3), (x3, y3 + 1.4), width=0.2)
 
