@@ -13,11 +13,20 @@ does everything except KiCad.
 | ngspice, TI PSpice models | POW-*, THM-001 | apt; the TI models are fetched from www.ti.com by `hw/power/models/fetch.py` (pinned by SHA-256; not redistributable) |
 | KiCad 10, Freerouting | the board tests (BRD-001, WIFI-004, E2E-006, the board rows) | below |
 
-The whole-machine emulator the end-to-end tests run on (`test/emu/test_e2e.mjs`)
-has two backends giving identical results: `test/emu/machine.mjs` (rp2040js
-cards, the default) and the native one in `emu/machine`
-(`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; about six times
-as fast, see its README). `test/emu/machine_diff.sh` checks that they agree.
+**Emulator and simulator** (David, 2026-09-25):
+
+- **The emulator** is the native whole-machine emulator in `emu/machine`
+  (`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; see its
+  README). It runs the chipset RTL (Verilated) and every card's real
+  firmware, and must be **cycle perfect**; the end-to-end tests
+  (`test/emu/test_e2e.mjs`) run on it. `test/emu/machine.mjs` (rp2040js) is
+  the legacy JS emulator, kept but no longer updated. Watch it in a browser
+  with `tools/machine_view.mjs --native`.
+- **The simulator** (`tools/sim`, from `tools/sim.nim`) is the interactive
+  way to run real CUPC/8 software locally and build programs: the CPU in
+  Nim and the cards' firmware cores compiled in (`tools/simcards.nim`). It
+  is not cycle exact, but it must always run the current kernel, ROM,
+  memory map and card commands.
 
 ## KiCad 10
 
