@@ -748,8 +748,8 @@ cmd = "test/emu/backend_diff.sh"
 
 [[test]]
 id = "EMU-007"
-title = "Native whole-machine emulator: identical to machine.mjs, threaded = serial"
-checks = "boot to BASIC and a typed program (1.6 s emulated) on test/emu/machine.mjs, the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42"
+title = "Native whole-machine emulator: threaded = serial"
+checks = "boot to BASIC and a typed program (1.6 s emulated) on the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42. No longer compared with test/emu/machine.mjs: the legacy JS emulator is not maintained (David, 2026-09-25) and still has the CS_n edge bug the native machine's E2E-011 fix removed, so the two differ"
 method = "test/emu/machine_diff.sh (test/emu/test_machine_native.mjs, emu/machine, tools/emu_machine_build.sh)"
 kind = "sim"
 vrow = "3.2"

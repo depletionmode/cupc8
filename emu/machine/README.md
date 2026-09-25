@@ -21,7 +21,7 @@ machine.mjs's `$A6`/`$A5` protocol.
 ```sh
 tools/emu_machine_build.sh          # tools/emu_build.sh, then cmake + ninja into build/emu-machine
 CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002
-test/emu/machine_diff.sh            # equivalence with machine.mjs and serial/threaded determinism
+test/emu/machine_diff.sh            # serial/threaded determinism (EMU-007; machine.mjs is legacy, not compared)
 build/emu-machine/machinerun --root . --rom ROM --mode both \
     --until '>>' 6e9 --type '10 print 6*7\nrun\n' --until 42 3e9 --run 200e6
 ```
