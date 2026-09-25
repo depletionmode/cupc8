@@ -549,7 +549,7 @@ def main():
         "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=LAYERS, zones=ZONES,
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence={"layer": "In3.Cu"},   # a B.Cu run would wall the address lines off their fingers
-        passes=80,                      # 60 left one bus net unrouted after its three tries
+        passes=40, route_tries=8,       # Freerouting converges early; what differs is each try's ordering
         silk_text=SILK_TEXT,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])
     print("LCSC:", " ".join(sorted(lcsc)))
