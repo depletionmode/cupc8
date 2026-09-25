@@ -20,6 +20,13 @@ when isMainModule:
 var log_mask* = 9
 var last_gpo*: string = ""
 var ins_retired*: int = 0
+## The CPU's 12 MHz clocks since reset, as cpu.vhd and the chipset spend
+## them: 4 a memory bus cycle (every byte fetched, a load or store, a push or
+## pop, a pointer byte), 2 an I/O register cycle ($f000-$ffff), 4 more an
+## instruction (exec, tick, settle, check), 3 a WAI idle turn, 20 an IRQ
+## entry (3 pushes, 2 vector bytes). The chipset's millisecond counter and
+## its tick run from it (memory-map.md).
+var simClocks*: int = 0
 
 proc log(lvl : int, msg : string) =
   if (lvl and log_mask) > 0:
@@ -55,8 +62,10 @@ var
   lastOp: int = 0                # the opcode of the instruction that retired last
   mem*: array[0..0x10000, int]
   imageEnd*: int = 0
-  irqPending*: int = 0
+  irqPending*: int = 0           # IRQ_PEND bits 4:0 (bit 4: the tick, on CPU line 3)
   irqMask*: int = 0
+  msLatch: int = 0               # MS_COUNT1-3: bits 31:8 latched by a read of MS_COUNT0
+  ticksSeen: int = 0             # 50 ms ticks raised so far
   tmr0*: int = 0
   tmr1*: int = 0
 
@@ -113,8 +122,28 @@ var
   lastCardTick: int = 0
 
 proc simMillis*(): uint32 =
-  ## Guest time: about one instruction per microsecond at 12 MHz.
+  ## The cards' time: about one instruction per microsecond at 12 MHz.
   uint32(ins_retired div 1000)
+
+const
+  MsClocks* = 12000              ## the chipset's clocks a millisecond
+  TickMs* = 50                   ## the tick IRQ's period (20 Hz)
+
+proc msCount*(): int =
+  ## The chipset's millisecond counter (MS_COUNT, $f206-$f209), 32 bits.
+  (simClocks div MsClocks) and 0xffffffff
+
+proc msRead(reg: int): int =
+  ## A CPU read of MS_COUNT0-3: MS_COUNT0 latches bits 31:8 for the others.
+  let c = msCount()
+  case reg
+  of 6:
+    msLatch = c shr 8
+    c and 0xff
+  of 7: msLatch and 0xff
+  of 8: (msLatch shr 8) and 0xff
+  of 9: (msLatch shr 16) and 0xff
+  else: 0
 
 var heldSlotIrq*: int = 0       ## test hook: slots whose IRQ_n is held low (another card's)
 
@@ -144,8 +173,16 @@ proc cpuLoadRom*(path: string) =
     rom[i] = if i < data.len: uint8(data[i]) else: 0xff'u8
 
 proc raiseIrq*(bit: int) =
-  irqPending = (irqPending or (1 shl bit)) and 0x0f
+  irqPending = (irqPending or (1 shl bit)) and 0x1f
   mem[0xf200] = irqPending
+
+proc clockTick() =
+  ## The chipset's tick: IRQ_PEND bit 4 each time the millisecond counter
+  ## reaches a multiple of 50.
+  let t = simClocks div (MsClocks * TickMs)
+  if t != ticksSeen:
+    ticksSeen = t
+    raiseIrq(4)
 
 proc cardsTick*() =
   ## Let the cards do background work, and latch IRQ0 on a new slot IRQ.
@@ -239,6 +276,7 @@ proc memRead(a: int): int =
 proc fetch(): int =
   result = memRead(PC)
   PC = (PC + 1) and 0xffff
+  simClocks += 4
 
 proc reg_write(operands, val: int) =
   if (operands and 1) == 1:
@@ -360,8 +398,8 @@ proc cardsStore(address, value: int) =
       cardsTick()
   of 0x2:
     case address and 0xff
-    of 0: irqPending = irqPending and not v and 0x0f
-    of 1: irqMask = v and 0x0f
+    of 0: irqPending = irqPending and not v and 0x1f
+    of 1: irqMask = v and 0x1f
     of 3: romOff = (v and 1) == 1
     of 4: romBank = v
     of 5: ramBank = v and 0x1f
@@ -391,6 +429,7 @@ proc cardsLoad(address: int): int =
     of 3: (if romOff: 1 else: 0) or (if pwrHi: 2 else: 0)
     of 4: romBank
     of 5: ramBank
+    of 6, 7, 8, 9: msRead(address and 0xff)
     else: 0
   else: 0
 
@@ -403,6 +442,7 @@ proc ins_st_do(o: int, a: int) =
     var ra = reg_read(o, true)
     address += ra
   address = address and 0xffff
+  simClocks += (if address >= 0xf000: 2 else: 4)
   let
     value = reg_read(o, false)
     oldValue = mem[address]
@@ -424,7 +464,7 @@ proc ins_st_do(o: int, a: int) =
           irqPending = irqPending and not value
           mem[address] = irqPending
         of 1:
-          irqMask = value and 0x0f      # 4 IRQs; bits 7:4 read 0 (memory-map.md)
+          irqMask = value and 0x1f      # 5 IRQ_PEND bits; bits 7:5 read 0 (memory-map.md)
           mem[address] = irqMask
         else:
           discard
@@ -467,6 +507,7 @@ proc ins_st(o: int) =
 proc ins_std(o: int) =
   var address = fetch() or (fetch() shl 8)
   var address_d = memRead(address) or (memRead(address + 1) shl 8)
+  simClocks += 8
   ins_st_do(o, address_d)
 
 proc ins_ld_do(o: int, a: int) =
@@ -475,6 +516,7 @@ proc ins_ld_do(o: int, a: int) =
     var rb = reg_read(o, false)
     address += rb
   address = address and 0xffff
+  simClocks += (if address >= 0xf000: 2 else: 4)
   if ioModel == imCards:
     let value = cardsLoad(address)
     reg_write(o, value)
@@ -490,6 +532,8 @@ proc ins_ld_do(o: int, a: int) =
           value = irqPending
         of 1:
           value = irqMask
+        of 6, 7, 8, 9:
+          value = msRead(address and 0xff)
         else:
           discard
     of 0xf1:    #spi
@@ -526,6 +570,7 @@ proc ins_ld(o: int) =
 proc ins_ldd(o: int) =
   var address = fetch() or (fetch() shl 8)
   var address_d = memRead(address) or (memRead(address + 1) shl 8)
+  simClocks += 8
   ins_ld_do(o, address_d)
 
 proc ins_gt(o: int) =
@@ -612,6 +657,7 @@ proc ins_push(o: int) =
   if not memHook.isNil:
     memHook(maWrite, SP, rb and 0xff, oldValue)
   SP += 1
+  simClocks += 4
 
 proc flagsNibble(): int =
   (if ZF: 1 else: 0) or (if IF: 2 else: 0)
@@ -622,6 +668,7 @@ proc setFlags(n: int) =
 
 proc ins_pop(o: int) =
   SP -= 1
+  simClocks += 4
   if (o and 7) == 7:
     pcl = ramRead(SP)
   elif (o and 6) == 6:
@@ -679,11 +726,14 @@ proc pushByte(v: int) =
   SP += 1
 
 proc irqReady(): int =
+  ## The CPU IRQ line to take: lines 0-2 are IRQ_PEND bits 0-2, line 3 is
+  ## bit 3 (SPI complete) or bit 4 (the tick), each by its own mask bit.
   let bits = irqPending and irqMask
-  if bits == 0:
+  let lines = (bits and 0x0f) or (if (bits and 0x10) != 0: 0x08 else: 0)
+  if lines == 0:
     return -1
   for i in 0..3:
-    if (bits and (1 shl i)) != 0:
+    if (lines and (1 shl i)) != 0:
       return i
   -1
 
@@ -693,6 +743,7 @@ proc takeIrq(n: int) =
   pushByte(ret shr 8)
   pushByte(ret and 0xff)
   pushByte(flagsNibble())
+  simClocks += 20                     # 3 pushes and 2 vector bytes
   IF = false
   let va = 0x0010 + n * 2
   PC = (mem[va] and 0xff) or ((mem[va + 1] and 0xff) shl 8)
@@ -768,6 +819,9 @@ proc cpuReset*() =
   lastOp = 0
   imageEnd = 0
   ins_retired = 0
+  simClocks = 0
+  msLatch = 0
+  ticksSeen = 0
   last_gpo = ""
   display_active = false
   has_key = false
@@ -857,12 +911,16 @@ proc cpuStep*(): StepResult =
   if waiting:
     tickTimers()
     inc ins_retired
+    simClocks += 3
+    clockTick()
     serviceIrq()
     return sOk
   if PC >= imageEnd:
     return sPastImage
   decode()
   ins_retired += 1
+  simClocks += 4
+  clockTick()
   tickTimers()
   if HF:
     return sHalted
@@ -901,6 +959,8 @@ proc cpuRun*(maxSteps: int): RunExit =
     if ioModel == imCards:
       cardsTick()
     tickTimers()
+    simClocks += 3
+    clockTick()
     serviceIrq()
     if waiting:
       return reCount
@@ -921,6 +981,8 @@ proc cpuRun*(maxSteps: int): RunExit =
       resumeBreak = -1
       decode()
       inc ins_retired
+      simClocks += 4
+      clockTick()
       tickTimers()
       if HF:
         return reHalted

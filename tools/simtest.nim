@@ -772,8 +772,53 @@ proc testIrqMaskMmio() =
   expect("mask register", irqMask, 5)
   expect("mask readable", mem[0xf201], 5)
 
+proc testMsCounter() =
+  ## SIM-011: the chipset's millisecond counter and tick in sim.nim, as
+  ## memory-map.md and chipset.vhd (CLK-001, IRQ-003) have them
+  echo "== the millisecond counter and the tick =="
+  loadProgram(testdata / "ms_tick.s")
+  var n = 0
+  while n < 2_000_000 and not HF:
+    if cpuStep() != sOk: break
+    inc n
+  expectTrue("the program halted after two ticks", HF)
+  expect("the counter at the start", mem[0x2000] or (mem[0x2001] shl 8), 0, 4)
+  expect("two ticks taken on the SPI vector (CPU line 3)", mem[0x2005], 2)
+  expect("IRQ_PEND in the handler: the tick, bit 4", mem[0x2004], 0x10)
+  expect("the second tick came at 100 ms", mem[0x2002] or (mem[0x2003] shl 8), 100, 4)
+  expectTrue("100 ms is 1200000 clocks (" & $simClocks & ")",
+             simClocks >= 1_200_000 and simClocks < 1_200_000 + 400)
+  # masked by bit 4, the tick does not wake a WAI, even with SPI's bit 3 set
+  HF = false
+  irqMask = 0x08
+  IF = true
+  waiting = true
+  let at = PC
+  for i in 0..<700_000: discard cpuStep()     # 2.1 M clocks: three ticks' worth
+  expectTrue("masked, three ticks later the CPU still waits", waiting and PC == at and (irqPending and 0x10) != 0)
+  irqMask = 0x10
+  discard cpuStep()
+  expectTrue("unmasked, the pending tick is taken", not waiting and PC == (mem[0x16] or (mem[0x17] shl 8)))
+  # MS_COUNT0 latches MS_COUNT1-3: one value across a carry of the low byte
+  machineCards([])
+  cpuReset()
+  simClocks = 0x1ff * MsClocks + MsClocks - 10   # $1ff ms, 10 clocks before $200
+  expect("MS_COUNT0 at $1ff ms", cardsLoadTest(0xf206), 0xff)
+  simClocks += 20                                # the counter is at $200 now
+  expect("MS_COUNT1 still the latched $01", cardsLoadTest(0xf207), 0x01)
+  expect("MS_COUNT0 after the carry", cardsLoadTest(0xf206), 0x00)
+  expect("MS_COUNT1 once MS_COUNT0 was read again", cardsLoadTest(0xf207), 0x02)
+  simClocks = 0x12345678 * MsClocks
+  discard cardsLoadTest(0xf206)
+  expect("MS_COUNT1-3 of $12345678", cardsLoadTest(0xf207) or (cardsLoadTest(0xf208) shl 8) or
+         (cardsLoadTest(0xf209) shl 16), 0x123456, 6)
+  cardsStoreTest(0xf201, 0xff)
+  expect("IRQ_MASK: bits 4:0", cardsLoadTest(0xf201), 0x1f)
+  ioModel = imLegacy
+
 run testIrqOps
 run testIrqTimer
+run testMsCounter
 run testIrqPopPcl
 run testIrqFlags
 run testIrqCli

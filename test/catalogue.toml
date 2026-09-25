@@ -45,6 +45,15 @@ vrow = "2.1"
 cmd = "python3 test/sim/test_cli.py"
 
 [[test]]
+id = "SIM-011"
+title = "The simulator's millisecond counter and tick"
+checks = "sim.nim counts the CPU's clocks as cpu.vhd and the chipset spend them (4 a memory cycle, 2 an I/O cycle, 4 more an instruction, 3 a WAI idle turn, 20 an IRQ entry): a program parked in WAI with only the tick unmasked takes two ticks on the SPI vector (CPU line 3) with IRQ_PEND $10, the second at MS_COUNT 100 and 1200000 clocks (+400); masked by bit 4 (SPI's bit 3 set) three ticks' worth leave it waiting, unmasked the pending tick is taken; MS_COUNT0 latches MS_COUNT1-3 across a carry of the low byte and at $12345678; IRQ_MASK reads back bits 4:0"
+method = "tools/simtest.nim testMsCounter (tools/testdata/ms_tick.s; cardsLoadTest for the registers)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testMsCounter"
+
+[[test]]
 id = "SIM-005"
 title = "Simulator models banked RAM"
 checks = "RAM_BANK ($f205) as the chipset has it (MMU-005): reset 2 is the identity map, 5 bits read back, $8000-$bfff shows {bank, A[13:0]} of the 512 KB SRAM for every bank, banks 0 and 3 alias the normal memory (bank 3 reaching SRAM $0f000, not the I/O shadows), $7fff and $c000 never move, the stack follows the window, and a reset puts bank 2 back"
