@@ -174,9 +174,10 @@ fixed_in = "29cfa8f"
 before = "d7f6145"
 files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-# the key bytes now come out shifted in the repeat test ("<" and "\x0f" for
-# "x"); "Hello" itself got through once the preload was double-buffered
-must_fail = ["held 700 ms gives 1 + ~7 repeats, got"]
+# which of IOC-004's timing-bound checks it trips moves with each build
+# ("Hello", then the repeat test); its polling section (the host polling back
+# to back against a 1 ms keyboard) catches it every time
+must_fail = ["FAIL polling: every status byte has bit 7 clear"]
 
 [[bug]]
 name = "wifi core: CONNECT_HOST connected with no SNI, so TLS could not check the certificate name"
