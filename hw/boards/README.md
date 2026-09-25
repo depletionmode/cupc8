@@ -456,13 +456,17 @@ module, which carries the booster; the card only drives its SPI.
 ## Main board (`main.py`)
 
 Specs: `doc/hardware/cpu-bus.md`, `slot.md`, `system-slot.md`,
-`memory-map.md`, `power.md`, `sysctl.md`, `debugging.md`. 4 layers
-(JLC04161H-7628): In1.Cu is a solid GND plane (Freerouting sees it as a
-plane and keeps signals off it; every SMD GND pad has its own via), and
-F.Cu, In2.Cu and B.Cu carry signals, with GND pours on the outer layers and
-a +3V3 pour on In2 filled round the routing (a "routed" zone). With only
-F.Cu and B.Cu for signals Freerouting stalls at ~80 unrouted connections.
-125 × 184 mm, 3 boards assembled.
+`memory-map.md`, `power.md` (and `hw/power`), `sysctl.md`, `debugging.md`.
+6 layers (JLC06161H-3313), as the
+CPU card: F.Cu / In1 GND plane / In2 / In3 / In4 +3V3 plane / B.Cu, with
+GND also poured on the outer layers. Four signal layers are what it takes:
+with two (a 4-layer board, both inner layers planes) Freerouting stalls at
+~80 unrouted connections; with four on a 4-layer board (the pours cut round
+the routing) it completes, but the +3V3 pour splits into pieces and GND
+islands form round the chipset. Every SMD pad on GND or +3V3 has its own
+via to its plane. The TQ144, sTSOP-32 and eFuse nets route in kicadgen's
+Fine class (0.15 mm), as on the CPU card. Routing is capped at 30 passes,
+then 60 (`ROUTE_PASSES`, `ROUTE_TRIES`). 125 × 184 mm, 3 boards assembled.
 
 ```
 python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pincheck netlist check

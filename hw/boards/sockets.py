@@ -61,7 +61,8 @@ SOCKETS = {
 #    (318307001 sheet 4) is 0.70 +-0.08 mm holes and 2.35 mm posts: drill
 #    0.75 mm with a 1.2 mm ring, posts 2.35 mm
 #  - the Sofng socket: its hold-down pads (65) reach over the locating
-#    holes' edge (mask bridge): narrowed to 1.3 mm, centre 0.15 mm outward
+#    holes' edge (mask bridge): narrowed to 1.0 mm, centre 0.2 mm outward
+#    (within bomcheck's 0.2 mm of JLC's pad), 0.3 mm clear of the hole
 DERIVED = {
     "UMAX_3183-10200P1T": ("CONN-TH_36P-P1.00-V_3183-XXXXXPXT", "umax"),
     "UMAX_3183-10112P1T": ("CONN-TH_98P-P1.00-V_3183-XXXXXPXT", "umax"),
@@ -81,13 +82,14 @@ def derive():
                           r"\1 (size 1.2 1.2) \2(drill 0.75)", text)
             text = re.sub(r'(\(pad "" np_thru_hole circle \(at [^)]*\)) \(size [\d.]+ [\d.]+\) \(drill [\d.]+\)',
                           r"\1 (size 2.35 2.35) (drill 2.35)", text)
-            # the row letters "A" and "B" 2 mm further out: 0.15 mm off pin 1 is JLC's minimum
-            text = re.sub(r"(\(fp_text user [AB] \(at )([-\d.]+)",
-                          lambda m: m.group(1) + "%.2f" % (float(m.group(2)) - 2.0), text)
+            # the row letters "A" and "B" go: beside pin 1 they sit on the
+            # outline or over the corner mounting hole, and the key already
+            # fixes the card's way round
+            text = re.sub(r"\n\t\(fp_text user [AB] \(at [^)]*\) \(layer F\.SilkS\)\n\t\t\(effects[^\n]*\n\t\)", "", text)
         else:
             def nail(m):
                 x = float(m.group(1))
-                return "(pad 65 smd rect (at %.2f %s) (size 1.30 %s)" % (x + (0.15 if x > 0 else -0.15),
+                return "(pad 65 smd rect (at %.2f %s) (size 1.00 %s)" % (x + (0.2 if x > 0 else -0.2),
                                                                          m.group(2), m.group(3))
             text = re.sub(r"\(pad 65 smd rect \(at ([-\d.]+) ([-\d.]+)(?: [-\d.]+)?\) \(size [\d.]+ ([\d.]+)\)", nail, text)
         path = os.path.join(CUPC8, name + ".kicad_mod")
