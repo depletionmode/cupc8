@@ -634,8 +634,12 @@ static bool pc_got(const char *s)
 {
 	int n = (int)strlen(s);
 	bool ok = M.con.to_pc_n == n && memcmp(M.con.to_pc, s, (size_t)n) == 0;
-	if (!ok)
-		fprintf(stderr, "  the PC got %d bytes: '%.*s', expected '%s'\n", M.con.to_pc_n, M.con.to_pc_n, M.con.to_pc, s);
+	if (!ok) {
+		fprintf(stderr, "  the PC got %d bytes: '", M.con.to_pc_n);
+		for (int i = 0; i < M.con.to_pc_n; i++)
+			fputc(M.con.to_pc[i] >= 32 && M.con.to_pc[i] < 127 ? M.con.to_pc[i] : '.', stderr);
+		fprintf(stderr, "', expected '%s'\n", s);
+	}
 	M.con.to_pc_n = 0;
 	return ok;
 }
