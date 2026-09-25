@@ -29,8 +29,10 @@
 #define PIN_I2C_SCL            25
 /* misc: open drain onto the reset supervisor output */
 #define PIN_SYS_NRST           23
-#define PIN_DBG_UART_TX        0
-#define PIN_DBG_UART_RX        1
+/* misc: USB activity to the host, lit ~30 ms (milestone-1.md, Indicator LEDs); was the debug UART, which nothing used */
+#define PIN_LED_USB_TX         0
+/* misc: USB activity from the host */
+#define PIN_LED_USB_RX         1
 #define PIN_CC1_SENSE          26
 #define PIN_CC2_SENSE          27
 #define PIN_V1V2_SENSE         28

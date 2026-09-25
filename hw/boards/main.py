@@ -214,7 +214,7 @@ def build_parts():
           "A6": None, "A7": None, "B6": None, "B7": None, "A8": None, "B8": None})   # power only
     R("R1", "5.1k", "CC1", "GND")
     R("R2", "5.1k", "CC2", "GND")
-    part("U1", "jlc:USBLC6-2SC6", "USBLC6-2SC6", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "C7519",
+    part("U1", "Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "C7519",
          {1: "CC1", 6: "CC1", 3: "CC2", 4: "CC2", 2: "GND", 5: "VBUS_F"})
     # the input path, all values from POWER (hw/power/design.py decides them)
     part("F1", "Device:Polyfuse", "3.5A", "Fuse:Fuse_1812_4532Metric", POWER["FUSE_IN"][1], {1: "VBUS", 2: "VBUS_F"})

@@ -165,6 +165,12 @@ const ping = request(0x00);
 expect(ping && ping.status === 0 && ping.crcOk && String.fromCharCode(...ping.data).startsWith('CUPC8 sysctl'),
   `PING: ${ping && String.fromCharCode(...ping.data)}`);
 expect(MACHINE_PINS.every((n) => !driven(n)), 'still nothing driven after PING');
+// the USB activity LEDs (GPIO0 TX, GPIO1 RX): lit by the exchange, dark ~30 ms later
+const lit = (n) => gpio[n].outputEnable && gpio[n].outputValue;
+emu.runUntil(() => false, 1e6);
+expect(lit(0) && lit(1), 'the USB TX and RX LEDs light after a request and its reply');
+emu.runUntil(() => false, 40e6);
+expect(!lit(0) && !lit(1), 'and go dark ~30 ms later');
 
 emu.mcu.adc.channelValues[0] = Math.round((900 / 3300) * 4095);    // CC1 0.9 V: a 1.5 A source
 emu.mcu.adc.channelValues[1] = 0;

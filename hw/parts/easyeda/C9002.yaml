@@ -1,0 +1,12 @@
+# JLC's part C9002 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C9002
+jlc_package: SMD3225-4P
+easyeda_footprint: CRYSTAL-SMD_4P-L3.2-W2.5-BL
+pins: {'1': OSC1, '2': GND, '3': OSC2, '4': GND}
+pads:
+- ['1', -1.1, -0.85]
+- ['2', 1.1, -0.85]
+- ['3', 1.1, 0.85]
+- ['4', -1.1, 0.85]

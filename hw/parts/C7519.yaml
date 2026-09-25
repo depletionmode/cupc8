@@ -1,13 +1,12 @@
-# USBLC6-2SC6 (ST), USB ESD protection, SOT-23-6
-# EasyEDA's symbol names the pins by number only.
-datasheet: https://datasheet.lcsc.com/datasheet/pdf/0d3a2ab954b34651a0695e7ccf534db0.pdf
-source: "ST USBLC6-2 datasheet, Figure 1 Functional diagram (SOT23-6L): 1 I/O1, 2 GND, 3 I/O2, 4 I/O2, 5 VBUS, 6 I/O1"
+# USBLC6-2SC6 (ST), 2-line USB ESD protection, SOT-23-6
+datasheet: https://www.st.com/resource/en/datasheet/usblc6-2.pdf
+source: "USBLC6-2 datasheet, Figure 1 Functional diagram / pin configuration (SOT23-6L, top view)"
 package: SOT-23-6L
 pins:
-  1: ["I/O1", "1"]
-  2: ["GND", "2"]
-  3: ["I/O2", "3"]
-  4: ["I/O2", "4"]
-  5: ["VBUS", "5"]
-  6: ["I/O1", "6"]
+  1: [I/O1, IO1]
+  2: GND
+  3: [I/O2, IO2]
+  4: [I/O2, IO2]
+  5: VBUS
+  6: [I/O1, IO1]
 ccw: [1, 6]
