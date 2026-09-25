@@ -2,10 +2,10 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013|E2E-014] [--record]
 //
 // E2E-007 (files on the storage card's microSD), E2E-008 (the e-ink card),
-// E2E-010..012 (programs at $7000) and E2E-013 (networking) need
+// E2E-010..012 (programs at $7000) and E2E-013..014 (networking) need
 // CUPC8_EMU=native: the SD card, panel and Wi-Fi models are only in the
 // native emulator.
 //
@@ -557,9 +557,86 @@ async function e2e013() {
   dns.close();
 }
 
+// ------------------------------------------------------------------ E2E-014
+// The example echo servers (examples/net: user programs for $7000 on the
+// kernel's net API, built by tools/mkprg.py after kernel/api.inc) loaded
+// with `cupc8.py run` through the system card, on the real Wi-Fi firmware
+// in QEMU, and reached from the PC through QEMU's port forwards
+// (Machine.create({ forward })): two TCP clients one after the other, then
+// (a second machine) UDP datagrams from two ports. Native only.
+async function freePort(kind) {
+  const net = await import('node:net');
+  const dgram = await import('node:dgram');
+  return new Promise((resolve) => {
+    if (kind === 'tcp') {
+      const s = net.createServer();
+      s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); });
+    } else {
+      const s = dgram.createSocket('udp4');
+      s.bind(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); });
+    }
+  });
+}
+
+async function e2e014() {
+  log('E2E-014: the TCP and UDP echo servers (examples/net) run with cupc8.py run, reached through port forwards');
+  if (!expect(backend === 'native', 'E2E-014 needs the native emulator (CUPC8_EMU=native)')) return;
+  const net = await import('node:net');
+  const dgram = await import('node:dgram');
+  const tcpPrg = mkprg('examples/net/tcpecho.s');
+  const udpPrg = mkprg('examples/net/udpecho.s');
+  // a machine joined to QEMU's network with the server running
+  const serve = async (prg, forward) => {
+    const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' }, sysctl: true, forward });
+    m.powerOn();
+    expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+    m.type('net join cupc8 password\n');
+    if (!expect(await waitFor(m, 'joined, address 10.0.2.15', 30e9), 'net join')) console.log('---- screen\n' + screenText(m));
+    await m.runUntil(() => /\n>> ?_?$/.test(screenText(m)), 3e9, 50e6);
+    const r = await cupc8(m, 'run', prg);
+    expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run ${path.basename(prg)}: ${r.out.trim()}`);
+    await m.runAsync(0.5e9, 50e6);            // it opens its socket and listens (or binds)
+    return m;
+  };
+
+  // TCP: two clients in turn, each line comes back
+  const tp = await freePort('tcp');
+  let m = await serve(tcpPrg, [`tcp:${tp}:7007`]);
+  for (const msg of ['hello cupc8\n', 'a second client, and a longer line to echo back\n']) {
+    let got = '', closed = false, error = null;
+    const c = net.connect(tp, '127.0.0.1', () => c.write(msg));
+    c.on('data', (d) => (got += d));
+    c.on('error', (e) => (error = e.message));
+    c.on('close', () => (closed = true));
+    const ok = await m.runUntil(() => got.length >= msg.length || error !== null, 20e9, 20e6);
+    expect(ok && got === msg, `TCP: ${JSON.stringify(msg.trim())} comes back (${JSON.stringify(got)}${error ? ', ' + error : ''})`);
+    c.end();
+    await m.runUntil(() => closed, 5e9, 20e6);
+    await m.runAsync(0.2e9, 20e6);            // the server takes the next client
+  }
+  expect(m.state().halted === 0, 'tcpecho still runs (the CPU not halted)');
+  m.stop();
+
+  // UDP: datagrams from two ports each come back to their sender
+  const up = await freePort('udp');
+  m = await serve(udpPrg, [`udp:${up}:7007`]);
+  for (const msg of ['ping over UDP', 'another datagram, from another port']) {
+    const s = dgram.createSocket('udp4');
+    await new Promise((r) => s.bind(0, '127.0.0.1', r));
+    let got = null;
+    s.on('message', (d) => (got = d.toString()));
+    s.send(msg, up, '127.0.0.1');
+    const ok = await m.runUntil(() => got !== null, 20e9, 20e6);
+    expect(ok && got === msg, `UDP from port ${s.address().port}: ${JSON.stringify(msg)} comes back (${JSON.stringify(got)})`);
+    s.close();
+  }
+  m.stop();
+}
+
 const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009,
-  'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012, 'E2E-013': e2e013 };
-const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013'];
+  'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012, 'E2E-013': e2e013,
+  'E2E-014': e2e014 };
+const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013', 'E2E-014'];
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !nativeOnly.includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);

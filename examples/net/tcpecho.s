@@ -4,11 +4,11 @@
 ; client closes, the next one is taken. Runs until reset (or until the card
 ; refuses a socket, when it returns to the terminal).
 ;
-; Build- the API's names first, then this, assembled for $7000:
-;   cat kernel/api.inc examples/net/tcpecho.s > build/tcpecho.ss
-;   python3 tools/as.py build/tcpecho.ss build/tcpecho.bin 0x7000,0x7400,0x7800
-; Run- cupc8.py run build/tcpecho.bin (the system card), or exec from the SD
-; card. On the emulator, forward a host port to it (forward- tcp:PORT:7007).
+; Build- the API's names (kernel/api.inc) first, then this, for $7000:
+;   python3 tools/mkprg.py examples/net/tcpecho.s -o build/tcpecho.prg
+; Run- cupc8.py run build/tcpecho.prg (the system card), exec from the SD card,
+; or tools/sim --cards:hdmi,io,wifi --run:build/tcpecho.prg. On the emulator,
+; forward a host port to it (forward- tcp:PORT:7007).
 
 %define ECHO_PORT_LO 95
 %define ECHO_PORT_HI 27

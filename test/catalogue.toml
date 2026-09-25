@@ -1167,6 +1167,15 @@ vrow = "3.2"
 cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
 
 [[test]]
+id = "E2E-014"
+title = "The example TCP and UDP echo servers from the PC"
+checks = "on the native emulator (HDMI, IO, the Wi-Fi card's real firmware in QEMU, the system card): examples/net/tcpecho.s and udpecho.s, built by tools/mkprg.py with kernel/api.inc, go in with cupc8.py run after net join; through QEMU port forwards (Machine.create({ forward })) two TCP clients in turn each get their line back and the CPU keeps running; on a second machine two UDP datagrams from two ports each come back to their sender"
+method = "test/emu/test_e2e.mjs E2E-014 (CUPC8_EMU=native): Node's net and dgram sockets on 127.0.0.1, free host ports forwarded to the card's port 7007"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
+
+[[test]]
 id = "E2E-004"
 title = "Negative system tests"
 checks = "empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power source: each behaves as specified (a missing CPU card and hot-plugging are out of scope)"
