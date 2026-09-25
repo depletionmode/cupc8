@@ -573,3 +573,11 @@ revert = [["kernel/net.s", """	ld r0, [net_wi]
 	b net_word_ip"""], ["kernel/net.s", "\tld r0, [net_wi]\t\t; net_cfg + 4", "\tld r0, [net_pn]\t\t; net_cfg + 4"], ["kernel/net.s", "\tld r0, [net_wi]\n\tadd r0, #1\n\tst [net_wi], r0", "\tld r0, [net_pn]\n\tadd r0, #1\n\tst [net_pn], r0"]]
 cmd = "tools/run_tests.sh testKernelDnsPing"
 must_fail = ["FAIL: net config ip IP MASK GW"]
+
+[[bug]]
+name = "assembler: any line with a lower-case \"db\" (or \"resb\") in it was taken for data (a %define of $10db, an address, a comment)"
+fixed_in = "HEAD"
+revert = [["tools/as.py", """            if directive == 'resb':""", """            if l.find('resb') > -1:"""],
+          ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
+cmd = "python3 test/asm/test_asm.py"
+must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'", "FAIL 'mov r0, #1"]

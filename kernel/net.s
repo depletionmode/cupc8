@@ -9,9 +9,8 @@
 ; Frames are stored as byte blobs in .data and sent with net_frame, or built
 ; with net_begin / net_send / net_cs_off.
 ;
-; The assembler takes any line with the letters d,b together (or r,e,s,b) as
-; a data (or bss) line, and any code line with a colon as a label, so names
-; and comments on code lines avoid them.
+; The assembler takes any code line with a colon as a label, so comments on
+; code lines avoid colons.
 
 %define SLOT_TABLE $0002
 %define NET_CFG_DIV2 16
