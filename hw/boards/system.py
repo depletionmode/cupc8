@@ -245,7 +245,7 @@ PLACEMENT = {
     # decoupling around U1 (28, 17)
     "C1": (21.2, 14.5, 90), "C2": (21.2, 19.5, 90),
     "C3": (24.5, 23.8, 0), "C9": (31.5, 23.8, 0),
-    "C4": (34.8, 19.5, 90), "C5": (34.8, 14.5, 90), "C13": (37.2, 17, 90),
+    "C4": (34.8, 17.23, 90), "C5": (34.8, 13.8, 90), "C13": (37.2, 17, 90),
     "C6": (22.4, 9.7, 90), "C10": (25.2, 9.7, 90), "C7": (28, 9.7, 90), "C8": (30.8, 9.7, 90),
     "C12": (33.6, 9.7, 90),
     "C14": (9, 27, 90),
@@ -271,6 +271,25 @@ FINE_NETS = sorted({"/" + n for n in list(GPIO.values()) + [
     "USB_DP", "USB_DM", "USB_CC1", "USB_CC2"]})   # and J1's 0.5 mm-pitch contacts
 
 
+def prepare(board):
+    """Locked pre-routing before Freerouting: IOVDD pin 33, in the middle of
+    the RP2040's right-hand row, straight out to its decoupling cap C4, whose
+    +3V3 pad sits level with it. Freerouting otherwise walls it in with the
+    row's signal escapes and leaves it unrouted."""
+    import pcbnew
+    fps = {f.GetReference(): f for f in board.GetFootprints()}
+    pin = [p for p in fps["U1"].Pads() if p.GetNumber() == "33"][0]
+    cap = [p for p in fps["C4"].Pads() if p.GetNetname() == pin.GetNetname()][0]
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(pin.GetPosition())
+    t.SetEnd(cap.GetPosition())
+    t.SetWidth(pcbnew.FromMM(0.2))
+    t.SetLayer(pcbnew.F_Cu)
+    t.SetNet(pin.GetNet())
+    t.SetLocked(True)
+    board.Add(t)
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     logo.footprint(LOGO_MM)
@@ -279,7 +298,7 @@ def main():
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
-        title="CUPC/8 system", revision=REVISION,
+        title="CUPC/8 system", revision=REVISION, prepare=prepare,
         # the presence link crosses on In2.Cu just above the tab (the key notch
         # reaches the body) and above the GND ties' vias: on B.Cu it would wall
         # off the A-side fingers' escapes
