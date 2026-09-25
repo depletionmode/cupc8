@@ -15,9 +15,13 @@ is classified by what it carries:
   - a BUS_PCIexpress_x1 finger tab: an I/O card; x8: the CPU card;
     x4: the system card
   - the slot sockets (C404113, C404111, C19188869): the main board
-Until the main board exists, the six I/O slots come from the stand-in in
-SOCKETS/STANDIN below (slot.md: 20.32 mm pitch; the socket's datasheet
-height and seating depth), and the CPU and system cards cannot be placed.
+The row (slot.md, Mechanical, "One row of cards"): the CPU socket first,
+then the six I/O slots, 20.32 mm apart, the same way round and at the same
+height, so the CPU card and the I/O cards (one outline) stand in a line.
+The system card's x4 socket is off the row and is checked on its own.
+Until the main board exists, the row comes from the stand-in in
+SOCKETS/STANDIN below (the sockets' datasheet heights and seating depths),
+and the system card cannot be placed.
 
 This half runs under the system python with KiCad's pcbnew: it reads the
 boards, exports STEP with kicad-cli, and does the checks that are numbers
@@ -82,23 +86,31 @@ EDGE_KIND = {"x1": "io", "x4": "system", "x8": "cpu"}
 SOCKETS = {
     "C404113": {"width": "x1", "part": "UMAX 3183-10200P1T", "height": 11.25, "depth": 7.60,
                 "slot_w": 1.78, "length": 25.00, "wide": 7.40, "rib_w": 1.75,
-                "ds": "hw/datasheets/C404113_UMAX-3183-10200P1T.pdf: 11.25 MAX, 7.60 deep, slot 1.78 +/- 0.05, D 25.00, 7.40 wide"},
+                "ds": "UMAX drawing 318307001 (hw/datasheets/C404113_UMAX-3183-10200P1T.pdf): 11.25 MAX, 7.60 deep, slot 1.78 +/- 0.05, D 25.00, 7.40 wide"},
     "C404111": {"width": "x8", "part": "UMAX 3183-10112P1T", "height": 11.25, "depth": 7.60,
                 "slot_w": 1.78, "length": 56.00, "wide": 7.40, "rib_w": 1.75,
-                "ds": "same drawing as C404113 (3183 series), D 56.00"},
+                "ds": "UMAX drawing 318307001, the one LCSC serves for C404111 and C404113 (hw/datasheets/C404113_UMAX-3183-10200P1T.pdf): 11.25 MAX, 7.60 deep, D 56.00 for 98 positions"},
     "C19188869": {"width": "x4", "part": "SOFNG PCIE-64P11L", "height": 11.10, "depth": 7.60,
                   "slot_w": 1.78, "length": 39.00, "wide": 8.76, "rib_w": 1.75,
-                  "ds": "hw/datasheets/C19188869_PCIE-64P11L.pdf: 11.10, 7.60 deep, 1.78 slot, 39.00 long, 8.76 wide"},
+                  "ds": "hw/datasheets/C19188869_PCIE-64P11L.pdf: 11.10, 7.60 deep, 1.78 slot, 39.00 long, 8.76 wide",
+                  "pads": ("1", "33")},    # JLC's pad numbers for A1 and B1 (hw/boards/sockets.py)
 }
 HOUSING_BEFORE_B1 = 14.50 - 11.50      # housing end to finger B1's contact
 SLOT_BEFORE_B1 = 1.00                  # slot end to B1 (EasyEDA model of C404113: slot x -10.50, B1 -9.50)
 SLOT_AFTER_TAB = 0.40                  # tab's far edge to the slot end (model: 10.55 vs tab 10.15)
 
-# Until the main board exists: six x1 sockets in a row, 20.32 mm apart
-# (slot.md, Mechanical), on a 1.6 mm board, all the same way round.
-STANDIN = {"pitch": 20.32, "slots": 6, "socket": "C404113", "main_t": 1.6}
+# Until the main board exists: the row of slot.md, Mechanical: the x8 CPU
+# socket, then six x1 sockets, 20.32 mm apart, finger B1 in line, all the
+# same way round, on a 1.6 mm board. Which way the cards face isn't in the
+# spec: the stand-in turns the component sides away from the CPU socket,
+# so the CPU card's FPGA faces I/O slot 1's back.
+STANDIN = {"pitch": 20.32, "row": ["C404111"] + ["C404113"] * 6, "main_t": 1.6}
+ROW_PITCH = STANDIN["pitch"]
+ROW_SLOTS = {"x8": 1, "x1": 6}         # slot.md: the CPU socket and six I/O slots
+ROW_KINDS = ("cpu", "io")
 
 # slot.md, Mechanical (and kicadgen IO_CARD_*): the I/O card outline, frame as CEM
+IO_BODY = (-6.0, -44.0, 56.0, -4.95)    # x0, y0 (top), x1, y1 (where the tab starts)
 IO_HOLE = (52.0, -40.0)
 IO_HOLE_DRILL = 3.2
 IO_PWR_LED = (-3.0, -41.0)
@@ -142,12 +154,12 @@ CABLE_MIN_GAP = 0.5
 CHECKS = {
     "MECH-001": "Card edge and socket fit vs PCIe CEM",
     "MECH-002": "Finger bevel and card thickness vs PCIe CEM",
-    "MECH-003": "Card-to-card clearance, each card in each slot",
+    "MECH-003": "Card-to-card clearance along the row, CPU card included",
     "MECH-004": "Top-edge connectors: overhang and plug access",
-    "MECH-005": "M3 holes line up for the rail; rail keep-out clear",
-    "MECH-006": "Power LEDs in one place on every I/O card",
+    "MECH-005": "One row: sockets in line at one height, M3 holes on the rail",
+    "MECH-006": "One row: one outline, top edges and power LEDs aligned",
     "MECH-007": "Wi-Fi antenna: connector match and cable route",
-    "MECH-008": "CPU card and system card clearance",
+    "MECH-008": "System card off the row: envelope and clearance",
 }
 
 
@@ -188,7 +200,8 @@ def discover():
     """{name: pcb path} for every board that exists or has a script."""
     import kicadgen  # noqa: F401  (only to find its mtime)
     gen_mtime = os.path.getmtime(os.path.join(ROOT, "hw", "tools", "kicadgen.py"))
-    names = {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))}
+    names = {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))
+             if "pipeline(" in open(p).read()}       # a board script; hw/boards also holds modules
     names |= {os.path.basename(os.path.dirname(p))
               for p in glob.glob(os.path.join(ROOT, "build", "hw", "*", "*.kicad_pcb"))
               if os.path.basename(p) == os.path.basename(os.path.dirname(p)) + ".kicad_pcb"}
@@ -233,6 +246,18 @@ def read_board(name, path):
         item = {"ref": fp.GetReference(), "value": fp.GetValue(), "fpid": fp.GetFPIDAsString(),
                 "lcsc": lcsc, "pos": (mm(pos.x), mm(pos.y)), "rot": fp.GetOrientationDegrees(),
                 "side": "B" if fp.IsFlipped() else "F"}
+        # where each 3D model lands in the STEP (x, y up): the footprint
+        # position plus the model's offset, turned with the footprint (an
+        # imported model can be offset, e.g. C165948's 2.27 mm)
+        at = []
+        th = math.radians(item["rot"])
+        for m in fp.Models():
+            ox, oy = m.m_Offset.x, m.m_Offset.y
+            if fp.IsFlipped():
+                ox = -ox
+            at.append((item["pos"][0] + ox * math.cos(th) - oy * math.sin(th),
+                       -item["pos"][1] + ox * math.sin(th) + oy * math.cos(th)))
+        item["model_at"] = at
         pads = {}
         holes = []
         for p in fp.Pads():
@@ -406,22 +431,25 @@ def slot_frames(main):
     component-side normal n (both horizontal)."""
     frames = []
     if main is None:
-        s = SOCKETS[STANDIN["socket"]]
-        for k in range(STANDIN["slots"]):
-            frames.append({"ref": "slot%d" % (k + 1), "lcsc": STANDIN["socket"], "width": s["width"],
+        for k, lcsc in enumerate(STANDIN["row"]):
+            s = SOCKETS[lcsc]
+            frames.append({"ref": "cpu" if s["width"] == "x8" else "slot%d" % k, "lcsc": lcsc,
+                           "width": s["width"],
                            "b1": (0.0, k * STANDIN["pitch"], STANDIN["main_t"] + s["height"] - s["depth"]),
-                           "u": (1.0, 0.0, 0.0), "n": (0.0, -1.0, 0.0), "standin": True})
+                           "u": (-1.0, 0.0, 0.0), "n": (0.0, 1.0, 0.0), "standin": True})
         return frames
     for fp in main["fps"]:
         if fp["lcsc"] not in SOCKETS:
             continue
         s = SOCKETS[fp["lcsc"]]
         pads = fp["pads"]
-        if "A1" not in pads or "B1" not in pads:
+        pa, pb = s.get("pads", ("A1", "B1"))
+        if pa not in pads or pb not in pads:
             frames.append({"ref": fp["ref"], "lcsc": fp["lcsc"], "width": s["width"],
-                           "error": "footprint has no pads named A1 and B1 to orient the card by"})
+                           "error": "footprint has no pads %s and %s (contacts A1, B1) to orient the card by"
+                           % (pa, pb)})
             continue
-        a1, b1 = step_xy(pads["A1"]["pos"]), step_xy(pads["B1"]["pos"])
+        a1, b1 = step_xy(pads[pa]["pos"]), step_xy(pads[pb]["pos"])
         n = unit((b1[0] - a1[0], b1[1] - a1[1]))
         u = (-n[1], n[0])                      # z x n
         m = ((a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2)
@@ -470,11 +498,40 @@ def label_part(b, word):
     return min(leds, key=lambda fp: math.dist(fp["pos"], at[0]), default=None)
 
 
+def check_outline(b, res):
+    """MECH-006: the body is slot.md's I/O card outline (the CPU card's
+    too, cpu-bus.md), in the finger footprint's frame whatever the tab."""
+    _, b1, a, d = edge_frame(b)
+    verts = [to_local(p, b1, a, d) for p in b["outline"]]
+    x0, y0, x1, y1 = IO_BODY
+    body = [v for v in verts if v[1] < y1 - 0.05]
+    top = [v for v in verts if abs(v[1] - y1) < 0.05]
+    if not body or not top:
+        res.add("MECH-006", False, "%s: no body above the tab line y = %.2f" % (b["name"], y1))
+        return
+    on_edge = all(min(abs(v[0] - x0), abs(v[0] - x1), abs(v[1] - y0)) < 0.01 for v in body)
+    corners = [v for v in top if min(abs(v[0] - x0), abs(v[0] - x1)) < 0.01] or top
+    got = (min(v[0] for v in body + top), min(v[1] for v in body), max(v[0] for v in body + top),
+           max(v[1] for v in corners))
+    ok = on_edge and all(abs(g - w) < 0.01 for g, w in zip(got, IO_BODY)) and len(body) == 2
+    res.add("MECH-006", ok, "%s: body x %.2f..%.2f, y %.2f..%.2f (%d corners above the tab line), slot.md "
+            "x %.1f..%.1f, y %.1f..%.2f, a plain rectangle" % (b["name"], got[0], got[2], got[1], got[3],
+                                                               len(body), x0, x1, y0, y1))
+
+
+def card_hole(b):
+    """The card's M3 hole (>= 3 mm), the one nearest slot.md's spot, in the
+    finger frame, or None."""
+    holes = [(fp_local(b, fp), h["drill"]) for fp in b["fps"] for h in fp["holes"] if h["drill"] >= 3.0]
+    return holes, min(holes, key=lambda h: math.dist(h[0], IO_HOLE), default=None)
+
+
 def check_io_card(b, res):
     """MECH-005 and MECH-006 in the card's own frame."""
     name = b["name"]
-    holes = [(fp_local(b, fp), h["drill"]) for fp in b["fps"] for h in fp["holes"] if h["drill"] >= 3.0]
-    hole = next((h for h in holes if math.dist(h[0], IO_HOLE) < 0.01), None)
+    check_outline(b, res)
+    holes, hole = card_hole(b)
+    hole = hole if hole and math.dist(hole[0], IO_HOLE) < 0.01 else None
     if hole:
         res.add("MECH-005", within(hole[1], IO_HOLE_DRILL, 0.01),
                 "%s: M3 hole at (%.2f, %.2f), %.2f mm NPTH, slot.md (%.1f, %.1f) %.1f"
@@ -491,6 +548,45 @@ def check_io_card(b, res):
                 "%s: power LED %s at (%.2f, %.2f) on the %s side, slot.md (%.1f, %.1f) component side"
                 % (name, led["ref"], loc[0], loc[1], "component" if led["side"] == "F" else "solder", *IO_PWR_LED))
     return hole, led
+
+
+def check_row(frames, res):
+    """MECH-005: the CPU socket and the six I/O sockets in one row: 20.32 mm
+    apart, finger B1 in line along the row, the same way round, the same
+    seat height (the card edge's rest), the CPU socket at one end."""
+    row = [f for f in frames if f["width"] in ROW_SLOTS]
+    for width, want in ROW_SLOTS.items():
+        got = sum(f["width"] == width for f in row)
+        res.add("MECH-005", got == want, "%d %s socket%s in the row, slot.md: %d"
+                % (got, width, "" if got == 1 else "s", want))
+    if not row:
+        return
+    n0 = row[0]["n"]
+    row.sort(key=lambda f: sum(f["b1"][i] * n0[i] for i in range(3)))
+    for f, g in zip(row, row[1:]):
+        step = sum((g["b1"][i] - f["b1"][i]) * n0[i] for i in range(3))
+        skew = sum((g["b1"][i] - f["b1"][i]) * f["u"][i] for i in range(3))
+        par = sum(f["n"][i] * g["n"][i] for i in range(3))
+        res.add("MECH-005", abs(abs(step) - ROW_PITCH) <= 0.05 and abs(skew) <= 0.05 and par > 0.99999,
+                "%s -> %s: pitch %.3f mm (slot.md %.2f), finger B1 offset along the row %.3f, same way round: %s"
+                % (f["ref"], g["ref"], abs(step), ROW_PITCH, skew, "yes" if par > 0.99999 else "NO"))
+    cpu = [k for k, f in enumerate(row) if f["width"] == "x8"]
+    if cpu:
+        k = cpu[0]
+        end = k in (0, len(row) - 1)
+        # row is sorted along n0; the cards' component sides point along n
+        towards = (k == 0) == (sum(n0[i] * row[k]["n"][i] for i in range(3)) > 0)
+        res.add("MECH-005", end, "the CPU socket %s is %s of the row; its card's component side faces %s the I/O cards"
+                % (row[k]["ref"], "at one end" if end else "NOT at an end (position %d)" % (k + 1),
+                   "towards" if towards else "away from"))
+    for lcsc in sorted({f["lcsc"] for f in row}):
+        s = SOCKETS[lcsc]
+        res.note("MECH-005", "%s %s: %.2f tall, %.2f deep, so the card edge rests %.2f mm above the main board (%s)"
+                 % (lcsc, s["part"], s["height"], s["depth"], s["height"] - s["depth"], s["ds"]))
+    zs = [f["b1"][2] for f in row]
+    res.add("MECH-005", max(zs) - min(zs) <= 0.01,
+            "seat heights in the row: x8 vs x1 differ by %.2f mm (card edge %.2f..%.2f above the main board's underside)"
+            % (max(zs) - min(zs), min(zs), max(zs)))
 
 
 # ------------------------------------------------------------------- report
@@ -537,29 +633,14 @@ def run():
         check_fingers(b, res)
         check_order(b, res)
     frames = slot_frames(main)
-    io_frames = [f for f in frames if f["width"] == "x1"]
     io_cards = [b for b in cards if b["kind"] == "io"]
-    for b in io_cards:
-        check_io_card(b, res)
-
-    # the frames: pitch and alignment of the I/O slots (MECH-005, the rail)
-    ok_frames = [f for f in io_frames if "error" not in f]
+    for b in cards:
+        if b["kind"] in ROW_KINDS:
+            check_io_card(b, res)
     for f in frames:
         if "error" in f:
-            res.add("MECH-003", False, "%s (%s): %s" % (f["ref"], f["lcsc"], f["error"]))
-    if ok_frames:
-        n0 = ok_frames[0]["n"]
-        ok_frames.sort(key=lambda f: sum(f["b1"][i] * n0[i] for i in range(3)))
-        for f, g in zip(ok_frames, ok_frames[1:]):
-            step = sum((g["b1"][i] - f["b1"][i]) * n0[i] for i in range(3))
-            skew = sum((g["b1"][i] - f["b1"][i]) * f["u"][i] for i in range(3))
-            par = sum(f["n"][i] * g["n"][i] for i in range(3))
-            res.add("MECH-005", abs(abs(step) - STANDIN["pitch"]) <= 0.05 and abs(skew) <= 0.05 and par > 0.99999,
-                    "%s -> %s: pitch %.3f mm (slot.md 20.32), offset along the row %.3f, same way round: %s"
-                    % (f["ref"], g["ref"], abs(step), skew, "yes" if par > 0.99999 else "NO"))
-        if len(ok_frames) != STANDIN["slots"]:
-            res.add("MECH-005", False, "%d I/O sockets on the main board, slot.md has %d"
-                    % (len(ok_frames), STANDIN["slots"]))
+            res.add("MECH-005", False, "%s (%s): %s" % (f["ref"], f["lcsc"], f["error"]))
+    check_row([f for f in frames if "error" not in f], res)
 
     placements = []
     for b in cards:
@@ -572,6 +653,7 @@ def run():
         "cards": {b["name"]: {"step": export_step(b), "kind": b["kind"], "width": b["width"],
                               "thickness": b["thickness"], "fps": b["fps"], "tab": b["tab"],
                               "edge": list(edge_frame(b)[1:]),
+                              "hole": (lambda h: h and h[0])(card_hole(b)[1]),
                               "pwr_led": (lambda led: led and led["ref"])(label_part(b, "PWR"))}
                   for b in cards},
         "main": main and {"name": main["name"], "step": export_step(main), "thickness": main["thickness"],
@@ -606,18 +688,21 @@ def run():
     header = ["Mechanical fit (verification.md 4.7): hw/mech/fit.py",
               "boards: " + ", ".join("%s (%s)" % (b["name"], b["kind"]) for b in boards.values() if b["kind"]),
               "not slot boards, ignored: " + (", ".join(ignored) or "none"),
-              "slots: " + ("STAND-IN, no main board yet: 6 x %s at %.2f mm pitch, seat %.2f mm above a %.1f mm board"
-                           % (SOCKETS[STANDIN["socket"]]["part"], STANDIN["pitch"],
-                              SOCKETS[STANDIN["socket"]]["height"] - SOCKETS[STANDIN["socket"]]["depth"],
+              "slots: " + ("STAND-IN, no main board yet: the row is 1 x %s (CPU) + 6 x %s at %.2f mm pitch "
+                           "on a %.1f mm board, component sides facing away from the CPU socket"
+                           % (SOCKETS["C404111"]["part"], SOCKETS["C404113"]["part"], STANDIN["pitch"],
                               STANDIN["main_t"])
                            if main is None else "main board %s: %d sockets" % (main["name"], len(frames))),
               "not yet designed: " + (", ".join(k for k in ("main", "cpu", "system")
                                                   if not any(b["kind"] == k for b in boards.values())) or "none")]
-    if not any(b["kind"] == "cpu" for b in boards.values()) or not any(b["kind"] == "system" for b in boards.values()) \
-            or main is None:
-        res.add("MECH-008", False, "cannot check yet: needs the main board, the CPU card and the system card built "
-                "(main: %s, cpu: %s, system: %s)" % tuple("yes" if any(b["kind"] == k for b in boards.values())
-                                                          else "no" for k in ("main", "cpu", "system")))
+    have = {k: any(b["kind"] == k for b in boards.values()) for k in ("main", "cpu", "system")}
+    if not (have["main"] and have["system"]):
+        res.add("MECH-008", False, "the system card's placement can't be checked yet: needs the main board "
+                "(its x4 socket) and the system card built (main: %s, system: %s)"
+                % tuple("yes" if have[k] else "no" for k in ("main", "system")))
+    if not have["cpu"]:
+        res.add("MECH-003", False, "no CPU card built: position 1 of the row is empty, so CPU card -> I/O slot 1 "
+                "is unchecked")
     if not io_cards:
         for cid in ("MECH-003", "MECH-004", "MECH-005", "MECH-006"):
             res.add(cid, False, "no I/O card found")
