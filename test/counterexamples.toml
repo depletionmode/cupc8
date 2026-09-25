@@ -603,3 +603,26 @@ revert = [["tools/sim.nim", """    tickTimers()
 cmd = "tools/run_tests.sh testWaiTimer"
 must_fail = ["FAIL: ... 594 clocks, 49.5 us (4 counts a microsecond)"]
 
+
+[[bug]]
+name = "GPU card: the board kept the TPS61023 boost and 100 mA PTC after POW-008 moved to the TPS63802 buck-boost"
+fixed_in = "9316238"
+before = "74f1293"
+files = ["hw/boards/gpu.py"]
+cmd = "python3 hw/power/thermal.py"
+must_fail = ["FAIL T0g", "hw/boards/gpu.py has TPS61023DRLR, these checks model TPS63802DLAR"]
+
+[[bug]]
+name = "bomcheck: JLC's 'VSON-10(2x3)' refused for a footprint named L3.0-W2.0 (body read one way round only)"
+fixed_in = "9316238"
+revert = [["hw/tools/bomcheck.py", """        return name.startswith(m.group(1)) and ("L%s-W%s" % tuple(body) in name
+                                                or "L%s-W%s" % tuple(body[::-1]) in name)""", """        return name.startswith(m.group(1)) and "L%s-W%s" % tuple(body) in name"""]]
+cmd = "python3 hw/tools/bomcheck.py gpu"
+must_fail = ["C2845237 jlc:VSON-10_L3.0-W2.0-P0.50-TL (U7): JLC's package is 'VSON-10(2x3)', the footprint is VSON-10_L3.0-W2.0-P0.50-TL"]
+
+[[bug]]
+name = "cards: signal tracks routed across the Kaplan Labs logo (ridges through the mask over the artwork)"
+fixed_in = "ef9ae93"
+revert = [["hw/tools/kicadgen.py", "        if logo_keepout and name.startswith(LOGO):\n            silk_keepout(board, fp)\n", ""]]
+cmd = "python3 hw/boards/storage.py"
+must_fail = ["runs under the artwork KaplanLabs_Logo_12mm"]
