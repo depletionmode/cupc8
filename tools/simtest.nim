@@ -775,6 +775,26 @@ proc testIrqMaskMmio() =
 run testIrqOps
 run testIrqTimer
 run testIrqPopPcl
+
+proc testWaiTimer() =
+  ## SIM-011: parked in WAI the timers count every 3 clocks, as cpu.vhd's
+  ## tick/settle/check loop does: 4 counts a microsecond step
+  echo "== timers in WAI =="
+  loadProgram(testdata / "wai_timer.s")
+  var n = 0
+  while n < 400 and not waiting and not HF:
+    discard cpuStep()
+    inc n
+  expectTrue("parked in wai", waiting)
+  var steps = 0
+  while steps < 1000 and waiting:
+    discard cpuStep()
+    inc steps
+  expectTrue("tmr0 #200 wakes WAI after 50 steps (4 counts each), not " & $steps, steps >= 49 and steps <= 51)
+  discard runToHalt()
+  expect("the code after WAI ran", mem[0x2000], 0x55)
+
+run testWaiTimer
 run testIrqFlags
 run testIrqCli
 run testIrqKeyb

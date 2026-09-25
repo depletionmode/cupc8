@@ -883,9 +883,13 @@ proc cpuStep*(): StepResult =
   if ioModel == imCards and ins_retired - lastCardTick >= 64:
     cardsTick()
   if waiting:
-    tickTimers()
+    # parked in WAI the CPU loops tick, settle, check: 3 clocks per timer
+    # count (cpu.vhd), so 4 counts in each microsecond step of the sim's clock
+    for k in 0..3:
+      tickTimers()
+      serviceIrq()
+      if not waiting: break
     inc ins_retired
-    serviceIrq()
     return sOk
   if PC >= imageEnd:
     return sPastImage

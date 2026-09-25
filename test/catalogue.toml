@@ -45,6 +45,15 @@ vrow = "2.1"
 cmd = "python3 test/sim/test_cli.py"
 
 [[test]]
+id = "SIM-011"
+title = "Simulator timers count in WAI as the CPU does"
+checks = "parked in WAI, cpu.vhd counts its timers every 3 clocks (tick, settle, check): 4 counts in each of the sim's microsecond steps, so tmr0 #200 wakes WAI 50 steps later; the code after WAI runs"
+method = "tools/simtest.nim testWaiTimer (tools/testdata/wai_timer.s)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testWaiTimer"
+
+[[test]]
 id = "SIM-005"
 title = "Simulator models banked RAM"
 checks = "RAM_BANK ($f205) as the chipset has it (MMU-005): reset 2 is the identity map, 5 bits read back, $8000-$bfff shows {bank, A[13:0]} of the 512 KB SRAM for every bank, banks 0 and 3 alias the normal memory (bank 3 reaching SRAM $0f000, not the I/O shadows), $7fff and $c000 never move, the stack follows the window, and a reset puts bank 2 back"
