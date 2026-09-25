@@ -86,15 +86,15 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # (pocket_escapes) and the crystal sits to the left, the flash by the
     # QSPI pins (now at the bottom)
     "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23
-    "C3": (CX + 5.8, CY + 0.2, 0),       # IOVDD 1, clear of the flash
-    "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
+    "C3": (CX + 5.8, CY - 0.2, 0),       # IOVDD 1, clear of the flash
+    "C5": (CX - 4.4, CY - 5.2, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
     "Y1": (CX - 8.5, CY - 4.0, 0),
     "C16": (CX - 11.2, CY - 4.0, 90),
     "C17": (CX - 8.5, CY - 1.4, 0),
     "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
-    "U3": (CX + 8.2, CY + 6.2, 90),
+    "U3": (CX + 8.2, CY + 5.6, 90),
     "C15": (CX + 12.0, CY + 3.4, 90),
     "R1": (CX + 12.0, CY + 7.4, 90),
     "J1": (0, 0, 0),
