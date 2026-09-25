@@ -158,7 +158,11 @@ track and clearance, 0.7 mm vias): at 0.2 mm clearance Freerouting counts
 every pair of the QFN's 0.2 mm-apart pads a violation and routes none of
 them. Freerouting necks those tracks to 0.11 mm at the pads, inside JLC's
 4-layer minimum (0.09 mm), which 4-layer boards now check against (0.1 mm).
-The presence link (A1 to B32) crosses on In2.Cu 1.8 mm above the tab. J1 is
+The presence link (A1 to B32) crosses on In2.Cu 1.8 mm above the tab. The
+script's `prepare()` pre-routes one finger's escape, CHIPSET_CDONE on A21:
+it sits between two all-GND columns whose ties wall it in, and Freerouting
+left it unrouted at every pass count. The pipeline checks it (and the
+key-notch escapes) on KiCad's connectivity after routing. J1 is
 JLC's own footprint (jlc: import), since KiCad's splits the paired contacts
 (A1/B12 ...) that JLC places as one pad; its EasyEDA 3D model is moved
 2.27 mm onto the footprint. Passives are 0603 basic parts.
