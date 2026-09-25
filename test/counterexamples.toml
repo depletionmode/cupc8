@@ -619,3 +619,16 @@ revert = [["tools/sim.nim", """          let behind = insStart + int((epochTime(
 cmd = "python3 test/sim/test_cli.py"
 must_fail = ["FAIL: interactive: WAI-heavy guest runs at ~1 MIPS"]
 
+[[bug]]
+name = "sim: timers counted once a microsecond in WAI, not every 3 clocks (API_WAIT_MS ~4x slow)"
+fixed_in = "514c86a"
+revert = [["tools/sim.nim", """    for k in 0..3:
+      tickTimers()
+      serviceIrq()
+      if not waiting: break
+    inc ins_retired""", """    tickTimers()
+    serviceIrq()
+    inc ins_retired"""]]
+cmd = "tools/run_tests.sh testWaiTimer"
+must_fail = ["tmr0 #200 wakes WAI after 50 steps"]
+
