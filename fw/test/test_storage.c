@@ -691,6 +691,12 @@ static void blocks(void)
 	write_file("RAW.TXT", 10, 1, 128);
 	/* the file system still works after raw access */
 	CHECK_EQ(read_file("RAW.TXT", 1, 128), 10);
+	/* a raw write, then ST_EJECT: EJECT syncs the medium (an SD card
+	 * finishes programming the block) before it answers */
+	CHECK_EQ(ecmd((uint8_t[]){ST_BLK_WRITE, lba[0], lba[1], lba[2], lba[3]}, 5), ST_OK);
+	CHECK(disk->unsynced, "a raw BLK_WRITE is not synced by itself");
+	CHECK_EQ(simple(ST_EJECT), ST_OK);
+	CHECK(!disk->unsynced, "ST_EJECT synced the medium after a raw BLK_WRITE");
 }
 
 /* files a PC wrote (tools/fatcheck.py mkimg) */

@@ -477,6 +477,11 @@ int st_exec(storage_t *s, const uint8_t *f, int len, uint8_t resp[CARD_RESP_MAX]
 	case ST_MOUNT: e = do_mount(s); break;
 	case ST_EJECT:
 		e = close_all(s);
+		/* a raw BLK_WRITE has no sync after it: wait until the medium has
+		 * programmed it (an SD card: busy until DO goes high), since the
+		 * card may be pulled as soon as EJECT answers */
+		if (disk_ioctl(0, CTRL_SYNC, 0) == RES_ERROR && !e)
+			e = ST_E_IO;
 		f_mount(0, "", 0);
 		s->mounted = false;
 		break;
