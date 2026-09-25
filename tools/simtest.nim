@@ -1420,6 +1420,246 @@ proc testKernelNetWeakPower() =
 run testKernelNetWeakPower
 
 # ---------------------------------------------------------------------------
+# KRN-010: networking in CUPC/8 assembly (doc/proposals/kernel-api.md,
+# "Networking"): the DNS client (kernel/resolv.s), ping's checksum and reply
+# matching (kernel/ping.s), and the parsing behind "net config" (kernel/net.s)
+# ---------------------------------------------------------------------------
+
+const
+  netEOk = 0
+  netENxdomain = 6
+  netENoAnswer = 7
+  netEMalformed = 8
+  netEBadArg = 9
+  netEDnsErr = 12
+  netNotOurs = 0xff
+
+proc kernelSyms(): Table[string, int] =
+  ## Code labels, data and bss of the kernel just built (kernel/kernel.map).
+  for line in lines(kernelDir / "kernel.map"):
+    let f = line.splitWhitespace
+    if f.len >= 3 and f[0] == "sym": result[f[2]] = parseHexInt(f[1])
+    elif f.len >= 4 and f[0] in ["bss", "data"]: result[f[3]] = parseHexInt(f[1])
+
+proc callKernel(sym: Table[string, int]; name: string; r0 = 0, r1 = 0; maxSteps = 3_000_000): bool =
+  ## Call a kernel routine as the kernel does (push pch, push pcl, b) with a
+  ## HALT to return to; true when it returned with the stack as it was.
+  mem[0x0e00] = 0xf8
+  SP = 0x0100
+  mem[0x0100] = 0x0e
+  mem[0x0101] = 0x00
+  SP = 0x0102
+  PC = sym[name]
+  R0 = r0
+  R1 = r1
+  HF = false
+  var n = 0
+  while n < maxSteps and not HF:
+    if cpuStep() != sOk: break
+    inc n
+  HF and PC == 0x0e01 and SP == 0x0100
+
+proc putBytes(a: int; b: openArray[int]) =
+  for i, v in b: mem[a + i] = v and 0xff
+
+proc putStr(a: int; s: string) =
+  for i, c in s: mem[a + i] = ord(c)
+  mem[a + s.len] = 0
+
+proc cksumRef(b: openArray[int]): int =
+  ## RFC 1071, in Nim
+  var s = 0
+  var i = 0
+  while i < b.len:
+    s += (b[i] shl 8) + (if i + 1 < b.len: b[i + 1] else: 0)
+    i += 2
+  while (s shr 16) != 0: s = (s and 0xffff) + (s shr 16)
+  (not s) and 0xffff
+
+proc dnsName(name: string): seq[int] =
+  for part in name.split('.'):
+    result.add(part.len)
+    for c in part: result.add(ord(c))
+  result.add(0)
+
+proc dnsHeader(id, flags, qd, an: int): seq[int] =
+  @[id shr 8, id and 0xff, flags shr 8, flags and 0xff, qd shr 8, qd and 0xff,
+    an shr 8, an and 0xff, 0, 0, 0, 0]
+
+proc dnsRR(name: seq[int]; typ, class, rdata: seq[int]): seq[int] =
+  ## a resource record: name, TYPE, CLASS, TTL 60, RDLENGTH, RDATA
+  result = name & @[0, typ[0]] & @[0, class[0]] & @[0, 0, 0, 60] &
+           @[rdata.len shr 8, rdata.len and 0xff] & rdata
+
+proc testNetRoutines() =
+  ## KRN-010: the kernel's networking routines called one by one on the CPU:
+  ## the Internet checksum against RFC 1071 (lengths odd and even, sums that
+  ## carry many times), the DNS query's bytes, the DNS answer parser
+  ## (compression, a CNAME before the A record, NXDOMAIN, no answer, another
+  ## id, not a response, malformed answers: truncated, a pointer loop, a label
+  ## or RDATA past the end), and the dotted-quad and number parsers.
+  echo "== kernel networking routines =="
+  discard buildKernelRom()
+  let sym = kernelSyms()
+  ioModel = imLegacy
+  cpuReset()
+  cpuLoadFile(kernelDir / "kernel.o")
+  let pkt = sym["net_pkt"]
+
+  # ---- the Internet checksum
+  var seed = 12345
+  proc rnd(): int =
+    seed = (seed * 1103515245 + 12345) and 0x7fffffff
+    (seed shr 16) and 0xff
+  var cases: seq[seq[int]] = @[
+    @[0x00, 0x01, 0xf2, 0x03, 0xf4, 0xf5, 0xf6, 0xf7],   # RFC 1071's example
+    @[0xff], @[0xff, 0xff], newSeqWith(255, 0xff), newSeqWith(254, 0xff),
+    @[], @[0x45, 0x00, 0x00, 0x73, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11, 0, 0,
+           0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7]]
+  for len in [1, 2, 3, 39, 40, 41, 100, 201]:
+    var b: seq[int]
+    for i in 0..<len: b.add(rnd())
+    cases.add(b)
+  var ckBad = 0
+  for b in cases:
+    putBytes(pkt, b)
+    mem[sym["net_ptr"]] = pkt and 0xff
+    mem[sym["net_ptr"] + 1] = pkt shr 8
+    mem[sym["net_count"]] = b.len
+    let ret = callKernel(sym, "net_cksum")
+    let got = (mem[sym["net_ck"]] shl 8) or mem[sym["net_ck"] + 1]
+    if not ret or got != cksumRef(b):
+      inc ckBad
+      echo "  checksum of ", b.len, " bytes: got ", toHex(got, 4), " want ", toHex(cksumRef(b), 4)
+  expectTrue("net_cksum equals RFC 1071 on " & $cases.len & " buffers", ckBad == 0)
+  # a message with its checksum in place sums to 0
+  var echoReq = @[8, 0, 0, 0, 0xc8, 7, 0, 1]
+  for i in 0..31: echoReq.add(64 + i)
+  let ck = cksumRef(echoReq)
+  echoReq[2] = ck shr 8
+  echoReq[3] = ck and 0xff
+  putBytes(pkt, echoReq)
+  mem[sym["net_ptr"]] = pkt and 0xff
+  mem[sym["net_ptr"] + 1] = pkt shr 8
+  mem[sym["net_count"]] = echoReq.len
+  discard callKernel(sym, "net_cksum")
+  expectTrue("net_cksum over a message with its checksum is 0",
+             mem[sym["net_ck"]] == 0 and mem[sym["net_ck"] + 1] == 0)
+
+  # ping_build makes that same echo request (identifier $c8, the run's number,
+  # the sequence, 32 bytes of payload)
+  mem[sym["ping_id"]] = 7
+  mem[sym["ping_seq"]] = 1
+  discard callKernel(sym, "ping_build")
+  var built: seq[int]
+  for i in 0..<40: built.add(mem[pkt + i])
+  expectTrue("ping_build: an echo request with its checksum", built == echoReq)
+
+  # ---- the DNS query
+  proc build(host: string): (int, seq[int]) =
+    putStr(sym["net_host"], host)
+    discard callKernel(sym, "dns_build")
+    var q: seq[int]
+    for i in 0..<mem[sym["dns_qlen"]]: q.add(mem[sym["dns_q"] + i])
+    (R0, q)
+  let wantQ = @[0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0] & dnsName("www.example.com") & @[0, 1, 0, 1]
+  var (r, q) = build("www.example.com")
+  expectTrue("dns_build: RD, one A question of class IN",
+             r == 0 and q[2 .. ^1] == wantQ[2 .. ^1])
+  (r, q) = build("a.b.")
+  expectTrue("dns_build: a trailing dot ends the name", r == 0 and q[12 .. ^1] == dnsName("a.b") & @[0, 1, 0, 1])
+  for bad in ["", ".a", "a..b", "x".repeat(64) & ".com"]:
+    (r, q) = build(bad)
+    expect("dns_build refuses \"" & bad & "\"", r, netEBadArg)
+  (r, q) = build("x".repeat(63))
+  expectTrue("dns_build takes a 63-character label", r == 0 and q[12] == 63)
+
+  # ---- DNS answers
+  let id = 0x4c31
+  let question = dnsName("www.example.com") & @[0, 1, 0, 1]
+  proc parse(answer: seq[int]; ip: var seq[int]): int =
+    mem[sym["dns_q"]] = id shr 8
+    mem[sym["dns_q"] + 1] = id and 0xff
+    putBytes(pkt, answer)
+    mem[sym["dns_n"]] = answer.len
+    for i in 0..3: mem[sym["net_ip"] + i] = 0
+    if not callKernel(sym, "dns_parse"): return -1
+    ip = @[mem[sym["net_ip"]], mem[sym["net_ip"] + 1], mem[sym["net_ip"] + 2], mem[sym["net_ip"] + 3]]
+    R0
+  var ip: seq[int]
+  let ptrQ = @[0xc0, 12]                  # the question's name
+  let simple = dnsHeader(id, 0x8180, 1, 1) & question & dnsRR(ptrQ, @[1], @[1], @[93, 184, 216, 34])
+  expectTrue("DNS: an A answer named by a pointer to the question",
+             parse(simple, ip) == netEOk and ip == @[93, 184, 216, 34])
+  # a CNAME first (its target partly compressed), then the target's A record
+  # named by a pointer into the CNAME's data (a pointer to a pointer)
+  let cnameAt = 12 + question.len + 12
+  let cname = dnsHeader(id, 0x8180, 1, 2) & question &
+    dnsRR(ptrQ, @[5], @[1], @[4] & "edge".mapIt(ord(it)) & @[0xc0, 16]) &
+    dnsRR(@[0xc0, cnameAt], @[1], @[1], @[10, 0, 2, 99])
+  expectTrue("DNS: CNAME, then its A record (name compression followed)",
+             parse(cname, ip) == netEOk and ip == @[10, 0, 2, 99])
+  let full = dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(dnsName("www.example.com"), @[1], @[1], @[1, 2, 3, 4])
+  expectTrue("DNS: an A answer with its name in full", parse(full, ip) == netEOk and ip == @[1, 2, 3, 4])
+  let aaaaThenA = dnsHeader(id, 0x8180, 1, 2) & question &
+    dnsRR(ptrQ, @[28], @[1], newSeqWith(16, 0x20)) & dnsRR(ptrQ, @[1], @[1], @[5, 6, 7, 8])
+  expectTrue("DNS: an AAAA record is skipped for the A after it", parse(aaaaThenA, ip) == netEOk and ip == @[5, 6, 7, 8])
+  expect("DNS: NXDOMAIN", parse(dnsHeader(id, 0x8183, 1, 0) & question, ip), netENxdomain)
+  expect("DNS: SERVFAIL is a server error", parse(dnsHeader(id, 0x8182, 1, 0) & question, ip), netEDnsErr)
+  expect("DNS: no answer records", parse(dnsHeader(id, 0x8180, 1, 0) & question, ip), netENoAnswer)
+  expect("DNS: only a CNAME, no A", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(ptrQ, @[5], @[1], dnsName("x.org")), ip), netENoAnswer)
+  expect("DNS: an A record of class CHAOS is not taken", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(ptrQ, @[1], @[3], @[1, 1, 1, 1]), ip), netENoAnswer)
+  expect("DNS: another id is not the answer", parse(dnsHeader(id + 1, 0x8180, 1, 1) & question &
+    dnsRR(ptrQ, @[1], @[1], @[6, 6, 6, 6]), ip), netNotOurs)
+  expect("DNS: a query (QR clear) is not the answer", parse(dnsHeader(id, 0x0100, 1, 1) & question &
+    dnsRR(ptrQ, @[1], @[1], @[6, 6, 6, 6]), ip), netNotOurs)
+  expect("DNS: shorter than a header", parse(@[id shr 8, id and 0xff, 0x81, 0x80, 0, 1], ip), netEMalformed)
+  expect("DNS: a pointer loop", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(@[0xc0, 12 + question.len], @[1], @[1], @[6, 6, 6, 6]), ip), netEMalformed)
+  expect("DNS: a pointer past the end", parse(dnsHeader(id, 0x8180, 1, 1) & question &
+    dnsRR(@[0xc0, 250], @[1], @[1], @[6, 6, 6, 6]), ip), netEMalformed)
+  expect("DNS: a label past the end", parse(dnsHeader(id, 0x8180, 1, 1) & @[40, 97, 98], ip), netEMalformed)
+  var cut = simple
+  cut.setLen(cut.len - 2)
+  expect("DNS: RDATA past the end", parse(cut, ip), netEMalformed)
+  cut = simple
+  cut.setLen(12 + question.len + 5)
+  expect("DNS: a record cut short", parse(cut, ip), netEMalformed)
+  expect("DNS: a question cut short", parse(dnsHeader(id, 0x8180, 1, 1) & dnsName("www.example.com") & @[0, 1], ip), netEMalformed)
+
+  # ---- dotted quads and numbers (net config, net get, net ping)
+  proc quad(s: string): (int, seq[int]) =
+    putStr(sym["net_wbuf"], s)
+    mem[sym["net_ptr"]] = sym["net_wbuf"] and 0xff
+    mem[sym["net_ptr"] + 1] = sym["net_wbuf"] shr 8
+    discard callKernel(sym, "net_parse_ip")
+    (R0, @[mem[sym["net_ip"]], mem[sym["net_ip"] + 1], mem[sym["net_ip"] + 2], mem[sym["net_ip"] + 3]])
+  expectTrue("net_parse_ip 10.0.2.2", quad("10.0.2.2") == (1, @[10, 0, 2, 2]))
+  expectTrue("net_parse_ip 255.255.255.0", quad("255.255.255.0") == (1, @[255, 255, 255, 0]))
+  var quadBad = 0
+  for s in ["", "1.2.3", "1.2.3.4.5", "256.1.1.1", "1.2.3.260", "1..2.3", "1.2.3.", ".1.2.3",
+            "1.2.3.a", "0001.2.3.4", "example.com", "1.2.3.4 "]:
+    if quad(s)[0] != 0:
+      inc quadBad
+      echo "  net_parse_ip took \"", s, "\""
+  expectTrue("net_parse_ip refuses what is not a dotted quad", quadBad == 0)
+  proc num(s: string): (int, int) =
+    putStr(sym["net_wbuf"], s)
+    mem[sym["net_ptr"]] = sym["net_wbuf"] and 0xff
+    mem[sym["net_ptr"] + 1] = sym["net_wbuf"] shr 8
+    discard callKernel(sym, "net_parse_u16")
+    (R0, mem[sym["net_u16"]] or (mem[sym["net_u16"] + 1] shl 8))
+  expectTrue("net_parse_u16 0, 53, 5353, 65535",
+             num("0") == (1, 0) and num("53") == (1, 53) and num("5353") == (1, 5353) and num("65535") == (1, 65535))
+  expectTrue("net_parse_u16 refuses 65536, 99999, 12a, and nothing",
+             num("65536")[0] == 0 and num("99999")[0] == 0 and num("12a")[0] == 0 and num("")[0] == 0)
+
+run testNetRoutines
+
+# ---------------------------------------------------------------------------
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
 # ---------------------------------------------------------------------------
 

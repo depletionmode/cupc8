@@ -6,6 +6,6 @@ for f in *.s; do
   cat "$f" >> merged.ss
   printf '\n' >> merged.ss
 done
-# code $1000-$3fff, data from $4000, bss from $6000 (as.py's defaults leave 8 KB for code)
-python3 ../tools/as.py merged.ss kernel.o 0x1000,0x4000,0x6000 --map
+# code $1000-$4fff, data $5000-$5fff, bss $6000-$6eff (doc/proposals/kernel-api.md)
+python3 ../tools/as.py merged.ss kernel.o 0x1000,0x5000,0x6000 --map
 #rm merged.ss
