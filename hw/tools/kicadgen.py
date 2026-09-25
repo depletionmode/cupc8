@@ -1007,6 +1007,12 @@ def place_designators(board, outline, labels=None, gap=0.3):
             for shift in (0, 1, -1, 2, -2, 3, -3):
                 spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
                           (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
+        # then a ring a little further out: a 0402's text right above it
+        # clips its own pads, which reach nearly to its courtyard
+        cx0, cy0, cx1, cy1 = courts[fp.GetReference()]
+        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+        for shift in (0, 1, -1, 2, -2):
+            spots += [(mx + shift, cy0 - gap - 1.0), (mx + shift, cy1 + gap + 1.0)]
         for sx, sy in spots:
             ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
             t = box(ref.GetBoundingBox())
@@ -1843,8 +1849,18 @@ def fill_zones(board):
 # doc/hardware/slot.md, Mechanical: every I/O card is this shape, in the
 # frame of KiCad's BUS_PCIexpress_x1 (finger B1 at the origin, fingers +y)
 IO_CARD_BODY = (-6.0, -44.0, 56.0, -4.95)
-IO_CARD_EDGE = [(-0.65, -4.95), (-6.0, -4.95), (-6.0, -44.0), (56.0, -44.0), (56.0, -4.95), (19.65, -4.95)]
-IO_CARD_TAB = (-0.65, 19.65)
+IO_CARD_TAB = (-0.65, 19.65)             # where the x1 tab meets the body
+X8_TAB = (-0.65, 50.65)                  # the CPU card's x8 tab, under the same body (cpu-bus.md, CPU card outline)
+
+
+def io_card_edge(tab=IO_CARD_TAB):
+    """The card body's Edge.Cuts, open where a finger tab spanning x
+    tab[0] .. tab[1] meets it (the tab footprint draws the rest)."""
+    x0, y0, x1, y1 = IO_CARD_BODY
+    return [(tab[0], y1), (x0, y1), (x0, y0), (x1, y0), (x1, y1), (tab[1], y1)]
+
+
+IO_CARD_EDGE = io_card_edge()
 IO_CARD_HOLE = (52.0, -40.0)             # M3, non-plated
 IO_CARD_PWR_LED = (-3.0, -41.0)          # the power LED, the same on every board: 3 mm in from top-left
 MOUNTING_HOLE = "MountingHole:MountingHole_3.2mm_M3"
@@ -1951,7 +1967,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False):
+             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, tab=IO_CARD_TAB):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1971,10 +1987,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
         # finger edge and pour come from here, and the parts every card has in
         # the same place are checked
-        if outline not in (None, IO_CARD_BODY) or edge not in (None, IO_CARD_EDGE):
+        # (the CPU card too, on its x8 tab: `tab` is where the tab meets the body)
+        if outline not in (None, IO_CARD_BODY) or edge not in (None, io_card_edge(tab)):
             raise SystemExit("%s: an I/O card has the standard outline (IO_CARD_BODY/EDGE), not its own" % name)
-        outline, edge, card_edge = IO_CARD_BODY, IO_CARD_EDGE, True
-        zone_outline = zone_outline or card_zone(IO_CARD_BODY, IO_CARD_TAB, -1.5)
+        outline, edge, card_edge = IO_CARD_BODY, io_card_edge(tab), True
+        zone_outline = zone_outline or card_zone(IO_CARD_BODY, tab, -1.5)
         for ref, want in (("J1", (0, 0, 0)), ("H1", IO_CARD_HOLE + (0,)), ("D1", IO_CARD_PWR_LED + (0,))):
             if tuple(placement.get(ref, ())[:3]) != want:
                 raise SystemExit("%s: an I/O card has %s at %s (slot.md, Mechanical), not %s" % (

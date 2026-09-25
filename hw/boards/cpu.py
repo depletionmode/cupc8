@@ -37,16 +37,16 @@ G = kg.GRID
 
 # ------------------------------------------------------------------- parts
 
-# 0603 throughout: KiCad's 0402 silkscreen sits closer to its pads than
-# kicadgen.check_silk allows
-R0603 = "Resistor_SMD:R_0603_1608Metric"
+# 0402 passives and 0402x4 arrays: the card has the I/O cards' 62 x 39 mm outline
+R0402 = "Resistor_SMD:R_0402_1005Metric"
 # JLC's footprint for C1521989: pin 1 at the bottom left, running right
 TQFP144 = "jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL"
-C0603 = "Capacitor_SMD:C_0603_1608Metric"
+C0402 = "Capacitor_SMD:C_0402_1005Metric"
+ARRAY = "jlc:RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL"
 LCSC = {
-    "100n": "C14663", "1u": "C15849", "4.7u": "C19666",         # caps (basic)
-    "10k": "C25804", "100": "C22775", "1k": "C21190",           # resistors (basic)
-    "33x4": "C25508",                                           # 4D03WGJ0330T5E, 33 ohm x4 convex
+    "100n": "C1525", "1u": "C52923", "4.7u": "C23733",          # 0402 caps (basic)
+    "10k": "C25744", "100": "C25076", "1k": "C11702",           # 0402 resistors (basic)
+    "33x4": "C25501",                                           # 4D02WGJ0330TCE, 33 ohm x4, 0402x4
 }
 
 
@@ -129,13 +129,13 @@ def schematic(path, footprint_libs):
     s = kg.Schematic("cpu", "CUPC/8 CPU card: iCE40HX4K-TQ144, W25Q32 config flash", paper="A2")
 
     def cap(ref, value, a, b, at):
-        c = s.add("Device:C", ref, value, C0603, at=at, fields={"LCSC": LCSC[value]})
+        c = s.add("Device:C", ref, value, C0402, at=at, fields={"LCSC": LCSC[value]})
         s.connect(c, 1, a)
         s.connect(c, 2, b)
         return c
 
     def res(ref, value, a, b, at):
-        r = s.add("Device:R", ref, value, R0603, at=at, fields={"LCSC": LCSC[value]})
+        r = s.add("Device:R", ref, value, R0402, at=at, fields={"LCSC": LCSC[value]})
         s.connect(r, 1, a)
         s.connect(r, 2, b)
         return r
@@ -183,7 +183,7 @@ def schematic(path, footprint_libs):
 
     # 33 ohm series arrays
     for i, nets in enumerate(SERIES):
-        rn = s.add("Device:R_Pack04", "RN%d" % (i + 1), "33", "jlc:RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL",
+        rn = s.add("Device:R_Pack04", "RN%d" % (i + 1), "33", ARRAY,
                    at=((16 + 16 * i) * G, 108 * G), fields={"LCSC": LCSC["33x4"]})
         for k, net in enumerate(nets):
             if net:
@@ -216,18 +216,18 @@ def schematic(path, footprint_libs):
     s.connect(q1, "B", "LED_B")
     s.connect(q1, "E", "GND")
     s.connect(q1, "C", "LED_K")
-    d1 = s.add("Device:LED", "D1", "red", "LED_SMD:LED_0603_1608Metric", at=(160 * G, (row - 4) * G),
+    d1 = s.add("Device:LED", "D2", "red", "LED_SMD:LED_0603_1608Metric", at=(160 * G, (row - 4) * G),
                fields={"LCSC": "C2286"})
     s.connect(d1, "K", "LED_K")
     s.connect(d1, "A", "LED_A")
-    res("R9", "1k", "3V3", "LED_A", at=(170 * G, row * G))
+    res("R10", "1k", "3V3", "LED_A", at=(170 * G, row * G))
 
     # power LED (milestone-1.md, Indicator LEDs): 3V3, the same spot on every board
-    d2 = s.add("Device:LED", "D2", "red", "LED_SMD:LED_0603_1608Metric", at=(176 * G, (row - 4) * G),
+    d2 = s.add("Device:LED", "D1", "red", "LED_SMD:LED_0603_1608Metric", at=(176 * G, (row - 4) * G),
                fields={"LCSC": "C2286"})
     s.connect(d2, "K", "GND")
     s.connect(d2, "A", "PWR_LED_A")
-    res("R10", "1k", "3V3", "PWR_LED_A", at=(186 * G, row * G))
+    res("R9", "1k", "3V3", "PWR_LED_A", at=(186 * G, row * G))
     # M3 mounting hole (as the I/O cards, slot.md Mechanical)
     s.add("Mechanical:MountingHole", "H1", "M3", kg.MOUNTING_HOLE, at=(196 * G, (row - 4) * G))
 
@@ -254,31 +254,33 @@ def schematic(path, footprint_libs):
 
 # ------------------------------------------------------------------- board
 #
-# Card body 72 x 60 mm above the PCIe x8 finger tab (the footprint draws the
-# tab's Edge.Cuts; its ends meet the body at y = 60). The FPGA's bank-3
-# side (A[15:0], then CLK and the control lines) faces the fingers and its
-# bank-2 side (D, IRQ, timers, then config) faces right, each in the
-# fingers' left-to-right order, so the front-side bus lines reach their
-# fingers without crossing; the 33 ohm arrays sit between each
-# side and the fingers, the flash beside the config pins.
+# The I/O cards' outline (cpu-bus.md, CPU card outline; slot.md, Mechanical)
+# in the frame of the x8 finger footprint (finger B1 at the origin): the body
+# is kg.IO_CARD_BODY, the M3 hole and the power LED where every card has them,
+# and the x8 tab (x -0.65 .. 50.65) under it with 5.35 mm shoulders. Nothing
+# is placed in the 4.5 mm strip above the fingers (their GND ties and vias).
+# The FPGA's bank-3 side (A[15:0], then CLK and the control lines) faces the
+# fingers and its bank-2 side (D, IRQ, timers, then config) faces right, each
+# in the fingers' left-to-right order, so the front-side bus lines reach
+# their fingers without crossing.
 
-W, H = 72.0, 60.0
-EDGE_X = 11.0                        # finger A1/B1 centre
-FPGA = (38.0, 22.0, 0)
-OUTLINE = (0, 0, W, H)
-TAB = (EDGE_X - 0.65, EDGE_X + 50.65)          # where the footprint's tab meets the body
-EDGE = [(TAB[1], H), (W, H), (W, 0), (0, 0), (0, H), (TAB[0], H)]
+BODY = kg.IO_CARD_BODY
+TAB_TOP = BODY[3]                      # where the tab meets the body
+FPGA = (24.5, -27.0, 0)
 ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
 LOGO_MM = 12
+LOGO_AT = (2.5, -17.5)
 TITLE, REVISION = "CUPC/8 CPU", "A"
-POWER_LED = kg.power_led_at(OUTLINE)
+POWER_LED = kg.IO_CARD_PWR_LED
 
 
 def fpga_pad(pin):
     """Board position of an FPGA pad and its outward direction."""
     import math
     x0, y0, rot = FPGA
-    side, k = divmod(int(pin) - 1, 36)   # 0 bottom, 1 right, 2 top, 3 left (unrotated), k along it
+    n = float(pin)                       # a half pin is the spot between two
+    side = int((n - 1) // 36)            # 0 bottom, 1 right, 2 top, 3 left (unrotated)
+    k = n - 1 - 36 * side                # along it
     t = -8.75 + 0.5 * k
     ux, uy, ox, oy = [(t, 10.95, 0, 1), (10.95, -t, 1, 0), (-t, -10.95, 0, -1), (-10.95, t, -1, 0)][side]
     a = math.radians(rot)                # KiCad turns counter-clockwise on screen (y down)
@@ -296,46 +298,47 @@ def beside(pin, dist=3.2, along=0.0):
 
 
 def placement():
-    p = {"J1": (EDGE_X, H + 4.95, 0), "U1": FPGA}
+    p = {"J1": (0, 0, 0), "U1": FPGA, "H1": kg.IO_CARD_HOLE + (0,)}
     for ref, (_, _, pin) in DECOUPLING.items():
         if pin:
             p[ref] = beside(pin)
     # the PLL filter caps sit between these and their pins' neighbours
-    p["C11"] = beside(123, along=-0.75)
+    p["C11"] = beside(123, along=-1.75)
     p["C8"] = beside(57, along=-0.5)
     # VCC_SPI's decap slides past the corner, out of pin 71's (FL1_nCS) lane to the flash
     p["C13"] = beside(72, along=-2.0)
-    # the top side's sit a little further out: room for U1's designator
-    for ref in ("C3", "C9", "C10", "C14"):
-        p[ref] = beside(DECOUPLING[ref][2], dist=4.5)
     # the bottom side's decaps step aside from the arrays under the bus pins
     p["C5"] = beside(6, along=-7.0)
     p["C1"] = beside(27, along=4.5)
-    p["C6"] = beside(30, along=5.5)
+    p["C6"] = beside(30, along=6.0)
+    # the top side's sit closer in: room for their designators under the board edge
+    for ref in ("C3", "C9", "C10", "C14"):
+        p[ref] = beside(DECOUPLING[ref][2], dist=2.5)
+    x0 = FPGA[0] - 8.0
     p.update({
-        "C15": (16, 44, 90), "C16": (66, 44, 90),              # 3V3 bulk: finger entry, right side
+        "C15": (4.5, -25.0, 0), "C16": (53.0, -25.0, 90),          # 3V3 bulk
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": (52.2, 22.5, 270), "C17": (57.6, 22.5, 270), "R6": (57.6, 26.8, 90),
-        "C20": (24.1, 22.0, 90), "C19": (16.5, 22.0, 90), "R7": (16.5, 26.0, 90),
-        # 33 ohm arrays at their pins: A and control under the bottom side,
-        # D and the timer lines in a column right of the right side
-        "RN1": (28.0, 37.2, 0), "RN2": (32.0, 37.2, 0), "RN3": (36.0, 37.2, 0), "RN4": (40.0, 37.2, 0),
-        "RN5": (44.0, 37.2, 0),
-        "RN6": (60.5, 30.8, 90), "RN7": (60.5, 26.8, 90), "RN8": (60.5, 21.0, 90),
-        # config flash and its pull-ups, top right by the config pins, clear
-        # of the mounting hole's keep-out
-        "U2": (60.0, 9.0, 0), "C23": (60.5, 3.0, 0),
-        "R1": (42.0, 4.0, 90), "R2": (45.5, 4.0, 90), "R3": (49.0, 4.0, 90), "R4": (52.5, 4.0, 90),
-        "R5": (56.0, 4.0, 90),
-        # 1V2 LDO and its rail LED, top left
-        "U3": (15.0, 5.0, 0), "C21": (11.0, 5.0, 90), "C22": (19.0, 5.0, 90),
-        # LEDs in a row along the top edge from the common PWR spot, each
-        # with its resistor under it; the 1V2 LED's switch below that
-        "D2": POWER_LED + (0,), "R10": (POWER_LED[0], POWER_LED[1] + 4.0, 90),
-        "D1": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R9": (POWER_LED[0] + 4.5, POWER_LED[1] + 4.0, 90),
-        "Q1": (POWER_LED[0] + 4.5, POWER_LED[1] + 10.0, 0), "R8": (POWER_LED[0] + 4.5, POWER_LED[1] + 14.5, 0),
-        "H1": (W - 4.0, 4.0, 0),
-        "TP1": (2.5, 14.0, 0), "TP2": (2.5, 18.5, 0), "TP3": (2.5, 23.0, 0),
+        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.9, -26.5, 270), "R6": (40.9, -30.2, 90),
+        "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (5.6, -27.0, 90), "R7": (5.6, -23.2, 90),
+        # 33 ohm arrays at their pins, finger side (pads 1-4) towards the
+        # fingers: A and control in a row under the bottom side, D and the
+        # timer lines in a column right of the right side
+        # (3.5 mm apart, a little wider than their pins: room for five designators)
+        "RN1": (x0 - 2.0, -13.4, 180), "RN2": (x0 + 1.5, -13.4, 180), "RN3": (x0 + 5.0, -13.4, 180),
+        "RN4": (x0 + 8.5, -13.4, 180), "RN5": (x0 + 12.0, -13.4, 180),
+        "RN6": (44.0, -19.4, 270), "RN7": (44.0, -22.3, 270), "RN8": (44.0, -28.8, 270),
+        # config flash under the top edge beside the hole, its decap and the
+        # configuration pull-ups
+        "U2": (43.0, -40.8, 90), "C23": (43.0, -37.3, 0),
+        "R1": (45.6, -33.0, 90), "R2": (47.8, -33.0, 90), "R3": (50.0, -33.0, 90), "R4": (52.2, -33.0, 90),
+        "R5": (54.4, -33.0, 90),
+        # LEDs along the top edge from the common PWR spot, each resistor
+        # under its LED; the 1V2 LED's switch below; then the LDO
+        "D1": POWER_LED + (0,), "R9": (POWER_LED[0], POWER_LED[1] + 2.9, 90),
+        "D2": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R10": (POWER_LED[0] + 4.5, POWER_LED[1] + 2.9, 90),
+        "Q1": (POWER_LED[0] + 4.5, POWER_LED[1] + 8.5, 0), "R8": (POWER_LED[0] + 4.5, POWER_LED[1] + 12.0, 0),
+        "U3": (7.6, -40.6, 0), "C21": (10.6, -40.6, 90), "C22": (7.6, -37.2, 0),
+        "TP1": (-3.5, -34.0, 0), "TP2": (-3.5, -29.5, 0), "TP3": (-3.5, -25.0, 0),
     })
     return p
 
@@ -387,7 +390,7 @@ def track(board, net, layer, a, b, width):
     board.Add(t)
 
 
-def supply_fingers(board, width=0.5, via=0.6, drill=0.3, top=H - 6.0):
+def supply_fingers(board, width=0.5, via=0.6, drill=0.3, top=TAB_TOP - 6.0):
     """Locked tie from the three +3V3 fingers (B5-B7, front) into the In2
     plane: each rises on F.Cu, a bar joins them, and one via drops into the
     plane above the presence link's run (which cuts the plane's sliver over
@@ -520,11 +523,11 @@ def key_ties(board, width=0.25):
     notch pass 0.3 mm from its edge at their 0.5 mm width: narrow those."""
     import pcbnew
     to = pcbnew.ToMM
-    notch = (EDGE_X + 10.55, EDGE_X + 12.45)          # the footprint's key, x of its sides
+    notch = (10.55, 12.45)                            # the footprint's key, x of its sides
     tracks = board.Tracks()
     for s in [tracks[i].Cast() for i in range(len(tracks))]:
         if s.Type() == pcbnew.PCB_TRACE_T and s.GetNetname() == "/GND" and s.IsLocked() and \
-                to(s.GetStart().y) > H - 5 and min(abs(to(s.GetStart().x) - n) for n in notch) < 0.8:
+                to(s.GetStart().y) > TAB_TOP - 5 and min(abs(to(s.GetStart().x) - n) for n in notch) < 0.8:
             s.SetWidth(pcbnew.FromMM(width))
 
 
@@ -557,12 +560,11 @@ def main():
     # GND poured on both outer layers (zones[0], which the pipeline ties the
     # fingers to and stitches) and as the In1 plane; 3V3 is the In2 plane
     lcsc = kg.pipeline(
-        "cpu", schematic, placement(), OUTLINE, out=out, edge=EDGE, card_edge=True, layers=4,
-        zones=ZONES, zone_outline=kg.card_zone(OUTLINE, TAB, H + 4.95 - 1.5),
-        labels={"D1": "1V2", "D2": "PWR"}, title=TITLE, revision=REVISION, prepare=prepare,
+        "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=4, zones=ZONES,
+        labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence={"layer": "In2.Cu"},   # a B.Cu run would wall the address lines off their fingers
         passes=60,                      # 40 leaves one of the long FL1 nets unrouted about half the time
-        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, 46.0, 0)])
+        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])
     print("LCSC:", " ".join(sorted(lcsc)))
 
 
