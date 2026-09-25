@@ -139,6 +139,43 @@ for (const speed of [1, 2]) {
   expect(!(status() & CONNECTED), `${name}: unplugged, KBD_CONNECTED clear`);
 }
 
+// ------------------------------- the host polling while the card refreshes
+// A 1 ms keyboard holding a key: the card refreshes its preload every report
+// and every repeat, while the host polls GETKEYS back to back at slot.md's
+// minimum gaps. Every frame must stay framed: a refresh that stopped the
+// state machine while the host clocked shifted the bytes by the SCK edges
+// it missed (status bytes with bit 7 set, keys like "<" for "x").
+{
+  const kbd = new UsbKeyboard({ speed: 2, interval: 1 });
+  emu.mcu.usbCtrl.attachDevice(kbd);
+  let st = 0;
+  for (let i = 0; i < 100 && !(st & CONNECTED); i++) {
+    wait(10e6);
+    st = status();
+  }
+  expect(st & CONNECTED, 'polling: keyboard enumerated');
+  cmd([0x05]);
+  const n0 = host.log.length;
+  kbd.press(0, usage('x'));
+  const got = run(function* () {
+    const out = [], t0 = emu.ns;
+    while (emu.ns - t0 < 700e6) {                     // 700 ms of polling
+      yield* this.frame([0x01, 16]);
+      const r = yield* this.read({ tries: 20, retryNs: 0 });
+      if (r) out.push(...r.data);
+    }
+    return out;
+  }, 20e9);
+  kbd.press(0);
+  wait(50e6);
+  const keysGot = got.filter((b) => b !== 0xff);
+  const torn = host.log.slice(n0).filter((f) => f.miso.length && f.miso[0] & 0x80);
+  expect(torn.length === 0, `polling: every status byte has bit 7 clear (${torn.length} did: ${[...new Set(torn.map((f) => '$' + f.miso[0].toString(16)))].slice(0, 6).join(' ')})`);
+  expect(keysGot.length >= 6 && keysGot.every((b) => b === 0x78), `polling: only "x" keys, 1 + repeats (${JSON.stringify(String.fromCharCode(...keysGot.slice(0, 20)))})`);
+  emu.mcu.usbCtrl.detachDevice();
+  wait(50e6);
+}
+
 // ------------------------------------- CS_n falling while the card refreshes
 // The main loop swaps the MISO preload (slotspi_refresh) whenever the status
 // changes, e.g. a key arrives. A frame whose CS_n falls inside that swap once

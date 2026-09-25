@@ -421,8 +421,10 @@ name = "slot SPI slave: slotspi_refresh stopping the state machine mid-frame - t
 fixed_in = "18c444f"
 before = "e9d8141"
 files = ["fw/rp2040/common/slotspi.c"]
-cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ["FAIL full-speed: held 700 ms gives 1 + ~7 repeats"]
+# the repeat test caught it only by the timing of that build; IOC-004's
+# polling section (a 1 ms keyboard, the host polling back to back) always does
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu.node >/dev/null && tools/fw_rp2040.sh io && CUPC8_EMU=native node test/emu/test_io.mjs"
+must_fail = ["FAIL polling: every status byte has bit 7 clear", "FAIL polling: only \"x\" keys"]
 
 [[bug]]
 name = "eink firmware: the wait for BUSY timed from before the picture went out (POF sent to a refreshing panel)"
