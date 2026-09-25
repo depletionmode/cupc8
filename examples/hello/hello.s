@@ -9,8 +9,9 @@
 
 msg_hi db "\nHello from a native CUPC/8 program!\nAPI version "
 msg_tri db "\n\n"
+; line_a is CR and "LEDs [" as numbers: the assembler has no \r in strings
 msg_leds db "\nThe LEDs step once a second. Press a key to stop.\n"
-line_a db "\rLEDs ["
+line_a db 13, 76, 69, 68, 115, 32, 91, 0
 line_b db "]  seconds "
 pat db 1, 2, 4, 8, 16, 32, 64, 128, 64, 32, 16, 8, 4, 2
 msg_got db "\nYou pressed '"

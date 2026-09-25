@@ -60,7 +60,7 @@ proc status(msg: string) =
       flushFile(stdout)
       statusShown = true
 
-when not defined(emscripten):
+when isMainModule and not defined(emscripten):
   addExitProc(proc () =
     if statusShown: stdout.write("\n"))   # leave the last speed line for the shell
 

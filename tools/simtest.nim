@@ -2393,7 +2393,7 @@ proc testKernelBanks() =
     var first = -1
     for p in 0..<0x80000:
       # the kernel's bss (the buffer and far_copy's variables) and the stack page change
-      if (p >= 0x6000 and p < 0x6f00) or (p >= 0x0100 and p < 0x1000): continue
+      if (p >= 0x6000 and p < 0x6f00) or (p >= 0xe000 and p < 0xf000) or (p >= 0x0100 and p < 0x1000): continue
       if physRead(p) != model[p]:
         inc diffs
         if first < 0: first = p
@@ -2457,7 +2457,7 @@ proc defineOf(defs: seq[(string, int)]; name: string): int =
 
 proc testKernelLayout() =
   ## KRN-010: the kernel's code, data and bss stay in their areas
-  ## (memory-map.md): code $1000-$4fff, data $5000-$5fff, bss $6000-$6eff;
+  ## (memory-map.md): code $1000-$5fff, data $6000-$6eff, bss $e000-$efff;
   ## $6f00 is the API block and $7000- the user program's.
   echo "== kernel memory layout =="
   let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
@@ -2475,11 +2475,11 @@ proc testKernelLayout() =
     of "data": dataEnd = max(dataEnd, parseHexInt(f[1]) + parseInt(f[2]))
     of "bss": bssEnd = max(bssEnd, parseHexInt(f[1]) + parseInt(f[2]))
     else: discard
-  expectTrue("assembled for code $1000, data $5000, bss $6000 (" & bases & ")",
-             bases == "base 0x1000 data 0x5000 bss 0x6000")
-  expectTrue("code ends by $4fff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x5000)
-  expectTrue("data ends by $5fff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6000)
-  expectTrue("bss ends by $6eff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0x6f00)
+  expectTrue("assembled for code $1000, data $6000, bss $e000 (" & bases & ")",
+             bases == "base 0x1000 data 0x6000 bss 0xe000")
+  expectTrue("code ends by $5fff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x6000)
+  expectTrue("data ends by $6eff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6f00)
+  expectTrue("bss ends by $efff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0xf000)
 
 run testKernelLayout
 
