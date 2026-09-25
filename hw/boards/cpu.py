@@ -576,7 +576,7 @@ def main():
         "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=4, zones=ZONES,
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence={"layer": "In2.Cu"},   # a B.Cu run would wall the address lines off their fingers
-        passes=60,                      # 40 leaves one of the long FL1 nets unrouted about half the time
+        passes=80,                      # 60 left one bus net unrouted after its three tries
         silk_text=SILK_TEXT,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])
     print("LCSC:", " ".join(sorted(lcsc)))
