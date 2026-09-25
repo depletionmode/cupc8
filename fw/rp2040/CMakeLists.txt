@@ -32,6 +32,15 @@ cupc8_strict(selftest/nested.c)
 target_link_libraries(emu_nested pico_stdlib hardware_timer)
 pico_enable_stdio_uart(emu_nested 1)
 
+# the SD card model (EMU-008) under the SDK's own SPI and DMA code, on the
+# storage card's pins: an independent SD host, not the storage firmware
+add_executable(emu_sdspi selftest/sdspi.c)
+cupc8_strict(selftest/sdspi.c)
+target_include_directories(emu_sdspi PRIVATE ${FW}/storage)
+target_compile_definitions(emu_sdspi PRIVATE PICO_DEFAULT_UART_TX_PIN=16 PICO_DEFAULT_UART_RX_PIN=1)
+target_link_libraries(emu_sdspi pico_stdlib hardware_spi hardware_dma)
+pico_enable_stdio_uart(emu_sdspi 1)
+
 # the slot SPI slave shared by the RP2040 cards (each card's pins.h is on its
 # include path)
 add_library(slotspi INTERFACE)

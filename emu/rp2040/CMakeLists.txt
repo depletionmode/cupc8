@@ -155,7 +155,7 @@ target_link_options(test_periph_diff PRIVATE "-Wl,--wrap=_ZN8rp2040js6RP204012se
 # rp2040harness is on the plain library (emu/machine links it),
 # rp2040harness_fast on the fast one (the addon).
 foreach(_lib rp2040harness rp2040harness_fast)
-  add_library(${_lib} STATIC harness/emu.cpp harness/slothost.cpp "${BOOTROM_INC}")
+  add_library(${_lib} STATIC harness/emu.cpp harness/slothost.cpp harness/sdcard.cpp "${BOOTROM_INC}")
   set_target_properties(${_lib} PROPERTIES CXX_STANDARD 20 POSITION_INDEPENDENT_CODE ON
                         CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
   target_include_directories(${_lib} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/harness"
@@ -173,6 +173,13 @@ set_target_properties(test_runsteps PROPERTIES CXX_STANDARD 20)
 target_compile_options(test_runsteps PRIVATE ${RP2040EMU_WARN})
 rp2040emu_fast_target(test_runsteps)
 target_link_libraries(test_runsteps PRIVATE rp2040harness_fast)
+
+# EMU-008: the SD card SPI-mode model (harness/sdcard.h), alone and on SPI1
+add_executable(test_sdcard test/sd/test_sdcard.cpp)
+set_target_properties(test_sdcard PROPERTIES CXX_STANDARD 20)
+target_compile_options(test_sdcard PRIVATE ${RP2040EMU_WARN})
+rp2040emu_fast_target(test_sdcard)
+target_link_libraries(test_sdcard PRIVATE rp2040harness_fast)
 
 find_program(NODE_EXECUTABLE node)
 if(NODE_EXECUTABLE)

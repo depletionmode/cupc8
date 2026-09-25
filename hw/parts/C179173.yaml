@@ -1,14 +1,14 @@
 # W25Q32JVSSIQ (Winbond), 32 Mbit SPI flash, SOIC-8 208 mil
-datasheet: https://datasheet.lcsc.com/datasheet/pdf/5e9d1528bd9ff612cdac1a3e34dc8d43.pdf
-source: "Winbond W25Q32JV datasheet, 3.1 Pin Configuration SOIC 208-mil (Figure 1a) and 3.2 Pin Description"
+datasheet: https://www.winbond.com/resource-files/w25q32jv%20revg%2003272018%20plus.pdf
+source: "Winbond W25Q32JV datasheet, 3.1 Pin Configuration SOIC 208-mil and 3.3 Pin Description; EasyEDA's symbol for C179173 names them the same"
 package: SOIC-8-208mil
 pins:
-  1: ["/CS", "~{CS}"]
-  2: ["DO (IO1)", "DO(IO1)"]
-  3: ["/WP (IO2)", "WP#(IO2)"]
-  4: "GND"
-  5: ["DI (IO0)", "DI(IO0)"]
-  6: "CLK"
-  7: ["/HOLD or /RESET (IO3)", "HOLD#orRESET#(IO3)"]
-  8: "VCC"
+  1: ["~{CS}", "/CS"]
+  2: ["DO/IO_{1}", "DO (IO1)"]
+  3: ["~{WP}/IO_{2}", "/WP (IO2)"]
+  4: GND
+  5: ["DI/IO_{0}", "DI (IO0)"]
+  6: CLK
+  7: ["~{HOLD}/~{RESET}/IO_{3}", "/HOLD or /RESET (IO3)"]
+  8: VCC
 ccw: [1, 8]

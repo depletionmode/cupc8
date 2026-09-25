@@ -428,11 +428,20 @@ class Schematic:
               (box[0] - off, box[1], box[2] - off, box[3])
         self.labels.append((box, net, part))
 
-    def nc(self, part, pin):
+    def nc(self, part, pin, stub=0):
+        """A no-connect cross on the pin, or `stub` mm out on a wire from it:
+        short library pins (KiCad's FPGA symbols) leave no room for the cross
+        beside the pin number."""
         num = part.pin(pin)
         for n in self._stacked(part, num):
             part.used[n] = None
-        (x, y), _ = part.pin_xy(num)
+        (x, y), (dx, dy) = part.pin_xy(num)
+        if stub:
+            ex, ey = round(x + dx * stub, 4), round(y + dy * stub, 4)
+            self.items.append(["wire", ["pts", ["xy", x, y], ["xy", ex, ey]],
+                               ["stroke", ["width", 0], ["type", "default"]], ["uuid", uid()]])
+            self.wires.append((x, y, ex, ey, part, None))
+            x, y = ex, ey
         self.items.append(["no_connect", ["at", x, y], ["uuid", uid()]])
         self.ncs.append(((x - 0.65, y - 0.65, x + 0.65, y + 0.65), part))
 
@@ -681,12 +690,14 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None, planes=()):
+                zone_outline=None, labels=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
     outline:   (x0, y0, x1, y1) in mm
     graphics:  board-only footprints such as logos: ("lib:name", x, y, rot)
+    zones:     nets poured on F.Cu and B.Cu, or (net, (layer names)) for
+               chosen layers; an inner layer with a zone becomes a plane
     edge:      Edge.Cuts as an open polyline [(x, y), ...] in place of the
                outline rectangle - for a card whose edge-connector footprint
                draws its own tab. Silk, designators and zones still keep
@@ -694,9 +705,6 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     zone_outline: the copper pours' polygon, if not `outline` less 0.5 mm
     labels:    {ref: word}: the word (what an LED shows) printed where the part's
                designator would go, in its place
-    planes:    inner-layer pours, [(net, "In1.Cu"), ...]: whole-board planes;
-               (net, layer, "routed") is a pour on a layer that still carries
-               signals, filled after routing
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -774,22 +782,31 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
-    pours = [(net, layer) for net in zones for layer in copper]
-    pours += [(p[0], board.GetLayerID(p[1])) for p in planes]
-    for net, layer in pours:
-        z = pcbnew.ZONE(board)
-        z.SetLayer(layer)
-        z.SetNet(netinfo[net])
-        z.SetLocalClearance(mm(0.3))
-        z.SetMinThickness(mm(0.25))
-        z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)   # solid: fine for reflow, no starved spokes
-        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)   # no floating copper
-        ol = z.Outline()
-        ol.NewOutline()
-        for px, py in zone_outline or ((x0 + .5, y0 + .5), (x1 - .5, y0 + .5), (x1 - .5, y1 - .5),
-                                       (x0 + .5, y1 - .5)):
-            ol.Append(mm(px), mm(py))
-        board.Add(z)
+    for zone in zones:
+        # a zone is a net on both outer layers, or (net, ("In1.Cu", ...)):
+        # inner layers named that way become planes (power layers), which
+        # Freerouting reaches with vias and never routes signals on; with a
+        # third element "routed", (net, ("In2.Cu",), "routed"), the layer keeps
+        # carrying signals and the pour is filled round them after routing
+        net, names = (zone, None) if isinstance(zone, str) else zone[:2]
+        routed = not isinstance(zone, str) and len(zone) > 2 and zone[2] == "routed"
+        layers = [board.GetLayerID(n) for n in names] if names else copper
+        for layer in layers:
+            if layer not in copper and not routed:
+                board.SetLayerType(layer, pcbnew.LT_POWER)
+            z = pcbnew.ZONE(board)
+            z.SetLayer(layer)
+            z.SetNet(netinfo[net])
+            z.SetLocalClearance(mm(0.3))
+            z.SetMinThickness(mm(0.25))
+            z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)   # solid: fine for reflow, no starved spokes
+            z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)   # no floating copper
+            ol = z.Outline()
+            ol.NewOutline()
+            for px, py in zone_outline or ((x0 + .5, y0 + .5), (x1 - .5, y0 + .5), (x1 - .5, y1 - .5),
+                                           (x0 + .5, y1 - .5)):
+                ol.Append(mm(px), mm(py))
+            board.Add(z)
     return board
 
 
@@ -966,13 +983,16 @@ def place_designators(board, outline, labels=None, gap=0.3):
         ref.SetTextAngleDegrees(0)
         ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
         ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
-        cx0, cy0, cx1, cy1 = courts[fp.GetReference()]
-        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
         others = [c for r, c in courts.items() if r != fp.GetReference()]
         spots = []
-        for shift in (0, 1, -1, 2, -2, 3, -3):
-            spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
-                      (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
+        # round the courtyard, then (for an imported footprint whose courtyard
+        # is only its body, leads outside it) round its pads
+        for cx0, cy0, cx1, cy1 in (courts[fp.GetReference()],
+                                   union([courts[fp.GetReference()]] + [box(p.GetBoundingBox(), 0.5) for p in fp.Pads()])):
+            mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+            for shift in (0, 1, -1, 2, -2, 3, -3):
+                spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
+                          (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
         for sx, sy in spots:
             ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
             t = box(ref.GetBoundingBox())
@@ -1238,17 +1258,28 @@ def remove_dangling(board, pours=()):
     return len(gone)
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3, power_layers=()):
+def autoroute(board, workdir, passes=40, pours=(), tries=3):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
-    and an error after `tries`. `power_layers` (inner planes) are typed power
-    in the DSN, so Freerouting keeps signals off them and reaches their net
-    with vias."""
+    and an error after `tries`."""
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
     env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
+    # a net pre-routed partly on an inner plane layer (presence_link's run on
+    # a wide card): the DSN has no inner track, so Freerouting sees the rest
+    # dangling and trims it, and the import drops the inner track. Such a net
+    # is restored whole, as it was pre-routed.
+    tracks = board.Tracks()
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    held = {t.GetNetname() for t in items
+            if t.Type() == pcbnew.PCB_TRACE_T and t.GetLayer() not in (pcbnew.F_Cu, pcbnew.B_Cu)}
+    # copies: GetStart() is a view into the item, which is removed below
+    inner = [(t.Type() == pcbnew.PCB_VIA_T, pcbnew.VECTOR2I(t.GetStart().x, t.GetStart().y),
+              pcbnew.VECTOR2I(t.GetEnd().x, t.GetEnd().y), t.GetWidth(), t.GetLayer(), t.GetNet(),
+              t.GetDrillValue() if t.Type() == pcbnew.PCB_VIA_T else 0)
+             for t in items if t.GetNetname() in held]
     for attempt in range(tries):
         # each try orders the problem differently (a UUID salt): Freerouting
         # can stall on one order and complete on another, and the salt keeps
@@ -1258,10 +1289,6 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, power_layers=()):
             raise RuntimeError("DSN export failed")
         with open(dsn) as f:
             text = canonical_dsn(f.read(), attempt)
-        for layer in power_layers:
-            text, k = re.subn(r"(\(layer %s\s*\(type )signal\)" % re.escape(layer), r"\1power)", text)
-            if k != 1:
-                raise RuntimeError("DSN: no signal layer %s to make a plane" % layer)
         with open(dsn, "w") as f:
             f.write(text)
         if os.path.exists(ses):
@@ -1281,6 +1308,23 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, power_layers=()):
         raise RuntimeError("Freerouting wrote no session file")
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
+    tracks = board.Tracks()
+    for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:
+        board.Remove(t)
+    for is_via, start, end, width, layer, net, drill in inner:
+        if is_via:
+            t = pcbnew.PCB_VIA(board)
+            t.SetPosition(start)
+            t.SetDrill(drill)
+        else:
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(start)
+            t.SetEnd(end)
+            t.SetLayer(layer)
+        t.SetWidth(width)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
     remove_dangling(board, pours)
     # the import can pair one net class's via diameter with another's drill
     # (0.6 mm with 0.4 mm: a 0.1 mm ring, under JLC's 0.13): keep a 0.15 mm ring
@@ -1435,12 +1479,15 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     return n
 
 
-def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
+def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3, layer="B.Cu"):
     """Pre-route the presence link every card makes (PRSNT1_n on A1 joined
     to PRSNT2_n on the last B finger): up from A1 on B.Cu, across `rise` mm
     above the tab, a via, and down to the B finger on F.Cu. It must cross
     the other fingers' escapes, and Freerouting gives up on it; the few it
-    crosses it routes round. Returns True if a link was drawn."""
+    crosses it routes round. `layer` carries the run across: on a wide card
+    whose bottom-side fingers all have signals (the CPU card's address bus)
+    a B.Cu run walls them off, so it goes on an inner layer between vias.
+    Returns True if a link was drawn."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     for fp in board.GetFootprints():
@@ -1453,8 +1500,9 @@ def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
             continue
         y = tab_top - rise
         ax, bx = to(a1.GetPosition().x), to(bn.GetPosition().x)
+        run = board.GetLayerID(layer)
         pts = [(pcbnew.B_Cu, (ax, to(a1.GetBoundingBox().GetTop()) + width / 2), (ax, y)),
-               (pcbnew.B_Cu, (ax, y), (bx, y)),
+               (run, (ax, y), (bx, y)),
                (pcbnew.F_Cu, (bx, y), (bx, to(bn.GetBoundingBox().GetTop()) + width / 2))]
         for layer, a, b in pts:
             t = pcbnew.PCB_TRACK(board)
@@ -1465,13 +1513,14 @@ def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3):
             t.SetNet(a1.GetNet())
             t.SetLocked(True)
             board.Add(t)
-        v = pcbnew.PCB_VIA(board)
-        v.SetPosition(pcbnew.VECTOR2I(mm(bx), mm(y)))
-        v.SetWidth(mm(via))
-        v.SetDrill(mm(drill))
-        v.SetNet(a1.GetNet())
-        v.SetLocked(True)
-        board.Add(v)
+        for vx in ((bx,) if run == pcbnew.B_Cu else (ax, bx)):
+            v = pcbnew.PCB_VIA(board)
+            v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(y)))
+            v.SetWidth(mm(via))
+            v.SetDrill(mm(drill))
+            v.SetNet(a1.GetNet())
+            v.SetLocked(True)
+            board.Add(v)
         return True
     return False
 
@@ -1792,21 +1841,21 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, planes=()):
+             io_card=False, prepare=None, presence=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
-    renders. `schematic(path, footprint_libs)` writes the sheet. `planes` are
-    whole-board inner-layer pours [(net, "In1.Cu"), ...]: their SMD pads get
-    a via each, as the first zone net's do, and Freerouting keeps signals off
-    their layers; (net, layer, "routed") pours a layer that also carries
-    signals, and the net is routed as any other. Returns {LCSC number: count per board}.
+    renders. `schematic(path, footprint_libs)` writes the sheet. Returns {LCSC number: count per board}.
 
     Every board carries its name and revision (doc/milestone-1.md, Board
     revision): `title` and `revision` are printed as "<title> rev <revision>"
     on the top silkscreen, in the body's bottom-right corner unless
     `revision_at` names another bottom-right anchor (mm), and go in the
-    board's title block, which the Gerbers' X2 attributes carry."""
+    board's title block, which the Gerbers' X2 attributes carry.
+
+    `prepare(board)`, if given, runs after the pad fan-out and before
+    Freerouting: a board's own locked pre-routing (layer changes the router
+    would otherwise scatter)."""
     import pcbnew
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
@@ -1827,6 +1876,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     os.makedirs(out, exist_ok=True)
     sch, pcb, pro = (os.path.join(out, name + e) for e in (".kicad_sch", ".kicad_pcb", ".kicad_pro"))
     state = {}
+    # the nets the pours join (not routed): a "routed" pour's net is routed
+    pour_nets = list(dict.fromkeys(z if isinstance(z, str) else z[0] for z in zones
+                                   if isinstance(z, str) or len(z) < 3 or z[2] != "routed"))
 
     def step(label, fn):
         print("%-28s" % label, end=" ", flush=True)
@@ -1849,22 +1901,22 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
-                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels, planes=planes)
+                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, zones[0], outline[3])
-            presence_link(b, outline[3])
-        solid = [p for p in planes if len(p) == 2]          # planes Freerouting keeps signals off
-        state["fanout"] = sum(ground_fanout(b, net) for net in
-                              [zones[0]] + sorted({p[0] for p in solid} - {zones[0]}))
+            presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
+        # every poured net's pads get a via: GND, and any net on a plane
+        # (build_board's (net, layers) zones), which is reached no other way
+        state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
+        if prepare:                   # the board's own locked pre-routing, before Freerouting
+            prepare(b)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    solid = [p for p in planes if len(p) == 2]
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=tuple(zones) + tuple(p[0] for p in solid),
-                                        power_layers=[p[1] for p in solid]))
+    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=pour_nets))
 
     def fill():
         x0, y0, x1, y1 = outline

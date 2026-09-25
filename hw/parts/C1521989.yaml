@@ -1,150 +1,150 @@
-# ICE40HX4K-TQ144 (Lattice), FPGA, TQFP-144
-datasheet: https://www.latticesemi.com/view_document?document_id=49385
-source: "Lattice iCE40 HX4K pinout (www.latticesemi.com document 49385), TQ144 column; copied to hw/datasheets/iCE40HX4K-TQ144-pinout.csv"
+# ICE40HX4K-TQ144 (Lattice), iCE40 HX FPGA, 3520 LUTs, TQFP-144 20x20
+datasheet: https://www.latticesemi.com/Products/FPGAandCPLD/iCE40
+source: "Lattice iCE40HX4K pinout, TQ144 column (Function). All 144 pins cross-checked against KiCad's FPGA_Lattice:ICE40HX4K-TQ144 symbol (identical names, CRESET_B drawn ~{CRESET}) and icestorm's chipdb-8k tq144:4k, whose 107 I/O pins are exactly the table's IO pins"
 package: TQFP-144(20x20)
 pins:
-  1: "IOL_2A"
-  2: "IOL_2B"
-  3: "IOL_3A"
-  4: "IOL_3B"
-  5: "GND"
-  6: "VCCIO_3"
-  7: "IOL_4A"
-  8: "IOL_4B"
-  9: "IOL_5A"
-  10: "IOL_5B"
-  11: "IOL_8A"
-  12: "IOL_8B"
-  13: "GND"
-  14: "GND"
-  15: "IOL_10A"
-  16: "IOL_10B"
-  17: "IOL_12A"
-  18: "IOL_12B"
-  19: "IOL_13A"
-  20: "IOL_13B_GBIN7"
-  21: "IOL_14A_GBIN6"
-  22: "IOL_14B"
-  23: "IOL_17A"
-  24: "IOL_17B"
-  25: "IOL_18A"
-  26: "IOL_18B"
-  27: "VCC"
-  28: "IOL_23A"
-  29: "IOL_23B"
-  30: "VCCIO_3"
-  31: "IOL_24A"
-  32: "IOL_24B"
-  33: "IOL_25A"
-  34: "IOL_25B"
-  35: "NC"
-  36: "NC"
-  37: "IOB_56"
-  38: "IOB_57"
-  39: "IOB_61"
-  40: "VCC"
-  41: "IOB_63"
-  42: "IOB_64"
-  43: "IOB_71"
-  44: "IOB_72"
-  45: "IOB_73"
-  46: "VCCIO_2"
-  47: "IOB_79"
-  48: "IOB_80"
-  49: "IOB_81_GBIN5"
-  50: "NC"
-  51: "NC"
-  52: "IOB_82_GBIN4"
-  53: "GNDPLL0"
-  54: "VCCPLL0"
-  55: "IOB_91"
-  56: "IOB_94"
-  57: "VCCIO_2"
-  58: "NC"
-  59: "GND"
-  60: "IOB_95"
-  61: "IOB_96"
-  62: "IOB_102"
-  63: "IOB_103_CBSEL0"
-  64: "IOB_104_CBSEL1"
-  65: "CDONE"
-  66: ["CRESET_B", "~{CRESET}"]
-  67: "IOB_105_SDO"
-  68: "IOB_106_SDI"
-  69: "GND"
-  70: "IOB_107_SCK"
-  71: "IOB_108_SS"
-  72: "VCC_SPI"
-  73: "IOR_109"
-  74: "IOR_110"
-  75: "IOR_111"
-  76: "IOR_112"
-  77: "NC"
-  78: "IOR_114"
-  79: "IOR_115"
-  80: "IOR_116"
-  81: "IOR_117"
-  82: "IOR_118"
-  83: "IOR_119"
-  84: "IOR_120"
-  85: "IOR_128"
-  86: "GND"
-  87: "IOR_136"
-  88: "IOR_137"
-  89: "VCCIO_1"
-  90: "IOR_138"
-  91: "IOR_139"
-  92: "VCC"
-  93: "IOR_140_GBIN3"
-  94: "IOR_141_GBIN2"
-  95: "IOR_144"
-  96: "IOR_146"
-  97: "IOR_147"
-  98: "IOR_148"
-  99: "IOR_152"
-  100: "VCCIO_1"
-  101: "IOR_160"
-  102: "IOR_161"
-  103: "GND"
-  104: "IOR_164"
-  105: "IOR_165"
-  106: "IOR_166"
-  107: "IOR_167"
-  108: "VPP_2V5"
-  109: "VPP_FAST"
-  110: "IOT_168"
-  111: "VCC"
-  112: "IOT_169"
-  113: "IOT_170"
-  114: "IOT_171"
-  115: "IOT_172"
-  116: "IOT_173"
-  117: "IOT_174"
-  118: "IOT_177"
-  119: "IOT_178"
-  120: "IOT_179"
-  121: "IOT_181"
-  122: "IOT_190"
-  123: "VCCIO_0"
-  124: "IOT_191"
-  125: "IOT_192"
-  126: "VCCPLL1"
-  127: "GNDPLL1"
-  128: "IOT_197_GBIN1"
-  129: "IOT_198_GBIN0"
-  130: "IOT_206"
-  131: "VCCIO_0"
-  132: "GND"
-  133: "NC"
-  134: "IOT_212"
-  135: "IOT_213"
-  136: "IOT_214"
-  137: "IOT_215"
-  138: "IOT_216"
-  139: "IOT_217"
-  140: "GND"
-  141: "IOT_219"
-  142: "IOT_220"
-  143: "IOT_221"
-  144: "IOT_222"
-ccw: [1, 144]
+  1: IOL_2A
+  2: IOL_2B
+  3: IOL_3A
+  4: IOL_3B
+  5: GND    # GND
+  6: VCCIO_3    # VCCIO
+  7: IOL_4A
+  8: IOL_4B
+  9: IOL_5A
+  10: IOL_5B
+  11: IOL_8A
+  12: IOL_8B
+  13: GND    # GND
+  14: GND    # GND
+  15: IOL_10A
+  16: IOL_10B
+  17: IOL_12A
+  18: IOL_12B
+  19: IOL_13A
+  20: IOL_13B_GBIN7    # GBIN
+  21: IOL_14A_GBIN6    # GBIN
+  22: IOL_14B
+  23: IOL_17A
+  24: IOL_17B
+  25: IOL_18A
+  26: IOL_18B
+  27: VCC    # VCC
+  28: IOL_23A
+  29: IOL_23B
+  30: VCCIO_3    # VCCIO
+  31: IOL_24A
+  32: IOL_24B
+  33: IOL_25A
+  34: IOL_25B
+  35: NC    # NC
+  36: NC    # NC
+  37: IOB_56
+  38: IOB_57
+  39: IOB_61
+  40: VCC    # VCC
+  41: IOB_63
+  42: IOB_64
+  43: IOB_71
+  44: IOB_72
+  45: IOB_73
+  46: VCCIO_2    # VCCIO
+  47: IOB_79
+  48: IOB_80
+  49: IOB_81_GBIN5    # GBIN
+  50: NC    # NC
+  51: NC    # NC
+  52: IOB_82_GBIN4    # GBIN
+  53: GNDPLL0    # GNDPLL
+  54: VCCPLL0    # VCCPLL
+  55: IOB_91
+  56: IOB_94
+  57: VCCIO_2    # VCCIO
+  58: NC    # NC
+  59: GND    # GND
+  60: IOB_95
+  61: IOB_96
+  62: IOB_102
+  63: IOB_103_CBSEL0
+  64: IOB_104_CBSEL1
+  65: CDONE    # CONFIG
+  66: [CRESET_B, "~{CRESET}"]    # CONFIG
+  67: IOB_105_SDO    # SPI
+  68: IOB_106_SDI    # SPI
+  69: GND    # GND
+  70: IOB_107_SCK    # SPI
+  71: IOB_108_SS    # SPI
+  72: VCC_SPI    # SPI
+  73: IOR_109
+  74: IOR_110
+  75: IOR_111
+  76: IOR_112
+  77: NC    # NC
+  78: IOR_114
+  79: IOR_115
+  80: IOR_116
+  81: IOR_117
+  82: IOR_118
+  83: IOR_119
+  84: IOR_120
+  85: IOR_128
+  86: GND    # GND
+  87: IOR_136
+  88: IOR_137
+  89: VCCIO_1    # VCCIO
+  90: IOR_138
+  91: IOR_139
+  92: VCC    # VCC
+  93: IOR_140_GBIN3    # GBIN
+  94: IOR_141_GBIN2    # GBIN
+  95: IOR_144
+  96: IOR_146
+  97: IOR_147
+  98: IOR_148
+  99: IOR_152
+  100: VCCIO_1    # VCCIO
+  101: IOR_160
+  102: IOR_161
+  103: GND    # GND
+  104: IOR_164
+  105: IOR_165
+  106: IOR_166
+  107: IOR_167
+  108: VPP_2V5    # VPP
+  109: VPP_FAST    # VPP
+  110: IOT_168
+  111: VCC    # VCC
+  112: IOT_169
+  113: IOT_170
+  114: IOT_171
+  115: IOT_172
+  116: IOT_173
+  117: IOT_174
+  118: IOT_177
+  119: IOT_178
+  120: IOT_179
+  121: IOT_181
+  122: IOT_190
+  123: VCCIO_0    # VCCIO
+  124: IOT_191
+  125: IOT_192
+  126: VCCPLL1    # VCCPLL
+  127: GNDPLL1    # GNDPLL
+  128: IOT_197_GBIN1    # GBIN
+  129: IOT_198_GBIN0    # GBIN
+  130: IOT_206
+  131: VCCIO_0    # VCCIO
+  132: GND    # GND
+  133: NC    # NC
+  134: IOT_212
+  135: IOT_213
+  136: IOT_214
+  137: IOT_215
+  138: IOT_216
+  139: IOT_217
+  140: GND    # GND
+  141: IOT_219
+  142: IOT_220
+  143: IOT_221
+  144: IOT_222
+ccw: [1, 144]       # pin 1 top left, down the left side, counterclockwise (top view)

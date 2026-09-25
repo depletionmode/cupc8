@@ -86,16 +86,16 @@ devices:
         signals:
           - {name: CPU_A, width: 16, dir: out, pin: [1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20]}
           - {name: CPU_D, width: 8, dir: inout, pin: [37, 38, 39, 41, 42, 43, 44, 45]}
-          - {name: CPU_RW, dir: out, pin: 47}
-          - {name: CPU_nSTB, dir: out, pin: 48}
-          - {name: CPU_nRDY, dir: in, pin: 52}
-          - {name: CPU_SYNC, dir: out, pin: 55}
-          - {name: CPU_IRQ, width: 4, dir: in, pin: [21, 22, 23, 24]}
-          - {name: CPU_TMR_EXP, width: 2, dir: out, pin: [62, 63]}
+          - {name: CPU_RW, dir: out, pin: 25}
+          - {name: CPU_nSTB, dir: out, pin: 23}
+          - {name: CPU_nRDY, dir: in, pin: 24}
+          - {name: CPU_SYNC, dir: out, pin: 26}
+          - {name: CPU_IRQ, width: 4, dir: in, pin: [47, 48, 49, 52]}
+          - {name: CPU_TMR_EXP, width: 2, dir: out, pin: [55, 56]}
           - {name: CPU_HALTED, dir: out, pin: 60}
           - {name: CPU_WAITING, dir: out, pin: 61}
-          - {name: CPU_CLK, dir: in, role: gbin, pin: 49}
-          - {name: CPU_nRST, dir: in, pin: 56}
+          - {name: CPU_CLK, dir: in, role: gbin, pin: 21}
+          - {name: CPU_nRST, dir: in, pin: 22}
 
   sysctl:
     board: system-card

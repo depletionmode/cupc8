@@ -54,6 +54,7 @@ import importlib.util
 import math
 import re
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -70,7 +71,7 @@ ROTATIONS = os.path.join(PARTS, "jlc_rotation.yaml")
 RECORDS = os.path.join(PARTS, "easyeda")
 CACHE = os.path.join(ROOT, "build", "parts", "easyeda")
 PAD_TOLERANCE = 0.2          # mm: 0402 pads are 0.27 mm off 0603's, 0603's 0.04 off EasyEDA's
-POLAR = {"K": "K", "A": "A", "CATHODE": "K", "ANODE": "A", "-": "K", "+": "A", "C": "K"}   # 2-pin names (C: EasyEDA diodes)
+POLAR = {"K": "K", "A": "A", "CATHODE": "K", "ANODE": "A", "-": "K", "+": "A"}   # 2-pin names
 
 
 def rotations():
@@ -171,9 +172,12 @@ def schematic_parts(sch):
             continue
         f = c.get("fields", {})
         pins = {}
-        if libid.get(ref) in lib:                  # every unit (the chipset's symbol has five)
-            for unit in range(1, 10):
-                pins.update(kg.symbol_pins(lib[libid[ref]], unit))
+        if libid.get(ref) in lib:                 # every unit's pins: an FPGA is drawn in several
+            sym = lib[libid[ref]]
+            units = {int(m.group(1)) for m in (re.search(r"_(\d+)_\d+$", str(s[1])) for s in kg.find(sym, "symbol"))
+                     if m}
+            for u in sorted(units | {1}):
+                pins.update(kg.symbol_pins(sym, u))
         out[ref] = {"value": c["value"], "footprint": c["footprint"], "lcsc": f.get("LCSC") or f.get("LCSC Part"),
                     "pins": {n: p[3] for n, p in pins.items()}}
     return out
@@ -230,9 +234,6 @@ def package_ok(pkg, fp_name):
     m = re.fullmatch(r"(.+)-(150|208)MIL", p)        # "SOIC-8-208mil": the body width in mils
     if m:
         return name.startswith(m.group(1)) and "-W%s-" % {"150": "3.9", "208": "5.3"}[m.group(2)] in name
-    m = re.fullmatch(r"(SOT-23-\d)L", p)             # "SOT-23-6L": JLC's name for a plain SOT-23-6
-    if m:
-        return name.startswith(m.group(1) + "_")
     return name.startswith(p) or ("_%s" % p) in name or ("_%s_" % p) in name
 
 
