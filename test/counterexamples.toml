@@ -634,3 +634,10 @@ before = "1d162fc"
 files = ["hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.step", "hw/lib/jlc.3dshapes/TF-SMD_TF-01A.step"]
 cmd = "freecadcmd hw/tools/modelcheck.py"
 must_fail = ["FAIL HDMI-SMD_HDMI-9PIN-043: the STEP is 3.89 mm from the WRL", "FAIL TF-SMD_TF-01A: the STEP is 5.28 mm from the WRL"]
+
+[[bug]]
+name = "fabready: the GPU, IO, storage and e-ink cards missing from fab-readiness.md's Boards table"
+fixed_in = "c63e125"
+revert = [["tools/fabready.py", "\"__main__\" not in open(script).read()", "\"def main\" not in open(script).read()"]]
+cmd = "python3 tools/fabready.py && python3 -c \"import sys; t = open('doc/hardware/fab-readiness.md').read(); m = [b for b in ('gpu', 'io', 'storage', 'eink') if '| %s |' % b not in t]; sys.exit('boards missing from fab-readiness: %s' % m if m else 0)\""
+must_fail = ["boards missing from fab-readiness: ['gpu', 'io', 'storage', 'eink']"]
