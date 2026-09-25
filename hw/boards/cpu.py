@@ -324,7 +324,7 @@ def placement():
         "C13": beside(72, along=2.5),                               # VCC_SPI
         "C15": (9.0, -21.0, 0), "C16": (54.8, -21.5, 90),          # 3V3 bulk
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.5, -17.2, 0), "R6": (40.5, -14.4, 0),
+        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (51.4, -20.9, 0), "R6": (48.2, -20.9, 0),
         "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2, 0), "R7": (3.2, -26.6, 0),
         # 33 ohm arrays at their pins, FPGA side (pads 1-4) towards the
         # package and in the pins' order, finger side (pads 8-5) away from
