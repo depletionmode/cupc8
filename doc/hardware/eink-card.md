@@ -120,6 +120,10 @@ has `eink_auto` (sends AUTO and AUTO_EXT from the 6 bytes at `eink_cfg`, in
 AUTO_GET's order), `eink_get` (AUTO_GET into `eink_cfg`) and `eink_status`
 (EPD_STATUS into `eink_st`). On HDMI they do nothing (`eink_get` and
 `eink_status` leave $ff). The kernel itself keeps the card's defaults.
+Programs reach them through the kernel API's e-ink group (`API_EINK_AUTO`,
+`API_EINK_GET`, `API_EINK_STATUS`, `API_EINK_REFRESH`; `kernel/api.inc`,
+`../proposals/kernel-api.md`), with the six settings in `API_ARGS`
+(KRN-013, E2E-012).
 
 In use, from the vendors' times: a typed key reaches the glass about 0.5 s
 after the key (150 ms quiet, then a 0.3 s partial refresh); a `LIST` or a
