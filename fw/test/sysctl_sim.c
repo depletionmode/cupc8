@@ -14,7 +14,8 @@
  * erase) does: a host killed after its request finds the reply arriving in
  * the next host's session (HOST-002 checks cupc8.py resyncs past it).
  * --dump writes, when it is stopped (SIGTERM or SIGINT), what the models
- * hold: rom.bin, fl0.bin, fl1.bin and card3.bin, for the tests to check.
+ * hold: rom.bin, fl0.bin, fl1.bin, card3.bin and ram.bin (the 512 KB SRAM),
+ * for the tests to check.
  */
 #include <arpa/inet.h>
 #include <errno.h>
@@ -190,6 +191,7 @@ int main(int argc, char **argv)
 		dump("fl0.bin", M.fl0.mem, sizeof M.fl0.mem);
 		dump("fl1.bin", M.fl1.mem, sizeof M.fl1.mem);
 		dump("card3.bin", card2.flash, sizeof card2.flash);
+		dump("ram.bin", M.br.ram, sizeof M.br.ram);
 	}
 	return 0;
 }

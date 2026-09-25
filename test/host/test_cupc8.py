@@ -55,7 +55,8 @@ class Sim:
         """Stop the sim and return what its models hold."""
         self.p.send_signal(signal.SIGTERM)
         self.p.wait(10)
-        return {n: open(os.path.join(self.dir, n), "rb").read() for n in ("rom.bin", "fl0.bin", "fl1.bin", "card3.bin")}
+        return {n: open(os.path.join(self.dir, n), "rb").read()
+                for n in ("rom.bin", "fl0.bin", "fl1.bin", "card3.bin", "ram.bin")}
 
 
 def main():
@@ -104,7 +105,21 @@ def main():
     sim.run("ram", "read", "0x4000", "5000", "-o", os.path.join(tmp, "ram-back.bin"))
     expect(open(os.path.join(tmp, "ram-back.bin"), "rb").read() == ram, "ram write then read")
     _, out = sim.run("ram", "read", "0xfff8", "16")
-    expect(out.count("\n") == 1, "ram read wrapping past $ffff: %r" % out)
+    expect(out.count("\n") == 1, "ram read across $ffff: %r" % out)
+
+    # the whole 512 KB SRAM (extended-ram.md): far addresses, bank:offset,
+    # across $10000 and bank boundaries, up to the last byte
+    far = bytes(rnd.randrange(256) for _ in range(9000))
+    sim.run("ram", "write", "0xfe00", file_of("far.bin", far))
+    sim.run("ram", "read", "3:0x3e00", "9000", "-o", os.path.join(tmp, "far-back.bin"))
+    expect(open(os.path.join(tmp, "far-back.bin"), "rb").read() == far, "ram write across $10000, read by bank:offset")
+    sim.run("ram", "write", "31:0x3f00", file_of("top.bin", far[:256]))
+    sim.run("ram", "read", "0x7ff00", "256", "-o", os.path.join(tmp, "top-back.bin"))
+    expect(open(os.path.join(tmp, "top-back.bin"), "rb").read() == far[:256], "ram write/read of the last 256 bytes")
+    rc, out = sim.run("ram", "read", "0x7ff00", "257", ok=False)
+    expect(rc == 1 and "past the end of the SRAM" in out, "ram read past $7ffff refused: %r" % out)
+    rc, _ = sim.run("ram", "read", "32:0", "1", ok=False)
+    expect(rc == 2, "bank 32 refused")
 
     # the CPU through the bridge
     for op in ("stop", "step", "cycle", "run", "hold", "release"):
@@ -150,6 +165,8 @@ def main():
     expect(rc == 0, "reset (SYS_nRST)")
     got = sim.stop()
     expect(got["rom.bin"][0x1000:0x1000 + len(rom)] == rom, "the ROM chip holds the image")
+    expect(got["ram.bin"][0xfe00:0xfe00 + len(far)] == far, "the SRAM holds the far write at $0fe00")
+    expect(got["ram.bin"][0x7ff00:] == far[:256], "the SRAM's last 256 bytes")
     expect(got["fl1.bin"][:len(bit)] == bit, "the CPU card's flash holds the bitstream")
     img = cupc8.elf_to_flash(elf)
     expect(got["card3.bin"][:len(img)] == img, "slot 3's RP2040 flash holds gpu.elf's image (%d bytes)" % len(img))

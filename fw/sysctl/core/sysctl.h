@@ -84,6 +84,8 @@ uint8_t br_gpo(sysctl_t *s);
 void br_cpu_ctl(sysctl_t *s, uint8_t ctl);
 void br_ram_write(sysctl_t *s, uint16_t addr, const uint8_t *data, int n);
 void br_ram_read(sysctl_t *s, uint16_t addr, uint8_t *data, int n);
+void br_xram_write(sysctl_t *s, uint32_t addr, const uint8_t *data, int n);  /* 19-bit SRAM address */
+void br_xram_read(sysctl_t *s, uint32_t addr, uint8_t *data, int n);
 void br_rom_read(sysctl_t *s, uint32_t addr, uint8_t *data, int n);
 void br_rom_busw(sysctl_t *s, uint32_t addr, uint8_t data);
 int br_trace(sysctl_t *s, uint8_t *out);                  /* ≤ 2 + 512 * 4 bytes */

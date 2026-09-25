@@ -8,12 +8,13 @@
 #define MAGIC        0xC8
 #define FRAME_MS     100                  /* a frame older than this is dropped */
 #define ROM_SIZE     0x80000u
+#define RAM_SIZE     0x80000u             /* the main board's SRAM: 32 banks of 16 KB */
 #define FLASH_SIZE   0x400000u
 #define RESET_MS     10                   /* SYS_nRST pulse */
 
 enum {
 	C_PING = 0x00, C_STATUS = 0x01,
-	C_RAM_READ = 0x10, C_RAM_WRITE = 0x11,
+	C_RAM_READ = 0x10, C_RAM_WRITE = 0x11, C_RAM_READ_FAR = 0x12, C_RAM_WRITE_FAR = 0x13,
 	C_ROM_READ = 0x20, C_ROM_ERASE = 0x21, C_ROM_PROGRAM = 0x22, C_ROM_ID = 0x23,
 	C_CPU_CTL = 0x30, C_TRACE = 0x31, C_RESET = 0x32,
 	C_FLASH_READ = 0x40, C_FLASH_ERASE = 0x41, C_FLASH_PROGRAM = 0x42, C_FLASH_ID = 0x43,
@@ -232,7 +233,8 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 		break;
 
 	/* ---- through the chipset's bridge */
-	case C_RAM_READ: case C_RAM_WRITE: case C_ROM_READ: case C_ROM_ERASE:
+	case C_RAM_READ: case C_RAM_WRITE: case C_RAM_READ_FAR: case C_RAM_WRITE_FAR:
+	case C_ROM_READ: case C_ROM_ERASE:
 	case C_ROM_PROGRAM: case C_ROM_ID: case C_CPU_CTL: case C_TRACE:
 		if (!chipset_up(s))
 			return ST_NOCHIPSET;
@@ -251,6 +253,21 @@ static int command(sysctl_t *s, uint8_t cmd, const uint8_t *p, int n, uint8_t *o
 			if (n < 3)
 				return ST_ARG;
 			br_ram_write(s, (uint16_t)le16(p), p + 2, n - 2);
+			return ST_OK;
+		case C_RAM_READ_FAR: {
+			if (n != 5)
+				return ST_ARG;
+			uint32_t addr = le24(p), len = le16(p + 3);
+			if (len == 0 || len > SYS_MAX_PAYLOAD || addr + len > RAM_SIZE)
+				return ST_ARG;
+			br_xram_read(s, addr, out, (int)len);
+			*rn = (int)len;
+			return ST_OK;
+		}
+		case C_RAM_WRITE_FAR:
+			if (n < 4 || le24(p) + (uint32_t)(n - 3) > RAM_SIZE)
+				return ST_ARG;
+			br_xram_write(s, le24(p), p + 3, n - 3);
 			return ST_OK;
 		case C_ROM_READ: {
 			if (n != 5)

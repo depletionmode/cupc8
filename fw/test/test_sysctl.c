@@ -1,5 +1,5 @@
 /*
- * SYS-001/002/003/005: the system controller core against models of the
+ * SYS-001/002/003/005/007: the system controller core against models of the
  * machine (fw/test/sysmodels.h), all driven through the USB protocol the way
  * tools/cupc8.py drives it. Time is virtual: SPI bytes and delays advance it.
  *
@@ -11,6 +11,7 @@
  *   SYS-003  the ROM chip through the bridge: ID, erase, program, verify,
  *            failure reporting, recovery after an interrupted write
  *   SYS-005  USB-C source class; cards run unless deliberately held
+ *   SYS-007  the whole 512 KB SRAM through RAM_READ_FAR/RAM_WRITE_FAR
  *   SYS-004  the card programming port: the slot mux, SWD against a bit-level
  *            RP2040 target (wake-up, multi-drop, power-up, posted reads,
  *            WAIT, FAULT), and the UART tunnel
@@ -529,12 +530,64 @@ static void sys004_progport(void)
 	CHECK_EQ(M.prog_slot, -1);
 }
 
+/* SYS-007: RAM_READ_FAR/RAM_WRITE_FAR, the whole 512 KB SRAM through the
+ * bridge's RAM_RD24/RAM_WR24 (extended-ram.md), next to the 16-bit forms */
+static void sys007_far_ram(void)
+{
+	power_on(true, true);
+	static uint8_t p[3 + 3000], data[3000];
+
+	/* across bank boundaries, across $0ffff (the 16-bit forms wrap there),
+	 * and up to the last byte, each crossing the bridge's 256-byte frames */
+	static const uint32_t at[] = {0x00100, 0x0BF80, 0x0FC00, 0x13F00, 0x42ABC, 0x7F448};
+	for (int t = 0; t < (int)(sizeof at / sizeof at[0]); t++) {
+		uint32_t a = at[t];
+		int len = a == 0x7F448 ? 0x80000 - 0x7F448 : 3000;
+		for (int i = 0; i < len; i++)
+			data[i] = (uint8_t)(i * 5 + t * 29 + (i >> 8));
+		p[0] = (uint8_t)a;
+		p[1] = (uint8_t)(a >> 8);
+		p[2] = (uint8_t)(a >> 16);
+		memcpy(p + 3, data, (size_t)len);
+		CHECK_EQ(req(0x13, p, 3 + len), ST_OK);
+		CHECK(memcmp(M.br.ram + a, data, (size_t)len) == 0, "RAM_WRITE_FAR at $%05x in the model", a);
+		CHECK_EQ(REQ(0x12, (uint8_t)a, (uint8_t)(a >> 8), (uint8_t)(a >> 16), (uint8_t)len, (uint8_t)(len >> 8)), ST_OK);
+		CHECK(resp_n == len && memcmp(resp, data, (size_t)len) == 0, "RAM_READ_FAR at $%05x", a);
+	}
+	/* the 16-bit forms keep their meaning: SRAM $00000-$0ffff, wrapping */
+	CHECK_EQ(REQ(0x11, 0xFE, 0xFF, 0xA1, 0xA2, 0xA3, 0xA4), ST_OK);
+	CHECK(M.br.ram[0xFFFE] == 0xA1 && M.br.ram[0xFFFF] == 0xA2 && M.br.ram[0x0000] == 0xA3 &&
+	      M.br.ram[0x0001] == 0xA4 && M.br.ram[0x10000] != 0xA3, "RAM_WRITE wraps past $ffff");
+	CHECK_EQ(REQ(0x12, 0xFE, 0xFF, 0x00, 4, 0), ST_OK);
+	CHECK(resp[0] == 0xA1 && resp[1] == 0xA2 && resp[2] == M.br.ram[0x10000], "RAM_READ_FAR does not wrap");
+
+	/* argument checks */
+	CHECK_EQ(REQ(0x12, 0, 0, 0, 0), ST_ARG);                         /* short */
+	CHECK_EQ(REQ(0x12, 0, 0, 0, 0, 0), ST_ARG);                      /* length 0 */
+	CHECK_EQ(REQ(0x12, 0, 0, 0, 0x01, 0x10), ST_ARG);                /* 4097 bytes */
+	CHECK_EQ(REQ(0x12, 0xFF, 0xFF, 0x07, 2, 0), ST_ARG);             /* past $7ffff */
+	CHECK_EQ(REQ(0x12, 0x00, 0x00, 0x08, 1, 0), ST_ARG);             /* $80000 */
+	CHECK_EQ(REQ(0x12, 0xFF, 0xFF, 0x07, 1, 0), ST_OK);              /* the last byte */
+	CHECK_EQ(REQ(0x13, 0, 0, 0), ST_ARG);                            /* no data */
+	CHECK_EQ(REQ(0x13, 0xFF, 0xFF, 0x07, 1, 2), ST_ARG);             /* past $7ffff */
+	CHECK_EQ(REQ(0x13, 0xFF, 0xFF, 0x07, 0x5A), ST_OK);
+	CHECK_EQ(M.br.ram[0x7FFFF], 0x5A);
+
+	/* with the chipset held they are refused like the other bridge commands */
+	CHECK_EQ(REQ(0x44, 0), ST_OK);
+	CHECK_EQ(REQ(0x12, 0, 0, 1, 1, 0), ST_NOCHIPSET);
+	CHECK_EQ(REQ(0x13, 0, 0, 1, 0), ST_NOCHIPSET);
+	CHECK_EQ(REQ(0x45, 0), ST_OK);
+	CHECK_EQ(M.contention, 0);
+}
+
 int main(void)
 {
 	sys004_progport();
 	sys001_protocol();
+	sys007_far_ram();
 	sys002_fpga_flash();
 	sys003_rom();
 	sys005_power_and_cards();
-	return check_report("SYS-001..005 sysctl core");
+	return check_report("SYS-001..007 sysctl core");
 }
