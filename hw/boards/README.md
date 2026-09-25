@@ -95,9 +95,21 @@ Spec: `doc/hardware/wifi-card.md`.
 - **Power LED** (red, 1 kΩ) at the standard spot; the M3 hole at the
   standard spot.
 - **Net classes:** every net on the RP2040's 0.4 mm-pitch pads (3V3 and 1V1
-  included) is in kicadgen's `Fine` class, 0.15 mm tracks: with 0.2 mm
-  tracks a track leaving a pad is exactly 0.2 mm from the next pad, and
-  Freerouting won't route that.
+  included) is in kicadgen's `Fine` class: 0.15 mm tracks, 0.15 mm clearance
+  (JLC: 0.127) and 0.65 mm vias. With the Default 0.2/0.2, a track can't
+  turn out of a pad beside its neighbour, and Freerouting left QFN pins
+  unrouted.
+- **Four layers** (JLC04161H-7628, the stackup `order_spec` names): In1 a
+  solid GND plane (a power layer Freerouting doesn't route), In2 routed with
+  a GND pour. On two layers Freerouting never completed around the QFN on
+  any of the cards; four layers also put every fast line (TMDS, SD, USB)
+  over a solid ground.
+- **Hand-laid copper before Freerouting** (`preroute`): TESTEN straight in
+  to the exposed pad (a GND pin between two signal pins, which no pour
+  reaches); on the turned cards (GPU, storage) the seven pins in the middle
+  of the chip's top edge escape by vias, three in the ring under the chip
+  and four just outside (`pocket_escapes`), because on the GPU they are
+  walled in by the TMDS pairs; on the IO card DVDD 23 is tied to its cap.
 
 ## IO card (`io.py`)
 
@@ -149,9 +161,14 @@ Spec: `doc/hardware/gpu-protocol.md`.
   receptacle's order, D2, D1, D0, clock, P before N: no crossings.
   `invert_diffpairs` is a pad output override, so the PIO lanes are the same;
   GPU-005 (the real gpu.elf, TMDS decoded) passes.
-- **Two layers:** with the pairs in order, TMDS needs no vias. 252 Mb/s over
-  < 20 mm is electrically short (a bit is ~0.6 m of FR-4), which is why
-  PicoDVI's own 2-layer boards pass the DVI eye mask.
+- **TMDS routing:** with the pairs in order they need no vias between the
+  chip and the receptacle, over In1's solid ground. 252 Mb/s over < 20 mm
+  is electrically short (a bit is ~0.6 m of FR-4), so the pairs are not
+  impedance-controlled; PicoDVI's own 2-layer boards pass the DVI eye mask.
+- **GND between the lines** (`preroute`): the receptacle's shield and DDC
+  ground pins get a via 2 mm behind the pad, under the receptacle's body;
+  each ESD's GND pins, in the middle of its rows, are joined through the
+  package and taken down by a via.
 - **+5V to the sink:** 100 mA PTC (C20975) against a shorted cable, and a
   B5819W Schottky so a monitor can't back-feed the machine. The pin then sits
   ~0.3 V under the slot's +5V (HDMI asks 4.8 V min); EDID ROMs and
