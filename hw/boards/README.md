@@ -372,8 +372,9 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   finger side on 8–5. CPU_CLK and the other inputs go straight to the FPGA.
 - **Straps.** CARD_ID = `10`: CARD_ID0 goes to GND, and CARD_ID1 is left to
   the main board's pull-up. PRSNT1_n is joined to PRSNT2_n. On this wide
-  card the link's run is on In3, because a run on B.Cu would wall the
-  address lines off their fingers.
+  card the link runs round the card's edge on In3 (`presence_ring`, passed to
+  the pipeline as `presence=`). Straight across above the fingers, it walled
+  that layer off from every line crossing towards them.
 - **LEDs.** The PWR LED (D1, red, 1 kΩ from 3V3) is at the common power-LED
   spot, 3 mm in from the body's top-left corner. The 1V2 rail LED (D2,
   [power.md](../../doc/hardware/power.md)) is next to it along the top edge.
@@ -387,10 +388,14 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
 - **Stackup.** 6 layers (David, 2026-09-25), JLC06161H-3313, 1.6 mm, with
   hard-gold fingers, bevelled per the fab order spec (`kicadgen.order_spec`).
   The layers are signal + GND pour / solid GND plane / signal / signal /
-  solid 3V3 plane / signal + GND pour. Between the package and the fingers
-  the bus has a 10 mm band, which neither two signal layers nor three (In1
-  shared with the GND pour) could route. 1V2 is routed as tracks. JLC offers
+  solid 3V3 plane / signal + GND pour. 1V2 is routed as tracks. JLC offers
   gold fingers at any layer count, given ENIG and a board of at least 50 mm.
+- **Routing.** The bus and configuration nets are in kicadgen's Fine class,
+  0.15 mm track and clearance (`fine_nets`). The TQ144's pads are 0.5 mm
+  apart with 0.22 mm between them, so at the Default class's 0.2 mm
+  clearance no track can pass between two pins. Freerouting then left 1–13
+  nets unrouted on 4 layers and on 6 alike. With Fine, 11 of 12 tries of a
+  search routed the card completely, and the pipeline's first try does.
 - **Placement.**
   - The FPGA sits against the top edge, with its top pad row 0.85 mm in.
     That leaves the 10 mm band under it for the arrays and the bus fan-out.
