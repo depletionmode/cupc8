@@ -237,7 +237,8 @@ ENTRY(js_screen, {
 
 // the e-ink panel's glass: { w, h, seq, grey: Uint8Array (0 black ... 255
 // white), refreshes: [clean, fast, grey, partial], busy, errors, error,
-// partialsSinceFull, bytesWithoutCs }, or null with no e-ink card
+// partialsSinceFull, bytesWithoutCs, asleep (the controller in deep sleep,
+// 1/0) }, or null with no e-ink card
 ENTRY(js_panel, {
   machine::EinkPanel *p = m->panel();
   napi_value o;
@@ -266,6 +267,7 @@ ENTRY(js_panel, {
   set(env, o, "partialsSinceFull", num(env, p->m.partials_since_full));
   set(env, o, "maxPartialsBetweenFulls", num(env, p->m.max_partials_between_fulls));
   set(env, o, "bytesWithoutCs", num(env, p->bytesWithoutCs));
+  set(env, o, "asleep", num(env, p->m.asleep ? 1 : 0));
   return o;
 })
 

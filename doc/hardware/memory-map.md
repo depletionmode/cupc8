@@ -11,9 +11,9 @@ manual gets updated to match once the hardware is implemented.
 | $0002–$000f | RAM: reserved | same |
 | $0010–$00ff | RAM: interrupt vector table | same |
 | $0100–$0fff | RAM: stack | same |
-| $1000–$7fff | RAM: program | same |
+| $1000–$7fff | RAM: kernel and user program (below) | same |
 | $8000–$bfff | **RAM window**: SRAM bank `RAM_BANK` (reset 2: the identity map) | same |
-| $c000–$dfff | RAM: program | same |
+| $c000–$dfff | RAM: user program (below) | same |
 | $e000–$e7ff | **ROM fixed window**: ROM $00000–$007ff (boot ROM) | RAM |
 | $e800–$efff | **ROM banked window**: ROM `(bank << 11) \| A[10:0]` | RAM |
 | $f000–$ffff | I/O (never RAM) | same |
@@ -58,6 +58,29 @@ window saves and restores `RAM_BANK` there. The kernel's `api_bank_set`,
 `api_bank_get`, `api_bank_count` and `api_bank_far_copy` (`kernel/bank.s`)
 are the programs' interface; the system card reaches every bank with the
 bridge's 24-bit RAM commands.
+
+### RAM from $1000 (the kernel's layout)
+
+| Range | Use |
+|---|---|
+| $1000–$4fff | kernel code (`b main` at $1000, then the API jump table $1003–$1182) |
+| $5000–$5fff | kernel data |
+| $6000–$6eff | kernel bss |
+| $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the rest reserved |
+| $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
+
+`kernel/assemble.sh` assembles for code $1000, data $5000, bss $6000;
+`testKernelLayout` (KRN-010) fails if any outgrows its area. The kernel keeps
+nothing at $7000 and up (the banked RAM window, `../proposals/extended-ram.md`,
+is $8000–$bfff). The jump table and calling convention are in
+`../proposals/kernel-api.md` and `kernel/api.inc`.
+
+**Program file** (`exec "NAME"` on the storage card, `cupc8.py run`): a 4-byte
+header, `"C8P"` then the version, 1, followed by the body, a flat binary for
+$7000 of at most 28672 bytes (`tools/mkprg.py` makes one). `exec` refuses a
+`"C8P"` file of any other version, or one too big for $7000–$dfff, and runs any
+file without the header as BASIC. `cupc8.py run` takes a program file or the
+bare body.
 
 ## I/O registers
 

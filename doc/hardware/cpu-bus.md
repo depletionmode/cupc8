@@ -101,7 +101,9 @@ nobody driving D.
 ## Instruction boundary, interrupts and timers
 
 - **IRQs.** The CPU samples IRQ[3:0] only between instructions, as it does
-  today in `cpu.vhd` `check_irq`. It takes the lowest-numbered one.
+  today in `cpu.vhd` `check_irq`. It takes the lowest-numbered one, but not
+  right after `POP pcl`: that and the `POP pch` after it are one return
+  (an IRQ between them would lose the return address; CPU-005).
 - **IRQ entry.** Entry is the push/vector sequence from the manual: push pch,
   push pcl, push f, clear I, read the vector at $0010+2n. Every one of those is
   a normal bus cycle with SYNC low.

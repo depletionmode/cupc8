@@ -77,10 +77,16 @@ void Rp2040Card::drive(uint32_t sck, uint32_t mosi, bool selected) {
     sel = selected;
     sck_ = sck;
   }
+  // Only the pins that change. setInputValue (rp2040js's, ported) latches
+  // an edge on every call, so setting CS_n high again while it was high
+  // made a rising edge the card never had: slotspi's CS_n interrupt then
+  // restarted its PIO machine, and when that landed at the start of the
+  // host's next frame the frame lost its first byte (exec's quick chunk
+  // reads went unanswered, E2E-011).
   auto &g = e.mcu->gpio;
-  g[P::MOSI].setInputValue(!!mosi);
-  g[P::SCK].setInputValue(!!sck);
-  g[P::NCS].setInputValue(!selected);
+  if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
+  if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
+  if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);
 }
 
 uint32_t Rp2040Card::miso() {

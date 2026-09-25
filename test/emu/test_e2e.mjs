@@ -2,11 +2,11 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012] [--record]
 //
-// E2E-007 (files on the storage card's microSD) and E2E-008 (the e-ink card)
-// need CUPC8_EMU=native: the SD card and panel models are only in the native
-// emulator.
+// E2E-007 (files on the storage card's microSD), E2E-008 (the e-ink card)
+// and E2E-010..012 (programs at $7000) need CUPC8_EMU=native: the SD card
+// and panel models are only in the native emulator.
 //
 // CUPC8_EMU=native runs them on the native emulator (emu/machine,
 // test/emu/machinenative.mjs: the same machine, cycle for cycle, faster);
@@ -346,8 +346,138 @@ async function e2e009() {
   m.stop();
 }
 
-const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009 };
+// ------------------------------------------------------------------ programs at $7000
+// The kernel API (doc/proposals/kernel-api.md): a program for $7000 built by
+// tools/mkprg.py, run from the PC with `cupc8.py run` through the system card
+// (E2E-010, E2E-012) or from the SD card with `exec` (E2E-011).
+function mkprg(src) {
+  fs.mkdirSync(path.join(ROOT, 'build/emu'), { recursive: true });
+  const out = path.join(ROOT, 'build/emu', path.basename(src, '.s') + '.prg');
+  execFileSync('python3', [path.join(ROOT, 'tools/mkprg.py'), path.join(ROOT, src), '-o', out], { stdio: 'pipe' });
+  return out;
+}
+
+const count = (text, want) => text.split(want).length - 1;
+
+// ------------------------------------------------------------------ E2E-010
+// `cupc8.py run` on the HDMI machine: the program's body over USB into RAM at
+// $7000 while the CPU runs, API_RUN set last; the terminal starts it from its
+// key wait. tools/testdata/eink_prog.s calls the e-ink entries, which do
+// nothing on HDMI and leave $ff. Then the bare binary, a second time, and
+// the terminal still works.
+async function e2e010() {
+  log('E2E-010: cupc8.py run: a program into RAM at $7000 over USB, started by the terminal (HDMI)');
+  if (!expect(backend === 'native', 'E2E-010 needs the native emulator (CUPC8_EMU=native)')) return;
+  const prg = mkprg('tools/testdata/eink_prog.s');
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, sysctl: true });
+  m.powerOn();
+  expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+  let r = await cupc8(m, 'run', prg);
+  expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run eink_prog.prg: ${r.out.trim()}`);
+  if (!expect(await waitFor(m, 'ST FF FF FF FF', 3e9), 'the program ran and printed')) console.log('---- screen\n' + screenText(m));
+  const t = screenText(m);
+  expect(t.includes('AUTO FF'), 'API_EINK_AUTO on HDMI: r0 = $ff');
+  expect(t.includes('GET FF FF FF FF FF FF FF'), 'API_EINK_GET on HDMI: $ff, and $ff left in API_ARGS');
+  expect(await m.runUntil(() => /ST FF FF FF FF\n+>> ?_?$/.test(screenText(m)), 2e9, 50e6), 'back at the prompt');
+  // the bare binary (no header), again
+  const bin = path.join(ROOT, 'build/emu/eink_prog.bin');
+  fs.writeFileSync(bin, fs.readFileSync(prg).subarray(4));
+  r = await cupc8(m, 'run', bin);
+  expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run eink_prog.bin: ${r.out.trim()}`);
+  expect(await m.runUntil(() => count(screenText(m), 'ST FF FF FF FF') === 2, 3e9, 50e6), 'it ran a second time');
+  m.type('10 print 6*7\nrun\n');
+  if (!expect(await waitFor(m, '42', 3e9), 'the terminal still works: a typed program runs')) console.log('---- screen\n' + screenText(m));
+  m.stop();
+}
+
+// ------------------------------------------------------------------ E2E-011
+// `exec "NAME"` from the SD card model: a program file (the "C8P" header,
+// version 1; three of exec's chunks) runs at $7000; a BASIC file is loaded
+// and run; a missing file says so.
+async function e2e011() {
+  log('E2E-011: exec from the storage card (microSD model): a program at $7000, a BASIC file');
+  if (!expect(backend === 'native', 'E2E-011 needs the native emulator (CUPC8_EMU=native)')) return;
+  const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-e2e011-'));
+  const fat = (...a) => execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
+  const img = path.join(dir, 'card.img');
+  fat('mkfs', img, '16', '16');
+  fat('put', img, 'PROG.PRG', mkprg('tools/testdata/exec_prog.s'));
+  fs.writeFileSync(path.join(dir, 'bas'), '10 print 6*7\r\n20 print "BASIC OK"\r\n');
+  fat('put', img, 'BAS', path.join(dir, 'bas'));
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'storage' } });
+  m.sd.insert(img, { highCapacity: false });
+  m.powerOn();
+  expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+  const shown = () => '---- screen\n' + screenText(m) + '\n----';
+  // a command, then its output up to the prompt after it
+  const line = async (text, want) => {
+    m.type(text + '\n');
+    return m.runUntil(() => {
+      const t = screenText(m);
+      const i = t.lastIndexOf(text);
+      return i >= 0 && /\n>> ?_?$/.test(t.slice(i + text.length)) && t.slice(i + text.length).includes(want);
+    }, 10e9, 100e6);
+  };
+  if (!expect(await line('exec "prog.prg"', 'NATIVE OK'), 'exec a program file: it prints NATIVE OK')) console.log(shown());
+  if (!expect(await line('exec "bas"', 'BASIC OK'), 'exec a BASIC file: loaded and run')) console.log(shown());
+  expect(screenText(m).includes('42'), 'the BASIC file printed 42');
+  if (!expect(await line('exec "nothing"', 'file not found'), 'exec a missing file')) console.log(shown());
+  const card = m.sd.card();
+  expect(card && card.violations.length === 0, `the storage firmware keeps to the SD protocol (${card?.violations.join('; ')})`);
+  m.stop();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ------------------------------------------------------------------ E2E-012
+// The e-ink API on the e-ink card (eink-card.md: AUTO_EXT, AUTO_GET): a
+// program run with `cupc8.py run` sets the policy through API_EINK_AUTO (on,
+// idle10 5, full_after 2, cap10 50, full_kind 3 greyscale, sleep_s 3) and
+// reads it back with API_EINK_GET; the panel model shows the effect: after 2
+// partial refreshes the full one is greyscale, and the controller goes into
+// deep sleep about 3 s after the last refresh (10 s by default).
+async function e2e012() {
+  log('E2E-012: the e-ink API on the e-ink card: set the refresh policy, read it back, see it on the panel');
+  if (!expect(backend === 'native', 'E2E-012 needs the native emulator (CUPC8_EMU=native)')) return;
+  const prg = mkprg('tools/testdata/eink_prog.s');
+  const m = await Machine.create({ slots: { 1: 'eink', 2: 'io' }, sysctl: true });
+  m.powerOn();
+  const on = (want, ns) => m.runUntil(() => panelText(m).includes(want), ns, 50e6);
+  expect(await on('>>', 10e9), 'the BASIC prompt appears on the panel');
+  expect(await m.runUntil(() => m.panel().refreshes[0] >= 1 && m.panel().busy === 0, 10e9, 50e6),
+    'the power-on clean refresh is done');
+  const p0 = m.panel();
+  const r = await cupc8(m, 'run', prg);
+  expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run eink_prog.prg: ${r.out.trim()}`);
+  if (!expect(await on('GET 00 01 05 02 32 03 03', 10e9),
+    'API_EINK_GET reads back what API_EINK_AUTO set (on 1, idle10 5, full_after 2, cap10 50, full_kind 3, sleep_s 3)')) {
+    console.log('---- panel\n' + panelText(m));
+  }
+  expect(panelText(m).includes('AUTO 00'), 'API_EINK_AUTO: r0 = 0');
+  expect(/ST 00 [0-9A-F]{2} [0-9A-F]{2} [0-9A-F]{2}/.test(panelText(m)), 'API_EINK_STATUS: r0 = 0 and three bytes');
+  // the program's output was one partial refresh; a key is the second
+  expect(await m.runUntil(() => m.panel().refreshes[3] > p0.refreshes[3], 5e9, 50e6), 'a partial refresh for the output');
+  await m.runUntil(() => m.panel().busy === 0, 5e9, 50e6);
+  m.type('x');
+  expect(await m.runUntil(() => m.panel().refreshes[3] >= p0.refreshes[3] + 2, 5e9, 50e6), 'a second partial refresh, for the key');
+  // full_after 2, full_kind 3: once quiet, a greyscale full refresh (by default: after 30, a fast one)
+  expect(await m.runUntil(() => m.panel().refreshes[2] > p0.refreshes[2], 10e9, 50e6), 'after 2 partials, a greyscale full refresh');
+  expect(m.panel().refreshes[1] === p0.refreshes[1], `no fast full refresh (${m.panel().refreshes})`);
+  await m.runUntil(() => m.panel().busy === 0, 5e9, 50e6);
+  // sleep_s 3: deep sleep about 3 s after the last refresh
+  expect(m.panel().asleep === 0, 'awake right after the refresh');
+  await m.runAsync(2e9);
+  expect(m.panel().asleep === 0, 'still awake 2 s later');
+  expect(await m.runUntil(() => m.panel().asleep === 1, 2.5e9, 50e6), 'in deep sleep by 4.5 s (sleep_s 3; the default is 10)');
+  const p = m.panel();
+  expect(p.errors === 0, `the panel model saw nothing the chip would ignore (${p.errors}: ${p.error})`);
+  m.stop();
+}
+
+const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009,
+  'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012 };
+const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012'];
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
-for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !['E2E-007', 'E2E-008'].includes(id) || backend === 'native') await fn();
+for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !nativeOnly.includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);
