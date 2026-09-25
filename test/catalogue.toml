@@ -786,6 +786,15 @@ kind = "static"
 vrow = "3.4"
 
 [[test]]
+id = "EINK-001"
+title = "E-ink card board, ready for JLC"
+checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, the standard I/O card outline, M3 hole and power LED, card order spec (1.6 mm, hard-gold 30 degree fingers), the board's name and revision on the top silkscreen and in the title block"
+method = "hw/boards/eink.py (the rp2040card.py core, the panel module's 9-pin header with TVS on the top edge) through kicadgen.pipeline: Freerouting, GND fingers tied, presence link pre-routed, GND pads fanned out, stitched pours"
+cmd = "python3 hw/boards/eink.py"
+kind = "static"
+vrow = "3.4"
+
+[[test]]
 id = "BRD-001"
 title = "Every BOM line of every board: package, pinout, JLC rotation, BOM = schematic"
 checks = "per LCSC part: JLC's package name is the footprint's, and the footprint's pads are those of the EasyEDA footprint JLC places for that code (count and position within 0.2 mm, in one of four orientations); every symbol pin has a pad and every pad a pin; a part with more than two pins matches its datasheet pin table (hw/parts/<LCSC>.yaml, with source) name for name and numbers counterclockwise from the top; an LED's K and A sit where JLC's footprint has them; hw/parts/jlc_rotation.yaml's correction for the footprint is the one the pads give; with a build, bom.csv is exactly the schematic's LCSC parts and cpl.csv is the board's angles plus the corrections, top side only"

@@ -47,7 +47,8 @@ def schematic(path, footprint_libs):
     s.connect(j2, 2, "GND")
     for i, net in enumerate(SIGNALS):
         s.connect(j2, 3 + i, net + "_J")
-        r = rc.passive(s, "R", "R%d" % (10 + i), "33R", ((186 + 5 * i) * G, 70 * G))
+        # 0603 (C23140, basic), so its designator fits over it in the row
+        r = rc.passive(s, "R", "R%d" % (10 + i), "33R", ((186 + 5 * i) * G, 70 * G), fp=rc.R0603, lcsc="C23140")
         rc.two(s, r, net, net + "_J")
 
     # ---- the module's 3.3 V: through a 100 mA PTC, so a shorted cable or
@@ -84,28 +85,26 @@ def schematic(path, footprint_libs):
 # ---- the board: the storage card's core (the RP2040 turned round, so the
 # panel pins GPIO9-15 are at its top-right corner, facing the header)
 POWER_NETS = rc.POWER_NETS           # EPD_VCC stays a default track: it reaches a TVS pad 0.25 mm wide
-CX, CY = 26, -19
+CX, CY = 26, -16
 HX, HY = 36.5, -39.6             # the header: its 2.5 mm insulator flush with the top edge, the pins out over it
 PIN_X = {n: HX + 10.16 - 2.54 * (n - 1) for n in HEADER}    # turned 180: pin 1 at the right
-TVS_Y, R_Y = -32.6, -26.6
+TVS_Y, R_Y = -32.6, -24.8
 PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
-    # the core as on the storage card
-    "C12": (CX - 0.7, CY - 5.3, 90),     # DVDD 23
+    # the core as on the storage card: the middle pins of the chip's top
+    # edge (SWD, DVDD, IOVDD, XIN/XOUT) escape by vias (rc.pocket_escapes),
+    # the crystal to the left, the flash by the QSPI pins (now at the bottom)
+    "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23
+    "C3": (CX + 5.8, CY + 0.2, 0),       # IOVDD 1, clear of the flash
+    "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
-    "C8": (CX - 3.2, CY + 7.2, 90),      # IOVDD 49
-    "C5": (CX + 5.6, CY + 4.4, 0),       # IOVDD 22: out of the pocket, so XIN/XOUT can leave it (as storage)
-    # the crystal turned round from the storage card's: XIN, the outermost of
-    # the pins that leave the chip's top edge to the left, reaches its pad at
-    # the crystal's top right, and XOUT (through R2) the bottom left, so the
-    # two don't cross (with the panel lines also leaving that edge, XIN
-    # would not route the storage card's way)
-    "Y1": (CX - 10.0, CY - 4.5, 180),
-    "C16": (CX - 8.9, CY - 7.3, 180),
-    "C17": (CX - 11.0, CY - 1.0, 0),
-    "R2": (CX - 8.2, CY - 1.0, 180),     # XOUT, under the crystal
-    "U3": (CX + 7, CY + 9.5, 0),
-    "C15": (CX + 7, CY + 5.6, 0),
-    "R1": (CX + 12.5, CY + 9.5, 90),
+    "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
+    "Y1": (CX - 13.0, CY - 3.0, 0),
+    "C16": (CX - 15.7, CY - 3.0, 90),
+    "C17": (CX - 13.0, CY - 0.4, 0),
+    "R2": (CX - 13.0, CY - 5.6, 0),      # XOUT
+    "U3": (CX + 8.2, CY + 6.2, 90),
+    "C15": (CX + 12.0, CY + 3.4, 90),
+    "R1": (CX + 12.0, CY + 7.4, 90),
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up, by its finger
@@ -118,54 +117,24 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # resistor under each signal pin
     "U5": (PIN_X[1] - 5.1, TVS_Y, 0),              # VCC, DIN, CLK, CS
     "U6": (PIN_X[9] + 3.8, TVS_Y, 0),              # DC, RST, BUSY, PWR
-    "F1": (PIN_X[1] + 0.8, -30.5, 90),
-    "C20": (PIN_X[1] + 3.8, -30.5, 90),
-    "C21": (PIN_X[1] + 1.8, -35.2, 90),
+    "F1": (PIN_X[1] + 0.5, -33.0, 90),
+    "C20": (PIN_X[1] + 3.3, -33.0, 90),
+    "C21": (PIN_X[1] + 1.9, -30.0, 0),
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
 # the series resistors in a row up and right of the chip's panel corner, in
 # the order its pins come out (GPIO15..12 along the top, then 11..9 down the
-# right side), so the fan-out doesn't cross and keeps clear of XIN/XOUT in
-# the middle of the top edge; staggered, so each designator has room
+# right side), so the fan-out doesn't cross; in two staggered rows, so each
+# has its designator over it
 CHIP_ORDER = ["EPD_PWR", "EPD_BUSY", "EPD_nRST", "EPD_DC", "EPD_DIN", "EPD_CLK", "EPD_nCS"]
-PLACEMENT.update({"R%d" % (10 + SIGNALS.index(net)): (31.0 + 2.1 * k, R_Y - 2.4 * (k % 2), 90)
+PLACEMENT.update({"R%d" % (10 + SIGNALS.index(net)): (29.0 + 2.1 * k, R_Y - 3.6 * (k % 2), 0)
                   for k, net in enumerate(CHIP_ORDER)})
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LAYERS = 4
 LOGO_MM = 12
 LEGEND = "EInk_Header_Legend"
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0), ("cupc8:" + LEGEND, HX, HY, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 9, -29, 0), ("cupc8:" + LEGEND, HX, HY, 0)]
 TITLE, REVISION = "CUPC/8 e-ink", "A"
-
-
-XIN_Y = -26.2                  # XIN's run to the crystal, above C12 and the chip's fan-out
-XOUT_Y, XOUT_X = -25.5, 19.3   # XOUT's, under XIN's and down the crystal's right to R2
-
-
-def preroute(board):
-    """XIN and XOUT, laid by hand: Freerouting left one or the other
-    unrouted on every try, with the pins beside them and the panel lines all
-    leaving the chip's top edge. Each goes from its pad straight up, left
-    above everything else that fans out of that edge (those drop to the inner
-    layers under them), XIN to C16 and down to the crystal's XIN pad (its
-    top right), XOUT inside it and down the crystal's right side to R2. And
-    TESTEN, as on every RP2040 card."""
-    rc.tie_testen(board)
-    x0, y0 = rc.pad_at(board, "U1", 20)                 # XIN
-    xc, yc = rc.pad_at(board, "C16", 1)
-    xy, yy = rc.pad_at(board, "Y1", 1)
-    for net_pad in (("C16", 1), ("Y1", 1)):
-        assert board.FindFootprintByReference(net_pad[0]).FindPadByNumber(str(net_pad[1])).GetNetname() == "/XIN"
-    rc.track(board, "/XIN", (x0, y0), (x0, XIN_Y), width=0.15)
-    rc.track(board, "/XIN", (x0, XIN_Y), (xc, XIN_Y), width=0.15)
-    rc.track(board, "/XIN", (xc, XIN_Y), (xc, yc), width=0.15)
-    rc.track(board, "/XIN", (xc, yc), (xy, yy), width=0.15)
-    x1, y1 = rc.pad_at(board, "U1", 21)                 # XOUT
-    xr, yr = rc.pad_at(board, "R2", 1)
-    assert board.FindFootprintByReference("R2").FindPadByNumber("1").GetNetname() == "/XOUT"
-    for a, b in (((x1, y1), (x1, XOUT_Y)), ((x1, XOUT_Y), (XOUT_X, XOUT_Y)), ((XOUT_X, XOUT_Y), (XOUT_X, yr - 0.8)),
-                 ((XOUT_X, yr - 0.8), (xr, yr))):
-        rc.track(board, "/XOUT", a, b, width=0.15)
 
 
 def legend(path):
@@ -195,4 +164,4 @@ def legend(path):
 if __name__ == "__main__":
     legend(os.path.join(kg.PROJECT_FOOTPRINTS["cupc8"], LEGEND + ".kicad_mod"))
     rc.build("eink", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "REFRESH"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=100, preroute=preroute)
+             TITLE, REVISION, layers=LAYERS, passes=100, preroute=rc.pocket_escapes)
