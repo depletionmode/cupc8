@@ -359,10 +359,11 @@ def build_parts():
                 "BR_SCK", "BR_MOSI", "BR_MISO", "BR_nCS"):
         TP(net)
 
-    # ---- memory: SRAM (A16-A18 low: 64 KB used, parts.md) and ROM
+    # ---- memory: SRAM (all 19 address lines: banked extended RAM, doc/proposals/extended-ram.md
+    # option A; in M1 the chipset drives A16-A18 low for RAM cycles) and ROM
     group("memory")
     sram = {"A%d" % i: "MEM_A%d" % i for i in range(16)}
-    sram.update({"A16": "GND", "A17": "GND", "A18": "GND", "~{WE}": "MEM_nWE", "~{OE}": "MEM_nOE",
+    sram.update({"A16": "MEM_A16", "A17": "MEM_A17", "A18": "MEM_A18", "~{WE}": "MEM_nWE", "~{OE}": "MEM_nOE",
                  "~{CS}": "MEM_nCE_RAM", "VDD": "+3V3", "GND": "GND"})
     sram.update({"I/O%d" % i: "MEM_D%d" % i for i in range(8)})
     part("U9", "jlc:IS62WV5128EBLL-45HLI", "IS62WV5128EBLL-45HLI", "jlc:STSOP-32_L8.0-W11.8-P0.50-LS13.4-TL",

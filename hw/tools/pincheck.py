@@ -511,7 +511,7 @@ def check_mainboard(pins, path=MAINBOARD_NET):
     for chip_ref, dq in [(r, "I/O") for r in parts_of("IS62WV5128EBLL-45HLI")] + \
                         [(r, "DQ") for r in parts_of("SST39VF040-70-4I-NHE")]:
         rom = dq == "DQ"
-        for i in range(19 if rom else 16):
+        for i in range(19):                       # the SRAM has all 19 too (extended RAM)
             if not same(by_func(chip_ref, "A%d" % i), chip_net("MEM_A[%d]" % i)):
                 err("main board: %s A%d is not chipset MEM_A[%d]" % (chip_ref, i, i))
         for i in range(8):

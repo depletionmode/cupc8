@@ -256,7 +256,8 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
 - **Series terminations:** 33 Ω at the chipset on every chipset output to
   the CPU socket (/RDY, IRQ, D, /CPU_RST), the slot SPI (SCK, MOSI, every
   CS_n) and BR_MISO. The FPGA side of each is net `<signal>_SRC`.
-- **Memory:** U9 IS62WV5128EBLL (A16–A18 low), U10 SST39VF040 (PLCC-32),
+- **Memory:** U9 IS62WV5128EBLL (all of A0–A18, for banked extended RAM; M1
+  drives A16–A18 low for RAM), U10 SST39VF040 (PLCC-32),
   on MEM_A/MEM_D. /CE_RAM, /CE_ROM and /WE have 10 kΩ pull-ups, so nothing
   is selected or written while the chipset configures.
 - **Clock and reset:** Y1 12 MHz (C160457) into CLK12 and CPU_CLK through
