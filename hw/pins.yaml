@@ -146,8 +146,8 @@ devices:
       misc:
         signals:
           - {name: SYS_nRST, gpio: 23, dir: out, note: open drain onto the reset supervisor output}
-          - {name: DBG_UART_TX, gpio: 0, dir: out}
-          - {name: DBG_UART_RX, gpio: 1, dir: in}
+          - {name: LED_USB_TX, gpio: 0, dir: out, note: "USB activity to the host, lit ~30 ms (milestone-1.md, Indicator LEDs); was the debug UART, which nothing used"}
+          - {name: LED_USB_RX, gpio: 1, dir: out, note: USB activity from the host, lit ~30 ms}
           - {name: CC1_SENSE, gpio: 26, dir: adc}
           - {name: CC2_SENSE, gpio: 27, dir: adc}
           - {name: V1V2_SENSE, gpio: 28, dir: adc}

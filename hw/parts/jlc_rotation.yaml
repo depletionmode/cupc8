@@ -19,12 +19,24 @@ Capacitor_SMD:C_0805_2012Metric:
 LED_SMD:LED_0603_1608Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s LED-SMD_L1.6-W0.8-R-RD, LED0603-RD (C12624, C2286)'
+Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s LQFN-56_L7.0-W7.0-P0.4-EP (C2040)'
+Package_SO:SOIC-8_5.3x5.3mm_P1.27mm:
+  rotation: 270
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL (C131025)'
+Package_TO_SOT_SMD:SOT-23-6:
+  rotation: 270
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
 Package_TO_SOT_SMD:SOT-23:
   rotation: 180
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (C20526)'
 Resistor_SMD:R_0603_1608Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0603 (C21190, C22775, C25804)'
+jlc:CRYSTAL-SMD_4P-L3.2-W2.5-BL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s CRYSTAL-SMD_4P-L3.2-W2.5-BL (C9002)'
 jlc:IND-SMD_L3.0-W3.0_FNR30XXS:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s IND-SMD_L3.0-W3.0_FNR30XXS (C167747)'
@@ -43,6 +55,9 @@ jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR:
 jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL (C52140430)'
+jlc:USB-C_SMD-TYPE-C-31-M-12_1:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-C_SMD-TYPE-C-31-M-12_1 (C165948)'
 jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL (C1521989)'
