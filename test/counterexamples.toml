@@ -203,6 +203,20 @@ cmd = "make -C fw test_wifi"
 must_fail = ["JOIN save=1 reached the backend as 0"]
 
 [[bug]]
+name = "wifi core: UDP_SENDTO connected the socket, so a bound UDP server heard only its last peer"
+fixed_in = "81d6b74"
+revert = [["fw/wifi/core/wifi.c", "if (w->net->sendto(w->ctx, s->handle, f + 2, port, f + 9, n) != n)", "if (w->net->connect(w->ctx, s->handle, f + 2, port, 0) < 0 || w->net->send(w->ctx, s->handle, f + 9, n) != n)"]]
+cmd = "make -C fw test_wifi"
+must_fail = ["RXREADY for a second client after replying to the first", "a bound socket that replied to A heard B"]
+
+[[bug]]
+name = "wifi host backend: a ping socket has no FIONREAD, so an ICMP reply never set RXREADY"
+fixed_in = "81d6b74"
+revert = [["fw/wifi/host/netposix.c", "if (s->type == WIFI_ICMP) {\n\t\t/* a ping socket", "if (0) {\n\t\t/* a ping socket"]]
+cmd = "make -C fw test_wifi"
+must_fail = ["RXREADY for the echo reply"]
+
+[[bug]]
 name = "wifi firmware: without LWIP_SO_RCVBUF, FIONREAD never counted received TCP data"
 fixed_in = "4d501f7"
 revert = [["fw/wifi/port/esp32c3/sdkconfig.defaults", "CONFIG_LWIP_SO_RCVBUF=y", "# CONFIG_LWIP_SO_RCVBUF is not set"]]
@@ -447,6 +461,18 @@ revert = [["fw/eink/core/eink.c", """		e->t0_fresh = true;
 		if (e->panel_state == PANEL_OFF) {"""]]
 cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-008"
 must_fail = ["FAIL waking from deep sleep: RST_N held low long enough"]
+
+[[bug]]
+name = "eink firmware: AUTO_EXT did not restart the deep-sleep countdown (after sleep_s 0 held past the 71.6 min uint32 us wrap, a new sleep_s fired at once or up to 71 min late)"
+fixed_in = "80dc083"
+revert = [["fw/eink/core/eink.c", """		e->sleep_s = a[2];
+		/* sleep_s counts from here: after sleep_s 0 held past 2^32 us
+		 * (71.6 min), now - last_panel has wrapped to anything */
+		e->last_panel = e->now;
+		return true;""", """		e->sleep_s = a[2];
+		return true;"""]]
+cmd = "make -s -C fw test_eink"
+must_fail = ["FAIL !model.asleep: sleep_s 3 after 72 min of sleep_s 0: awake at 2.8 s"]
 
 [[bug]]
 name = "slot SPI slave: slotspi_poll set busy while replaying READ frames, so a host polling in step never saw the ready response (E2E-007's slow SAVE lost its last Enter)"

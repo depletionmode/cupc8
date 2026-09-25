@@ -180,6 +180,33 @@ static void command(card_t *c, const uint8_t *f, int len)
 		memcpy(r + 1, w->resolve_ip, 4);
 		card_respond(c, r, 5);
 		break;
+	case 0x08: {                               /* NET_CONFIG mode, ip, mask, gw, dns, dns_port, save */
+		if (len < 21 || f[1] > 1) { c->errors++; break; }
+		wifi_netcfg_t cfg = {.mode = f[1], .dns_port = (uint16_t)(f[18] | (f[19] << 8))};
+		memcpy(cfg.ip, f + 2, 4);
+		memcpy(cfg.mask, f + 6, 4);
+		memcpy(cfg.gw, f + 10, 4);
+		memcpy(cfg.dns, f + 14, 4);
+		if (cfg.mode == 1 && !(cfg.ip[0] | cfg.ip[1] | cfg.ip[2] | cfg.ip[3])) { c->errors++; break; }
+		w->cfg = cfg;
+		w->net->net_config(w->ctx, &cfg);
+		if (f[20])
+			w->cfg_saved = w->net->config_save(w->ctx, &cfg) == 0;
+		else
+			w->cfg_saved = false;
+		break;
+	}
+	case 0x09:                                 /* NET_CONFIG_GET */
+		r[0] = w->cfg.mode;
+		memcpy(r + 1, w->cfg.ip, 4);
+		memcpy(r + 5, w->cfg.mask, 4);
+		memcpy(r + 9, w->cfg.gw, 4);
+		memcpy(r + 13, w->cfg.dns, 4);
+		r[17] = (uint8_t)w->cfg.dns_port;
+		r[18] = (uint8_t)(w->cfg.dns_port >> 8);
+		r[19] = w->cfg_saved;
+		card_respond(c, r, 20);
+		break;
 
 	case 0x10: {                               /* OPEN type */
 		if (len < 2) { c->errors++; break; }
@@ -287,11 +314,42 @@ static void command(card_t *c, const uint8_t *f, int len)
 		uint16_t port = (uint16_t)(f[6] | (f[7] << 8));
 		int n = f[8];
 		if (9 + n > len) { c->errors++; break; }
-		if (w->net->connect(w->ctx, s->handle, f + 2, port, 0) < 0 ||
-		    w->net->send(w->ctx, s->handle, f + 9, n) != n)
+		/* not connect + send: that would tie a bound socket to this one peer */
+		if (w->net->sendto(w->ctx, s->handle, f + 2, port, f + 9, n) != n)
 			event(w, WIFI_EV_ERROR, f[1]);
 		else
 			w->tx_bytes += (uint32_t)n;
+		break;
+	}
+	case 0x19: {                               /* UDP_BIND sock, port */
+		if (len < 4) { c->errors++; break; }
+		wifi_socket_t *s = sock_of(w, f[1]);
+		if (!s) { c->errors++; break; }
+		if (w->net->bind(w->ctx, s->handle, (uint16_t)(f[2] | (f[3] << 8))) < 0)
+			event(w, WIFI_EV_ERROR, f[1]);
+		break;
+	}
+	case 0x1A: {                               /* RECVFROM sock, max */
+		if (len < 3) { c->errors++; break; }
+		wifi_socket_t *s = sock_of(w, f[1]);
+		if (!s) { c->errors++; break; }
+		int max = f[2];
+		if (max > CARD_RESP_MAX - 7)
+			max = CARD_RESP_MAX - 7;
+		uint8_t ip[4] = {0};
+		uint16_t port = 0;
+		int n = w->net->recvfrom(w->ctx, s->handle, r + 7, max, ip, &port);
+		if (n < 0) {
+			n = 0;
+			memset(ip, 0, 4);
+			port = 0;
+		}
+		w->rx_bytes += (uint32_t)n;
+		memcpy(r, ip, 4);
+		r[4] = (uint8_t)port;
+		r[5] = (uint8_t)(port >> 8);
+		r[6] = (uint8_t)n;
+		card_respond(c, r, 7 + n);
 		break;
 	}
 
@@ -362,4 +420,13 @@ void wifi_init(wifi_t *w, const wifi_net_ops *net, void *ctx)
 	w->net = net;
 	w->ctx = ctx;
 	wifi_reset(w);
+	/* network settings: the ones NET_CONFIG saved, or DHCP. A soft reset
+	 * keeps them, as it keeps the link. */
+	wifi_netcfg_t saved;
+	w->cfg = (wifi_netcfg_t){.mode = 0, .dns_port = 53};
+	w->cfg_saved = net->config_load(ctx, &saved) && saved.mode <= 1;
+	if (w->cfg_saved) {
+		w->cfg = saved;
+		net->net_config(ctx, &w->cfg);
+	}
 }
