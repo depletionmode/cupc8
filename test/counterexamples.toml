@@ -672,3 +672,13 @@ fixed_in = "6a6b470"
 revert = [["fw/sysctl/core/console.c", """	if (ix[4] & ~CON_HOST) {""", """	if (0) {"""]]
 cmd = "make -s -C fw test_sysctl"
 must_fail = ["power-up junk in the rings: nothing sent"]
+
+[[bug]]
+name = "boards: designators printed over vias on every card (the silkscreen check never looked)"
+fixed_in = "24b5229"
+revert = [["hw/tools/kicadgen.py", """        for v, net in vias:
+            if overlap(t, v):
+                bad.append("%s over a via of %s" % (what, net))
+""", ""]]
+cmd = "python3 test/hw/test_silk.py"
+must_fail = ["FAIL designator over a via"]
