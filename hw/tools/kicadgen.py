@@ -2090,9 +2090,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
                 state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
             try:
                 autoroute(state["b"], out, passes * (attempt + 1), pours=tuple(pour_nets) + escaped, tries=1)
-            except RuntimeError:
+            except RuntimeError as e:
                 if attempt == 2:
-                    raise
+                    raise RuntimeError("%s; 3 tries, %d to %d passes" % (e, passes, passes * 3))
                 continue
             open_nets = open_escapes(state["b"], escaped)
             if not open_nets:
