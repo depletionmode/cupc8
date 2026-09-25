@@ -1033,7 +1033,22 @@ def _graphics():
 POWER_NETS = ("/VBUS", "/VBUS_F", "/5V_SYS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
 # In1 a solid GND plane; In2 carries signals too (two signal layers leave ~80
 # connections unrouted), with a +3V3 pour filled round them after routing
-ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/+3V3", ("In2.Cu",), "routed"))
+# every layer carries signals: GND poured on F.Cu, In1.Cu (plane=True) and
+# B.Cu, +3V3 poured on In2.Cu, each filled round the routing. With In1 a solid
+# plane Freerouting escaped half the TQ144's pins and was still at 85
+# unrouted after 6 passes (11-18 min each); routed, 85 after 4.
+ZONES = ("/GND", ("/+3V3", ("In2.Cu",), "routed"))
+# the nets on fine-pitch pins route at 0.15 mm (kicadgen's Fine class), as on
+# the CPU card: at the Default 0.2 mm no track passes between two 0.5 mm-pitch
+# pins of the TQ144 or the sTSOP-32
+FINE_PARTS = ("U7", "U9")
+ROUTE_PASSES, ROUTE_TRIES = 30, 2          # at most 30 + 60 passes
+
+
+def fine_nets():
+    power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL"}
+    return sorted({"/" + n for s in build_parts() if s.ref in FINE_PARTS for n in s.conns.values()
+                   if n and n not in power})
 
 
 def main():
@@ -1049,7 +1064,8 @@ def main():
     logo.footprint(LOGO_MM)
     pl = placement()
     out = sys.argv[1] if len(sys.argv) > 1 else None
-    lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=4, zones=ZONES,
+    lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=4, zones=ZONES, plane=True,
+                       fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
                        power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3,
                        title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
