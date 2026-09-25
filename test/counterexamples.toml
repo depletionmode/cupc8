@@ -521,13 +521,16 @@ cmd = "make -s -C fw test_gpu"
 must_fail = ["BS at column 0"]
 
 [[bug]]
-name = "sim: an IRQ taken between POP pcl and POP pch lost the return (the kernel's timer tick crashed it at boot)"
+name = "sim: an IRQ taken between POP pcl and POP pch lost the return"
 fixed_in = "51c8e35"
+# (it also crashed the kernel at boot while the kernel's clock was a timer-0
+# tick every 250 instructions; the chipset's 50 ms tick meets a POP pcl
+# too rarely for testKernelOnCards to show it)
 revert = [["tools/sim.nim", """  if lastOp == 0x9f:
     return
 """, ""]]
-cmd = "tools/run_tests.sh testIrqPopPcl testKernelOnCards"
-must_fail = ["FAIL: the call returned where it should", "FAIL: BASIC banner on screen"]
+cmd = "tools/run_tests.sh testIrqPopPcl"
+must_fail = ["FAIL: the call returned where it should"]
 
 [[bug]]
 name = "cpu: an IRQ taken between POP pcl and POP pch lost the return"
