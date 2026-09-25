@@ -245,7 +245,11 @@ static uint32_t ram_addr(bridge_t *m)
 
 static uint8_t mem_rd(bridge_t *m, uint64_t now)
 {
-	return m->cmd == 0x03 ? sst39_read(m->rom, m->addr, now) : m->ram[ram_addr(m)];
+	if (m->cmd == 0x03)
+		return sst39_read(m->rom, m->addr, now);
+	if (m->on_ram)
+		m->on_ram(ram_addr(m), false);
+	return m->ram[ram_addr(m)];
 }
 
 /* one SPI byte; the response to byte k goes out in byte k+2 (see bridge.vhd) */
@@ -311,6 +315,8 @@ uint8_t bridge_byte(bridge_t *m, uint8_t b, uint64_t now)
 	case B_WDATA:
 		if (m->len > 0) {
 			m->ram[ram_addr(m)] = b;
+			if (m->on_ram)
+				m->on_ram(ram_addr(m), true);
 			m->addr++;
 			m->len--;
 		}

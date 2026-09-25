@@ -8,7 +8,7 @@
 //   (CUPC8_EMU=native: on the C++ emulator, see emu_backend.mjs)
 
 import path from 'node:path';
-import { Emu, USBCDC } from './emu_backend.mjs';                     // CUPC8_EMU=native: the C++ emulator
+import { Emu, CdcHost } from './emu_backend.mjs';                     // CUPC8_EMU=native: the C++ emulator
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const emu = await Emu.load(path.join(ROOT, 'build/rp2040/sysctl.elf'), { mhz: 125 });
@@ -118,14 +118,17 @@ i2c.onReadByte = () => i2c.completeRead(expander[i2cAddr]?.[i2cReg++ & 7] ?? 0xf
 const cardHeld = (slot) => !((expander[0x20][6] >> slot) & 1) && !((expander[0x20][2] >> slot) & 1);
 
 // ------------------------------------------------------------ USB CDC host
-const cdc = new USBCDC(emu.mcu.usbCtrl);
-let connected = false, rxBytes = [];
+// the PC: both of the card's serial ports (cdchost.mjs); cupc8.py's is port 0
+const usb = new CdcHost(emu.mcu.usbCtrl, 2);
+const cdc = usb.ports[0];
+let connected = false, rxBytes = [], consoleBytes = [];
 const pending = [];
-cdc.onDeviceConnected = () => (connected = true);
+usb.onDeviceConnected = () => (connected = true);
 cdc.onSerialData = (buf) => rxBytes.push(...buf);
+if (usb.ports[1]) usb.ports[1].onSerialData = (buf) => consoleBytes.push(...buf);
 emu.everyCycles(1000, () => {
   fpgaTick();
-  while (pending.length && cdc.txFIFO.itemCount < 512) cdc.sendSerialByte(pending.shift());
+  while (pending.length && cdc.txFIFO.itemCount < 512) usb.sendSerialByte(pending.shift(), 0);
 });
 
 function crc8(bytes) {
@@ -167,6 +170,7 @@ emu.runUntil(() => false, 50e6);
 expect(MACHINE_PINS.every((n) => !driven(n)), `at start-up no machine pin is driven: ${MACHINE_PINS.filter(driven)}`);
 emu.runUntil(() => connected, 3e9);
 expect(connected, 'enumerates as a USB CDC device');
+expect(usb.portCount === 2, `two CDC serial ports, the protocol and the console (${usb.portCount})`);
 
 const ping = request(0x00);
 expect(ping && ping.status === 0 && ping.crcOk && String.fromCharCode(...ping.data).startsWith('CUPC8 sysctl'),
@@ -317,6 +321,32 @@ const idr = request(0x55, [0xa5]);
 const v = idr && idr.data.length === 5 ? (idr.data[1] | (idr.data[2] << 8) | (idr.data[3] << 16) | (idr.data[4] << 24)) >>> 0 : 0;
 expect(idr && idr.data[0] === 1 && v === 0x0bc12477, `DPIDR read at pin level: ack ${idr && idr.data[0]}, ${v.toString(16)}`);
 request(0x53, [0xff]);
+
+// the console port (usb-console.md): the card polls the bridge only while
+// it is open and the chipset runs. (Nothing answers on BR_MISO here: the
+// rings read as empty. SYS-008 and E2E-020 have the RAM.)
+let bridgeFrames = 0, ncs = true;
+gpio[5].addListener(() => {                                 // BR_NCS
+  if (drivenLow(5) && ncs) bridgeFrames++;
+  ncs = !drivenLow(5);
+});
+emu.runUntil(() => false, 30e6);
+expect(bridgeFrames === 0, `console closed: no bridge frames (${bridgeFrames})`);
+expect(request(0x44, [0]).status === 0, 'FPGA_HOLD 0');
+usb.open(1, true);
+emu.runUntil(() => false, 30e6);
+expect(bridgeFrames === 0 && consoleBytes.length === 0, `console open, chipset held: no bridge frames (${bridgeFrames}), nothing sent`);
+expect(request(0x45, [0]).status === 0, 'FPGA_BOOT 0');
+emu.runUntil(() => false, 30e6);
+const polls = bridgeFrames;
+expect(polls >= 10 && consoleBytes.length === 0, `console open, chipset up: the card polls the rings (${polls} bridge frames in 30 ms)`);
+usb.open(1, false);
+emu.runUntil(() => false, 5e6);
+const closed = bridgeFrames;
+emu.runUntil(() => false, 30e6);
+expect(bridgeFrames === closed, `console closed again: the polling stops (${bridgeFrames - closed} frames)`);
+const again = request(0x00);
+expect(again && again.status === 0, 'PING still answers on the protocol port');
 
 console.log(`SYS-006: real sysctl.elf on the emulated RP2040 over USB, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

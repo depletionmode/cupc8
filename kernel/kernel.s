@@ -7,6 +7,11 @@ main:
 	mov r0, #1
 	st $f203, r0
 
+	; the USB console's rings (console.s), before anything prints
+	push pch
+	push pcl
+	b con_init
+
 	; card drivers
 	push pch
 	push pcl

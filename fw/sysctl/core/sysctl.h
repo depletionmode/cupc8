@@ -4,7 +4,8 @@
  *
  * Hardware-independent: everything it touches goes through sysctl_hal, which
  * is the RP2040 on the card and a set of models in the host tests. The
- * machine runs without it; it only programs, resets and debugs.
+ * machine runs without it. It programs, resets and debugs, and, while a PC
+ * has its console port open, carries the kernel's terminal (console.c).
  */
 #ifndef SYSCTL_H
 #define SYSCTL_H
@@ -12,7 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SYSCTL_VERSION  "2.0"
+#define SYSCTL_VERSION  "2.1"          /* 2.1: the USB console */
 #define SYS_MAX_PAYLOAD 4096          /* a full trace drain is 2 + 512 * 4 */
 
 /* SPI buses: one selected at a time (the two flash buses share SPI1) */
@@ -58,6 +59,12 @@ typedef struct {
 	void (*uart_open)(void *ctx, uint32_t baud);          /* 0 closes: pins released */
 	void (*uart_write)(void *ctx, const uint8_t *data, int n);
 	int (*uart_read)(void *ctx, uint8_t *data, int max);  /* what has arrived, up to max */
+
+	/* the console's USB serial port (doc/proposals/usb-console.md) */
+	bool (*con_open)(void *ctx);                          /* a PC has it open (DTR) */
+	int (*con_room)(void *ctx);                           /* bytes con_write takes now */
+	void (*con_write)(void *ctx, const uint8_t *data, int n);
+	int (*con_read)(void *ctx, uint8_t *data, int max);   /* what the PC typed, up to max */
 } sysctl_hal;
 
 typedef struct {
@@ -72,11 +79,17 @@ typedef struct {
 	uint8_t held;                     /* FPGAs held in reset: bit per target */
 	uint8_t reset_slots;              /* cards held in reset by CARD_RESET */
 	uint8_t prog_slots;               /* cards with PROG_n held low by CARD_PROG */
+
+	/* the console (console.c) */
+	bool con_host;                    /* HOST is set in CON_FLAGS as far as we know */
+	bool con_cr;                      /* the last byte from the PC was CR */
+	uint32_t con_last_ms;             /* the last poll */
 } sysctl_t;
 
 void sysctl_init(sysctl_t *s, const sysctl_hal *hal, void *ctx);
 void sysctl_rx(sysctl_t *s, const uint8_t *data, int n);   /* bytes from USB */
-void sysctl_poll(sysctl_t *s);                            /* drop stale frames */
+void sysctl_poll(sysctl_t *s);                            /* drop stale frames, run the console */
+bool sysctl_chipset_up(sysctl_t *s);                      /* the bridge answers */
 
 /* bridge (bridge.c) */
 uint8_t br_status(sysctl_t *s);
@@ -119,5 +132,19 @@ int prog_select(sysctl_t *s, int slot);
 void swd_seq(sysctl_t *s, const uint8_t *bits, int nbits);
 /* one ADIv5 transfer: returns the ack; *data is written or read */
 int swd_xfer(sysctl_t *s, uint8_t request, uint32_t *data);
+
+/* console.c: the USB console's two rings in the API block */
+#define CON_OUT_HEAD 0x6f22               /* kernel: next free byte of CON_OUT */
+#define CON_OUT_TAIL 0x6f23               /* card: next byte it will take */
+#define CON_IN_HEAD  0x6f24               /* card: next free byte of CON_IN */
+#define CON_IN_TAIL  0x6f25               /* kernel: next byte it will take */
+#define CON_FLAGS    0x6f26               /* card: bit 0 HOST */
+#define CON_HOST     0x01
+#define CON_OUT      0x6f40               /* 128 bytes */
+#define CON_OUT_SIZE 128
+#define CON_IN       0x6fc0               /* 64 bytes */
+#define CON_IN_SIZE  64
+#define CON_POLL_MS  2
+void con_poll(sysctl_t *s);
 
 #endif

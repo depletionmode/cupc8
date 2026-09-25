@@ -15,6 +15,9 @@
 %define API_ARGS $6f00
 %define API_ERR $6f20
 %define API_RUN $6f21
+; the USB console's flags (usb-console.md): bit 0 set while a PC has the
+; system card's console port open. The console group's output goes there too.
+%define CON_FLAGS $6f26
 
 ; group 0: system ($1003)
 %define API_VERSION $1003

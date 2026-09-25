@@ -15,6 +15,8 @@ when isMainModule:
   import parseopt
   import std/exitprocs
   import sequtils
+  import posix
+  import termios
   import simmachine
 
 var log_mask* = 9
@@ -1037,7 +1039,9 @@ when defined(emscripten):
   proc emscripten_set_main_loop_timing(mode: cint, value: cint) {.header: "<emscripten.h>".}
 
 when isMainModule:
-  addExitProc(resetAttributes)
+  var consoleOn = false          # --console: the USB console's rings on this terminal
+  addExitProc(proc () =
+    if not consoleOn: resetAttributes())   # no escape codes in the console's stream
 
   var binPath = ""
   var maxIns = 0
@@ -1076,6 +1080,13 @@ the kernel from the ROM chip; the slot cards run the real card firmware cores.
                     or the bare binary), once the kernel is at its prompt: as
                     `cupc8.py run` does on the machine (the body at $7000,
                     then API_RUN = 1; the terminal starts it)
+  --console         the USB console (doc/proposals/usb-console.md) on this
+                    terminal, as the system card carries it to a PC: the
+                    kernel's terminal output on stdout (\n as CR LF), stdin
+                    (raw, if a terminal; Ctrl-] quits) typed into the machine,
+                    HOST set while it runs. The sim's own messages go to
+                    stderr. Headless with stdin a pipe: it exits --settle ms
+                    after stdin's end and the last console traffic
 The Wi-Fi card uses the host's own sockets: any SSID joins, and the machine
 reaches the real network and localhost directly.
   --legacy          the old I/O model (ILI9340 display, SD on SPI 1, keyboard on
@@ -1135,6 +1146,9 @@ Both:
         settleMs = parseInt(val)
       of "run":
         runPath = val
+      of "console":
+        consoleOn = true
+        log_mask = 0                 # no GPO lines or speed line in the console's stream
       of "help", "h":
         echo usage
         quit(0)
@@ -1147,6 +1161,97 @@ Both:
   proc die(msg: string) =
     stderr.writeLine("sim: " & msg)
     quit(1)
+
+  proc note(msg: string) =
+    ## the sim's own messages: stdout, or stderr while stdout is the console
+    if consoleOn: stderr.writeLine(msg)
+    else: echo msg
+
+  if consoleOn and legacy:
+    die("--console is for the M1 machine (not --legacy)")
+
+  # --console: the rings in the API block (memory-map.md), moved to and from
+  # this terminal as fw/sysctl/core/console.c moves them to a PC
+  const
+    ConOutHead = 0x6f22
+    ConOutTail = 0x6f23
+    ConInHead = 0x6f24
+    ConInTail = 0x6f25
+    ConFlags = 0x6f26
+    ConOut = 0x6f40
+    ConIn = 0x6fc0
+  var conPending: seq[char]         # typed, not yet in CON_IN
+  var conCr = false                 # the last byte typed was CR
+  var conEof = false                # stdin has ended
+  var conSaved: Termios
+  var conRaw = false
+
+  proc cfmakeraw(t: ptr Termios) {.importc, header: "<termios.h>".}
+
+  proc consoleRestore() {.noconv.} =
+    if conRaw:
+      discard tcSetAttr(0, TCSADRAIN, addr conSaved)
+      conRaw = false
+
+  proc consoleStart() =
+    if isatty(0) != 0:
+      discard tcGetAttr(0, addr conSaved)
+      var t = conSaved
+      cfmakeraw(addr t)
+      discard tcSetAttr(0, TCSANOW, addr t)
+      conRaw = true
+      addExitProc(consoleRestore)
+      stderr.write("sim: the USB console on this terminal: Ctrl-] quits\r\n")
+    discard fcntl(0, F_SETFL, fcntl(0, F_GETFL) or O_NONBLOCK)
+
+  proc consolePoll(input: bool): bool =
+    ## one poll of the card's: HOST, CON_OUT to stdout, stdin to CON_IN
+    ## (only once `input`: the kernel is up, so its boot does not zero what
+    ## was typed ahead); true if anything moved
+    if (mem[ConFlags] and 0xfe) != 0:
+      # power-up junk (ramJunk), not the kernel's rings yet: drop both, as the card does
+      mem[ConOutTail] = mem[ConOutHead]
+      mem[ConInHead] = mem[ConInTail]
+      mem[ConFlags] = 1
+      return true
+    if (mem[ConFlags] and 1) == 0:
+      mem[ConFlags] = 1               # opened, or the kernel zeroed it at boot
+    var t = mem[ConOutTail] and 127
+    let h = mem[ConOutHead] and 127
+    var s = ""
+    while t != h:
+      let c = mem[ConOut + t] and 0xff
+      if c == 10: s.add("\r\n") else: s.add(chr(c))
+      t = (t + 1) and 127
+    mem[ConOutTail] = t
+    if s.len > 0:
+      stdout.write(s)
+      flushFile(stdout)
+      result = true
+    if not conEof:
+      var buf: array[256, char]
+      let n = posix.read(0, addr buf[0], buf.len)
+      if n == 0:
+        conEof = true
+      for i in 0 ..< max(n, 0):
+        if conRaw and buf[i] == '\x1d':
+          quit(0)
+        conPending.add(buf[i])
+    var hd = mem[ConInHead] and 63
+    let tl = mem[ConInTail] and 63
+    while input and conPending.len > 0 and ((hd + 1) and 63) != tl:
+      let b = conPending[0]
+      conPending.delete(0)
+      let afterCr = conCr
+      conCr = b == '\r'
+      var k = b
+      if b == '\n':
+        if afterCr: continue          # CR LF: one Enter
+        k = '\r'
+      mem[ConIn + hd] = ord(k)
+      hd = (hd + 1) and 63
+      result = true
+    mem[ConInHead] = hd
 
   proc setupCards() =
     ## The M1 machine: the cards in their slots, the SD image in the storage
@@ -1170,7 +1275,7 @@ Both:
           makeFatImage(sdPath)
         except IOError as e:
           die(e.msg)
-        echo "made a blank FAT image ", sdPath
+        note("made a blank FAT image " & sdPath)
       for c in slots:
         if not c.isNil and simcard_type(c) == CardStorage and
            simcard_storage_image(c, cstring(sdPath), 0) != 0:
@@ -1277,12 +1382,18 @@ Both:
     var lastMhz = realAt
     var lastMhzIns = 0
     var lastMhzClocks = simClocks
+    var conLast = 0                   # msCount() at the last console poll
+    if consoleOn: consoleStart()
     while not atend:
       if HF or PC >= imageEnd:
-        echo "HALT!"
+        note("HALT!")
         break
       if maxIns > 0 and ins_retired >= maxIns:
         break
+      if consoleOn and msCount() - conLast >= 2:
+        conLast = msCount()           # every 2 guest ms, as the card polls
+        if consolePoll(readyDone) or conPending.len > 0 or not conEof:
+          idleAt = -1                 # still typing, or printing: not idle
       if headless and idleAt >= 0 and msCount() - idleAt >= settleMs:
         break
       if waiting:
@@ -1349,7 +1460,7 @@ Both:
           lastMhz = now
           lastMhzIns = ins_retired
           lastMhzClocks = simClocks
-    echo cpuStatusLine()
+    note(cpuStatusLine())
     if dumpText.len > 0:
       let g = gpuCard()
       if g.isNil:
@@ -1361,7 +1472,7 @@ Both:
     if dumpFb.len > 0:
       gpuPresent()
       display_dumpPpm(dumpFb)
-      echo "wrote framebuffer ", dumpFb
+      note("wrote framebuffer " & dumpFb)
     if not headless and maxIns == 0 and not atend:
       while not atend:                # halted: keep the window up until it is closed
         pumpInput()

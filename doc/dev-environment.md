@@ -63,6 +63,26 @@ does everything except KiCad.
   `--headless` runs as fast as it can.
   `tools/sim --help` lists the rest.
 
+**The USB console** (`doc/proposals/usb-console.md`): the kernel's terminal
+on a PC's terminal, both ways.
+
+- **Real hardware:** the system card is two USB serial ports;
+  `tools/cupc8.py console` opens the second (interface 2, usually
+  `/dev/ttyACM1`; `$CUPC8_CONSOLE` or an argument names another), raw, and
+  `Ctrl-]` quits. Any terminal program works as well (`picocom
+  /dev/ttyACM1`). Piped, `cupc8.py console < prog.bas` types a program in
+  and quits once the machine has been quiet for `--idle` seconds.
+- **Emulator:** `node tools/machine_view.mjs --native --console` fits the
+  system card and shows the console under the screen, with a box to type or
+  paste into; `--console-port 8641` instead serves it on TCP for
+  `cupc8.py console tcp:127.0.0.1:8641`. In a script,
+  `Machine.create({ sysctl: true })` then `m.console.open()`,
+  `m.console.write('run\r')`, `m.console.read()` (`test/emu/machinenative.mjs`).
+- **Simulator:** `tools/sim --console` puts the console on the terminal the
+  sim runs in: stdout the kernel's output, stdin (raw) typed into the
+  machine, `Ctrl-]` quits, the sim's own messages on stderr. With a pipe:
+  `tools/sim --headless --console < prog.txt`.
+
 ## KiCad 10
 
 The board scripts write KiCad 8 files, which Ubuntu's KiCad 7 cannot read.

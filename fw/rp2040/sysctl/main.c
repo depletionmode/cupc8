@@ -1,6 +1,8 @@
 /*
  * System card firmware (doc/hardware/sysctl.md, system-slot.md): the sysctl
- * core (fw/sysctl/core) on the RP2040, talking USB CDC to cupc8.py.
+ * core (fw/sysctl/core) on the RP2040, talking USB CDC to cupc8.py on its
+ * first serial port (CDC 0) and carrying the kernel's terminal on the second
+ * (CDC 1, the console: doc/proposals/usb-console.md).
  *
  * At start-up it drives nothing on the machine: every machine-facing pin is
  * an input until a command needs it, and returns to one afterwards.
@@ -139,19 +141,57 @@ static void activity(uint32_t *until)
 	*until = to_ms_since_boot(get_absolute_time()) + ACTIVITY_MS;
 }
 
+enum { CDC_PROTOCOL = 0, CDC_CONSOLE = 1 };
+
 static void h_usb_write(void *ctx, const uint8_t *data, int n)
 {
 	(void)ctx;
 	if (n > 0)
 		activity(&led_tx_until);
-	while (n > 0 && tud_cdc_connected()) {
-		uint32_t k = tud_cdc_write(data, (uint32_t)n);
+	while (n > 0 && tud_cdc_n_connected(CDC_PROTOCOL)) {
+		uint32_t k = tud_cdc_n_write(CDC_PROTOCOL, data, (uint32_t)n);
 		data += k;
 		n -= (int)k;
-		tud_cdc_write_flush();
+		tud_cdc_n_write_flush(CDC_PROTOCOL);
 		if (!k)
 			tud_task();
 	}
+}
+
+/* ------------------------------------------------------------ the console */
+
+static bool usb_started, usb_on;
+
+/* the host's VBUS gone counts as closed: HOST is cleared, the kernel stops waiting */
+static bool h_con_open(void *ctx)
+{
+	(void)ctx;
+	return usb_on && tud_cdc_n_connected(CDC_CONSOLE);
+}
+
+static int h_con_room(void *ctx)
+{
+	(void)ctx;
+	return (int)tud_cdc_n_write_available(CDC_CONSOLE);
+}
+
+static void h_con_write(void *ctx, const uint8_t *data, int n)
+{
+	(void)ctx;
+	if (n <= 0)
+		return;
+	activity(&led_tx_until);
+	tud_cdc_n_write(CDC_CONSOLE, data, (uint32_t)n);   /* fits: con_room said so */
+	tud_cdc_n_write_flush(CDC_CONSOLE);
+}
+
+static int h_con_read(void *ctx, uint8_t *data, int max)
+{
+	(void)ctx;
+	int n = (int)tud_cdc_n_read(CDC_CONSOLE, data, (uint32_t)max);
+	if (n > 0)
+		activity(&led_rx_until);
+	return n;
 }
 
 /* ---------------------------------------------------- the programming port */
@@ -309,6 +349,7 @@ static const sysctl_hal hal = {
 	.now_ms = h_now_ms, .usb_write = h_usb_write,
 	.prog_select = h_prog_select, .swd_io = h_swd_io,
 	.uart_open = h_uart_open, .uart_write = h_uart_write, .uart_read = h_uart_read,
+	.con_open = h_con_open, .con_room = h_con_room, .con_write = h_con_write, .con_read = h_con_read,
 };
 
 int main(void)
@@ -354,7 +395,6 @@ int main(void)
 	/* A self-powered device must not pull D+ up while VBUS is absent (USB 2.0,
 	 * 7.1.5): the card runs from the slot, so it starts USB only once the host's
 	 * VBUS is seen, and lets go of the bus (the pull-up) whenever it goes. */
-	bool usb_started = false, usb_on = false;
 	for (;;) {
 		bool vbus = !gpio_get(PIN_USB_NVBUS);
 		if (vbus && !usb_started) {
@@ -370,12 +410,12 @@ int main(void)
 		if (usb_started)
 			tud_task();
 		uint8_t buf[256];
-		uint32_t n = usb_started && tud_cdc_available() ? tud_cdc_read(buf, sizeof buf) : 0;
+		uint32_t n = usb_started && tud_cdc_n_available(CDC_PROTOCOL) ? tud_cdc_n_read(CDC_PROTOCOL, buf, sizeof buf) : 0;
 		if (n) {
 			activity(&led_rx_until);
 			sysctl_rx(&sys, buf, (int)n);
 		}
-		sysctl_poll(&sys);
+		sysctl_poll(&sys);                   /* and the console, while it is open */
 		uint32_t now = to_ms_since_boot(get_absolute_time());
 		gpio_put(PIN_LED_USB_TX, (int32_t)(led_tx_until - now) > 0);
 		gpio_put(PIN_LED_USB_RX, (int32_t)(led_rx_until - now) > 0);

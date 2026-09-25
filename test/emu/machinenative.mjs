@@ -6,6 +6,12 @@
 //   m.sd.insert('card.img', { writeMs: 5 });   // not in machine.mjs: the storage card's microSD
 //   m.powerOn();  await m.runAsync(3e9);  m.screen()
 //
+// With sysctl: true, the system card's two USB serial ports: the first is a
+// TCP port for cupc8.py (m.sysctlPort, as machine.mjs), the second is the
+// console (doc/proposals/usb-console.md), m.console:
+//   m.console.open()  m.console.write('list\r')  await m.runAsync(1e8)  m.console.read()
+//   m.console.close()  await m.console.listen(port)   (a TCP client is the terminal)
+//
 // test_e2e.mjs uses it with CUPC8_EMU=native. CUPC8_EMU_THREADS=0 runs the
 // cards serially (the same result, slower). Build:
 //   tools/emu_build.sh && cmake -G Ninja -S emu/machine -B build/emu-machine && ninja -C build/emu-machine
@@ -50,6 +56,60 @@ function startEsp(image, forward = []) {
   return { proc, tx, rx };
 }
 
+// The system card's console port, the PC's side: open() is a terminal
+// opening it (DTR; the card then sets HOST and starts moving the rings), and
+// what the card sends collects until read(). Like the protocol port, bytes
+// move only between runs.
+class Console {
+  constructor(m) {
+    this.m = m;
+    this.isOpen = false;
+    this.buf = [];
+  }
+  open() {
+    native.consoleOpen(this.m.h, true);
+    this.isOpen = true;
+  }
+  close() {
+    native.consoleOpen(this.m.h, false);
+    this.isOpen = false;
+  }
+  // bytes (a string, Buffer or array) typed on the PC
+  write(data) {
+    native.cdcWrite(this.m.h, Buffer.from(data), 1);
+  }
+  // everything the card sent since the last read(), as a Buffer
+  read() {
+    this.m.flush();
+    const b = Buffer.concat(this.buf);
+    this.buf = [];
+    return b;
+  }
+  received(b) {
+    if (this.client) this.client.write(b);
+    else this.buf.push(b);
+  }
+  // a TCP port for a terminal (cupc8.py console --port tcp:127.0.0.1:N, or
+  // nc): a connection opens the console, and its end closes it
+  listen(port = 0) {
+    return new Promise((resolve) => {
+      this.server = net.createServer((sock) => {
+        this.client?.destroy();
+        this.client = sock;
+        this.open();
+        sock.on('data', (d) => this.write(d));
+        sock.on('close', () => {
+          if (this.client !== sock) return;
+          this.client = null;
+          this.close();
+        });
+        sock.on('error', () => {});
+      });
+      this.server.listen(port, '127.0.0.1', () => resolve(this.server.address().port));
+    });
+  }
+}
+
 export class Machine {
   // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53']
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false,
@@ -64,7 +124,10 @@ export class Machine {
     m.h = native.create({ slots, rom: m.rom, sysctl, root: ROOT, threaded, spiLog,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
-    if (sysctl) m.sysctlPort = await m.listen();
+    if (sysctl) {
+      m.sysctlPort = await m.listen();
+      m.console = new Console(m);
+    }
     if (Object.values(slots).includes('io')) {
       const h = m.h;
       m.keyboard = {
@@ -99,8 +162,10 @@ export class Machine {
   // what the card sent on its CDC while the machine ran (machine.mjs writes it
   // as it comes; the socket only sends it when the event loop runs anyway)
   flush() {
-    const b = native.cdcRead(this.h);
+    const b = native.cdcRead(this.h, 0);
     if (b) this.client?.write(b);
+    const c = this.console && native.cdcRead(this.h, 1);
+    if (c) this.console.received(c);
   }
 
   powerOn() {
@@ -118,6 +183,8 @@ export class Machine {
     this.h = null;
     this.server?.close();
     this.client?.destroy();
+    this.console?.server?.close();
+    this.console?.client?.destroy();
     if (this.esp) {
       this.esp.proc.kill();
       fs.closeSync(this.esp.tx);

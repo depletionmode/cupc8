@@ -667,10 +667,94 @@ async function e2e014() {
   m.stop();
 }
 
+// ------------------------------------------------------------------ E2E-020
+// The USB console (doc/proposals/usb-console.md) on the real system card
+// firmware and the real kernel: the banner and a command's output read from
+// the card's second serial port, a BASIC program pasted into it runs, and
+// with the port closed (HOST clear) the kernel never waits on the ring.
+async function e2e020() {
+  log('E2E-020: the USB console: output, typed commands, a pasted program; closed, nothing waits');
+  if (!expect(backend === 'native', 'E2E-020 needs the native emulator (CUPC8_EMU=native)')) return;
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, sysctl: true });
+  let text = '';
+  const got = () => (text += m.console.read().toString('latin1'));
+  const until = async (want, ns) => {
+    const ok = await m.runUntil(() => got().includes(want), ns, 20e6);
+    if (!ok) console.log('---- console\n' + JSON.stringify(text) + '\n---- screen\n' + screenText(m) + '\n----');
+    return ok;
+  };
+  m.console.open();                        // before power-on: the kernel's boot zeroes the rings, the card sets HOST again
+  m.powerOn();
+  expect(await until('>>', 6e9), 'the banner and the prompt arrive on the console port');
+  expect(text.startsWith('\r\n      CUPC/8 BASIC'), `the banner first, no power-up junk before it: ${JSON.stringify(text.slice(0, 80))}`);
+  expect(/\r\n/.test(text) && !/[^\r]\n/.test(text), 'newlines arrive as CR LF');
+  expect(await waitFor(m, '>>', 1e9), 'and on HDMI, as before');
+
+  // a command typed on the PC: echoed, run, its output back (and on HDMI)
+  text = '';
+  m.console.write('help\r');
+  expect(await until('NEW RUN CLR', 3e9), 'help typed on the console: its output comes back');
+  expect(text.startsWith('help'), `the typed line is echoed: ${JSON.stringify(text.slice(0, 20))}`);
+  expect(await waitFor(m, 'NEW RUN CLR', 1e9), 'the output is on HDMI too');
+
+  // a program pasted in one go (more than CON_IN's 64 bytes, LF line ends
+  // as a PC's clipboard has them), then run
+  text = '';
+  const prog = ['10 rem pasted over the usb console', '20 for i = 1 to 3', '30 print i * 7', '40 next i', 'run'];
+  m.console.write(prog.join('\n') + '\n');
+  expect(await until('DONE.', 20e9), 'the pasted program runs to DONE.');
+  expect(/\r\n7\r\n14\r\n21\r\n/.test(text), `its output on the console: ${JSON.stringify(text.slice(-60))}`);
+  expect(await waitFor(m, '21', 1e9), 'and on HDMI');
+
+  // closed: HOST is cleared, and a program printing ~5 KB (40 times the
+  // ring) runs at the speed it runs with no system card at all
+  m.console.close();
+  await m.runAsync(20e6);
+  m.console.read();
+  // on the USB keyboard, each line once the last one is on screen
+  const lines = ['new', '10 for i = 1 to 200', '20 print "the console port is closed"', '30 next i'];
+  const typeLines = async (mm) => {
+    for (const l of lines) {
+      mm.type(l + '\n');
+      expect(await mm.runUntil(() => {
+        const t = screenText(mm), i = t.lastIndexOf('>> ' + l);   // the line, then the next prompt
+        return i >= 0 && t.slice(i + 3 + l.length).includes('>>');
+      }, 3e9, 20e6), `typed: ${l}`);
+    }
+    mm.type('clr\n');
+    expect(await mm.runUntil(() => !screenText(mm).includes('30 next i'), 3e9, 20e6), 'clr');
+  };
+  await typeLines(m);
+  const t0 = m.ns;
+  m.type('run\n');
+  const done = await waitFor(m, 'DONE.', 60e9);
+  const took = (m.ns - t0) / 1e9;
+  if (!expect(done && screenText(m).includes('the console port is closed'), 'closed: the long program runs to DONE.')) {
+    console.log('---- screen\n' + screenText(m) + '\n----');
+  }
+  expect(m.console.read().length === 0, 'closed: nothing is sent to the PC');
+  log(`closed: 200 lines in ${took.toFixed(2)} s emulated`);
+  m.stop();
+
+  // the same program with no system card: the kernel drops its ring output
+  // the same way, so it takes as long
+  const n = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' } });
+  n.powerOn();
+  expect(await waitFor(n, '>>', 6e9), 'no system card: the prompt');
+  await typeLines(n);
+  const t1 = n.ns;
+  n.type('run\n');
+  expect(await waitFor(n, 'DONE.', 60e9), 'no system card: the long program runs to DONE.');
+  const bare = (n.ns - t1) / 1e9;
+  log(`no system card: 200 lines in ${bare.toFixed(2)} s emulated`);
+  expect(took < bare * 1.1 + 0.2, `closed console: no waiting (${took.toFixed(2)} s vs ${bare.toFixed(2)} s without the card)`);
+  n.stop();
+}
+
 const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009,
   'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012, 'E2E-013': e2e013,
-  'E2E-014': e2e014 };
-const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013', 'E2E-014'];
+  'E2E-014': e2e014, 'E2E-020': e2e020 };
+const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013', 'E2E-014', 'E2E-020'];
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !nativeOnly.includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
