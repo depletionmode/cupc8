@@ -420,7 +420,14 @@ async function e2e011() {
   const fat = (...a) => execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
   const img = path.join(dir, 'card.img');
   fat('mkfs', img, '16', '16');
-  fat('put', img, 'PROG.PRG', mkprg('tools/testdata/exec_prog.s'));
+  const prg = mkprg('tools/testdata/exec_prog.s');
+  fat('put', img, 'PROG.PRG', prg);
+  // the same program with 24 KB after it (192 of exec's 128-byte chunk
+  // reads, back to back: they caught the emulator's stray CS_n edges,
+  // 08496f0, which the three chunks above no longer meet)
+  const big = Buffer.concat([fs.readFileSync(prg), Buffer.alloc(24 * 1024 - (fs.statSync(prg).size - 4), 0xa5)]);
+  fs.writeFileSync(path.join(dir, 'big'), big);
+  fat('put', img, 'BIG.PRG', path.join(dir, 'big'));
   fs.writeFileSync(path.join(dir, 'bas'), '10 print 6*7\r\n20 print "BASIC OK"\r\n');
   fat('put', img, 'BAS', path.join(dir, 'bas'));
   const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'storage' } });
@@ -438,9 +445,19 @@ async function e2e011() {
     }, 10e9, 100e6);
   };
   if (!expect(await line('exec "prog.prg"', 'NATIVE OK'), 'exec a program file: it prints NATIVE OK')) console.log(shown());
+  m.type('clr\n');
+  if (!expect(await line('exec "big.prg"', 'NATIVE OK'), 'exec a 24 KB program file (192 chunks): it prints NATIVE OK')) console.log(shown());
   if (!expect(await line('exec "bas"', 'BASIC OK'), 'exec a BASIC file: loaded and run')) console.log(shown());
   expect(screenText(m).includes('42'), 'the BASIC file printed 42');
   if (!expect(await line('exec "nothing"', 'file not found'), 'exec a missing file')) console.log(shown());
+  // every rising CS_n edge a card's GPIO latched was a real deselect by the
+  // chipset (08496f0: the emulator set CS_n high again at every sync, and
+  // each call latched an edge the pin never had)
+  for (const c of m.cards().filter((k) => k.csRises !== undefined)) {
+    log(`slot ${c.slot} (${c.kind}): ${c.csEdges} CS_n rising edges latched, ${c.csRises} deselects`);
+    expect(c.csRises > 0 && c.csEdges <= c.csRises,
+      `slot ${c.slot} (${c.kind}): ${c.csEdges} rising CS_n edges latched for ${c.csRises} deselects`);
+  }
   const card = m.sd.card();
   expect(card && card.violations.length === 0, `the storage firmware keeps to the SD protocol (${card?.violations.join('; ')})`);
   m.stop();

@@ -38,7 +38,7 @@ cmd = "tools/run_tests.sh"
 [[test]]
 id = "SIM-010"
 title = "The simulator CLI runs the M1 machine with its slot cards"
-checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000"
+checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000"
 method = "test/sim/test_cli.py builds tools/sim and runs it as a user would; the HTTP server runs in the test"
 kind = "sim"
 vrow = "2.1"
@@ -1231,7 +1231,7 @@ cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node
 [[test]]
 id = "E2E-011"
 title = "exec from the SD card: a program at $7000 and a BASIC file"
-checks = "on the native emulator with the storage card and a FAT image in the SD card model: exec \"prog.prg\" (the \"C8P\" header, three chunks) prints NATIVE OK; exec of a BASIC file loads and runs it (42, BASIC OK); exec of a missing file says file not found; the storage firmware keeps to the SD protocol"
+checks = "on the native emulator with the storage card and a FAT image in the SD card model: exec \"prog.prg\" (the \"C8P\" header, three chunks) prints NATIVE OK, and so does the same program with 24 KB after it (192 chunk reads back to back); exec of a BASIC file loads and runs it (42, BASIC OK); exec of a missing file says file not found; the storage firmware keeps to the SD protocol; on every card every rising CS_n edge its GPIO latched was a real deselect by the chipset (the emulator's pins have edges only when they change)"
 method = "test/emu/test_e2e.mjs E2E-011 (machinenative.mjs m.sd, test/emu/fatimg.py)"
 kind = "sim"
 vrow = "3.2"

@@ -544,15 +544,16 @@ must_fail = ["an IRQ due at POP pcl pushed"]
 [[bug]]
 name = "emu/machine: a card's CS_n set high again on every sync latched a rising edge each time; slotspi restarted mid-frame and exec's chunk reads went unanswered"
 fixed_in = "08496f0"
-# timing-bound, as the slotspi entry above: it shows with exec's chunk loop
-# of 6c88ad2's kernel; if a later layout hides it, this entry says so
+# exec's chunk reads showed it only by timing (6c88ad2's kernel; later ones
+# hide it), so E2E-011 counts, per card, the rising CS_n edges its GPIO
+# latched against the chipset's deselects (Rp2040Card::csEdges, csRises)
 revert = [["emu/machine/machine.cpp", """  if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
   if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
   if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);""", """  g[P::MOSI].setInputValue(!!mosi);
   g[P::SCK].setInputValue(!!sck);
   g[P::NCS].setInputValue(!selected);"""]]
 cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-011"
-must_fail = ["FAIL exec a program file: it prints NATIVE OK"]
+must_fail = ["FAIL slot 1 (hdmi):", "FAIL slot 2 (io):", "FAIL slot 3 (storage):", "rising CS_n edges latched for"]
 
 [[bug]]
 name = "kernel net: net config ip counted its words in net_pn, which net_parse_ip uses too"
