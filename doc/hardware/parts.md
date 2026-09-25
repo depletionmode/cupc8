@@ -23,7 +23,7 @@ extras. Stock checked 2026-09-23 (the power parts: 2026-09-24).
 | Chipset FPGA **and** CPU card FPGA | ICE40HX4K-TQ144 | C1521989 | 51 | 5 | main, CPU |
 | ROM | SST39VF040-70-4I-NHE (512 KB, PLCC-32) | C645939 | **11** | 3 | main. ⚠ low stock: fallbacks below |
 | ROM (fallback) | SST39VF010-70-4I-NHE-T (128 KB, PLCC-32) | C632851 | 33 | | same footprint; A17/A18 NC, ROM_BANK 0–63, enough for boot + kernel |
-| SRAM | IS62WV5128EBLL-45HLI (512K×8, 45 ns, sTSOP-32) | C1348955 | 224 | 3 | main; A16–A18 tied low |
+| SRAM | IS62WV5128EBLL-45HLI (512K×8, 45 ns, sTSOP-32) | C1348955 | 224 | 3 | main; A16–A18 to MEM_A16–A18: banked RAM, extended-ram.md |
 | FPGA config flash | W25Q32JVSSIQ | C179173 | 25,178 | 5 | main (FL0), CPU (FL1) |
 | 12 MHz clock | HSO321S 12 MHz 3.3 V CMOS oscillator | C160457 | 3,086 | 3 | main: CLK12 and CPU_CLK, 33 Ω each (cpu-bus.md) |
 | Reset supervisor | MAX811TEUS+T (3.08 V, 140 ms, manual reset) | C7272 | 11,115 | 3 | main: nPOR; MR from the button and SYS_nRST |
