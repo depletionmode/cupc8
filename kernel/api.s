@@ -1,8 +1,8 @@
 ; The kernel API: the jump table programs call (doc/proposals/kernel-api.md).
 ;
 ; This file sorts first among kernel/*.s, so the table follows the
-; assembler's `b main` at $1000: 8 groups of 16 entries, 3 bytes each
-; (`b routine`), $1003-$1182. Group g, entry n is at $1003 + 48g + 3n.
+; assembler's `b main` at $1000: 8 groups of 32 entries, 3 bytes each
+; (`b routine`), $1003-$1302. Group g, entry n is at $1003 + 96g + 3n.
 ; kernel/api.inc names every entry for programs. Entries are only ever
 ; added, never moved: testKernelApi checks the table against api.inc, and
 ; every committed api.inc against this one.
@@ -14,6 +14,8 @@
 ; Calls that only print or draw return nothing (r0 and r1 changed). Every
 ; call may change r0, r1 and API_ARGS. Each routine's comment (sys.s) is
 ; its contract. An entry not implemented is `b api_none`: r0 = API_ERR = $ff.
+; The bank entries (group 0, 4-7) are kernel/bank.s's routines as they are:
+; their contracts are there, and they leave API_ERR alone.
 ;
 ; The API block, $6f00-$6fff, is at fixed addresses shared with programs.
 
@@ -26,10 +28,10 @@
 	b api_exit
 	b api_block
 	b api_slots
-	b api_none				; 4 API_BANK_SET - api_bank_set once kernel/bank.s lands
-	b api_none				; 5 API_BANK_GET - api_bank_get
-	b api_none				; 6 API_BANK_COUNT - api_bank_count
-	b api_none				; 7 API_BANK_FAR_COPY - api_bank_far_copy
+	b api_bank_set
+	b api_bank_get
+	b api_bank_count
+	b api_bank_far_copy
 	b api_none
 	b api_none
 	b api_none
@@ -38,7 +40,23 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 1: console ($1033)
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+; ---------------------------------------------------------------- group 1: console ($1063)
 	b api_putc
 	b api_puts
 	b api_getkey
@@ -55,7 +73,23 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 2: graphics ($1063)
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+; ---------------------------------------------------------------- group 2: graphics ($10c3)
 	b api_gfx_mode
 	b api_gfx_pixel
 	b api_gfx_fill_rect
@@ -72,7 +106,23 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 3: e-ink ($1093)
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+; ---------------------------------------------------------------- group 3: e-ink ($1123)
 	b api_eink_auto
 	b api_eink_get
 	b api_eink_status
@@ -89,7 +139,23 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 4: storage ($10c3)
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+; ---------------------------------------------------------------- group 4: storage ($1183)
 	b api_st_info
 	b api_st_open
 	b api_st_read
@@ -106,7 +172,6 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 5: net ($10f3)
 	b api_none
 	b api_none
 	b api_none
@@ -123,7 +188,40 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 6: timers ($1123)
+; ---------------------------------------------------------------- group 5: net ($11e3)
+	b api_net_status
+	b api_net_join
+	b api_net_open
+	b api_net_connect
+	b api_net_connect_host
+	b api_net_listen
+	b api_net_send
+	b api_net_recv
+	b api_net_sock_status
+	b api_net_close
+	b api_net_udp_bind
+	b api_net_sendto
+	b api_net_recvfrom
+	b api_net_events
+	b api_net_resolve
+	b api_net_config
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+; ---------------------------------------------------------------- group 6: timers ($1243)
 	b api_ticks
 	b api_wait_ms
 	b api_none
@@ -140,7 +238,6 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- group 7: reserved ($1153)
 	b api_none
 	b api_none
 	b api_none
@@ -157,7 +254,40 @@
 	b api_none
 	b api_none
 	b api_none
-; ---------------------------------------------------------------- end of the table ($1183)
+; ---------------------------------------------------------------- group 7: reserved ($12a3)
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+	b api_none
+; ---------------------------------------------------------------- end of the table ($1303)
 
 ; not implemented - r0 = API_ERR = $ff
 api_none:

@@ -1782,6 +1782,8 @@ proc screenText(g: SimCard): string =
     let line = gpuLine(g, row)
     if line.len > 0: result.add(line & "\n")
 
+var netCmdMs = 0                  ## the millisecond counter when netCommand pressed Enter
+
 proc netCommand(g: SimCard; b: DnsBench; cmd: string; limit = 30_000_000): string =
   ## Clear the screen, type cmd, and run (serving DNS) until the kernel waits
   ## for a key again; the screen
@@ -1790,6 +1792,7 @@ proc netCommand(g: SimCard; b: DnsBench; cmd: string; limit = 30_000_000): strin
     pushKey(ord(ch))
     settle(400_000)
     if waiting: discard cpuStep()
+  netCmdMs = msCount()
   pushKey(13)
   var n = 0
   discard cpuStep()
@@ -1868,14 +1871,18 @@ proc testKernelDnsPing() =
   lookup("late.example.com", "late.example.com 1.2.3.4")
   lookup("wrongid.example.com", "DNS server not answering", 2)
   lookup("silent.example.com", "DNS server not answering", 2)
+  # two waits of 1000 ms on the chipset's millisecond counter, and the
+  # command's own few ms
+  expectTrue("a silent server: two 1000 ms waits (" & $(msCount() - netCmdMs) & " ms)",
+             msCount() - netCmdMs >= 2000 and msCount() - netCmdMs <= 2050)
   let ids = bench.queries[^2 .. ^1].mapIt((it[0] shl 8) or it[1])
   expectTrue("the retry is a new query (another id)", ids[0] != ids[1])
   lookup("retry.example.com", "retry.example.com 5.6.7.8", 2)
   lookup("bad.example.com", "bad answer from the DNS server")
   lookup("10.1.2.3", "10.1.2.3 10.1.2.3", 0)
   lookup("a..b", "net lookup NAME", 0)
-  expectTrue("the clock is stopped after the lookups (TMR1 masked and off)",
-             (irqMask and 4) == 0 and tmr1 == 0)
+  expectTrue("the CPU timers are left to programs (TMR0, TMR1 off and masked)",
+             (irqMask and 6) == 0 and tmr0 == 0 and tmr1 == 0)
 
   # ping: the host's loopback answers (Linux's ping socket, fw/wifi/host)
   s = netCommand(g, bench, "net ping 127.0.0.1 3")
@@ -1889,9 +1896,12 @@ proc testKernelDnsPing() =
   if not check("net ping to an address that never answers: timeouts, then 2 sent, 0 received",
                     "seq 1 timeout" in s and "seq 2 timeout" in s and "2 sent, 0 received" in s):
     echo s
+  expectTrue("each unanswered request waits 1000 ms (" & $(msCount() - netCmdMs) & " ms for 2)",
+             msCount() - netCmdMs >= 2000 and msCount() - netCmdMs <= 2050)
   s = netCommand(g, bench, "net ping nx.example.com")
   expectTrue("net ping of a name that does not exist", "name not found" in s)
-  expectTrue("the clock is stopped after ping", (irqMask and 4) == 0 and tmr1 == 0)
+  expectTrue("the CPU timers are still left to programs after ping",
+             (irqMask and 6) == 0 and tmr0 == 0 and tmr1 == 0)
 
   # static address, back to DHCP, save
   s = netCommand(g, bench, "net config ip 10.0.2.50 255.255.255.0 10.0.2.2")
@@ -2383,7 +2393,7 @@ proc testKernelBanks() =
     var first = -1
     for p in 0..<0x80000:
       # the kernel's bss (the buffer and far_copy's variables) and the stack page change
-      if (p >= 0x6000 and p < 0x6f00) or (p >= 0x0100 and p < 0x1000): continue
+      if (p >= 0x6400 and p < 0x6f00) or (p >= 0x0100 and p < 0x1000): continue
       if physRead(p) != model[p]:
         inc diffs
         if first < 0: first = p
@@ -2447,8 +2457,9 @@ proc defineOf(defs: seq[(string, int)]; name: string): int =
 
 proc testKernelLayout() =
   ## KRN-010: the kernel's code, data and bss stay in their areas
-  ## (memory-map.md): code $1000-$4fff, data $5000-$5fff, bss $6000-$6eff;
-  ## $6f00 is the API block and $7000- the user program's.
+  ## (memory-map.md): code $1000-$5dff, data $5e00-$63ff, bss $6400-$6eff;
+  ## $6f00 is the API block and $7000- the user program's. (The code
+  ## outgrew $4fff with networking, 2026-09-25.)
   echo "== kernel memory layout =="
   let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
   if assembled.exitCode != 0:
@@ -2465,20 +2476,22 @@ proc testKernelLayout() =
     of "data": dataEnd = max(dataEnd, parseHexInt(f[1]) + parseInt(f[2]))
     of "bss": bssEnd = max(bssEnd, parseHexInt(f[1]) + parseInt(f[2]))
     else: discard
-  expectTrue("assembled for code $1000, data $5000, bss $6000 (" & bases & ")",
-             bases == "base 0x1000 data 0x5000 bss 0x6000")
-  expectTrue("code ends by $4fff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x5000)
-  expectTrue("data ends by $5fff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6000)
+  expectTrue("assembled for code $1000, data $5e00, bss $6400 (" & bases & ")",
+             bases == "base 0x1000 data 0x5e00 bss 0x6400")
+  expectTrue("code ends by $5dff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x5e00)
+  expectTrue("data ends by $63ff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6400)
   expectTrue("bss ends by $6eff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0x6f00)
 
 run testKernelLayout
 
 proc testKernelApi() =
-  ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 16 entries
+  ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 32 entries
   ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
   ## goes to api_<name> (or api_none, a stub for now); every other to
   ## api_none. Entries are only added: every committed api.inc's entries are
-  ## still there at the same addresses.
+  ## still there at the same addresses, from the 32-entry table on (David
+  ## widened the groups from 16 on 2026-09-25, before any release; the
+  ## 16-entry drafts, API_PUTC $1033, are not held to it).
   echo "== kernel API table =="
   let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
   if assembled.exitCode != 0:
@@ -2489,7 +2502,7 @@ proc testKernelApi() =
   let defs = incDefines(readFile(kernelDir / "api.inc"))
   var named = initTable[int, string]()
   for (name, value) in defs:
-    if value >= 0x1003 and value < 0x1183:
+    if value >= 0x1003 and value < 0x1303:
       if (value - 0x1003) mod 3 != 0:
         fail(name & " $" & toHex(value, 4) & " is not an entry's address")
       elif named.hasKey(value):
@@ -2499,8 +2512,8 @@ proc testKernelApi() =
   var bad: seq[string]
   var stubs: seq[string]
   for g in 0..7:
-    for n in 0..15:
-      let a = 0x1003 + 48 * g + 3 * n
+    for n in 0..31:
+      let a = 0x1003 + 96 * g + 3 * n
       let o = a - 0x1000
       if image[o].ord != 0xb0:
         bad.add("$" & toHex(a, 4) & " is not a B")
@@ -2518,8 +2531,8 @@ proc testKernelApi() =
   for b in bad: echo "  ", b
   expectTrue("the table matches api.inc (" & $named.len & " entries named)", bad.len == 0)
   if stubs.len > 0: echo "  stubs (api_none for now): ", stubs.join(" ")
-  expectTrue("the table ends at $1182: api_none follows it",
-             syms.getOrDefault(0x1183, "") == "api_none")
+  expectTrue("the table ends at $1302: api_none follows it",
+             syms.getOrDefault(0x1303, "") == "api_none")
   # the API block's addresses: the kernel's (api.s) and the programs' (api.inc)
   for (name, value) in incDefines(readFile(kernelDir / "api.s")):
     expect(name & " in api.inc as in api.s", defineOf(defs, name), value, 4)
@@ -2531,6 +2544,7 @@ proc testKernelApi() =
     if commit.len != 40: continue
     let old = execCmdEx("git show " & commit & ":kernel/api.inc", workingDir = rootDir)
     if old.exitCode != 0: continue
+    if defineOf(incDefines(old.output), "API_PUTC") != 0x1063: continue   # a 16-entry draft
     inc versions
     for (name, value) in incDefines(old.output):
       let now = defineOf(defs, name)
@@ -2639,16 +2653,19 @@ proc testApiProgram() =
   r = fatcheck("check " & quoteShell(img) & " --absent API.TXT --absent API2.TXT")
   if r.exitCode != 0: echo r.output
   expectTrue("the card as a PC sees it: nothing left", r.exitCode == 0)
-  # groups 5 and 7: not there yet
-  expect("an empty net entry: $ff", mem[0x7e24], 0xff)
+  # a blank entry of group 5 (after the 16 net routines), and group 7
+  expect("a blank net entry: $ff", mem[0x7e24], 0xff)
   expect("... and API_ERR $ff", mem[0x7e25], 0xff)
   expect("an empty reserved entry: $ff", mem[0x7e27], 0xff)
   # group 6
   expect("API_WAIT_MS", mem[0x7e26], 0)
   let t0 = mem[0x7e28] or (mem[0x7e29] shl 8)
   let t1 = mem[0x7e2c] or (mem[0x7e2d] shl 8)
+  # the wait is to the counter's next step, then 20 more (20 to 21 ms), so
+  # the counter moves 21 between the two TICKS (22 if it stepped between
+  # the first TICKS and the wait's first look)
   expectTrue("API_TICKS counts the 20 ms API_WAIT_MS waited (" & $t0 & " to " & $t1 & ")",
-             t1 - t0 >= 18 and t1 - t0 <= 30)
+             t1 - t0 >= 21 and t1 - t0 <= 22)
 
   echo "== kernel API: API_EXIT =="
   let ex = testdata / "api_exit.prg"

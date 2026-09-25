@@ -12,10 +12,9 @@
 
 %define PING_ID 200
 %define PING_LEN 40
-%define NET_TICK 250
-; 4000 quarter milliseconds- a second
-%define NET_WAIT_LO 160
-%define NET_WAIT_HI 15
+; a second, in ms
+%define NET_WAIT_LO 232
+%define NET_WAIT_HI 3
 
 ping_s_ping db "\nping "
 ping_s_seq db "seq "
@@ -41,126 +40,20 @@ ping_base: resb 1
 
 ; ------------------------------------------------------------ the clock
 ;
-; TMR1 counts retired instructions. While the clock runs it interrupts every
-; NET_TICK of them and net_ticks counts one more. The CPU retires about one
-; instruction a microsecond (12 MHz, 4-clock memory cycles), so a tick is
-; about a quarter of a millisecond. It only runs while something uses it
-; (net_clock_on / net_clock_off, which nest)- left running it would wake
-; every WAI.
+; The chipset's millisecond counter (MS_COUNT, $f206-$f209, memory-map.md):
+; its low 16 bits are the time here, in ms. Reading MS_COUNT0 latches the
+; rest, so MS_COUNT0 then MS_COUNT1 is one value.
 
-net_clock_on:
-	ld r0, [net_clk_n]
-	add r0, #1
-	st [net_clk_n], r0
-	eq r0, #1
-	bzf .start
-	pop pcl
-	pop pch
-.start:
-	xor r0, r0
-	st [net_ticks], r0
-	st [net_ticks+1], r0
-	mov r0, #<net_irq_tick
-	st $0014, r0
-	mov r0, #>net_irq_tick
-	st $0015, r0
-	mov r0, #4			; timer 1- nothing stale, then unmasked
-	st $f200, r0
-	ld r0, $f201
-	or r0, #4
-	st $f201, r0
-	tmr1 #NET_TICK
-	pop pcl
-	pop pch
-
-net_clock_off:
-	ld r0, [net_clk_n]
-	sub r0, #1
-	st [net_clk_n], r0
-	eq r0, #0
-	bzf .stop
-	pop pcl
-	pop pch
-.stop:
-	tmr1 #0
-	ld r0, $f201
-	and r0, #0xfb
-	st $f201, r0
-	mov r0, #4
-	st $f200, r0
-	mov r0, #<irq_tmr1
-	st $0014, r0
-	mov r0, #>irq_tmr1
-	st $0015, r0
-	pop pcl
-	pop pch
-
-; The CPU keeps what "pop pcl" popped in a latch that an IRQ does not save,
-; and takes IRQs between "pop pcl" and "pop pch". A handler returning with
-; its own "pop pcl" would overwrite that latch, and the interrupted "pop pch"
-; would jump somewhere else. So when the instruction to return to is a "pop
-; pch" ($9e), this returns by doing that "pop pch" itself- the latch is still
-; the interrupted routine's, its high byte still on the stack below the
-; frame. (Another IRQ taken between the "pop f" and "pop pch" here returns
-; the same way.)
-net_irq_tick:
-	st [net_irq_r0], r0
-	tmr1 #NET_TICK
-	mov r0, #4
-	st $f200, r0
-	ld r0, [net_ticks]
-	add r0, #1
-	st [net_ticks], r0
-	eq r0, #0
-	bzf .carry
-	b .ret
-.carry:
-	ld r0, [net_ticks+1]
-	add r0, #1
-	st [net_ticks+1], r0
-.ret:
-	pop r0				; the flags
-	st [net_irq_f], r0
-	pop r0				; the return address, low
-	st [net_irq_a], r0
-	pop r0				; and high
-	st [net_irq_a+1], r0
-	ldd r0, [net_irq_a]
-	eq r0, #0x9e
-	bzf .in_return
-	ld r0, [net_irq_a+1]
-	push r0
-	ld r0, [net_irq_a]
-	push r0
-	ld r0, [net_irq_f]
-	push r0
-	ld r0, [net_irq_r0]
-	pop f
-	pop pcl
-	pop pch
-.in_return:
-	ld r0, [net_irq_f]
-	push r0
-	ld r0, [net_irq_r0]
-	pop f
-	pop pch
-
-; net_u16 = net_ticks (read again if the high byte moved meanwhile)
+; net_u16 = the counter's low 16 bits
 net_now:
-	ld r0, [net_ticks+1]
-	st [net_u16+1], r0
-	ld r0, [net_ticks]
+	ld r0, $f206
 	st [net_u16], r0
-	ld r0, [net_ticks+1]
-	ld r1, [net_u16+1]
-	eq r0, r1
-	bzf .done
-	b net_now
-.done:
+	ld r0, $f207
+	st [net_u16+1], r0
 	pop pcl
 	pop pch
 
-; net_u16 = ticks since net_t16
+; net_u16 = ms since net_t16
 net_since:
 	push pch
 	push pcl
@@ -365,9 +258,6 @@ net_c_ping:
 	push pch
 	push pcl
 	b print_ascii_char
-	push pch
-	push pcl
-	b net_clock_on
 
 .next:
 	ld r0, [ping_seq]
@@ -410,7 +300,7 @@ net_c_ping:
 	b .poll
 
 .reply:
-	; the round trip, in ms- ticks / 4
+	; the round trip, in ms
 	ld r0, [ping_t0]
 	st [net_t16], r0
 	ld r0, [ping_t0+1]
@@ -418,14 +308,9 @@ net_c_ping:
 	push pch
 	push pcl
 	b net_since
-	ld r1, [net_u16+1]
-	shl r1, #6
 	ld r0, [net_u16]
-	shr r0, #2
-	or r0, r1
 	st [ping_rtt], r0
 	ld r0, [net_u16+1]
-	shr r0, #2
 	st [ping_rtt+1], r0
 	ld r0, [ping_got]
 	add r0, #1
@@ -508,9 +393,6 @@ net_c_ping:
 
 .summary:
 	; S sent, R received[, MIN-MAX ms]
-	push pch
-	push pcl
-	b net_clock_off
 	push pch
 	push pcl
 	b net_close

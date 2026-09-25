@@ -63,13 +63,13 @@ bridge's 24-bit RAM commands.
 
 | Range | Use |
 |---|---|
-| $1000–$4fff | kernel code (`b main` at $1000, then the API jump table $1003–$1182) |
-| $5000–$5fff | kernel data |
-| $6000–$6eff | kernel bss |
+| $1000–$5dff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
+| $5e00–$63ff | kernel data |
+| $6400–$6eff | kernel bss |
 | $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the rest reserved |
 | $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
 
-`kernel/assemble.sh` assembles for code $1000, data $5000, bss $6000;
+`kernel/assemble.sh` assembles for code $1000, data $5e00, bss $6400;
 `testKernelLayout` (KRN-010) fails if any outgrows its area. The kernel keeps
 nothing at $7000 and up (the banked RAM window, `../proposals/extended-ram.md`,
 is $8000–$bfff). The jump table and calling convention are in

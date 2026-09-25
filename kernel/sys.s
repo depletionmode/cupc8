@@ -514,44 +514,81 @@ api_st_n:
 	pop pch
 
 ; ============================================================ group 6: timers
-; The kernel's clock is timer 0 (irq.s): about right, not exact.
+; The kernel's clock is the chipset's millisecond counter (MS_COUNT,
+; $f206-$f209, memory-map.md): exact, from the 12 MHz clock. Reading
+; MS_COUNT0 latches the other three bytes, so a read that starts with it is
+; one value.
+
+tim_left: resb 2			; API_WAIT_MS - steps of the counter still to see
+tim_last: resb 1			;   MS_COUNT0 when last looked at
 
 ; API_TICKS - API_ARGS[0..3] = ms since power-on (32 bits, low first);
 ; r0 = 0. Interrupts are on afterwards.
 api_ticks:
 	cli
-	ld r0, [tick_ms]
+	ld r0, $f206			; MS_COUNT0 first- it latches the rest
 	st API_ARGS, r0
-	ld r0, [tick_ms+1]
+	ld r0, $f207
 	st $6f01, r0
-	ld r0, [tick_ms+2]
+	ld r0, $f208
 	st $6f02, r0
-	ld r0, [tick_ms+3]
+	ld r0, $f209
 	st $6f03, r0
 	sti
 	xor r0, r0
 	b api_ret
 
-; API_WAIT_MS - wait r0 + 256 x r1 ms, asleep in WAI; r0 = 0. Interrupts
-; are on afterwards.
+; API_WAIT_MS - wait r0 + 256 x r1 ms (0 returns at once); r0 = 0. It
+; watches the millisecond counter: to its next step, then that many more, so
+; the wait is more than N ms and at most N + 1. The CPU is busy meanwhile;
+; interrupts are left as they were.
 api_wait_ms:
-	cli
-	st [tick_wait], r0
-	st [tick_wait+1], r1
-	sti
-.wait:
-	ld r0, [tick_wait]
-	ld r1, [tick_wait+1]
+	st [tim_left], r0
+	st [tim_left+1], r1
 	or r0, r1
 	eq r0, #0
 	bzf .done
-	mov r0, #1
-	st [tick_idle], r0
-	wai
-	xor r0, r0
-	st [tick_idle], r0
+	ld r0, $f206
+	st [tim_last], r0
+.sync:
+	ld r0, $f206
+	ld r1, [tim_last]
+	eq r0, r1
+	bzf .sync
+	st [tim_last], r0
+.wait:
+	ld r0, $f206			; r1 = the steps since the last look (mod 256)
+	ld r1, [tim_last]
+	st [tim_last], r0
+	sub r0, r1
+	mov r1, r0
+	ld r0, [tim_left+1]
+	eq r0, #0
+	bzf .low
+	ld r0, [tim_left]		; 256 or more to go- tim_left - r1
+	lt r0, r1
+	bzf .borrow
+	b .sub
+.borrow:
+	ld r0, [tim_left+1]
+	sub r0, #1
+	st [tim_left+1], r0
+	ld r0, [tim_left]
+.sub:
+	sub r0, r1
+	st [tim_left], r0
+	b .wait
+.low:
+	ld r0, [tim_left]		; done once r1 reaches what is left
+	gt r0, r1
+	bzf .more
+	b .done
+.more:
+	sub r0, r1
+	st [tim_left], r0
 	b .wait
 .done:
+	xor r0, r0
 	b api_ret
 
 ; ============================================================ running programs

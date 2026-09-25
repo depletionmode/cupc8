@@ -5,7 +5,7 @@
 ; as it is. Otherwise it asks the configured server (net config dns- the
 ; card's NET_CONFIG_GET), or the one DHCP gave (NET_STATUS), over a UDP socket
 ; of its own- one A question, RD set, a new id each time. It waits about a
-; second (ping.s's clock) for the answer and asks once more. A datagram from
+; second (ping.s's net_waited, on the chipset's millisecond counter) for the answer and asks once more. A datagram from
 ; another address or port, with another id, or that is not a response is
 ; ignored. The answer's questions are skipped and its answers walked- names
 ; followed through compression pointers, every length checked against the
@@ -121,9 +121,6 @@ net_resolve:
 	pop pcl
 	pop pch
 .opened:
-	push pch
-	push pcl
-	b net_clock_on
 	xor r0, r0
 	st [dns_try], r0
 
@@ -189,9 +186,6 @@ net_resolve:
 	push pch
 	push pcl
 	b net_close
-	push pch
-	push pcl
-	b net_clock_off
 	ld r0, [dns_err]
 	pop pcl
 	pop pch
