@@ -331,8 +331,10 @@ def placement():
         # package and in the pins' order, finger side (pads 8-5) away from
         # it: A and control in a row under the bottom side, D and the timer
         # lines in a column right of the right side
-        "RN1": (16.5, fy + 15.1, 0), "RN2": (19.5, fy + 15.1, 0), "RN3": (22.3, fy + 15.1, 0),
-        "RN4": (25.1, fy + 15.1, 0), "RN5": (27.9, fy + 15.1, 0),
+        # (RN1, RN2 and RN4 exactly under their pins, joined by stubs();
+        # RN3 and RN5 as near as the GND and /RDY pins between allow)
+        "RN1": (16.5, fy + 15.1, 0), "RN2": (19.5, fy + 15.1, 0), "RN3": (22.25, fy + 15.1, 0),
+        "RN4": (24.5, fy + 15.1, 0), "RN5": (27.75, fy + 15.1, 0),
         "RN6": (45.8, fy + 7.8, 90), "RN7": (45.8, fy + 5.0, 90), "RN8": (45.8, fy - 0.2, 90),
         # config flash by the config pins, under the top edge beside the
         # hole, its decap, and the configuration pull-ups
@@ -348,41 +350,6 @@ def placement():
         "TP1": (-3.0, -19.0 + DY, 0), "TP2": (1.0, -19.0 + DY, 0), "TP3": (5.0, -19.0 + DY, 0),
     })
     return p
-
-
-def a_vias(board, via=0.6, drill=0.3, track=0.2):
-    """Locked pre-routing: each address line leaves its array (finger side,
-    pads 8-5, 0.5 mm apart) on a short track to its own via, in two
-    staggered rows just under the arrays. A goes to the back-side fingers;
-    placing its layer changes here keeps the front below the arrays clear
-    for the control and data lines, which Freerouting otherwise has to
-    thread through vias it scattered itself."""
-    import pcbnew
-    mm = pcbnew.FromMM
-    for fp in board.GetFootprints():
-        if fp.GetReference() not in ("RN1", "RN2", "RN3", "RN4"):
-            continue
-        for pad in fp.Pads():
-            k = int(pad.GetNumber())
-            if k <= 4:
-                continue
-            px, py = pad.GetPosition().x, pad.GetPosition().y
-            v = pcbnew.VECTOR2I(px, py + mm(1.2 if k % 2 else 2.4))
-            t = pcbnew.PCB_TRACK(board)
-            t.SetStart(pad.GetPosition())
-            t.SetEnd(v)
-            t.SetWidth(mm(track))
-            t.SetLayer(pcbnew.F_Cu)
-            t.SetNet(pad.GetNet())
-            t.SetLocked(True)
-            board.Add(t)
-            vi = pcbnew.PCB_VIA(board)
-            vi.SetPosition(v)
-            vi.SetWidth(mm(via))
-            vi.SetDrill(mm(drill))
-            vi.SetNet(pad.GetNet())
-            vi.SetLocked(True)
-            board.Add(vi)
 
 
 def track(board, net, layer, a, b, width):
@@ -551,6 +518,27 @@ def ring_pads(board):
                     pad.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_NONE)
 
 
+def stubs(board, width=0.2):
+    """Locked pre-routing of the pin-to-array hops where an array sits
+    exactly under its four pins (0402x4 pads have the pins' 0.5 mm pitch):
+    straight drops, which the router otherwise fumbles among the
+    neighbouring pins. Arrays whose pins have a supply or input pin between
+    them are left to the router: parallel jogs at 0.5 mm break clearance."""
+    import pcbnew
+    to = pcbnew.ToMM
+    fps = {fp.GetReference(): fp for fp in board.GetFootprints()}
+    pins = {p.GetNetname(): p for p in fps["U1"].Pads() if p.GetNetname().startswith("/FPGA_")}
+    for ref in ("RN1", "RN2", "RN4"):
+        for pad in fps[ref].Pads():
+            if int(pad.GetNumber()) > 4 or pad.GetNetname() not in pins:
+                continue
+            pin = pins[pad.GetNetname()]
+            px, py = to(pin.GetPosition().x), to(pin.GetPosition().y)
+            ax, ay = to(pad.GetPosition().x), to(pad.GetPosition().y)
+            assert abs(ax - px) < 1e-3, "%s pad %s is not under its pin" % (ref, pad.GetNumber())
+            track(board, pad.GetNet(), pcbnew.F_Cu, (px, py), (ax, ay), width)
+
+
 def prepare(board):
     """The card's own pre-routing, run after the pad fan-out. In1 carries
     signals as well as the GND pour: on the I/O-card outline the bus has a
@@ -560,8 +548,8 @@ def prepare(board):
     import pcbnew
     board.SetLayerType(board.GetLayerID("In1.Cu"), pcbnew.LT_SIGNAL)
     ring_pads(board)
+    stubs(board)
     key_ties(board)
-    a_vias(board)
     supply_fingers(board)
     plane_pins(board)
 
