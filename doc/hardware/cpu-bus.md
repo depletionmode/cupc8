@@ -238,6 +238,17 @@ budget.
 The CPU card may draw up to 500 mA from +3V3 and 1 A from +5V. The M1 FPGA
 card draws about 30 mA. See `power.md`.
 
+## CPU card outline
+
+The CPU card has **the same outline as the I/O cards** (`slot.md`,
+Mechanical; David, 2026-09-24): the body is x −6.0 … 56.0 mm, y −44.0 …
+−4.95 mm in the frame of its finger footprint (finger B1 at the origin), the
+M3 hole at (52.0, −40.0) and the power LED at (−3.0, −41.0). Only the tab
+differs: the x8 tab (98 contacts, about 50 mm wide) sits under the same body,
+where the I/O cards have their x1 tab. On the main board the CPU socket is
+first in the row of card sockets, so the CPU card stands in line with the
+I/O cards. A later CPU card (the M2 discrete CPU) keeps this outline.
+
 ## Conformance testbench (acceptance test for any CPU card)
 
 `soc/tb/cpubus_conformance` drives the card through the socket signals only.

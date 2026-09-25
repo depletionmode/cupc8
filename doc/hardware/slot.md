@@ -178,7 +178,16 @@ ESP ROM bootloader sync.
 
 ## Mechanical
 
-- **Slot pitch:** 20.32 mm, for the full-height cards. Six slots take ≈ 122 mm.
+- **One row of cards** (David, 2026-09-24): on the main board the **CPU
+  socket comes first, then the six I/O slots, side by side in one row** at
+  the slot pitch, every socket the same way round and at the same height, so
+  the cards stand in a line with their top edges, M3 holes, power LEDs and
+  LED rows aligned. The CPU card has the I/O card outline (below) on its
+  wider x8 tab (`cpu-bus.md`, CPU card outline). The **system card is not in
+  the row**: its x4 socket sits off to one side of the main board, and the
+  card keeps its own outline (`system-slot.md`).
+- **Slot pitch:** 20.32 mm, for the full-height cards, the CPU socket
+  included. Seven sockets in the row take ≈ 142 mm.
 - **Card outline:** every I/O card has the **same outline**, so that cards
   line up in the case and their power LEDs sit in one row. In KiCad's
   `BUS_PCIexpress_x1` footprint frame (finger B1 at the origin, fingers
