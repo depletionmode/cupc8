@@ -105,7 +105,7 @@ R_SLOT_LINK = assume("main", "slot 0 ohm isolation link: <= 50 mOhm (0 ohm jumpe
 R_SLOT_SENSE = 0.050                            # power.md
 R_SLOT_CONTACTS = assume("main/cards", "slot +5V: 3 contacts at <= 30 mOhm each, plus 10 mOhm card copper", 0.030 / 3 + 0.010)
 SLOT_3V3_MAX = 0.300                            # slot.md: <= 300 mA of +3V3 per card
-SLOT_5V_MAX = 0.55                              # slot.md: <= 0.55 A of +5V per card
+SLOT_5V_MAX = 0.80                              # slot.md: <= 0.80 A of +5V per card (David, 2026-09-24; was 0.55)
 
 # ---------------------------------------------------------------------------
 # 3V3 buck: TLV62569DBV (TI model for dynamics)

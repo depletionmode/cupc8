@@ -150,7 +150,7 @@ circuit is below, for the IO board agent.
 
 | Check | Result | What it needs |
 |---|---|---|
-| B10, the IO card's +5V against slot.md's 0.55 A | A 500 mA keyboard through the boost draws **0.746 A** from a 3.89 V card input at the worst corner. No boost can do better on 0.55 A: even an ideal one needs 0.57 A. | Raise slot.md's per-card +5V budget from 0.55 A to **0.80 A**. The slot fuse goes up one size to **SMD1206P110TFT** (C143975), which holds 0.92 A at 40 °C. With that fuse the IO card passes against the fuse itself (B10b, +19 %), and 0.80 A is 13 % under its hold (B8 at 10 %). |
+| B10, the IO card's +5V against slot.md's 0.55 A (**decided 2026-09-24: raised to 0.80 A**) | A 500 mA keyboard through the boost draws **0.746 A** from a 3.89 V card input at the worst corner. No boost can do better on 0.55 A: even an ideal one needs 0.57 A. | Raise slot.md's per-card +5V budget from 0.55 A to **0.80 A**. The slot fuse goes up one size to **SMD1206P110TFT** (C143975), which holds 0.92 A at 40 °C. With that fuse the IO card passes against the fuse itself (B10b, +19 %), and 0.80 A is 13 % under its hold (B8 at 10 %). |
 
 ### IO card keyboard boost (for the IO board agent)
 
@@ -222,8 +222,8 @@ Other observations (not failures):
 - **Main board, slots:** slot +5V fuses **SMD1206P110TFT** (C143975; was
   SMD1206P075TFT).
 - **Cards:** slot +5V contacts ≤ 30 mΩ each. IO, GPU and system cards
-  ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.55 A of +5V (0.80 A proposed,
-  B10), ≤ 300 mA of +3V3.
+  ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.80 A of +5V (raised from
+  0.55 A for the keyboard boost, B10), ≤ 300 mA of +3V3.
 - **IO card:** the keyboard boost above: TPS61023DRLR, 1 µH FXL0420-1R0-M,
   10 µF in, 2 × 22 µF out, 750k/100k 1 %, feeding the SY6280 port switch.
 - **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's
