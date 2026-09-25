@@ -1028,6 +1028,7 @@ proc testKernelOnCards() =
 
 run testKernelOnCards
 
+
 proc settle(limit = 2_000_000) =
   var n = 0
   while n < limit and not waiting:
@@ -1177,6 +1178,60 @@ proc testKernelOnEink() =
   ioModel = imLegacy
 
 run testKernelOnEink
+
+proc testBackspace() =
+  ## KRN-014: Backspace at the prompt takes the last character back, from
+  ## the line and from the screen (back, space, back); on an empty line it
+  ## does nothing; DEL ($7F) does the same; and it goes back over a line
+  ## that wrapped at column 80.
+  echo "== backspace at the prompt =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+  settle(6_000_000)
+  expectTrue("prompt", gpuFind(g, ">>") >= 0)
+  typeLine("\b\b10 print 7\b8")
+  typeLine("20 print 3\x7f4")
+  typeLine("run")
+  let lines = screenLines(g)
+  var s8, s7, s4, s3 = false
+  for l in lines:
+    if l.strip() == "8": s8 = true
+    if l.strip() == "7": s7 = true
+    if l.strip() == "4": s4 = true
+    if l.strip() == "3": s3 = true
+  expectTrue("Backspace: the corrected line ran (8, not 7)", s8 and not s7)
+  expectTrue("DEL: the corrected line ran (4, not 3)", s4 and not s3)
+  expectTrue("the echo shows the corrected text", gpuFind(g, "10 print 8") >= 0 and gpuFind(g, "print 7") < 0)
+  # a line that wraps: 77 characters fill the row after ">> ", the 78th
+  # wraps; two Backspaces must leave 76 on the first row, the rest blank
+  let long = "rem " & "x".repeat(74)
+  var keys = long & "\b\b"
+  for ch in keys:
+    pushKey(ord(ch))
+    var m = 0
+    while m < 400_000 and not waiting:
+      if cpuStep() != sOk: break
+      inc m
+    if waiting:
+      discard cpuStep()
+  settle(2_000_000)
+  let after = screenLines(g)
+  var row = -1
+  for i, l in after:
+    if l.startsWith(">> rem x"): row = i
+  expectTrue("the long line is on screen", row >= 0)
+  if row >= 0:
+    expectTrue("Backspace over the wrap: the first row ends in 76 characters",
+               after[row].strip(leading = false).len == 3 + 76)
+    expectTrue("Backspace over the wrap: the wrapped character is gone",
+               row + 1 >= after.len or after[row + 1].strip().len == 0)
+  ioModel = imLegacy
+
+run testBackspace
 
 proc testProgramFull() =
   ## KRN-003: the 256-byte program buffer refuses a line that does not fit

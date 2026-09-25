@@ -614,6 +614,15 @@ cmd = "tools/run_tests.sh testKernelBanks"
 # ============================================================================
 
 [[test]]
+id = "KRN-020"
+title = "Backspace at the prompt"
+checks = "Backspace takes the last typed character back from the line and from the screen (back, space, back); on an empty line it does nothing; DEL ($7F) does the same; it goes back over a line that wrapped at column 80 (the graphics card's BS at column 0 moves to the end of the row above, GPU-001); a corrected BASIC line runs as corrected"
+method = "tools/simtest.nim testBackspace: the real kernel on the simulator's HDMI and IO cards"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBackspace"
+
+[[test]]
 id = "CARD-001"
 title = "Common framing conformance"
 checks = "status bit 7 = 0; READ frame and RESP_LEN rules; resync on CS rising; IDENT/SOFT_RESET/IRQ_EN; 5 ms response deadline; $FF is never an opcode"

@@ -123,6 +123,18 @@ static void test_text(void)
 	SEND(0x18);
 	CHECK_EQ(read_resp(r, 2), 2);
 	CHECK(r[0] == 9 && r[1] == 1, "cursor %d,%d", r[0], r[1]);
+	/* BS at column 0 goes back over a wrapped line; at 0,0 it stays */
+	SEND(0x12, 0, 2);
+	SEND(0x10, 0x08);
+	SEND(0x18);
+	CHECK_EQ(read_resp(r, 2), 2);
+	CHECK(r[0] == 79 && r[1] == 1, "BS at column 0: cursor %d,%d, not 79,1", r[0], r[1]);
+	SEND(0x12, 0, 0);
+	SEND(0x10, 0x08);
+	SEND(0x18);
+	CHECK_EQ(read_resp(r, 2), 2);
+	CHECK(r[0] == 0 && r[1] == 0, "BS at 0,0: cursor %d,%d", r[0], r[1]);
+	SEND(0x12, 9, 1);                         /* where the tests below expect it */
 
 	/* wrap at column 80 */
 	SEND(0x12, 79, 5);
