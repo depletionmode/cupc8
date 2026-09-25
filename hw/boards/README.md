@@ -191,10 +191,19 @@ Spec: `doc/hardware/gpu-protocol.md`.
   ground pins get a via 2 mm behind the pad, under the receptacle's body;
   each ESD's GND pins, in the middle of its rows, are joined through the
   package and taken down by a via.
-- **+5V to the sink:** 100 mA PTC (C20975) against a shorted cable, and a
-  B5819W Schottky so a monitor can't back-feed the machine. The pin then sits
-  ~0.3 V under the slot's +5V (HDMI asks 4.8 V min); EDID ROMs and
-  hot-plug detect work far lower.
+- **+5V to the sink** (HDMI: 4.8–5.3 V, ≥ 55 mA at the source's pin): the
+  slot's +5V is 4.12 V at the card at the worst corner (power model,
+  POW-006: 4.75 V source, 1.69 A machine load), so the IO card's boost
+  circuit makes it: TPS61023 (C919459), 1 µH FXL0420, 10 µF in, 2 × 22 µF
+  out, 750k/100k: 5.06 V nominal, 4.84–5.28 V over VREF and the 1 %
+  divider. The 100 mA PTC (C20975) is **ahead** of the boost, so its drop
+  doesn't come off the pin (worst case 4.84 V at the pin, plus only copper)
+  and it still trips on a shorted cable, which makes the boost draw hard
+  from its input. No diode: with the machine off the boost's high-side FET
+  body diode points SW → VOUT, so a monitor can't back-feed it. The boost
+  sits in the open area left of the receptacle, near the +5V fingers; its
+  pins are laid by the board script as on the IO card. It draws about
+  75 mA from the slot's +5V at the worst corner.
 - **HPD** (GPIO18): 22k/33k from the connector, 5 V → 2.9 V, pulled low when
   nothing is plugged in.
 - **DDC** (GPIO19/20, EDID): a 2N7002 (C8545) per line as a bidirectional

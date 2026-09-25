@@ -50,7 +50,7 @@ this table.
 | **3V3 total** | | **272** | **617** |
 | 3V3 buck input at 90% efficiency (5.0 V; 535 mA max at the worst-case 4.23 V) | 5V | 200 | 452 |
 | USB keyboard VBUS, through the IO card's boost (500 mA at the port: 746 mA from +5V at the worst corner) | 5V | 110 | 746 |
-| HDMI +5V pin (sink EDID power, per spec) | 5V | 10 | 55 |
+| HDMI +5V pin (sink EDID power, per spec), through the GPU card's boost (as the IO card's: 5.06 V, the PTC ahead of it) | 5V | 10 | 55 |
 | Wi-Fi card (ESP32-C3 via its own TLV62569 buck from +5V; TX peaks, ~260 mA at 5 V) | 5V | 80 | 350 |
 | Slots 5–6 (future cards; not in M1) | 5V | 0 | — |
 | **Total from USB-C (M1 cards)** | 5V | **≈ 400** | **≈ 1690** (worst-case corner, POW-006) |
