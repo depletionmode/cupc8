@@ -125,6 +125,13 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 9, -29, 0)]
 TITLE, REVISION = "CUPC/8 storage", "A"
 
 
+def prepare(board):
+    """rp2040card.pocket_escapes, with SWDIO's via a row further out and
+    towards the fingers: from the first row Freerouting found no way past the
+    SD lines to finger B7."""
+    rc.pocket_escapes(board, swdio=(2.26, -0.6))
+
+
 if __name__ == "__main__":
     rc.build("storage", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "ACT", "D3": "CARD"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=150, preroute=rc.pocket_escapes)
+             TITLE, REVISION, layers=LAYERS, passes=150, preroute=prepare)

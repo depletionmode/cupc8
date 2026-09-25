@@ -381,7 +381,7 @@ def escape(board, pin, out, side=0.0, net=None):
     via(board, netname, (vx, vy), size=0.65)
 
 
-def pocket_escapes(board):
+def pocket_escapes(board, swdio=(1.16, 0.0)):
     """The turned cards (GPU, storage): the middle of the chip's top edge,
     between the pins that fan out to the edge connector, has seven pins to
     get out: RUN, SWCLK and IOVDD 22 through vias in the ring under the chip,
@@ -391,7 +391,8 @@ def pocket_escapes(board):
     tie_testen(board)
     for pin in (26, 24, 22):                  # RUN, SWCLK, IOVDD: in
         escape(board, pin, -1.14)
-    for pin in (25, 23, 21):                  # SWDIO, DVDD, XOUT: out, one row
+    escape(board, 25, *swdio)                 # SWDIO: out, one row (or where the board says)
+    for pin in (23, 21):                      # DVDD, XOUT: out, one row
         escape(board, pin, 1.16)
     escape(board, 20, 2.26, side=0.3)         # XIN: the next row out, clear of XOUT's via
 
