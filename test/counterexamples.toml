@@ -125,7 +125,9 @@ fixed_in = "29cfa8f"
 before = "d7f6145"
 files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ['typed "Hello" + Enter, got']
+# the key bytes now come out shifted in the repeat test ("<" and "\x0f" for
+# "x"); "Hello" itself got through once the preload was double-buffered
+must_fail = ["held 700 ms gives 1 + ~7 repeats, got"]
 
 [[bug]]
 name = "wifi core: CONNECT_HOST connected with no SNI, so TLS could not check the certificate name"
@@ -181,14 +183,17 @@ must_fail = ["FAIL UART loopback across two UART_XFERs"]
 [[bug]]
 name = "gpu firmware: the slot SPI interrupt could delay PicoDVI's past its porch, cross-wiring the TMDS lanes"
 fixed_in = "9b4966c"
+# The fix's other half (slotspi masking only its own IRQ) is gone on purpose:
+# slotspi_refresh now turns every interrupt off for a few dozen cycles to swap
+# the preload (18c444f). GPU-005's traffic check never caught this bug, even at
+# 9b4966c with the bug put back; the whole machine's boot (as when it was
+# found) does: no picture at all.
 revert = [
   ["fw/rp2040/gpu/main.c", "	irq_set_priority(DMA_IRQ_0, 0);\n", ""],
   ["fw/rp2040/common/slotspi.c", "	irq_set_priority(IO_IRQ_BANK0, 0x40);", "	irq_set_priority(IO_IRQ_BANK0, 0);"],
-  ["fw/rp2040/common/slotspi.c", "	irq_set_enabled(IO_IRQ_BANK0, false);\n	if (gpio_get(PIN_SLOT_NCS)) {", "	uint32_t irq = save_and_disable_interrupts();\n	if (gpio_get(PIN_SLOT_NCS)) {"],
-  ["fw/rp2040/common/slotspi.c", "		arm_tx();\n	}\n	irq_set_enabled(IO_IRQ_BANK0, true);", "		arm_tx();\n	}\n	restore_interrupts(irq);"],
 ]
-cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
-must_fail = ["FAIL GPU-005-traffic"]
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002"
+must_fail = ["FAIL the BASIC prompt appears on HDMI after the reset"]
 
 [[bug]]
 name = "boot ROM: SPI_RX read straight after SPI_GO, before the transfer is done - every card's IDENT came back a byte late and every slot was recorded empty"
