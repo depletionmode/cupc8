@@ -994,7 +994,7 @@ cmd = "python3 hw/tools/pincheck.py"
 [[test]]
 id = "E2E-008"
 title = "Whole machine with the e-ink card instead of HDMI"
-checks = "slots {1: eink, 2: io} on the native whole-machine emulator, every card on its real firmware and the UC8179 model as the panel: the kernel finds the console by INFO; the BASIC prompt, a typed program's output (42), help and refresh appear on the panel's glass (read back through the font); refresh gives a second clean full refresh; the glass equals test/eink/golden/E2E-008.pbm and its text test/emu/golden/E2E-008.txt; the panel model saw no command the chip would ignore"
+checks = "slots {1: eink, 2: io} on the native whole-machine emulator, every card on its real firmware and the UC8179 model as the panel: the kernel finds the console by INFO; the BASIC prompt, a typed program's output (42), help and refresh appear on the panel's glass (read back through the font); refresh gives a second clean full refresh; the glass equals test/eink/golden/E2E-008.pbm and its text test/emu/golden/E2E-008.txt; the panel model saw no command the chip would ignore; after 11 s unused (deep sleep) a key reaches the glass and the wake-up reset holds RST_N low long enough"
 method = "test/emu/test_e2e.mjs E2E-008 (test/emu/machinenative.mjs panel(), panelScreen())"
 kind = "sim"
 vrow = "3.2"

@@ -287,6 +287,13 @@ async function e2e008() {
   expect(p.busy === 0, 'the panel is idle');
   golden('E2E-008', panelText(m));
   panelGolden('E2E-008', p);
+  // 10 s unused puts the controller in deep sleep; the next change wakes it
+  // with a reset, after a partial refresh's row compare ran in the same poll
+  await m.runAsync(11e9);
+  m.type('x');
+  expect(await m.runUntil(() => m.panel().refreshes[3] > p.refreshes[3], 3e9, 50e6), 'a key after deep sleep reaches the glass');
+  const w = m.panel();
+  expect(w.errors === 0, `waking from deep sleep: RST_N held low long enough (${w.errors}: ${w.error})`);
   m.stop();
 }
 
