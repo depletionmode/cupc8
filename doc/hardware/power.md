@@ -272,3 +272,24 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
 - **System card:** ADC reference = its 3.3 V rail ±3 %. ADC error ≤ 12 LSB.
 - **Not re-fetched:** the MAX811T's threshold (2.98–3.17 V) and its ~10 µs
   glitch immunity. Both datasheet sources were unavailable on 2026-09-24.
+
+## Future: more power needs USB PD (not in M1)
+
+Decided 2026-09-24 (David): **M1 has no USB Power Delivery.** Plain USB-C
+gives at most 3 A at 5 V (15 W). M1's worst case is 1.69 A, and slots 5–6
+share about 0.67 A of +5V headroom on a 3 A source (not 0.67 A each; each
+slot alone is still limited to 0.80 A by its fuse).
+
+**If a future card needs more than that, the main board needs USB PD:**
+
+- a PD sink/trigger chip (e.g. CH224K, in JLC's library) asks the charger for
+  9, 12, 15 or 20 V, which gives 30–65 W and more;
+- a buck converter turns that into the 5V_SYS rail at 4–5 A;
+- the input protection is redesigned for up to 20 V (eFuse OVLO, TVS, fuse),
+  and every POW/THM check is redone;
+- **a 5 V fallback path** for chargers without PD (a buck cannot make 5 V
+  from 5 V): a buck-boost, or a bypass with switching. This is the part that
+  needs the most care.
+
+The slot pinout and per-card rules don't change, so every existing card keeps
+working on a main board revision with PD.
