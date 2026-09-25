@@ -4,8 +4,8 @@
  * Hardware-independent, like fw/gpu/core: the RP2040 build, the host tests
  * and the simulator all use it. It is the graphics card's interpreter
  * (fw/gpu/core/gpu.c, unchanged for TEXT and GFX) with an extension for the
- * e-paper commands (INFO, REFRESH, AUTO, EPD_STATUS) and the native 4-grey
- * mode 2, plus the panel loop: the refresh policy, the rasteriser to the
+ * e-paper commands (INFO, REFRESH, AUTO, EPD_STATUS, AUTO_EXT, AUTO_GET) and
+ * the native 4-grey mode 2, plus the panel loop: the refresh policy, the rasteriser to the
  * panel (the ink rule, an ordered dither) and the UC8179's command
  * sequences (uc8179.h), as a state machine that never waits: eink_poll()
  * does a little and returns, so the slot SPI is never kept waiting.
@@ -43,9 +43,7 @@ extern const eink_panel_t eink_panel_583;       /* Good Display GDEY0583T81, 648
 extern const eink_panel_t eink_panel_750;       /* Good Display GDEY075T7, 800 x 480 */
 
 /* the policy's fixed times (eink-card.md, "Refresh policy") */
-#define EINK_CAP_US        1000000u     /* changes wait at most this long under continuous output */
 #define EINK_FULL_QUIET_US 2000000u     /* the ghost-clearing full refresh waits for this much quiet */
-#define EINK_SLEEP_US      10000000u    /* the controller goes to deep sleep after this long unused */
 #define EINK_BUSY_TIMEOUT_US 10000000u  /* a BUSY this long means the panel is not answering */
 
 typedef struct eink {
@@ -58,6 +56,9 @@ typedef struct eink {
 	/* the refresh policy */
 	bool auto_on;
 	uint8_t idle10, full_after;
+	uint8_t cap10;                          /* AUTO_EXT: longest wait under continuous output, 10 ms (0: none) */
+	uint8_t full_kind;                      /* AUTO_EXT: the automatic full refresh's kind (EINK_FAST..EINK_GREY) */
+	uint8_t sleep_s;                        /* AUTO_EXT: seconds unused before deep sleep (0: never) */
 	uint32_t change_seq, shown_seq, refresh_seq;
 	uint32_t last_change, unshown_since;
 	bool unshown;                           /* a change since the running refresh took its picture */

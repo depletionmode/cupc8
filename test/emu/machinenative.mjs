@@ -21,9 +21,19 @@ import { kernelRom, ROOT } from './romimage.mjs';
 const native = createRequire(import.meta.url)(path.join(ROOT, 'build/emu-machine/machine.node'));
 const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
 
+// QEMU user networking's port forwards: 'tcp:8080:80' makes the PC's
+// 127.0.0.1:8080 reach the card's port 80 (hostfwd)
+function hostfwd(forward) {
+  return forward.map((f) => {
+    const m = /^(tcp|udp):(\d+):(\d+)$/.exec(f);
+    if (!m) throw new Error(`machinenative: forward '${f}' is not tcp|udp:HOSTPORT:CARDPORT`);
+    return `,hostfwd=${m[1]}:127.0.0.1:${m[2]}-:${m[3]}`;
+  }).join('');
+}
+
 // The Wi-Fi card's QEMU, started exactly as machine.mjs's EspCard does; the
 // native EspCard speaks the same $A6/$A5 protocol over these pipes.
-function startEsp(image) {
+function startEsp(image, forward = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-esp-'));
   const fifo = path.join(dir, 'uart1');
   execFileSync('mkfifo', [fifo + '.in', fifo + '.out']);
@@ -32,7 +42,7 @@ function startEsp(image) {
   const qemu = fs.readdirSync(path.join(SDK, 'espressif/tools/qemu-riscv32'))
     .map((v) => path.join(SDK, 'espressif/tools/qemu-riscv32', v, 'qemu/bin/qemu-system-riscv32'))[0];
   const proc = spawn(qemu, ['-nographic', '-machine', 'esp32c3', '-monitor', 'none',
-    '-drive', `file=${flash},if=mtd,format=raw`, '-nic', 'user,model=open_eth',
+    '-drive', `file=${flash},if=mtd,format=raw`, '-nic', 'user,model=open_eth' + hostfwd(forward),
     '-serial', 'file:' + path.join(dir, 'uart0.log'), '-chardev', `pipe,id=frames,path=${fifo}`,
     '-serial', 'chardev:frames'], { stdio: 'ignore' });
   const tx = fs.openSync(fifo + '.in', 'w');
@@ -41,13 +51,16 @@ function startEsp(image) {
 }
 
 export class Machine {
+  // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53']
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false,
-    threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false } = {}) {
+    threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [] } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
     const wifi = Object.entries(slots).filter(([, k]) => k === 'wifi');
     if (wifi.length > 1) throw new Error('machinenative: one Wi-Fi card at most');
-    if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'));
+    if (forward.length && !wifi.length) throw new Error('machinenative: forward needs a Wi-Fi card');
+    hostfwd(forward);                    // a bad entry throws before QEMU starts
+    if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward);
     m.h = native.create({ slots, rom: m.rom, sysctl, root: ROOT, threaded, spiLog,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };

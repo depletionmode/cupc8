@@ -1,8 +1,10 @@
-# Extended RAM (plan, not in M1)
+# Extended RAM (option A in M1)
 
-Status: **plan only** (David, 2026-09-25: "plan support, not added yet").
-Nothing here is built; the one M1 question is whether to wire the SRAM's
-top address pins now (below).
+Status: **option A decided and being implemented** (David, 2026-09-25:
+"implement the plan that uses the current 512 KB chip"), in M1: the board
+wiring, `RAM_BANK` at **$f205** (reset 2, a 16 KB window at $8000–$bfff),
+the system card's 24-bit RAM access, the kernel's bank routines and API
+entries, and the tests. B and C stay plans.
 
 ## What the machine has
 
