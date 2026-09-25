@@ -171,58 +171,76 @@ socket ([cpu-bus.md](../../doc/hardware/cpu-bus.md)). It boots from its own
 W25Q32JVSSIQ, which the system card reprograms through the socket (FL1 bus,
 CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
 
+- **Outline.** The I/O cards' outline (cpu-bus.md, CPU card outline): the
+  62 × 39.05 mm body `kg.IO_CARD_BODY`, with the M3 hole and the PWR LED
+  where every card has them. The x8 tab (x −0.65…50.65) sits under it with
+  5.35 mm shoulders, and finger B1 is at the same offset from the body's left
+  edge as on the x1 cards. `pipeline(io_card=True, tab=kg.X8_TAB)` draws and
+  checks the outline. The width is set by the x8 tab plus its two 5 mm
+  shoulders (61.3 mm, which the existing 62 covers). The height needed no
+  change: everything fits single-sided in 39.05 mm, as described below.
 - **FPGA pins** are read from `hw/pins.yaml` (`cpu_fpga`), the file that also
   generates `build/hw/cpucard.pcf`, so the schematic and the bitstream agree
   by construction. Each side of the package carries its bus lines in the
   order of their fingers, left to right. The bottom side (bank 3) has A0–A15
   on pins 1–20, then CPU_CLK (21, GBIN6), /RST, /STB, /RDY, RW and SYNC
   (22–26). The right side (bank 2), bottom up, has D0–D7 (37–45), IRQ0–3
-  (47–52), TMR_EXP0/1, HALTED and WAITING (55–61). So the front-side lines
-  reach their fingers without crossing, and A drops to the back layer
-  through its arrays. With the first two pin orders, Freerouting left 5–7
-  bus nets unrouted on every try, even when it could also route on In2.
+  (47–52), TMR_EXP0/1, HALTED and WAITING (55–61). I also tried the other
+  way round (D and the control lines on the bottom side, A on the right),
+  and it routed worse.
 - **Footprints** are JLC's own (`jlc:`, imported from the LCSC part) for the
   FPGA, the flash and the resistor arrays, so the BOM check (BRD-001) matches
   them pad for pad. The pin tables are in `hw/parts/`. The FPGA's table is
   Lattice's HX4K TQ144 pinout. All 144 pins were cross-checked against
-  KiCad's symbol and icestorm's chipdb. EasyEDA's symbol for C1521989 has
-  another device's pin names, and nothing uses it.
+  KiCad's symbol and icestorm's chipdb.
 - **Power** (Lattice FPGA-TN-02006, the iCE40 hardware checklist). VCC 1V2
   comes from an RT9013-12GB off the socket's +3V3. All four VCCIO banks,
   SPI_VCC and VPP_2V5 are on 3V3; VPP_2V5 may be 2.5–3.3 V when the FPGA
   boots from SPI flash. The PLLs are unused, but each VCCPLL still gets
   100 Ω + 4.7 µF + 100 nF, as the checklist asks. The caps go to that PLL's
   own GNDPLL pin, which is *not* joined to board ground. VPP_FAST is left
-  open. Each supply pin has 100 nF beside it, and each rail group has 4.7 µF.
-  The card takes nothing from +5V.
+  open. Every supply pin has 100 nF and its own via to its plane or rail,
+  and each rail group has 4.7 µF. The card takes nothing from +5V.
 - **Configuration.** SPI_SS_B and SPI_SCK are pulled up (controller mode).
   CRESET_B and CDONE are pulled up on the card as well as on the main board.
   /WP and /HOLD are pulled high, because the FPGA uses plain 0x0B reads.
 - **Bus.** Every card output (A, D, RW, /STB, SYNC, TMR_EXP, HALTED,
-  WAITING) has 33 Ω at the driver: eight 4D03 arrays, 4 × 33 Ω each.
-  CPU_CLK and the other inputs go straight to the FPGA.
+  WAITING) has 33 Ω at the driver: eight 4D02 arrays (0402x4, 4 × 33 Ω).
+  Each array keeps its pins' order on both rows: FPGA side on pads 1–4,
+  finger side on 8–5. CPU_CLK and the other inputs go straight to the FPGA.
 - **Straps.** CARD_ID = `10`: CARD_ID0 goes to GND, and CARD_ID1 is left to
-  the main board's pull-up. PRSNT1_n is joined to PRSNT2_n.
-- **LEDs.** The PWR LED (red, 1 kΩ from 3V3) sits at the common power-LED
-  spot, 3 mm in from the body's top-left corner. Next to it along the top
-  edge is the 1V2 rail LED ([power.md](../../doc/hardware/power.md)). 1.2 V
-  cannot light an LED, so an MMBT3904 driven from 1V2 switches a red LED on
-  3V3. The silkscreen labels them "PWR" and "1V2". There are test pads for
-  1V2, 3V3 and GND, and an M3 hole 4 mm in from the top-right corner, as on
-  the I/O cards. The board's title and revision are "CUPC/8 CPU rev A".
+  the main board's pull-up. PRSNT1_n is joined to PRSNT2_n. On this wide
+  card the link's run is on In2, because a run on B.Cu would wall the
+  address lines off their fingers.
+- **LEDs.** The PWR LED (D1, red, 1 kΩ from 3V3) is at the common power-LED
+  spot, 3 mm in from the body's top-left corner. The 1V2 rail LED (D2,
+  [power.md](../../doc/hardware/power.md)) is next to it along the top edge.
+  1.2 V cannot light an LED, so an MMBT3904 driven from 1V2 switches a red
+  LED on 3V3. The silkscreen labels them "PWR" and "1V2". There are test
+  pads for 1V2, 3V3 and GND. The title and revision are "CUPC/8 CPU rev A".
 - **Parts** (LCSC): iCE40HX4K-TQ144 C1521989, W25Q32JVSSIQ C179173,
-  RT9013-12GB C58464, 4D03WGJ0330T5E 33 Ω × 4 C25508, MMBT3904 C20526,
-  KT-0603R red LED C2286, and 0603 basics: 100 nF C14663, 1 µF C15849,
-  4.7 µF C19666, 10 kΩ C25804, 1 kΩ C21190, 100 Ω C22775.
-- **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold fingers, bevelled per the fab order spec (`kicadgen.order_spec`).
-  The layers are signal + GND pour / GND plane / 3V3 plane / signal + GND
-  pour. 1V2 is routed as tracks. With a TQ144 there
-  are 16 supply pins on all four sides, plus 31 series-terminated bus lines
-  and the clock. Two planes give every one of them a short via to its supply
-  and a solid return path under the whole bus, without cutting up a pour. On
-  two layers the fan-out would have to share its layers with the power.
-- **Placement.** Each 33 Ω array sits at its pins. A0–15 and /STB-RW-SYNC
-  are in a row under the bottom side. D0–3, D4–7 and the timer lines are in
-  a column right of the right side. The flash sits by the config pins, top right,
-  clear of the M3 hole. The PWR LED is at the common spot, 3 mm in from the
-  top-left corner. Nothing sits in the 4.5 mm strip above the fingers.
+  RT9013-12GB C58464, 4D02WGJ0330TCE 33 Ω × 4 C25501, MMBT3904 C20526,
+  KT-0603R red LED C2286, and 0402 basics: 100 nF C1525, 1 µF C52923,
+  4.7 µF C23733, 10 kΩ C25744, 1 kΩ C11702, 100 Ω C25076.
+- **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold fingers,
+  bevelled per the fab order spec (`kicadgen.order_spec`). The layers are
+  signal + GND pour / signal + GND pour / solid 3V3 plane / signal + GND
+  pour. Between the package and the fingers the bus has a 10 mm band, and
+  two signal layers could not route it. So In1 carries signals too, and its
+  GND pour fills round them. Every piece of that pour is tied by GND vias to
+  the stitched outer pours. 1V2 is routed as tracks.
+- **Placement.**
+  - The FPGA sits against the top edge, with its top pad row 0.85 mm in.
+    That leaves the 10 mm band under it for the arrays and the bus fan-out.
+  - The four top-side supply pins (VPP, VCC and 2 × VCCIO1, the last an
+    unused bank) are decoupled from the package's corners and sides, 5–10 mm
+    away, all on planes or the 1V2 rail. Every other supply pin has its
+    100 nF beside it.
+  - The A and control arrays are in a row under the bottom side. The D and
+    timer arrays are in a column right of the right side.
+  - The flash is by the config pins, under the top edge beside the M3 hole.
+    The configuration pull-ups are at the lower left, over their fingers.
+  - The LDO, the 1V2 switch and the PLL1 filter are on the left, on a grid.
+  - The logo is in the lower right.
+  - The designators are at JLC's 0.8 mm minimum height (`silk_text`): the
+    card is 0402s. Nothing sits in the 4.5 mm strip above the fingers.
