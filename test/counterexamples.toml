@@ -575,3 +575,31 @@ revert = [["tools/as.py", """            if directive == 'resb':""", """        
           ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
 cmd = "python3 test/asm/test_asm.py"
 must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'", "FAIL 'mov r0, #1"]
+
+[[bug]]
+name = "sim: an interactive run slept a millisecond per WAI (0.17 MHz with a timer tick)"
+fixed_in = "ced7599"
+# (as merged with the clock model: guest time is simClocks, held to the host clock)
+revert = [["tools/sim.nim", """          let behind = hostClocks() - simClocks
+          if behind <= 0:
+            sleep(1)
+            steps = 0
+          else:
+            steps = min(behind div 3 + 1, 400_000)""", """          sleep(1)
+          steps = clamp((hostClocks() - simClocks) div 3, 1, 400_000)"""]]
+cmd = "python3 test/sim/test_cli.py"
+must_fail = ["FAIL: interactive: a WAI-heavy guest keeps its 12 MHz clock"]
+
+[[bug]]
+name = "sim: a WAI turn was a microsecond, not 3 clocks, so its timer counts ran 4x slow (API_WAIT_MS ~4x slow)"
+fixed_in = "514c86a"
+# (as merged with the clock model: a turn is 3 of simClocks; the bug puts
+# a microsecond, 12, back)
+revert = [["tools/sim.nim", """    tickTimers()
+    inc ins_retired
+    simClocks += 3""", """    tickTimers()
+    inc ins_retired
+    simClocks += 12"""]]
+cmd = "tools/run_tests.sh testWaiTimer"
+must_fail = ["FAIL: ... 594 clocks, 49.5 us (4 counts a microsecond)"]
+

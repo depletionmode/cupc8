@@ -773,7 +773,7 @@ proc testIrqMaskMmio() =
   expect("mask readable", mem[0xf201], 5)
 
 proc testMsCounter() =
-  ## SIM-011: the chipset's millisecond counter and tick in sim.nim, as
+  ## SIM-013: the chipset's millisecond counter and tick in sim.nim, as
   ## memory-map.md and chipset.vhd (CLK-001, IRQ-003) have them
   echo "== the millisecond counter and the tick =="
   loadProgram(testdata / "ms_tick.s")
@@ -820,6 +820,30 @@ run testIrqOps
 run testIrqTimer
 run testMsCounter
 run testIrqPopPcl
+
+proc testWaiTimer() =
+  ## SIM-011: parked in WAI the timers count once a turn of 3 clocks, as
+  ## cpu.vhd's tick/settle/check loop does: 4 counts a microsecond
+  echo "== timers in WAI =="
+  loadProgram(testdata / "wai_timer.s")
+  var n = 0
+  while n < 400 and not waiting and not HF:
+    discard cpuStep()
+    inc n
+  expectTrue("parked in wai", waiting)
+  var steps = 0
+  let clocks0 = simClocks
+  while steps < 1000 and waiting:
+    discard cpuStep()
+    inc steps
+  # TMR0 and WAI count it as they retire (the manual): 198 turns are left
+  expect("tmr0 #200 wakes WAI after 198 idle turns", steps, 198, 4)
+  expect("... 594 clocks, 49.5 us (4 counts a microsecond), and the IRQ entry's 20",
+         simClocks - clocks0, 614, 4)
+  discard runToHalt()
+  expect("the code after WAI ran", mem[0x2000], 0x55)
+
+run testWaiTimer
 run testIrqFlags
 run testIrqCli
 run testIrqKeyb

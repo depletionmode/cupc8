@@ -219,6 +219,27 @@ def main():
     mean = sum(gaps) / len(gaps) if gaps else 0
     check("the interactive sim: hello steps once a wall-clock second (%s s)" % ", ".join("%.3f" % g for g in gaps),
           len(gaps) >= 5 and 0.98 <= mean <= 1.04, "%d steps" % len(steps))
+    # interactive pacing: a machine woken from WAI every 50 instructions must
+    # still run at about 1 MHz (the sim once slept a millisecond per WAI: 0.17)
+    prg = os.path.join(work, "WAIT.PRG")
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "mkprg.py"),
+                    os.path.join(ROOT, "test", "sim", "waitloop.s"), "-o", prg], check=True, capture_output=True)
+    img2 = os.path.join(work, "pace.img")
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "blank", img2, "2048"],
+                   check=True, capture_output=True)
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "put", img2, "WAIT.PRG", prg],
+                   check=True, capture_output=True)
+    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
+    try:
+        r = subprocess.run([SIM, "--cards:hdmi,io,storage", "--sd:" + img2, '--type:exec "WAIT.PRG"\\n'],
+                           capture_output=True, text=True, timeout=12, env=env)
+        out = r.stdout
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+    # the speed line: instructions (WAI turns included) and the clocks they came to
+    mhz = [float(m) for m in re.findall(r"([0-9.]+) MHz of CUPC/8 clock", out)]
+    check("interactive: a WAI-heavy guest keeps its 12 MHz clock (last %s)" % (mhz[-3:],),
+          len(mhz) >= 3 and all(11 <= x <= 13 for x in mhz[-3:]), out[-400:])
 
     # the old I/O model
     obj = os.path.join(work, "gpo.o")

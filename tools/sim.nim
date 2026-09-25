@@ -54,6 +54,13 @@ proc log(lvl : int, msg : string) =
         writeLine(stdout, msg)
         resetAttributes()
 
+proc speedLine(ips, cps: float): string =
+  ## instructions per second (WAI idle turns included), and the CPU clocks a
+  ## second they came to (simClocks: the real CPU runs 12 MHz, so an
+  ## interactive run held to the host clock shows 12)
+  "$1 MIPS, $2 MHz of CUPC/8 clock (the real one: 12 MHz)" %
+    [formatFloat(ips / 1_000_000, ffDecimal, 2), formatFloat(cps / 1_000_000, ffDecimal, 1)]
+
 proc status(msg: string) =
   ## the speed line: rewritten in place, not one line per second
   if (8 and log_mask) > 0:
@@ -932,6 +939,8 @@ proc cpuStep*(): StepResult =
   if ioModel == imCards and ins_retired - lastCardTick >= 64:
     cardsTick()
   if waiting:
+    # parked in WAI the CPU loops tick, settle, check: one timer count and 3
+    # clocks a turn (cpu.vhd), so 4 counts a microsecond
     tickTimers()
     inc ins_retired
     simClocks += 3
@@ -1267,6 +1276,7 @@ Both:
     var lastPresent = 0.0
     var lastMhz = realAt
     var lastMhzIns = 0
+    var lastMhzClocks = simClocks
     while not atend:
       if HF or PC >= imageEnd:
         echo "HALT!"
@@ -1293,9 +1303,16 @@ Both:
           idleAt = -1
         var steps = 1000
         if not headless:
-          sleep(1)
-          # idle turns up to the host clock (at most 100 ms of them at once)
-          steps = clamp((hostClocks() - simClocks) div 3, 1, 400_000)
+          # idle turns (3 clocks each) up to the host clock, at most 100 ms
+          # of them at once; sleep only while the guest is ahead of it: a
+          # sleep per WAI would cap a machine that wakes often (a timer tick)
+          # at a few hundred instructions per millisecond
+          let behind = hostClocks() - simClocks
+          if behind <= 0:
+            sleep(1)
+            steps = 0
+          else:
+            steps = min(behind div 3 + 1, 400_000)
         if maxIns > 0:
           steps = min(steps, maxIns - ins_retired)
         var i = 0
@@ -1327,9 +1344,11 @@ Both:
           display_render()
           lastPresent = now
         if now - lastMhz >= 1.0:
-          status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / (now - lastMhz) / 1_000_000, ffDecimal, 2))
+          status(speedLine(float(ins_retired - lastMhzIns) / (now - lastMhz),
+                           float(simClocks - lastMhzClocks) / (now - lastMhz)))
           lastMhz = now
           lastMhzIns = ins_retired
+          lastMhzClocks = simClocks
     echo cpuStatusLine()
     if dumpText.len > 0:
       let g = gpuCard()
@@ -1384,6 +1403,7 @@ Both:
     var lastPresent = start
     var lastMhz = start
     var lastMhzIns = 0
+    var lastMhzClocks = simClocks
     if wantDisplay:
       display_render()
     while not atend:
@@ -1402,9 +1422,10 @@ Both:
             lastPresent = now
           if now - lastMhz >= 1.0:
             let dt = now - lastMhz
-            status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / dt / 1_000_000, ffDecimal, 2))
+            status(speedLine(float(ins_retired - lastMhzIns) / dt, float(simClocks - lastMhzClocks) / dt))
             lastMhz = now
             lastMhzIns = ins_retired
+            lastMhzClocks = simClocks
     if dumpFb.len > 0:
       display_dumpPpm(dumpFb)
       echo "wrote framebuffer ", dumpFb

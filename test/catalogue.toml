@@ -38,7 +38,7 @@ cmd = "tools/run_tests.sh"
 [[test]]
 id = "SIM-010"
 title = "The simulator CLI runs the M1 machine with its slot cards"
-checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000"
+checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000; interactively (SDL's dummy video driver) a guest woken from WAI by timer 0 every 50 instructions keeps its 12 MHz clock on the speed line (11-13 MHz: no sleep per WAI while the guest is behind the host clock)"
 method = "test/sim/test_cli.py builds tools/sim and runs it as a user would; the HTTP server runs in the test"
 kind = "sim"
 vrow = "2.1"
@@ -46,12 +46,12 @@ cmd = "python3 test/sim/test_cli.py"
 
 [[test]]
 id = "SIM-011"
-title = "The simulator's millisecond counter and tick"
-checks = "sim.nim counts the CPU's clocks as cpu.vhd and the chipset spend them (4 a memory cycle, 2 an I/O cycle, 4 more an instruction, 3 a WAI idle turn, 20 an IRQ entry), the one guest time (the chipset's counter and the cards' ms): a program parked in WAI with only the tick unmasked takes two ticks on the SPI vector (CPU line 3) with IRQ_PEND $10, the second at MS_COUNT 100 and 1200000 clocks (+400); masked by bit 4 (SPI's bit 3 set) three ticks' worth leave it waiting, unmasked the pending tick is taken; MS_COUNT0 latches MS_COUNT1-3 across a carry of the low byte and at $12345678; IRQ_MASK reads back bits 4:0"
-method = "tools/simtest.nim testMsCounter (tools/testdata/ms_tick.s; cardsLoadTest for the registers)"
+title = "Simulator timers count in WAI as the CPU does"
+checks = "parked in WAI, cpu.vhd counts its timers once a turn of 3 clocks (tick, settle, check), 4 counts a microsecond: tmr0 #200 (counted down as TMR0 and WAI retire) wakes WAI after 198 turns, 594 clocks and the IRQ entry's 20; the code after WAI runs"
+method = "tools/simtest.nim testWaiTimer (tools/testdata/wai_timer.s)"
 kind = "sim"
 vrow = "2.1"
-cmd = "tools/run_tests.sh testMsCounter"
+cmd = "tools/run_tests.sh testWaiTimer"
 
 [[test]]
 id = "SIM-012"
@@ -61,6 +61,16 @@ method = "test/sim/test_cli.py (builds tools/sim; the interactive check reads th
 kind = "sim"
 vrow = "2.1"
 cmd = "python3 test/sim/test_cli.py"
+
+[[test]]
+id = "SIM-013"
+title = "The simulator's millisecond counter and tick"
+checks = "sim.nim counts the CPU's clocks as cpu.vhd and the chipset spend them (4 a memory cycle, 2 an I/O cycle, 4 more an instruction, 3 a WAI idle turn, 20 an IRQ entry), the one guest time (the chipset's counter and the cards' ms): a program parked in WAI with only the tick unmasked takes two ticks on the SPI vector (CPU line 3) with IRQ_PEND $10, the second at MS_COUNT 100 and 1200000 clocks (+400); masked by bit 4 (SPI's bit 3 set) three ticks' worth leave it waiting, unmasked the pending tick is taken; MS_COUNT0 latches MS_COUNT1-3 across a carry of the low byte and at $12345678; IRQ_MASK reads back bits 4:0"
+method = "tools/simtest.nim testMsCounter (tools/testdata/ms_tick.s; cardsLoadTest for the registers)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testMsCounter"
+
 
 [[test]]
 id = "SIM-005"

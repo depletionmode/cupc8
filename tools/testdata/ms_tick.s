@@ -1,4 +1,4 @@
-; SIM-011: the chipset's millisecond counter and tick (memory-map.md) in
+; SIM-013: the chipset's millisecond counter and tick (memory-map.md) in
 ; sim.nim. Parked in WAI with only the tick unmasked; its handler (the SPI
 ; vector, CPU line 3) keeps IRQ_PEND and the counter, and after the second
 ; tick the program halts.
