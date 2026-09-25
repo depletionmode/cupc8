@@ -179,7 +179,7 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
   contact 1, 40 mm up) line up at x = 64 mm; two M3 holes on that line, 10 mm
   north of slot 1 and 10 mm south of slot 6, carry the rail's posts
   (`slot.md`, Mechanical). Six more M3 holes at the corners and the east edge.
-- **Slots:** each +5V through its own 0.75 A PTC, 0 Ω 0805 link and 50 mΩ
+- **Slots:** each +5V through its own 1.1 A PTC (SMD1206P110TFT: 0.80 A per card), 0 Ω 0805 link and 50 mΩ
   sense resistor, with test pads either side of the sense. IRQ_n 4.7 kΩ,
   CARD_RST_n, PROG_n and PRSNT2_n 10 kΩ pull-ups. SWCLK/SWDIO from the two
   CD74HC4051 (U11 clock, U12 data; channel n−1 = slot n, MUX_SEL pulled high

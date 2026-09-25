@@ -48,6 +48,7 @@ POWER = {
     "EFUSE_DVDT": ("680p", "C107055"),                # C15
     # --- 5V_SYS and the rails ---
     "5V_SYS_BULK": ("22u", "C45783"),                 # C3
+    "SLOT_PTC": ("1.1A SMD1206P110TFT", "C143975"),   # F200..F700: 0.80 A per card (slot.md)
     "SLOT_LINK": ("0R 0805, <= 50 mOhm", "C17477"),   # R201.. (each slot's isolation link)
     "BUCK": ("TLV62569PDDCR", "C398365"),             # U3 (THM-001 T2)
     "BUCK_L": ("2.2uH HPC5020NF-2R2M, Isat 4.1 A, DCR 32 mOhm", "C357060"),   # L1
@@ -453,7 +454,8 @@ def build_parts():
         part("J%d" % (10 + n), "cupc8:CUPC8_Slot", "Slot %d" % n, sockets.SOCKETS["CUPC8_Slot"][0], "C404113",
              {num: slot_net(n, nm) for num, nm in names.items()})
         v = "SLOT%d_5V" % n
-        part("F%d" % b, "Device:Polyfuse", "0.75A", "Fuse:Fuse_1206_3216Metric", "C545214", {1: "+5V", 2: v + "_F"})
+        part("F%d" % b, "Device:Polyfuse", "1.1A", "Fuse:Fuse_1206_3216Metric", POWER["SLOT_PTC"][1],
+             {1: "+5V", 2: v + "_F"})
         R("R%d" % (b + 1), "0", v + "_F", v + "_L", "Resistor_SMD:R_0805_2012Metric", "C17477")
         R("R%d" % (b + 2), "50m", v + "_L", v, "Resistor_SMD:R_1206_3216Metric", "C127691")
         R("R%d" % (b + 3), "4.7k", "+3V3", "SLOT_nIRQ%d" % (n - 1))
