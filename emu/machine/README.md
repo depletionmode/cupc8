@@ -89,6 +89,12 @@ clocks, CPU state, RAM, every card's time, cycle counts and UART, a hash over
 (board clocks, outputs, every card's time) after every iteration, every SPI
 frame, and the screen.
 
+A `storage` slot runs `build/rp2040/storage.elf` with the SD card model's
+socket on its SPI1 (`emu/rp2040/harness/sdcard.h`); `Machine::sd()`, and
+`sdInsert`/`sdRemove`/`sdCard` in the addon (`m.sd` in machinenative.mjs), put
+an image in and take it out between runs. The model runs on the storage
+card's own clock, inside its thread.
+
 Harness hooks used in emu/rp2040: `FIFO::onPull` (TMDS capture), the SPI
 `onTransmit`/`completeTransmit` callbacks, USBCDC and UsbKeyboard; nothing in
 emu/rp2040 was changed for this directory.

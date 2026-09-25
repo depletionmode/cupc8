@@ -327,3 +327,24 @@ export class USBCDC {
     N.cdcSend(this.h, b);
   }
 }
+
+// not in rp2040js: the storage card's microSD socket on SPI1 (SCK 14, MOSI 15,
+// MISO 12, nCS 13, card detect 17) with an SD card model backed by an image
+// file (emu/rp2040/harness/sdcard.h)
+export class SdSocket {
+  constructor(emu) {
+    this.h = emu.h;
+    N.sdCreate(this.h);
+  }
+  // opts: { highCapacity, writeProtect, initMs, readUs, writeMs, ncr }
+  insert(image, opts = {}) {
+    N.sdInsert(this.h, image, opts);
+  }
+  remove() {
+    N.sdRemove(this.h);
+  }
+  // null (no card) or { initialised, busy, blocks, violations, stats }
+  card() {
+    return N.sdCard(this.h);
+  }
+}
