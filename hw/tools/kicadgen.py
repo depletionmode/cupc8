@@ -1266,11 +1266,12 @@ def remove_dangling(board, pours=()):
         del tracks, items, segs, vias, removable, gone
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3):
+def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
-    and an error after `tries`."""
+    and an error after `tries`. `salt` starts the tries' orderings further
+    on, for a second round that must not repeat the first."""
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
@@ -1292,11 +1293,11 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
         # each try orders the problem differently (a UUID salt): Freerouting
         # can stall on one order and complete on another, and the salt keeps
         # every run of the pipeline the same
-        stable_uuids(board, attempt)
+        stable_uuids(board, salt + attempt)
         if not pcbnew.ExportSpecctraDSN(board, dsn):
             raise RuntimeError("DSN export failed")
         with open(dsn) as f:
-            text = canonical_dsn(f.read(), attempt)
+            text = canonical_dsn(f.read(), salt + attempt)
         with open(dsn, "w") as f:
             f.write(text)
         if os.path.exists(ses):
@@ -2088,20 +2089,15 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # here, on KiCad's own connectivity: a try that left one open is
         # thrown away and the router runs again with more passes
         escaped = tuple(state.get("escaped", ()))
-        for attempt in range(3):
-            if attempt:
+        for round_ in range(2):
+            if round_:
                 state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
-            try:
-                autoroute(state["b"], out, passes * (attempt + 1), pours=tuple(pour_nets) + escaped, tries=1)
-            except RuntimeError as e:
-                if attempt == 2:
-                    raise RuntimeError("%s; 3 tries, %d to %d passes" % (e, passes, passes * 3))
-                continue
+            autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped, salt=3 * round_)
             open_nets = open_escapes(state["b"], escaped)
             if not open_nets:
                 break
-            if attempt == 2:
-                raise RuntimeError("Freerouting left %s unrouted after 3 tries" % open_nets)
+        else:
+            raise RuntimeError("Freerouting left %s unrouted, twice over 3 tries" % open_nets)
         if card_edge:
             n = clear_fingers(state["b"], pour_nets)
             return "%d pour tracks cleared off the fingers" % n if n else None
