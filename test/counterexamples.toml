@@ -20,12 +20,16 @@ must_fail = ["FAIL tmr0 r1"]
 name = "kernel BASIC: tokenizer, mem_cmp, precedence, strings, FOR/NEXT, jumps, REM, ELSE, 0, /0, long lines"
 fixed_in = "e635dbd"
 before = "f811788"
-files = ["kernel/ubasic.s", "kernel/ubasic_tokenizer.s", "kernel/printf.s", "kernel/math.s", "kernel/term.s"]
-cmd = "tools/run_tests.sh testBasicPrograms"
-must_fail = ["BASIC precedence", "BASIC string", "BASIC for/next", "BASIC if/then/else", "BASIC goto loop",
-             "BASIC gosub", "BASIC nested for", "BASIC parentheses", "BASIC equals", "BASIC zero",
-             "BASIC rem", "BASIC mod, divide by 0", "BASIC let in then", "BASIC gosub nest",
-             "BASIC longest line"]
+# The fix touched ubasic.s, ubasic_tokenizer.s, printf.s, math.s and term.s;
+# those old files no longer assemble with today's kernel (sys.s, the API,
+# calls routines they lack), so the whole kernel as it was goes back, and
+# the files added since go.
+files = ["kernel"]
+cmd = "rm -f kernel/api.inc kernel/api.s kernel/bank.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
+must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/next", "FAIL: BASIC if/then/else",
+             "FAIL: BASIC goto loop", "FAIL: BASIC gosub", "FAIL: BASIC nested for", "FAIL: BASIC parentheses",
+             "FAIL: BASIC equals", "FAIL: BASIC zero", "FAIL: BASIC rem", "FAIL: BASIC mod, divide by 0",
+             "FAIL: BASIC let in then", "FAIL: BASIC gosub nest", "FAIL: BASIC longest line"]
 
 [[bug]]
 name = "kernel: the BASIC program buffer overflowed"
@@ -333,15 +337,11 @@ must_fail = ["FAIL race sweep: every READ framed"]
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
 fixed_in = "52423fa"
-revert = [["kernel/term.s", """term_do:
-	; start with an empty program: .bss is not cleared, and the SRAM
-	; powers up with junk
-	xor r0, r0
+revert = [["kernel/term.s", """	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
 	st [term_basic_prog_buf], r0
-
-""", """term_do:
-"""]]
+	st API_RUN, r0""", """	xor r0, r0
+	st API_RUN, r0"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
 must_fail = ["FAIL: BASIC on junk RAM"]
 
@@ -490,7 +490,7 @@ must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
 [[bug]]
 name = "sim: headless --type hung when no card took the key (no IO card)"
 fixed_in = "000d63c"
-revert = [["tools/sim.nim", """        if not ranSinceKey and ins_retired - keyAt >= settleMs * 1000:
+revert = [["tools/sim.nim", """        if not ranSinceKey and msCount() - keyAt >= settleMs:
           ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
 """, ""]]
 cmd = "python3 test/sim/test_cli.py"
