@@ -6,6 +6,11 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## Decisions (David, 2026-09-24)
 
+- **Card form factor:** the CPU card has the I/O card outline (62 × 39.05 mm
+  above the tab) on its x8 tab; on the main board the CPU socket is first,
+  then the six I/O slots, one row, all aligned. The system card keeps its
+  own shape, its socket off to one side (`slot.md`, `cpu-bus.md`).
+
 - **Power: the full M1 machine requires a USB-C 3.0 A source** (four cards
   no longer fit 1.5 A with margin). Below 3 A the radio stays off and SD
   writes are refused. The power agent re-derives the CC threshold, the
