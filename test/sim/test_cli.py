@@ -19,6 +19,7 @@ Runs the sim binary headless, typing with --type and reading the console with
 
 import http.server
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -139,6 +140,27 @@ def main():
         check(kind + ": the program ran", "\n42\n" in text and "DONE." in text, out + text)
         # rows 0-7 of text are 16 px each: the banner (row 1), the typed lines and 42
         check(kind + ": the text is on the glass", ink_rows(ppm, 16, 128) > 500, ppm)
+
+    # interactive pacing: a machine woken from WAI every 50 instructions must
+    # still run at about 1 MHz (the sim once slept a millisecond per WAI: 0.17)
+    prg = os.path.join(work, "WAIT.PRG")
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "mkprg.py"),
+                    os.path.join(ROOT, "test", "sim", "waitloop.s"), "-o", prg], check=True, capture_output=True)
+    img2 = os.path.join(work, "pace.img")
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "blank", img2, "2048"],
+                   check=True, capture_output=True)
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "put", img2, "WAIT.PRG", prg],
+                   check=True, capture_output=True)
+    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
+    try:
+        r = subprocess.run([SIM, "--cards:hdmi,io,storage", "--sd:" + img2, '--type:exec "WAIT.PRG"\\n'],
+                           capture_output=True, text=True, timeout=12, env=env)
+        out = r.stdout
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+    mhz = [float(m) for m in re.findall(r"([0-9.]+) MHz", out)]
+    check("interactive: WAI-heavy guest runs at ~1 MHz (last %s)" % (mhz[-3:],),
+          len(mhz) >= 3 and min(mhz[-3:]) >= 0.7, out[-400:])
 
     # the old I/O model
     obj = os.path.join(work, "gpo.o")

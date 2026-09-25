@@ -1176,6 +1176,10 @@ Both:
     var readyDone = false
     var idleAt = -1                   # ins_retired when the typed text was used up and the CPU parked
     var lastReal = epochTime()
+    # guest time is one microsecond per instruction (WAI steps included);
+    # interactive runs keep it level with the host clock from here
+    let realStart = lastReal
+    let insStart = ins_retired
     var lastPresent = 0.0
     var lastMhz = lastReal
     var lastMhzIns = 0
@@ -1203,8 +1207,15 @@ Both:
             idleAt = ins_retired
         var steps = 1000
         if not headless:
-          sleep(1)
-          steps = clamp(int((epochTime() - lastReal) * 1_000_000), 1, 100_000)
+          # sleep only while the guest is ahead of the host clock: a sleep per
+          # WAI would cap a machine that wakes often (a timer tick) at a few
+          # hundred instructions per millisecond
+          let behind = insStart + int((epochTime() - realStart) * 1_000_000) - ins_retired
+          if behind <= 0:
+            sleep(1)
+            steps = 1000
+          else:
+            steps = min(behind, 100_000)
         if maxIns > 0:
           steps = min(steps, maxIns - ins_retired)
         var i = 0
