@@ -388,6 +388,23 @@ async function e2e010() {
   expect(await m.runUntil(() => count(screenText(m), 'ST FF FF FF FF') === 2, 3e9, 50e6), 'it ran a second time');
   m.type('10 print 6*7\nrun\n');
   if (!expect(await waitFor(m, '42', 3e9), 'the terminal still works: a typed program runs')) console.log('---- screen\n' + screenText(m));
+  // examples/hello: its light steps once a "second", ten API_WAIT_MS 100 on
+  // the chipset's millisecond counter (each 100-101 ms) and its printing;
+  // timed here in emulated time on the RTL, by its LEDs (GPO, to 0.2 ms;
+  // the sim gives 1012-1013 ms)
+  r = await cupc8(m, 'run', mkprg('examples/hello/hello.s'));
+  expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run hello.prg: ${r.out.trim()}`);
+  const at = [];
+  for (const led of [2, 4, 8]) {
+    if (!expect(await m.runUntil(() => m.state().gpo === led, 3e9, 0.2e6), `hello's light reaches $${led.toString(16)}`)) break;
+    at.push(m.ns);
+  }
+  const gaps = at.slice(1).map((t, i) => Math.round((t - at[i]) / 1e6));
+  log(`hello's steps: ${gaps} ms apart`);
+  expect(gaps.length === 2 && gaps.every((g) => g >= 1000 && g <= 1015), `hello steps every 1000-1015 ms of emulated time (${gaps} ms)`);
+  expect(screenText(m).includes('seconds 00'), 'hello counts seconds on the screen');
+  m.type('x');
+  expect(await waitFor(m, "You pressed 'x'", 2e9), 'a key stops hello; the terminal is back');
   m.stop();
 }
 

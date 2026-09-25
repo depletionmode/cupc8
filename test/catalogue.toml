@@ -815,7 +815,7 @@ cmd = "test/emu/backend_diff.sh"
 [[test]]
 id = "EMU-007"
 title = "Native whole-machine emulator: threaded = serial"
-checks = "boot to BASIC and a typed program (1.6 s emulated) on the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42. No longer compared with test/emu/machine.mjs: the legacy JS emulator is not maintained (David, 2026-09-25) and still has the CS_n edge bug the native machine's E2E-011 fix removed, so the two differ"
+checks = "boot to BASIC and a typed program (2.4 s emulated: the boot ROM's copy of the kernel body, 21.7 KB since the layout moved data to $6000, takes 1.3 s of it) on the native machine serially, and threaded twice: identical board clock count, CPU state, each card's emulated time, core cycle counts and UART, every slot SPI frame (bytes both ways, start and end times) and screen text; the program prints 42. No longer compared with test/emu/machine.mjs: the legacy JS emulator is not maintained (David, 2026-09-25) and still has the CS_n edge bug the native machine's E2E-011 fix removed, so the two differ"
 method = "test/emu/machine_diff.sh (test/emu/test_machine_native.mjs, emu/machine, tools/emu_machine_build.sh)"
 kind = "sim"
 vrow = "3.2"
@@ -1222,7 +1222,7 @@ cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node
 [[test]]
 id = "E2E-010"
 title = "cupc8.py run: a program over USB into RAM at $7000"
-checks = "on the native emulator (HDMI, IO, the system card): cupc8.py run eink_prog.prg writes the body at $7000 through the bridge while the CPU runs, then API_RUN; the terminal starts it from its key wait; its e-ink calls on HDMI print AUTO FF, GET FF x7, ST FF x4; it returns to the prompt; the bare binary runs a second time; a typed BASIC program still runs"
+checks = "on the native emulator (HDMI, IO, the system card): cupc8.py run eink_prog.prg writes the body at $7000 through the bridge while the CPU runs, then API_RUN; the terminal starts it from its key wait; its e-ink calls on HDMI print AUTO FF, GET FF x7, ST FF x4; it returns to the prompt; the bare binary runs a second time; a typed BASIC program still runs; examples/hello (mkprg.py with api.inc) run the same way steps its LEDs every 1000-1015 ms of emulated time (the chipset's millisecond counter on the RTL; 1013 ms measured, the sim gives 1012-1013) and a key stops it"
 method = "test/emu/test_e2e.mjs E2E-010 (tools/cupc8.py against the emulated system card)"
 kind = "sim"
 vrow = "3.2"

@@ -6,7 +6,8 @@
 //   node test/emu/test_machine_native.mjs [--ns N] [--type TEXT] [--expect TEXT]
 //
 // Runs the kernel ROM with the GPU and IO cards for N ns (default: boot to
-// BASIC and type a program, 1.6 s), on the native machine serially, and
+// BASIC and type a program, 2.4 s: the boot ROM copies the 21.7 KB kernel
+// body for 1.3 s of it), on the native machine serially, and
 // threaded twice, and compares the main board's clock count and CPU state,
 // every card's clock, core cycle counts and UART output, every SPI frame each
 // card saw (bytes both ways, start and end times) and the screen read off the
@@ -17,7 +18,7 @@ import { Machine as NativeMachine } from './machinenative.mjs';
 import { kernelRom } from './romimage.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
-const NS = Number(arg('--ns', '1.6e9'));
+const NS = Number(arg('--ns', '2.4e9'));
 const TYPE = (arg('--type', '10 print 6*7\\nrun\\n') || null)?.replace(/\\n/g, '\n');
 const EXPECT = arg('--expect', process.argv.includes('--type') ? '' : '42');
 const rom = kernelRom();
