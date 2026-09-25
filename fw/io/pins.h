@@ -12,7 +12,10 @@
 #define PIN_SLOT_NCS           5
 /* slot: open drain */
 #define PIN_SLOT_NIRQ          6
+/* debug: keyboard connected */
 #define PIN_LED_KBD            25
+/* debug: keyboard activity: lit ~30 ms after each HID report */
+#define PIN_LED_KEY            24
 #define PIN_UART_TX            16
 
 #endif

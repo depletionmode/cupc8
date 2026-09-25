@@ -26,6 +26,7 @@ import Part
 JOB = json.load(open(os.environ["MECH_JOB"]))
 OUT = JOB["out"]
 CHECKS = {"MECH-%03d" % i: [] for i in range(1, 9)}
+ROW = ("cpu", "io")        # the cards in the one row (slot.md, Mechanical)
 EPS_VOL = 1e-3            # mm^3: less than this in common is touching, not a collision
 
 
@@ -133,15 +134,18 @@ def read_assembly(path):
     return body, comps
 
 
-def assign(comps, fps, mid):
+def assign(comps, fps, mid, name=""):
     """{ref: shape}: each assembly node to the footprint at its position."""
     parts = {}
     for pos, shape in comps:
         side = "F" if pos.z > mid else "B"
         same = [fp for fp in fps if fp["side"] == side] or fps
-        fp = min(same, key=lambda f: math.dist(step_xy(f["pos"]), (pos.x, pos.y)))
-        if math.dist(step_xy(fp["pos"]), (pos.x, pos.y)) > 0.01:
-            raise SystemExit("3D model at (%.2f, %.2f) matches no footprint" % (pos.x, pos.y))
+
+        def miss(f):
+            return min(math.dist(a, (pos.x, pos.y)) for a in f["model_at"] + [step_xy(f["pos"])])
+        fp = min(same, key=miss)
+        if miss(fp) > 0.01:
+            raise SystemExit("%s: 3D model at (%.2f, %.2f) matches no footprint" % (name, pos.x, pos.y))
         parts[fp["ref"]] = Part.makeCompound([parts[fp["ref"]], shape]) if fp["ref"] in parts else shape
     return parts
 
@@ -160,7 +164,7 @@ class Card:
         self.slab = base.extrude(V(0, 0, self.T))
         self.slab.translate(V(0, 0, self.bot - bb.ZMin))
         self.fps = c["fps"]
-        self.parts = assign(comps, self.fps, self.mid)
+        self.parts = assign(comps, self.fps, self.mid, name)
         self.by_ref = {fp["ref"]: fp for fp in self.fps}
         b1, a, d = c["edge"]
         self.b1, self.a, self.d = b1, a, d
@@ -184,6 +188,10 @@ class Card:
     def top_edge(self):
         """How far 'up' (away from the fingers) the card reaches, in STEP x, y."""
         return max(dot((v.Point.x, v.Point.y), self.up_s) for v in self.slab.Vertexes)
+
+    def edge(self, d):
+        """How far the card reaches along direction d (STEP x, y)."""
+        return max(dot((v.Point.x, v.Point.y), d) for v in self.slab.Vertexes)
 
 
 cards = {}
@@ -231,10 +239,14 @@ if JOB["main"]:
         shape.translate(shift)
         main_items.append(("main board " + ref, shape))
 elif frames:
-    xs = [f["b1"] for f in frames]
     t = JOB["standin_cfg"]["main_t"]
-    main_plate = Part.makeBox(90, (len(xs) - 1) * JOB["standin_cfg"]["pitch"] + 40, t,
-                              V(-20, xs[0][1] - 20, 0))
+    bb = None
+    for sk in sockets.values():
+        if bb is None:
+            bb = sk.BoundBox
+        else:
+            bb.add(sk.BoundBox)
+    main_plate = Part.makeBox(bb.XLength + 30, bb.YLength + 30, t, V(bb.XMin - 15, bb.YMin - 15, 0))
 
 
 # -------------------------------------------------------------- placements
@@ -293,7 +305,7 @@ def mech_003_008():
     cem = JOB["cem"]
     for c in cards.values():
         (up, ru), (down, rd) = c.envelope()
-        cid = "MECH-003" if c.c["kind"] == "io" else "MECH-008"
+        cid = "MECH-003" if c.c["kind"] in ROW else "MECH-008"
         add(cid, up <= cem["comp_side_max"] + 1e-6,
             "%s: tallest on the component side %.2f mm (%s), CEM Fig. 9-1 max %.2f" % (c.name, up, ru, cem["comp_side_max"]))
         add(cid, down <= cem["solder_side_max"] + 1e-6,
@@ -309,7 +321,7 @@ def mech_003_008():
             if ck not in pair_cache:
                 pair_cache[ck] = closest(p.items, q.items)
             d, na, nb, pa, pb, vol = pair_cache[ck]
-            cid = "MECH-003" if p.kind == "io" and q.kind == "io" else "MECH-008"
+            cid = "MECH-003" if p.kind in ROW and q.kind in ROW else "MECH-008"
             key = (cid,) + tuple(sorted((p.card.name, q.card.name)))
             if key not in worst or d < worst[key][0]:
                 worst[key] = (d, p, na, q, nb, vol, pa, pb)
@@ -322,7 +334,6 @@ def mech_003_008():
         gaps.append((d, pa, pb))
     # every card against the sockets it is not in, and the main board's parts
     for p in placed:
-        cid = "MECH-003" if p.kind == "io" else "MECH-008"
         others = [(r, s) for r, s in sockets.items() if r != p.slot]
         near = [(r, s) for r, s in others if bb_gap(p.bb, s.BoundBox) < 25]
         if near:
@@ -331,7 +342,7 @@ def mech_003_008():
         if main_items:
             d, na, nb, _, _, vol = closest(p.items, main_items)
             p.main_gap = (d, na, nb, vol)
-    for kind, cid in (("io", "MECH-003"), ("cpu", "MECH-008"), ("system", "MECH-008")):
+    for kind, cid in (("io", "MECH-003"), ("cpu", "MECH-003"), ("system", "MECH-008")):
         ps = [p for p in placed if p.kind == kind]
         for attr, what in (("sock_gap", "a neighbouring socket"), ("main_gap", "the main board's parts")):
             got = [(getattr(p, attr), p) for p in ps if hasattr(p, attr)]
@@ -360,35 +371,42 @@ def mech_004():
             if part is None:
                 add("MECH-004", False, "%s %s: no 3D model, so its overhang can't be checked" % (c.name, fp["ref"]))
                 continue
-            face = max(dot((v.Point.x, v.Point.y), c.up_s) for v in part.Vertexes)
-            over = face - top
+            # a connector faces out of the top edge, or out of the back edge
+            # (the B1 end, slot.md Mechanical): whichever it reaches past more
+            back_s = (-c.a_s[0], -c.a_s[1])
+            ups = [(max(dot((v.Point.x, v.Point.y), d) for v in part.Vertexes) - c.edge(d), d, side, across)
+                   for d, side, across in ((c.up_s, "top", c.a_s), (back_s, "back", c.up_s))]
+            over, out_s, side, across_s = max(ups, key=lambda u: u[0])
+            face = over + c.edge(out_s)
             add("MECH-004", over >= JOB["min_overhang"],
-                "%s %s (%s): mating face %+.2f mm past the top edge (>= %.1f: flush within routing tolerance)"
-                % (c.name, fp["ref"], fp["value"], over, JOB["min_overhang"]))
+                "%s %s (%s): mating face %+.2f mm past the %s edge (>= %.1f: flush within routing tolerance)"
+                % (c.name, fp["ref"], fp["value"], over, side, JOB["min_overhang"]))
             plug = JOB["plugs"].get(fp["lcsc"])
             if not plug:
                 note("MECH-004", "%s %s: no plug envelope known for %s" % (c.name, fp["ref"], fp["lcsc"] or fp["value"]))
                 continue
             what, w, t = plug
             bb = part.BoundBox
-            cx = dot((bb.Center.x, bb.Center.y), c.a_s)
+            cx = dot((bb.Center.x, bb.Center.y), across_s)
             cz = (max(bb.ZMin, c.top) + bb.ZMax) / 2
-            # a box in the card's frame: across the row (a), up (up_s), across the card (z)
+            # a box in the card's frame: along the edge (across_s), out of it (out_s), across the card (z)
             loc = Part.makeBox(w, 40, t, V(-w / 2, 0, -t / 2))
-            m = App.Matrix(c.a_s[0], c.up_s[0], 0, cx * c.a_s[0] + face * c.up_s[0],
-                           c.a_s[1], c.up_s[1], 0, cx * c.a_s[1] + face * c.up_s[1],
+            m = App.Matrix(across_s[0], out_s[0], 0, cx * across_s[0] + face * out_s[0],
+                           across_s[1], out_s[1], 0, cx * across_s[1] + face * out_s[1],
                            0, 0, 1, cz, 0, 0, 0, 1)
             env = moved(loc, m)
             for p in placed:
                 if p.card is c:
                     plug_envelopes.append((p, fp["ref"], what, moved(env, p.m)))
     if not any_conn:
-        add("MECH-004", True, "no top-edge connectors on %s (the Wi-Fi antenna plug is MECH-007)"
+        add("MECH-004", True, "no top- or back-edge connectors on %s (the Wi-Fi antenna plug is MECH-007)"
             % ", ".join(cards) if cards else "no cards")
         return
     for p, ref, what, env in plug_envelopes:
-        others = [(q.label() + " " + n, s) for q in placed if q is not p for n, s in q.items]
-        others += [(q.label() + " " + r + " plug", e) for q, r, _, e in plug_envelopes if q is not p]
+        # cards in the other slots only: another card's placement in this
+        # same slot is not a neighbour (one card per slot)
+        others = [(q.label() + " " + n, s) for q in placed if q.slot != p.slot for n, s in q.items]
+        others += [(q.label() + " " + r + " plug", e) for q, r, _, e in plug_envelopes if q.slot != p.slot]
         others += [("socket " + r, s) for r, s in sockets.items()] + main_items
         d, _, nb, _, _, vol = closest([("plug", env)], others)
         p.plug_gap = getattr(p, "plug_gap", [])
@@ -410,7 +428,7 @@ rails = []
 
 
 def mech_005():
-    io = [p for p in placed if p.kind == "io"]
+    io = [p for p in placed if p.kind in ROW]
     if not io:
         return
     f0 = frame_by_ref[io[0].slot]
@@ -418,16 +436,22 @@ def mech_005():
     lo, hi = min(ends) - 12, max(ends) + 12
     axes = {}
     for p in io:
-        hx, hy = p.card.local_to_step(*JOB["io_hole"])
+        if not p.card.c.get("hole"):
+            continue
+        hx, hy = p.card.local_to_step(*p.card.c["hole"])        # where the card has it
         w = p.at(hx, hy, p.card.mid)
-        axes.setdefault(p.card.name, []).append((dot((w.x, w.y, w.z), f0["u"]), w.z, p.slot, w))
-    allpts = [a for v in axes.values() for a in v]
+        axes.setdefault(p.card.name, []).append((dot((w.x, w.y, w.z), f0["u"]), w.z, p.slot, w, p.kind))
+    # the rail axis from an I/O card's hole where there is one (slot.md's spot)
+    allpts = sorted((a for v in axes.values() for a in v), key=lambda a: a[4] != "io")
+    if not allpts:
+        add("MECH-005", False, "no M3 hole on any card in the row")
+        return
     su = max(a[0] for a in allpts) - min(a[0] for a in allpts)
     sz = max(a[1] for a in allpts) - min(a[1] for a in allpts)
     add("MECH-005", su <= 0.05 and sz <= 0.05,
-        "M3 holes of %s in all %d slots on one line: spread %.3f mm along the row, %.3f mm in height (<= 0.05)"
+        "M3 holes of %s in all %d row positions on one line: spread %.3f mm along the row, %.3f mm in height (<= 0.05)"
         % (", ".join(axes), len({a[2] for a in allpts}), su, sz))
-    u0, z0, _, w0 = allpts[0]
+    u0, z0, _, w0, _ = allpts[0]
     note("MECH-005", "the rail axis: %.2f mm along the row from finger B1, %.2f mm above the main board's top"
          % (u0 - dot(f0["b1"], f0["u"]), z0 - (main_top or 0)))
     # the rail standoffs: a 6.4 mm keep-out cylinder through the whole stack
@@ -446,10 +470,25 @@ def mech_005():
 
 # ---------------------------------------------------------------- MECH-006
 def mech_006():
-    io = [p for p in placed if p.kind == "io"]
+    io = [p for p in placed if p.kind in ROW]
     if not io:
         return
     f0 = frame_by_ref[io[0].slot]
+    # top edges: the board's highest line, and its ends along the row
+    tops = []
+    for p in io:
+        slab = p.items[0][1]
+        zt = slab.BoundBox.ZMax
+        us = [dot((v.Point.x, v.Point.y, v.Point.z), f0["u"]) for v in slab.Vertexes if abs(v.Point.z - zt) < 1e-3]
+        tops.append((zt, min(us), max(us), p.label()))
+    sz = max(t[0] for t in tops) - min(t[0] for t in tops)
+    s0 = max(t[1] for t in tops) - min(t[1] for t in tops)
+    s1 = max(t[2] for t in tops) - min(t[2] for t in tops)
+    add("MECH-006", sz <= 0.01 and s0 <= 0.01 and s1 <= 0.01,
+        "top edges of %d card placements (%s) in line: spread %.3f in height, %.3f / %.3f at the two ends "
+        "(<= 0.01); %.2f mm above the main board, %.2f mm long"
+        % (len(tops), ", ".join(sorted({p.card.name for p in io})), sz, s0, s1, tops[0][0] - (main_top or 0),
+           tops[0][2] - tops[0][1]))
     pts = []
     for p in io:
         ref = p.card.c.get("pwr_led")
@@ -516,10 +555,12 @@ def mech_007():
                 cables.append((p, r))
                 # its own card's parts it passes over, not the board it lies along
                 others = [(n, s) for n, s in p.items if n not in (fp["ref"], "board")]
-                others += [(q.label() + " " + n, s) for q in placed if q is not p and bb_gap(q.bb, r.BoundBox) < 5
-                           for n, s in q.items]
+                # other cards in the other slots (one card per slot: another
+                # card's placement in this same slot is not a neighbour)
+                others += [(q.label() + " " + n, s) for q in placed if q.slot != p.slot
+                           and bb_gap(q.bb, r.BoundBox) < 5 for n, s in q.items]
                 others += rails + [("socket " + k, s) for k, s in sockets.items()] + main_items
-                others += [(q.label() + " " + rr + " plug", e) for q, rr, _, e in plug_envelopes]
+                others += [(q.label() + " " + rr + " plug", e) for q, rr, _, e in plug_envelopes if q.slot != p.slot]
                 d, _, nb, _, _, vol = closest([("cable", r)], others)
                 if worst is None or d < worst[0]:
                     worst = (d, nb, vol, p.label())
@@ -546,6 +587,7 @@ def render(gaps):
     # one configuration: the I/O cards in turn along the slots, plus the CPU/system cards
     io_slots = [f["ref"] for f in frames if f["width"] == "x1"]
     names = sorted({p.card.name for p in placed if p.kind == "io"})
+    # the other I/O cards follow in turn along slots 1-6
     show = []
     for k, slot in enumerate(io_slots):
         if names:

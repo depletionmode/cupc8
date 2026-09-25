@@ -30,7 +30,7 @@ function screenText(m) {
 }
 
 async function runJs() {
-  const m = await JsMachine.create({ slots: { 1: 'gpu', 2: 'io' }, rom });
+  const m = await JsMachine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom });
   for (const c of Object.values(m.cards)) c.log = [];
   const t = Date.now();
   m.powerOn();
@@ -50,7 +50,7 @@ async function runJs() {
 }
 
 async function runNative(threaded) {
-  const m = await NativeMachine.create({ slots: { 1: 'gpu', 2: 'io' }, rom, threaded, spiLog: true });
+  const m = await NativeMachine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom, threaded, spiLog: true });
   const t = Date.now();
   m.powerOn();
   if (TYPE) m.type(TYPE);

@@ -6,7 +6,7 @@
 //   node test/emu/test_machine.mjs
 import { Machine } from './machine.mjs';
 
-const m = await Machine.create({ slots: { 1: 'gpu' } });
+const m = await Machine.create({ slots: { 1: 'hdmi' } });
 m.cards[1].log = [];                    // every frame the GPU sees (Rp2040Card.drive)
 m.powerOn();
 let text = '';

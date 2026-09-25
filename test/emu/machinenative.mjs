@@ -2,7 +2,7 @@
 // machine/machine.node): the same machine and the same API as machine.mjs's
 // Machine, cycle for cycle, with each RP2040 card on its own thread.
 //
-//   const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io', 3: 'storage' } });
+//   const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'storage' } });
 //   m.sd.insert('card.img', { writeMs: 5 });   // not in machine.mjs: the storage card's microSD
 //   m.powerOn();  await m.runAsync(3e9);  m.screen()
 //
@@ -41,7 +41,7 @@ function startEsp(image) {
 }
 
 export class Machine {
-  static async create({ slots = { 1: 'gpu', 2: 'io' }, rom = null, sysctl = false,
+  static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false,
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();

@@ -343,25 +343,39 @@ int main(void)
 	uart_tx_sm = (uint)pio_claim_unused_sm(uart_pio, true);
 	uart_rx_sm = (uint)pio_claim_unused_sm(uart_pio, true);
 	rx_dma = dma_claim_unused_channel(true);
-	gpio_init(PIN_LED_STATUS);
-	gpio_set_dir(PIN_LED_STATUS, true);
+	gpio_init(PIN_USB_NVBUS);                /* input: low while the host's VBUS is there */
+	gpio_pull_up(PIN_USB_NVBUS);             /* the card has 10k to 3V3 too */
 	gpio_init(PIN_LED_USB_TX);
 	gpio_set_dir(PIN_LED_USB_TX, true);
 	gpio_init(PIN_LED_USB_RX);
 	gpio_set_dir(PIN_LED_USB_RX, true);
 
 	sysctl_init(&sys, &hal, NULL);
-	tusb_init();
+	/* A self-powered device must not pull D+ up while VBUS is absent (USB 2.0,
+	 * 7.1.5): the card runs from the slot, so it starts USB only once the host's
+	 * VBUS is seen, and lets go of the bus (the pull-up) whenever it goes. */
+	bool usb_started = false, usb_on = false;
 	for (;;) {
-		tud_task();
+		bool vbus = !gpio_get(PIN_USB_NVBUS);
+		if (vbus && !usb_started) {
+			tusb_init();                     /* enables the pull-up */
+			usb_started = usb_on = true;
+		} else if (usb_started && vbus != usb_on) {
+			if (vbus)
+				tud_connect();
+			else
+				tud_disconnect();
+			usb_on = vbus;
+		}
+		if (usb_started)
+			tud_task();
 		uint8_t buf[256];
-		uint32_t n = tud_cdc_available() ? tud_cdc_read(buf, sizeof buf) : 0;
+		uint32_t n = usb_started && tud_cdc_available() ? tud_cdc_read(buf, sizeof buf) : 0;
 		if (n) {
 			activity(&led_rx_until);
 			sysctl_rx(&sys, buf, (int)n);
 		}
 		sysctl_poll(&sys);
-		gpio_put(PIN_LED_STATUS, tud_mounted());
 		uint32_t now = to_ms_since_boot(get_absolute_time());
 		gpio_put(PIN_LED_USB_TX, (int32_t)(led_tx_until - now) > 0);
 		gpio_put(PIN_LED_USB_RX, (int32_t)(led_rx_until - now) > 0);

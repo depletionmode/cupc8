@@ -67,8 +67,57 @@ must_fail = ["programmed $F0 reads"]
 [[bug]]
 name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on them)"
 fixed_in = "45d051b"
-before = "80c23a6"
-files = ["kernel/ubasic.s"]
+# the empty stubs put back into today's ubasic.s (80c23a6's whole file no
+# longer assembles with the rest of the kernel)
+revert = [
+  ["kernel/ubasic.s", """ubasic_peek_statement:
+	mov r0, TOKENIZER_PEEK
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [ub_peek_var], r0
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
+	ldd r1, [ub_mem_ptr]
+	ld r0, [ub_peek_var]
+	push pch
+	push pcl
+	b ubasic_set_variable
+	push pch
+	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+""", """ubasic_peek_statement:
+	pop pcl
+"""],
+  ["kernel/ubasic.s", """ubasic_poke_statement:
+	mov r0, TOKENIZER_POKE
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_expr
+	std [ub_mem_ptr], r0
+	push pch
+	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+""", """ubasic_poke_statement:
+	pop pcl
+"""],
+]
 cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
 must_fail = ["BASIC poke/peek", "BASIC poke expr", "GPO after poke 240, 0, 165"]
 
@@ -77,12 +126,12 @@ name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (
 fixed_in = "5da685c"
 revert = [
   ["fw/gpu/core/gpu.c", """	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
 	uint8_t frame[2 + CARD_FRAME_MAX];
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
@@ -96,12 +145,12 @@ name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (
 fixed_in = "5da685c"
 revert = [
   ["fw/gpu/core/gpu.c", """	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
 	uint8_t frame[2 + CARD_FRAME_MAX];
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
@@ -125,7 +174,10 @@ fixed_in = "29cfa8f"
 before = "d7f6145"
 files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ['typed "Hello" + Enter, got']
+# which of IOC-004's timing-bound checks it trips moves with each build
+# ("Hello", then the repeat test); its polling section (the host polling back
+# to back against a 1 ms keyboard) catches it every time
+must_fail = ["FAIL polling: every status byte has bit 7 clear"]
 
 [[bug]]
 name = "wifi core: CONNECT_HOST connected with no SNI, so TLS could not check the certificate name"
@@ -181,14 +233,17 @@ must_fail = ["FAIL UART loopback across two UART_XFERs"]
 [[bug]]
 name = "gpu firmware: the slot SPI interrupt could delay PicoDVI's past its porch, cross-wiring the TMDS lanes"
 fixed_in = "9b4966c"
+# The fix's other half (slotspi masking only its own IRQ) is gone on purpose:
+# slotspi_refresh now turns every interrupt off for a few dozen cycles to swap
+# the preload (18c444f). GPU-005's traffic check never caught this bug, even at
+# 9b4966c with the bug put back; the whole machine's boot (as when it was
+# found) does: no picture at all.
 revert = [
   ["fw/rp2040/gpu/main.c", "	irq_set_priority(DMA_IRQ_0, 0);\n", ""],
   ["fw/rp2040/common/slotspi.c", "	irq_set_priority(IO_IRQ_BANK0, 0x40);", "	irq_set_priority(IO_IRQ_BANK0, 0);"],
-  ["fw/rp2040/common/slotspi.c", "	irq_set_enabled(IO_IRQ_BANK0, false);\n	if (gpio_get(PIN_SLOT_NCS)) {", "	uint32_t irq = save_and_disable_interrupts();\n	if (gpio_get(PIN_SLOT_NCS)) {"],
-  ["fw/rp2040/common/slotspi.c", "		arm_tx();\n	}\n	irq_set_enabled(IO_IRQ_BANK0, true);", "		arm_tx();\n	}\n	restore_interrupts(irq);"],
 ]
-cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
-must_fail = ["FAIL GPU-005-traffic"]
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002"
+must_fail = ["FAIL the BASIC prompt appears on HDMI after the reset"]
 
 [[bug]]
 name = "boot ROM: SPI_RX read straight after SPI_GO, before the transfer is done - every card's IDENT came back a byte late and every slot was recorded empty"
@@ -367,8 +422,10 @@ name = "slot SPI slave: slotspi_refresh stopping the state machine mid-frame - t
 fixed_in = "18c444f"
 before = "e9d8141"
 files = ["fw/rp2040/common/slotspi.c"]
-cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ["FAIL full-speed: held 700 ms gives 1 + ~7 repeats"]
+# the repeat test caught it only by the timing of that build; IOC-004's
+# polling section (a 1 ms keyboard, the host polling back to back) always does
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu.node >/dev/null && tools/fw_rp2040.sh io && CUPC8_EMU=native node test/emu/test_io.mjs"
+must_fail = ["FAIL polling: every status byte has bit 7 clear", "FAIL polling: only \"x\" keys"]
 
 [[bug]]
 name = "eink firmware: the wait for BUSY timed from before the picture went out (POF sent to a refreshing panel)"
@@ -381,3 +438,25 @@ revert = [["fw/eink/core/eink.c", """	if (e->t0_fresh) {
 	}"""]]
 cmd = "make -s -C fw test_eink"
 must_fail = ["while BUSY", "the UC8179 model saw nothing the chip would ignore"]
+
+[[bug]]
+name = "eink firmware: the wake-up reset timed RST_N from the start of the poll that ran the row compare (RST_N low 7.5 us after deep sleep)"
+fixed_in = "cd138c2"
+revert = [["fw/eink/core/eink.c", """		e->t0_fresh = true;
+		if (e->panel_state == PANEL_OFF) {""", """		e->t0 = e->now;
+		if (e->panel_state == PANEL_OFF) {"""]]
+cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-008"
+must_fail = ["FAIL waking from deep sleep: RST_N held low long enough"]
+
+[[bug]]
+name = "slot SPI slave: slotspi_poll set busy while replaying READ frames, so a host polling in step never saw the ready response (E2E-007's slow SAVE lost its last Enter)"
+fixed_in = "4d7648a"
+# timing-bound: it shows with the code layout of 8068f78 (the IO card's loop
+# in step with the kernel's READ polling); if a later layout hides it, this
+# entry will say so ("PASSES with the bug back")
+revert = [
+  ["fw/rp2040/common/slotspi.c", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		card_select(card, true);", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		busy = true;\n		card_select(card, true);"],
+  ["fw/rp2040/common/slotspi.c", "		q_tail++;\n		irq_set_enabled", "		q_tail++;\n		busy = false;\n		irq_set_enabled"],
+]
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
+must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]

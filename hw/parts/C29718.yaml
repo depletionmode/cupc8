@@ -1,0 +1,15 @@
+# 4D03WGJ0103T5E (UNI-ROYAL), 4 x 10 kohm resistor array, convex 0603 x 4
+datasheet: https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_UNI-ROYAL-Uniroyal-Elec-4D03WGJ0103T5E_C29718.pdf
+source: "UNI-ROYAL chip resistor array datasheet, 3.1 Equivalent Circuit Diagram (4D02/4D03: four isolated resistors, terminal k to 9-k) and 3.2 Dimensions (4D03: 3.20 x 1.60 mm, 0.80 mm pitch)"
+package: 0603x4
+footprints: [R_Array_Convex_4x0603]   # KiCad's convex 4 x 0603 array
+pins:
+  1: R1.1
+  2: R2.1
+  3: R3.1
+  4: R4.1
+  5: R4.2
+  6: R3.2
+  7: R2.2
+  8: R1.2
+ccw: [1, 8]

@@ -15,10 +15,10 @@ static const std::vector<uint32_t> BOOT_KEYBOARD_REPORT = {
 // `Uint8Array.from(bytes.slice(0, length))`
 static std::vector<uint8_t> toBytes(const std::vector<uint32_t> &bytes, uint32_t length) {
   const size_t n = std::min(static_cast<size_t>(length), bytes.size());
-  std::vector<uint8_t> result(n);
-  for (size_t i = 0; i < n; i++) {
-    result[i] = static_cast<uint8_t>(bytes[i]);  // ToUint8
-  }
+  std::vector<uint8_t> result;
+  result.reserve(n);
+  for (auto it = bytes.begin(); it != bytes.begin() + static_cast<std::ptrdiff_t>(n); ++it)
+    result.push_back(static_cast<uint8_t>(*it));  // ToUint8
   return result;
 }
 

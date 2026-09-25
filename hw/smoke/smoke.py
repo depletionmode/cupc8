@@ -39,8 +39,10 @@ def schematic(path):
                fields={"LCSC": "C15849"})
     r3 = s.add("Device:R", "R3", "1k", "Resistor_SMD:R_0603_1608Metric", at=(80 * G, 30 * G),
                fields={"LCSC": "C21190"})
-    d1 = s.add("Device:LED", "D1", "green", "LED_SMD:LED_0603_1608Metric", at=(80 * G, 46 * G),
-               rot=90, fields={"LCSC": "C72043"})
+    # red KT-0603R (C2286, basic): C72043 (green) is out of stock, and a green
+    # LED drops ~3 V, too close to 3.3 V for 1k
+    d1 = s.add("Device:LED", "D1", "red", "LED_SMD:LED_0603_1608Metric", at=(80 * G, 46 * G),
+               rot=90, fields={"LCSC": "C2286"})
     j2 = s.add("Connector_Generic:Conn_01x02", "J2", "3V3 out",
                "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", at=(92 * G, 30 * G))
     f1 = s.add("power:PWR_FLAG", "#FLG01", "PWR_FLAG", at=(30 * G, 44 * G))

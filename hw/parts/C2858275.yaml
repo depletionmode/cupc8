@@ -1,0 +1,26 @@
+# HDMI 19PIN 043 (SHOU HAN), HDMI type-A receptacle, SMD right angle, THT shell legs
+datasheet: https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2306201607_SHOU-HAN-HDMI-19PIN-043_C2858275.pdf
+source: "SHOU HAN HDMI 19PIN 043 drawing, page 3 (19 contacts at 0.50 mm, the recommended PCB layout); pin functions are the HDMI 1.4 type A receptacle's (1 TMDS Data2+ ... 19 Hot Plug Detect); 20 is the shell's four legs"
+package: SMD
+footprints: [HDMI_A_SHOUHAN_HDMI-19PIN-043]   # hw/lib/cupc8.pretty, EasyEDA's pads with the drawing's leg slots
+pins:
+  1: TMDSData2+
+  2: TMDSData2Shield
+  3: TMDSData2-
+  4: TMDSData1+
+  5: TMDSData1Shield
+  6: TMDSData1-
+  7: TMDSData0+
+  8: TMDSData0Shield
+  9: TMDSData0-
+  10: TMDSClock+
+  11: TMDSClockShield
+  12: TMDSClock-
+  13: CEC
+  14: [Reserved(N.C.), Utility]
+  15: SCL
+  16: SDA
+  17: DDC/CECGround
+  18: +5VPower
+  19: HotPlugDetect
+  20: [EH, shell]

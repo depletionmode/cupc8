@@ -3,12 +3,12 @@
 // firmware, the GPU's HDMI (TMDS) output decoded to pixels, and the browser's
 // keyboard on the IO card's USB keyboard.
 //
-//   node tools/machine_view.mjs [--port 8640] [--slots gpu,io[,wifi]] [--every 250] [--native]
+//   node tools/machine_view.mjs [--port 8640] [--slots hdmi,io[,wifi]] [--every 250] [--native]
 //   node tools/machine_view.mjs --native --slots eink,io      (the e-ink card: 5.83", or eink750)
 //
 // then open http://127.0.0.1:8640. --every is the emulated time between
 // captured frames, in ms. --native (or CUPC8_EMU=native) runs the native
-// emulator (emu/machine, built by tools/emu_machine_build.sh; about 15x slower
+// emulator (emu/machine, built by tools/emu_machine_build.sh; about 8x slower
 // than real time) instead of test/emu/machine.mjs (~100x slower): the same
 // machine, cycle for cycle (EMU-007), just faster.
 //
@@ -19,6 +19,41 @@
 // panel's busy times).
 
 import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`Watch the CUPC/8 machine emulator in a browser.
+
+usage: node tools/machine_view.mjs [options]
+
+  --native         run the native emulator (emu/machine; build it with
+                   tools/emu_machine_build.sh). Also CUPC8_EMU=native.
+                   Without it: the legacy JS emulator (test/emu/machine.mjs).
+  --slots LIST     the cards in slots 1, 2, ... (default hdmi,io). Kinds:
+                   hdmi, io, wifi, storage, and (native only) eink (5.83")
+                   or eink750 in place of hdmi.
+  --every MS       emulated time between captured frames (default 250)
+  --sd IMAGE       with a storage card (native only): put this card image in
+                   its microSD socket; a missing file is made first, a 16 MB
+                   FAT16 card as a PC would format it (test/emu/fatimg.py)
+  --port N         the web page's port (default 8640)
+  -h, --help       this text
+
+Then open http://127.0.0.1:<port>, click the screen and type.
+
+examples:
+  node tools/machine_view.mjs --native
+  node tools/machine_view.mjs --native --slots hdmi,io,wifi
+  node tools/machine_view.mjs --native --slots eink,io,storage --sd card.img
+
+environment:
+  CUPC8_EINK_SCALE   scale the e-ink panel's busy times
+  CUPC8_EMU_THREADS  0 runs the native emulator single-threaded`);
+  process.exit(0);
+}
 
 const native = process.argv.includes('--native') || process.env.CUPC8_EMU === 'native';
 const { Machine } = await import(native ? '../test/emu/machinenative.mjs' : '../test/emu/machine.mjs');
@@ -29,15 +64,27 @@ const arg = (name, dflt) => {
 };
 const port = Number(arg('port', 8640));
 const every = Number(arg('every', 250)) * 1e6;
-const kinds = arg('slots', 'gpu,io').split(',');
+const kinds = arg('slots', 'hdmi,io').split(',');
 const slots = Object.fromEntries(kinds.map((k, i) => [i + 1, k]));
 
 const eink = kinds.some((k) => k.startsWith('eink'));
 if (eink && !native) throw new Error('the e-ink card runs on the native emulator only: add --native');
+const sd = arg('sd', null);
+if (sd && !(native && kinds.includes('storage'))) throw new Error('--sd needs --native and a storage card in --slots');
 const m = await Machine.create({ slots });
+if (sd) {
+  if (!fs.existsSync(sd)) {
+    const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
+    const root = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+    execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(root, 'test/emu/fatimg.py'), 'mkfs', sd, '16', '16']);
+    console.log(`made ${sd}: a 16 MB FAT16 card`);
+  }
+  m.sd.insert(sd, { highCapacity: false });  // a 16 MB card is standard capacity, as in E2E-007
+}
 let frame = null;                 // the last good frame, RGB888
 let fw = 640, fh = 480;           // its size (the e-ink panel's is its own)
 let frames = 0, note = 'powering on', started = Date.now();
+let keyAt = null;                 // emulated time of the first key not yet shown
 
 // ------------------------------------------------------------------- the page
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emulator</title>
@@ -79,7 +126,7 @@ async function tick() {
       }
     }
   } catch (e) { status.textContent = 'emulator not reachable: ' + e; }
-  setTimeout(tick, 300);
+  setTimeout(tick, 100);
 }
 tick();
 // USB HID usages for the keys typed text can't carry
@@ -112,6 +159,7 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
     res.end(frame ?? Buffer.alloc(0));
   } else if (url.pathname === '/key' && req.method === 'POST') {
+    keyAt ??= m.ns;
     if (!m.keyboard) note = 'no IO card fitted: keys go nowhere';
     else if (url.searchParams.has('text')) m.type(url.searchParams.get('text'));
     else if (url.searchParams.has('usage')) {
@@ -131,9 +179,14 @@ http.createServer((req, res) => {
 // ------------------------------------------------------------- the emulator
 m.powerOn();
 started = Date.now();
-let seq = -1;
+let seq = -1, shot = 0;
 for (;;) {
-  await m.runAsync(every);
+  // capture every `every`, or 5 ms after a key (the echo takes ~2 ms): not at
+  // the end of the chunk, which at ~8x slower than real time is seconds away
+  await m.runAsync(5e6);
+  if (!(keyAt !== null && m.ns - keyAt >= 5e6) && m.ns - shot < every) continue;
+  keyAt = null;
+  shot = m.ns;
   if (eink) {
     // the panel's glass: it changes when a refresh completes
     const p = m.panel();

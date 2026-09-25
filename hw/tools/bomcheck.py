@@ -305,7 +305,11 @@ def check_line(fpid, lcsc, refs, parts, table, problems, notes, refetch=False):
         notes.add("%s not recorded in hw/parts/easyeda and CUPC8_OFFLINE: package and rotation unchecked" % lcsc)
         return None
     pkg = jlc["jlc_package"]
-    if not package_ok(pkg, fp_name):
+    # a footprint whose name doesn't spell JLC's package ("LQFN-56(7x7)" for
+    # KiCad's QFN-56-1EP_7x7mm_..., "SMD" for a connector) passes when the
+    # part's datasheet table names it under `footprints:`, checked by hand;
+    # the pads are still compared with EasyEDA's below
+    if not package_ok(pkg, fp_name) and not (ds and fp_name in (ds[0].get("footprints") or [])):
         say("JLC's package is %r, the footprint is %s" % (pkg, fp_name))
     if ds and ds[0].get("package") and pkg.upper().replace(" ", "") != ds[0]["package"].upper().replace(" ", ""):
         say("JLC's package is %r, the datasheet table's %r" % (pkg, ds[0]["package"]))
@@ -443,7 +447,11 @@ def main():
     a = ap.parse_args()
     boards = a.boards
     if boards == ["all"]:
-        boards = sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, "hw", "boards")) if f.endswith(".py"))
+        # every board script: one that draws a schematic (not a shared module
+        # such as rp2040card.py)
+        here = os.path.join(ROOT, "hw", "boards")
+        boards = sorted(f[:-3] for f in os.listdir(here) if f.endswith(".py")
+                        and "\ndef schematic(" in open(os.path.join(here, f)).read())
     failed = 0
     for b in boards:
         try:

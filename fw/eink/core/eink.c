@@ -543,7 +543,10 @@ static void panel_step(eink_t *e)
 			e->y1 < 0 ? finish(e, true) : (void)(e->step = S_PREP);   /* nothing changed */
 		break;
 	case S_PREP:
-		e->t0 = e->now;
+		/* PWR and RST_N's waits count from the next poll: S_DIFF may have
+		 * run in this one (~14 ms for 480 rows), so `now` is stale here
+		 * (RST_N went high 7.5 us after it fell when waking from deep sleep) */
+		e->t0_fresh = true;
 		if (e->panel_state == PANEL_OFF) {
 			b->pin(b->ctx, EPD_PIN_PWR, true);
 			e->step = S_PWR;

@@ -1,14 +1,15 @@
-# W25Q16JVSSIQ (Winbond), 16 Mbit SPI/QSPI NOR flash, SOIC-8 208 mil
-datasheet: https://www.winbond.com/resource-files/w25q16jv%20spi%20revh%2004082019%20plus.pdf
-source: "W25Q16JV datasheet, 3.1 Pin Configuration SOIC 208-mil (top view) and 3.3 Pin Description"
+# W25Q16JVSSIQ (Winbond), 16 Mbit QSPI flash, SOIC-8 208 mil
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/abc83bb7f5b7f022c50f4fddf07136a0.pdf
+source: "W25Q16JV datasheet, 3.1 Pin Configuration SOIC 150/208-mil (Figure 1a, top view) and 3.3 Pin Description"
 package: SOIC-8-208mil
+footprints: [SOIC-8_5.3x5.3mm_P1.27mm]   # KiCad's 208 mil (5.3 mm body) SOIC-8
 pins:
-  1: ["~{CS}", "/CS", "CS"]
-  2: ["DO/IO_{1}", "DO", "IO1"]
-  3: ["~{WP}/IO_{2}", "/WP", "IO2"]
+  1: ["~{CS}", "/CS", CS]
+  2: ["DO/IO_{1}", "DO (IO1)", DO, IO1]
+  3: ["~{WP}/IO_{2}", "/WP (IO2)", "/WP", IO2]
   4: GND
-  5: ["DI/IO_{0}", "DI", "IO0"]
+  5: ["DI/IO_{0}", "DI (IO0)", DI, IO0]
   6: CLK
-  7: ["~{HOLD}/~{RESET}/IO_{3}", "/HOLD", "/RESET", "IO3"]
+  7: ["~{HOLD}/~{RESET}/IO_{3}", "/HOLD or /RESET (IO3)", "/HOLD", "/RESET", IO3]
   8: VCC
 ccw: [1, 8]

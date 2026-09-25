@@ -60,3 +60,29 @@ Bin in gnd i = max(0, i(Vsense)) + {IQ}
 Bx x gnd v = max(0, v(in, gnd) * min(1, max(0, time - {TDLY}) / {TON}) - v(out, gnd)) / {RON} / {ILIM}
 Bch in out i = {ILIM} * v(x, gnd) / pow(1 + pow(v(x, gnd), 8), 0.125)
 .ends SW_BEH
+
+* ---------------------------------------------------------------------------
+* BB_BEH: a buck-boost converter (TPS63802 class) as a Thevenin source.
+*
+*   Used because TI's TPS63802 PSpice model does not run in ngspice-47 (see
+*   hw/power/boost.py). A buck-boost regulates whether its input is above or
+*   below its output, so: an ideal source VSET, ramped over TSS, behind the
+*   closed-loop output impedance RDC + (LEQ || RP), fitted to the datasheet's
+*   load-transient figure. It shuts down (source to 0) while IN is below
+*   VINMIN or above VOVP (input over-voltage). Its input draws the output
+*   power over ETA, plus IQ. No ripple: the checks add the datasheet's
+*   power-save ripple band themselves.
+* ---------------------------------------------------------------------------
+.subckt BB_BEH in out gnd params: VSET=5 TSS=500u ETA=0.85 IQ=11u VINMIN=1.3 VOVP=5.7
++ RDC=5m LEQ=1u RP=0.2
+* on between VINMIN and VOVP through smooth steps: 50 mV wide at VINMIN (a
+* hard switch stalls ngspice as the input rises through it), 5 mV at VOVP (so
+* an input 90 mV under the OVP is fully on)
+Bsrc src gnd v = {VSET} * min(1, time / {TSS}) * 0.5 * (1 + tanh((v(in, gnd) - {VINMIN}) / 0.05))
++   * 0.5 * (1 + tanh(({VOVP} - v(in, gnd)) / 0.005))
+Rdc src z {RDC}
+Leq z o2 {LEQ}
+Rp z o2 {RP}
+Vsense o2 out 0
+Bin in gnd i = max(0, v(out, gnd) * i(Vsense)) / ({ETA} * max(v(in, gnd), 0.5)) + {IQ}
+.ends BB_BEH

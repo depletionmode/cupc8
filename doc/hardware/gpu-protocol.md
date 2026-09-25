@@ -5,6 +5,14 @@ DVI** on an HDMI type-A connector: no audio, no HDCP. It is an SPI slave
 using the common framing in `slot.md`: one command per CS_n frame, and the
 status byte comes back during the opcode.
 
+**Hardware notes** (the board: `hw/boards/gpu.py`, `hw/boards/README.md`):
+TMDS through 270 Ω series resistors (PicoDVI's DC-coupled output) and
+TPD4E05U06 ESD; the pairs are on GPIO10–17 with the pads inverted
+(`hw/pins.yaml`). The receptacle's +5V comes from a TPS61023 boost at 5.06 V
+(the IO card's circuit, `power.md`), because the slot's +5V can be 4.1 V at
+the card; its 100 mA PTC sits ahead of the boost. HPD through a 22k/33k
+divider; DDC through 2N7002 level shifters.
+
 The protocol is designed for an 8-bit CPU with two registers:
 - every command is an opcode followed by **fixed-size** arguments;
 - 16-bit values are little-endian, and only X coordinates need them;

@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
   Machine::Options o;
   std::string mode = "threaded", romFile;
   std::vector<Step> steps;
-  o.slots = {{1, "gpu"}, {2, "io"}};
+  o.slots = {{1, "hdmi"}, {2, "io"}};
   for (int i = 1; i < argc; i++) {
     const std::string a = argv[i];
     auto next = [&]() -> std::string {

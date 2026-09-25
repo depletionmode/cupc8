@@ -50,10 +50,10 @@ this table.
 | **3V3 total** | | **272** | **617** |
 | 3V3 buck input at 90% efficiency (5.0 V; 535 mA max at the worst-case 4.23 V) | 5V | 200 | 452 |
 | USB keyboard VBUS, through the IO card's boost (500 mA at the port: 746 mA from +5V at the worst corner) | 5V | 110 | 746 |
-| HDMI +5V pin (sink EDID power, per spec) | 5V | 10 | 55 |
+| HDMI +5V pin (sink EDID power, 55 mA per spec), through the GPU card's PTC and buck-boost (95 mA from +5V at the worst corner) | 5V | 10 | 95 |
 | Wi-Fi card (ESP32-C3 via its own TLV62569 buck from +5V; TX peaks, ~260 mA at 5 V) | 5V | 80 | 350 |
 | Slots 5–6 (future cards; not in M1) | 5V | 0 | — |
-| **Total from USB-C (M1 cards)** | 5V | **≈ 400** | **≈ 1690** (worst-case corner, POW-006) |
+| **Total from USB-C (M1 cards)** | 5V | **≈ 400** | **≈ 1740** (worst-case corner, POW-006) |
 
 The worst case assumes a keyboard drawing the full 500 mA (e.g. an RGB
 gaming keyboard), Wi-Fi transmitting at 100 % duty and the SD card writing,
@@ -107,7 +107,9 @@ the margin. The values and their sources (datasheet, spec, board script, or
 assumption) are in `hw/power/design.py`.
 
 **Models.** The 3V3 bucks, the IO card's keyboard boost and the PWR_HI
-comparator use TI's own PSpice models (TLV62569, TPS61023, TLV7011).
+comparator use TI's own PSpice models (TLV62569, TPS61023, TLV7011). The
+GPU card's TPS63802 is behavioural: TI's model does not run in ngspice
+(POW-008 below).
 `hw/power/models/fetch.py` downloads them from pinned URLs, checks their
 SHA-256, and ports them to ngspice. They aren't committed, because TI's
 licence doesn't grant redistribution. There is no vendor model for the
@@ -122,8 +124,9 @@ datasheet figures:
 The TI buck model's switches are 10 mΩ rather than 100/60 mΩ, so buck losses
 come from the datasheet RDS(on) and not from the simulation.
 
-As of 2026-09-25 every test passes except one **decision** in POW-006:
-B10, the IO card's +5V against slot.md's 0.55 A per card (below).
+As of 2026-09-25 every test passes. POW-006 B5 (the 1.5 A source case)
+passes at 7.8 % against a 5 % margin, under a waiver
+(`fab-waivers.md`, David 2026-09-25).
 
 **The input path, re-sized for 3 A.** The SY6280 (limit at most 2.5 A,
 ±25 %) could not pass the 3 A case with margin. It is replaced on the main
@@ -146,7 +149,18 @@ the port sat at 3.97 V at the worst corner. With it, the port stays at 4.70 V
 or more through a 500 mA step at every corner, against USB 2.0's 4.40 V. The
 circuit is below, for the IO board agent.
 
-### Decision still open (POW-006 B10)
+### Decided (POW-008, POW-006 B5), David 2026-09-25
+
+- **HDMI +5V: a TPS63802 buck-boost**, the safest of the options. With the
+  TPS61023 boost the pin followed a source above 5.45 V through the boost's
+  pass-through, reaching 5.40 V against HDMI's 5.3 V. A buck-boost
+  regulates in both directions: the pin now stays within 4.862–5.239 V at
+  every corner, 5.5 V sources included.
+- **B5, a 1.5 A source:** accepted at 5 % margin, not 10 % (the waiver).
+  It is 1.383 A (7.8 % under 1.5 A); the buck-boost costs 14 mA more than
+  the boost did.
+
+### Decided (POW-006 B10)
 
 | Check | Result | What it needs |
 |---|---|---|
@@ -187,6 +201,41 @@ Other observations (not failures):
   POW-007 G0 checks the ported model still regulates at the datasheet's set
   point (0.8 % off).
 
+### GPU card HDMI +5V (for the GPU board agent)
+
+```
+slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
+         ── 10 µF 25 V 0805 (C15850) at VIN
+         ── TPS63802DLAR (C2845237, VSON-10)
+              VIN, EN ── the PTC's output (on whenever the card has power)
+              MODE ── GND (power save: it never sinks current from the pin)
+              AGND, GND ── ground; PG ── unconnected (or to a GPIO)
+              L1–L2: 0.47 µH FXL0420-R47-M (C167200, 14 mΩ, Isat 9.5 A)
+              VOUT: 2 × 22 µF 25 V 0805 (C45783)
+              FB: 825 kΩ 1 % (C25823) to VOUT, 91 kΩ 1 % (C23265) to GND  → 5.03 V
+         ── HDMI pin 18 (and the 2.2 kΩ DDC pull-ups, the HPD divider)
+```
+
+- **The PTC goes ahead of the converter.** After it, 55 mA × 3.5 Ω (R1max)
+  takes the pin to 4.670 V at the worst corner, under 4.8 V. Ahead of it,
+  the PTC's drop only lowers the converter's input.
+- **The PTC is the 200 mA size.** Ahead of the converter it carries the
+  converter's input current: 95 mA at the worst corner. The 100 mA part
+  (C20975) holds only 0.08 A at 40 °C; the 200 mA part holds 0.17 A (+44 %).
+  A shorted cable still trips it: the converter's current limit (4–5.75 A
+  in boost) pulls far more than that through it.
+- **No Schottky.** The B5819W's ~0.3 V would cost the margin, and the
+  TPS63802 disconnects its output from its input when it is off.
+- **The output**: 5.03 V nominal; 4.869–5.201 V with VFB ±1 %, the 1 %
+  divider and a 50 mVpp power-save ripple band (datasheet figure 10-21).
+  HDMI asks 4.8–5.3 V.
+- **Its input OVP** stops the TPS63802 above 5.5–5.9 V. At vSafe5V max its
+  input reaches 5.409 V (91 mV under). Only a non-compliant source above
+  5.5 V (the eFuse lets up to 5.81 V through) can trip it; it then stops,
+  which is safe.
+- Layout per TI (SLVSEU9D section 12): VIN and VOUT capacitors right at the
+  pins over GND, the L1–L2 loop short, FB divider next to FB.
+
 ### Results (margins)
 
 | Test | Key numbers |
@@ -196,9 +245,10 @@ Other observations (not failures):
 | POW-003 Wi-Fi card buck (as built) | ESP32-C3 minimum in a 358 mA TX burst: 3.199 V at the worst corner (+199 mV over 3.0), 3.201 V typical. Maximum 3.495 V (+105 mV under 3.6). Slot +5V at the card 4.116 V in the burst (+587 mV of headroom). |
 | POW-004 inrush | 1 µF ahead of the eFuse (≤ 10 µF). The eFuse ramps 5V_SYS in 1.1–4.4 ms, so the 84 µF behind it charges at 91–427 mA. The whole surge, loads starting included, peaks at 0.85–1.34 A, under the eFuse's 2.63 A minimum limit (+49 %). The receptacle stays ≥ 3.91 V. |
 | POW-005 CC | Realised CC ranges: default 0.317–0.571 V, 1.5 A 0.829–1.090 V, 3.0 A 1.524–1.936 V. PWR_HI trips between 1.203 V (+112 mV clear of 1.5 A) and 1.386 V (+138 mV clear of 3.0 A). The ADC classes clear by 60–102 mV. TI's TLV7011 model agrees at both edges. |
-| POW-006 budget | M1 worst case 1.689 A: +44 % under a 3.0 A source, +36 % under the eFuse's minimum limit, +46 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.341 A (+10.6 %). Default USB at typical loads: 370 mA (+26 % under 500 mA). Slots 5–6 have 0.70 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.399 V highest (+101 mV under 5.5). The IO card's +5V: 0.746 A, +19 % under the new slot fuse's 0.92 A hold (B10b), but over slot.md's 0.55 A (B10, the open decision). OVLO 5.60–5.81 V (+1.8 % over 5.5 V, +3.2 % under 6 V). |
+| POW-006 budget | M1 worst case 1.737 A: +42 % under a 3.0 A source, +34 % under the eFuse's minimum limit, +45 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.383 A (+7.8 %, against 5 % under the waiver). Default USB at typical loads: 374 mA (+25 % under 500 mA). Slots 5–6 have 0.65 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.397 V highest (+103 mV under 5.5). Per card +5V: IO 0.750 A (+6.3 % under slot.md's 0.80 A, +19 % under the fuse's 0.92 A hold), GPU 0.095 A, Wi-Fi 0.34 A. OVLO 5.60–5.81 V. |
 | POW-007 keyboard boost | Model check: 0.8 % off the set point. Port minimum in a 0→500 mA step at the DC low corner: 4.697 V worst (+297 mV over 4.40), 4.724 V typical, 5.129 V at vSafe5V max (pass-through). Port maximum 5.431 V (+69 mV under 5.5). Up in 0.32–0.36 ms. Inductor current 0.75 A against the 2.7 A valley limit. |
-| THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.4 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. The AMS1117 rows are gone: no M1 card has one. |
+| POW-008 HDMI +5V (TPS63802, behavioural) | Model check: 147 mV dip against the datasheet figure's 130 mV. Pin in a 10→55 mA step, over every tolerance: 4.862 V minimum (+62 mV over 4.8) and 5.220–5.239 V maximum (+61 mV under 5.3), at the worst and typical corners and at vSafe5V max. Converter input at vSafe5V max 5.409 V (+91 mV under its 5.5 V OVP), at the worst corner 3.751 V (over 1.3 V). PTC current 0.095 A against its 0.17 A hold (+44 %). With the PTC after the converter the pin would be 4.670 V. |
+| THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.5 °C, GPU card buck-boost 45.8 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. The AMS1117 rows are gone: no M1 card has one. |
 
 ### Assumptions the boards must meet
 
@@ -224,6 +274,8 @@ Other observations (not failures):
 - **Cards:** slot +5V contacts ≤ 30 mΩ each. IO, GPU and system cards
   ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.80 A of +5V (raised from
   0.55 A for the keyboard boost, B10), ≤ 300 mA of +3V3.
+- **GPU card:** the HDMI +5V circuit above: PTC SMD0805P020TF ahead of
+  a TPS63802DLAR, 0.47 µH, 825k/91k 1 %, MODE to GND, no Schottky.
 - **IO card:** the keyboard boost above: TPS61023DRLR, 1 µH FXL0420-1R0-M,
   10 µF in, 2 × 22 µF out, 750k/100k 1 %, feeding the SY6280 port switch.
 - **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's
@@ -235,3 +287,24 @@ Other observations (not failures):
 - **System card:** ADC reference = its 3.3 V rail ±3 %. ADC error ≤ 12 LSB.
 - **Not re-fetched:** the MAX811T's threshold (2.98–3.17 V) and its ~10 µs
   glitch immunity. Both datasheet sources were unavailable on 2026-09-24.
+
+## Future: more power needs USB PD (not in M1)
+
+Decided 2026-09-24 (David): **M1 has no USB Power Delivery.** Plain USB-C
+gives at most 3 A at 5 V (15 W). M1's worst case is 1.69 A, and slots 5–6
+share about 0.67 A of +5V headroom on a 3 A source (not 0.67 A each; each
+slot alone is still limited to 0.80 A by its fuse).
+
+**If a future card needs more than that, the main board needs USB PD:**
+
+- a PD sink/trigger chip (e.g. CH224K, in JLC's library) asks the charger for
+  9, 12, 15 or 20 V, which gives 30–65 W and more;
+- a buck converter turns that into the 5V_SYS rail at 4–5 A;
+- the input protection is redesigned for up to 20 V (eFuse OVLO, TVS, fuse),
+  and every POW/THM check is redone;
+- **a 5 V fallback path** for chargers without PD (a buck cannot make 5 V
+  from 5 V): a buck-boost, or a bypass with switching. This is the part that
+  needs the most care.
+
+The slot pinout and per-card rules don't change, so every existing card keeps
+working on a main board revision with PD.

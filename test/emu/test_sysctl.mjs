@@ -156,6 +156,13 @@ function request(cmd, payload = [], timeoutNs = 5e9) {
 const u24 = (v) => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff];
 
 // ------------------------------------------------------------ start-up
+// USB_nVBUS (GPIO29) low: the host's VBUS is there. High, the card must not
+// pull D+ up (USB 2.0, 7.1.5), so its USB controller stays off.
+const PULLUP_EN = 1 << 16;                               // SIE_CTRL
+gpio[29].setInputValue(true);
+emu.runUntil(() => false, 20e6);
+expect(!connected && !(emu.mcu.usbCtrl.sieCtrl & PULLUP_EN), 'no VBUS at start-up: no D+ pull-up, no enumeration');
+gpio[29].setInputValue(false);
 emu.runUntil(() => false, 50e6);
 expect(MACHINE_PINS.every((n) => !driven(n)), `at start-up no machine pin is driven: ${MACHINE_PINS.filter(driven)}`);
 emu.runUntil(() => connected, 3e9);
@@ -171,6 +178,14 @@ emu.runUntil(() => false, 1e6);
 expect(lit(0) && lit(1), 'the USB TX and RX LEDs light after a request and its reply');
 emu.runUntil(() => false, 40e6);
 expect(!lit(0) && !lit(1), 'and go dark ~30 ms later');
+// the host goes away (VBUS off): the D+ pull-up goes; it comes back with VBUS
+expect(emu.mcu.usbCtrl.sieCtrl & PULLUP_EN, 'D+ pull-up on while VBUS is there');
+gpio[29].setInputValue(true);
+emu.runUntil(() => false, 2e6);
+expect(!(emu.mcu.usbCtrl.sieCtrl & PULLUP_EN), 'VBUS gone: D+ pull-up off');
+gpio[29].setInputValue(false);
+emu.runUntil(() => false, 2e6);
+expect(emu.mcu.usbCtrl.sieCtrl & PULLUP_EN, 'VBUS back: D+ pull-up on again');
 
 emu.mcu.adc.channelValues[0] = Math.round((900 / 3300) * 4095);    // CC1 0.9 V: a 1.5 A source
 emu.mcu.adc.channelValues[1] = 0;
