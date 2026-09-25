@@ -38,6 +38,7 @@
 #include <thread>
 #include <vector>
 
+#include "einkpanel.h"
 #include "emu.h"
 #include "sdcard.h"
 #include "tmds.h"
@@ -168,7 +169,7 @@ class SysctlCard {
 class Machine {
  public:
   struct Options {
-    std::map<int, std::string> slots;  // slot -> gpu | io | storage | wifi
+    std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;
     bool sysctl = false;
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
@@ -199,12 +200,17 @@ class Machine {
   // the text on screen (80x30); empty with `error` set if there is no picture
   std::vector<std::string> screen(std::string *error);
   void type(const std::string &text);
+  // the e-ink card's panel (the first fitted), nullptr if none
+  EinkPanel *panel();
+  // the text on the e-ink panel's glass (80x30, centred), as screen()
+  std::vector<std::string> panelScreen(std::string *error);
   // the storage card's microSD socket (the first storage card), or null
   rp2040js::harness::SdSocket *sd();
 
   std::vector<std::pair<int, std::unique_ptr<Card>>> cards;  // slot order
   std::unique_ptr<SysctlCard> sysctl;
   std::unique_ptr<TmdsCapture> tmds;
+  std::map<int, std::unique_ptr<EinkPanel>> panels;  // slot -> the e-ink card's panel
   std::unique_ptr<rp2040js::UsbKeyboard> keyboard;
   std::unique_ptr<MainBoard> board;
   Stats stats;
@@ -220,6 +226,7 @@ class Machine {
   std::vector<std::array<uint8_t, 16>> font;
 
   uint32_t inputs(bool por = true);
+  std::vector<std::string> cells(const std::function<uint32_t(int, int)> &px);
   void iterate();
   void iterateSerial(bool busy, uint32_t cs);
   void traceStep();

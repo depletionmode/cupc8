@@ -22,6 +22,12 @@
 #define GPU_OUT_W     640
 #define GPU_OUT_H     480
 #define GPU_FIFO_SIZE 8192
+/* the GFX buffer's size: a card built on this core may make it bigger for a
+ * mode of its own that shares it (the e-ink card's native mode 2, 96,000
+ * bytes: fw/eink/core/eink.h). Every file of one build must agree. */
+#ifndef GPU_GFX_BYTES
+#define GPU_GFX_BYTES (GPU_GFX_W * GPU_GFX_H)
+#endif
 
 enum { GPU_MODE_TEXT = 0, GPU_MODE_GFX = 1 };
 
@@ -29,13 +35,32 @@ typedef struct {
 	uint8_t ch, attr;
 } gpu_cell_t;
 
+struct gpu;
+
+/* An extension: a card that runs this core with commands of its own (the
+ * e-ink card, fw/eink/core). It sees every command before the core does. */
+typedef struct gpu_ext {
+	/* true: the extension executed the command (or rejected it), and the
+	 * core does nothing more with it */
+	bool (*command)(struct gpu *g, const uint8_t *f, int len, bool respond);
+	/* after the core's own power-on state (SOFT_RESET) */
+	void (*reset)(struct gpu *g);
+} gpu_ext_t;
+
 typedef struct gpu {
 	card_t card;
+	const gpu_ext_t *ext;                  /* optional */
+	/* the extension holds execution (the e-ink card's REFRESH waits for the
+	 * panel); commands keep queuing in the FIFO meanwhile */
+	volatile bool hold;
 
 	uint8_t mode;
 	gpu_cell_t text[GPU_TEXT_ROWS][GPU_TEXT_COLS];
 	uint8_t cx, cy, attr, cursor;
-	uint8_t gfx[GPU_GFX_H][GPU_GFX_W] __attribute__((aligned(4)));   /* word reads on the card */
+	union {
+		uint8_t gfx[GPU_GFX_H][GPU_GFX_W] __attribute__((aligned(4)));   /* word reads on the card */
+		uint8_t gfx_bytes[GPU_GFX_BYTES];      /* an extension's own mode (mode 2) */
+	};
 	uint16_t palette[256];                 /* RGB565 */
 	uint8_t font16[256][16];               /* TEXT glyphs */
 	uint8_t font8[256][8];                 /* TEXT8 glyphs */
