@@ -520,6 +520,7 @@ revert = [["fw/gpu/core/gpu.c", """		if (g->cx > 0) {
 cmd = "make -s -C fw test_gpu"
 must_fail = ["BS at column 0"]
 
+[[bug]]
 name = "sim: an IRQ taken between POP pcl and POP pch lost the return (the kernel's timer tick crashed it at boot)"
 fixed_in = "51c8e35"
 revert = [["tools/sim.nim", """  if lastOp == 0x9f:
