@@ -133,7 +133,7 @@ def read_assembly(path):
     return body, comps
 
 
-def assign(comps, fps, mid):
+def assign(comps, fps, mid, name=""):
     """{ref: shape}: each assembly node to the footprint at its position."""
     parts = {}
     for pos, shape in comps:
@@ -141,7 +141,7 @@ def assign(comps, fps, mid):
         same = [fp for fp in fps if fp["side"] == side] or fps
         fp = min(same, key=lambda f: math.dist(step_xy(f["pos"]), (pos.x, pos.y)))
         if math.dist(step_xy(fp["pos"]), (pos.x, pos.y)) > 0.01:
-            raise SystemExit("3D model at (%.2f, %.2f) matches no footprint" % (pos.x, pos.y))
+            raise SystemExit("%s: 3D model at (%.2f, %.2f) matches no footprint" % (name, pos.x, pos.y))
         parts[fp["ref"]] = Part.makeCompound([parts[fp["ref"]], shape]) if fp["ref"] in parts else shape
     return parts
 
@@ -160,7 +160,7 @@ class Card:
         self.slab = base.extrude(V(0, 0, self.T))
         self.slab.translate(V(0, 0, self.bot - bb.ZMin))
         self.fps = c["fps"]
-        self.parts = assign(comps, self.fps, self.mid)
+        self.parts = assign(comps, self.fps, self.mid, name)
         self.by_ref = {fp["ref"]: fp for fp in self.fps}
         b1, a, d = c["edge"]
         self.b1, self.a, self.d = b1, a, d
@@ -396,8 +396,8 @@ def mech_004():
             % ", ".join(cards) if cards else "no cards")
         return
     for p, ref, what, env in plug_envelopes:
-        others = [(q.label() + " " + n, s) for q in placed if q is not p for n, s in q.items]
-        others += [(q.label() + " " + r + " plug", e) for q, r, _, e in plug_envelopes if q is not p]
+        others = [(q.label() + " " + n, s) for q in placed if q.slot != p.slot for n, s in q.items]   # other slots only
+        others += [(q.label() + " " + r + " plug", e) for q, r, _, e in plug_envelopes if q.slot != p.slot]
         others += [("socket " + r, s) for r, s in sockets.items()] + main_items
         d, _, nb, _, _, vol = closest([("plug", env)], others)
         p.plug_gap = getattr(p, "plug_gap", [])
@@ -525,10 +525,12 @@ def mech_007():
                 cables.append((p, r))
                 # its own card's parts it passes over, not the board it lies along
                 others = [(n, s) for n, s in p.items if n not in (fp["ref"], "board")]
-                others += [(q.label() + " " + n, s) for q in placed if q is not p and bb_gap(q.bb, r.BoundBox) < 5
-                           for n, s in q.items]
+                # other cards in the other slots (one card per slot: another
+                # card's placement in this same slot is not a neighbour)
+                others += [(q.label() + " " + n, s) for q in placed if q.slot != p.slot
+                           and bb_gap(q.bb, r.BoundBox) < 5 for n, s in q.items]
                 others += rails + [("socket " + k, s) for k, s in sockets.items()] + main_items
-                others += [(q.label() + " " + rr + " plug", e) for q, rr, _, e in plug_envelopes]
+                others += [(q.label() + " " + rr + " plug", e) for q, rr, _, e in plug_envelopes if q.slot != p.slot]
                 d, _, nb, _, _, vol = closest([("cable", r)], others)
                 if worst is None or d < worst[0]:
                     worst = (d, nb, vol, p.label())

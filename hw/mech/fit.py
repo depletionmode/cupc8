@@ -191,10 +191,15 @@ def discover():
     """{name: pcb path} for every board that exists or has a script."""
     import kicadgen  # noqa: F401  (only to find its mtime)
     gen_mtime = os.path.getmtime(os.path.join(ROOT, "hw", "tools", "kicadgen.py"))
-    names = {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))}
+    # board scripts draw a schematic; a shared module (rp2040card.py) is not a board
+    names = {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))
+             if "\ndef schematic(" in open(p).read()}
     names |= {os.path.basename(os.path.dirname(p))
               for p in glob.glob(os.path.join(ROOT, "build", "hw", "*", "*.kicad_pcb"))
               if os.path.basename(p) == os.path.basename(os.path.dirname(p)) + ".kicad_pcb"}
+    only = os.environ.get("CUPC8_MECH_BOARDS")      # e.g. "eink,wifi": a partial run, while another board's build is broken
+    if only:
+        names &= set(only.split(","))
     found = {}
     for name in sorted(names):
         script = os.path.join(ROOT, "hw", "boards", name + ".py")
