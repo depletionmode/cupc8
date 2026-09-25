@@ -47,6 +47,12 @@ proc log(lvl : int, msg : string) =
         writeLine(stdout, msg)
         resetAttributes()
 
+proc speedLine(ips: float): string =
+  ## instructions per second, and the CPU clock that is: the sim counts one
+  ## instruction per microsecond, ~12 clocks of the real 12 MHz CPU
+  "$1 MIPS, as a $2 MHz CUPC/8 (the real one: 12 MHz, ~1 MIPS)" %
+    [formatFloat(ips / 1_000_000, ffDecimal, 2), formatFloat(ips * 12 / 1_000_000, ffDecimal, 1)]
+
 proc status(msg: string) =
   ## the speed line: rewritten in place, not one line per second
   if (8 and log_mask) > 0:
@@ -1239,7 +1245,7 @@ Both:
           display_render()
           lastPresent = now
         if now - lastMhz >= 1.0:
-          status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / (now - lastMhz) / 1_000_000, ffDecimal, 2))
+          status(speedLine(float(ins_retired - lastMhzIns) / (now - lastMhz)))
           lastMhz = now
           lastMhzIns = ins_retired
       lastReal = epochTime()
@@ -1315,7 +1321,7 @@ Both:
             lastPresent = now
           if now - lastMhz >= 1.0:
             let dt = now - lastMhz
-            status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / dt / 1_000_000, ffDecimal, 2))
+            status(speedLine(float(ins_retired - lastMhzIns) / dt))
             lastMhz = now
             lastMhzIns = ins_retired
     if dumpFb.len > 0:

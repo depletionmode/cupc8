@@ -617,5 +617,5 @@ revert = [["tools/sim.nim", """          let behind = insStart + int((epochTime(
             steps = min(behind, 100_000)""", """          sleep(1)
           steps = clamp(int((epochTime() - lastReal) * 1_000_000), 1, 100_000)"""]]
 cmd = "python3 test/sim/test_cli.py"
-must_fail = ["FAIL: interactive: WAI-heavy guest runs at ~1 MHz"]
+must_fail = ["FAIL: interactive: WAI-heavy guest runs at ~1 MIPS"]
 

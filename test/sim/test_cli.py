@@ -158,8 +158,8 @@ def main():
         out = r.stdout
     except subprocess.TimeoutExpired as e:
         out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-    mhz = [float(m) for m in re.findall(r"([0-9.]+) MHz", out)]
-    check("interactive: WAI-heavy guest runs at ~1 MHz (last %s)" % (mhz[-3:],),
+    mhz = [float(m) for m in re.findall(r"([0-9.]+) MIPS", out)]
+    check("interactive: WAI-heavy guest runs at ~1 MIPS, a 12 MHz CUPC/8 (last %s)" % (mhz[-3:],),
           len(mhz) >= 3 and min(mhz[-3:]) >= 0.7, out[-400:])
 
     # the old I/O model
