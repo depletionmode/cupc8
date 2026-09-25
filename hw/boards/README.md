@@ -42,6 +42,13 @@ Shared rules:
   and clearance, 0.7 mm vias), for parts at 0.4–0.5 mm pitch: the system
   card's RP2040 and USB-C.
 - **Branding:** the Kaplan Labs logo on the top silkscreen of every board.
+  On the cards, `pipeline(logo_keepout=True)` keeps tracks and vias off the
+  top copper under it (a rule area; the pour still fills there), and the
+  silkscreen step fails on any track under it: routed across the logo, a
+  track shows through the mask as a ridge over the artwork. The system
+  card's logo is the 10 mm size (milestone-1.md's minimum): with the 12 mm
+  one's keep-out, Freerouting left QFN nets unrouted or pour pockets
+  unjoined at every position tried.
 - **Assembly:** nothing is fitted by hand. The Wi-Fi card's antenna lead (MHF III to SMA) is
   the one exception: it is plugged in, not soldered.
 
@@ -191,19 +198,29 @@ Spec: `doc/hardware/gpu-protocol.md`.
   ground pins get a via 2 mm behind the pad, under the receptacle's body;
   each ESD's GND pins, in the middle of its rows, are joined through the
   package and taken down by a via.
-- **+5V to the sink** (HDMI: 4.8–5.3 V, ≥ 55 mA at the source's pin): the
-  slot's +5V is 4.12 V at the card at the worst corner (power model,
-  POW-006: 4.75 V source, 1.69 A machine load), so the IO card's boost
-  circuit makes it: TPS61023 (C919459), 1 µH FXL0420, 10 µF in, 2 × 22 µF
-  out, 750k/100k: 5.06 V nominal, 4.84–5.28 V over VREF and the 1 %
-  divider. The 100 mA PTC (C20975) is **ahead** of the boost, so its drop
-  doesn't come off the pin (worst case 4.84 V at the pin, plus only copper)
-  and it still trips on a shorted cable, which makes the boost draw hard
-  from its input. No diode: with the machine off the boost's high-side FET
-  body diode points SW → VOUT, so a monitor can't back-feed it. The boost
-  sits in the open area left of the receptacle, near the +5V fingers; its
-  pins are laid by the board script as on the IO card. It draws about
-  75 mA from the slot's +5V at the worst corner.
+- **+5V to the sink** (HDMI: 4.8–5.3 V, ≥ 55 mA at the source's pin), the
+  circuit power.md decides ("GPU card HDMI +5V"): the slot's +5V is 4.1 V
+  at the card at the worst corner and up to 5.4 V at vSafe5V max, so U7, a
+  **TPS63802DLAR buck-boost** (C2845237), holds the pin at 5.03 V either
+  way (4.87–5.20 V over VFB, the 1 % divider and the power-save ripple).
+  Slot +5V → F1, a 200 mA PTC SMD0805P020TF (C20976), **ahead** of the
+  converter (after it, its drop would take the pin to 4.67 V; ahead, it
+  still trips on a shorted cable) → 10 µF (C21) at VIN → U7 (VIN and EN
+  on the PTC's output, MODE to GND for power save, PG unconnected), L1
+  0.47 µH FXL0420-R47-M (C167200), 2 × 22 µF out (C22, C23), FB 825k
+  (C25823) / 91k (C23265) → HDMI pin 18, with the DDC pull-ups and the HPD
+  divider. No Schottky: the TPS63802 disconnects its output from its input
+  when off. It draws 95 mA from the slot's +5V at the worst corner
+  (POW-008; POW-006 B9b). `hw/power/design.py` `GPU_BOARD` lists these
+  parts, and POW-008 and THM-001 fail if the board script differs.
+- **Buck-boost layout** (TI SLVSEU9D, 12; `buck_boost()` lays it before
+  Freerouting, the pads being 0.3 mm at 0.5 mm pitch): U7 turned so its
+  power row (VIN, L1, GND, L2, VOUT) faces up, the inductor across it
+  above, C21 and C22 at VIN and VOUT on either side, C23 beside C22. EN is
+  tied to VIN under the package; MODE, AGND and GND pin 8 are joined
+  through the package's middle and taken down by a via that also ties in
+  C21's ground. FB runs down to the divider below, away from L1/L2. The
+  block sits in the open area left of the receptacle.
 - **HPD** (GPIO18): 22k/33k from the connector, 5 V → 2.9 V, pulled low when
   nothing is plugged in.
 - **DDC** (GPIO19/20, EDID): a 2N7002 (C8545) per line as a bidirectional
