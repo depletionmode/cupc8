@@ -2036,8 +2036,11 @@ def order_spec(layers, card_edge):
             "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
             "gold_fingers": card_edge, "finger_finish": "hard gold" if card_edge else None,
             "finger_chamfer_deg": 30 if card_edge else None}
-    if layers == 4:
-        spec["stackup"] = "JLC04161H-7628"
+    # JLC's standard 1.6 mm stack-ups (jlcpcb.com/impedance); gold fingers
+    # are offered at any layer count, with ENIG and a board >= 50 mm
+    stackup = {4: "JLC04161H-7628", 6: "JLC06161H-3313"}.get(layers)
+    if stackup:
+        spec["stackup"] = stackup
     return spec
 
 
@@ -2104,7 +2107,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def sheet():
         schematic(sch, footprint_libs)
         write_project(pro, power_nets=power_nets, fine_nets=fine_nets,   # before ERC: it carries the library tables
-                      rules=JLC_RULES_4 if layers == 4 else None)
+                      rules=JLC_RULES_4 if layers >= 4 else None)
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)

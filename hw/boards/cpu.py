@@ -272,7 +272,11 @@ BODY = kg.IO_CARD_BODY
 TAB_TOP = BODY[3]                      # where the tab meets the body
 DY = BODY[1] + 44.0                  # the layout is drawn for a 39.05 mm body; a taller one adds at the top
 FPGA = (24.5, -31.3 + DY, 0)         # its top pad row 0.85 mm from the top edge
-ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
+# 6 layers (David, 2026-09-25): sig / GND / sig / sig / 3V3 / sig, both planes
+# solid; GND also poured on the outer layers (zones[0], which the pipeline
+# ties the fingers to and stitches)
+LAYERS = 6
+ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In4.Cu",)))
 LOGO_MM = 12
 LOGO_AT = (49.4, -14.6 + DY)              # the empty lower right: D and timer lines pass under it
 TITLE, REVISION = "CUPC/8 CPU", "A"
@@ -492,19 +496,6 @@ def plane_pins(board, via=0.6, drill=0.3, width=0.25, gap=0.2):
             raise SystemExit("U1 pin %s (%s): no room for its plane via" % (pad.GetNumber(), net))
 
 
-def key_ties(board, width=0.25):
-    """The GND ties ground_fingers runs up the fingers either side of the key
-    notch pass 0.3 mm from its edge at their 0.5 mm width: narrow those."""
-    import pcbnew
-    to = pcbnew.ToMM
-    notch = (10.55, 12.45)                            # the footprint's key, x of its sides
-    tracks = board.Tracks()
-    for s in [tracks[i].Cast() for i in range(len(tracks))]:
-        if s.Type() == pcbnew.PCB_TRACE_T and s.GetNetname() == "/GND" and s.IsLocked() and \
-                to(s.GetStart().y) > TAB_TOP - 5 and min(abs(to(s.GetStart().x) - n) for n in notch) < 0.8:
-            s.SetWidth(pcbnew.FromMM(width))
-
-
 def ring_pads(board):
     """No pour joins the FPGA's supply pads: between pads 0.5 mm apart it
     could only reach one through a sliver under the 0.15 mm minimum. Each has
@@ -540,16 +531,9 @@ def stubs(board, width=0.2):
 
 
 def prepare(board):
-    """The card's own pre-routing, run after the pad fan-out. In1 carries
-    signals as well as the GND pour: on the I/O-card outline the bus has a
-    10 mm band to its fingers, and two signal layers are not enough there.
-    The GND pour on In1 fills round them, and every piece of it is joined by
-    GND vias to the stitched outer pours; In2 stays a solid 3V3 plane."""
-    import pcbnew
-    board.SetLayerType(board.GetLayerID("In1.Cu"), pcbnew.LT_SIGNAL)
+    """The card's own pre-routing, run after the pad fan-out."""
     ring_pads(board)
     stubs(board)
-    key_ties(board)
     supply_fingers(board)
     plane_pins(board)
 
@@ -562,9 +546,9 @@ def main():
     # GND poured on both outer layers (zones[0], which the pipeline ties the
     # fingers to and stitches) and as the In1 plane; 3V3 is the In2 plane
     lcsc = kg.pipeline(
-        "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=4, zones=ZONES,
+        "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=LAYERS, zones=ZONES,
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
-        presence={"layer": "In2.Cu"},   # a B.Cu run would wall the address lines off their fingers
+        presence={"layer": "In3.Cu"},   # a B.Cu run would wall the address lines off their fingers
         passes=80,                      # 60 left one bus net unrouted after its three tries
         silk_text=SILK_TEXT,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])
