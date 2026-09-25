@@ -1217,10 +1217,10 @@ def remove_dangling(board, pours=()):
         items = [t for t in items if t.GetNetname() not in pours]
         segs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]
         vias = [t for t in items if t.Type() == pcbnew.PCB_VIA_T]
-        # what can go: not the locked pre-routes (a presence link crossing on
-        # an inner layer has vias joined on one outer layer only), but they
-        # still count as what the rest is joined to
-        removable = [t for t in segs + vias if not t.IsLocked()]
+        # what can go: anything, locked pre-routes too (a board's prepare()
+        # vias the router didn't use). A via counts as joined on any copper
+        # layer, so the inner-layer presence link's vias stay.
+        removable = segs + vias
         pads = [p for fp in board.GetFootprints() for p in fp.Pads()]
 
         def seg_dist(pt, t):
