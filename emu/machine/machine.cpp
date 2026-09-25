@@ -312,6 +312,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     c->slot = slot;
     c->logging = o.spiLog;
     if (kind == "gpu") tmds = std::make_unique<TmdsCapture>(c->e);
+    if (kind == "eink" || kind == "eink750")  // the panel on its header: 5.83" 648x480 or 7.5" 800x480
+      panels[slot] = std::make_unique<EinkPanel>(c->e, EinkPanel::config(kind == "eink" ? 648 : 800, 480));
     if (kind == "storage") c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
     if (kind == "io") {
       c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
@@ -652,6 +654,54 @@ static std::vector<std::array<uint8_t, 16>> loadFont(const std::string &root) {
       font[c][r] = at < bytes.size() ? bytes[at] : 0;
     }
   return font;
+}
+
+// the text in a picture: each 8x16 cell matched against the font (either polarity,
+// so the cursor's inverted cell reads as its character); px(x, y) is a colour
+std::vector<std::string> Machine::cells(const std::function<uint32_t(int, int)> &px) {
+  if (font.empty()) font = loadFont(root);
+  std::vector<std::string> rows;
+  for (int row = 0; row < 30; row++) {
+    std::string line;
+    for (int col = 0; col < 80; col++) {
+      const int x0 = col * 8, y0 = row * 16;
+      const uint32_t bg = px(x0, y0);
+      std::array<uint8_t, 16> bits{}, inv{};
+      bool any = false;
+      for (int y = 0; y < 16; y++) {
+        uint8_t b = 0;
+        for (int x = 0; x < 8; x++)
+          if (px(x0 + x, y0 + y) != bg) b |= 0x80 >> x;
+        bits[y] = b;
+        inv[y] = static_cast<uint8_t>(~b & 0xff);
+        any |= b != 0;
+      }
+      char ch = ' ';
+      if (any) {
+        int c = -1;
+        for (int i = 0; i < 256 && c < 0; i++)
+          if (font[i] == bits || font[i] == inv) c = i;
+        ch = c >= 32 && c < 127 ? static_cast<char>(c) : c < 0 ? '?' : '.';
+      }
+      line += ch;
+    }
+    while (!line.empty() && line.back() == ' ') line.pop_back();
+    rows.push_back(line);
+  }
+  return rows;
+}
+
+EinkPanel *Machine::panel() { return panels.empty() ? nullptr : panels.begin()->second.get(); }
+
+std::vector<std::string> Machine::panelScreen(std::string *error) {
+  EinkPanel *p = panel();
+  if (!p) {
+    if (error) *error = "no e-ink card";
+    return {};
+  }
+  const EinkPanel::Picture pic = p->picture();
+  const int ox = (pic.w - 640) / 2;  // 80x30 centred
+  return cells([&](int x, int y) { return static_cast<uint32_t>(pic.grey[y * pic.w + ox + x]); });
 }
 
 // the text on screen: each 8x16 cell matched against the font (either polarity,

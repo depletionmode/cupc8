@@ -15,6 +15,7 @@ typedef struct imgdisk {
 	bool wp;                           /* write-protected */
 	bool fail;                         /* every access fails (a dead medium) */
 	uint32_t reads, writes, inits;     /* sectors read and written, init calls */
+	bool unsynced;                     /* written since the last sync */
 	/* test hook: called before each sector write; false fails it */
 	bool (*before_write)(struct imgdisk *d, uint32_t lba);
 	void *user;

@@ -9,7 +9,6 @@
 # resistors and capacitors) and fails when an entry here disagrees or is
 # missing; `bomcheck.py <board> --update-rotations` adds new footprints.
 # Every footprint in a BOM needs an entry, 0 included, so none is unchecked.
-
 Capacitor_SMD:C_0402_1005Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s C0402 (C1525, C1562, C52923)'
@@ -45,7 +44,7 @@ Package_SON:USON-10_2.5x1.0mm_P0.5mm:
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USON-10_L2.5-W1.0-P0.50-BL (C138714)'
 Package_TO_SOT_SMD:SOT-23:
   rotation: 180
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (C8545, C20526)'
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (C20526, C8545)'
 Package_TO_SOT_SMD:SOT-23-6:
   rotation: 270
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
@@ -64,6 +63,9 @@ cupc8:HDMI_A_SHOUHAN_HDMI-19PIN-043:
 cupc8:USB_A_SOFNG_USB-302S-T:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-A-SMD_USB-302S (C112455)'
+jlc:CRYSTAL-SMD_4P-L3.2-W2.5-BL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s CRYSTAL-SMD_4P-L3.2-W2.5-BL (C9002)'
 jlc:HDR-TH_9P-P2.54-H-M-W10.4:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s HDR-TH_9P-P2.54-H-M-W10.4 (C492417)'
@@ -94,6 +96,9 @@ jlc:TF-SMD_TF-01A:
 jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL (C1521989)'
+jlc:USB-C_SMD-TYPE-C-31-M-12_1:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-C_SMD-TYPE-C-31-M-12_1 (C165948)'
 jlc:WIFIM-SMD_61P-L13.2-W12.5-P0.80:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s WIFIM-SMD_61P-L13.2-W12.5-P0.80 (C2911374)'

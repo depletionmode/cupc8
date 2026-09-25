@@ -4,12 +4,19 @@
 // keyboard on the IO card's USB keyboard.
 //
 //   node tools/machine_view.mjs [--port 8640] [--slots gpu,io[,wifi]] [--every 250] [--native]
+//   node tools/machine_view.mjs --native --slots eink,io      (the e-ink card: 5.83", or eink750)
 //
 // then open http://127.0.0.1:8640. --every is the emulated time between
 // captured frames, in ms. --native (or CUPC8_EMU=native) runs the native
 // emulator (emu/machine, built by tools/emu_machine_build.sh; about 15x slower
 // than real time) instead of test/emu/machine.mjs (~100x slower): the same
 // machine, cycle for cycle (EMU-007), just faster.
+//
+// With an e-ink card (slot kind eink or eink750, native only) the page shows
+// the panel's glass instead of HDMI: the UC8179 model's picture, which
+// changes only when a refresh completes, as on the real panel (a partial
+// refresh about 0.3 s after the typing stops; CUPC8_EINK_SCALE scales the
+// panel's busy times).
 
 import http from 'node:http';
 
@@ -25,8 +32,11 @@ const every = Number(arg('every', 250)) * 1e6;
 const kinds = arg('slots', 'gpu,io').split(',');
 const slots = Object.fromEntries(kinds.map((k, i) => [i + 1, k]));
 
+const eink = kinds.some((k) => k.startsWith('eink'));
+if (eink && !native) throw new Error('the e-ink card runs on the native emulator only: add --native');
 const m = await Machine.create({ slots });
-let frame = null;                 // the last good frame, 640x480 RGB888
+let frame = null;                 // the last good frame, RGB888
+let fw = 640, fh = 480;           // its size (the e-ink panel's is its own)
 let frames = 0, note = 'powering on', started = Date.now();
 
 // ------------------------------------------------------------------- the page
@@ -45,7 +55,8 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emu
 <div id="status">connecting...</div>
 <div id="help">click the screen, then type: keys go to the IO card's USB keyboard</div>
 <script>
-const c = document.getElementById('c'), g = c.getContext('2d'), img = g.createImageData(640, 480);
+const c = document.getElementById('c'), g = c.getContext('2d');
+let img = g.createImageData(640, 480);
 const status = document.getElementById('status');
 c.focus();
 async function tick() {
@@ -54,8 +65,13 @@ async function tick() {
     status.textContent = s.line;
     if (s.frames !== window.seen) {
       window.seen = s.frames;
+      if (c.width !== s.w || c.height !== s.h) {
+        c.width = s.w; c.height = s.h;
+        img = g.createImageData(s.w, s.h);
+        c.style.background = s.eink ? '#fff' : '#000';
+      }
       const rgb = new Uint8Array(await (await fetch('/frame')).arrayBuffer());
-      if (rgb.length === 640 * 480 * 3) {
+      if (rgb.length === s.w * s.h * 3) {
         for (let i = 0, j = 0; i < rgb.length; i += 3, j += 4) {
           img.data[j] = rgb[i]; img.data[j + 1] = rgb[i + 1]; img.data[j + 2] = rgb[i + 2]; img.data[j + 3] = 255;
         }
@@ -91,7 +107,7 @@ http.createServer((req, res) => {
       `   POST $${s.gpo.toString(16).padStart(2, '0')}   PC $${s.pc.toString(16).padStart(4, '0')}` +
       `${s.halted ? '   HALTED' : ''}   frames ${frames}   ${note}`;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ line, frames }));
+    res.end(JSON.stringify({ line, frames, w: fw, h: fh, eink }));
   } else if (url.pathname === '/frame') {
     res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
     res.end(frame ?? Buffer.alloc(0));
@@ -115,8 +131,26 @@ http.createServer((req, res) => {
 // ------------------------------------------------------------- the emulator
 m.powerOn();
 started = Date.now();
+let seq = -1;
 for (;;) {
   await m.runAsync(every);
+  if (eink) {
+    // the panel's glass: it changes when a refresh completes
+    const p = m.panel();
+    const busy = { 0: '', 4: 'powering on', 2: 'powering off', 18: 'REFRESHING' }[p.busy] ?? `busy $${p.busy.toString(16)}`;
+    note = `e-paper ${p.w}x${p.h}: ${p.refreshes[0]} clean, ${p.refreshes[1]} fast, ${p.refreshes[2]} grey, ` +
+      `${p.refreshes[3]} partial refreshes ${busy}${p.errors ? `   PANEL ERRORS ${p.errors}: ${p.error}` : ''}`;
+    if (p.seq !== seq) {
+      seq = p.seq;
+      const rgb = Buffer.alloc(p.w * p.h * 3);
+      for (let i = 0; i < p.w * p.h; i++) rgb[i * 3] = rgb[i * 3 + 1] = rgb[i * 3 + 2] = p.grey[i];
+      fw = p.w;
+      fh = p.h;
+      frame = rgb;
+      frames++;
+    }
+    continue;
+  }
   const f = m.frame();                       // ~2 frame times of TMDS, decoded
   if (f.error) {
     note = 'no picture yet: ' + f.error;     // the GPU has not started its output

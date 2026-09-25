@@ -59,6 +59,6 @@ pins:
   53: QSPI_SD0
   54: QSPI_SD2
   55: QSPI_SD1
-  56: ["~{QSPI_SS}", QSPI_SS]   # QSPI_SS, active low
+  56: ['~{QSPI_SS}', QSPI_SS, QSPI_SS_N]  # QSPI_SS, active low
   57: GND
 ccw: [1, 56]

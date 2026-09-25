@@ -40,13 +40,18 @@ static int d_write(void *ctx, const uint8_t *buf, uint32_t lba, uint32_t count)
 		if (d->fd >= 0 && pwrite(d->fd, buf + (size_t)i * 512, 512, (off_t)(lba + i) * 512) != 512)
 			return -1;
 		d->writes++;
+		d->unsynced = true;
 	}
 	return 0;
 }
 
 static int d_sync(void *ctx)
 {
-	return ((imgdisk_t *)ctx)->fail ? -1 : 0;
+	imgdisk_t *d = ctx;
+	if (d->fail)
+		return -1;
+	d->unsynced = false;
+	return 0;
 }
 
 const st_disk_t imgdisk_ops = {

@@ -129,9 +129,21 @@ static uint32_t h_now_ms(void *ctx)
 	return to_ms_since_boot(get_absolute_time());
 }
 
+/* USB activity LEDs (milestone-1.md, Indicator LEDs): each is lit until
+ * its deadline, ~30 ms after the last data in its direction */
+#define ACTIVITY_MS 30
+static uint32_t led_tx_until, led_rx_until;
+
+static void activity(uint32_t *until)
+{
+	*until = to_ms_since_boot(get_absolute_time()) + ACTIVITY_MS;
+}
+
 static void h_usb_write(void *ctx, const uint8_t *data, int n)
 {
 	(void)ctx;
+	if (n > 0)
+		activity(&led_tx_until);
 	while (n > 0 && tud_cdc_connected()) {
 		uint32_t k = tud_cdc_write(data, (uint32_t)n);
 		data += k;
@@ -333,6 +345,10 @@ int main(void)
 	rx_dma = dma_claim_unused_channel(true);
 	gpio_init(PIN_LED_STATUS);
 	gpio_set_dir(PIN_LED_STATUS, true);
+	gpio_init(PIN_LED_USB_TX);
+	gpio_set_dir(PIN_LED_USB_TX, true);
+	gpio_init(PIN_LED_USB_RX);
+	gpio_set_dir(PIN_LED_USB_RX, true);
 
 	sysctl_init(&sys, &hal, NULL);
 	tusb_init();
@@ -340,9 +356,14 @@ int main(void)
 		tud_task();
 		uint8_t buf[256];
 		uint32_t n = tud_cdc_available() ? tud_cdc_read(buf, sizeof buf) : 0;
-		if (n)
+		if (n) {
+			activity(&led_rx_until);
 			sysctl_rx(&sys, buf, (int)n);
+		}
 		sysctl_poll(&sys);
 		gpio_put(PIN_LED_STATUS, tud_mounted());
+		uint32_t now = to_ms_since_boot(get_absolute_time());
+		gpio_put(PIN_LED_USB_TX, (int32_t)(led_tx_until - now) > 0);
+		gpio_put(PIN_LED_USB_RX, (int32_t)(led_rx_until - now) > 0);
 	}
 }

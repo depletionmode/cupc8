@@ -287,10 +287,24 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .num
+	bzf .refresh
 	push pch
 	push pcl
 	b ub_cmd_del
+	b .done
+
+.refresh:
+	term_s_refresh db "refresh"
+	mov r0, #>[term_s_refresh]
+	mov r1, #<[term_s_refresh]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .num
+	push pch
+	push pcl
+	b eink_cmd_refresh
 	b .done
 
 .num:
@@ -381,7 +395,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL\n"
+	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch
