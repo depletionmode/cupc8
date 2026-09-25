@@ -349,3 +349,28 @@ fixed_in = "199387e"
 revert = [["test/emu/romimage.mjs", """'kernel.o', ...(bases ? [bases[1]] : []), '--map']""", """'kernel.o', '--map']"""]]
 cmd = "node --input-type=module -e \"import { kernelRom } from './test/emu/romimage.mjs'; kernelRom(); console.log('kernel ROM built')\""
 must_fail = ["negative count"]
+
+[[bug]]
+name = "storage card: ST_EJECT answered while the SD card was still programming a raw BLK_WRITE (no sync), so pulling it straight after lost the block"
+fixed_in = "e9d8141"
+revert = [["fw/storage/core/storage.c", """		if (disk_ioctl(0, CTRL_SYNC, 0) == RES_ERROR && !e)
+			e = ST_E_IO;
+""", ""]]
+cmd = "make -s -C fw test_storage; cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu.node >/dev/null && tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs slow"
+must_fail = ["ST_EJECT synced the medium after a raw BLK_WRITE", "FAIL slow card: a block written before ST_EJECT is on the card when it is pulled right after"]
+
+[[bug]]
+name = "slot SPI slave: slotspi_refresh held the state machine stopped (up to ~10 us) while the host clocked - storage card frames lost, status bytes with bit 7 set at the 20 us frame gap"
+fixed_in = "18c444f"
+before = "e9d8141"
+files = ["fw/rp2040/common/slotspi.c"]
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu.node >/dev/null && tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs"
+must_fail = ["FAIL the status byte's bit 7 is always 0 (slot.md)"]
+
+[[bug]]
+name = "slot SPI slave: slotspi_refresh stopping the state machine mid-frame - the IO card's key bytes came out one bit late (full-speed repeat read '<' for 'x')"
+fixed_in = "18c444f"
+before = "e9d8141"
+files = ["fw/rp2040/common/slotspi.c"]
+cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
+must_fail = ["FAIL full-speed: held 700 ms gives 1 + ~7 repeats"]
