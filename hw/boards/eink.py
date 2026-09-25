@@ -94,15 +94,15 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     # edge (SWD, DVDD, IOVDD, XIN/XOUT) escape by vias (rc.pocket_escapes),
     # the crystal to the left, the flash by the QSPI pins (now at the bottom)
     "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23
-    "C3": (CX + 5.8, CY + 0.2, 0),       # IOVDD 1, clear of the flash
-    "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22 (its GND via: preroute)
+    "C3": (CX + 5.8, CY - 0.2, 0),       # IOVDD 1, clear of the flash
+    "C5": (CX - 4.4, CY - 5.2, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
-    "Y1": (CX - 13.0, CY - 3.0, 0),
-    "C16": (CX - 15.7, CY - 3.0, 90),
-    "C17": (CX - 13.0, CY - 0.4, 0),
-    "R2": (CX - 13.0, CY - 5.6, 0),      # XOUT
-    "U3": (CX + 8.2, CY + 5.9, 90),      # its GND via (pin 4, below) 0.3 mm clear of the edge
+    "Y1": (CX - 8.5, CY - 4.0, 0),
+    "C16": (CX - 11.2, CY - 4.0, 90),
+    "C17": (CX - 8.5, CY - 1.4, 0),
+    "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
+    "U3": (CX + 8.2, CY + 5.6, 90),
     "C15": (CX + 12.0, CY + 3.4, 90),
     "R1": (CX + 12.0, CY + 7.4, 90),
     "J1": (0, 0, 0),
@@ -138,55 +138,9 @@ TITLE, REVISION = "CUPC/8 e-ink", "A"
 
 
 def preroute(board):
-    """The storage card's escapes (rc.pocket_escapes), then SWDIO's run to
-    its test pad, laid by hand: Freerouting left it unrouted on every try
-    (its escape via sits under the panel lines' fan-out). A B.Cu track west
-    from the via, under the crystal, to a via beside TP3, at the first
-    height near the escape via's that clears every via already placed (the
-    GND fan-out's); Freerouting joins the finger (B7) to it."""
-    import math
-    import pcbnew
-    px, py = rc.pad_at(board, "U1", 25)                  # SWDIO
-    assert board.FindFootprintByReference("U1").FindPadByNumber("25").GetNetname() == "/SWDIO"
-    vy = py - 1.16                                       # pocket_escapes' via: one row out (up, turned chip)
-    # C5's GND fan-out via lands where pocket_escapes puts SWDIO's (the
-    # fan-out runs first): it goes, with its track, and C5's GND pad gets a
-    # via 1 mm straight up instead
-    ts = board.Tracks()
-    near = [ts[i] for i in range(len(ts)) if ts[i].GetNetname() == "/GND" and
-            math.hypot(pcbnew.ToMM(ts[i].GetEnd().x) - px, pcbnew.ToMM(ts[i].GetEnd().y) - vy) < 1.0]
-    if near:
-        gx, gy = rc.pad_at(board, "C5", 2)
-        assert board.FindFootprintByReference("C5").FindPadByNumber("2").GetNetname() == "/GND"
-        for t in near:
-            board.Remove(t)
-        rc.via(board, "/GND", (gx, gy - 1.0))
-        rc.track(board, "/GND", (gx, gy), (gx, gy - 1.0), width=0.3)
-    rc.pocket_escapes(board)
-    tx, ty = rc.pad_at(board, "TP3", 1)
-    ts = board.Tracks()
-    vias = [(pcbnew.ToMM(ts[i].GetPosition().x), pcbnew.ToMM(ts[i].GetPosition().y)) for i in range(len(ts))
-            if ts[i].Type() == pcbnew.PCB_VIA_T and ts[i].GetNetname() != "/SWDIO"]
-
-    def clear(a, b, gap=0.3 + 0.2 + 0.075):              # via radius + clearance + half the track
-        (ax, ay), (bx, by) = a, b
-        for x, y in vias:
-            t = max(0.0, min(1.0, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) /
-                             ((bx - ax) ** 2 + (by - ay) ** 2 or 1e-12)))
-            if math.hypot(x - ax - t * (bx - ax), y - ay - t * (by - ay)) < gap:
-                return False
-        return True
-    end = (tx + 1.6, ty)
-    for dy in (0, -0.4, 0.4, -0.8, 0.8, -1.2, 1.2, -1.6, 1.6):
-        pts = [(px, vy), (px - 1.0, vy + dy), (tx + 3.0, vy + dy), end]
-        if all(clear(a, b) for a, b in zip(pts, pts[1:])):
-            break
-    else:
-        raise SystemExit("eink: no clear height for SWDIO's run")
-    for a, b in zip(pts, pts[1:]):
-        rc.track(board, "/SWDIO", a, b, layer=pcbnew.B_Cu, width=0.15)
-    rc.via(board, "/SWDIO", end)
-    rc.track(board, "/SWDIO", end, (tx, ty), width=0.2)
+    """As the storage card: rp2040card.pocket_escapes, with SWDIO's via a
+    row further out and towards the fingers, clear of the panel lines."""
+    rc.pocket_escapes(board, swdio=(2.26, -0.6))
 
 
 def legend(path):
@@ -216,4 +170,4 @@ def legend(path):
 if __name__ == "__main__":
     legend(os.path.join(kg.PROJECT_FOOTPRINTS["cupc8"], LEGEND + ".kicad_mod"))
     rc.build("eink", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "REFRESH"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=100, preroute=preroute)
+             TITLE, REVISION, layers=LAYERS, passes=150, preroute=preroute)

@@ -398,12 +398,11 @@ GDEY0583T81 on a DESPI-C02, or a Waveshare e-Paper HAT) comes on its driver
 module, which carries the booster; the card only drives its SPI.
 
 - **The RP2040 core** from `rp2040card.py`, laid out as on the storage card
-  (its `pocket_escapes` prerouting, the crystal to the left): the chip turned
+  (the same chip-area placement and `pocket_escapes` prerouting): the chip turned
   round, so the panel pins (GPIO9–15, `hw/pins.yaml` `eink_mcu`) sit at its
   top-right corner, facing the header. Four layers, In1 a GND plane.
-  SWDIO's run from its escape via to its test pad is laid by hand on B.Cu
-  (Freerouting left it unrouted on every try), and C5's GND via moves off
-  the spot where SWDIO's escape via goes.
+  Its `pocket_escapes` put SWDIO's via a row further out and towards the
+  fingers, as the storage card's do.
 - **J2, 1 × 9 right-angle 2.54 mm header PZ254R-11-09P** (C492417,
   through-hole, JLC's own footprint) on the top edge: the insulator flush
   with the edge, the pins out over it, in the module cable's order: 1 VCC,
