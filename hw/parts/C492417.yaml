@@ -1,0 +1,15 @@
+# PZ254R-11-09P (XFCN), 1 x 9 right-angle 2.54 mm male pin header, through-hole
+datasheet: https://lcsc.com/product-detail/New-Arrivals_XFCN-PZ254R-11-09P_C492417.html
+source: "XFCN PZ254R-11 series drawing (LCSC C492417): one row of 9 pins at 2.54 mm, numbered 1-9 from the square pad; 2.5 mm insulator, 6 mm mating pins at right angles to the board"
+package: Push-Pull,P=2.54mm
+footprints: [HDR-TH_9P-P2.54-H-M-W10.4]   # JLC's own (EasyEDA)
+pins:
+  1: "1"
+  2: "2"
+  3: "3"
+  4: "4"
+  5: "5"
+  6: "6"
+  7: "7"
+  8: "8"
+  9: "9"

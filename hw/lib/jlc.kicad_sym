@@ -435,7 +435,6 @@
       )
     )
   )
-
   (symbol "AMS1117-3.3"
     (in_bom yes)
     (on_board yes)
@@ -534,7 +533,6 @@
       )
     )
   )
-
   (symbol "74LVC1G125GW_C52140430"
     (in_bom yes)
     (on_board yes)
@@ -632,7 +630,6 @@
       )
     )
   )
-
   (symbol "TLV62569DBVR"
     (in_bom yes)
     (on_board yes)
@@ -737,7 +734,6 @@
       )
     )
   )
-
   (symbol "FNR3015S2R2MT"
     (in_bom yes)
     (on_board yes)
@@ -840,7 +836,6 @@
       )
     )
   )
-
   (symbol "RT9013-12GB"
     (in_bom yes)
     (on_board yes)
@@ -951,7 +946,6 @@
       )
     )
   )
-
   (symbol "ICE40HX4K-TQ144"
     (in_bom yes)
     (on_board yes)
@@ -1890,7 +1884,6 @@
       )
     )
   )
-
   (symbol "W25Q32JVSSIQ_C179173"
     (in_bom yes)
     (on_board yes)
@@ -2013,7 +2006,6 @@
       )
     )
   )
-
   (symbol "4D03WGJ0330T5E"
     (in_bom yes)
     (on_board yes)
@@ -2271,7 +2263,6 @@
       )
     )
   )
-
   (symbol "X322512MSB4SI"
     (in_bom yes)
     (on_board yes)
@@ -2434,7 +2425,6 @@
       )
     )
   )
-
   (symbol "TYPE-C-31-M-12"
     (in_bom yes)
     (on_board yes)
@@ -2599,7 +2589,6 @@
       )
     )
   )
-
   (symbol "HDMI19PIN043"
     (in_bom yes)
     (on_board yes)
@@ -2794,7 +2783,6 @@
       )
     )
   )
-
   (symbol "SY6280AAC"
     (in_bom yes)
     (on_board yes)
@@ -2905,7 +2893,6 @@
       )
     )
   )
-
   (symbol "USB-302S"
     (in_bom yes)
     (on_board yes)
@@ -3010,7 +2997,6 @@
       )
     )
   )
-
   (symbol "TF-01A"
     (in_bom yes)
     (on_board yes)
@@ -3157,7 +3143,6 @@
       )
     )
   )
-
   (symbol "TPS61023DRLR"
     (in_bom yes)
     (on_board yes)
@@ -3268,7 +3253,6 @@
       )
     )
   )
-
   (symbol "FXL0420-1R0-M"
     (in_bom yes)
     (on_board yes)
@@ -3368,6 +3352,134 @@
         (length 5.08)
         (name "1" (effects (font (size 1.27 1.27))))
         (number "1" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )
+  (symbol "PZ254R-11-09P"
+    (in_bom yes)
+    (on_board yes)
+    (property
+      "Reference"
+      "H"
+      (id 0)
+      (at 0 15.24 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Value"
+      "PZ254R-11-09P"
+      (id 1)
+      (at 0 -15.24 0)
+      (effects (font (size 1.27 1.27) ) )
+    )
+    (property
+      "Footprint"
+      "jlc:HDR-TH_9P-P2.54-H-M-W10.4"
+      (id 2)
+      (at 0 -17.78 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Datasheet"
+      "https://lcsc.com/product-detail/New-Arrivals_XFCN-PZ254R-11-09P_C492417.html"
+      (id 3)
+      (at 0 -20.32 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "Manufacturer"
+      "XFCN(兴飞)"
+      (id 4)
+      (at 0 -22.86 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "MPN"
+      "PZ254R-11-09P"
+      (id 5)
+      (at 0 -25.40 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "LCSC Part"
+      "C492417"
+      (id 6)
+      (at 0 -27.94 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (property
+      "ki_keywords"
+      "Pin Headers"
+      (id 8)
+      (at 0 -30.48 0)
+      (effects (font (size 1.27 1.27) ) hide)
+    )
+    (symbol "PZ254R-11-09P_0_1"
+      (rectangle
+        (start -1.27 12.70)
+        (end 3.81 -12.70)
+        (stroke (width 0) (type default))
+        (fill (type background))
+      )
+      (circle
+        (center 0.00 11.43)
+        (radius 0.38)
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+      (pin passive line
+        (at -6.35 10.16 0)
+        (length 5.08)
+        (name "1" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 7.62 0)
+        (length 5.08)
+        (name "2" (effects (font (size 1.27 1.27))))
+        (number "2" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 5.08 0)
+        (length 5.08)
+        (name "3" (effects (font (size 1.27 1.27))))
+        (number "3" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 2.54 0)
+        (length 5.08)
+        (name "4" (effects (font (size 1.27 1.27))))
+        (number "4" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 0 0)
+        (length 5.08)
+        (name "5" (effects (font (size 1.27 1.27))))
+        (number "5" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 -2.54 0)
+        (length 5.08)
+        (name "6" (effects (font (size 1.27 1.27))))
+        (number "6" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 -5.08 0)
+        (length 5.08)
+        (name "7" (effects (font (size 1.27 1.27))))
+        (number "7" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 -7.62 0)
+        (length 5.08)
+        (name "8" (effects (font (size 1.27 1.27))))
+        (number "8" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at -6.35 -10.16 0)
+        (length 5.08)
+        (name "9" (effects (font (size 1.27 1.27))))
+        (number "9" (effects (font (size 1.27 1.27))))
       )
     )
   )

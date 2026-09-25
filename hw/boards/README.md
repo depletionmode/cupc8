@@ -389,3 +389,42 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   a column right of the right side. The flash sits by the config pins, top right,
   clear of the M3 hole. The PWR LED is at the common spot, 3 mm in from the
   top-left corner. Nothing sits in the 4.5 mm strip above the fingers.
+
+## E-ink card (`eink.py`)
+
+Spec: `doc/proposals/eink-gpu.md` (its Decisions): card type $01, a
+replacement for the GPU card, never fitted with it. The panel (5.83"
+GDEY0583T81 on a DESPI-C02, or a Waveshare e-Paper HAT) comes on its driver
+module, which carries the booster; the card only drives its SPI.
+
+- **The RP2040 core** from `rp2040card.py`, laid out as on the storage card
+  (the same chip-area placement and `pocket_escapes` prerouting): the chip turned
+  round, so the panel pins (GPIO9–15, `hw/pins.yaml` `eink_mcu`) sit at its
+  top-right corner, facing the header. Four layers, In1 a GND plane.
+  Its `pocket_escapes` put SWDIO's via a row further out and towards the
+  fingers, as the storage card's do.
+- **J2, 1 × 9 right-angle 2.54 mm header PZ254R-11-09P** (C492417,
+  through-hole, JLC's own footprint) on the top edge: the insulator flush
+  with the edge, the pins out over it, in the module cable's order: 1 VCC,
+  2 GND, 3 DIN, 4 CLK, 5 CS, 6 DC, 7 RST, 8 BUSY, 9 PWR. Each pin's name is
+  on the silkscreen under it (the DESPI-C02's header has another order and
+  is wired with loose jumpers by these names); the names are a board-only
+  footprint that `eink.py` writes (`cupc8:EInk_Header_Legend`).
+- **ESD:** two TPD4E05U06DQAR (C138714), as the storage card, at the header:
+  the seven signals and VCC. The header is handled from outside the case.
+- **33 Ω in series** (0603, C23140, basic) with each of the seven signals,
+  at the RP2040 side of the TVS: the edge rate on the 20 cm cable, and the
+  current into a pin while the TVS clamps. They sit in two staggered rows in
+  the order the chip's pins come out, so the fan-out doesn't cross (0603, not
+  0402, so each designator fits over its part).
+- **Module power:** the slot's +3V3 through F1, a 100 mA PTC (C20975, as on
+  the GPU card's HDMI +5V), then 10 µF + 100 nF at the header. The slot's
+  +3V3 has no fuse of its own and is shared by every card, so a shorted
+  cable or module must not pull it down; the module's capacitors also charge
+  through the PTC, not straight off the card's rail. The module draws
+  ≤ 40 mA while refreshing (0.36 V across the PTC at its 9 Ω worst case).
+  EPD_PWR (GPIO15) switches the module's power on Waveshare's Rev 2.3 HATs;
+  the RP2040 pad's reset pull-down keeps it off until the firmware runs.
+- **LEDs:** PWR, and REFRESH (green, 100 Ω, GPIO24) in the top-edge row:
+  lit while the panel refreshes.
+- **UART TX** (GPIO16) on a test pad.

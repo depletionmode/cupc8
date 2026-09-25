@@ -10,6 +10,7 @@ Boards are built with the pcbnew API from the netlist that kicad-cli exports
 from the schematic, so the board can only contain what the schematic says.
 """
 
+import copy
 import math
 import os
 import re
@@ -160,7 +161,10 @@ def load_symbol(lib_id):
     if parent:
         base = load_symbol(lib + ":" + parent[1])
         own = {p[1]: p for p in find(sym, "property")}
-        flat = [e for e in base if not (isinstance(e, list) and e[0] == "property")]
+        # copies: the sub-symbols are renamed below, and `base` shares them
+        # with the cached parent (a second symbol extending it, or the same
+        # one loaded again in this process, would find them renamed already)
+        flat = [copy.deepcopy(e) for e in base if not (isinstance(e, list) and e[0] == "property")]
         props = [own.get(p[1], p) for p in find(base, "property")]
         props += [p for k, p in own.items() if k not in {q[1] for q in props}]
         flat = flat[:2] + props + flat[2:]
@@ -848,7 +852,8 @@ def clip_silk_to_board(board, outline, gap=0.15):
         for g in [gi[i].Cast() for i in range(len(gi))]:
             if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
                 continue
-            w = to(g.GetWidth()) / 2 + gap
+            # a text's bounding box already includes its stroke
+            w = (to(g.GetWidth()) / 2 if isinstance(g, pcbnew.PCB_SHAPE) else 0) + gap
             lo_x, lo_y, hi_x, hi_y = x0 + w, y0 + w, x1 - w, y1 - w
             if not (isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT):
                 b = g.GetBoundingBox()

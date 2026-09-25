@@ -128,6 +128,9 @@ PLUGS = {
     "C2858275": ("HDMI type A plug (assumed typical overmold)", 21.0, 11.5),
     "C112455": ("USB-A plug (assumed typical overmold)", 17.0, 9.0),
     "C165948": ("USB-C plug (Type-C r2.0 max overmold)", 12.35, 6.5),
+    # the e-ink card's 1 x 9 header: nine 2.54 mm female jumper housings side
+    # by side (Dupont, 2.54 x 2.54 each, assumed; a 1 x 9 housing is the same)
+    "C492417": ("nine 2.54 mm female jumper housings (assumed)", 22.9, 2.6),
 }
 MIN_OVERHANG = -0.3                    # mating face at the edge: routing tolerance +/-0.2
 
@@ -201,10 +204,13 @@ def discover():
     import kicadgen  # noqa: F401  (only to find its mtime)
     gen_mtime = os.path.getmtime(os.path.join(ROOT, "hw", "tools", "kicadgen.py"))
     names = {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))
-             if "pipeline(" in open(p).read()}       # a board script; hw/boards also holds modules
+             if "\ndef schematic(" in open(p).read()}   # a board script draws a schematic; rp2040card.py is a module
     names |= {os.path.basename(os.path.dirname(p))
               for p in glob.glob(os.path.join(ROOT, "build", "hw", "*", "*.kicad_pcb"))
               if os.path.basename(p) == os.path.basename(os.path.dirname(p)) + ".kicad_pcb"}
+    only = os.environ.get("CUPC8_MECH_BOARDS")      # e.g. "eink,wifi": a partial run, while another board's build is broken
+    if only:
+        names &= set(only.split(","))
     found = {}
     for name in sorted(names):
         script = os.path.join(ROOT, "hw", "boards", name + ".py")
