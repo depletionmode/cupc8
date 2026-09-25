@@ -551,6 +551,13 @@ def ring_pads(board):
 
 
 def prepare(board):
+    """The card's own pre-routing, run after the pad fan-out. In1 carries
+    signals as well as the GND pour: on the I/O-card outline the bus has a
+    10 mm band to its fingers, and two signal layers are not enough there.
+    The GND pour on In1 fills round them, and every piece of it is joined by
+    GND vias to the stitched outer pours; In2 stays a solid 3V3 plane."""
+    import pcbnew
+    board.SetLayerType(board.GetLayerID("In1.Cu"), pcbnew.LT_SIGNAL)
     ring_pads(board)
     key_ties(board)
     a_vias(board)
