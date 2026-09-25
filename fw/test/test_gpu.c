@@ -289,8 +289,9 @@ static void test_general(void)
 	SEND(0x10, 'q', 1, 2, 3);
 	CHECK_EQ(gpu.errors, e + 2);
 #ifndef TEST_EINK
-	/* INFO: HDMI, 640x480, colour, 80x30; REFRESH, AUTO and EPD_STATUS are
-	 * NOPs here (eink-card.md), MODE 2 is not a mode of this card */
+	/* INFO: HDMI, 640x480, colour, 80x30; REFRESH, AUTO, EPD_STATUS, AUTO_EXT
+	 * and AUTO_GET are NOPs here (eink-card.md), MODE 2 is not a mode of
+	 * this card */
 	uint8_t info[9];
 	SEND(0x08);
 	CHECK_EQ(read_resp(info, 9), 9);
@@ -301,9 +302,21 @@ static void test_general(void)
 	SEND(0x0A, 1, 15, 30);
 	SEND(0x0B);
 	CHECK_EQ(read_resp(r, 1), 0);
+	SEND(0x0C, 100, 3, 10);
+	SEND(0x0C, 0, 9, 0);                        /* not checked here: a NOP */
+	SEND(0x0D);
+	CHECK_EQ(read_resp(r, 6), 0);               /* AUTO_GET: no response */
 	SEND(0x01, 2);
 	CHECK_EQ(gpu.mode, GPU_MODE_TEXT);
 	CHECK_EQ(gpu.errors, e);
+	/* the stream stays in step after them: the next command answers */
+	SEND(0x0C, 1, 1, 1);
+	SEND(0x0D);
+	SEND(0x08);
+	CHECK_EQ(read_resp(info, 9), 9);
+	CHECK(info[0] == 0 && info[7] == 80, "INFO after AUTO_EXT and AUTO_GET");
+	SEND(0x0C, 1, 1);                           /* short, as AUTO short: counted */
+	CHECK_EQ(gpu.errors, e + 1);
 #endif
 	/* IDENT */
 	SEND(CARD_OP_IDENT);
