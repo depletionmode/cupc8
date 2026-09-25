@@ -447,7 +447,11 @@ def main():
     a = ap.parse_args()
     boards = a.boards
     if boards == ["all"]:
-        boards = sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, "hw", "boards")) if f.endswith(".py"))
+        # every board script: one that draws a schematic (not a shared module
+        # such as rp2040card.py)
+        here = os.path.join(ROOT, "hw", "boards")
+        boards = sorted(f[:-3] for f in os.listdir(here) if f.endswith(".py")
+                        and "\ndef schematic(" in open(os.path.join(here, f)).read())
     failed = 0
     for b in boards:
         try:
