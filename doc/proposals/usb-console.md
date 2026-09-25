@@ -93,7 +93,10 @@ bytes, `sysctl.md`), so no lock is needed.
   USB buffer's room from `CON_OUT` (never half a CR LF), then its tail;
   up to CON_IN's room from the PC (CR Enter, CR LF one Enter, a lone LF
   Enter), then its head. Closed: `HOST` cleared once, then no bridge
-  traffic. A PC that holds the port open without reading holds up the
+  traffic. `CON_FLAGS` with a bit other than `HOST` set is power-up junk
+  (the kernel has not zeroed it yet): the card drops both rings, moving
+  only its own indices, so a terminal open across power-on sees the banner
+  first (found in the emulator's viewer: a ring of junk came before it). A PC that holds the port open without reading holds up the
   terminal, as flow control on a serial line would (`sysctl.md`).
 - **Kernel** (`kernel/console.s`): `con_init` zeroes $6f22–$6f26 first
   thing at boot; `gpu_putc`, which everything the terminal and the console

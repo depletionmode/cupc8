@@ -1208,6 +1208,12 @@ Both:
     ## one poll of the card's: HOST, CON_OUT to stdout, stdin to CON_IN
     ## (only once `input`: the kernel is up, so its boot does not zero what
     ## was typed ahead); true if anything moved
+    if (mem[ConFlags] and 0xfe) != 0:
+      # power-up junk (ramJunk), not the kernel's rings yet: drop both, as the card does
+      mem[ConOutTail] = mem[ConOutHead]
+      mem[ConInHead] = mem[ConInTail]
+      mem[ConFlags] = 1
+      return true
     if (mem[ConFlags] and 1) == 0:
       mem[ConFlags] = 1               # opened, or the kernel zeroed it at boot
     var t = mem[ConOutTail] and 127

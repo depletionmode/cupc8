@@ -684,7 +684,22 @@ static void sys008_console(void)
 	char in[256];
 	power_on(true, true);
 	M.br.on_ram = log_ram;
-	/* RAM is junk at power-on; the kernel zeroes the rings at boot */
+	/* RAM is junk at power-on. A PC with the port open before the kernel has
+	 * booted: CON_FLAGS $A5 is not the kernel's, so the card drops both rings
+	 * (moving only its own indices) instead of sending the PC a ring of junk */
+	memset(M.br.ram + 0x6f00, 0xA5, 0x100);
+	RAM(CON_OUT_HEAD) = 0x31;
+	RAM(CON_IN_TAIL) = 0x17;
+	M.con.open = true;
+	con_run(CON_POLL_MS * 3);
+	CHECK(pc_got(""), "power-up junk in the rings: nothing sent");
+	CHECK(RAM(CON_OUT_TAIL) == 0x31 && RAM(CON_IN_HEAD) == 0x17 && RAM(CON_OUT_HEAD) == 0x31 &&
+	      RAM(CON_IN_TAIL) == 0x17, "junk: the card's indices moved to the kernel's, the kernel's left alone");
+	CHECK_EQ(RAM(CON_FLAGS), CON_HOST);
+	M.con.open = false;
+	con_run(1);
+	M.bridge_frames = 0;
+	/* the kernel zeroes the rings at boot */
 	memset(M.br.ram + 0x6f00, 0xA5, 0x100);
 	memset(M.br.ram + CON_OUT_HEAD, 0, 5);
 

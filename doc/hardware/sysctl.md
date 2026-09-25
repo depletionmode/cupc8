@@ -176,7 +176,11 @@ does that), every 2 ms (`CON_POLL_MS`, `fw/sysctl/core/console.c`) the card:
 
 1. reads the four indices and `CON_FLAGS` in one `RAM_RD` frame, and sets
    `HOST` (bit 0 of `CON_FLAGS`) if it is clear: the kernel zeroes it at
-   boot, so a reset machine gets it back on the next poll;
+   boot, so a reset machine gets it back on the next poll. `CON_FLAGS` with
+   any other bit set is the SRAM as it powered up, before the kernel has
+   run: the card then moves its own indices to the kernel's (dropping both
+   rings), sets `HOST` and sends nothing, so a terminal open across
+   power-on sees the banner first, not a ring of junk;
 2. copies the bytes from `CON_OUT_TAIL` to `CON_OUT_HEAD` to the PC, as many
    as its USB buffer takes, each `\n` as CR LF (never half of one), then
    writes `CON_OUT_TAIL`;

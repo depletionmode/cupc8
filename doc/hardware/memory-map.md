@@ -77,7 +77,7 @@ The USB console's part of the API block (the kernel zeroes $6f22–$6f26 at boot
 | $6f23 | `CON_OUT_TAIL` | system card | next byte the card will take |
 | $6f24 | `CON_IN_HEAD` | system card | next free byte of `CON_IN` |
 | $6f25 | `CON_IN_TAIL` | kernel | next byte the kernel will take |
-| $6f26 | `CON_FLAGS` | system card | bit 0 `HOST`: a PC has the console port open |
+| $6f26 | `CON_FLAGS` | system card | bit 0 `HOST`: a PC has the console port open; bits 7:1 are 0 (the card takes any other value for power-up junk and drops both rings) |
 | $6f40–$6fbf | `CON_OUT` | kernel | the terminal's output, a 128-byte ring |
 | $6fc0–$6fff | `CON_IN` | system card | keys from the PC, a 64-byte ring |
 

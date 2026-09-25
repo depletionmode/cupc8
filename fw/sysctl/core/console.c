@@ -14,7 +14,8 @@
  *
  * The indices are read from RAM on every poll, not cached: the kernel zeroes
  * them (and CON_FLAGS) when it boots, and the card finds HOST clear and sets
- * it again.
+ * it again. CON_FLAGS with any other bit set is power-up junk (the kernel
+ * has not booted yet): the card drops both rings instead of sending them.
  */
 #include "sysctl.h"
 
@@ -113,6 +114,16 @@ void con_poll(sysctl_t *s)
 	/* CON_OUT_HEAD, CON_OUT_TAIL, CON_IN_HEAD, CON_IN_TAIL, CON_FLAGS */
 	uint8_t ix[5];
 	br_ram_read(s, CON_OUT_HEAD, ix, 5);
+	if (ix[4] & ~CON_HOST) {
+		/* not the kernel's rings: RAM as it powered up (the kernel zeroes
+		 * CON_FLAGS at boot, and the card writes only 0 or HOST there).
+		 * Drop both rings, moving only the card's own indices, rather than
+		 * send the PC a ring of junk before the banner. */
+		br_ram_write(s, CON_OUT_TAIL, &ix[0], 1);
+		br_ram_write(s, CON_IN_HEAD, &ix[3], 1);
+		set_flags(s, CON_HOST);
+		return;
+	}
 	if (!(ix[4] & CON_HOST))
 		set_flags(s, CON_HOST);       /* opened, or the kernel zeroed it at boot */
 	s->con_host = true;

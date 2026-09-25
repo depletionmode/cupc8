@@ -686,7 +686,7 @@ async function e2e020() {
   m.console.open();                        // before power-on: the kernel's boot zeroes the rings, the card sets HOST again
   m.powerOn();
   expect(await until('>>', 6e9), 'the banner and the prompt arrive on the console port');
-  expect(text.includes('CUPC/8 BASIC'), `the banner: ${JSON.stringify(text.slice(0, 80))}`);
+  expect(text.startsWith('\r\n      CUPC/8 BASIC'), `the banner first, no power-up junk before it: ${JSON.stringify(text.slice(0, 80))}`);
   expect(/\r\n/.test(text) && !/[^\r]\n/.test(text), 'newlines arrive as CR LF');
   expect(await waitFor(m, '>>', 1e9), 'and on HDMI, as before');
 
