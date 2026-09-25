@@ -782,6 +782,17 @@ static void test_policy_ext(void)
 	CHECK(model.asleep, "sleep_s 255: asleep at 256 s");
 	SEND(0x10, 'y');
 	CHECK(settle(3000), "wakes");
+
+	/* sleep_s 0 held for 72 min, past the 32-bit microsecond clock's wrap
+	 * (71.6 min), then sleep_s 3: 3 s from the change, not at once */
+	SEND(0x0C, 100, EINK_FAST, 0);
+	idle_s(72 * 60);
+	CHECK(!model.asleep, "sleep_s 0: awake after 72 min");
+	SEND(0x0C, 100, EINK_FAST, 3);
+	run_ms(2800);
+	CHECK(!model.asleep, "sleep_s 3 after 72 min of sleep_s 0: awake at 2.8 s");
+	run_ms(400);
+	CHECK(model.asleep, "sleep_s 3 after 72 min of sleep_s 0: asleep at 3.2 s");
 	CHECK_EQ(model.errors, 0);
 	if (model.errors)
 		fprintf(stderr, "model: %s\n", model.error);

@@ -291,6 +291,9 @@ static bool ext_command(gpu_t *g, const uint8_t *f, int len, bool respond)
 		e->cap10 = a[0];
 		e->full_kind = a[1];
 		e->sleep_s = a[2];
+		/* sleep_s counts from here: after sleep_s 0 held past 2^32 us
+		 * (71.6 min), now - last_panel has wrapped to anything */
+		e->last_panel = e->now;
 		return true;
 	case 0x0D: {                                /* AUTO_GET */
 		uint8_t cfg[6] = {e->auto_on, e->idle10, e->full_after, e->cap10, e->full_kind, e->sleep_s};
