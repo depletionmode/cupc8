@@ -185,7 +185,10 @@ ESP ROM bootloader sync.
   LED rows aligned. **Every card in the row has exactly the same outline;
   only the finger tab differs (x8 or x1).** If the CPU card doesn't fit the
   outline below, the outline grows for every card (David allows up to about
-  68 × 40 mm), keeping the hole and LED 4 mm and 3 mm in from their corners. The CPU card has the I/O card outline (below) on its
+  68 × 40 mm), keeping the hole and LED 4 mm and 3 mm in from their corners.
+  **No finger tab ends at the body's edge:** every tab, the CPU card's x8
+  included, has at least 5 mm of body beyond each of its ends (a shoulder),
+  as the x1 cards have; the common outline widens if the x8 needs it. The CPU card has the I/O card outline (below) on its
   wider x8 tab (`cpu-bus.md`, CPU card outline). The **system card is not in
   the row**: its x4 socket sits off to one side of the main board, and the
   card keeps its own outline (`system-slot.md`).
