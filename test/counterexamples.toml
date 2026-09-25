@@ -605,3 +605,17 @@ revert = [["tools/as.py", """            if directive == 'resb':""", """        
           ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
 cmd = "python3 test/asm/test_asm.py"
 must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'", "FAIL 'mov r0, #1"]
+
+[[bug]]
+name = "sim: an interactive run slept a millisecond per WAI (0.17 MHz with a timer tick)"
+fixed_in = "ced7599"
+revert = [["tools/sim.nim", """          let behind = insStart + int((epochTime() - realStart) * 1_000_000) - ins_retired
+          if behind <= 0:
+            sleep(1)
+            steps = 1000
+          else:
+            steps = min(behind, 100_000)""", """          sleep(1)
+          steps = clamp(int((epochTime() - lastReal) * 1_000_000), 1, 100_000)"""]]
+cmd = "python3 test/sim/test_cli.py"
+must_fail = ["FAIL: interactive: WAI-heavy guest runs at ~1 MHz"]
+
