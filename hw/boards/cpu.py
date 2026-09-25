@@ -318,8 +318,8 @@ def placement():
     p["C8"] = beside(57, along=-0.5)
     # the bottom side's decaps step aside from the arrays under the bus pins
     p["C5"] = beside(6, along=-4.0)
-    p["C1"] = beside(27, along=4.5)
-    p["C6"] = beside(30, along=6.0)
+    p["C1"] = beside(27, along=2.0)
+    p["C6"] = beside(30, along=2.5)
     fx, fy = FPGA[:2]
     p.update({
         # the top side's supply pins (VPP 108, VCC 92, VCCIO1 100 and 89) are
@@ -339,7 +339,7 @@ def placement():
         # RN3 and RN5 as near as the GND and /RDY pins between allow)
         "RN1": (16.5, fy + 15.1, 0), "RN2": (19.5, fy + 15.1, 0), "RN3": (22.25, fy + 15.1, 0),
         "RN4": (24.5, fy + 15.1, 0), "RN5": (27.75, fy + 15.1, 0),
-        "RN6": (45.8, fy + 7.8, 90), "RN7": (45.8, fy + 5.0, 90), "RN8": (45.8, fy - 0.2, 90),
+        "RN6": (36.6, fy + 16.8, 0), "RN7": (39.8, fy + 16.8, 0), "RN8": (45.8, fy - 0.2, 90),
         # config flash by the config pins, under the top edge beside the
         # hole, its decap, and the configuration pull-ups
         "U2": (45.3, -38.6 + DY, 0), "C23": (48.6, -35.6 + DY, 90),
