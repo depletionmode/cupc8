@@ -71,7 +71,7 @@ ROTATIONS = os.path.join(PARTS, "jlc_rotation.yaml")
 RECORDS = os.path.join(PARTS, "easyeda")
 CACHE = os.path.join(ROOT, "build", "parts", "easyeda")
 PAD_TOLERANCE = 0.2          # mm: 0402 pads are 0.27 mm off 0603's, 0603's 0.04 off EasyEDA's
-POLAR = {"K": "K", "A": "A", "CATHODE": "K", "ANODE": "A", "-": "K", "+": "A"}   # 2-pin names
+POLAR = {"K": "K", "A": "A", "CATHODE": "K", "ANODE": "A", "-": "K", "+": "A", "C": "K"}   # 2-pin names (C: EasyEDA diodes)
 
 
 def rotations():
@@ -234,6 +234,9 @@ def package_ok(pkg, fp_name):
     m = re.fullmatch(r"(.+)-(150|208)MIL", p)        # "SOIC-8-208mil": the body width in mils
     if m:
         return name.startswith(m.group(1)) and "-W%s-" % {"150": "3.9", "208": "5.3"}[m.group(2)] in name
+    m = re.fullmatch(r"(SOT-23-\d)L", p)             # "SOT-23-6L": JLC's name for a plain SOT-23-6
+    if m:
+        return name.startswith(m.group(1) + "_")
     return name.startswith(p) or ("_%s" % p) in name or ("_%s_" % p) in name
 
 
