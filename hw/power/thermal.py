@@ -15,11 +15,8 @@ at the corner that heats it most:
                   rated at 100 % duty (a long transfer or an RF test), from
                   the slot's +5V at both of its corners
   RT9013 (1V2)    (3V3 max - 1V2 min) x 40 mA, main board and CPU card
-  AMS1117 (card)  (+5V max - VOUT min) x Iout + VIN x IQ. The +5V max is
-                  vSafe5V max with no drop (the lightest load elsewhere).
-                  No M1 card has one: the system, GPU and IO cards run from
-                  the slot's +3V3 (power.md), so these only say what one
-                  would take if they ever regulated from +5V.
+  TPS61023 (IO card keyboard boost)  the same kind of loss model, at 500 mA
+                  and its highest set point from the worst-case card input
   input eFuse     I^2 x RON max at the most current it passes without
                   limiting (its minimum limit)
   SY6280          the IO card's keyboard port at 500 mA, RDS(on) hot
@@ -36,6 +33,18 @@ def buck_loss(vin, iout, vout=3.3):
     dcy = vout / vin
     cond = iout ** 2 * d.BUCK_RDS_HOT * (dcy * d.BUCK_RHS + (1 - dcy) * d.BUCK_RLS)
     sw = vin * iout * 2 * d.BUCK_T_EDGE * d.BUCK_FSW
+    return cond + sw + d.BUCK_IQ_LOSS
+
+
+def boost_loss(vin, iout):
+    """The keyboard boost's IC loss at its highest set point: RDS(on) hot
+    (x BUCK_RDS_HOT, as the buck), switching edges at 1 MHz, the control. The
+    low side carries the inductor current for D, the high side for 1 - D."""
+    vout = d.iob_vout_range()[2]
+    dcy = 1 - vin / vout
+    il = vout * iout / (d.IOB_ETA * vin)
+    cond = il ** 2 * d.BUCK_RDS_HOT * (dcy * d.IOB_RLS + (1 - dcy) * d.IOB_RHS)
+    sw = vout * il * 2 * d.BUCK_T_EDGE * 1.0e6
     return cond + sw + d.BUCK_IQ_LOSS
 
 
@@ -80,15 +89,11 @@ def main():
         d.WIFI_BUCK_PACKAGE, 1e3 * d.WIFI_I_3V3, 1e3 * p, theta_wifi), tj(p, theta_wifi), lim, "<=", "C",
         fmt="%.1f")
 
-    ams = d.AMS1117
-    cards = (("T5", "GPU card, if from +5V", d.LOADS_3V3["GPU card RP2040 + flash"] + d.LOADS_3V3["GPU card TMDS"]),
-             ("T6", "IO card, if from +5V", d.LOADS_3V3["IO card RP2040 + flash"]),
-             ("T7", "system card, if from +5V", d.LOADS_3V3["sysctl RP2040 + flash"]))
-    for ident, what, i in cards:
-        p = (d.VBUS_MAX - d.AMS1117_VOUT_MIN) * i + d.VBUS_MAX * ams["IQ"]
-        c.check(ident, "AMS1117 %s, %.0f mA from %.2f V: %.0f mW x %.0f C/W" % (
-            what, 1e3 * i, d.VBUS_MAX, 1e3 * p, d.AMS1117_THETA_JA), tj(p, d.AMS1117_THETA_JA), lim, "<=",
-            "C", fmt="%.1f")
+    v_io = budget.chain("worst")["io_in"]
+    p = boost_loss(v_io, d.I_KEYBOARD)
+    c.check("T5", "TPS61023 IO card keyboard boost, 500 mA at %.2f V from %.2f V in: %.0f mW x %.0f C/W" % (
+        d.iob_vout_range()[2], v_io, 1e3 * p, d.IOB_THETA_JA), tj(p, d.IOB_THETA_JA), lim, "<=", "C",
+        fmt="%.1f")
 
     lo, _, _ = d.insw_ilim()
     p = lo ** 2 * d.INSW_RON_MAX

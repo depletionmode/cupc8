@@ -26,7 +26,9 @@ static uint32_t frame_start;                    /* ring position (free-running) 
 static uint32_t replayed_bytes;                 /* bytes of frames replayed */
 static volatile bool busy;
 
-static uint8_t preload[2 + CARD_RESP_MAX];
+/* two: slotspi_refresh() fills the one the TX DMA is not reading */
+static uint8_t preload[2][2 + CARD_RESP_MAX];
+static int cur;                                 /* the one armed */
 
 static card_t *card;
 static slotspi_status_fn status_fn;
@@ -52,28 +54,40 @@ static void rx_start(void)
 	dma_channel_configure(dma_rx, &c, ring, &pio->rxf[sm], 0xffffffffu, true);
 }
 
-/* MISO for the next frame: the status byte, then the response if one is
- * ready and nothing that could change it is still queued or running (a READ
- * frame changes nothing). The SM's first pull blocks, so it waits for the
- * status byte if CS_n falls while this is still loading it. */
-static void arm_tx(void)
+/* MISO for the next frame into p: the status byte, then the response if
+ * one is ready and nothing that could change it is still queued or running
+ * (a READ frame changes nothing). Returns the length. */
+static uint fill(uint8_t *p)
 {
 	uint32_t queued_frames = q_head - q_tail;
 	uint32_t queued_bytes = frame_start - replayed_bytes;
-	int n = 0;
-	preload[n++] = (uint8_t)(status_fn(card, queued_bytes, queued_frames) & 0x7f);
+	uint n = 0;
+	p[n++] = (uint8_t)(status_fn(card, queued_bytes, queued_frames) & 0x7f);
 	if (!q_commands && !busy && card->resp_ready) {
-		preload[n++] = (uint8_t)card->resp_len;
-		memcpy(&preload[n], card->resp, (size_t)card->resp_len);
-		n += card->resp_len;
+		p[n++] = (uint8_t)card->resp_len;
+		memcpy(&p[n], card->resp, (size_t)card->resp_len);
+		n += (uint)card->resp_len;
 	}
-	/* after these, `pull noblock` sends $00 */
+	return n;
+}
+
+/* The TX DMA feeds preload[b] to the SM (after it, `pull noblock` sends
+ * $00). The SM's first pull blocks, so it waits for the status byte if CS_n
+ * falls while this is still loading it. */
+static void __not_in_flash_func(start_tx)(int b, uint n)
+{
 	dma_channel_config c = dma_channel_get_default_config(dma_tx);
 	channel_config_set_transfer_data_size(&c, DMA_SIZE_8);      /* a byte lands in all four lanes */
 	channel_config_set_read_increment(&c, true);
 	channel_config_set_write_increment(&c, false);
 	channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
-	dma_channel_configure(dma_tx, &c, &pio->txf[sm], preload, (uint)n, true);
+	dma_channel_configure(dma_tx, &c, &pio->txf[sm], preload[b], n, true);
+	cur = b;
+}
+
+static void arm_tx(void)
+{
+	start_tx(cur, fill(preload[cur]));
 }
 
 static bool is_command(uint32_t start)
@@ -161,25 +175,45 @@ void slotspi_busy(bool b)
 	busy = b;
 }
 
-void slotspi_refresh(void)
+void __not_in_flash_func(slotspi_refresh)(void)
 {
-	/* only CS_n's interrupt shares this state: mask it alone, never the
-	 * video's (see slotspi_init) */
+	const uint start = prog + slotspi_offset_start;
+	/* CS_n's interrupt shares this state (see slotspi_init) */
 	irq_set_enabled(IO_IRQ_BANK0, false);
-	/* Swap the preload for the current status and response only while the
-	 * SM is still waiting for CS_n: stopped, it cannot move on, and at
-	 * `start` it has pulled nothing. (Checking the CS_n pin instead raced a
-	 * falling CS_n: the SM could pull the old status byte between the check
-	 * and the FIFO clear, and the frame then began with two status bytes,
-	 * so the host read the second as RESP_LEN.) If a frame has begun, it
-	 * goes out with the old preload; cs_rose re-arms after it. */
-	pio_sm_set_enabled(pio, sm, false);
-	if (pio_sm_get_pc(pio, sm) == prog + slotspi_offset_start) {
-		dma_channel_abort(dma_tx);
-		pio_sm_clear_fifos(pio, sm);
-		arm_tx();
+	/* A frame has begun: it goes out with the old preload, and cs_rose
+	 * re-arms after it. Never stop the SM then: a host clocking a stopped
+	 * SM loses bits (the MISO bytes, and the MOSI bytes of a command,
+	 * shift by the SCK edges missed). */
+	if (pio_sm_get_pc(pio, sm) != start) {
+		irq_set_enabled(IO_IRQ_BANK0, true);
+		return;
 	}
-	pio_sm_set_enabled(pio, sm, true);
+	/* the new preload, into the buffer the DMA is not reading */
+	int b = cur ^ 1;
+	uint n = fill(preload[b]);
+	/* Swap it in only while the SM is still waiting for CS_n: stopped, it
+	 * cannot move on, and at `start` it has pulled nothing. (Checking the
+	 * CS_n pin instead raced a falling CS_n: the SM could pull the old
+	 * status byte between the check and the FIFO clear, and the frame then
+	 * began with two status bytes.) The SM is stopped for a few dozen
+	 * cycles from RAM with every interrupt off, so even if CS_n falls
+	 * meanwhile it runs again long before the host's first SCK edge (>= 2
+	 * us after CS_n). Stopping it with interrupts on, or around fill()
+	 * running from flash, held it for up to ~10 us: CS_n fell, the host
+	 * clocked the first bits with MISO still Hi-Z (a status byte with bit 7
+	 * set) and the SM, restarted mid-byte, lost the frame's alignment. The
+	 * video's DMA interrupt on the GPU waits those few cycles at most. */
+	uint32_t irq = save_and_disable_interrupts();
+	if (pio_sm_get_pc(pio, sm) == start) {
+		pio_sm_set_enabled(pio, sm, false);
+		if (pio_sm_get_pc(pio, sm) == start) {
+			dma_channel_abort(dma_tx);
+			pio_sm_clear_fifos(pio, sm);
+			start_tx(b, n);
+		}
+		pio_sm_set_enabled(pio, sm, true);
+	}
+	restore_interrupts(irq);
 	irq_set_enabled(IO_IRQ_BANK0, true);
 }
 

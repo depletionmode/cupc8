@@ -36,7 +36,8 @@ extras. Stock checked 2026-09-23 (the power parts: 2026-09-24).
 | USB ESD | USBLC6-2SC6 | C7519 | 38,417 | 5 | main, system card, IO card |
 | 5V TVS | SMF5.0A | C193402 | 582,382 | 3 | main |
 | Input fuse | SMD1812P350TF/16 (3.5 A PTC, 16 V, 8–30 mΩ) | C46970911 | 310 | 3 | main. Fallback: SMD1812P350TF (6 V rating), C20815 (2,858) |
-| Slot +5V fuse | SMD1206P075TFT (0.75 A PTC) | C545214 | 16,570 | 21 | main: 6 slots + system slot |
+| Slot +5V fuse | SMD1206P110TFT (1.1 A PTC, 0.92 A hold at 40 °C, 0.04–0.21 Ω) | C143975 | 1,442 | 21 | main: 6 slots + system slot. Up from the 0.75 A part: the IO card's keyboard boost draws up to 0.75 A at the worst corner (POW-006 B10b) |
+| IO card keyboard boost | TPS61023DRLR (sync boost, SOT-563), 1 µH FXL0420-1R0-M (C167203, 27 mΩ, Isat 7 A), 750k (C23240) / 100k (C25803) 1 % | C919459 | 14,097 | 2 | IO: holds the keyboard's VBUS at 5.06 V from a card +5V down to 3.9 V (POW-007); feeds the SY6280 port switch (`power.md`) |
 | CPU socket | UMAX 3183-10112P1T, PCIe x8 98-pin, THT | C404111 | 418 | 3 | main |
 | I/O slot socket | UMAX 3183-10200P1T, PCIe x1 36-pin, THT | C404113 | 2,418 | 18 | main |
 | System slot socket | PCIE-64P11L, PCIe x4 64-pin, SMD with posts | C19188869 | 201 | 3 | main |
