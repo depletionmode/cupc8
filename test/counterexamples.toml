@@ -495,3 +495,28 @@ revert = [["tools/sim.nim", """        if not ranSinceKey and ins_retired - keyA
 """, ""]]
 cmd = "python3 test/sim/test_cli.py"
 must_fail = ["FAIL: --type with no IO card: headless still exits"]
+
+[[bug]]
+name = "kernel: Backspace at the prompt was stored in the line and only moved the cursor"
+fixed_in = "1a53edf"
+revert = [["kernel/printf.s", """	eq r0, #8				; Backspace (DEL too) takes the last character back
+	bzf .erase
+	eq r0, #127
+	bzf .erase
+""", ""]]
+cmd = "tools/run_tests.sh testBackspace"
+must_fail = ["Backspace: the corrected line ran (8, not 7)", "DEL: the corrected line ran (4, not 3)"]
+
+[[bug]]
+name = "graphics card: BS at column 0 did not go back over a wrapped line"
+fixed_in = "1a53edf"
+revert = [["fw/gpu/core/gpu.c", """		if (g->cx > 0) {
+			g->cx--;
+		} else if (g->cy > 0) {                 /* back over a wrapped line */
+			g->cy--;
+			g->cx = GPU_TEXT_COLS - 1;
+		}""", """		if (g->cx > 0)
+			g->cx--;"""]]
+cmd = "make -s -C fw test_gpu"
+must_fail = ["BS at column 0"]
+
