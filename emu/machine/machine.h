@@ -114,6 +114,9 @@ class Rp2040Card : public Card {
   bool sel = false, sck_ = false;
   std::vector<uint8_t> bits, rbits;
   double t0 = 0;
+  // the levels on the slot pins now: drive() changes a pin only when its
+  // level changes (rp2040js's setInputValue latches an edge on every call)
+  bool pinSck = false, pinMosi = false, pinNcs = true;
 };
 
 // the Wi-Fi card in QEMU: tx/rx are the pipes to its UART1 (machine.mjs EspCard)
