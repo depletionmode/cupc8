@@ -4,9 +4,12 @@
  * (sysmachine.c) and speaks its USB protocol on a pseudo-terminal, which
  * cupc8.py opens like the card's USB serial port.
  *
- *   sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR] [--reply-delay MS]
+ *   sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR] [--reply-delay MS] [--console]
  *
- * It prints the pty's path, then serves until killed. --flashed starts with
+ * It prints the pty's path, then serves until killed. --console serves the
+ * console port (usb-console.md) on a second pty, whose path it prints next:
+ * the port counts as open from the start (a pty has no DTR), so the core
+ * polls the rings in the bridge model's SRAM and moves them to and from it. --flashed starts with
  * both FPGA flashes holding their bitstreams. --esp puts an ESP32 card in
  * SLOT whose UART is at HOST:PORT (Espressif QEMU in download mode); slot 2
  * always holds an RP2040 card (swdtarget.h). --cc sets the USB-C CC voltage.
@@ -58,6 +61,26 @@ static char esp_host[64];
 static int esp_port;
 
 static int reply_delay_ms;
+
+static int open_pty(void)
+{
+	int fd = posix_openpt(O_RDWR | O_NOCTTY);
+	if (fd < 0 || grantpt(fd) || unlockpt(fd)) {
+		perror("sysctl_sim: pty");
+		exit(1);
+	}
+	struct termios t;
+	tcgetattr(fd, &t);
+	cfmakeraw(&t);
+	tcsetattr(fd, TCSANOW, &t);
+	printf("%s\n", ptsname(fd));
+	fflush(stdout);
+	/* keep the slave open ourselves, so a client closing it isn't a hangup */
+	int keep = open(ptsname(fd), O_RDWR | O_NOCTTY);
+	(void)keep;
+	fcntl(fd, F_SETFL, O_NONBLOCK);
+	return fd;
+}
 
 static void usb_out(const uint8_t *d, int n)
 {
@@ -112,7 +135,7 @@ static int esp_read(uint8_t *d, int max)
 
 int main(int argc, char **argv)
 {
-	bool flashed = false;
+	bool flashed = false, with_console = false;
 	int cc_mv = 0;
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--flashed"))
@@ -121,13 +144,15 @@ int main(int argc, char **argv)
 			cc_mv = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--reply-delay") && i + 1 < argc)
 			reply_delay_ms = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--console"))
+			with_console = true;
 		else if (!strcmp(argv[i], "--dump") && i + 1 < argc)
 			dump_dir = argv[++i];
 		else if (!strcmp(argv[i], "--esp") && i + 1 < argc &&
 			 sscanf(argv[++i], "%d=%63[^:]:%d", &esp_slot, esp_host, &esp_port) == 3)
 			;
 		else {
-			fprintf(stderr, "usage: sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR] [--reply-delay MS]\n");
+			fprintf(stderr, "usage: sysctl_sim [--flashed] [--cc MV] [--esp SLOT=HOST:PORT] [--dump DIR] [--reply-delay MS] [--console]\n");
 			return 2;
 		}
 	}
@@ -143,22 +168,9 @@ int main(int argc, char **argv)
 		M.uart_far.read = esp_read;
 	}
 
-	pty = posix_openpt(O_RDWR | O_NOCTTY);
-	if (pty < 0 || grantpt(pty) || unlockpt(pty)) {
-		perror("sysctl_sim: pty");
-		return 1;
-	}
-	struct termios t;
-	tcgetattr(pty, &t);
-	cfmakeraw(&t);
-	tcsetattr(pty, TCSANOW, &t);
-	printf("%s\n", ptsname(pty));
-	fflush(stdout);
-
-	/* keep the slave open ourselves, so a client closing it isn't a hangup */
-	int keep = open(ptsname(pty), O_RDWR | O_NOCTTY);
-	(void)keep;
-	fcntl(pty, F_SETFL, O_NONBLOCK);
+	pty = open_pty();
+	int con = with_console ? open_pty() : -1;
+	M.con.open = with_console;
 
 	struct timespec last;
 	clock_gettime(CLOCK_MONOTONIC, &last);
@@ -184,7 +196,20 @@ int main(int argc, char **argv)
 				usb_out(M.usb, M.usb_n);
 			}
 		}
+		if (con >= 0) {
+			/* the console port: the PC's bytes in, the card's out */
+			int room = (int)sizeof M.con.from_pc - M.con.from_pc_n;
+			ssize_t k = read(con, M.con.from_pc + M.con.from_pc_n, (size_t)room);
+			if (k > 0)
+				M.con.from_pc_n += (int)k;
+			M.con.room = 4096;
+		}
 		sysctl_poll(&S);
+		if (con >= 0 && M.con.to_pc_n) {
+			if (write(con, M.con.to_pc, (size_t)M.con.to_pc_n) < 0 && errno != EAGAIN)
+				perror("sysctl_sim: console");
+			M.con.to_pc_n = 0;
+		}
 	}
 	if (dump_dir) {
 		dump("rom.bin", M.rom.mem, sizeof M.rom.mem);

@@ -82,6 +82,9 @@ typedef struct {
 	bool thdr, lost_snap;
 	int ctl_writes;
 	uint8_t ctl_when_busw;                /* CPU_CTL at the last ROM bus write */
+	/* optional: called at every SRAM cycle the bridge makes, before a read
+	 * and after a write (the console tests log them and play the CPU there) */
+	void (*on_ram)(uint32_t addr, bool write);
 } bridge_t;
 
 void bridge_init(bridge_t *m, sst39_t *rom);

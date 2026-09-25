@@ -65,9 +65,25 @@ bridge's 24-bit RAM commands.
 |---|---|
 | $1000–$5fff | kernel code (`b main` at $1000, then the API jump table $1003–$1182) |
 | $6000–$6eff | kernel data |
-| $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the rest reserved |
+| $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
 | $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
 | $e000–$efff | kernel bss: RAM once the kernel has turned the ROM off (its first instruction), and bss needs no loading |
+
+The USB console's part of the API block (the kernel zeroes $6f22–$6f26 at boot):
+
+| Address | Name | Written by | |
+|---|---|---|---|
+| $6f22 | `CON_OUT_HEAD` | kernel | next free byte of `CON_OUT` |
+| $6f23 | `CON_OUT_TAIL` | system card | next byte the card will take |
+| $6f24 | `CON_IN_HEAD` | system card | next free byte of `CON_IN` |
+| $6f25 | `CON_IN_TAIL` | kernel | next byte the kernel will take |
+| $6f26 | `CON_FLAGS` | system card | bit 0 `HOST`: a PC has the console port open |
+| $6f40–$6fbf | `CON_OUT` | kernel | the terminal's output, a 128-byte ring |
+| $6fc0–$6fff | `CON_IN` | system card | keys from the PC, a 64-byte ring |
+
+Indices are offsets into their ring (modulo its size); head = tail is empty,
+and one slot stays free. Each side writes only its own index, after the data
+it covers (`sysctl.md`, "The console port").
 
 `kernel/assemble.sh` assembles for code $1000, data $6000, bss $e000
 (2026-09-25: the kernel's code outgrew $4fff once the API, the network

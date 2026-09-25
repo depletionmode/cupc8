@@ -43,6 +43,7 @@ class Sim:
         # (tools/counterexamples.py) would wait for it forever
         atexit.register(self.p.kill)
         self.port = self.p.stdout.readline().strip()
+        self.console = self.p.stdout.readline().strip() if "--console" in args else None
 
     def run(self, *args, ok=True):
         r = subprocess.run(CUPC8 + ["--port", self.port, *args], capture_output=True, text=True, timeout=300)
@@ -196,6 +197,25 @@ def main():
     expect(got["fl1.bin"][:len(bit)] == bit, "the CPU card's flash holds the bitstream")
     img = cupc8.elf_to_flash(elf)
     expect(got["card3.bin"][:len(img)] == img, "slot 3's RP2040 flash holds gpu.elf's image (%d bytes)" % len(img))
+
+    # the console (usb-console.md): cupc8.py console on the card's second
+    # port, the core moving the rings in the model's SRAM; the kernel's side
+    # is played with ram write/read on the protocol port
+    con = Sim("--flashed", "--console")
+    con.run("ram", "write", "0x6f22", file_of("con-zero.bin", bytes(5)))     # as the kernel does at boot
+    term = subprocess.Popen(CUPC8 + ["console", con.console, "--idle", "1"], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(0.5)                                     # it has the port open (and flushed what was there)
+    con.run("ram", "write", "0x6f40", file_of("con-out.bin", b"READY\n>> "))
+    con.run("ram", "write", "0x6f22", file_of("con-head.bin", bytes([9])))
+    out, err = term.communicate(b"10 print 1\n", timeout=60)
+    expect(term.returncode == 0 and out == b"READY\r\n>> ", "console: the ring's text, \\n as CR LF: %r %r" % (out, err))
+    con.run("ram", "read", "0x6f22", "5", "-o", os.path.join(tmp, "con-ix.bin"))
+    ix = open(os.path.join(tmp, "con-ix.bin"), "rb").read()
+    expect(ix == bytes([9, 9, 11, 0, 1]), "console: tail moved, 11 bytes in, HOST set: %s" % ix.hex())
+    con.run("ram", "read", "0x6fc0", "11", "-o", os.path.join(tmp, "con-in.bin"))
+    expect(open(os.path.join(tmp, "con-in.bin"), "rb").read() == b"10 print 1\r", "console: typed text in CON_IN, LF as Enter")
+    con.stop()
 
     print("HOST-002: cupc8.py against sysctl_sim, %d checks, %d failures" % (checks, bad))
     return 1 if bad else 0
