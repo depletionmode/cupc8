@@ -1,4 +1,4 @@
-# Extended RAM (plan, not in M1)
+# Extended RAM (option A in M1)
 
 Status: **option A decided and being implemented** (David, 2026-09-25:
 "implement the plan that uses the current 512 KB chip"), in M1: the board
