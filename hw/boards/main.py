@@ -1024,7 +1024,7 @@ def _graphics():
 POWER_NETS = ("/VBUS", "/VBUS_F", "/5V_SYS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
 # In1 a solid GND plane; In2 carries signals too (two signal layers leave ~80
 # connections unrouted), with a +3V3 pour filled round them after routing
-PLANES = (("/GND", "In1.Cu"), ("/+3V3", "In2.Cu", "routed"))
+ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/+3V3", ("In2.Cu",), "routed"))
 
 
 def main():
@@ -1040,7 +1040,7 @@ def main():
     logo.footprint(LOGO_MM)
     pl = placement()
     out = sys.argv[1] if len(sys.argv) > 1 else None
-    lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=4, zones=("/GND",), planes=PLANES,
+    lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=4, zones=ZONES,
                        power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3,
                        title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
