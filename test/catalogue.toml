@@ -1089,7 +1089,7 @@ cmd = "python3 hw/power/cc.py"
 [[test]]
 id = "POW-006"
 title = "Worst-case current budget, input path and slot feeds"
-checks = "M1 worst case (four cards) within the 3.0 A source class, the eFuse's minimum current limit and the input PTC's 40 C hold, with 10 % margin, and the eFuse's maximum limit under 3.3 A; a 1.5 A source with the radio off and SD writes refused; default USB with the radio off; slot.md's per-card +5V and +3V3 budgets against the slot PTC and each card; keyboard VBUS >= 4.40 V; what is left for slots 5-6; the eFuse OVLO between vSafe5V max and 6 V; the TVS"
+checks = "M1 worst case (four cards) within the 3.0 A source class, the eFuse's minimum current limit and the input PTC's 40 C hold, with 10 % margin, and the eFuse's maximum limit under 3.3 A; a 1.5 A source with the radio off and SD writes refused; default USB with the radio off at power.md's typical loads; slot.md's per-card +5V and +3V3 budgets against the slot PTC and each card (the IO card's +5V through its keyboard boost); keyboard VBUS 4.40-5.5 V; what is left for slots 5-6; the eFuse OVLO between vSafe5V max and 6 V; the TVS"
 method = "hw/power/budget.py: power.md's max loads through the source/cable/fuse/switch/PTC chain at worst and typical corners"
 kind = "static"
 vrow = "4.4"
@@ -1098,11 +1098,20 @@ cmd = "python3 hw/power/budget.py"
 [[test]]
 id = "THM-001"
 title = "Regulator junction temperatures at 40 C ambient"
-checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 5-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, an AMS1117 on any other card that regulated from +5V, the input eFuse and the IO card's SY6280, from datasheet theta_JA"
+checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 5-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, the IO card's keyboard boost at 500 mA, the input eFuse and the IO card's SY6280, from datasheet theta_JA"
 method = "hw/power/thermal.py: dissipation at each part's hottest corner x theta_JA"
 kind = "static"
 vrow = "4.5"
 cmd = "python3 hw/power/thermal.py"
+
+[[test]]
+id = "POW-007"
+title = "IO card keyboard boost: USB VBUS at the port (TI TPS61023 model)"
+checks = "model regulates within 3 % of its set point; the keyboard's VBUS >= 4.40 V (USB 2.0 low-power port) through a 0->500 mA step at the DC low corner and <= 5.5 V at the DC high corner, at the worst and typical corners and at vSafe5V max (pass-through); boost up within 2 ms; inductor current under the 2.7 A valley limit"
+method = "hw/power/boost.py: TI's PSpice transient model (fetched, sha256-pinned, ported), fed through the source-to-card chain, into the SY6280 port switch"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/boost.py"
 
 
 # ============================================================================

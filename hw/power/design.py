@@ -12,11 +12,10 @@ Every check in hw/power reads its numbers from here. Each value is one of:
           are listed by running this file, and in doc/hardware/power.md.
 
 Datasheets (fetched 2026-09-24): TLV62569 SLVSDG1C (the main board's 3V3
-and the Wi-Fi card's); RT9013 DS9013-09;
-AMS1117 (Advanced Monolithic, LCSC C6186); SY6280 AN_SY6280 Rev 0.1;
-TLV7011 SLVSDM5F; SMD1812P200TF16 (Ruilon); SMD1206P075TFT (PTTC); SMF5.0A
-(MDD); ESP32-C3-MINI-1U datasheet v2.2; LM1117 SNOS412Q (for the 1117-class
-load-step figure the AMS1117 datasheet lacks).
+and the Wi-Fi card's); RT9013 DS9013-09; SY6280 AN_SY6280 Rev 0.1;
+TLV7011 SLVSDM5F; SMD1812P350TF (Ruilon); SMD1206P110TFT (PTTC); SMF5.0A
+(MDD); ESP32-C3-MINI-1U datasheet v2.2; TPS25947 SLVSFC9C; TPS61023 SLVSF14B
+(2026-09-25).
 """
 
 AMBIENT_C = 40.0            # verification.md row 4.5
@@ -95,8 +94,13 @@ SY6280_THETA_JA = 200.0                         # DS, JEDEC 51-3 (low-K board)
 # ---------------------------------------------------------------------------
 # Slot +5V feed: PTC -> 0 ohm link -> 50 mOhm sense -> 3 contacts -> card
 # ---------------------------------------------------------------------------
-SLOT_PTC_R_MIN, SLOT_PTC_R_MAX = 0.090, 0.290   # DS SMD1206P075TFT
-SLOT_PTC_IHOLD_40C = 0.65                       # DS derating chart, 40 C
+# The IO card's keyboard boost draws up to ~0.72 A at the worst corner, over
+# the 0.75 A PTC's 0.65 A hold at 40 C, so the slot PTC goes up one size
+# (all slots are alike). PTTC SMD1206P110TFT (C143975): hold 1.10 A (0.92 A at
+# 40 C), R 0.040..0.210 ohm, same 1206 footprint and family as before
+SLOT_PTC = assume("main", "slot +5V PTCs SMD1206P110TFT (C143975, 1.1 A; was SMD1206P075TFT)", "SMD1206P110TFT")
+SLOT_PTC_R_MIN, SLOT_PTC_R_MAX = 0.040, 0.210   # DS
+SLOT_PTC_IHOLD_40C = 0.92                       # DS derating chart, 40 C
 R_SLOT_LINK = assume("main", "slot 0 ohm isolation link: <= 50 mOhm (0 ohm jumper spec)", 0.050)
 R_SLOT_SENSE = 0.050                            # power.md
 R_SLOT_CONTACTS = assume("main/cards", "slot +5V: 3 contacts at <= 30 mOhm each, plus 10 mOhm card copper", 0.030 / 3 + 0.010)
@@ -159,26 +163,6 @@ V1V2_MIN, V1V2_MAX = 1.14, 1.26                 # iCE40 HX VCC recommended range
 BUCK_RIPPLE = [(17e3, 0.030), (30e3, 0.030), (1.1e6, 0.005), (1.5e6, 0.005)]
 I_1V2_MAX = 0.040                               # power.md (chipset core)
 
-# ---------------------------------------------------------------------------
-# Card 3V3 LDO: AMS1117-3.3. No M1 card has one (the Wi-Fi card's failed
-# POW-003 and THM-001 and became the buck below); thermal.py still checks one
-# for the GPU, IO and system cards in case they ever regulate from +5V
-# ---------------------------------------------------------------------------
-AMS1117_VOUT_MIN, AMS1117_VOUT_NOM = 3.201, 3.300   # DS over line, load and temperature
-AMS1117 = dict(VSET=3.3, TSS=20e-6,
-               # dropout: DS gives only 1.1 typ / 1.3 V max at 0.8 A, "decreasing at lower
-               # currents"; the LM1117's typical curve (1.00 V at 0 A to 1.16 V at 0.8 A)
-               # scaled to meet 1.3 V at 0.8 A: 1.12 V + 0.225 ohm
-               DROP0=1.12, RDROP=0.225,
-               ILIM=0.9,                    # DS minimum current limit
-               IQ=11e-3,                    # DS max quiescent
-               PSRR_DC=10 ** (-60 / 20), F_PSRR=1e3, VIN_NOM=5.0,  # DS 60 dB min at 120 Hz
-               # fitted to LM1117 figure 7-8 (0.1 -> 0.5 A, 10 uF tantalum at the
-               # 0.3 ohm minimum ESR TI allows: -0.13 V at ~2 us, settled by ~5 us).
-               # The fit matches the peak (-0.124 V) and recovers ~3x slower than
-               # the figure, which errs on the safe side for a droop check.
-               RDC=0.004, LEQ=2e-6, RP=2.0)
-AMS1117_THETA_JA = 90.0     # DS SOT-223 (46..90 by copper; table 1: 65 with 225 mm^2 top + plane)
 
 # ---------------------------------------------------------------------------
 # Wi-Fi card 3V3 buck: TLV62569DBV, the main board's part (BOARD hw/boards/wifi.py U2)
@@ -209,6 +193,31 @@ WIFI_I_LEDS = 0.0013 + 0.006 + 0.001   # power LED (1k), link LED (100 ohm), EN/
 WIFI_I_3V3 = ESP32_I_TX + WIFI_I_LEDS   # the Wi-Fi card's 3V3 load, TX at 100 % duty
 
 # ---------------------------------------------------------------------------
+# IO card keyboard port: slot +5V -> TPS61023 boost -> SY6280 (500 mA, FLT to
+# GPIO8) -> USB-A VBUS. Without the boost the port sat at 3.97 V at the worst
+# corner (USB 2.0 wants >= 4.40 V at a low-power port). The IO board agent
+# builds this circuit (power.md, "IO card keyboard boost").
+# DS TPS61023 SLVSF14B (sha256 a3359fee...), model SLVMD68A (fetch.py).
+# ---------------------------------------------------------------------------
+IOB_PART = assume("IO", "keyboard-port boost TPS61023DRLR (C919459), EN to the card's +5V", "TPS61023DRLR")
+IOB_L = assume("IO", "boost inductor 1 uH FXL0420-1R0-M (C167203): 27 mOhm, Isat 7 A (over the 3.7 A "
+               "valley limit into a fault)", 1.0e-6)
+IOB_L_DCR = 0.027
+IOB_CIN = assume("IO", "boost input 10 uF 25 V 0805 (C15850) at VIN", 10e-6)
+IOB_COUT = assume("IO", "boost output 2 x 22 uF 25 V 0805 (C45783), then the SY6280", 2 * 22e-6)
+IOB_R1, IOB_R2 = assume("IO", "boost feedback 750k (C23240) / 100k (C25803) 1 %: 5.06 V", (750e3, 100e3))
+IOB_RES_TOL = 0.01
+IOB_VREF = (0.580, 0.595, 0.610)                # DS, PWM mode
+IOB_RHS, IOB_RLS = 0.068, 0.047                 # DS typ RDS(on) at VOUT = 5 V
+IOB_ILIM_VALLEY_MIN = 2.7                       # DS
+IOB_VIN_MAX, IOB_VIN_ABS = 5.5, 6.0             # DS recommended, absolute max (VIN, SW, VOUT)
+IOB_OVP_MIN = 5.5                               # DS: stops switching above 5.5..6.0 V
+IOB_THETA_JA = 142.7                            # DS SOT-563, JEDEC
+IOB_ETA = 0.91              # DS figure 6-1: 96-97 % at 0.5 A from 3.6-4.2 V to 5 V, less 5 points (as the buck)
+USB_PORT_MIN = 4.40         # SPEC USB 2.0 low-power port (a high-power port: 4.75 V)
+USB_PORT_MAX = VBUS_MAX     # SPEC vSafe5V max (USB 2.0 alone: 5.25 V)
+
+# ---------------------------------------------------------------------------
 # Loads (power.md budget, max column), in A
 # ---------------------------------------------------------------------------
 LOADS_3V3 = {
@@ -227,6 +236,16 @@ LOADS_3V3 = {
     "LEDs": 0.030,
     "1V2 LDO (chipset core)": I_1V2_MAX,
 }
+# power.md's Typ column, same rows: what B6/B7 check on a default USB source
+LOADS_3V3_TYP = {
+    "chipset iCE40 I/O": 0.015, "CPU card iCE40 core + I/O": 0.015, "SRAM": 0.010, "ROM": 0.010,
+    "W25Q32": 0.002, "sysctl RP2040 + flash": 0.025, "GPU card RP2040 + flash": 0.060,
+    "GPU card TMDS": 0.030, "IO card RP2040 + flash": 0.025, "storage card RP2040 + flash": 0.025,
+    "storage card microSD (writing)": 0.005, "I2C expanders, SWD mux": 0.001, "LEDs": 0.015,
+    "1V2 LDO (chipset core)": 0.015,
+}
+I_KEYBOARD_TYP = 0.100      # power.md Typ: an ordinary keyboard
+I_HDMI_5V_TYP = 0.010       # power.md Typ
 # the graphics slot holds the HDMI card or the e-ink card (type $01 either
 # way); the budget carries the HDMI card, the heavier of the two
 GPU_CARD_3V3 = LOADS_3V3["GPU card RP2040 + flash"] + LOADS_3V3["GPU card TMDS"]
@@ -317,6 +336,29 @@ def wifi_i_5v(v_card, i3=WIFI_I_3V3):
     """The Wi-Fi card's draw from the slot's +5V, given the voltage that
     reaches it: its buck at the budget efficiency and its DC high output."""
     return i3 * wifi_vout_range()[1] / (BUCK_ETA_BUDGET * v_card)
+
+
+def iob_vout_range():
+    """The keyboard boost's regulated output (min, nom, max): VREF and 1 % divider."""
+    r1, r2, t = IOB_R1, IOB_R2, IOB_RES_TOL
+    return (IOB_VREF[0] * (1 + r1 * (1 - t) / (r2 * (1 + t))), IOB_VREF[1] * (1 + r1 / r2),
+            IOB_VREF[2] * (1 + r1 * (1 + t) / (r2 * (1 - t))))
+
+
+def iob_i_in(v_in, i_out):
+    """The boost's input current for i_out: at its highest set point (the most
+    it draws), or i_out itself in pass-through (v_in above the set point)."""
+    vset = iob_vout_range()[2]
+    return i_out if v_in >= vset * 1.01 else vset * i_out / (IOB_ETA * v_in)
+
+
+def iob_vout(v_in, i_out, corner):
+    """The port side of the boost: regulated at the corner's set point, or
+    v_in less the inductor and high-side drop in pass-through."""
+    lo, nom, hi = iob_vout_range()
+    vset = {"lo": lo, "nom": nom, "hi": hi}[corner]
+    through = v_in - i_out * (IOB_L_DCR + IOB_RHS * BUCK_RDS_HOT)
+    return max(vset, through) if v_in >= vset * 1.01 else vset
 
 
 def insw_ilim(rilm=None):
