@@ -272,6 +272,35 @@ static void test_commands(void)
 	SEND(0x0B, 1, 2, 3);                        /* longer than its command: fine */
 	CHECK_EQ(eink.gpu.errors, e + 3);
 
+	/* AUTO_EXT and AUTO_GET: the defaults, a round trip, the limits */
+	SEND(0x0D);
+	CHECK_EQ(read_resp(r, 6), 6);
+	CHECK(r[0] == 1 && r[1] == 15 && r[2] == 30 && r[3] == 100 && r[4] == 1 && r[5] == 10,
+	      "AUTO_GET at power-on: 1, 15, 30, 100, 1, 10 (got %d %d %d %d %d %d)", r[0], r[1], r[2], r[3], r[4], r[5]);
+	SEND(0x0A, 0, 7, 3);
+	SEND(0x0C, 42, 3, 200);
+	SEND(0x0D);
+	CHECK_EQ(read_resp(r, 6), 6);
+	CHECK(r[0] == 0 && r[1] == 7 && r[2] == 3 && r[3] == 42 && r[4] == 3 && r[5] == 200, "AUTO_GET round trip");
+	SEND(0x0C, 0, 2, 0);                        /* no cap, clean, never sleep */
+	SEND(0x0C, 255, 1, 255);                    /* the other ends */
+	CHECK(eink.cap10 == 255 && eink.full_kind == EINK_FAST && eink.sleep_s == 255, "AUTO_EXT 255, 1, 255");
+	SEND(0x0C, 0, 2, 0);
+	CHECK(eink.cap10 == 0 && eink.full_kind == EINK_CLEAN && eink.sleep_s == 0, "AUTO_EXT 0, 2, 0");
+	e = eink.gpu.errors;
+	SEND(0x0C, 50, 0, 5);                       /* full_kind 0 is no full refresh */
+	SEND(0x0C, 50, 4, 5);                       /* no such refresh */
+	SEND(0x0C, 50, 255, 5);
+	SEND(0x0C, 50, 1);                          /* short */
+	SEND(0x0C);
+	CHECK_EQ(eink.gpu.errors, e + 5);
+	CHECK(eink.cap10 == 0 && eink.full_kind == EINK_CLEAN && eink.sleep_s == 0, "a bad AUTO_EXT changes nothing");
+	SEND(0x0D, 9, 9);                           /* longer than its command: fine */
+	CHECK_EQ(read_resp(r, 6), 6);
+	CHECK_EQ(eink.gpu.errors, e + 5);
+	SEND(0x0A, 1, 15, 30);
+	SEND(0x0C, 100, 1, 10);
+
 	/* MODE 2: native, cleared to white; MODE 3 is no mode */
 	SEND(0x01, 2);
 	CHECK_EQ(eink.gpu.mode, EINK_MODE_NATIVE);
@@ -352,9 +381,14 @@ static void test_commands(void)
 
 	/* SOFT_RESET: TEXT mode, the policy's defaults */
 	SEND(0x0A, 0, 1, 1);
+	SEND(0x0C, 7, 3, 0);
 	SEND(CARD_OP_SOFT_RESET);
 	CHECK(eink.gpu.mode == GPU_MODE_TEXT && eink.auto_on && eink.idle10 == 15 && eink.full_after == 30 &&
 	      eink.full_next, "SOFT_RESET");
+	SEND(0x0D);
+	CHECK_EQ(read_resp(r, 6), 6);
+	CHECK(r[0] == 1 && r[1] == 15 && r[2] == 30 && r[3] == 100 && r[4] == 1 && r[5] == 10,
+	      "SOFT_RESET restores AUTO_EXT's defaults too (got %d %d %d %d %d %d)", r[0], r[1], r[2], r[3], r[4], r[5]);
 	CHECK(settle(10000), "settles after SOFT_RESET");
 
 	/* the 7.5" panel: INFO says so */
@@ -635,6 +669,124 @@ static void test_policy(void)
 	CHECK_EQ(eink.resets, resets + 1);
 }
 
+/* AUTO_EXT's fields in use: cap10, full_kind, sleep_s */
+static void idle_s(double s)                    /* long quiet stretches, in 10 ms steps */
+{
+	for (int i = 0; i < s * 100; i++) {
+		now_us += 10000;
+		gpu_run(&eink.gpu, 1000);
+		eink_poll(&eink, (uint32_t)now_us);
+		epd_advance(&model, ns());
+	}
+}
+
+static void test_policy_ext(void)
+{
+	setup(&eink_panel_583, 1.0);
+	/* full_kind 3 from the start: the first refresh after power-on stays clean */
+	SEND(0x0C, 100, EINK_GREY, 10);
+	SEND(0x14, 0);
+	SEND(0x11, 4, 'B', 'O', 'O', 'T');
+	CHECK(settle(5000), "settles");
+	CHECK(model.refreshes[EPD_WF_CLEAN] == 1 && model.refreshes[EPD_WF_GREY] == 0,
+	      "the power-on refresh is clean whatever full_kind says");
+
+	/* cap10 0: continuous output (a change every 20 ms) waits for the quiet time */
+	SEND(0x0C, 0, EINK_FAST, 10);
+	drfs = 0;
+	for (int i = 0; i < 150; i++) {
+		SEND(0x10, (uint8_t)('a' + i % 26));
+		run_ms(20);
+	}
+	CHECK(drfs == 0, "cap10 0: no refresh under 3 s of continuous output (%d)", drfs);
+	CHECK(settle(2000), "then the quiet time shows it");
+	CHECK_EQ(drfs, 1);
+
+	/* cap10 50: continuous output reaches the glass every 0.5 s */
+	SEND(0x0C, 50, EINK_FAST, 10);
+	SEND(0x12, 0, 10);
+	drfs = 0;
+	uint64_t t = now_us;
+	for (int i = 0; i < 150; i++) {
+		SEND(0x10, (uint8_t)('a' + i % 26));
+		run_ms(20);
+	}
+	CHECK(drfs >= 4, "cap10 50: refreshes in 3 s of continuous output: %d", drfs);
+	CHECK(drfs && drf_at[0] - t >= 500000 && drf_at[0] - t <= 500000 + 60000, "the first after 0.5 s (%llu us)",
+	      (unsigned long long)(drf_at[0] - t));
+	CHECK(drfs >= 2 && drf_at[1] - drf_at[0] <= 600000, "the next 0.5 s later (%llu us)",
+	      (unsigned long long)(drf_at[1] - drf_at[0]));
+	CHECK(settle(3000), "settles");
+
+	/* full_kind: CLS, a form feed and MODE make the next refresh one of it */
+	uint32_t clean = model.refreshes[EPD_WF_CLEAN], grey = model.refreshes[EPD_WF_GREY];
+	uint32_t fast = model.refreshes[EPD_WF_FAST];
+	SEND(0x0C, 100, EINK_CLEAN, 10);
+	SEND(0x02, 0x07);
+	CHECK(settle(8000), "settles");
+	CHECK(model.refreshes[EPD_WF_CLEAN] == clean + 1 && model.refreshes[EPD_WF_FAST] == fast,
+	      "full_kind 2: CLS gives a clean full refresh");
+	SEND(0x0C, 100, EINK_GREY, 10);
+	SEND(0x02, 0x07);
+	CHECK(settle(8000), "settles");
+	CHECK_EQ(model.refreshes[EPD_WF_GREY], grey + 1);
+	SEND(0x10, 0x0C);
+	CHECK(settle(8000), "settles");
+	CHECK_EQ(model.refreshes[EPD_WF_GREY], grey + 2);
+	SEND(0x01, 0);
+	CHECK(settle(8000), "settles");
+	CHECK_EQ(model.refreshes[EPD_WF_GREY], grey + 3);
+	CHECK(model.refreshes[EPD_WF_FAST] == fast && model.refreshes[EPD_WF_CLEAN] == clean + 1, "and no other");
+	eink_render(&eink, ref, true);
+	CHECK(!memcmp(model.glass, ref, (size_t)W() * (size_t)H()), "the glass is the core's 4-grey raster");
+
+	/* ... and the automatic full refresh after full_after partials */
+	SEND(0x0A, 1, 15, 2);
+	for (int i = 0; i < 2; i++) {
+		SEND(0x10, 'p');
+		settle(2000);
+	}
+	CHECK_EQ(eink.partials, 2);
+	run_ms(2500);
+	CHECK(settle(5000), "settles");
+	CHECK(model.refreshes[EPD_WF_GREY] == grey + 4 && eink.partials == 0,
+	      "after full_after partials, a full refresh of full_kind 3");
+	CHECK_EQ(model.refreshes[EPD_WF_FAST], fast);
+	SEND(0x0A, 1, 15, 30);
+
+	/* sleep_s 3: deep sleep 3 s after the last refresh, not before */
+	SEND(0x0C, 100, EINK_FAST, 3);
+	SEND(0x10, 's');
+	CHECK(settle(2000), "settles");
+	run_ms(2800);
+	CHECK(!model.asleep, "sleep_s 3: awake at 2.8 s");
+	run_ms(400);
+	CHECK(model.asleep, "sleep_s 3: asleep at 3.2 s");
+	uint32_t resets = eink.resets;
+	SEND(0x10, 'w');
+	CHECK(settle(3000), "wakes");
+	CHECK(!model.asleep && eink.resets == resets + 1, "a reset wakes the controller");
+
+	/* sleep_s 0: never */
+	SEND(0x0C, 100, EINK_FAST, 0);
+	idle_s(60);
+	CHECK(!model.asleep, "sleep_s 0: awake after 60 s");
+
+	/* sleep_s 255: the longest (255 000 000 us, within a uint32) */
+	SEND(0x0C, 100, EINK_FAST, 255);
+	SEND(0x10, 'x');
+	CHECK(settle(2000), "settles");
+	idle_s(254);
+	CHECK(!model.asleep, "sleep_s 255: awake at 254 s");
+	idle_s(2);
+	CHECK(model.asleep, "sleep_s 255: asleep at 256 s");
+	SEND(0x10, 'y');
+	CHECK(settle(3000), "wakes");
+	CHECK_EQ(model.errors, 0);
+	if (model.errors)
+		fprintf(stderr, "model: %s\n", model.error);
+}
+
 /* ------------------------------------------------------------------ main */
 
 int main(void)
@@ -644,6 +796,7 @@ int main(void)
 	test_commands();
 	test_pictures();
 	test_policy();
+	test_policy_ext();
 	CHECK(model.errors == 0, "the UC8179 model saw nothing the chip would ignore (%u errors: %s)", model.errors,
 	      model.error);
 	return check_report("GPU-006..008 e-ink card core");
