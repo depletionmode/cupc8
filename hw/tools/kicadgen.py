@@ -1331,14 +1331,6 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
-    # Freerouting can hand back a track at 3/4 of its class's width (0.1124
-    # mm for 0.15, out of a QFN's side pads), under JLC's minimum: each goes
-    # back to the minimum, and DRC judges the clearance
-    want = pcbnew.FromMM(JLC_RULES["min_track_width"])
-    tracks = board.Tracks()
-    for t in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_TRACE_T]:
-        if t.GetWidth() < want:
-            t.SetWidth(want)
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
@@ -1894,7 +1886,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def sheet():
         schematic(sch, footprint_libs)
-        write_project(pro, power_nets=power_nets, fine_nets=fine_nets)   # before ERC: it carries the library tables
+        # JLC's multilayer minimum is 0.09 mm track and space (2 layers:
+        # 0.127): Freerouting necks a Fine track to 0.1124 mm where it leaves
+        # a QFN pad, which a 4-layer board may keep
+        rules = {"min_track_width": 0.1, "min_connection": 0.1} if layers >= 4 else None
+        write_project(pro, power_nets=power_nets, fine_nets=fine_nets, rules=rules)   # before ERC: it carries the library tables
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
