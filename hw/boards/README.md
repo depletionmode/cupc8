@@ -341,11 +341,6 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   edge as on the x1 cards. `pipeline(io_card=True, tab=kg.X8_TAB)` draws and
   checks the outline. The width is set by the x8 tab plus its two 5 mm
   shoulders (61.3 mm, which the existing 62 covers).
-- **Status: not yet routable by the pipeline.** Every part fits
-  single-sided in 39.05 mm: placement, silkscreen and courtyards are clean,
-  and so is DRC after pre-routing. But Freerouting leaves 1–10 of the bus
-  connections unrouted in the 10 mm band between the package and the
-  fingers (see the CPU-card report for the numbers and the options).
 - **FPGA pins** are read from `hw/pins.yaml` (`cpu_fpga`), the file that also
   generates `build/hw/cpucard.pcf`, so the schematic and the bitstream agree
   by construction. Each side of the package carries its bus lines in the
@@ -377,7 +372,7 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   finger side on 8–5. CPU_CLK and the other inputs go straight to the FPGA.
 - **Straps.** CARD_ID = `10`: CARD_ID0 goes to GND, and CARD_ID1 is left to
   the main board's pull-up. PRSNT1_n is joined to PRSNT2_n. On this wide
-  card the link's run is on In2, because a run on B.Cu would wall the
+  card the link's run is on In3, because a run on B.Cu would wall the
   address lines off their fingers.
 - **LEDs.** The PWR LED (D1, red, 1 kΩ from 3V3) is at the common power-LED
   spot, 3 mm in from the body's top-left corner. The 1V2 rail LED (D2,
@@ -389,13 +384,13 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   RT9013-12GB C58464, 4D02WGJ0330TCE 33 Ω × 4 C25501, MMBT3904 C20526,
   KT-0603R red LED C2286, and 0402 basics: 100 nF C1525, 1 µF C52923,
   4.7 µF C23733, 10 kΩ C25744, 1 kΩ C11702, 100 Ω C25076.
-- **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold fingers,
-  bevelled per the fab order spec (`kicadgen.order_spec`). The layers are
-  signal + GND pour / signal + GND pour / solid 3V3 plane / signal + GND
-  pour. Between the package and the fingers the bus has a 10 mm band, which
-  two signal layers could not route. So In1 carries signals too, and its GND
-  pour fills round them. Every piece of that pour is tied by GND vias to the
-  stitched outer pours. 1V2 is routed as tracks.
+- **Stackup.** 6 layers (David, 2026-09-25), JLC06161H-3313, 1.6 mm, with
+  hard-gold fingers, bevelled per the fab order spec (`kicadgen.order_spec`).
+  The layers are signal + GND pour / solid GND plane / signal / signal /
+  solid 3V3 plane / signal + GND pour. Between the package and the fingers
+  the bus has a 10 mm band, which neither two signal layers nor three (In1
+  shared with the GND pour) could route. 1V2 is routed as tracks. JLC offers
+  gold fingers at any layer count, given ENIG and a board of at least 50 mm.
 - **Placement.**
   - The FPGA sits against the top edge, with its top pad row 0.85 mm in.
     That leaves the 10 mm band under it for the arrays and the bus fan-out.
@@ -403,8 +398,10 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
     unused bank) are decoupled from the package's corners and sides, 5–10 mm
     away, all on planes or the 1V2 rail. Every other supply pin has its
     100 nF beside it.
-  - The A and control arrays are in a row under the bottom side. The D and
-    timer arrays are in a column right of the right side.
+  - The A and control arrays are in a row under the bottom side, and the D
+    arrays sit under the package's bottom-right corner. Every array flows
+    down towards its fingers. The timer array is right of the right side,
+    above its fingers at the right-hand end.
   - The flash is by the config pins, under the top edge beside the M3 hole.
     The configuration pull-ups are at the lower left, over their fingers.
   - The LDO, the 1V2 switch and the PLL1 filter are on the left, on a grid.

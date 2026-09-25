@@ -2126,7 +2126,10 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, pour_nets[0], outline[3])
-            presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
+            if callable(presence):      # the board routes the link itself, before the fan-out
+                presence(b)
+            else:
+                presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
             tab_via_keepout(b, outline[3])
             state["escaped"] = key_escapes(b, outline[3], skip=pour_nets)
         # every poured net's pads get a via: GND, and any net on a plane

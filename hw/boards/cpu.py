@@ -530,6 +530,37 @@ def stubs(board, width=0.2):
             track(board, pad.GetNet(), pcbnew.F_Cu, (px, py), (ax, ay), width)
 
 
+def presence_ring(board, layer="In3.Cu", width=0.2, via=0.6, drill=0.3, rise=3.0, inset=0.6):
+    """The presence link (PRSNT1_n on A1 to PRSNT2_n on B49), locked, round
+    the card's edge on an inner signal layer: up the left edge, across the top
+    and down the right edge. kicadgen's presence_link runs straight across
+    above the fingers, which walls that layer off from everything crossing
+    towards the fingers; round the edge it walls off nothing."""
+    import pcbnew
+    to = pcbnew.ToMM
+    x0, y0, x1, _ = BODY
+    y = TAB_TOP - rise
+    j1 = [fp for fp in board.GetFootprints() if fp.GetReference() == "J1"][0]
+    pads = {p.GetNumber(): p for p in j1.Pads()}
+    a1, b49 = pads["A1"], pads["B49"]
+    net = a1.GetNet()
+    ax, bx = to(a1.GetPosition().x), to(b49.GetPosition().x)
+    run = board.GetLayerID(layer)
+    track(board, net, pcbnew.B_Cu, (ax, to(a1.GetBoundingBox().GetTop()) + width / 2), (ax, y), width)
+    ring = [(ax, y), (x0 + inset, y), (x0 + inset, y0 + inset), (x1 - inset, y0 + inset), (x1 - inset, y), (bx, y)]
+    for a, b in zip(ring, ring[1:]):
+        track(board, net, run, a, b, width)
+    track(board, net, pcbnew.F_Cu, (bx, y), (bx, to(b49.GetBoundingBox().GetTop()) + width / 2), width)
+    for vx in (ax, bx):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(vx), pcbnew.FromMM(y)))
+        v.SetWidth(pcbnew.FromMM(via))
+        v.SetDrill(pcbnew.FromMM(drill))
+        v.SetNet(net)
+        v.SetLocked(True)
+        board.Add(v)
+
+
 def prepare(board):
     """The card's own pre-routing, run after the pad fan-out."""
     ring_pads(board)
@@ -548,7 +579,7 @@ def main():
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=LAYERS, zones=ZONES,
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
-        presence={"layer": "In3.Cu"},   # a B.Cu run would wall the address lines off their fingers
+        presence=presence_ring,         # round the edge, before the pad fan-out places its vias
         passes=40, route_tries=8,       # Freerouting converges early; what differs is each try's ordering
         silk_text=SILK_TEXT,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])
