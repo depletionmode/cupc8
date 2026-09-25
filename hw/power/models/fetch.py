@@ -59,6 +59,19 @@ MODELS = {
         # let it converge. hw/power/boost.py checks the model against the datasheet
         [(r"(?im)^(\.model\s+\S+\s+d\s.*?)\bn=0\.01\b", r"\1n=0.1"),
          (r"(?im)^(\.model\s+MbreakP\s+pmos\s.*)$", r"\1 cbd=1p cbs=1p cgso=1e-6 cgdo=1e-6")]),
+    # TPS63802 PSpice transient model, Rev. C (datasheet SLVSEU9D); the GPU
+    # card's HDMI +5V buck-boost
+    "TPS63802_TRANS.lib": (
+        "https://www.ti.com/lit/mo/slvmcx1c/slvmcx1c.zip",
+        "19e0bd80a35629f3084746796a51c4724346337077cb54aa96f6012190b0c8e6",
+        "SLVMCX1B/TPS63802_PSPICE_TRANS/TPS63802_TRANS.LIB",
+        # its SR latch holds with E = V(Q) through 1 ohm, which any Q solves:
+        # PSpice starts from an IC, ngspice finds the matrix singular and the
+        # converter never starts. A regenerative hold (Q above the threshold
+        # stays high) is the same digital latch with one solution per state.
+        # hw/power/boost.py checks the model against the datasheet
+        [(r"(E_ABM5\s+N00055 0 VALUE \{ if\([^\n]*?,\s*)V\(Q\)\)\)",
+          r"\1if(V(Q)>{THRESH},{VDD},{VSS})))")]),
     # TLV7011 PSpice model, Rev. A (datasheet SLVSDM5F), version 2.0
     "tlv7011.lib": (
         "https://www.ti.com/lit/mo/slvmde3a/slvmde3a.zip",
@@ -95,7 +108,7 @@ def write_atomic(path, data):
     os.replace(tmp, path)
 
 
-PORT_VERSION = 3               # bump when port() or a model's fixes change: re-ports the cache
+PORT_VERSION = 5               # bump when port() or a model's fixes change: re-ports the cache
 
 
 def fetch(name):
