@@ -25,6 +25,22 @@ Shared rules:
 - **Card edge:** each card's finger tab is KiCad's `BUS_PCIexpress_*`
   footprint. The script draws the body's outline and meets the tab where it
   starts.
+- **Finger tab (every card, done by `pipeline(card_edge=True)`):** GND
+  fingers tied into the pour, the PRSNT1_n/PRSNT2_n presence link pre-routed
+  (`presence={"layer": ..., "rise": ...}` puts its run on an inner layer: the
+  CPU card and the system card use In2.Cu), no vias on the tab, pre-routed
+  escapes for the signal fingers beside the key notch, and routed GND tracks
+  cleared off the contacts.
+- **Inner layers on 4-layer cards (both opt-in):**
+  - `zones=(..., ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))` makes each named
+    inner layer a solid **plane** (a power layer, which Freerouting never
+    routes on): the **CPU card**.
+  - `plane=True` pours the outer layers' net on In1.Cu as well but leaves In1
+    a **signal layer**, which the pour fills around the routes: the **system
+    card**. Its QFN-56 fan-out would not route with a layer lost to a plane.
+- **Fine pitch:** `fine_nets=` puts nets in the "Fine" class (0.15 mm track
+  and clearance, 0.7 mm vias), for parts at 0.4–0.5 mm pitch: the system
+  card's RP2040 and USB-C.
 - **Branding:** the Kaplan Labs logo on the top silkscreen of every board.
 - **Assembly:** nothing is fitted by hand. The Wi-Fi card's antenna lead (MHF III to SMA) is
   the one exception: it is plugged in, not soldered.
