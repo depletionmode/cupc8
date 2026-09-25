@@ -27,6 +27,7 @@ typedef struct {
 	bool connecting;
 	bool peer_closed;
 	bool used;
+	bool bound;                           /* ICMP: the echo id is set (see h_sendto) */
 } hsock_t;
 
 struct netposix {
@@ -34,9 +35,16 @@ struct netposix {
 	int link;
 	int joins;
 	char ssid[33];
+	wifi_netcfg_t cfg;                    /* NET_CONFIG's settings */
 };
 
 static netposix_t g_net;
+
+/* the card's NVS: outlives netposix_new(), so a test can power-cycle the card */
+static struct {
+	bool kept;
+	wifi_netcfg_t cfg;
+} g_nvs;
 
 static void set_nonblock(int fd)
 {
@@ -64,6 +72,14 @@ static int h_link_state(void *ctx, uint8_t *rssi, uint8_t ip[4], uint8_t gw[4], 
 	memcpy(ip, n->link == WIFI_LINK_UP ? local : (const uint8_t[4]){0, 0, 0, 0}, 4);
 	memcpy(gw, ip, 4);
 	memcpy(dns, ip, 4);
+	/* the host's own address is what it is; a static one is only reported */
+	if (n->link == WIFI_LINK_UP && n->cfg.mode == 1) {
+		memcpy(ip, n->cfg.ip, 4);
+		memcpy(gw, n->cfg.gw, 4);
+		memset(dns, 0, 4);
+	}
+	if (n->link == WIFI_LINK_UP && (n->cfg.dns[0] | n->cfg.dns[1] | n->cfg.dns[2] | n->cfg.dns[3]))
+		memcpy(dns, n->cfg.dns, 4);
 	return n->link;
 }
 
@@ -104,19 +120,43 @@ static int h_resolve(void *ctx, const char *host, uint8_t ip[4])
 	return 1;
 }
 
+static void h_net_config(void *ctx, const wifi_netcfg_t *cfg)
+{
+	((netposix_t *)ctx)->cfg = *cfg;
+}
+
+static int h_config_save(void *ctx, const wifi_netcfg_t *cfg)
+{
+	(void)ctx;
+	g_nvs.cfg = *cfg;
+	g_nvs.kept = true;
+	return 0;
+}
+
+static bool h_config_load(void *ctx, wifi_netcfg_t *cfg)
+{
+	(void)ctx;
+	if (g_nvs.kept)
+		*cfg = g_nvs.cfg;
+	return g_nvs.kept;
+}
+
 static int h_open(void *ctx, int type)
 {
 	netposix_t *n = ctx;
-	if (type == WIFI_TLS)
+	if (type == WIFI_TLS || type > WIFI_ICMP)
 		return -1;                        /* TLS is the ESP32's mbedTLS, not the host backend */
 	for (int i = 0; i < MAXS; i++) {
 		if (n->s[i].used)
 			continue;
-		int fd = socket(AF_INET, type == WIFI_UDP ? SOCK_DGRAM : SOCK_STREAM, 0);
+		/* ICMP: Linux's unprivileged ping socket (net.ipv4.ping_group_range),
+		 * not a raw one, which needs root. It sends echo requests only. */
+		int fd = type == WIFI_ICMP ? socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)
+		       : socket(AF_INET, type == WIFI_UDP ? SOCK_DGRAM : SOCK_STREAM, 0);
 		if (fd < 0)
 			return -1;
 		set_nonblock(fd);
-		n->s[i] = (hsock_t){fd, type, false, false, false, true};
+		n->s[i] = (hsock_t){.fd = fd, .type = type, .used = true};
 		return i;
 	}
 	return -1;
@@ -184,6 +224,55 @@ static int h_recv(void *ctx, int h, uint8_t *data, int len)
 	return n;
 }
 
+static int h_bind(void *ctx, int h, uint16_t port)
+{
+	hsock_t *s = get(ctx, h);
+	if (!s || s->type != WIFI_UDP)
+		return -1;
+	struct sockaddr_in sa = {.sin_family = AF_INET, .sin_port = htons(port),
+	                         .sin_addr.s_addr = htonl(INADDR_ANY)};
+	return bind(s->fd, (struct sockaddr *)&sa, sizeof sa);
+}
+
+static int h_sendto(void *ctx, int h, const uint8_t ip[4], uint16_t port, const uint8_t *data, int len)
+{
+	hsock_t *s = get(ctx, h);
+	if (!s || s->type == WIFI_TCP)
+		return -1;
+	struct sockaddr_in sa = {.sin_family = AF_INET, .sin_port = htons(port)};
+	memcpy(&sa.sin_addr.s_addr, ip, 4);
+	if (s->type == WIFI_ICMP) {
+		if (len < 8)
+			return -1;
+		/* a ping socket puts its own port in the echo id: make that the id
+		 * the host chose (the first one it sends; the socket keeps it) */
+		sa.sin_port = 0;
+		if (!s->bound) {
+			struct sockaddr_in id = {.sin_family = AF_INET, .sin_port = htons((uint16_t)(data[4] << 8 | data[5]))};
+			if (bind(s->fd, (struct sockaddr *)&id, sizeof id) < 0)
+				return -1;
+			s->bound = true;
+		}
+	}
+	int n = (int)sendto(s->fd, data, (size_t)len, MSG_NOSIGNAL, (struct sockaddr *)&sa, sizeof sa);
+	return n < 0 ? (errno == EAGAIN ? 0 : -1) : n;
+}
+
+static int h_recvfrom(void *ctx, int h, uint8_t *data, int len, uint8_t ip[4], uint16_t *port)
+{
+	hsock_t *s = get(ctx, h);
+	if (!s || s->type == WIFI_TCP)
+		return -1;
+	struct sockaddr_in sa = {0};
+	socklen_t sl = sizeof sa;
+	int n = (int)recvfrom(s->fd, data, (size_t)len, 0, (struct sockaddr *)&sa, &sl);
+	if (n < 0)
+		return errno == EAGAIN ? 0 : -1;
+	memcpy(ip, &sa.sin_addr.s_addr, 4);
+	*port = s->type == WIFI_ICMP ? 0 : ntohs(sa.sin_port);
+	return n;
+}
+
 static int h_status(void *ctx, int h, int *rx_avail, int *tx_free)
 {
 	netposix_t *n = ctx;
@@ -195,6 +284,13 @@ static int h_status(void *ctx, int h, int *rx_avail, int *tx_free)
 	int pending = 0;
 	if (ioctl(s->fd, FIONREAD, &pending) == 0)
 		*rx_avail = pending;
+	if (s->type == WIFI_ICMP) {
+		/* a ping socket has no FIONREAD (nor MSG_TRUNC's real length): peek
+		 * at the next message for its length instead */
+		uint8_t msg[1500];
+		int n = (int)recv(s->fd, msg, sizeof msg, MSG_PEEK | MSG_DONTWAIT);
+		*rx_avail = n > 0 ? n : 0;
+	}
 	if (s->listening) {
 		int fd = accept(s->fd, 0, 0);
 		if (fd >= 0) {
@@ -222,7 +318,7 @@ static int h_status(void *ctx, int h, int *rx_avail, int *tx_free)
 		}
 		return WIFI_CONNECTING;
 	}
-	if (*rx_avail == 0 && s->type != WIFI_UDP) {
+	if (*rx_avail == 0 && s->type == WIFI_TCP) {
 		/* peek for EOF without consuming anything */
 		uint8_t b;
 		int n = (int)recv(s->fd, &b, 1, MSG_PEEK | MSG_DONTWAIT);
@@ -253,8 +349,10 @@ static void h_poll(void *ctx)
 const wifi_net_ops netposix_ops = {
 	.join = h_join, .link_state = h_link_state, .leave = h_leave,
 	.scan_start = h_scan_start, .scan_result = h_scan_result, .resolve = h_resolve,
+	.net_config = h_net_config, .config_save = h_config_save, .config_load = h_config_load,
 	.open = h_open, .connect = h_connect, .listen = h_listen, .send = h_send,
-	.recv = h_recv, .status = h_status, .close = h_close, .poll = h_poll,
+	.recv = h_recv, .bind = h_bind, .sendto = h_sendto, .recvfrom = h_recvfrom,
+	.status = h_status, .close = h_close, .poll = h_poll,
 };
 
 netposix_t *netposix_new(void)

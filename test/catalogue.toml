@@ -825,11 +825,29 @@ cmd = "make -s -C fw test_wifi"
 [[test]]
 id = "WIFI-003"
 title = "Real binary in QEMU"
-checks = "the real ESP-IDF image (core, lwIP, esp-tls, DNS task, frame engine with the SPI slave's preload rules): IDENT, SCAN, JOIN with DHCP (10.0.2.15, gw, dns), LINK and RXREADY in the status byte, failed RESOLVE, TCP client both ways with PEER_CLOSED, LISTEN/ACCEPTED, UDP_SENDTO, CONNECT_HOST to an unresolvable name, and TLS refusing a self-signed certificate after a real handshake. Optional (CUPC8_ONLINE=1, not yet passing): verified TLS and an HTTPS GET to example.com"
+checks = "the real ESP-IDF image (core, lwIP, esp-tls, DNS task, frame engine with the SPI slave's preload rules): IDENT, SCAN, JOIN with DHCP (10.0.2.15, gw, dns), LINK and RXREADY in the status byte, failed RESOLVE, TCP client both ways with PEER_CLOSED, LISTEN/ACCEPTED, UDP_SENDTO, CONNECT_HOST to an unresolvable name, and TLS refusing a self-signed certificate after a real handshake; NET_CONFIG_GET's power-up defaults; a UDP server: UDP_BIND, RECVFROM through a hostfwd (nothing waiting: n 0; a datagram with its sender 10.0.2.2), UDP_SENDTO back to the sender, and a second client still heard after that reply; an ICMP echo request the test built sent to 10.0.2.2 on a raw ICMP socket, the reply (QEMU's) from RECVFROM with id, sequence, payload and checksum intact and the IP header stripped; NET_CONFIG's DNS server in NET_STATUS over DHCP's; a static address (10.0.2.20) in use at once, TCP from it; saved: after a power cycle on the same flash NET_CONFIG_GET has it (saved 1) and JOIN comes up on it without DHCP, TCP from it; back to DHCP (saved) gets the lease 10.0.2.15 and DNS 10.0.2.3 again. Optional (CUPC8_ONLINE=1, not yet passing): verified TLS and an HTTPS GET to example.com"
 method = "Espressif QEMU 9.2.2 esp32c3, OpenCores Ethernet on user-mode NAT, frames over UART1 (QEMU has no SPI slave); tools/fw_esp32c3.sh qemu"
 cmd = "tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
 kind = "sim"
 vrow = "2.6"
+
+[[test]]
+id = "WIFI-005"
+title = "Network settings, UDP server and ICMP on the host"
+checks = "NET_CONFIG/NET_CONFIG_GET round trip (all 20 bytes, saved flag), a static address and DNS server reaching the backend (NET_STATUS); unsaved settings gone after a power cycle, saved ones kept by SOFT_RESET and a power cycle and applied at power-up, changed-unsaved settings replaced by the saved ones at power-up; malformed NET_CONFIG (short, mode 2, static 0.0.0.0) counted, unanswered, changing nothing. UDP_BIND and RECVFROM with host clients: n 0 when nothing waits, RXREADY, sender address and port, rx_bytes, UDP_SENDTO replies from the bound port, a second client heard after replying to the first, a long datagram cut to max and its rest dropped, max capped at 248 (RESP_LEN 255), a taken port and a TCP socket refused with ERROR(sock), RECVFROM on TCP n 0. OPEN type 3 and an ICMP echo request built by the test to 127.0.0.1: RXREADY, the reply with id, sequence, payload and a valid checksum, port 0; a 4-byte ICMP message ERROR(sock). Short UDP_BIND/RECVFROM/UDP_SENDTO frames and bad sockets counted and unanswered"
+method = "fw/test/test_wifi.c against the host socket backend (fw/wifi/host/netposix.c, NVS a variable that outlives the simulated power cycle); ICMP through Linux's unprivileged ping socket, so the user's group must be in net.ipv4.ping_group_range, and it sends echo requests only"
+kind = "sim"
+vrow = "2.6"
+cmd = "make -s -C fw test_wifi"
+
+[[test]]
+id = "WIFI-006"
+title = "Port forwards to the emulated Wi-Fi card"
+checks = "Machine.create({ forward }) on the native emulator: QEMU accepts TCP on the forwarded host port and holds the forwarded UDP port; a malformed entry, an unknown protocol and a forward with no Wi-Fi card are refused before QEMU starts. (Traffic through forwards: WIFI-003.)"
+method = "test/emu/test_wifi_forward.mjs, test/emu/machinenative.mjs (hostfwd on the -nic user,model=open_eth line)"
+kind = "sim"
+vrow = "2.6"
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && node test/emu/test_wifi_forward.mjs"
 
 [[test]]
 id = "WIFI-004"

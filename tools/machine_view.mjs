@@ -4,6 +4,7 @@
 // keyboard on the IO card's USB keyboard.
 //
 //   node tools/machine_view.mjs [--port 8640] [--slots hdmi,io[,wifi]] [--every 250] [--native]
+//   node tools/machine_view.mjs --native --slots hdmi,io,wifi --forward tcp:8080:80,udp:5353:53
 //   node tools/machine_view.mjs --native --slots eink,io      (the e-ink card: 5.83", or eink750)
 //
 // then open http://127.0.0.1:8640. --every is the emulated time between
@@ -35,6 +36,10 @@ usage: node tools/machine_view.mjs [options]
   --slots LIST     the cards in slots 1, 2, ... (default hdmi,io). Kinds:
                    hdmi, io, wifi, storage, and (native only) eink (5.83")
                    or eink750 in place of hdmi.
+  --forward LIST   port forwards to the Wi-Fi card (native only), comma
+                   separated PROTO:HOSTPORT:CARDPORT: tcp:8080:80 makes the
+                   PC's 127.0.0.1:8080 reach port 80 on the card (QEMU's
+                   hostfwd). The card reaches the PC as 10.0.2.2.
   --every MS       emulated time between captured frames (default 250)
   --sd IMAGE       with a storage card (native only): put this card image in
                    its microSD socket; a missing file is made first, a 16 MB
@@ -47,6 +52,7 @@ Then open http://127.0.0.1:<port>, click the screen and type.
 examples:
   node tools/machine_view.mjs --native
   node tools/machine_view.mjs --native --slots hdmi,io,wifi
+  node tools/machine_view.mjs --native --slots hdmi,io,wifi --forward tcp:8080:80,udp:5353:53
   node tools/machine_view.mjs --native --slots eink,io,storage --sd card.img
 
 environment:
@@ -67,11 +73,14 @@ const every = Number(arg('every', 250)) * 1e6;
 const kinds = arg('slots', 'hdmi,io').split(',');
 const slots = Object.fromEntries(kinds.map((k, i) => [i + 1, k]));
 
+const forward = arg('forward', '').split(',').filter(Boolean);
+
 const eink = kinds.some((k) => k.startsWith('eink'));
 if (eink && !native) throw new Error('the e-ink card runs on the native emulator only: add --native');
+if (forward.length && !native) throw new Error('--forward is for the native emulator only: add --native');
 const sd = arg('sd', null);
 if (sd && !(native && kinds.includes('storage'))) throw new Error('--sd needs --native and a storage card in --slots');
-const m = await Machine.create({ slots });
+const m = await Machine.create({ slots, forward });
 if (sd) {
   if (!fs.existsSync(sd)) {
     const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
