@@ -81,12 +81,27 @@ most significant first. Ports are 16-bit little-endian.
 | $05 | LEAVE | forget8 | Disconnect. `forget = 1` also erases the stored credentials. |
 | $06 | RESOLVE | name(len8+…) | Asynchronous DNS lookup. Raises `RESOLVED`. |
 | $07 | RESOLVE_RESULT | → ok8, ip[4] | Result of the last `RESOLVE` |
+| $08 | NET_CONFIG | mode, ip[4], mask[4], gw[4], dns[4], dns_port16, save8 | mode 0 DHCP, 1 static (ip, mask, gw). `dns` 0.0.0.0 = the one DHCP gives. `save = 1` keeps the settings in NVS, and they apply at power-up. Takes effect at once, and again at every join. |
+| $09 | NET_CONFIG_GET | → mode, ip[4], mask[4], gw[4], dns[4], dns_port16, saved8 | The settings (not the lease: NET_STATUS has that). `saved = 1`: these are the ones in NVS. |
+
+**Network settings.** At power-up the card uses what NET_CONFIG last saved,
+or DHCP with the DHCP server's DNS (`dns_port` 53). A soft reset keeps the
+settings, as it keeps the link. A static address needs a join all the same
+(the card has to be on a network), and the link comes up with that address
+without asking DHCP. A DNS server given here replaces DHCP's for the card's
+own `RESOLVE`, which always asks it on port 53; `dns_port` is for the CPU's
+DNS client (`net resolve` in the kernel), which reads it with NET_CONFIG_GET.
+Going from static back to DHCP drops the address until a lease comes (NET_STATUS
+reports `joining`, then `JOINED`). With `dns` set back to 0.0.0.0, DHCP's
+server returns at the next lease. NET_CONFIG with fewer than 21 bytes, a mode
+above 1, or static with address 0.0.0.0 is malformed. `save = 0` leaves NVS
+as it was, so the saved settings come back at the next power-up.
 
 ### Sockets (4 sockets, numbered 0–3)
 
 | Op | Name | Args → response | Description |
 |---|---|---|---|
-| $10 | OPEN | type8 → sock | type: 0 TCP, 1 UDP, 2 TLS over TCP. `$FF` = none free. |
+| $10 | OPEN | type8 → sock | type: 0 TCP, 1 UDP, 2 TLS over TCP, 3 ICMP (a raw ICMP socket). `$FF` = none free, or an unknown type. |
 | $11 | CONNECT | sock, ip[4], port16 | Asynchronous. Raises `CONNECTED(sock)` or `CONN_FAILED(sock)`. |
 | $12 | CONNECT_HOST | sock, port16, host(len8+…) | DNS + connect in one step. TLS uses `host` for SNI and checks it against the certificate. |
 | $13 | LISTEN | sock, port16 | TCP server. An incoming client raises `ACCEPTED(sock)`, and the connection takes over this socket. |
@@ -94,7 +109,13 @@ most significant first. Ports are 16-bit little-endian.
 | $15 | RECV | sock, max8 → n, data × n | Up to `max` bytes (1–250). `n` may be 0 when nothing is waiting. RESP_LEN = 1 + n. |
 | $16 | SOCK_STATUS | sock → state, rx_avail16, tx_free16 | state: 0 closed, 1 connecting, 2 open, 3 listening, 4 peer closed |
 | $17 | CLOSE | sock | |
-| $18 | UDP_SENDTO | sock, ip[4], port16, len8, data × len | |
+| $18 | UDP_SENDTO | sock, ip[4], port16, len8, data × len | One datagram. It does not connect the socket, so a bound socket still hears everyone. On an ICMP socket: the ICMP message the host built, checksum included (at least 8 bytes); the port is ignored. A failed send raises `ERROR(sock)`. |
+| $19 | UDP_BIND | sock, port16 | Bind a UDP socket to a local port (a UDP server). A port in use, or a socket that isn't UDP: `ERROR(sock)`. |
+| $1A | RECVFROM | sock, max8 → ip[4], port16, n, data × n | One datagram (UDP) or ICMP message (ICMP socket, port 0, without the IP header), with its sender. `n = 0`: nothing waiting. `max` is capped at 248, so RESP_LEN = 7 + n fits; a longer datagram is cut to `max` and the rest dropped. On a TCP socket: n = 0. |
+
+For UDP and ICMP sockets, RXREADY and SOCK_STATUS's `rx_avail` say a datagram
+is waiting; the count is the stack's (all queued bytes, with lwIP's IP
+headers for ICMP), not the next datagram's length.
 
 ### Events
 
@@ -122,8 +143,13 @@ Event codes: `$01 SCAN_DONE`, `$02 JOINED`, `$03 JOIN_FAILED`, `$04 LINK_LOST`,
     socket table, and the event queue.
   - `fw/wifi/port/esp32c3/`: the SPI slave (DMA, queued so the next READ
     response is always preloaded), Wi-Fi and lwIP glue.
-- **Testing:** the core also builds for the host against **lwIP's Unix port
-  on a TAP interface**. So the co-simulation and the host tests make real
-  TCP connections, for example an HTTP GET from a local test server, driven
-  entirely by CUPC/8 code. Only the radio itself is left untested before
-  hardware.
+- **Testing:** the core also builds for the host against **the host's own
+  sockets** (`fw/wifi/host/netposix.c`). So the co-simulation and the host
+  tests make real TCP and UDP connections, driven entirely by CUPC/8 code.
+  NVS is a variable there that outlives a simulated power cycle. ICMP uses
+  Linux's unprivileged ping socket (the user's group must be in
+  `net.ipv4.ping_group_range`): it sends echo requests only, and the id is
+  the one in the first request (the socket is bound to it). The real image
+  runs in Espressif's QEMU (WIFI-003) with lwIP, esp-tls, NVS, a raw ICMP
+  socket and static addresses on the emulated Ethernet. Only the radio
+  itself is left untested before hardware.
