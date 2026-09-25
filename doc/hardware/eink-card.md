@@ -81,11 +81,15 @@ as for BLIT8, so a picture goes in several BLITs.
 | $09 | REFRESH | m | Refresh the panel now, with everything before it. m: 0 partial (the rows that differ), 1 fast full (one flash, clears ghosting), 2 clean full (the slow waveform), 3 greyscale full (4 levels). **Execution waits until the panel has the picture**, so a `FENCE` after it fires when the picture is on the glass; commands keep queuing in the FIFO meanwhile. m > 3 is an error. |
 | $0A | AUTO | on, idle10, full_after | The automatic refresh policy: on 0/1, idle10 the quiet time in 10 ms steps (default 15 = 150 ms), full_after partial refreshes before a ghost-clearing full one (0 = never; default 30). |
 | $0B | EPD_STATUS | → busy, dirty, partials | busy: a refresh is running or waiting; dirty: changes not on the glass yet; partials since the last full refresh. |
+| $0C | AUTO_EXT | cap10, full_kind, sleep_s | The rest of the policy: cap10 the longest a change waits under continuous output, in 10 ms steps (default 100 = 1 s; 0 = no limit, only the quiet time); full_kind the refresh used for the automatic full refresh and after `CLS` (REFRESH's m: 1 fast (default), 2 clean, 3 greyscale; anything else is an error); sleep_s the seconds unused before the controller's deep sleep (default 10; 0 = never). |
+| $0D | AUTO_GET | → on, idle10, full_after, cap10, full_kind, sleep_s | The policy as AUTO and AUTO_EXT set it. |
 
-The HDMI card executes REFRESH, AUTO and EPD_STATUS as NOPs (EPD_STATUS
-gives no response there), and ignores `MODE 2`. Software asks `INFO` first.
+The HDMI card executes REFRESH, AUTO, EPD_STATUS, AUTO_EXT and AUTO_GET as
+NOPs (EPD_STATUS and AUTO_GET give no response there), and ignores `MODE 2`. Software asks `INFO` first.
 
-`SOFT_RESET` restores the power-on state, including AUTO's defaults.
+`SOFT_RESET` restores the power-on state, including AUTO's and AUTO_EXT's
+defaults (decided 2026-09-25: the settings do not survive a reset; the
+software sets what it wants).
 
 ## Refresh policy
 
@@ -94,21 +98,28 @@ the 1-bit picture last sent to the panel, and every turn of its loop:
 
 1. **Automatic refresh** (AUTO on), when there are unshown changes and no
    refresh is running: once the command stream has made no change for
-   `idle10` (150 ms), or changes have waited **1 s** (continuous output),
+   `idle10` (150 ms), or changes have waited `cap10` (**1 s**; continuous output),
    it renders the screen, **compares it with the picture on the panel** row
    by row, and sends a **partial refresh of the rows that differ** (the
    window spans the panel's width). A change undone before then costs
    nothing. Commands that change nothing (NOP, FENCE, the reads) do not
    count as activity.
-2. After `full_after` partial refreshes it does a **fast full refresh** the
-   next time the stream has been quiet for **2 s**, to clear the ghosting.
+2. After `full_after` partial refreshes it does a full refresh of
+   `full_kind` (**fast**) the next time the stream has been quiet for
+   **2 s**, to clear the ghosting.
 3. `CLS`, a form feed, `MODE` and `SOFT_RESET` make the next refresh a
-   fast full one.
+   full one of `full_kind` (fast).
 4. The first refresh after power-on is a **clean full** one. Until then the
    panel keeps the picture from before power-off.
 5. A change made while the panel refreshes goes into the next refresh.
-6. After **10 s** unused the controller goes into deep sleep; the next
-   refresh wakes it with a reset.
+6. After `sleep_s` (**10 s**) unused the controller goes into deep sleep;
+   the next refresh wakes it with a reset.
+
+**From the kernel** (decided 2026-09-25; no BASIC command): `kernel/eink.s`
+has `eink_auto` (sends AUTO and AUTO_EXT from the 6 bytes at `eink_cfg`, in
+AUTO_GET's order), `eink_get` (AUTO_GET into `eink_cfg`) and `eink_status`
+(EPD_STATUS into `eink_st`). On HDMI they do nothing (`eink_get` and
+`eink_status` leave $ff). The kernel itself keeps the card's defaults.
 
 In use, from the vendors' times: a typed key reaches the glass about 0.5 s
 after the key (150 ms quiet, then a 0.3 s partial refresh); a `LIST` or a
