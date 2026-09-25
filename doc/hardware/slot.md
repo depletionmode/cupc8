@@ -182,7 +182,10 @@ ESP ROM bootloader sync.
   socket comes first, then the six I/O slots, side by side in one row** at
   the slot pitch, every socket the same way round and at the same height, so
   the cards stand in a line with their top edges, M3 holes, power LEDs and
-  LED rows aligned. The CPU card has the I/O card outline (below) on its
+  LED rows aligned. **Every card in the row has exactly the same outline;
+  only the finger tab differs (x8 or x1).** If the CPU card doesn't fit the
+  outline below, the outline grows for every card (David allows up to about
+  68 × 40 mm), keeping the hole and LED 4 mm and 3 mm in from their corners. The CPU card has the I/O card outline (below) on its
   wider x8 tab (`cpu-bus.md`, CPU card outline). The **system card is not in
   the row**: its x4 socket sits off to one side of the main board, and the
   card keeps its own outline (`system-slot.md`).
