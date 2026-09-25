@@ -27,12 +27,36 @@ def schematic(path, footprint_libs):
     # one TX/RX-style LED an input-only link needs (milestone-1.md)
     rc.core(s, GPIOS, leds=[("LED_KBD", "red"), ("LED_KEY", "green")], usb=True)
 
-    # ---- VBUS: SY6280AAC switch from the slot's +5V. Ilim = 6800 / Rset:
+    # ---- the keyboard port's 5 V (power.md, "IO card keyboard boost"): the
+    # slot's +5V can sag to 3.97 V at the card, under USB's 4.40 V, so a
+    # TPS61023 boosts it to 5.06 V (750k/100k: 0.595 V x 8.5), and passes
+    # its input straight through above ~5.1 V. Always on (EN at VIN).
+    u7 = s.add("jlc:TPS61023DRLR", "U7", "TPS61023DRLR", "jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR",
+               at=(204 * G, 124 * G), fields={"LCSC": "C919459"})
+    s.connect(u7, "VIN", "+5V")
+    s.connect(u7, "EN", "+5V")
+    s.connect(u7, "GND", "GND")
+    s.connect(u7, "SW", "BOOST_SW")
+    s.connect(u7, "VOUT", "VBOOST")
+    s.connect(u7, "FB", "BOOST_FB")
+    l1 = s.add("jlc:FXL0420-1R0-M", "L1", "1u", "jlc:IND-SMD_L4.4-W4.2", at=(184 * G, 124 * G),
+               fields={"LCSC": "C167203"})
+    rc.two(s, l1, "+5V", "BOOST_SW")
+    r16 = rc.passive(s, "R", "R16", "750k", (218 * G, 120 * G), fp=rc.R0603, lcsc="C23240")
+    r17 = rc.passive(s, "R", "R17", "100k", (218 * G, 138 * G), fp=rc.R0603, lcsc="C25803")
+    rc.two(s, r16, "VBOOST", "BOOST_FB")
+    rc.two(s, r17, "BOOST_FB", "GND")
+    c23 = rc.passive(s, "C", "C23", "22u", (222 * G, 118 * G))
+    c24 = rc.passive(s, "C", "C24", "22u", (228 * G, 118 * G))
+    rc.two(s, c23, "VBOOST", "GND")
+    rc.two(s, c24, "VBOOST", "GND")
+
+    # ---- VBUS: SY6280AAC switch from the boost's output. Ilim = 6800 / Rset:
     # 12k -> 0.57 A nominal (0.42-0.71 A over the +-25% spread), so a
     # keyboard gets its 500 mA and the card stays under the slot's 750 mA PTC
     u5 = s.add("jlc:SY6280AAC", "U5", "SY6280AAC", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL",
                at=(200 * G, 20 * G), fields={"LCSC": "C55136"})
-    s.connect(u5, "IN", "+5V")
+    s.connect(u5, "IN", "VBOOST")
     s.connect(u5, "OUT", "VBUS")
     s.connect(u5, "GND", "GND")
     s.connect(u5, "ISET", "ISET")
@@ -41,7 +65,7 @@ def schematic(path, footprint_libs):
     rc.two(s, r10, "ISET", "GND")
     r11 = rc.passive(s, "R", "R11", "100k", (186 * G, 46 * G))       # EN must not float (RP2040 in reset)
     rc.two(s, r11, "VBUS_EN", "GND")
-    c20 = rc.passive(s, "C", "C20", "10u", (214 * G, 12 * G))        # datasheet: 10 uF at IN
+    c20 = rc.passive(s, "C", "C20", "10u", (214 * G, 12 * G))        # the boost's input (TPS61023: 10 uF at VIN)
     rc.two(s, c20, "+5V", "GND")
     c21 = rc.passive(s, "C", "C21", "100u", (222 * G, 12 * G))       # USB host port bulk (spec: >= 120 uF-ish, 100 uF ceramic)
     rc.two(s, c21, "VBUS", "GND")
@@ -80,7 +104,7 @@ def schematic(path, footprint_libs):
     s.write(path, footprint_libs=footprint_libs)
 
 
-POWER_NETS = rc.POWER_NETS + ("/VBUS",)
+POWER_NETS = rc.POWER_NETS + ("/VBUS", "/VBOOST")   # the boost IC's own pins are laid by hand (prepare)
 # J2's opening is 12.04 mm in front of its footprint origin (the pegs are
 # 2.54 mm in front, the shell face 9.5 mm beyond them: C112455 drawing), so
 # turned to face up, the origin sits 12.04 mm below the top edge
@@ -102,15 +126,22 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "J2": (39.5, -44 + 12.04, 180),
     "U6": (41.4, -25.3, 0),
     "R14": (36.8, -19.6, 0),            # USB_DM, DP: by the ESD, over the cap column from pins 46/47
-    "R15": (36.8, -21.6, 0),
+    "R15": (36.8, -22.6, 0),
     "U5": (50, -22, 0),
-    "C20": (53, -27, 0),
-    "C21": (51.5, -16.5, 90),
+    # the boost (TPS61023 layout guide: caps at VIN and VOUT, short SW loop)
+    "U7": (43, -11.5, 180),
+    "L1": (47.5, -10.8, 0),
+    "C20": (40.3, -9.8, 90),
+    "C23": (45.2, -15.0, 90),
+    "C24": (47.9, -15.0, 90),
+    "R16": (40.8, -13.3, 0),
+    "R17": (40.8, -15.5, 180),
+    "C21": (53.6, -17.5, 90),
     "C22": (44.9, -25.5, 90),
-    "R10": (47.5, -19.5, 90),
-    "R11": (45, -19.5, 90),
-    "R12": (37, -10, 90),
-    "R13": (40, -10, 90),
+    "R10": (46.3, -22.6, 90),
+    "R11": (42.6, -18.3, 90),
+    "R12": (33.5, -10.5, 90),
+    "R13": (36, -10.5, 90),
     # bring-up pads down the left edge, the SWD ones nearest the fingers they share
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
@@ -120,6 +151,27 @@ GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7.5, -24, 0)]
 TITLE, REVISION = "CUPC/8 IO", "A"
 
 
+def prepare(board):
+    """The RP2040 card's own (TESTEN, DVDD), then the boost's pins, which are
+    0.3 mm pads at 0.5 mm pitch that Freerouting's power-class tracks can't
+    reach: VIN and EN to the input cap, SW to the inductor, VOUT to the
+    output caps, FB to its divider (TPS61023 layout guide: short loops)."""
+    rc.io_preroute(board)
+    at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
+    vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)
+    sw, vout = at("U7", 5), at("U7", 6)
+    rc.track(board, "/+5V", vin, at("C20", 1), width=0.3)
+    rc.track(board, "/+5V", en, vin, width=0.25)
+    lsw = at("L1", 2)
+    corner = (lsw[0] - 0.4, sw[1])
+    rc.track(board, "/BOOST_SW", sw, corner, width=0.3)
+    rc.track(board, "/BOOST_SW", corner, (corner[0], lsw[1]), width=0.3)
+    rc.track(board, "/VBOOST", vout, at("C23", 1), width=0.3)
+    rc.track(board, "/VBOOST", at("C23", 1), at("C24", 1), width=0.3)
+    rc.track(board, "/BOOST_FB", fb, at("R16", 2), width=0.2)
+    rc.track(board, "/BOOST_FB", at("R16", 2), at("R17", 1), width=0.2)
+
+
 if __name__ == "__main__":
     rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS,
-             TITLE, REVISION, usb=True, layers=4, passes=100, preroute=rc.io_preroute)
+             TITLE, REVISION, usb=True, layers=4, passes=100, preroute=prepare)

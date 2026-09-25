@@ -43,12 +43,12 @@ Package_SO:SOIC-8_5.3x5.3mm_P1.27mm:
 Package_SON:USON-10_2.5x1.0mm_P0.5mm:
   rotation: 270
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USON-10_L2.5-W1.0-P0.50-BL (C138714)'
-Package_TO_SOT_SMD:SOT-23-6:
-  rotation: 270
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
 Package_TO_SOT_SMD:SOT-23:
   rotation: 180
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR (C20526, C8545)'
+Package_TO_SOT_SMD:SOT-23-6:
+  rotation: 270
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
 Resistor_SMD:R_0402_1005Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0402 (C11702, C25100, C25741, C25744, C25752, C25756, C25768)'
