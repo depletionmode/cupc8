@@ -77,8 +77,12 @@ static void text_putc(gpu_t *g, uint8_t ch)
 {
 	switch (ch) {
 	case 0x08:
-		if (g->cx > 0)
+		if (g->cx > 0) {
 			g->cx--;
+		} else if (g->cy > 0) {                 /* back over a wrapped line */
+			g->cy--;
+			g->cx = GPU_TEXT_COLS - 1;
+		}
 		break;
 	case 0x09:
 		g->cx = (uint8_t)((g->cx + 8) & ~7);

@@ -144,8 +144,10 @@ Event codes: `$01 SCAN_DONE`, `$02 JOINED`, `$03 JOIN_FAILED`, `$04 LINK_LOST`,
   - `fw/wifi/port/esp32c3/`: the SPI slave (DMA, queued so the next READ
     response is always preloaded), Wi-Fi and lwIP glue.
 - **Testing:** the core also builds for the host against **the host's own
-  sockets** (`fw/wifi/host/netposix.c`). So the co-simulation and the host
-  tests make real TCP and UDP connections, driven entirely by CUPC/8 code.
+  sockets** (`fw/wifi/host/netposix.c`). So the co-simulation, the host
+  tests and the simulator (`tools/sim --cards:...,wifi`: any SSID joins,
+  the address is 127.0.0.1, localhost is the host's) make real TCP and UDP
+  connections, driven entirely by CUPC/8 code.
   NVS is a variable there that outlives a simulated power cycle. ICMP uses
   Linux's unprivileged ping socket (the user's group must be in
   `net.ipv4.ping_group_range`): it sends echo requests only, and the id is

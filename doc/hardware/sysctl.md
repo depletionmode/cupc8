@@ -16,7 +16,7 @@ nothing on the machine.
 
 The firmware is a hardware-independent core (`fw/sysctl/core/`) plus an
 RP2040 HAL, the same split as the cards. The core runs in the host tests
-(SYS-001..005) against models of the bridge, the SST39, the two W25Q flashes,
+(SYS-001..005, SYS-007) against models of the bridge, the SST39, the two W25Q flashes,
 the two iCE40s booting from them, and the TCA9555 expanders.
 
 ## FPGA configuration flash
@@ -63,8 +63,11 @@ A byte stream over USB CDC. Requests and replies share one frame format:
 | $06 | that FPGA is not held: its flash belongs to it (`FPGA_HOLD` first) |
 | $07 | the chipset is not running (held, or not configured), so its bridge cannot answer |
 
-Addresses are little-endian: 16 bits for RAM, 24 for ROM and flash. `t` is a
-flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
+Addresses are little-endian: 16 bits for RAM (the far forms: 24), 24 for ROM
+and flash. RAM addresses are physical SRAM addresses: the 16-bit forms reach
+$00000–$0ffff (the CPU's view with `RAM_BANK` at its reset value), the far
+forms the whole 512 KB, bank × $4000 + offset (`memory-map.md`, "RAM banks").
+`t` is a flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 
 | Cmd | Request payload | Reply payload |
 |---|---|---|
@@ -72,6 +75,8 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 | $01 STATUS | – | bridge status (0 if the chipset is down), GPO, CDONE (bit0 chipset, bit1 CPU card), held FPGAs, USB-C class, CC mV (16), 1V2 mV (16), cards held in reset, CPU card present |
 | $10 RAM_READ | addr16, len16 | data |
 | $11 RAM_WRITE | addr16, data | – |
+| $12 RAM_READ_FAR | addr24, len16 | data: `addr + len` ≤ $80000 (bridge `RAM_RD24`) |
+| $13 RAM_WRITE_FAR | addr24, data | – : `addr + len` ≤ $80000 (bridge `RAM_WR24`) |
 | $20 ROM_READ | addr24, len16 | data |
 | $21 ROM_ERASE | addr24, len24 (0 = whole chip) | – : erases the 4 KB sectors that cover the range |
 | $22 ROM_PROGRAM | addr24, data | – : programs, polls and reads back each byte, retrying once |
@@ -95,6 +100,18 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 | $58 CARD_PROG | slot (0–5), low8 | – : drives that slot's PROG_n low (1) or releases it (0): with a CARD_RESET pulse, an ESP32 card starts in its ROM bootloader |
 
 $00 PING, $01 STATUS, $32, $4x and $5x work with the chipset down.
+
+**RAM writes while the CPU runs.** `RAM_WRITE` needs no `CPU_CTL` stop. The
+bridge (`soc/bridge.vhd`) hands the chipset one byte at a time; the chipset's
+memory controller serves it only when idle and takes no new CPU cycle while
+the bridge's request is up (`soc/chipset.vhd`: the bridge goes first, the CPU
+waits on /RDY), so every byte is one whole SRAM cycle between CPU cycles: no
+bus contention and no torn byte. Nothing is atomic across bytes, though: the
+CPU can see a block half written. So `cupc8.py run` writes a program at $7000
+first and then, in a separate `RAM_WRITE`, sets `API_RUN` ($6f21) to 1, which
+is the only byte the kernel's terminal looks at; and it refuses while
+`API_RUN` is 2 (a program is running at $7000, which it would write over) or
+still 1 (the last one not started yet).
 
 ### The card programming port
 

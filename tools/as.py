@@ -216,15 +216,21 @@ def __assemble(filename):
             # deal with comments alone on line
             if l[0] == ';': continue
 
+            # .bss and .data: `name: resb N` and `name db ...`. The directive
+            # is the second token; "db" or "resb" anywhere else (a name such as
+            # $10db, a comment) is not one.
+            words = l.split(None, 2)
+            directive = words[1] if len(words) > 1 else ''
+
             # .bss
-            if l.find('resb') > -1:
+            if directive == 'resb':
                 toks = l.split()
                 bss[toks[0][:-1]] = (bss_offset, int(toks[2]))
                 bss_offset += int(toks[2])
                 continue
 
             # .data
-            if l.find('db') > -1:
+            if directive == 'db':
                 toks = l.split(' ', 2)
                 data_d = []
                 data_c =''

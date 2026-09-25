@@ -10,6 +10,7 @@ term_do:
 	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
 	st [term_basic_prog_buf], r0
+	st API_RUN, r0			; no program from the PC yet
 
 	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n"
 	mov r0, #>[term_s_info]
@@ -17,6 +18,11 @@ term_do:
 	push pch
 	push pcl
 	b str_printstr
+
+	; the stack as it is at the prompt, where a program's end takes it back
+	push pch
+	push pcl
+	b sys_mark
 
 .loop:
 	push pch
@@ -133,11 +139,15 @@ term_prompt:
 	b str_printstr
 
 .read_string:
+	mov r0, #1				; a program from the PC may start meanwhile
+	st [keyb_term], r0
 	mov r0, #>[term_line_buf]
 	mov r1, #<[term_line_buf]
 	push pch
 	push pcl
 	b read_string
+	xor r0, r0
+	st [keyb_term], r0
 
 	term_s_cr db "\n"
 	mov r0, #>[term_s_cr]
@@ -301,10 +311,24 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .num
+	bzf .exec
 	push pch
 	push pcl
 	b eink_cmd_refresh
+	b .done
+
+.exec:
+	term_s_exec db "exec"
+	mov r0, #>[term_s_exec]
+	mov r1, #<[term_s_exec]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .num
+	push pch
+	push pcl
+	b sys_cmd_exec
 	b .done
 
 .num:
@@ -395,7 +419,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH\n"
+	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH EXEC\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch

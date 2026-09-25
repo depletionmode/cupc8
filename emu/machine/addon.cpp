@@ -237,7 +237,8 @@ ENTRY(js_screen, {
 
 // the e-ink panel's glass: { w, h, seq, grey: Uint8Array (0 black ... 255
 // white), refreshes: [clean, fast, grey, partial], busy, errors, error,
-// partialsSinceFull, bytesWithoutCs }, or null with no e-ink card
+// partialsSinceFull, bytesWithoutCs, asleep (the controller in deep sleep,
+// 1/0) }, or null with no e-ink card
 ENTRY(js_panel, {
   machine::EinkPanel *p = m->panel();
   napi_value o;
@@ -266,6 +267,7 @@ ENTRY(js_panel, {
   set(env, o, "partialsSinceFull", num(env, p->m.partials_since_full));
   set(env, o, "maxPartialsBetweenFulls", num(env, p->m.max_partials_between_fulls));
   set(env, o, "bytesWithoutCs", num(env, p->bytesWithoutCs));
+  set(env, o, "asleep", num(env, p->m.asleep ? 1 : 0));
   return o;
 })
 
@@ -349,11 +351,15 @@ ENTRY(js_cards, {
   napi_value arr;
   napi_create_array(env, &arr);
   uint32_t i = 0;
-  auto add = [&](int slot, const std::string &kind, machine::Emu *e) {
+  auto add = [&](int slot, const std::string &kind, machine::Emu *e, const machine::Rp2040Card *rc = nullptr) {
     napi_value o;
     napi_create_object(env, &o);
     set(env, o, "slot", num(env, slot));
     set(env, o, "kind", jsstr(env, kind));
+    if (rc) {
+      set(env, o, "csRises", num(env, static_cast<double>(rc->csRises)));
+      set(env, o, "csEdges", num(env, static_cast<double>(rc->csEdges)));
+    }
     if (e) {
       set(env, o, "ns", num(env, e->ns()));
       set(env, o, "uart", jsstr(env, e->uart));
@@ -368,7 +374,7 @@ ENTRY(js_cards, {
     napi_set_element(env, arr, i++, o);
   };
   if (m->sysctl) add(0, "sysctl", &m->sysctl->e);
-  for (auto &[slot, c] : m->cards) add(slot, c->kind, c->emu());
+  for (auto &[slot, c] : m->cards) add(slot, c->kind, c->emu(), dynamic_cast<const machine::Rp2040Card *>(c.get()));
   return arr;
 })
 

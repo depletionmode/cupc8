@@ -14,16 +14,30 @@ when isMainModule:
   import os
   import parseopt
   import std/exitprocs
+  import sequtils
+  import simmachine
 
 var log_mask* = 9
 var last_gpo*: string = ""
 var ins_retired*: int = 0
+## The CPU's 12 MHz clocks since reset, as cpu.vhd and the chipset spend
+## them: 4 a memory bus cycle (every byte fetched, a load or store, a push or
+## pop, a pointer byte), 2 an I/O register cycle ($f000-$ffff), 4 more an
+## instruction (exec, tick, settle, check), 3 a WAI idle turn, 20 an IRQ
+## entry (3 pushes, 2 vector bytes). The chipset's millisecond counter and
+## its tick run from it (memory-map.md).
+var simClocks*: int = 0
+
+var statusShown = false  ## the speed line is on screen, without its newline
 
 proc log(lvl : int, msg : string) =
   if (lvl and log_mask) > 0:
     when defined(emscripten):
       echo msg
     else:
+        if statusShown:
+          stdout.write("\r\e[K")   # the next line takes the speed line's place
+          statusShown = false
         case lvl:
             of 8:
                 setStyle({styleBright})
@@ -40,6 +54,30 @@ proc log(lvl : int, msg : string) =
         writeLine(stdout, msg)
         resetAttributes()
 
+proc speedLine(ips, cps: float): string =
+  ## instructions per second (WAI idle turns included), and the CPU clocks a
+  ## second they came to (simClocks: the real CPU runs 12 MHz, so an
+  ## interactive run held to the host clock shows 12)
+  "$1 MIPS, $2 MHz of CUPC/8 clock (the real one: 12 MHz)" %
+    [formatFloat(ips / 1_000_000, ffDecimal, 2), formatFloat(cps / 1_000_000, ffDecimal, 1)]
+
+proc status(msg: string) =
+  ## the speed line: rewritten in place, not one line per second
+  if (8 and log_mask) > 0:
+    when defined(emscripten):
+      echo msg
+    else:
+      setStyle({styleBright})
+      setForegroundColor(fgBlue, true)
+      stdout.write("\r\e[K" & msg)
+      resetAttributes()
+      flushFile(stdout)
+      statusShown = true
+
+when isMainModule and not defined(emscripten):
+  addExitProc(proc () =
+    if statusShown: stdout.write("\n"))   # leave the last speed line for the shell
+
 var
   PC*: int = 0x1000
   SP*: int = 0x0100
@@ -50,10 +88,13 @@ var
   IF*: bool = false
   waiting*: bool = false
   pcl*: int = 0
+  lastOp: int = 0                # the opcode of the instruction that retired last
   mem*: array[0..0x10000, int]
   imageEnd*: int = 0
-  irqPending*: int = 0
+  irqPending*: int = 0           # IRQ_PEND bits 4:0 (bit 4: the tick, on CPU line 3)
   irqMask*: int = 0
+  msLatch: int = 0               # MS_COUNT1-3: bits 31:8 latched by a read of MS_COUNT0
+  ticksSeen: int = 0             # 50 ms ticks raised so far
   tmr0*: int = 0
   tmr1*: int = 0
 
@@ -99,6 +140,9 @@ var
   romOff*: bool = false
   pwrHi*: bool = true            # USB-C source >= 3.0 A (a board input, kept across reset)
   romBank*: int = 0
+  ramBank*: int = 2              # RAM_BANK ($f205): the $8000-$bfff window's SRAM bank
+  xram*: seq[int]                # SRAM $0f000-$7ffff; mem[] holds $00000-$0efff (its
+                                 # $f000-$ffff are the I/O registers' shadows)
   ramJunk*: bool = false         # cpuReset leaves RAM as the SRAM powers up (the
                                  # emulator's pattern, soc/emu/board.h), not zeroed
   spiTxR, spiRxR, spiCfgR: array[8, int]
@@ -106,9 +150,30 @@ var
   slotIrqPrev: int = 0
   lastCardTick: int = 0
 
+const
+  MsClocks* = 12000              ## the chipset's clocks a millisecond
+  TickMs* = 50                   ## the tick IRQ's period (20 Hz)
+
 proc simMillis*(): uint32 =
-  ## Guest time: about one instruction per microsecond at 12 MHz.
-  uint32(ins_retired div 1000)
+  ## The machine's time in ms, for the cards: the CPU's clocks, as the
+  ## chipset's millisecond counter counts them.
+  uint32((simClocks div MsClocks) and 0xffffffff)
+
+proc msCount*(): int =
+  ## The chipset's millisecond counter (MS_COUNT, $f206-$f209), 32 bits.
+  (simClocks div MsClocks) and 0xffffffff
+
+proc msRead(reg: int): int =
+  ## A CPU read of MS_COUNT0-3: MS_COUNT0 latches bits 31:8 for the others.
+  let c = msCount()
+  case reg
+  of 6:
+    msLatch = c shr 8
+    c and 0xff
+  of 7: msLatch and 0xff
+  of 8: (msLatch shr 8) and 0xff
+  of 9: (msLatch shr 16) and 0xff
+  else: 0
 
 var heldSlotIrq*: int = 0       ## test hook: slots whose IRQ_n is held low (another card's)
 
@@ -138,8 +203,16 @@ proc cpuLoadRom*(path: string) =
     rom[i] = if i < data.len: uint8(data[i]) else: 0xff'u8
 
 proc raiseIrq*(bit: int) =
-  irqPending = (irqPending or (1 shl bit)) and 0x0f
+  irqPending = (irqPending or (1 shl bit)) and 0x1f
   mem[0xf200] = irqPending
+
+proc clockTick() =
+  ## The chipset's tick: IRQ_PEND bit 4 each time the millisecond counter
+  ## reaches a multiple of 50.
+  let t = simClocks div (MsClocks * TickMs)
+  if t != ticksSeen:
+    ticksSeen = t
+    raiseIrq(4)
 
 proc cardsTick*() =
   ## Let the cards do background work, and latch IRQ0 on a new slot IRQ.
@@ -200,16 +273,40 @@ proc romWindow(a: int): int =
   if a < 0xe800: a and 0x7ff
   else: (romBank shl 11) or (a and 0x7ff)
 
+proc physRead*(p: int): int =
+  ## The 512 KB SRAM by physical address (extended-ram.md).
+  if p < 0xf000: mem[p] and 0xff
+  else: xram[p - 0xf000] and 0xff
+
+proc physWrite*(p, v: int) =
+  if p < 0xf000: mem[p] = v and 0xff
+  else: xram[p - 0xf000] = v and 0xff
+
+proc ramRead(a: int): int =
+  ## RAM at CPU address a: the window at $8000-$bfff shows bank RAM_BANK
+  ## (M1 machine only; bank 2 is the identity map).
+  if ioModel == imCards and ramBank != 2 and (a and 0xc000) == 0x8000:
+    physRead((ramBank shl 14) or (a and 0x3fff))
+  else:
+    mem[a]
+
+proc ramWrite(a, v: int) =
+  if ioModel == imCards and ramBank != 2 and (a and 0xc000) == 0x8000:
+    physWrite((ramBank shl 14) or (a and 0x3fff), v)
+  else:
+    mem[a] = v
+
 proc memRead(a: int): int =
   let a = a and 0xffff
   let r = romWindow(a)
   if r >= 0:
     return int(rom[r mod rom.len])
-  mem[a] and 0xff
+  ramRead(a) and 0xff
 
 proc fetch(): int =
   result = memRead(PC)
   PC = (PC + 1) and 0xffff
+  simClocks += 4
 
 proc reg_write(operands, val: int) =
   if (operands and 1) == 1:
@@ -298,7 +395,7 @@ proc cardsStore(address, value: int) =
   if address >= 0xe000 and address <= 0xefff and not romOff:
     return                                   # CPU writes to the ROM windows are ignored
   if address < 0xf000:
-    mem[address] = v
+    ramWrite(address, v)
     return
   case (address shr 8) and 0xf
   of 0x0:
@@ -331,10 +428,11 @@ proc cardsStore(address, value: int) =
       cardsTick()
   of 0x2:
     case address and 0xff
-    of 0: irqPending = irqPending and not v and 0x0f
-    of 1: irqMask = v and 0x0f
+    of 0: irqPending = irqPending and not v and 0x1f
+    of 1: irqMask = v and 0x1f
     of 3: romOff = (v and 1) == 1
     of 4: romBank = v
+    of 5: ramBank = v and 0x1f
     else: discard
   else:
     discard
@@ -360,10 +458,13 @@ proc cardsLoad(address: int): int =
     of 2: slotIrqBits()
     of 3: (if romOff: 1 else: 0) or (if pwrHi: 2 else: 0)
     of 4: romBank
+    of 5: ramBank
+    of 6, 7, 8, 9: msRead(address and 0xff)
     else: 0
   else: 0
 
 proc cardsLoadTest*(address: int): int = cardsLoad(address)
+proc cardsStoreTest*(address, value: int) = cardsStore(address, value)
 
 proc ins_st_do(o: int, a: int) =
   var address = a
@@ -371,6 +472,7 @@ proc ins_st_do(o: int, a: int) =
     var ra = reg_read(o, true)
     address += ra
   address = address and 0xffff
+  simClocks += (if address >= 0xf000: 2 else: 4)
   let
     value = reg_read(o, false)
     oldValue = mem[address]
@@ -392,7 +494,7 @@ proc ins_st_do(o: int, a: int) =
           irqPending = irqPending and not value
           mem[address] = irqPending
         of 1:
-          irqMask = value and 0x0f      # 4 IRQs; bits 7:4 read 0 (memory-map.md)
+          irqMask = value and 0x1f      # 5 IRQ_PEND bits; bits 7:5 read 0 (memory-map.md)
           mem[address] = irqMask
         else:
           discard
@@ -435,6 +537,7 @@ proc ins_st(o: int) =
 proc ins_std(o: int) =
   var address = fetch() or (fetch() shl 8)
   var address_d = memRead(address) or (memRead(address + 1) shl 8)
+  simClocks += 8
   ins_st_do(o, address_d)
 
 proc ins_ld_do(o: int, a: int) =
@@ -443,6 +546,7 @@ proc ins_ld_do(o: int, a: int) =
     var rb = reg_read(o, false)
     address += rb
   address = address and 0xffff
+  simClocks += (if address >= 0xf000: 2 else: 4)
   if ioModel == imCards:
     let value = cardsLoad(address)
     reg_write(o, value)
@@ -458,6 +562,8 @@ proc ins_ld_do(o: int, a: int) =
           value = irqPending
         of 1:
           value = irqMask
+        of 6, 7, 8, 9:
+          value = msRead(address and 0xff)
         else:
           discard
     of 0xf1:    #spi
@@ -494,6 +600,7 @@ proc ins_ld(o: int) =
 proc ins_ldd(o: int) =
   var address = fetch() or (fetch() shl 8)
   var address_d = memRead(address) or (memRead(address + 1) shl 8)
+  simClocks += 8
   ins_ld_do(o, address_d)
 
 proc ins_gt(o: int) =
@@ -575,11 +682,12 @@ proc ins_push(o: int) =
 
   # Manual 3.1/3.2: SP points to the next free byte ([SP] <= Rb; SP <= SP + 1),
   # matching cpu.vhd.
-  let oldValue = mem[SP]
-  mem[SP] = rb and 0xff
+  let oldValue = ramRead(SP)
+  ramWrite(SP, rb and 0xff)
   if not memHook.isNil:
     memHook(maWrite, SP, rb and 0xff, oldValue)
   SP += 1
+  simClocks += 4
 
 proc flagsNibble(): int =
   (if ZF: 1 else: 0) or (if IF: 2 else: 0)
@@ -590,17 +698,18 @@ proc setFlags(n: int) =
 
 proc ins_pop(o: int) =
   SP -= 1
+  simClocks += 4
   if (o and 7) == 7:
-    pcl = mem[SP]
+    pcl = ramRead(SP)
   elif (o and 6) == 6:
-    PC = pcl or (mem[SP] shl 8)
+    PC = pcl or (ramRead(SP) shl 8)
     if stepOutArmed and SP <= stepOutSP:
       stepOutArmed = false
       stopRequest = true
   elif (o and 7) == 4:
-    setFlags(mem[SP])
+    setFlags(ramRead(SP))
   else:
-    reg_write(o, mem[SP])
+    reg_write(o, ramRead(SP))
 
 proc ins_b(o: int) =
   PC = fetch() or (fetch() shl 8)
@@ -640,18 +749,21 @@ proc ins_wai(o: int) =
 proc pushByte(v: int) =
   let
     value = v and 0xff
-    oldValue = mem[SP]
-  mem[SP] = value
+    oldValue = ramRead(SP)
+  ramWrite(SP, value)
   if not memHook.isNil:
     memHook(maWrite, SP, value, oldValue)
   SP += 1
 
 proc irqReady(): int =
+  ## The CPU IRQ line to take: lines 0-2 are IRQ_PEND bits 0-2, line 3 is
+  ## bit 3 (SPI complete) or bit 4 (the tick), each by its own mask bit.
   let bits = irqPending and irqMask
-  if bits == 0:
+  let lines = (bits and 0x0f) or (if (bits and 0x10) != 0: 0x08 else: 0)
+  if lines == 0:
     return -1
   for i in 0..3:
-    if (bits and (1 shl i)) != 0:
+    if (lines and (1 shl i)) != 0:
       return i
   -1
 
@@ -661,6 +773,7 @@ proc takeIrq(n: int) =
   pushByte(ret shr 8)
   pushByte(ret and 0xff)
   pushByte(flagsNibble())
+  simClocks += 20                     # 3 pushes and 2 vector bytes
   IF = false
   let va = 0x0010 + n * 2
   PC = (mem[va] and 0xff) or ((mem[va + 1] and 0xff) shl 8)
@@ -678,12 +791,18 @@ proc tickTimers() =
 proc serviceIrq() =
   if not IF:
     return
+  # POP pcl and the POP pch after it are one return: an IRQ taken between
+  # them would push over the popped byte and its handler's own POP pcl would
+  # replace the pcl register, so the return would go astray (cpu.vhd)
+  if lastOp == 0x9f:
+    return
   let n = irqReady()
   if n >= 0:
     takeIrq(n)
 
 proc decode() =
   var op = fetch()
+  lastOp = op
   var ins = op and 0xf8
   var r = op and 7
   case ins:
@@ -727,8 +846,12 @@ proc cpuReset*() =
   IF = false
   waiting = false
   pcl = 0
+  lastOp = 0
   imageEnd = 0
   ins_retired = 0
+  simClocks = 0
+  msLatch = 0
+  ticksSeen = 0
   last_gpo = ""
   display_active = false
   has_key = false
@@ -756,6 +879,11 @@ proc cpuReset*() =
     spiCfgR[i] = 0
   romOff = false
   romBank = 0
+  ramBank = 2
+  if xram.len == 0:
+    xram = newSeq[int](0x80000 - 0xf000)
+  for i in 0..xram.high:
+    xram[i] = if ramJunk: ((i + 0xf000) * 13 + 5) and 0xff else: 0
   slotIrqPrev = 0
   lastCardTick = 0
 
@@ -780,6 +908,28 @@ proc cpuBootRom*() =
 proc cpuLoadFile*(path: string) =
   cpuLoadImage(readFile(path))
 
+const
+  ProgramBase* = 0x7000          ## user programs (memory-map.md)
+  ProgramEnd* = 0xe000
+  ApiRun* = 0x6f21               ## the API block's API_RUN mailbox (kernel/api.s)
+
+proc runProgram*(data: string): bool =
+  ## What `cupc8.py run` does through the system card: the program's body at
+  ## $7000, then API_RUN = 1; the kernel's terminal starts it while it waits
+  ## for a key. A file with the "C8P" header must be version 1; a file
+  ## without one is the body itself. False (nothing written) otherwise.
+  var body = data
+  if body.len >= 3 and body[0 .. 2] == "C8P":
+    if body.len < 4 or body[3] != '\x01':
+      return false
+    body = body[4 .. ^1]
+  if body.len > ProgramEnd - ProgramBase:
+    return false
+  for i, c in body:
+    mem[ProgramBase + i] = ord(c)
+  mem[ApiRun] = 1
+  true
+
 proc cpuStep*(): StepResult =
   ## Fetch/decode/execute one instruction and report why execution stopped.
   # A direct step consumes the resume allowance from a prior breakpoint hit.
@@ -789,14 +939,20 @@ proc cpuStep*(): StepResult =
   if ioModel == imCards and ins_retired - lastCardTick >= 64:
     cardsTick()
   if waiting:
+    # parked in WAI the CPU loops tick, settle, check: one timer count and 3
+    # clocks a turn (cpu.vhd), so 4 counts a microsecond
     tickTimers()
     inc ins_retired
+    simClocks += 3
+    clockTick()
     serviceIrq()
     return sOk
   if PC >= imageEnd:
     return sPastImage
   decode()
   ins_retired += 1
+  simClocks += 4
+  clockTick()
   tickTimers()
   if HF:
     return sHalted
@@ -835,6 +991,8 @@ proc cpuRun*(maxSteps: int): RunExit =
     if ioModel == imCards:
       cardsTick()
     tickTimers()
+    simClocks += 3
+    clockTick()
     serviceIrq()
     if waiting:
       return reCount
@@ -855,6 +1013,8 @@ proc cpuRun*(maxSteps: int): RunExit =
       resumeBreak = -1
       decode()
       inc ins_retired
+      simClocks += 4
+      clockTick()
       tickTimers()
       if HF:
         return reHalted
@@ -865,8 +1025,8 @@ proc cpuRun*(maxSteps: int): RunExit =
   reCount
 
 proc cpuStatusLine*(): string =
-  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7" % [
-    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF]
+  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7 ms=$8" % [
+    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF, $msCount()]
 
 when defined(emscripten):
   proc emscripten_set_main_loop(fun: proc() {.cdecl.}, fps,
@@ -885,6 +1045,58 @@ when isMainModule:
   var doTrace = false
   var wantDisplay = true
   var dumpFb = ""
+  # the Milestone 1 machine (the default; --legacy for the old I/O model)
+  var legacy = defined(emscripten)
+  var cardList = "hdmi,io"
+  var sdPath = ""
+  var romPath = ""
+  var typed = ""                 # --type: the keys to type
+  var dumpText = ""
+  var settleMs = 2000
+  var scaleSet = false
+  var runPath = ""               # --run: a program for $7000
+
+  const usage = """usage: sim [options] [kernel.o]
+
+The Milestone 1 machine (the default): reset runs the boot ROM, which loads
+the kernel from the ROM chip; the slot cards run the real card firmware cores.
+  --cards:LIST      slot cards, slots 1.. in order (default hdmi,io); kinds:
+                    """ & CardKindNames & """
+
+  --sd:IMAGE        the storage card's SD card: a FAT image (a blank 32 MB one
+                    is made if the file does not exist)
+  --rom:FILE        boot this ROM image (default: built from rom/boot.s and
+                    kernel.o, or from kernel/ when no kernel.o is given)
+  --type:TEXT       type TEXT on the keyboard (\n = Enter), one key each time
+                    the CPU parks in WAI (the kernel's keyboard wait); repeatable
+  --dump-text:PATH  at exit, write the console's text (- = stdout)
+  --settle:MS       headless: guest ms to run on once the typed text is used up
+                    and the machine is idle again (default 2000); then exit
+  --run:PROG        run PROG, a program for $7000 (a .prg from tools/mkprg.py,
+                    or the bare binary), once the kernel is at its prompt: as
+                    `cupc8.py run` does on the machine (the body at $7000,
+                    then API_RUN = 1; the terminal starts it)
+The Wi-Fi card uses the host's own sockets: any SSID joins, and the machine
+reaches the real network and localhost directly.
+  --legacy          the old I/O model (ILI9340 display, SD on SPI 1, keyboard on
+                    SPI 2); kernel.o (or stdin) is loaded at $1000 and run
+Both:
+  --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --trace  --log-mask:N"""
+
+  proc unescapeTyped(t: string): string =
+    ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash.
+    var i = 0
+    while i < t.len:
+      if t[i] == '\\' and i + 1 < t.len:
+        inc i
+        case t[i]
+        of 'n', 'r': result.add('\r')
+        of 't': result.add('\t')
+        of 'e': result.add('\x1b')
+        else: result.add(t[i])
+      else:
+        result.add(if t[i] == '\n': '\r' else: t[i])
+      inc i
 
   var p = initOptParser()
   for kind, key, val in p.getopt():
@@ -904,10 +1116,27 @@ when isMainModule:
         log_mask = parseInt(val)
       of "scale":
         display_setScale(parseInt(val))
+        scaleSet = true
       of "dump-fb":
         dumpFb = val
+      of "legacy":
+        legacy = true
+      of "cards":
+        cardList = val
+      of "sd":
+        sdPath = val
+      of "rom":
+        romPath = val
+      of "type":
+        typed.add(unescapeTyped(val))
+      of "dump-text":
+        dumpText = val
+      of "settle":
+        settleMs = parseInt(val)
+      of "run":
+        runPath = val
       of "help", "h":
-        echo "usage: sim [--headless] [--max-ins:N] [--scale:N] [--dump-fb:path] [--trace] <kernel.o>"
+        echo usage
         quit(0)
       else:
         echo "unknown option: ", key
@@ -915,7 +1144,53 @@ when isMainModule:
     of cmdEnd:
       discard
 
-  if binPath.len == 0:
+  proc die(msg: string) =
+    stderr.writeLine("sim: " & msg)
+    quit(1)
+
+  proc setupCards() =
+    ## The M1 machine: the cards in their slots, the SD image in the storage
+    ## card, the ROM image in the ROM chip, and reset into the boot ROM.
+    var kinds: seq[int]
+    for name in cardList.split(','):
+      let k = cardKind(name)
+      if k < 0:
+        die("unknown card kind '" & name & "' (" & CardKindNames & ")")
+      kinds.add(k)
+    if kinds.len > 6:
+      die("6 slots, " & $kinds.len & " cards")
+    if kinds.filterIt(it == CardStorage).len > 1:
+      die("one storage card at most (the card's FatFs has one volume per process)")
+    machineCards(kinds)
+    if sdPath.len > 0:
+      if CardStorage notin kinds:
+        die("--sd needs a storage card in --cards")
+      if not fileExists(sdPath):
+        try:
+          makeFatImage(sdPath)
+        except IOError as e:
+          die(e.msg)
+        echo "made a blank FAT image ", sdPath
+      for c in slots:
+        if not c.isNil and simcard_type(c) == CardStorage and
+           simcard_storage_image(c, cstring(sdPath), 0) != 0:
+          die("cannot open the SD image " & sdPath)
+    try:
+      if romPath.len == 0:
+        romPath = if binPath.len > 0: makeRom(buildBootRom(), binPath, binPath.changeFileExt("rom"))
+                  else: buildKernelRom()
+    except IOError as e:
+      die(e.msg)
+    cpuReset()
+    cpuLoadRom(romPath)
+    cpuBootRom()
+    if not scaleSet:
+      display_setScale(2)          # 640x480 at 3x does not fit most screens
+    display_setSize(GpuOutW, GpuOutH)
+
+  if not legacy:
+    setupCards()
+  elif binPath.len == 0:
     if paramCount() > 0:
       binPath = paramStr(1)
     else:
@@ -928,7 +1203,8 @@ when isMainModule:
       stderr.writeLine("display init failed: " & display_init_error)
       quit(2)
 
-  discard sd_try_init()
+  if legacy:
+    discard sd_try_init()
 
   var atend = false
   var evt = defaultEvent
@@ -952,10 +1228,149 @@ when isMainModule:
               pushKey(13)
             of K_BACKSPACE:
               pushKey(8)
+            of K_ESCAPE:
+              pushKey(27)
+            of K_TAB:
+              pushKey(9)
             else:
-              discard
+              # Ctrl+letter (no TextInput comes for it)
+              let sym = int(e.keysym.sym)
+              if (e.keysym.modstate and KMOD_CTRL) != 0 and sym >= ord('a') and sym <= ord('z'):
+                pushKey(sym - ord('a') + 1)
         else:
           discard
+
+  # Hooks for later features (a program to load and run, ...): each runs
+  # once, when the kernel first parks in WAI (it is at its prompt).
+  var onKernelReady: seq[proc()] = @[]
+  if runPath.len > 0:
+    if legacy:
+      die("--run needs the M1 machine (not --legacy)")
+    var prog = ""
+    try:
+      prog = readFile(runPath)
+    except IOError:
+      die("cannot read " & runPath)
+    onKernelReady.add(proc() =
+      if not runProgram(prog):
+        die(runPath & ": not a program for $7000 (a \"C8P\" header of another version, or over 28672 bytes)")
+      echo "sim: ", runPath, " at $7000, API_RUN = 1")
+
+  proc runCards() =
+    ## The M1 machine's main loop. Guest time is the CPU's clocks (sim.nim's
+    ## simClocks, which the chipset's millisecond counter and the cards
+    ## follow). Interactive, it is held to the host clock: the CPU runs until
+    ## it is ahead of it, then the loop sleeps, and a CPU parked in WAI idles
+    ## (3 clocks a turn) up to it; a CPU slower than the machine falls behind
+    ## and the clock starts again from where it is. Headless, nothing sleeps.
+    ## --type keys go in one at a time, each once the CPU has run and parked
+    ## in WAI again.
+    var pos = 0                       # next key of `typed`
+    var ranSinceKey = true
+    var keyAt = 0                     # guest ms when the last key went in
+    var readyDone = false
+    var idleAt = -1                   # guest ms when the typed text was used up and the CPU parked
+    var realAt = epochTime()          # the host time ...
+    var clocksAt = simClocks          # ... that these guest clocks stood for
+    proc hostClocks(): int = clocksAt + int((epochTime() - realAt) * float(MsClocks * 1000))
+    var lastPresent = 0.0
+    var lastMhz = realAt
+    var lastMhzIns = 0
+    var lastMhzClocks = simClocks
+    while not atend:
+      if HF or PC >= imageEnd:
+        echo "HALT!"
+        break
+      if maxIns > 0 and ins_retired >= maxIns:
+        break
+      if headless and idleAt >= 0 and msCount() - idleAt >= settleMs:
+        break
+      if waiting:
+        if not readyDone:
+          readyDone = true
+          for hook in onKernelReady: hook()
+        if not ranSinceKey and msCount() - keyAt >= settleMs:
+          ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
+        if ranSinceKey:
+          if pos < typed.len:
+            pushKey(ord(typed[pos]))
+            inc pos
+            ranSinceKey = false
+            keyAt = msCount()
+          elif idleAt < 0 and mem[ApiRun] != 1:
+            idleAt = msCount()        # (not while a --run program waits to start)
+        if mem[ApiRun] == 1:
+          idleAt = -1
+        var steps = 1000
+        if not headless:
+          # idle turns (3 clocks each) up to the host clock, at most 100 ms
+          # of them at once; sleep only while the guest is ahead of it: a
+          # sleep per WAI would cap a machine that wakes often (a timer tick)
+          # at a few hundred instructions per millisecond
+          let behind = hostClocks() - simClocks
+          if behind <= 0:
+            sleep(1)
+            steps = 0
+          else:
+            steps = min(behind div 3 + 1, 400_000)
+        if maxIns > 0:
+          steps = min(steps, maxIns - ins_retired)
+        var i = 0
+        while i < steps and waiting and not HF:
+          discard cpuStep()
+          inc i
+      else:
+        ranSinceKey = true
+        var batch = 4096
+        if maxIns > 0:
+          batch = min(batch, maxIns - ins_retired)
+        if doTrace:
+          echo "TRACE pc=$1 op=$2" % [toHex(PC, 4), toHex(memRead(PC), 2)]
+          batch = 1
+        discard cpuRun(batch)
+        if not headless:
+          let ahead = simClocks - hostClocks()
+          if ahead > 2 * MsClocks:
+            sleep(ahead div MsClocks)
+      if not headless:
+        let behind = hostClocks() - simClocks
+        if behind > 100 * MsClocks:   # slower than the machine: start the clock again here
+          realAt = epochTime()
+          clocksAt = simClocks
+        let now = epochTime()
+        if now - lastPresent >= 0.016:
+          pumpInput()
+          gpuPresent()
+          display_render()
+          lastPresent = now
+        if now - lastMhz >= 1.0:
+          status(speedLine(float(ins_retired - lastMhzIns) / (now - lastMhz),
+                           float(simClocks - lastMhzClocks) / (now - lastMhz)))
+          lastMhz = now
+          lastMhzIns = ins_retired
+          lastMhzClocks = simClocks
+    echo cpuStatusLine()
+    if dumpText.len > 0:
+      let g = gpuCard()
+      if g.isNil:
+        stderr.writeLine("sim: --dump-text: no graphics card")
+      else:
+        let text = screenLines(g).join("\n") & "\n"
+        if dumpText == "-": stdout.write(text)
+        else: writeFile(dumpText, text)
+    if dumpFb.len > 0:
+      gpuPresent()
+      display_dumpPpm(dumpFb)
+      echo "wrote framebuffer ", dumpFb
+    if not headless and maxIns == 0 and not atend:
+      while not atend:                # halted: keep the window up until it is closed
+        pumpInput()
+        display_render()
+        sleep(16)
+
+  if not legacy:
+    runCards()
+    quit(0)
 
   proc exec() {.cdecl.} =
     if PC >= imageEnd or HF:
@@ -988,6 +1403,7 @@ when isMainModule:
     var lastPresent = start
     var lastMhz = start
     var lastMhzIns = 0
+    var lastMhzClocks = simClocks
     if wantDisplay:
       display_render()
     while not atend:
@@ -1006,9 +1422,10 @@ when isMainModule:
             lastPresent = now
           if now - lastMhz >= 1.0:
             let dt = now - lastMhz
-            log(8, "$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / dt / 1_000_000, ffDecimal, 2))
+            status(speedLine(float(ins_retired - lastMhzIns) / dt, float(simClocks - lastMhzClocks) / dt))
             lastMhz = now
             lastMhzIns = ins_retired
+            lastMhzClocks = simClocks
     if dumpFb.len > 0:
       display_dumpPpm(dumpFb)
       echo "wrote framebuffer ", dumpFb

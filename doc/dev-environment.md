@@ -13,11 +13,55 @@ does everything except KiCad.
 | ngspice, TI PSpice models | POW-*, THM-001 | apt; the TI models are fetched from www.ti.com by `hw/power/models/fetch.py` (pinned by SHA-256; not redistributable) |
 | KiCad 10, Freerouting | the board tests (BRD-001, WIFI-004, E2E-006, the board rows) | below |
 
-The whole-machine emulator the end-to-end tests run on (`test/emu/test_e2e.mjs`)
-has two backends giving identical results: `test/emu/machine.mjs` (rp2040js
-cards, the default) and the native one in `emu/machine`
-(`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; about six times
-as fast, see its README). `test/emu/machine_diff.sh` checks that they agree.
+**Emulator and simulator** (David, 2026-09-25):
+
+- **The emulator** is the native whole-machine emulator in `emu/machine`
+  (`CUPC8_EMU=native`, built by `tools/emu_machine_build.sh`; see its
+  README). It runs the chipset RTL (Verilated) and every card's real
+  firmware, and must be **cycle perfect**; the end-to-end tests
+  (`test/emu/test_e2e.mjs`) run on it. `test/emu/machine.mjs` (rp2040js) is
+  the legacy JS emulator, kept but no longer updated. Watch it in a browser
+  with `tools/machine_view.mjs --native`.
+- **The simulator** (`tools/sim`, from `tools/sim.nim`) is the interactive
+  way to run real CUPC/8 software locally and build programs: the CPU in
+  Nim and the cards' firmware cores compiled in (`tools/simcards.nim`). It
+  is not cycle exact, but it must always run the current kernel, ROM,
+  memory map and card commands.
+
+  Build it with `cd tools && nim c -d:release sim.nim`; `kernel/simulate.sh`
+  assembles the kernel and runs it. It simulates the Milestone 1 machine:
+  reset runs the boot ROM, which loads the kernel from the ROM image, and
+  the slot cards are chosen with `--cards` (default `hdmi,io`):
+
+  ```
+  tools/sim --cards:hdmi,io,storage,wifi --sd:card.img     # the kernel from kernel/
+  kernel/simulate.sh --cards:eink,io                       # the 5.83" e-ink card
+  ```
+
+  Card kinds are the emulator's: `hdmi`, `eink`, `eink750`, `io`,
+  `storage`, `wifi` (and `empty`). `--sd:IMAGE` is the storage card's SD
+  card, a FAT image; a missing file is made as a blank 32 MB FAT16 volume
+  (`mkfs.fat`), and a PC reads it afterwards (`tools/fatcheck.py`,
+  `mtools`, a loop mount). The Wi-Fi card uses the **host's own sockets**:
+  `net join` joins any SSID, and the machine reaches the real network and
+  localhost directly (no QEMU, no 10.0.2.x addresses). The window shows
+  the graphics card's picture (an e-ink card's glass, which changes only
+  when a refresh completes); keys go to the IO card. `--rom:FILE` boots a
+  given ROM image, a `kernel.o` argument is put in one with the boot ROM,
+  and `--legacy` keeps the old I/O model (ILI9340, SD on SPI 1). For
+  scripts, `--headless --type:"10 print 1\nrun\n" --dump-text:-` types
+  the text (a key each time the CPU parks in WAI), runs on for `--settle`
+  guest ms once idle, and prints the screen (SIM-010, `test/sim/test_cli.py`).
+  `--run:PROG` runs a program for $7000 (a `.prg` from `tools/mkprg.py`, or
+  the bare binary) once the kernel is at its prompt, as `cupc8.py run` does
+  on the machine (SIM-012): `python3 tools/mkprg.py examples/hello/hello.s -o
+  hello.prg`, then `tools/sim --run:hello.prg`.
+  Guest time is the CPU's clocks, counted as `cpu.vhd` and the chipset spend
+  them; the chipset's millisecond counter and the cards follow it. The
+  window's sim holds it to the host clock (the speed line then shows 12 MHz
+  of CUPC/8 clock), so a program's seconds are wall-clock seconds;
+  `--headless` runs as fast as it can.
+  `tools/sim --help` lists the rest.
 
 ## KiCad 10
 

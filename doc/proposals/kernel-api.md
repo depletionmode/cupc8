@@ -27,36 +27,40 @@ loader do not fit the 2.8 KB left, so:
 | Range | Use |
 |---|---|
 | $0000–$0fff | vectors, boot ROM variables, stack (as now) |
-| $1000–$4fff | kernel code (16 KB); the jump table first |
-| $5000–$5fff | kernel data |
-| $6000–$6eff | kernel bss |
+| $1000–$5fff | kernel code (20 KB); the jump table first |
+| $6000–$6eff | kernel data (3.75 KB) |
 | $6f00–$6fff | **API block**: fixed addresses shared with programs (below) |
 | $7000–$dfff | **user program** (28 KB): loaded at $7000, entered at $7000 |
+| $e000–$efff | kernel bss (4 KB): RAM once the kernel turns the ROM off, its first instruction |
 
-`kernel/assemble.sh` passes `0x1000,0x5000,0x6000`; a test fails the build
-if code, data or bss outgrow their areas.
+`kernel/assemble.sh` passes `0x1000,0x6000,0xe000`; a test (KRN-010) fails
+the build if code, data or bss outgrow their areas. (Decided first as code
+$1000–$4fff, data $5000, bss $6000; with the API, networking and the bank
+routines the code reached $5623, so on 2026-09-25 the code area grew to
+$5fff, data moved to $6000 and bss to $e000.)
 
 ## The jump table
 
 - `kernel/api.s` (sorts first, so it follows the assembler's `b main` at
-  $1000) holds the table from **$1003**: **8 groups × 16 entries × 3 bytes**
-  (`b routine`), $1003–$1182. Group g, entry n is at `$1003 + 48g + 3n`.
+  $1000) holds the table from **$1003**: **8 groups × 32 entries × 3 bytes**
+  (`b routine`), $1003–$1302. Group g, entry n is at `$1003 + 96g + 3n`
+  (David, 2026-09-25: 32 a group, not 16, so a group has room to grow).
 - Unused entries are `b api_none`, which returns `r0 = $ff` (and sets
   `API_ERR` to $ff, "not implemented").
-- `kernel/api.inc` gives every entry a name (`%define API_NET_OPEN $10f3`)
+- `kernel/api.inc` gives every entry a name (`%define API_NET_OPEN $11e9`)
   for programs. A test checks the table's addresses against `api.inc` and
   that no used entry moved (entries are only ever **added**).
 
 | Group | Base | Contents (first entries) |
 |---|---|---|
-| 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table |
-| 1 console | $1033 | putc, puts, getkey (wait), pollkey, cls, cursor set/get, attr |
-| 2 graphics | $1063 | mode, pixel, rect, line, palette, text-plane helpers (what `gfx.s`/the GPU protocol offer) |
-| 3 e-ink | $1093 | eink_auto, eink_get, eink_status, eink_refresh (`eink-card.md`) |
-| 4 storage | $10c3 | info, open, read, write, close, seek, dir first/next, delete, rename |
-| 5 net | $10f3 | status, join, open, connect, connect_host, listen, send, recv, sock_status, close, udp_bind, sendto, recvfrom, events, resolve (the kernel's DNS client), config get/set |
-| 6 timers | $1123 | ticks (ms since boot), wait ms |
-| 7 reserved | $1153 | |
+| 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table, bank_set, bank_get, bank_count, bank_far_copy (`kernel/bank.s`, as they are: they leave `API_ERR` alone) |
+| 1 console | $1063 | putc, puts, getkey (wait), pollkey, cls, cursor set/get, attr |
+| 2 graphics | $10c3 | mode, pixel, rect, line, palette, text-plane helpers (what `gfx.s`/the GPU protocol offer) |
+| 3 e-ink | $1123 | eink_auto, eink_get, eink_status, eink_refresh (`eink-card.md`) |
+| 4 storage | $1183 | info, open, read, write, close, seek, dir first/next, delete, rename |
+| 5 net | $11e3 | 16 routines (`kernel/net.s`): status, join, open, connect, connect_host, listen, send, recv, sock_status, close, udp_bind, sendto, recvfrom, events, resolve (the kernel's DNS client), config (r0 0 get, 1 set); then 16 blank |
+| 6 timers | $1243 | ticks (ms since boot), wait ms |
+| 7 reserved | $12a3 | |
 
 **Calling convention.** A program calls an entry like any kernel routine:
 `push pch` / `push pcl` / `b API_X`; the routine returns with
@@ -71,17 +75,60 @@ rest reserved.
 
 ## Loading and running programs
 
-- **Format:** a flat binary assembled for $7000 (`tools/as.py prog.s
-  prog.bin 0x7000,<data>,<bss>`, with `kernel/api.inc` included). Up to
-  28 KB.
+- **Format:** a flat binary assembled for $7000 (`tools/mkprg.py prog.s -o
+  prog.prg` puts `kernel/api.inc` in front, assembles it with its data right
+  after the code and its bss after that, and adds the header). Up to 28 KB.
+- **Program file header** (decided by David): 4 bytes, `'C'`, `'8'`, `'P'`,
+  then the version, 1. The body follows and is loaded at $7000.
+  `tools/mkprg.py prog.bin -o prog.prg` wraps a binary assembled some other
+  way.
 - **From the storage card:** the terminal command `exec "NAME"` reads the
-  file to $7000 and calls it. `ret` (`pop pcl`/`pop pch`) or the `exit` API
-  entry returns to the terminal, which resets its stack.
-- **From the PC:** `cupc8.py run prog.bin` writes the binary with
-  `RAM_WRITE`, then sets `API_RUN` to 1. The terminal checks `API_RUN` while
-  it waits for a key (a timer tick wakes its `WAI`, ~20 Hz), clears it, and
-  calls $7000 as `exec` does. Needs the system card. The implementer checks
-  the bridge's RAM writes are safe while the CPU runs.
+  file. With the header (version 1) the body goes to $7000, 128-byte chunk
+  by chunk, and is called. `"C8P"` with another version, or cut short, gives
+  `bad program header`; a body past $dfff gives `program too big`; neither
+  runs anything. Any other file is a BASIC program as SAVE writes it: `exec`
+  does LOAD's work (NEW, then the lines as if typed), then RUN. `ret`
+  (`pop pcl`/`pop pch`) or the `exit` API entry returns to the terminal,
+  which resets its stack.
+- **From the PC:** `cupc8.py run prog.prg` (or the bare binary) writes the
+  body at $7000 with `RAM_WRITE`, then sets `API_RUN` to 1. The terminal
+  looks at `API_RUN` every time its key wait wakes: the chipset's tick
+  (IRQ_PEND bit 4, `memory-map.md`) wakes the `WAI` every 50 ms, and the look
+  is three instructions. It then calls $7000 as `exec` does. `API_RUN` is 2 while a program runs and 0 again at the prompt, and
+  `cupc8.py run` refuses unless it is 0. Needs the system card. The bridge's
+  RAM writes are safe while the CPU runs, byte by byte (`sysctl.md`), which
+  is why `API_RUN` goes last.
+- **In the simulator** (no system card): `runProgram` in `tools/sim.nim` does
+  what `cupc8.py run` does.
+
+### As implemented (2026-09-25)
+
+- `kernel/api.s` holds the table, `kernel/sys.s` the routines (each one's
+  comment is its contract) and the loader, `kernel/api.inc` the names.
+  Pointers in `API_ARGS` are low byte first; routines that return a pointer
+  in registers give r0 = low, r1 = high.
+- **Resetting the stack:** nothing reads SP, so the terminal finds it once at
+  start-up (a pushed byte lands at SP: the address that takes two different
+  pushed markers is SP), and a program's end pops until the same probe says
+  SP is back there. A program that pops more than it pushed cannot be
+  recovered.
+- **The clock** is the chipset's millisecond counter (MS_COUNT, $f206–$f209,
+  `memory-map.md`; David, 2026-09-25): 12000 clocks of the chipset's 12 MHz
+  a millisecond, exact, with a latch so MS_COUNT0-then-1-2-3 is one value.
+  `API_TICKS` reads it; `API_WAIT_MS` N watches it to its next step and N
+  more (more than N ms, at most N + 1; the CPU busy meanwhile); DNS and ping
+  time out after 1000 ms of it and ping's round trip is exact ms. The
+  chipset's 20 Hz tick only wakes the terminal's key wait. The CPU's timers
+  (`TMR0`, `TMR1`) are the programs' again: the kernel masks their IRQs and
+  never starts them. (First built on a timer-0 tick counting instructions,
+  ±25%, and a TMR1 clock for the network; both are gone.)
+- **CPU fix found on the way:** an IRQ taken right after `POP pcl` lost the
+  return (its frame went over the popped byte, its handler's `POP pcl`
+  replaced pcl). `cpu.vhd` and `sim.nim` now take no IRQ at that boundary
+  (CPU-005).
+- Graphics has no BLIT8/BLIT1/DEFCHAR entries yet (a frame over 64 bytes
+  needs the card's FREE check); they can be added in group 2's spare
+  entries.
 
 ## Networking
 
@@ -115,7 +162,7 @@ software; the kernel's `net` no longer uses it).
 - **`net ping HOST [COUNT]`:** resolves, opens an ICMP socket, sends echo
   requests (id, sequence, a payload, the Internet checksum computed in
   assembly), matches replies by id and sequence, prints the round-trip
-  time from the timer, and a summary.
+  time from the chipset's millisecond counter, and a summary.
 - The net API group gives programs the same sockets (TCP client/server,
   UDP bind/sendto/recvfrom, ICMP, events), so a server is: open, listen or
   bind, then `WAI` for the card's IRQ and drain EVENTS.

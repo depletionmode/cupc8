@@ -26,7 +26,7 @@ entity bridge is
 		req:		out std_logic;
 		req_we:		out std_logic;
 		req_rom:	out std_logic;					-- 1 = ROM chip, 0 = SRAM
-		req_addr:	out unsigned(18 downto 0);
+		req_addr:	out unsigned(18 downto 0);			-- physical: RAM_WR/RAM_RD reach $00000-$0ffff
 		req_wdata:	out std_logic_vector(7 downto 0);
 		ack:		in std_logic;					-- pulse: access done
 		rdata:		in std_logic_vector(7 downto 0);
@@ -68,7 +68,10 @@ begin
 	req <= req_r;
 	req_we <= we_r;
 	req_rom <= rom_r;
-	req_addr <= addr(18 downto 0);
+	-- RAM_WR/RAM_RD ($01/$02) carry 16 bits and wrap within $00000-$0ffff;
+	-- the ROM commands and RAM_WR24/RAM_RD24 ($09/$0A) carry 19
+	req_addr <= addr(18 downto 0) when cmd = x"03" or cmd = x"04" or cmd = x"09" or cmd = x"0a"
+				else "000" & addr(15 downto 0);
 	req_wdata <= wdata_r;
 	cpu_ctl <= ctl_r;
 	ctl_wr <= ctl_wr_r;
@@ -148,7 +151,7 @@ begin
 						argn <= "000";
 						addr <= (others => '0');
 						case b is
-							when x"01" | x"02" | x"03" | x"04" => state <= st_arg;
+							when x"01" | x"02" | x"03" | x"04" | x"09" | x"0a" => state <= st_arg;
 							when x"05" => respond(status);
 							when x"06" => respond(gpo);
 							when x"07" => state <= st_ctl;
@@ -182,7 +185,7 @@ begin
 									end if;
 							end case;
 						else
-							-- addr24, then len8 (ROM_RD) or data8 (ROM_BUSW)
+							-- addr24, then len8 (ROM_RD, RAM_WR24, RAM_RD24) or data8 (ROM_BUSW)
 							case to_integer(argn) is
 								when 0 => addr(7 downto 0) <= unsigned(b);
 								when 1 => addr(15 downto 8) <= unsigned(b);
@@ -192,6 +195,9 @@ begin
 										wdata_r <= b;
 										mem_access('1');
 										state <= st_ignore;
+									elsif cmd = x"09" then
+										len <= resize(unsigned(b), 9) + 1;
+										state <= st_wdata;
 									else
 										len <= resize(unsigned(b), 9) + 1;
 										mem_access('0');

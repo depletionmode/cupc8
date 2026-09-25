@@ -39,6 +39,8 @@ st_mode: resb 1
 st_n: resb 1
 st_name: resb 14
 st_buf: resb 128
+st_pos: resb 4				; F_SEEK's position
+st_name2: resb 14			; F_RENAME's new name
 
 st_s_nomedium db "\nno SD card\n"
 st_s_nocard db "\nno storage card\n"
@@ -419,6 +421,76 @@ st_delete:
 	push pch
 	push pcl
 	b st_cmd
+	push pch
+	push pcl
+	b st_send_name
+	b st_err_answer
+.weak:
+	mov r0, ST_E_POWER
+	pop pcl
+	pop pch
+.nocard:
+	mov r0, ST_E_NOCARD
+	pop pcl
+	pop pch
+
+; F_SEEK st_h to st_pos (4 bytes, low first)
+st_seek:
+	ld r0, [st_spi]
+	eq r0, #0xff
+	bzf .nocard
+	mov r0, #0x14
+	push pch
+	push pcl
+	b st_cmd
+	ld r0, [st_h]
+	push pch
+	push pcl
+	b st_send
+	xor r1, r1
+.loop:
+	ld r0, [st_pos]+r1
+	add r1, #1
+	push r1
+	push pch
+	push pcl
+	b st_send
+	pop r1
+	eq r1, #4
+	bzf .sent
+	b .loop
+.sent:
+	b st_err_answer
+.nocard:
+	mov r0, ST_E_NOCARD
+	pop pcl
+	pop pch
+
+; F_RENAME st_name to st_name2 - a write to the file system: needs PWR_HI
+st_rename:
+	ld r0, [st_spi]
+	eq r0, #0xff
+	bzf .nocard
+	ld r0, $f203
+	and r0, #2
+	eq r0, #0
+	bzf .weak
+	mov r0, #0x18
+	push pch
+	push pcl
+	b st_cmd
+	push pch
+	push pcl
+	b st_send_name
+	xor r1, r1
+.copy:
+	ld r0, [st_name2]+r1
+	st [st_name]+r1, r0
+	add r1, #1
+	eq r1, #14
+	bzf .new
+	b .copy
+.new:
 	push pch
 	push pcl
 	b st_send_name

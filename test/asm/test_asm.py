@@ -81,8 +81,51 @@ def assemble(line):
     return code
 
 
+# "db" and "resb" are directives only as the second token of a line: a
+# %define, an address or a comment with those letters in it is code (as.py
+# once took any line with a lower-case "db" in it for data, which is why
+# kernel/api.inc wrote API_ST_DELETE as $10DB)
+DIRECTIVE_WORDS = [
+    ("%define ADDR $10db\n\tb ADDR",          "b0 db 10"),
+    ("%define ADDR $10DB\n\tb ADDR",          "b0 db 10"),
+    ("b $10db",                               "b0 db 10"),
+    ("ld r0, $6fdb",                          "a0 db 6f"),
+    ("mov r0, #1\t\t; a comment on db and resb", "8c 01"),
+]
+
+
+def assemble_data(src):
+    """(code after the jump to main, data segment) for a whole source, or None."""
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "t.s")
+        out = os.path.join(d, "t.o")
+        with open(path, "w") as f:
+            f.write(src)
+        r = subprocess.run([sys.executable, AS, path, out, "0x1000,0x3000,0x5000"],
+                           capture_output=True, text=True, cwd=d)
+        if r.returncode != 0:
+            return None
+        data = open(out, "rb").read()
+    return data[3:0x2000], data[0x2000:]
+
+
 def main():
     bad = 0
+    for line, want in DIRECTIVE_WORDS:
+        want_b = bytes.fromhex(want)
+        got = assemble(line)
+        if got is None or got[:len(want_b)] != want_b:
+            bad += 1
+            print("FAIL %r: want %s got %s" % (line, want, "error" if got is None else got[:4].hex(" ")))
+    # the directives themselves still work: data, bss and a variable in each
+    got = assemble_data('greet db "hi"\nnums db 1, 2, 219\ncount: resb 2\nmain:\n'
+                        '\tld r0, [nums+2]\n\tst [count+1], r0\n')
+    want_code = bytes.fromhex("a0 05 30 a8 01 50")
+    if got is None or got[0][:6] != want_code or got[1][:6] != b"hi\x00\x01\x02\xdb":
+        bad += 1
+        print("FAIL db and resb directives: got %s" % ("error" if got is None else
+              got[0][:6].hex(" ") + " / " + got[1][:6].hex(" ")))
+
     for line, want in GOLDEN:
         want_b = bytes.fromhex(want)
         got = assemble(line)
@@ -93,7 +136,8 @@ def main():
         if assemble(line) is not None:
             bad += 1
             print("FAIL %-20s was accepted" % line)
-    print("SIM-003: %d encodings, %d rejections, %d failures" % (len(GOLDEN), len(REJECT), bad))
+    print("SIM-003: %d encodings, %d rejections, %d directive checks, %d failures" % (
+        len(GOLDEN), len(REJECT), len(DIRECTIVE_WORDS) + 1, bad))
     return 1 if bad else 0
 
 

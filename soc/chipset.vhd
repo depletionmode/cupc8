@@ -3,7 +3,8 @@
 --   CPU bus front-end  doc/hardware/cpu-bus.md (answers every cycle, /RDY)
 --   address decode     doc/hardware/memory-map.md (RAM, ROM windows, I/O)
 --   memory controller  SRAM + ROM chip, 4-clock cycles; the bridge goes first
---   registers          GPO, SPI (via spi_master), IRQ, SLOT_IRQ, SYSCTL, ROM_BANK
+--   registers          GPO, SPI (via spi_master), IRQ, SLOT_IRQ, SYSCTL, ROM_BANK, RAM_BANK,
+--                      MS_COUNT (the millisecond counter) and its 20 Hz tick IRQ
 --   bridge             sysctl's SPI port: memory access, CPU control, trace
 --   stop/step/trace    via /RDY; every completed CPU cycle goes into a ring
 
@@ -92,11 +93,25 @@ architecture rtl of chipset is
 	type byte8_t is array(0 to 7) of std_logic_vector(7 downto 0);
 	signal spi_tx, spi_rx, spi_cfg: byte8_t := (others => x"00");
 	signal spi_hold: std_logic_vector(7 downto 0) := x"00";
-	signal pending, mask: std_logic_vector(3 downto 0) := "0000";
+	-- IRQ_PEND/IRQ_MASK bits 4:0; bit 4 (the tick) shares CPU IRQ line 3
+	signal pending, mask: std_logic_vector(4 downto 0) := "00000";
 	signal rom_off: std_logic := '0';
 	signal rom_bank: std_logic_vector(7 downto 0) := x"00";
+	-- the 16 KB RAM window at $8000-$bfff shows SRAM bank ram_bank (reset 2:
+	-- the identity map; doc/proposals/extended-ram.md)
+	signal ram_bank: std_logic_vector(4 downto 0) := "00010";
 	signal slot_s1, slot_s2: std_logic_vector(5 downto 0) := (others => '0');
 	signal slot_s3: std_logic_vector(5 downto 0) := (others => '0');	-- previous slot_s2
+
+	-- the millisecond counter (memory-map.md): ms_div counts 12000 clocks,
+	-- ms_cnt the milliseconds; reading MS_COUNT0 latches bits 31:8 in ms_lat.
+	-- tick_div counts 50 ms: the tick IRQ (IRQ_PEND bit 4)
+	constant MS_CLOCKS: natural := 12000;
+	constant TICK_MS: natural := 50;
+	signal ms_div: unsigned(13 downto 0) := (others => '0');
+	signal ms_cnt: unsigned(31 downto 0) := (others => '0');
+	signal ms_lat: std_logic_vector(23 downto 0) := (others => '0');
+	signal tick_div: unsigned(5 downto 0) := (others => '0');
 
 	-- SPI master
 	signal spi_start, spi_busy, spi_done: std_logic := '0';
@@ -125,7 +140,7 @@ begin
 	cpu_n_rdy <= rdy_r;
 	cpu_d_out <= dout_r;
 	cpu_d_oe <= '1' when rdy_r = '0' and cyc_rw = '1' else '0';
-	cpu_irq <= pending and mask;
+	cpu_irq <= ((pending(3) and mask(3)) or (pending(4) and mask(4))) & (pending(2 downto 0) and mask(2 downto 0));
 	cpu_rst_i <= rst or cpu_hold or br_ctl(6);
 	cpu_n_rst <= not cpu_rst_i;
 
@@ -168,7 +183,7 @@ begin
 		variable dev: natural range 0 to 15;
 		variable reg: std_logic_vector(3 downto 0);
 		variable rd: std_logic_vector(7 downto 0);
-		variable p: std_logic_vector(3 downto 0);
+		variable p: std_logic_vector(4 downto 0);
 		variable accept, is_io: boolean;
 		variable phys: unsigned(18 downto 0);
 		variable rom: std_logic;
@@ -211,8 +226,10 @@ begin
 			if rst = '1' then
 				cyc_busy <= '0'; rdy_r <= '1'; mstate <= m_idle;
 				n_oe_r <= '1'; n_we_r <= '1'; n_ce_ram_r <= '1'; n_ce_rom_r <= '1'; d_oe_r <= '0';
-				gpo_r <= x"00"; spi_hold <= x"00"; p := "0000"; mask <= "0000";
-				rom_off <= '0'; rom_bank <= x"00";
+				gpo_r <= x"00"; spi_hold <= x"00"; p := "00000"; mask <= "00000";
+				ms_div <= (others => '0'); ms_cnt <= (others => '0'); ms_lat <= (others => '0');
+				tick_div <= (others => '0');
+				rom_off <= '0'; rom_bank <= x"00"; ram_bank <= "00010";
 				step_instr <= '0'; step_cycle <= '0';
 				tr_wr <= (others => '0'); tr_rd <= (others => '0'); tr_count <= (others => '0');
 				tr_ovf <= '0';
@@ -229,6 +246,21 @@ begin
 				if spi_done = '1' then
 					p(3) := '1';
 					spi_rx(to_integer(spi_cur)) <= spi_rxb;
+				end if;
+
+				------------------------------------------------------------ millisecond counter
+				-- free-running from reset; every 50th ms sets the tick
+				if ms_div = MS_CLOCKS - 1 then
+					ms_div <= (others => '0');
+					ms_cnt <= ms_cnt + 1;
+					if tick_div = TICK_MS - 1 then
+						tick_div <= (others => '0');
+						p(4) := '1';
+					else
+						tick_div <= tick_div + 1;
+					end if;
+				else
+					ms_div <= ms_div + 1;
 				end if;
 
 				------------------------------------------------------------ stop / step
@@ -283,7 +315,9 @@ begin
 						a := unsigned(cpu_a);
 						is_io := a(15 downto 12) = x"f";
 						rom := '0';
-						if a < x"e000" then
+						if a(15 downto 14) = "10" then
+							phys := unsigned(ram_bank) & a(13 downto 0);	-- the RAM window
+						elsif a < x"e000" then
 							phys := "000" & a;
 						elsif a(15 downto 12) = x"e" and rom_off = '1' then
 							phys := "000" & a;
@@ -338,11 +372,11 @@ begin
 							when x"2" =>
 								case a(7 downto 0) is
 								when x"00" =>
-									rd := "0000" & p;
-									if cpu_rw = '0' then p := p and not cpu_d_in(3 downto 0); end if;
+									rd := "000" & p;
+									if cpu_rw = '0' then p := p and not cpu_d_in(4 downto 0); end if;
 								when x"01" =>
-									rd := "0000" & mask;
-									if cpu_rw = '0' then mask <= cpu_d_in(3 downto 0); end if;
+									rd := "000" & mask;
+									if cpu_rw = '0' then mask <= cpu_d_in(4 downto 0); end if;
 								when x"02" =>
 									rd := "00" & slot_s2;
 								when x"03" =>
@@ -351,6 +385,19 @@ begin
 								when x"04" =>
 									rd := rom_bank;
 									if cpu_rw = '0' then rom_bank <= cpu_d_in; end if;
+								when x"05" =>
+									rd := "000" & ram_bank;
+									if cpu_rw = '0' then ram_bank <= cpu_d_in(4 downto 0); end if;
+								when x"06" =>
+									-- MS_COUNT0; the rest of this same value for MS_COUNT1-3
+									rd := std_logic_vector(ms_cnt(7 downto 0));
+									if cpu_rw = '1' then ms_lat <= std_logic_vector(ms_cnt(31 downto 8)); end if;
+								when x"07" =>
+									rd := ms_lat(7 downto 0);
+								when x"08" =>
+									rd := ms_lat(15 downto 8);
+								when x"09" =>
+									rd := ms_lat(23 downto 16);
 								when others => null;
 								end case;
 							when others => null;
@@ -383,9 +430,7 @@ begin
 						m_owner_br <= '1';
 						m_rom <= br_rom;
 						m_we <= br_we;
-						if br_rom = '1' then ma_r <= br_addr;
-						else ma_r <= "000" & br_addr(15 downto 0);
-						end if;
+						ma_r <= br_addr;			-- 19 bits: the bridge limits its 16-bit forms
 						md_r <= br_wdata;
 						n_ce_ram_r <= br_rom;
 						n_ce_rom_r <= not br_rom;

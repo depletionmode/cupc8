@@ -66,6 +66,46 @@ void br_ram_read(sysctl_t *s, uint16_t addr, uint8_t *data, int n)
 	}
 }
 
+/* RAM_WR24/RAM_RD24: the whole 512 KB SRAM by physical address
+ * (bank * $4000 + offset; extended-ram.md). The caller keeps addr + n
+ * within $80000. */
+void br_xram_write(sysctl_t *s, uint32_t addr, const uint8_t *data, int n)
+{
+	uint8_t tx[5 + 256];
+	while (n > 0) {
+		int k = n > 256 ? 256 : n;
+		tx[0] = 0x09;
+		tx[1] = (uint8_t)addr;
+		tx[2] = (uint8_t)(addr >> 8);
+		tx[3] = (uint8_t)(addr >> 16);
+		tx[4] = (uint8_t)(k - 1);
+		memcpy(tx + 5, data, (size_t)k);
+		frame(s, tx, 0, 5 + k);
+		addr += (uint32_t)k;
+		data += k;
+		n -= k;
+	}
+}
+
+void br_xram_read(sysctl_t *s, uint32_t addr, uint8_t *data, int n)
+{
+	static uint8_t tx[6 + 256], rx[6 + 256];
+	while (n > 0) {
+		int k = n > 256 ? 256 : n;
+		tx[0] = 0x0A;
+		tx[1] = (uint8_t)addr;
+		tx[2] = (uint8_t)(addr >> 8);
+		tx[3] = (uint8_t)(addr >> 16);
+		tx[4] = (uint8_t)(k - 1);
+		memset(tx + 5, 0, (size_t)k + 1);
+		frame(s, tx, rx, 6 + k);
+		memcpy(data, rx + 6, (size_t)k);
+		addr += (uint32_t)k;
+		data += k;
+		n -= k;
+	}
+}
+
 void br_rom_read(sysctl_t *s, uint32_t addr, uint8_t *data, int n)
 {
 	static uint8_t tx[6 + 256], rx[6 + 256];

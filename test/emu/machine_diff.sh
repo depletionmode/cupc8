@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# The native whole-machine emulator (emu/machine) against machine.mjs: boot
-# to BASIC and type a program on both, and the native one serially and
-# threaded (twice); screen, emulated end times, board clocks, card core
-# cycle counts, UART output and every slot SPI frame must be identical, and
-# the program's output must be on the screen (test/emu/test_machine_native.mjs).
-#   test/emu/machine_diff.sh [--ns N] [--type TEXT] [--expect TEXT] [--skip-js]
+# The native whole-machine emulator (emu/machine), serially and threaded
+# (twice): boot to BASIC and type a program; screen, emulated end times,
+# board clocks, card core cycle counts, UART output and every slot SPI frame
+# must be identical, and the program's output must be on the screen
+# (test/emu/test_machine_native.mjs). The legacy JS emulator (machine.mjs) is
+# not maintained and not compared.
+#   test/emu/machine_diff.sh [--ns N] [--type TEXT] [--expect TEXT]
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$ROOT"
