@@ -792,7 +792,7 @@ def wanted(parts):
                               "FL1_nCS")]
     cpu_tp += [tp("CPU_RSVD_A%d" % k) for k in range(2, 9)] + [tp("CPU_RSVD_B1")]
     for i, r in enumerate(cpu_tp):
-        at[r] = (8.0 + 3.4 * i, ROW_CPU + 12.6, 0)
+        at[r] = (8.0 + 4.0 * i, ROW_CPU + 12.6, 0)
     # system slot channel
     sys_parts = ["R100", "R101", "R102", "R103", "R104", "R105", "R106", "C45", "C46"]
     for i, r in enumerate(sys_parts):
@@ -800,11 +800,11 @@ def wanted(parts):
     sys_tp = [tp(n) for n in ("SYS_PRSNT2_n", "I2C_SDA", "I2C_SCL", "PROG_CLK", "PROG_IO", "MUX_SEL0", "MUX_SEL1",
                               "MUX_SEL2", "SYS_RSVD_A1", "SYS_RSVD_A2", "SYS_RSVD_A3", "SYS_RSVD_B1", "SYS_RSVD_B2")]
     for i, r in enumerate(sys_tp):
-        at[r] = (8.0 + 3.4 * i, ROW_SYS + 12.8, 0)
+        at[r] = (8.0 + 4.2 * i, ROW_SYS + 12.8, 0)
     for i, net in enumerate(("CHIPSET_nCRESET", "CHIPSET_CDONE", "FL0_SCK", "FL0_MOSI", "FL0_MISO", "FL0_nCS",
                              "BR_SCK", "BR_MOSI", "BR_MISO", "BR_nCS", "MEM_nCE_RAM", "CLK12", "CPU_CLK", "nPOR",
                              "nMR", "SPI_SCK", "SPI_MOSI", "SPI_MISO")):
-        at[tp(net)] = (60.0 + 2.6 * (i % 9), ROW_SYS + 9.0 + 3.0 * (i // 9), 0)
+        at[tp(net)] = (68.5 + 3.5 * (i % 3), ROW_SYS + 5.5 + 3.2 * (i // 3), 0)
     # each I/O slot: its feed, pulls and pads in the channel south of it
     for n in range(1, 7):
         y0 = row_slot(n)
@@ -819,7 +819,7 @@ def wanted(parts):
         pads = [tp("SLOT%d_5V_L" % n), tp("SLOT%d_5V" % n), tp("SLOT%d_CS_n" % n)] + \
                [tp("SLOT%d_RSVD_A%d" % (n, k)) for k in range(1, 6)]
         for i, r in enumerate(pads):
-            at[r] = (24.0 + 3.0 * i, y0 + 12.4, 0)
+            at[r] = (24.0 + 4.0 * i, y0 + 12.4, 0)
     # slot expanders, programming-port mux and their pulls: east of the slots
     at["U13"] = (74.0, row_slot(1) + 8, 90)
     at["U14"] = (74.0, row_slot(2) + 4, 90)
@@ -845,7 +845,7 @@ def wanted(parts):
         at[r] = (v[0], v[1], v[2] if len(v) > 2 else 0)
     for i, net in enumerate(("VBUS_F", "5V_SYS", "+5V", "3V3_BUCK", "+3V3", "1V2_LDO", "+1V2", "CC1", "CC2",
                              "PWR_HI")):
-        at[tp(net)] = (46.0 + 2.6 * i, y - 32.0, 0)
+        at[tp(net)] = (44.0 + 3.8 * (i % 7), y - 33.0 + 3.2 * (i // 7), 0)
     return at
 
 
@@ -919,7 +919,7 @@ def placement():
     if missing:
         raise SystemExit("no placement for: %s" % ", ".join(missing))
     extra = {}
-    for _ in range(40):
+    for _ in range(200):
         pl = legalize(parts, at, extra=extra)
         bad = _designators(parts, pl) or _designators_kicad(parts, pl)
         if not bad:
