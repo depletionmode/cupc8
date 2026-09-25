@@ -1476,6 +1476,34 @@ def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
     return nets
 
 
+def clear_fingers(board, nets, margin=0.6):
+    """Remove routed tracks of the pour `nets` that reach down over a card's
+    fingers (below their top `margin` mm): Freerouting joins neighbouring
+    GND fingers with thin wires across the contact surface. ground_fingers
+    ties each of them into the pour from its top instead. Returns the count."""
+    import pcbnew
+    to = pcbnew.ToMM
+    areas = []
+    for fp in board.GetFootprints():
+        if str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
+            bb = fp.GetBoundingBox(False)
+            top = min(to(p.GetBoundingBox().GetTop()) for p in fp.Pads())
+            areas.append((to(bb.GetLeft()), top + margin, to(bb.GetRight()), to(bb.GetBottom())))
+    tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
+    gone = []
+    for tr in [tracks[i].Cast() for i in range(len(tracks))]:
+        if tr.Type() != pcbnew.PCB_TRACE_T or tr.IsLocked() or tr.GetNetname() not in nets:
+            continue
+        for e in (tr.GetStart(), tr.GetEnd()):
+            if any(a[0] <= to(e.x) <= a[2] and a[1] <= to(e.y) <= a[3] for a in areas):
+                gone.append(tr)
+                break
+    for tr in gone:
+        board.Remove(tr)
+        tr.thisown = False
+    return len(gone)
+
+
 def tab_via_keepout(board, tab_top, margin=1.0):
     """A rule area with no vias over each card-edge footprint's finger tab,
     from `tab_top` down past the tab's bottom: Freerouting otherwise drops
@@ -1503,23 +1531,6 @@ def tab_via_keepout(board, tab_top, margin=1.0):
             ol.Append(mm(px), mm(py))
         board.Add(z)
         n += 1
-        # and no tracks over the fingers themselves: Freerouting otherwise
-        # joins two GND fingers across the contact surface (0.075 mm wires
-        # at their centres). A track reaches a finger from its top end.
-        top = min(to(p.GetBoundingBox().GetTop()) for p in fp.Pads())
-        z = pcbnew.ZONE(board)
-        z.SetIsRuleArea(True)
-        z.SetDoNotAllowVias(True)
-        z.SetDoNotAllowTracks(True)
-        z.SetDoNotAllowPads(False)
-        z.SetDoNotAllowZoneFills(False)
-        z.SetDoNotAllowFootprints(False)
-        z.SetLayerSet(pcbnew.LSET.AllCuMask())
-        ol = z.Outline()
-        ol.NewOutline()
-        for px, py in ((x0, top + 0.6), (x1, top + 0.6), (x1, y1), (x0, y1)):
-            ol.Append(mm(px), mm(py))
-        board.Add(z)
     return n
 
 
@@ -1958,8 +1969,12 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes,
-                                        pours=tuple(zones) + tuple(state.get("escaped", ()))))
+    def route():
+        autoroute(state["b"], out, passes, pours=tuple(zones) + tuple(state.get("escaped", ())))
+        if card_edge:
+            n = clear_fingers(state["b"], zones)
+            return "%d pour tracks cleared off the fingers" % n if n else None
+    step("autoroute", route)
 
     def fill():
         x0, y0, x1, y1 = outline
