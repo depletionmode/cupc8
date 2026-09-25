@@ -2,7 +2,7 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009] [--record]
 //
 // E2E-007 (files on the storage card's microSD) and E2E-008 (the e-ink card)
 // need CUPC8_EMU=native: the SD card and panel models are only in the native
@@ -297,7 +297,56 @@ async function e2e008() {
   m.stop();
 }
 
-const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008 };
+// ------------------------------------------------------------------ E2E-009
+// Banked RAM (doc/proposals/extended-ram.md) on the whole machine: the
+// chipset RTL's RAM_BANK and window, the SRAM's A16-A18, the real sysctl
+// firmware's RAM_WRITE_FAR/RAM_READ_FAR through the bridge's 24-bit access,
+// and the real kernel. The host writes across the bank 4/5 boundary; BASIC
+// switches banks with POKE to $f205, reads what the host wrote through the
+// window at $8000-$bfff and writes into banks 5 and 31; the host reads those
+// back by physical address and by bank:offset.
+async function e2e009() {
+  log('E2E-009: banked RAM: far writes from the PC, BASIC through the window, far reads back');
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, sysctl: true });
+  m.powerOn();
+  expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+  const pattern = Buffer.alloc(1024);
+  for (let i = 0; i < pattern.length; i++) pattern[i] = (i * 7 + (i >> 8) * 3 + 1) & 0xff;
+  const file = path.join(ROOT, 'build/emu/e2e009.bin');
+  fs.writeFileSync(file, pattern);
+  // SRAM $13e00-$141ff: the last 512 bytes of bank 4 and the first 512 of bank 5
+  const w = await cupc8(m, 'ram', 'write', '0x13e00', file);
+  expect(w.code === 0, `cupc8.py ram write 0x13e00 (far): ${w.out.trim()}`);
+  const prog = [
+    '10 poke 242, 5, 4', '20 peek 191, 0, a',            // bank 4, $bf00: SRAM $13f00
+    '30 poke 242, 5, 5', '40 peek 128, 16, b',           // bank 5, $8010: SRAM $14010
+    '50 poke 128, 32, 99',                               // bank 5, $8020: SRAM $14020
+    '60 poke 242, 5, 31', '70 poke 191, 255, 123',       // bank 31, $bfff: SRAM $7ffff
+    '80 poke 242, 5, 2', '90 peek 242, 5, c',
+    '100 print a', '110 print b', '120 print c'];
+  m.type(prog.join('\n') + '\nrun\n');
+  const want = [pattern[0x100], pattern[0x210], 2].join('\n');
+  if (!expect(await m.runUntil(() => screenText(m).includes(want), 5e9, 100e6),
+    `BASIC reads the host's bytes through the window (${want.replace(/\n/g, ', ')})`)) console.log('---- screen\n' + screenText(m));
+  const byte = async (...addr) => {
+    const r = await cupc8(m, 'ram', 'read', ...addr, '1');
+    const hex = /^[0-9a-f]{6} {2}([0-9a-f]{2})/m.exec(r.out);
+    return r.code === 0 && hex ? parseInt(hex[1], 16) : `(${r.out.trim()})`;
+  };
+  const b5 = await byte('0x14020');
+  expect(b5 === 99, `BASIC's POKE into bank 5 is at SRAM $14020 (${b5})`);
+  const b31 = await byte('31:0x3fff');
+  expect(b31 === 123, `BASIC's POKE into bank 31 is SRAM $7ffff, read as 31:$3fff (${b31})`);
+  const back = path.join(ROOT, 'build/emu/e2e009-back.bin');
+  const r = await cupc8(m, 'ram', 'read', '4:0x3e00', '1024', '-o', back);
+  const got = r.code === 0 ? fs.readFileSync(back) : Buffer.alloc(0);
+  const expectBack = Buffer.from(pattern);
+  expectBack[0x220] = 99;                              // BASIC's write into bank 5
+  expect(got.equals(expectBack), `cupc8.py ram read 4:0x3e00 1024 (far, across banks 4/5) gives the pattern and BASIC's byte (${r.out.trim()})`);
+  m.stop();
+}
+
+const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009 };
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !['E2E-007', 'E2E-008'].includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
