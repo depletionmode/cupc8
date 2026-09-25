@@ -15,9 +15,10 @@ at the corner that heats it most:
                   rated at 100 % duty (a long transfer or an RF test), from
                   the slot's +5V at both of its corners
   RT9013 (1V2)    (3V3 max - 1V2 min) x 40 mA, main board and CPU card
-  TPS61023 (IO card keyboard boost, GPU card HDMI boost)  the same kind of
-                  loss model, at 500 mA / 55 mA and the highest set point,
-                  from the worst-case card input
+  TPS61023 (IO card keyboard boost)  the same kind of loss model, at 500 mA
+                  and the highest set point, from the worst-case card input
+  TPS63802 (GPU card HDMI buck-boost)  all it loses at its budget
+                  efficiency (design.GPUB_ETA), at 55 mA and its highest output
   input eFuse     I^2 x RON max at the most current it passes without
                   limiting (its minimum limit)
   SY6280          the IO card's keyboard port at 500 mA, RDS(on) hot
@@ -37,11 +38,11 @@ def buck_loss(vin, iout, vout=3.3):
     return cond + sw + d.BUCK_IQ_LOSS
 
 
-def boost_loss(vin, iout, card="io"):
+def boost_loss(vin, iout):
     """A TPS61023's IC loss at its highest set point: RDS(on) hot
     (x BUCK_RDS_HOT, as the buck), switching edges at 1 MHz, the control. The
     low side carries the inductor current for D, the high side for 1 - D."""
-    vout = d.iob_vout_range(card)[2]
+    vout = d.iob_vout_range()[2]
     dcy = 1 - vin / vout
     il = vout * iout / (d.IOB_ETA * vin)
     cond = il ** 2 * d.BUCK_RDS_HOT * (dcy * d.IOB_RLS + (1 - dcy) * d.IOB_RHS)
@@ -96,12 +97,11 @@ def main():
         d.iob_vout_range()[2], v_io, 1e3 * p, d.IOB_THETA_JA), tj(p, d.IOB_THETA_JA), lim, "<=", "C",
         fmt="%.1f")
 
-    ch = budget.chain("worst")
-    v_b = d.gpu_i_5v(ch["gpu_in"])[1]
-    p = boost_loss(v_b, d.I_HDMI_PIN, "gpu")
-    c.check("T6", "TPS61023 GPU card HDMI boost, 55 mA at %.2f V from %.2f V in: %.0f mW x %.0f C/W" % (
-        d.iob_vout_range("gpu")[2], v_b, 1e3 * p, d.IOB_THETA_JA), tj(p, d.IOB_THETA_JA), lim, "<=", "C",
-        fmt="%.1f")
+    # the GPU card's buck-boost: everything its efficiency loses, all in the IC
+    vout = d.gpub_vout_range()[2]
+    p = vout * d.I_HDMI_PIN * (1 / d.GPUB_ETA - 1)
+    c.check("T6", "TPS63802 GPU card HDMI buck-boost, 55 mA at %.2f V, %.0f %% efficient: %.0f mW x %.0f C/W" % (
+        vout, 100 * d.GPUB_ETA, 1e3 * p, d.GPUB_THETA_JA), tj(p, d.GPUB_THETA_JA), lim, "<=", "C", fmt="%.1f")
 
     lo, _, _ = d.insw_ilim()
     p = lo ** 2 * d.INSW_RON_MAX

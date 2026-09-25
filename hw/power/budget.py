@@ -28,6 +28,7 @@ import design as d
 from spice import Checks
 
 MARGIN = 0.10
+B5_MARGIN = 0.05            # the 1.5 A-source case: waived from 10 % (fab-waivers.md, David 2026-09-25)
 WIFI_IDLE_3V3 = 0.030 + d.WIFI_I_LEDS       # radio off: the ESP32-C3 idle, plus the card's LEDs
 
 
@@ -99,11 +100,12 @@ def main():
     # a 1.5 A source: PWR_HI low, so the radio is off and SD writes are refused
     # (reads are allowed: a microSD reading can draw as much as one writing,
     # so the SD stays in this budget at its full 100 mA)
+    # 5 %, not 10 %: waived by David, 2026-09-25 (doc/hardware/fab-waivers.md).
+    # Every tolerance is at its worst at once, and the case is still under 1.5 A
     red = chain("worst", wifi_3v3=WIFI_IDLE_3V3)
-    c.check("B5", "1.5 A source: radio off, SD reading (100 mA), 500 mA keyboard", red["itot"],
-            d.SOURCE_CLASSES[d.REDUCED_CLASS], "<=", "A", need=MARGIN,
-            fix="a decision: accept the margin (every tolerance at its worst at once, and still under "
-                "1.5 A), or below 3 A also refuse SD reads (~95 mA less) or limit the keyboard port")
+    c.check("B5", "1.5 A source: radio off, SD reading (100 mA), 500 mA keyboard (5 % margin: waiver, "
+            "fab-waivers.md)", red["itot"], d.SOURCE_CLASSES[d.REDUCED_CLASS], "<=", "A", need=B5_MARGIN,
+            fix="below 3 A also refuse SD reads (~95 mA less) or limit the keyboard port")
     # default USB: power.md promises typical loads only (the same policy: radio
     # off, no SD writes). The typical loads at the worst-case voltage corner
     for ident, name in (("B6", "default USB 2.0"), ("B7", "default USB 3.x")):
@@ -128,7 +130,7 @@ def main():
             fix="a decision: slot.md's +5V per card 0.55 A -> 0.80 A (the SMD1206P110TFT slot PTC holds "
                 "%.2f A at 40 C, B10b) - no boost can hold the port at USB's 4.40 V for 500 mA from a 4 V "
                 "card input on 0.55 A" % hold)
-    c.check("B9b", "GPU card +5V (HDMI pin's 55 mA through its PTC and boost, worst) vs slot.md's %.2f A"
+    c.check("B9b", "GPU card +5V (HDMI pin's 55 mA through its PTC and buck-boost, worst) vs slot.md's %.2f A"
             % d.SLOT_5V_MAX, w["igpu"], d.SLOT_5V_MAX, "<=", "A", need=MARGIN)
     c.check("B10b", "IO card +5V (worst, through its boost) vs slot PTC hold at 40 C", w["iio"], hold, "<=",
             "A", need=MARGIN)
