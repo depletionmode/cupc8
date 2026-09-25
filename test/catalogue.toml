@@ -538,6 +538,15 @@ vrow = "2.3"
 cmd = "tools/run_tests.sh"
 
 [[test]]
+id = "KRN-007"
+title = "Kernel on the e-ink card"
+checks = "with the e-ink card (5.83\" and 7.5\") as the console the kernel's INFO says e-paper (gpu_kind = 1), BASIC runs, the power-on clean refresh puts the banner on the glass, typing is partial refreshes, the terminal's refresh gives a clean full refresh, and the panel model sees no command the chip would ignore; on the HDMI card INFO says HDMI and refresh does nothing"
+method = "tools/simtest.nim testKernelOnEink: the simulator's e-ink card is fw/eink/core with the UC8179 model (fw/sim/simcards.c)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testKernelOnEink"
+
+[[test]]
 id = "KRN-006"
 title = "Files on the storage card: SAVE, LOAD, DIR, DEL"
 checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file too long for the program buffer stops at PROGRAM FULL and what fitted runs; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); a USB source under 3 A (PWR_HI low: SAVE and DEL refused with \"USB power under 3A: SD writes off\", the card unchanged, LOAD, RUN and DIR fine); no SD card, no storage card, a full card"
@@ -682,6 +691,42 @@ method = "test/emu/test_gpu.mjs: test/emu/tmds.mjs captures the serialisers' sym
 kind = "sim"
 vrow = "2.4"
 cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
+
+[[test]]
+id = "GPU-006"
+title = "E-ink card: commands"
+checks = "INFO (both panels), IDENT type $01, AUTO, EPD_STATUS, REFRESH m (and m > 3), MODE 2 and MODE 3, every mode-2 command at the panel's corners and clipped (PIXEL2, FILL_RECT2, RECT2, LINE2, BLIT1_2 with transparency, BLIT2, TEXT16, TEXT8_2, VSCROLL2 both ways and past the screen, GETPIXEL2, CLS g); malformed frames (short, a grey that is not one, transparent where it is not allowed, unknown $4A) count one error each and draw nothing; mode 1's commands are ignored in mode 2 and mode 2's elsewhere; SOFT_RESET restores AUTO's defaults; GPU-001's whole suite passes on the e-ink build"
+method = "fw/test/test_eink.c on fw/eink/core with the UC8179 model fw/test/epdmodel.c, on a fake clock; fw/test/test_gpu.c built with -DTEST_EINK"
+kind = "sim"
+vrow = "2.4"
+cmd = "make -s -C fw test_eink test_gpu_eink"
+
+[[test]]
+id = "GPU-007"
+title = "E-ink card: the ink rule and the pictures on the panel"
+checks = "for all 256 attributes, every pixel of the cell on the model's glass is ink exactly where the brighter colour is (equal colours all paper), 4 white columns each side on the 5.83\"; TEXT (control codes, inverse, a redefined glyph, the static underline and block cursors), GFX mode 1 (all 256 palette entries through luminance and the Bayer dither, every drawing command), mode 2 dithered and in 4 greys (REFRESH 3: black, dark, light, white), and 80 x 30 centred on the 7.5\": the glass after each refresh equals the core's raster and a golden image (test/eink/golden)"
+method = "fw/test/test_eink.c; EINK_RECORD=1 rewrites the golden images after a human has looked at them"
+kind = "sim"
+vrow = "2.4"
+cmd = "make -s -C fw test_eink"
+
+[[test]]
+id = "GPU-008"
+title = "E-ink card: the refresh policy and the UC8179 command stream"
+checks = "at the vendors' busy times: the first refresh is a clean full one 150 ms after the last change; a key's echo a partial refresh 150 ms after it, its window exactly the 14 changed rows; continuous output refreshed within 1 s; a change undone before the refresh costs nothing; CLS and form feed make the next one fast full; after full_after partials, a fast full refresh at the next 2 s pause and not before; AUTO 0 waits for REFRESH, and a FENCE (and a GETXY) after REFRESH waits for the panel; REFRESH with nothing changed returns at once; a change made during a refresh reaches the glass; deep sleep after 10 s and a reset to wake; VSYNC_COUNT at 60 Hz; a panel whose BUSY never ends is given up after 10 s, and the next refresh resets it; the model sees no command the chip would ignore (SPI takes time, BUSY_N falls 950 us late)"
+method = "fw/test/test_eink.c on a fake clock"
+kind = "sim"
+vrow = "2.4"
+cmd = "make -s -C fw test_eink"
+
+[[test]]
+id = "GPU-009"
+title = "E-ink card: the real binary with the panel model"
+checks = "the real eink.elf and eink750.elf on the native RP2040, the UC8179 model on SPI1 + CS/DC/RST/BUSY/PWR, driven at the slot pins with the chipset's timing: the card answers within 200 ms of power-on, IDENT within 5 ms (and during a refresh), FREE = 127, INFO; the console text after the power-on clean refresh, 300 PUTCs at full speed respecting FREE, mode 2 with REFRESH 3 and a FENCE that raises IRQ_n only once the grey picture is on the glass, 120 POKEs at seeded random moments across refreshes: after each, the glass equals the e-ink core's raster of the same commands and a golden image; no SPI byte without CS, no command the chip would ignore"
+method = "emu/machine/einkcard.cpp (build/emu-machine/einkcard), the panel model emu/machine/einkpanel.cpp over fw/test/epdmodel.c, busy times x 0.1"
+kind = "sim"
+vrow = "2.4"
+cmd = "tools/fw_rp2040.sh eink eink750 && tools/emu_machine_build.sh && build/emu-machine/einkcard --root . && build/emu-machine/einkcard --root . --panel 750"
 
 # ============================================================================
 # IOC: IO card firmware
@@ -945,6 +990,15 @@ method = "hw/tools/pincheck.py"
 kind = "static"
 vrow = "3.4"
 cmd = "python3 hw/tools/pincheck.py"
+
+[[test]]
+id = "E2E-008"
+title = "Whole machine with the e-ink card instead of HDMI"
+checks = "slots {1: eink, 2: io} on the native whole-machine emulator, every card on its real firmware and the UC8179 model as the panel: the kernel finds the console by INFO; the BASIC prompt, a typed program's output (42), help and refresh appear on the panel's glass (read back through the font); refresh gives a second clean full refresh; the glass equals test/eink/golden/E2E-008.pbm and its text test/emu/golden/E2E-008.txt; the panel model saw no command the chip would ignore"
+method = "test/emu/test_e2e.mjs E2E-008 (test/emu/machinenative.mjs panel(), panelScreen())"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-008"
 
 [[test]]
 id = "E2E-006"

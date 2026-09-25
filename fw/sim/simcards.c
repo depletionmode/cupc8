@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "cardproto.h"
+#include "eink.h"
+#include "epdmodel.h"
 #include "gpu.h"
 #include "imgdisk.h"
 #include "iocard.h"
@@ -22,7 +24,40 @@ struct simcard {
 	uint32_t st_latency_ms, st_busy_since;
 	int st_was_busy;
 	uint32_t last_vsync_ms;
+	/* the e-ink card: its core and its panel (the UC8179 model) */
+	eink_t *eink;
+	epd_model_t *panel;
+	uint64_t panel_ns;                 /* the panel's time: now, plus SPI bytes sent since */
 };
+
+/* the e-ink card's panel header, on the host: bytes take 0.8 us (10 MHz) */
+static void sim_epd_command(void *ctx, uint8_t b)
+{
+	simcard_t *c = ctx;
+	c->panel_ns += 800;
+	epd_byte(c->panel, c->panel_ns, false, b);
+}
+static void sim_epd_data(void *ctx, const uint8_t *p, int n)
+{
+	simcard_t *c = ctx;
+	for (int i = 0; i < n; i++) {
+		c->panel_ns += 800;
+		epd_byte(c->panel, c->panel_ns, true, p[i]);
+	}
+}
+static void sim_epd_pin(void *ctx, int pin, bool v)
+{
+	simcard_t *c = ctx;
+	if (pin == EPD_PIN_RST_N)
+		epd_rst(c->panel, c->panel_ns, v);
+	else
+		epd_pwr(c->panel, c->panel_ns, v);
+}
+static bool sim_epd_busy(void *ctx)
+{
+	simcard_t *c = ctx;
+	return !epd_busy_n(c->panel, c->panel_ns);
+}
 
 simcard_t *simcard_new(int type)
 {
@@ -30,7 +65,22 @@ simcard_t *simcard_new(int type)
 	if (!c)
 		return 0;
 	c->type = type;
-	if (type == CARD_TYPE_GPU) {
+	if (type == SIMCARD_EINK || type == SIMCARD_EINK750) {
+		/* the e-ink graphics card: type $01 on the slot, its panel's busy
+		 * times x 0.1 (the simulator's guest time is slow to come by) */
+		int w = type == SIMCARD_EINK ? 648 : 800;
+		epd_cfg_t cfg;
+		epd_cfg_default(&cfg, w, 480);
+		cfg.time_scale = 0.1;
+		c->panel = malloc(sizeof *c->panel);
+		epd_init(c->panel, &cfg);
+		c->eink = malloc(sizeof *c->eink);
+		epd_bus_t bus = {c, sim_epd_command, sim_epd_data, sim_epd_pin, sim_epd_busy};
+		eink_init(c->eink, type == SIMCARD_EINK ? &eink_panel_583 : &eink_panel_750, &bus);
+		c->gpu = &c->eink->gpu;         /* the text and GFX state, for tests */
+		c->card = &c->gpu->card;
+		c->type = CARD_TYPE_GPU;
+	} else if (type == CARD_TYPE_GPU) {
 		c->gpu = malloc(sizeof *c->gpu);
 		gpu_init(c->gpu);
 		c->card = &c->gpu->card;
@@ -60,7 +110,13 @@ void simcard_free(simcard_t *c)
 {
 	if (!c)
 		return;
-	free(c->gpu);
+	if (c->eink) {
+		free(c->eink);
+		epd_free(c->panel);
+		free(c->panel);
+	} else {
+		free(c->gpu);
+	}
 	free(c->io);
 	free(c->wifi);
 	if (c->st) {
@@ -85,6 +141,15 @@ int simcard_irq(simcard_t *c) { return card_irq(c->card); }
 
 void simcard_tick(simcard_t *c, uint32_t now_ms)
 {
+	if (c->eink) {
+		uint64_t ns = (uint64_t)now_ms * 1000000u;
+		if (ns > c->panel_ns)
+			c->panel_ns = ns;
+		epd_advance(c->panel, c->panel_ns);
+		gpu_run(c->gpu, 1 << 20);
+		eink_poll(c->eink, (uint32_t)(c->panel_ns / 1000));   /* VSYNC_COUNT too */
+		return;
+	}
 	if (c->gpu) {
 		gpu_run(c->gpu, 1 << 20);
 		while (now_ms - c->last_vsync_ms >= 17) {       /* ~60 Hz */
@@ -143,6 +208,14 @@ int simcard_storage_status(simcard_t *c)
 
 void simcard_render(simcard_t *c, uint32_t *rgb)
 {
+	if (c->eink) {
+		/* the panel's glass, as of its last refresh: the 640x480 middle */
+		int w = c->panel->cfg.w, ox = (w - GPU_OUT_W) / 2;
+		for (int y = 0; y < GPU_OUT_H; y++)
+			for (int x = 0; x < GPU_OUT_W; x++)
+				rgb[y * GPU_OUT_W + x] = c->panel->glass[y * w + ox + x] * 0x010101u;
+		return;
+	}
 	if (c->gpu)
 		gpu_render(c->gpu, rgb);
 }
@@ -162,6 +235,13 @@ int simcard_gpu_pixel(simcard_t *c, int x, int y)
 }
 
 int simcard_gpu_mode(simcard_t *c) { return c->gpu ? c->gpu->mode : -1; }
+
+int simcard_eink_refreshes(simcard_t *c, int waveform)
+{
+	return c->eink && waveform >= 0 && waveform < 4 ? (int)c->panel->refreshes[waveform] : -1;
+}
+
+int simcard_eink_errors(simcard_t *c) { return c->eink ? (int)c->panel->errors : -1; }
 
 void simcard_hid(simcard_t *c, const uint8_t report[8], uint32_t now_ms)
 {

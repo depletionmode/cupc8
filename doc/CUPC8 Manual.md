@@ -20,6 +20,8 @@ This RAM chip is loaded on poweron from an external ROM chip which provides the 
 #### 2.3. Display
 Display is piped over the SPI bus. Theoretically any display that works over SPI can be used (provided that a driver is writted for it). In reality, **CUPC/8** neither has sufficient bandwidth over its SPI bus nor enough memory to drive large displays with many colours. The display chosen reflects these limitations.
 
+The M1 machine's console is its graphics card, one of two (a machine has one or the other): the **HDMI card**, 80 x 30 text or 320 x 240 graphics in 256 colours on a monitor (`doc/hardware/gpu-protocol.md`), or the **e-ink card**, the same text and graphics on an e-paper panel on the card's cable, a 5.83" 648 x 480 panel (or a 7.5" 800 x 480), plus the panel's own resolution in 4 greys (`doc/hardware/eink-card.md`). On e-paper the text is black on white (each cell's brighter colour is the ink), the cursor does not blink, and the card refreshes the panel by itself: a line typed reaches the panel about half a second later, and continuous output updates it about once a second. The kernel asks the card which it is and drives either.
+
 #### 2.4. Input
 *[TODO]*
 
@@ -30,7 +32,7 @@ In addition to drivers and system functions, the kernel provides a 'terminal' in
 
 The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1-255, one-letter variables `a`-`z`, and a 256-byte program buffer (a line that does not fit is refused with `PROGRAM FULL`; a typed line is at most 78 characters). Statements: `let`, `print` (`,` prints a space, `;` nothing), `if ... then ... else`, `for ... to ... next`, `goto`, `gosub`/`return`, `rem`, `end`, and, because an 8-bit number cannot hold an address, `poke hi, lo, value` and `peek hi, lo, var` (the address is hi*256+lo; `poke 240, 0, n` sets the LEDs at $f000). Operators: `+ - * / % & |`, `< > =`, parentheses. Dividing by 0 gives 0.
 
-Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen) and `net`, for the Wi-Fi card:
+Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen), `refresh` (on the e-ink card, a clean full refresh of the panel, which clears the faint ghosts partial refreshes leave; on HDMI it does nothing) and `net`, for the Wi-Fi card:
 
 - `net join SSID PASSWORD` joins that network, keeps the credentials on the card (it joins them again at power-up) and prints the address it was given.
 - `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. A name that doesn't resolve or a refused connection prints `connect failed`.

@@ -9,7 +9,7 @@ CFLAGS  ?= -std=c11 -D_GNU_SOURCE -O2 -g -Wall -Wextra -Werror -fsanitize=addres
 INC     := -Icommon -Igpu/core -Iio/core -Iwifi/core -Iwifi/host -Isysctl/core -Istorage/core -Istorage/host -Ithird_party/fatfs -Itest
 
 COMMON  := common/cardproto.c common/font8x8_cp437.c
-TESTS   := test_cardproto test_gpu test_iocard test_wifi test_sysctl
+TESTS   := test_cardproto test_gpu test_iocard test_wifi test_sysctl test_eink test_gpu_eink
 
 .PHONY: test $(TESTS) test_storage
 test: $(TESTS) test_storage
@@ -21,6 +21,15 @@ $(OUT)/test_cardproto: test/test_cardproto.c $(COMMON) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 $(OUT)/test_gpu: test/test_gpu.c gpu/core/gpu.c $(COMMON) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
+
+# the e-ink card: the graphics core with mode 2's bigger buffer, and the
+# UC8179 model (fw/test/epdmodel.c)
+EINK    := eink/core/eink.c eink/core/uc8179.c gpu/core/gpu.c
+EINKDEF := -DGPU_GFX_BYTES=96000 -Ieink/core
+$(OUT)/test_eink: test/test_eink.c test/epdmodel.c $(EINK) $(COMMON) | $(OUT)
+	$(CC) $(CFLAGS) $(EINKDEF) $(INC) -o $@ $^
+$(OUT)/test_gpu_eink: test/test_gpu.c $(EINK) $(COMMON) | $(OUT)
+	$(CC) $(CFLAGS) $(EINKDEF) -DTEST_EINK $(INC) -o $@ $^
 
 $(OUT)/test_iocard: test/test_iocard.c io/core/iocard.c $(COMMON) | $(OUT)
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
