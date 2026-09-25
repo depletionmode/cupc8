@@ -1927,6 +1927,40 @@ proc testExec() =
 
 run testExec
 
+proc testEinkApi() =
+  ## KRN-013: the e-ink API entries (kernel/eink.s eink_auto, eink_get,
+  ## eink_status) on the simulator's e-ink card (fw/eink/core, AUTO_EXT and
+  ## AUTO_GET): tools/testdata/eink_prog.s sets on 1, idle10 5, full_after 2,
+  ## cap10 50, full_kind 3, sleep_s 3 and reads them back; on HDMI the same
+  ## calls give $ff and leave $ff.
+  echo "== kernel API: the e-ink entries =="
+  let rom = buildKernelRom()
+  let prg = testdata / "eink_prog.prg"
+  mkprg(testdata / "eink_prog.s", prg)
+  for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
+    machineCards([card, CardIo])
+    cpuReset()
+    cpuLoadRom(rom)
+    cpuBootRom()
+    settle(6_000_000)
+    for a in 0x7e00 .. 0x7e0b: mem[a] = 0x55
+    expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
+    expectTrue(name & ": it ran", runUntil(proc (): bool = mem[ApiRun] == 0, 20_000_000))
+    var got: seq[int]
+    for a in 0x7e00 .. 0x7e0b: got.add(mem[a])
+    let want = if card == CardGpu: @[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+               else: @[0, 0, 1, 5, 2, 50, 3, 3, 0, got[9], got[10], got[11]]
+    expectTrue(name & ": AUTO, GET (the settings back), STATUS: " & $got, got == want)
+    let g = gpuCard()
+    let shown = if card == CardGpu: "GET FF FF FF FF FF FF FF" else: "GET 00 01 05 02 32 03 03"
+    settle(2_000_000)
+    expectTrue(name & ": printed " & shown, gpuFind(g, shown) >= 0)
+    if card != CardGpu:
+      expect(name & ": the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
+  ioModel = imLegacy
+
+run testEinkApi
+
 if failures > 0:
   echo "FAILED ", failures, " check(s)"
   quit(1)

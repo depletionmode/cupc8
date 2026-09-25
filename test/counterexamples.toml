@@ -486,3 +486,19 @@ revert = [
 ]
 cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
 must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
+
+[[bug]]
+name = "sim: an IRQ taken between POP pcl and POP pch lost the return (the kernel's timer tick crashed it at boot)"
+fixed_in = "51c8e35"
+revert = [["tools/sim.nim", """  if lastOp == 0x9f:
+    return
+""", ""]]
+cmd = "tools/run_tests.sh testIrqPopPcl testKernelOnCards"
+must_fail = ["FAIL: the call returned where it should", "FAIL: kernel reached the keyboard wait"]
+
+[[bug]]
+name = "cpu: an IRQ taken between POP pcl and POP pch lost the return"
+fixed_in = "51c8e35"
+revert = [["soc/cpu.vhd", """if iflag = '1' and irq /= "0000" and ir /= x"9f" then""", """if iflag = '1' and irq /= "0000" then"""]]
+cmd = "python3 tools/cpudirected.py CPU-005"
+must_fail = ["an IRQ due at POP pcl pushed"]
