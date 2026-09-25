@@ -67,8 +67,57 @@ must_fail = ["programmed $F0 reads"]
 [[bug]]
 name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on them)"
 fixed_in = "45d051b"
-before = "80c23a6"
-files = ["kernel/ubasic.s"]
+# the empty stubs put back into today's ubasic.s (80c23a6's whole file no
+# longer assembles with the rest of the kernel)
+revert = [
+  ["kernel/ubasic.s", """ubasic_peek_statement:
+	mov r0, TOKENIZER_PEEK
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [ub_peek_var], r0
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
+	ldd r1, [ub_mem_ptr]
+	ld r0, [ub_peek_var]
+	push pch
+	push pcl
+	b ubasic_set_variable
+	push pch
+	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+""", """ubasic_peek_statement:
+	pop pcl
+"""],
+  ["kernel/ubasic.s", """ubasic_poke_statement:
+	mov r0, TOKENIZER_POKE
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_expr
+	std [ub_mem_ptr], r0
+	push pch
+	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+""", """ubasic_poke_statement:
+	pop pcl
+"""],
+]
 cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
 must_fail = ["BASIC poke/peek", "BASIC poke expr", "GPO after poke 240, 0, 165"]
 
@@ -77,12 +126,12 @@ name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (
 fixed_in = "5da685c"
 revert = [
   ["fw/gpu/core/gpu.c", """	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
 	uint8_t frame[2 + CARD_FRAME_MAX];
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
@@ -96,12 +145,12 @@ name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (
 fixed_in = "5da685c"
 revert = [
   ["fw/gpu/core/gpu.c", """	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
 	uint8_t frame[2 + CARD_FRAME_MAX];
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
