@@ -440,6 +440,15 @@ cmd = "make -s -C fw test_eink"
 must_fail = ["while BUSY", "the UC8179 model saw nothing the chip would ignore"]
 
 [[bug]]
+name = "eink firmware: the wake-up reset timed RST_N from the start of the poll that ran the row compare (RST_N low 7.5 us after deep sleep)"
+fixed_in = "cd138c2"
+revert = [["fw/eink/core/eink.c", """		e->t0_fresh = true;
+		if (e->panel_state == PANEL_OFF) {""", """		e->t0 = e->now;
+		if (e->panel_state == PANEL_OFF) {"""]]
+cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-008"
+must_fail = ["FAIL waking from deep sleep: RST_N held low long enough"]
+
+[[bug]]
 name = "slot SPI slave: slotspi_poll set busy while replaying READ frames, so a host polling in step never saw the ready response (E2E-007's slow SAVE lost its last Enter)"
 fixed_in = "4d7648a"
 # timing-bound: it shows with the code layout of 8068f78 (the IO card's loop
