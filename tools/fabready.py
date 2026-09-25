@@ -50,6 +50,8 @@ def board_status(script):
     built = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(fab)))
     spec = "%s layers, %s mm, %s" % (order.get("layers", "?"), order.get("thickness_mm", "?"),
                                      order.get("surface_finish", "?"))
+    if order.get("stackup"):
+        spec += ", " + order["stackup"]
     if order.get("gold_fingers"):
         spec += ", %s fingers, %s deg bevel" % (order.get("finger_finish"), order.get("finger_chamfer_deg"))
     newer = os.path.getmtime(script) > os.path.getmtime(fab)
