@@ -623,3 +623,10 @@ revert = [["test/emu/rp2040native.mjs", """  get sieCtrl() {
 """, ""]]
 cmd = "tools/fw_rp2040.sh sysctl && cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && CUPC8_EMU=native node test/emu/test_sysctl.mjs"
 must_fail = ["FAIL D+ pull-up on while VBUS is there"]
+
+[[bug]]
+name = "sysctl console: power-up junk in the rings went to the PC before the banner"
+fixed_in = "6a6b470"
+revert = [["fw/sysctl/core/console.c", """	if (ix[4] & ~CON_HOST) {""", """	if (0) {"""]]
+cmd = "make -s -C fw test_sysctl"
+must_fail = ["power-up junk in the rings: nothing sent"]
