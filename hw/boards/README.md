@@ -236,7 +236,7 @@ plane and keeps signals off it; every SMD GND pad has its own via), and
 F.Cu, In2.Cu and B.Cu carry signals, with GND pours on the outer layers and
 a +3V3 pour on In2 filled round the routing (a "routed" zone). With only
 F.Cu and B.Cu for signals Freerouting stalls at ~80 unrouted connections.
-125 × 178 mm, 3 boards assembled.
+125 × 184 mm, 3 boards assembled.
 
 ```
 python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pincheck netlist check
@@ -261,18 +261,26 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
   is selected or written while the chipset configures.
 - **Clock and reset:** Y1 12 MHz (C160457) into CLK12 and CPU_CLK through
   33 Ω each. U6 MAX811T: nPOR to the chipset; MR from SW1 and SYS_nRST.
-- **Sockets:** all with contact 1 at x = 12 mm, 20.32 mm apart
-  (north to south: CPU x8, system x4, slots 1–6), cards extending east.
+- **Sockets:** one row (slot.md, "One row of cards"): the CPU socket
+  (x8) first, then slots 1–6 (x1), 20.32 mm apart, all with contact 1 at
+  x = 12 mm and the same way round, so the seven cards, which share one
+  outline, stand in line with their top edges, M3 holes and LEDs aligned.
+  Both are UMAX 3183 sockets from one drawing (318307001), so they seat the
+  cards at the same height (the same 11.25 mm body and contact section). The
+  system slot (x4, its own card) is off the row in the south-east.
   `sockets.py` mates KiCad's finger footprint with each socket footprint
   (key in key, B side facing south) and fails if any finger meets a contact
   of another name; its self-test proves it catches swapped rows and reversed
-  numbering. The system slot uses JLC's own C19188869 footprint with a copy
-  of `CUPC8_SystemSlot` numbered as its pads (A1–A32 = 1–32, B1–B32 =
-  33–64, hold-downs 65 on GND).
-- **Card rail:** the I/O cards' M3 holes (`kg.IO_CARD_HOLE`, 52 mm east of
-  contact 1, 40 mm up) line up at x = 64 mm; two M3 holes on that line, 10 mm
-  north of slot 1 and 10 mm south of slot 6, carry the rail's posts
-  (`slot.md`, Mechanical). Six more M3 holes at the corners and the east edge.
+  numbering. The UMAX footprints are JLC's with the drawing's recommended
+  holes (0.75 mm) and posts (2.35 mm), so pin A11/B11 clears the key post.
+  The system slot uses JLC's own C19188869 footprint (hold-downs narrowed
+  off the locating holes) with a copy of `CUPC8_SystemSlot` numbered as its
+  pads (A1–A32 = 1–32, B1–B32 = 33–64, hold-downs 65 on GND).
+- **Card rail:** the row's M3 holes (`kg.IO_CARD_HOLE`, 52 mm east of
+  contact 1, 40 mm up) line up at x = 64 mm; two M3 holes on that line,
+  midway between slots 1 and 2 and 10 mm south of slot 6, carry the rail's
+  posts (`slot.md`, Mechanical). Six more M3 holes at the corners and the
+  east edge.
 - **Slots:** each +5V through its own 1.1 A PTC (SMD1206P110TFT: 0.80 A per card), 0 Ω 0805 link and 50 mΩ
   sense resistor, with test pads either side of the sense. IRQ_n 4.7 kΩ,
   CARD_RST_n, PROG_n and PRSNT2_n 10 kΩ pull-ups. SWCLK/SWDIO from the two

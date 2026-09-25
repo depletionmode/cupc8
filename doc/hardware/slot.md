@@ -216,13 +216,14 @@ ESP ROM bootloader sync.
   its own outline (`system-slot.md`).
 - **Connectors:** on the card's top edge, facing away from the main board.
 - **Mounting:** each card has an M3 hole that lines up with a standoff on a
-  main board mounting rail. On the main board every socket has contact 1
-  (A1/B1) at the same x, so the six card holes sit in one line, 52 mm east
-  of contact 1 and 40 mm above the board, 20.32 mm apart. The rail is a bar
-  along that line at that height, with one M3 standoff per slot; it stands
-  on two posts screwed into M3 holes in the main board on the same line,
-  10 mm north of slot 1 and 10 mm south of slot 6 (between the cards, clear
-  of them). `hw/boards/main.py` places the holes (`RAIL_X`, `RAIL_POSTS`).
+  main board mounting rail. On the main board every socket in the row has
+  contact 1 (A1/B1) at the same x, so the seven card holes sit in one line,
+  52 mm east of contact 1 and 40 mm above the board, 20.32 mm apart. The
+  rail is a bar along that line at that height, with one M3 standoff per
+  card; it stands on two posts screwed into M3 holes in the main board on
+  the same line, midway between slots 1 and 2 and 10 mm south of slot 6
+  (clear of the cards). `hw/boards/main.py` places the holes (`RAIL_X`,
+  `RAIL_POSTS`).
 - **Fit check:** the exact drawing is in `hw/lib/cards/card-outline.kicad_pcb`
   and is checked by the FreeCAD fit script.
   - The script is `hw/mech/fit.py` (MECH-001…008 in `test/catalogue.toml`,

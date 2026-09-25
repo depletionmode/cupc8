@@ -632,24 +632,28 @@ def schematic(path, footprint_libs=("cupc8",)):
 
 # ------------------------------------------------------------------ board
 #
-# Mechanics (doc/hardware/slot.md): the sockets lie east-west, 20.32 mm
-# apart, all with contact 1 at x = PIN1_X, so every card stands in the same
-# place along its socket and extends east over the board. North to south: the
-# CPU socket, the system slot, then I/O slots 1-6. Each card's component (B)
-# side faces south. The chipset, memory and clock sit east of the CPU socket
-# and system slot, the slot expanders and mux east of the I/O slots, power
-# in along the south edge. The debug LEDs, reset button and AUX header are on
-# the east edge, beyond the cards.
+# Mechanics (doc/hardware/slot.md, "One row of cards"): the CPU socket and
+# the six I/O slots lie east-west in one row, 20.32 mm apart, all the same
+# way round with contact 1 (finger B1) at x = PIN1_X, so the seven cards,
+# which share one outline, stand in line: top edges, M3 holes and LEDs
+# aligned. Both sockets are UMAX 3183 parts, one drawing, one height
+# (11.25 mm). Each card's component (B) side faces south. The chipset,
+# memory and clock sit east of the CPU socket, the slot expanders and mux
+# east of the I/O slots. The system slot (its own card, system-slot.md) is
+# off the row in the south-east, power in along the south-west edge. The
+# debug LEDs, reset button and AUX header are on the east edge, beyond the
+# cards.
 
-W, H = 125.0, 178.0
+W, H = 125.0, 184.0
 OUTLINE = (0, 0, W, H)
 PIN1_X = 12.0
-ROW_CPU, ROW_SYS = 12.0, 32.32
+ROW_CPU = 12.0
 SLOT_PITCH = 20.32
+SYS_PIN1_X, ROW_SYS = 66.0, 162.0               # the system slot, off the row
 
 
 def row_slot(n):
-    return ROW_SYS + SLOT_PITCH * n
+    return ROW_CPU + SLOT_PITCH * n
 
 
 # LEDs say what they show (kicadgen prints these in place of the designator);
@@ -659,7 +663,7 @@ LABELS.update({"D%d" % (11 + i): str(i) for i in range(8)})
 
 FPGA = (97.0, 47.0)                               # centre of U7
 LOGO_MM = 12
-LOGO_AT = (108.0, 160.0)
+LOGO_AT = (113.0, 164.0)
 TITLE, REVISION = "CUPC/8 main board", "A"
 REV_AT = (W - 10.0, H - 1.5)                       # bottom-right of "<title> rev <rev>", clear of H4
 
@@ -667,11 +671,12 @@ REV_AT = (W - 10.0, H - 1.5)                       # bottom-right of "<title> re
 def rev_box():
     w, h = _text_w("%s rev %s" % (TITLE, REVISION))
     return (REV_AT[0] - w, REV_AT[1] - h, REV_AT[0], REV_AT[1])
-# the I/O cards' M3 hole is 52 mm east of contact B1 and 40 mm up (slot.md,
-# Mechanical), so all six line up on x = RAIL_X: a mounting rail there carries
-# a standoff per card, on two posts screwed to the board beyond slots 1 and 6
+# the row's cards have their M3 hole 52 mm east of contact B1 and 40 mm up
+# (slot.md, Mechanical), so all seven line up on x = RAIL_X: a mounting rail
+# there carries a standoff per card, on two posts screwed to the board
+# between slots 1 and 2 and south of slot 6 (east of the slot channels' parts)
 RAIL_X = PIN1_X + kg.IO_CARD_HOLE[0]
-RAIL_POSTS = [(RAIL_X, ROW_SYS + SLOT_PITCH * 1 - 10.0), (RAIL_X, ROW_SYS + SLOT_PITCH * 6 + 10.0)]
+RAIL_POSTS = [(RAIL_X, row_slot(1) + SLOT_PITCH / 2), (RAIL_X, row_slot(6) + SLOT_PITCH / 2)]
 HOLES = [(4.5, 10.0), (W - 4.5, 4.5), (4.5, H - 4.5), (W - 4.5, H - 4.5), (W - 4.5, 56.0), (W - 4.5, 128.0)] + \
     RAIL_POSTS
 
@@ -701,14 +706,14 @@ def wanted(parts):
 
     at = {}
     at["J2"] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_CPUSocket"][0]), ROW_CPU, 0)
-    at["J3"] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_SystemSlot"][0]), ROW_SYS, 0)
+    at["J3"] = (SYS_PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_SystemSlot"][0]), ROW_SYS, 0)
     for n in range(1, 7):
         at["J%d" % (10 + n)] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_Slot"][0]), row_slot(n), 0)
     fx, fy = FPGA
     at["U7"] = (fx, fy, 0)
     at["U10"] = (88.5, 21.0, 0)                  # ROM, north of the chipset's memory pins
     at["U9"] = (104.5, 24.0, 90)                 # SRAM
-    at["J1"] = (70.0, H - 4.58, 0)               # USB-C, opening south: the edge 5.79 mm off the pegs (y -1.21)
+    at["J1"] = (30.0, H - 4.58, 0)               # USB-C, opening south: the edge 5.79 mm off the pegs (y -1.21)
     at["J4"] = (116.6, 107.0, 0)                 # AUX SPI header, east edge
     at["SW1"] = (119.5, 140.0, 0)
     at["D6"] = kg.power_led_at(OUTLINE) + (0,)   # the power LED, where every board has it
@@ -798,15 +803,15 @@ def wanted(parts):
     # system slot channel
     sys_parts = ["R100", "R101", "R102", "R103", "R104", "R105", "R106", "C45", "C46"]
     for i, r in enumerate(sys_parts):
-        at[r] = (8.0 + 3.8 * i, ROW_SYS + 8.8, 0)
+        at[r] = (SYS_PIN1_X + 3.8 * i, ROW_SYS + 9.0, 0)
     sys_tp = [tp(n) for n in ("SYS_PRSNT2_n", "I2C_SDA", "I2C_SCL", "PROG_CLK", "PROG_IO", "MUX_SEL0", "MUX_SEL1",
                               "MUX_SEL2", "SYS_RSVD_A1", "SYS_RSVD_A2", "SYS_RSVD_A3", "SYS_RSVD_B1", "SYS_RSVD_B2")]
     for i, r in enumerate(sys_tp):
-        at[r] = (8.0 + 4.2 * i, ROW_SYS + 12.8, 0)
+        at[r] = (SYS_PIN1_X - 4.0 + 4.2 * (i % 11), ROW_SYS + 13.0 + 3.4 * (i // 11), 0)
     for i, net in enumerate(("CHIPSET_nCRESET", "CHIPSET_CDONE", "FL0_SCK", "FL0_MOSI", "FL0_MISO", "FL0_nCS",
                              "BR_SCK", "BR_MOSI", "BR_MISO", "BR_nCS", "MEM_nCE_RAM", "CLK12", "CPU_CLK", "nPOR",
                              "nMR", "SPI_SCK", "SPI_MOSI", "SPI_MISO")):
-        at[tp(net)] = (68.5 + 3.5 * (i % 3), ROW_SYS + 5.5 + 3.2 * (i // 3), 0)
+        at[tp(net)] = (68.5 + 3.5 * (i % 3), 37.8 + 3.2 * (i // 3), 0)
     # each I/O slot: its feed, pulls and pads in the channel south of it
     for n in range(1, 7):
         y0 = row_slot(n)
@@ -831,7 +836,7 @@ def wanted(parts):
         at[r] = (at[u][0] + 6.0, at[u][1], 90)
     at["R107"] = (70.0, row_slot(5), 0)
     # power: south edge, around the USB-C inlet
-    y = H - 12.0
+    y, dx = H - 9.0, -40.0                      # the south-west corner
     power = {"R1": (62.0, y - 2), "R2": (78.0, y - 2), "U1": (70.0, y - 9, 0), "F1": (58.0, y - 9, 90),
              "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "U2": (58.0, y - 19),
              "R3": (58.0, y - 23), "R58": (62.5, y - 21), "R59": (62.5, y - 24), "C15": (54.0, y - 24), "C3": (51.0, y - 19, 90),
@@ -844,10 +849,11 @@ def wanted(parts):
              "C11": (88.0, y - 5), "R15": (91.5, y - 5), "R16": (91.5, y - 2), "U5": (95.0, y - 5, 90),
              "C12": (95.0, y - 1)}
     for r, v in power.items():
-        at[r] = (v[0], v[1], v[2] if len(v) > 2 else 0)
+        east = v[0] > 105                       # the LEDs on the east edge stay
+        at[r] = (v[0] + (0 if east else dx), v[1], v[2] if len(v) > 2 else 0)
     for i, net in enumerate(("VBUS_F", "5V_SYS", "+5V", "3V3_BUCK", "+3V3", "1V2_LDO", "+1V2", "CC1", "CC2",
                              "PWR_HI")):
-        at[tp(net)] = (44.0 + 3.8 * (i % 7), y - 33.0 + 3.2 * (i // 7), 0)
+        at[tp(net)] = (44.0 + 3.8 * (i % 5), y - 26.0 + 3.2 * (i // 5), 0)
     return at
 
 
