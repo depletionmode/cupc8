@@ -227,7 +227,13 @@ int slotspi_poll(void)
 	int n = 0;
 	while (q_tail != q_head) {
 		uint32_t start = queue[q_tail % QUEUE_LEN].start, end = queue[q_tail % QUEUE_LEN].end;
-		busy = true;
+		/* No slotspi_busy() here: while a command is replayed, q_commands
+		 * still counts it, so no preload offers a response; a READ frame
+		 * changes nothing. (Setting busy for every frame withheld a ready
+		 * response whenever CS_n rose while the previous READ was being
+		 * replayed: a host polling READ in step with this loop got RESP_LEN
+		 * 0 every time, gave up, and the key GETKEY had popped was lost -
+		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */
 		card_select(card, true);
 		for (uint32_t i = start; i != end; i++) {
 			(void)card_next_miso(card);
@@ -238,7 +244,6 @@ int slotspi_poll(void)
 		replayed_bytes += end - start;
 		q_commands -= is_command(start);
 		q_tail++;
-		busy = false;
 		irq_set_enabled(IO_IRQ_BANK0, true);
 		n++;
 	}
