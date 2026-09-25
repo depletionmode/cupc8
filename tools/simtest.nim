@@ -841,7 +841,7 @@ proc testKernelKeybWaits() =
     inc n
   expectTrue("kernel waiting for key", waiting)
   expectTrue("I enabled while waiting", IF)
-  expect("slot, timer 0 and SPI IRQs unmasked", irqMask, 11)
+  expect("slot, SPI and the chipset tick unmasked; the CPU timers masked", irqMask, 0x19)
 
 run testKernelKeybWaits
 
@@ -1176,9 +1176,11 @@ proc testBasicPrograms() =
 
 run testBasicPrograms
 
-proc runGuest(steps: int) =
-  ## guest time passes (the kernel waits in WAI; the cards tick)
-  for i in 0..<steps:
+proc runGuest(ms: int) =
+  ## ms of guest time pass (the machine's clocks; the kernel waits in WAI,
+  ## the cards tick)
+  let until = msCount() + ms
+  while msCount() < until:
     if cpuStep() != sOk: break
 
 proc testKernelOnEink() =
@@ -1201,7 +1203,7 @@ proc testKernelOnEink() =
     settle(6_000_000)
     expectTrue(name & ": prompt in the card's text", gpuFind(g, ">>") >= 0)
     expect(name & ": INFO says e-paper", mem[kindAt], 1)
-    runGuest(1_500_000)                      # 1.5 s: the power-on clean refresh (x0.1)
+    runGuest(1500)                           # the power-on clean refresh (x0.1)
     expect(name & ": one clean refresh at power-on", int(simcard_eink_refreshes(g, 0)), 1)
     # the glass: the banner's row (row 1, text in the middle) has ink
     var frame = newSeq[uint32](GpuOutW * GpuOutH)
@@ -1215,7 +1217,7 @@ proc testKernelOnEink() =
     typeLine("run")
     expectTrue(name & ": the program ran", gpuFind(g, "42") >= 0)
     typeLine("refresh")
-    runGuest(1_500_000)
+    runGuest(1500)
     expect(name & ": refresh asks for a clean refresh", int(simcard_eink_refreshes(g, 0)), 2)
     expectTrue(name & ": partial refreshes for the typing", simcard_eink_refreshes(g, 3) >= 1)
     expect(name & ": the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
@@ -2829,6 +2831,51 @@ proc testEinkApi() =
   ioModel = imLegacy
 
 run testEinkApi
+
+proc testHello() =
+  ## KRN-015: examples/hello (tools/mkprg.py: kernel/api.inc, then the
+  ## program, for $7000) on the HDMI machine: its banner and API version,
+  ## then a light stepping across the LEDs once a second. A "second" is ten
+  ## API_WAIT_MS 100 (each more than 100 ms, at most 101, on the chipset's
+  ## millisecond counter) and the printing, so the steps are 1000-1015 ms
+  ## apart. A key stops it, and the terminal is back.
+  echo "== examples/hello =="
+  let rom = buildKernelRom()
+  let prg = rootDir / "build" / "examples" / "hello.prg"
+  createDir(rootDir / "build" / "examples")
+  mkprg(rootDir / "examples" / "hello" / "hello.s", prg)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  let g = gpuCard()
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("its banner and API version 1", runUntil(proc (): bool =
+    gpuFind(g, "Hello from a native CUPC/8 program!") >= 0 and gpuFind(g, "API version 1") >= 0, 5_000_000))
+  var at: seq[int]                          # guest ms as each "seconds N" appears
+  var leds: seq[int]
+  for n in 0..4:
+    let want = "seconds " & align($n, 3, '0')
+    var k = 0
+    while gpuFind(g, want) < 0 and k < 10_000:
+      for i in 0..<500:
+        if cpuStep() != sOk: break
+      inc k
+    at.add(msCount())
+    leds.add(mem[0xf000])
+  expectTrue("seconds 000 to 004 on screen", gpuFind(g, "seconds 004") >= 0)
+  var gaps: seq[int]
+  for i in 1..<at.len: gaps.add(at[i] - at[i - 1])
+  expectTrue("a step every 1000-1015 ms of the counter " & $gaps, gaps.allIt(it >= 1000 and it <= 1015))
+  expectTrue("the LEDs step 1, 2, 4, 8, 16 " & $leds, leds == @[1, 2, 4, 8, 16])
+  pushKey(ord('x'))
+  expectTrue("a key stops it; the terminal is back",
+             runUntil(proc (): bool = gpuFind(g, "You pressed 'x'") >= 0 and mem[ApiRun] == 0 and waiting, 5_000_000))
+  expect("the LEDs off", mem[0xf000], 0)
+  ioModel = imLegacy
+
+run testHello
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

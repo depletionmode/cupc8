@@ -143,13 +143,14 @@ var
   slotIrqPrev: int = 0
   lastCardTick: int = 0
 
-proc simMillis*(): uint32 =
-  ## The cards' time: about one instruction per microsecond at 12 MHz.
-  uint32(ins_retired div 1000)
-
 const
   MsClocks* = 12000              ## the chipset's clocks a millisecond
   TickMs* = 50                   ## the tick IRQ's period (20 Hz)
+
+proc simMillis*(): uint32 =
+  ## The machine's time in ms, for the cards: the CPU's clocks, as the
+  ## chipset's millisecond counter counts them.
+  uint32((simClocks div MsClocks) and 0xffffffff)
 
 proc msCount*(): int =
   ## The chipset's millisecond counter (MS_COUNT, $f206-$f209), 32 bits.
@@ -1015,8 +1016,8 @@ proc cpuRun*(maxSteps: int): RunExit =
   reCount
 
 proc cpuStatusLine*(): string =
-  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7" % [
-    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF]
+  "retired=$1 pc=$2 r0=$3 r1=$4 sp=$5 hf=$6 if=$7 ms=$8" % [
+    $ins_retired, toHex(PC, 4), toHex(R0, 2), toHex(R1, 2), toHex(SP, 4), $HF, $IF, $msCount()]
 
 when defined(emscripten):
   proc emscripten_set_main_loop(fun: proc() {.cdecl.}, fps,
@@ -1044,6 +1045,7 @@ when isMainModule:
   var dumpText = ""
   var settleMs = 2000
   var scaleSet = false
+  var runPath = ""               # --run: a program for $7000
 
   const usage = """usage: sim [options] [kernel.o]
 
@@ -1061,6 +1063,10 @@ the kernel from the ROM chip; the slot cards run the real card firmware cores.
   --dump-text:PATH  at exit, write the console's text (- = stdout)
   --settle:MS       headless: guest ms to run on once the typed text is used up
                     and the machine is idle again (default 2000); then exit
+  --run:PROG        run PROG, a program for $7000 (a .prg from tools/mkprg.py,
+                    or the bare binary), once the kernel is at its prompt: as
+                    `cupc8.py run` does on the machine (the body at $7000,
+                    then API_RUN = 1; the terminal starts it)
 The Wi-Fi card uses the host's own sockets: any SSID joins, and the machine
 reaches the real network and localhost directly.
   --legacy          the old I/O model (ILI9340 display, SD on SPI 1, keyboard on
@@ -1118,6 +1124,8 @@ Both:
         dumpText = val
       of "settle":
         settleMs = parseInt(val)
+      of "run":
+        runPath = val
       of "help", "h":
         echo usage
         quit(0)
@@ -1226,20 +1234,38 @@ Both:
   # Hooks for later features (a program to load and run, ...): each runs
   # once, when the kernel first parks in WAI (it is at its prompt).
   var onKernelReady: seq[proc()] = @[]
+  if runPath.len > 0:
+    if legacy:
+      die("--run needs the M1 machine (not --legacy)")
+    var prog = ""
+    try:
+      prog = readFile(runPath)
+    except IOError:
+      die("cannot read " & runPath)
+    onKernelReady.add(proc() =
+      if not runProgram(prog):
+        die(runPath & ": not a program for $7000 (a \"C8P\" header of another version, or over 28672 bytes)")
+      echo "sim: ", runPath, " at $7000, API_RUN = 1")
 
   proc runCards() =
-    ## The M1 machine's main loop. The CPU runs flat out; while it is parked
-    ## in WAI, guest time follows the host clock (interactive) or runs on
-    ## without sleeping (headless). --type keys go in one at a time, each
-    ## once the CPU has run and parked in WAI again.
+    ## The M1 machine's main loop. Guest time is the CPU's clocks (sim.nim's
+    ## simClocks, which the chipset's millisecond counter and the cards
+    ## follow). Interactive, it is held to the host clock: the CPU runs until
+    ## it is ahead of it, then the loop sleeps, and a CPU parked in WAI idles
+    ## (3 clocks a turn) up to it; a CPU slower than the machine falls behind
+    ## and the clock starts again from where it is. Headless, nothing sleeps.
+    ## --type keys go in one at a time, each once the CPU has run and parked
+    ## in WAI again.
     var pos = 0                       # next key of `typed`
     var ranSinceKey = true
-    var keyAt = 0                     # ins_retired when the last key went in
+    var keyAt = 0                     # guest ms when the last key went in
     var readyDone = false
-    var idleAt = -1                   # ins_retired when the typed text was used up and the CPU parked
-    var lastReal = epochTime()
+    var idleAt = -1                   # guest ms when the typed text was used up and the CPU parked
+    var realAt = epochTime()          # the host time ...
+    var clocksAt = simClocks          # ... that these guest clocks stood for
+    proc hostClocks(): int = clocksAt + int((epochTime() - realAt) * float(MsClocks * 1000))
     var lastPresent = 0.0
-    var lastMhz = lastReal
+    var lastMhz = realAt
     var lastMhzIns = 0
     while not atend:
       if HF or PC >= imageEnd:
@@ -1247,26 +1273,29 @@ Both:
         break
       if maxIns > 0 and ins_retired >= maxIns:
         break
-      if headless and idleAt >= 0 and ins_retired - idleAt >= settleMs * 1000:
+      if headless and idleAt >= 0 and msCount() - idleAt >= settleMs:
         break
       if waiting:
         if not readyDone:
           readyDone = true
           for hook in onKernelReady: hook()
-        if not ranSinceKey and ins_retired - keyAt >= settleMs * 1000:
+        if not ranSinceKey and msCount() - keyAt >= settleMs:
           ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
         if ranSinceKey:
           if pos < typed.len:
             pushKey(ord(typed[pos]))
             inc pos
             ranSinceKey = false
-            keyAt = ins_retired
-          elif idleAt < 0:
-            idleAt = ins_retired
+            keyAt = msCount()
+          elif idleAt < 0 and mem[ApiRun] == 0:
+            idleAt = msCount()        # (not while a --run program waits to start or runs)
+        if mem[ApiRun] != 0:
+          idleAt = -1
         var steps = 1000
         if not headless:
           sleep(1)
-          steps = clamp(int((epochTime() - lastReal) * 1_000_000), 1, 100_000)
+          # idle turns up to the host clock (at most 100 ms of them at once)
+          steps = clamp((hostClocks() - simClocks) div 3, 1, 400_000)
         if maxIns > 0:
           steps = min(steps, maxIns - ins_retired)
         var i = 0
@@ -1282,7 +1311,15 @@ Both:
           echo "TRACE pc=$1 op=$2" % [toHex(PC, 4), toHex(memRead(PC), 2)]
           batch = 1
         discard cpuRun(batch)
+        if not headless:
+          let ahead = simClocks - hostClocks()
+          if ahead > 2 * MsClocks:
+            sleep(ahead div MsClocks)
       if not headless:
+        let behind = hostClocks() - simClocks
+        if behind > 100 * MsClocks:   # slower than the machine: start the clock again here
+          realAt = epochTime()
+          clocksAt = simClocks
         let now = epochTime()
         if now - lastPresent >= 0.016:
           pumpInput()
@@ -1293,7 +1330,6 @@ Both:
           status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / (now - lastMhz) / 1_000_000, ffDecimal, 2))
           lastMhz = now
           lastMhzIns = ins_retired
-      lastReal = epochTime()
     echo cpuStatusLine()
     if dumpText.len > 0:
       let g = gpuCard()

@@ -12,17 +12,25 @@ Runs the sim binary headless, typing with --type and reading the console with
     localhost (the Wi-Fi card uses the host's own sockets);
   - the e-ink cards (eink, eink750): the program runs, and the dumped picture
     (the panel's glass) shows the text;
-  - --legacy still runs a program loaded at $1000.
+  - --legacy still runs a program loaded at $1000;
+  - SIM-012: --run:PROG runs a program for $7000 (tools/mkprg.py) once the
+    kernel is at its prompt, as cupc8.py run does: a .prg and the bare
+    binary run and return to the prompt, a header of another version is
+    refused; examples/hello ticks once a second of guest time headless, and
+    of wall time in the interactive sim (SDL's dummy video driver: the
+    real-time loop without a window).
 
     python3 test/sim/test_cli.py
 """
 
 import http.server
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SIM = os.path.join(ROOT, "tools", "sim")
@@ -131,6 +139,11 @@ def main():
     check("net join: any SSID joins, the host's address", "joined, address 127.0.0.1" in lines, text)
     check("net get: the local server got the request", Handler.requests == ["/"], str(Handler.requests))
     check("net get: the reply is on the screen", "HTTP/1.0 200 OK" in lines and "SIM-CLI-OK" in lines, text)
+    text, out = sim("--cards:hdmi,io,wifi", "--type:net join anynet anypass\\nnet config\\nnet ping 127.0.0.1 2\\n")
+    check("net config: the card's settings", "mode dhcp" in text, text)
+    check("net ping 127.0.0.1 2: two replies, times from the ms counter",
+          re.search(r"seq 1 time \d+ ms", text) and re.search(r"seq 2 time \d+ ms", text)
+          and "2 sent, 2 received" in text, text)
 
     # the e-ink cards: text model and the glass
     for kind in ("eink", "eink750"):
@@ -139,6 +152,62 @@ def main():
         check(kind + ": the program ran", "\n42\n" in text and "DONE." in text, out + text)
         # rows 0-7 of text are 16 px each: the banner (row 1), the typed lines and 42
         check(kind + ": the text is on the glass", ink_rows(ppm, 16, 128) > 500, ppm)
+
+    # SIM-012: --run
+    def mkprg(src, dest):
+        subprocess.run([sys.executable, os.path.join(ROOT, "tools", "mkprg.py"), os.path.join(ROOT, src),
+                        "-o", dest], check=True, capture_output=True)
+    prg = os.path.join(work, "exec_prog.prg")
+    mkprg("tools/testdata/exec_prog.s", prg)
+    text, out = sim("--run:" + prg)
+    check("--run a .prg: it runs and the prompt is back", "NATIVE OK" in text and text.rstrip().endswith(">>")
+          and "exit 0" in out, out + text)
+    raw = os.path.join(work, "exec_prog.bin")
+    with open(raw, "wb") as f:
+        f.write(open(prg, "rb").read()[4:])
+    text, out = sim("--run:" + raw)
+    check("--run the bare binary", "NATIVE OK" in text, out + text)
+    bad = os.path.join(work, "v2.prg")
+    with open(bad, "wb") as f:
+        f.write(b"C8P\x02" + open(prg, "rb").read()[4:])
+    text, out = sim("--run:" + bad)
+    check("--run refuses a header of another version", "not a program for $7000" in out and "exit 1" in out
+          and "NATIVE OK" not in text, out)
+    hello = os.path.join(work, "hello.prg")
+    mkprg("examples/hello/hello.s", hello)
+    text, out = sim("--run:" + hello, "--max-ins:8000000")
+    ms = re.search(r"ms=(\d+)", out)
+    secs = re.findall(r"seconds (\d{3})", text)
+    check("--run examples/hello headless: it counts seconds (%s at %s ms)" % (secs[-1:], ms and ms.group(1)),
+          "Hello from a native CUPC/8 program!" in text and secs and int(secs[-1]) >= 6 and ms, out + text)
+    # the interactive sim holds guest time to the host clock: hello's light
+    # steps once a second of wall time (its "second" is ten 100-101 ms waits
+    # and its printing: 1.01 s of guest time)
+    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
+    p = subprocess.Popen([SIM, "--run:" + hello], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    os.set_blocking(p.stdout.fileno(), False)
+    t0 = time.monotonic()
+    buf, started, steps = b"", None, []
+    while time.monotonic() - t0 < 30 and len(steps) < 6:
+        chunk = p.stdout.read(65536)
+        if not chunk:
+            time.sleep(0.002)
+            continue
+        buf += chunk
+        *lines, buf = buf.replace(b"\r", b"\n").split(b"\n")
+        now = time.monotonic()
+        for line in lines:
+            s = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", line.decode(errors="replace"))
+            if "API_RUN = 1" in s:
+                started = now
+            elif started is not None and s.startswith("GPO:"):
+                steps.append(now)
+    p.kill()
+    p.wait()
+    gaps = [b - a for a, b in zip(steps, steps[1:])]
+    mean = sum(gaps) / len(gaps) if gaps else 0
+    check("the interactive sim: hello steps once a wall-clock second (%s s)" % ", ".join("%.3f" % g for g in gaps),
+          len(gaps) >= 5 and 0.98 <= mean <= 1.04, "%d steps" % len(steps))
 
     # the old I/O model
     obj = os.path.join(work, "gpo.o")

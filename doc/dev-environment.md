@@ -52,6 +52,15 @@ does everything except KiCad.
   scripts, `--headless --type:"10 print 1\nrun\n" --dump-text:-` types
   the text (a key each time the CPU parks in WAI), runs on for `--settle`
   guest ms once idle, and prints the screen (SIM-010, `test/sim/test_cli.py`).
+  `--run:PROG` runs a program for $7000 (a `.prg` from `tools/mkprg.py`, or
+  the bare binary) once the kernel is at its prompt, as `cupc8.py run` does
+  on the machine (SIM-012): `python3 tools/mkprg.py examples/hello/hello.s -o
+  hello.prg`, then `tools/sim --run:hello.prg`.
+  Guest time is the CPU's clocks, counted as `cpu.vhd` and the chipset spend
+  them; the chipset's millisecond counter and the cards follow it. The
+  window's sim holds it to the host clock (the speed line then shows about
+  0.8 MHz of instructions: 12 MHz of clocks), so a program's seconds are
+  wall-clock seconds; `--headless` runs as fast as it can.
   `tools/sim --help` lists the rest.
 
 ## KiCad 10

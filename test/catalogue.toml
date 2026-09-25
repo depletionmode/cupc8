@@ -47,11 +47,20 @@ cmd = "python3 test/sim/test_cli.py"
 [[test]]
 id = "SIM-011"
 title = "The simulator's millisecond counter and tick"
-checks = "sim.nim counts the CPU's clocks as cpu.vhd and the chipset spend them (4 a memory cycle, 2 an I/O cycle, 4 more an instruction, 3 a WAI idle turn, 20 an IRQ entry): a program parked in WAI with only the tick unmasked takes two ticks on the SPI vector (CPU line 3) with IRQ_PEND $10, the second at MS_COUNT 100 and 1200000 clocks (+400); masked by bit 4 (SPI's bit 3 set) three ticks' worth leave it waiting, unmasked the pending tick is taken; MS_COUNT0 latches MS_COUNT1-3 across a carry of the low byte and at $12345678; IRQ_MASK reads back bits 4:0"
+checks = "sim.nim counts the CPU's clocks as cpu.vhd and the chipset spend them (4 a memory cycle, 2 an I/O cycle, 4 more an instruction, 3 a WAI idle turn, 20 an IRQ entry), the one guest time (the chipset's counter and the cards' ms): a program parked in WAI with only the tick unmasked takes two ticks on the SPI vector (CPU line 3) with IRQ_PEND $10, the second at MS_COUNT 100 and 1200000 clocks (+400); masked by bit 4 (SPI's bit 3 set) three ticks' worth leave it waiting, unmasked the pending tick is taken; MS_COUNT0 latches MS_COUNT1-3 across a carry of the low byte and at $12345678; IRQ_MASK reads back bits 4:0"
 method = "tools/simtest.nim testMsCounter (tools/testdata/ms_tick.s; cardsLoadTest for the registers)"
 kind = "sim"
 vrow = "2.1"
 cmd = "tools/run_tests.sh testMsCounter"
+
+[[test]]
+id = "SIM-012"
+title = "The simulator runs a program for $7000 (--run)"
+checks = "tools/sim --run:PROG, once the kernel is at its prompt, does what cupc8.py run does (the body at $7000, then API_RUN = 1): tools/testdata/exec_prog.prg prints NATIVE OK and the prompt is back, and so does its bare binary; a header of version 2 is refused (exit 1, nothing runs); examples/hello (mkprg.py with kernel/api.inc) counts seconds headless (to at least 6 in 8 M instructions, with the guest ms on the status line); in the interactive sim (SDL's dummy video driver: the real-time loop without a window) hello's light steps once a wall-clock second (five steps, mean 0.98-1.04 s); net config and net ping 127.0.0.1 run on the sim's Wi-Fi card"
+method = "test/sim/test_cli.py (builds tools/sim; the interactive check reads the sim's GPO lines against the host clock)"
+kind = "sim"
+vrow = "2.1"
+cmd = "python3 test/sim/test_cli.py"
 
 [[test]]
 id = "SIM-005"
@@ -683,6 +692,15 @@ method = "tools/simtest.nim testExec: the storage card model on an image made wi
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testExec"
+
+[[test]]
+id = "KRN-015"
+title = "examples/hello on the kernel API"
+checks = "examples/hello/hello.s built by tools/mkprg.py after kernel/api.inc (the 32-entry table) and run as cupc8.py run does on the HDMI machine: its banner and API version 1; seconds 000 to 004 appear 1000-1015 ms of the chipset's millisecond counter apart (ten API_WAIT_MS 100, each 100-101 ms, and its printing); the LEDs step 1, 2, 4, 8, 16; a key stops it, the LEDs go off and the terminal is back (API_RUN 0)"
+method = "tools/simtest.nim testHello"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testHello"
 
 [[test]]
 id = "KRN-013"
