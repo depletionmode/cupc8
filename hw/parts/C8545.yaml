@@ -1,0 +1,8 @@
+# 2N7002 (Changjiang), 60 V N-channel MOSFET, SOT-23
+datasheet: https://datasheet.lcsc.com/lcsc/1811081213_Changjiang-Electronics-Tech-CJ-2N7002_C8545.pdf
+source: "CJ 2N7002 datasheet, page 1: SOT-23 pin configuration (1 Gate, 2 Source, 3 Drain)"
+package: SOT-23
+pins:
+  1: [G, GATE]
+  2: [S, SOURCE]
+  3: [D, DRAIN]

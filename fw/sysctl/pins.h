@@ -36,6 +36,7 @@
 #define PIN_CC1_SENSE          26
 #define PIN_CC2_SENSE          27
 #define PIN_V1V2_SENSE         28
-#define PIN_LED_STATUS         29
+/* misc: low while the host's VBUS is there (a 2N7002 on the card); high with no host, when the D+ pull-up must stay off (USB 2.0, 7.1.5). Was the status LED */
+#define PIN_USB_NVBUS          29
 
 #endif

@@ -47,7 +47,7 @@ GPIO = {
     18: "PROG_CLK", 19: "PROG_IO",
     20: "MUX_SEL0", 21: "MUX_SEL1", 22: "MUX_SEL2",
     23: "SYS_nRST", 24: "I2C_SDA", 25: "I2C_SCL",
-    26: "CC1", 27: "CC2", 28: "V1V2_SENSE", 29: "LED_STATUS",
+    26: "CC1", 27: "CC2", 28: "V1V2_SENSE", 29: "USB_nVBUS",
 }
 TERMINATED = ["BR_SCK", "BR_MOSI", "BR_nCS", "FL0_SCK", "FL0_MOSI", "FL0_nCS",
               "FL1_SCK", "FL1_MOSI", "FL1_nCS"]
@@ -75,15 +75,20 @@ PASSIVES = (
      ("R8", "Device:R", "10k", R0603, "C25804", "+3V3", "I2C_SCL"),
      # power LED (milestone-1.md, Indicator LEDs): red, 1 kOhm from 3V3
      ("R9", "Device:R", "1k", R0603, "C21190", "+3V3", "LED_PWR"),
-     # green drops ~3 V, so 100 Ohm for a few mA from 3.3 V (as the Wi-Fi card)
-     ("R10", "Device:R", "100", R0603, "C22775", "LED_STATUS", "LED_ST"),
      ("D1", "Device:LED", "red", LED0603, "C2286", "LED_PWR", "GND"),        # power
-     ("D2", "Device:LED", "green", LED0603, "C12624", "LED_ST", "GND"),      # status, GPIO29
-     # USB activity to (TX) and from (RX) the host, lit ~30 ms by the firmware
+     # USB activity to (TX) and from (RX) the host, lit ~30 ms by the firmware;
+     # green drops ~3 V, so 100 Ohm for a few mA from 3.3 V (as the Wi-Fi card)
      ("R20", "Device:R", "100", R0603, "C22775", "LED_USB_TX", "LED_TX"),
-     ("D3", "Device:LED", "green", LED0603, "C12624", "LED_TX", "GND"),
+     ("D2", "Device:LED", "green", LED0603, "C12624", "LED_TX", "GND"),
      ("R21", "Device:R", "100", R0603, "C22775", "LED_USB_RX", "LED_RX"),
-     ("D4", "Device:LED", "green", LED0603, "C12624", "LED_RX", "GND")] +
+     ("D3", "Device:LED", "green", LED0603, "C12624", "LED_RX", "GND"),
+     # VBUS sense for Q1 (USB_nVBUS): 10k in, 100k to GND, so the 2N7002's
+     # gate sees ~4.5 V from 5 V (Vth <= 2.5 V) and is off without a host;
+     # 10k pull-up on the drain. The RP2040 pin never sees VBUS itself: no
+     # 5 V on a 3.3 V pin, and no current into it while the card is unpowered
+     ("R10", "Device:R", "10k", R0603, "C25804", "USB_VBUS", "VBUS_GATE"),
+     ("R22", "Device:R", "100k", R0603, "C25803", "VBUS_GATE", "GND"),
+     ("R23", "Device:R", "10k", R0603, "C25804", "+3V3", "USB_nVBUS")] +
     [("R%d" % (11 + i), "Device:R", "33", R0603, "C23140", n + "_MCU", n) for i, n in enumerate(TERMINATED)]
 )
 
@@ -144,8 +149,15 @@ def schematic(path, footprint_libs):
                      ("4", "GND"), ("A5", "USB_CC1"), ("B5", "USB_CC2"), ("A6", "USB_DP"),
                      ("B6", "USB_DP"), ("A7", "USB_DM"), ("B7", "USB_DM")):
         s.connect(j1, pin, net)
-    for pin in ("A4B9", "B4A9", "A8", "B8"):    # VBUS goes nowhere; SBU unused
+    for pin in ("A4B9", "B4A9"):                # VBUS: sensed through Q1 only
+        s.connect(j1, pin, "USB_VBUS")
+    for pin in ("A8", "B8"):                    # SBU unused
         s.nc(j1, pin)
+    q1 = s.add("Transistor_FET:2N7002", "Q1", "2N7002", "Package_TO_SOT_SMD:SOT-23",
+               at=(120 * G, 30 * G), fields={"LCSC": "C8545"})
+    s.connect(q1, "G", "VBUS_GATE")
+    s.connect(q1, "S", "GND")
+    s.connect(q1, "D", "USB_nVBUS")
 
     # ESD clamps to +3V3, the rail of the pins they protect, not to VBUS:
     # tied to VBUS its steering diodes would lift VBUS to ~2.7 V from the
@@ -212,7 +224,7 @@ OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
 LOGO_MM = 12
 REVISION = "A"            # doc/milestone-1.md, Board revision: bump for every board sent to be made
-LABELS = {"D1": "PWR", "D2": "STAT", "D3": "TX", "D4": "RX"}   # silkscreen says what each LED shows
+LABELS = {"D1": "PWR", "D2": "TX", "D3": "RX"}   # silkscreen says what each LED shows
 LOGO_AT = (49, 22)
 
 PLACEMENT = {
@@ -241,9 +253,10 @@ PLACEMENT = {
     # the LEDs in a row along the top edge, the power LED first, each
     # resistor under its LED (milestone-1.md, Indicator LEDs)
     "D1": kg.power_led_at(OUTLINE) + (0,), "R9": (3, 5.5, 0),
-    "D2": (9, 3, 0), "R10": (9, 5.5, 0),
-    "D3": (15, 3, 0), "R20": (15, 5.5, 0),
-    "D4": (21, 3, 0), "R21": (21, 5.5, 0),
+    "D2": (9, 3, 0), "R20": (9, 5.5, 0),
+    "D3": (15, 3, 0), "R21": (15, 5.5, 0),
+    # VBUS sense, between the LED row and J1
+    "Q1": (29, 4.2, 0), "R10": (24.5, 3, 0), "R22": (24.5, 5.5, 0), "R23": (33.5, 4.2, 0),
 }
 for _i, _n in enumerate(TERMINATED):
     PLACEMENT["R%d" % (11 + _i)] = (21.5 + 3.3 * _i, 31, 90)   # over the fingers they drive
