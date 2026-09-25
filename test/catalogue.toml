@@ -666,6 +666,15 @@ vrow = "3.2"
 cmd = "test/emu/machine_diff.sh"
 
 [[test]]
+id = "EMU-008"
+title = "SD card model: SPI mode against the SD spec"
+checks = "the native emulator's SD card (emu/rp2040/harness/sdcard.h) against the SD Physical Layer Simplified Specification, each check citing its section: CRC7/CRC16; 74 power-up clocks; CMD0 into SPI mode with a checked CRC, CMD8 always checked, CMD59; CMD8 R7, ACMD41 idle until initialised, HCS from the first ACMD41 and only after CMD8; OCR with CCS; CSD 1.0/2.0 capacity and CRC, CID, SCR, SD status; single and multiple block reads (access time, CRC16, CMD12, out-of-range error token) and writes (data response tokens, busy while programming, surviving deselection, programmed only when busy ends), SDSC byte addresses and partial reads, write-protect (write error, WP violation), erase; and in its socket on SPI1 through the chip's registers: a byte takes 8 SCK periods, card detect, a DMA block read, removal and re-initialisation, and host mistakes (SCK over 400 kHz before init, SPI1's CSn on nCS) recorded; then under the pico-sdk's own SPI and DMA code (an independent SD host, fw/rp2040/selftest/sdspi.c) on SDHC and SDSC images: init at 400 kHz, polled and DMA block reads, a write whose busy time the firmware's timer measures (1 ms and 250 ms), the capacity from the CSD, the written block in the image file, no violations"
+method = "emu/rp2040/test/sd/test_sdcard.cpp (build/emu-native/test_sdcard); test/emu/test_sdspi.mjs (build/rp2040/emu_sdspi.elf, CUPC8_EMU=native)"
+kind = "sim"
+vrow = "2.4"
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native >/dev/null && build/emu-native/test_sdcard && tools/fw_rp2040.sh emu_sdspi && CUPC8_EMU=native node test/emu/test_sdspi.mjs"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
@@ -784,10 +793,11 @@ cmd = "make -s -C fw test_storage"
 [[test]]
 id = "STO-003"
 title = "Real binary on the emulated RP2040 with an SD card model"
-checks = "the real storage.elf on the native emulator with an SD SPI-mode model on SPI1 (CMD0/8/55/ACMD41/58, single-block read and write, busy time, card detect): mounts an image, writes and reads files that tools/fatcheck.py confirms, and the reverse; the slot answers (status byte, IDENT) while core 1 writes; ACT lit ~30 ms after SD activity, CARD while mounted"
-method = "the native emulator (emu/), the SD card model (another agent's work)"
+checks = "the real storage.elf with the SD card model on its SPI1 (EMU-008), driven through the slot pins: IDENT type $04; no card: MEDIA clear, ST_INFO media 0, F_OPEN 'no medium'; an SDSC FAT16 and an SDHC FAT32 card made on the host mount on insertion; ST_INFO sizes; DIR; files written on the host read on the card, files the card writes (chunks, a partial chunk, append, two handles at once, rename, delete) read on the host with pyfatfs and pass fsck.fat; F_SEEK; not found, bad name, bad handle, exists; raw BLK_READ/BUF_GET of the boot sector, BUF_PUT/BLK_WRITE; ST_EJECT; a 250 ms-per-block card: every status frame answered with BUSY set and READ not ready until F_CLOSE completes; the ACT LED lit after an access and dark 50 ms later, CARD lit while mounted; hot removal mid-write: MEDIA/MOUNTED clear, the open handle fails 'no medium', closed files intact after re-insertion; write-protected: WP in the status byte, writes and deletes refused, image unchanged; a full card: free 0, writes refused 'full', volume consistent; the firmware breaks no SD protocol rule and initialises at <= 400 kHz"
+method = "test/emu/test_storage.mjs on the native emulator (emu/rp2040/harness/sdcard.h, rp2040native.mjs SdSocket); host FAT: test/emu/fatimg.py (pyfatfs 1.1.0 in the SDK venv, fsck.fat)"
 kind = "sim"
 vrow = "2.9"
+cmd = "tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs"
 
 # ============================================================================
 # WIFI: Wi-Fi card firmware
@@ -964,6 +974,15 @@ kind = "sim"
 vrow = "3.3"
 
 [[test]]
+id = "E2E-007"
+title = "Files: BASIC SAVE, power cycle, LOAD, RUN on the storage card"
+checks = "the whole machine on the native emulator with the GPU, IO and storage cards on their real firmware and a FAT image in the SD card model: a typed program SAVEd as text (read on the host), the machine powered off and on, LOAD and RUN print its output; DIR lists the files; a program written on the host LOADs and runs; a line typed during a SAVE to a 250 ms-per-block card is not lost; SAVE with no card, a write-protected card and a full card print their messages"
+method = "test/emu/test_e2e.mjs E2E-007 (machinenative.mjs m.sd, test/emu/fatimg.py)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
+
+[[test]]
 id = "E2E-005"
 title = "Pin consistency"
 checks = "pins.yaml = .pcf = pins.h = KiCad netlists; iCE40 pin roles match the Lattice CSV"
@@ -973,13 +992,13 @@ vrow = "3.4"
 cmd = "python3 hw/tools/pincheck.py"
 
 [[test]]
-id = "E2E-007"
+id = "E2E-008"
 title = "Whole machine with the e-ink card instead of HDMI"
-checks = "slots {1: eink, 2: io} on the native whole-machine emulator, every card on its real firmware and the UC8179 model as the panel: the kernel finds the console by INFO; the BASIC prompt, a typed program's output (42), help and refresh appear on the panel's glass (read back through the font); refresh gives a second clean full refresh; the glass equals test/eink/golden/E2E-007.pbm and its text test/emu/golden/E2E-007.txt; the panel model saw no command the chip would ignore"
-method = "test/emu/test_e2e.mjs E2E-007 (test/emu/machinenative.mjs panel(), panelScreen())"
+checks = "slots {1: eink, 2: io} on the native whole-machine emulator, every card on its real firmware and the UC8179 model as the panel: the kernel finds the console by INFO; the BASIC prompt, a typed program's output (42), help and refresh appear on the panel's glass (read back through the font); refresh gives a second clean full refresh; the glass equals test/eink/golden/E2E-008.pbm and its text test/emu/golden/E2E-008.txt; the panel model saw no command the chip would ignore"
+method = "test/emu/test_e2e.mjs E2E-008 (test/emu/machinenative.mjs panel(), panelScreen())"
 kind = "sim"
 vrow = "3.2"
-cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-008"
 
 [[test]]
 id = "E2E-006"

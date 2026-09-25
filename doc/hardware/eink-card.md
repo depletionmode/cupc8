@@ -174,7 +174,7 @@ ghosting by hand. On HDMI it does nothing.
 | GPU-006..008 | host tests of the core with the UC8179 model (`fw/test/test_eink.c`, `make -C fw test_eink`): every command, malformed frames, the ink rule for all 256 attributes, TEXT/GFX/mode 2 pictures on the glass against golden images (`test/eink/golden`), the policy's timing, deep sleep, a dead panel; and GPU-001's suite on the e-ink build (`test_gpu_eink`) |
 | GPU-009 | the real `eink.elf` and `eink750.elf` on the native emulator with the panel model (`build/emu-machine/einkcard`) |
 | KRN-007 | the kernel on the simulator's e-ink card (`tools/run_tests.sh testKernelOnEink`) |
-| E2E-007 | the whole machine with the e-ink card: boot to BASIC on the panel, a program, `refresh` |
+| E2E-008 | the whole machine with the e-ink card: boot to BASIC on the panel, a program, `refresh` |
 
 **The UC8179 model** (`fw/test/epdmodel.c`) is one model for the host
 tests, the simulator and the emulator. It takes SPI bytes with DC, RST_n and

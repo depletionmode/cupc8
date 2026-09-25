@@ -1,0 +1,11 @@
+# RT9013-12GB (Richtek), 500 mA LDO, 1.2 V fixed, SOT-23-5
+datasheet: https://www.richtek.com/assets/product_file/RT9013/DS9013-10.pdf
+source: "Richtek RT9013 datasheet DS9013-10 (April 2011), page 1 Pin Configurations and page 2 Functional Pin Description, SOT-23-5 / SC-70-5 column"
+package: SOT-23-5
+pins:
+  1: VIN
+  2: GND
+  3: EN
+  4: NC
+  5: VOUT
+ccw: [1, 5]         # 1-3 along the bottom, 4-5 back along the top (top view)

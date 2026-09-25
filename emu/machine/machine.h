@@ -40,6 +40,7 @@
 
 #include "einkpanel.h"
 #include "emu.h"
+#include "sdcard.h"
 #include "tmds.h"
 #include "usb/cdc.h"
 #include "usb/usbkbd.h"
@@ -97,6 +98,7 @@ class Rp2040Card : public Card {
   Emu e;
   bool logging = false;
   std::vector<SpiFrame> log;
+  std::unique_ptr<rp2040js::harness::SdSocket> sd;  // the storage card's microSD socket (SPI1)
 
   Rp2040Card(const std::string &kind, const std::string &elf, double mhz);
   // advance: run until the chip's time reaches `ns`
@@ -167,7 +169,7 @@ class SysctlCard {
 class Machine {
  public:
   struct Options {
-    std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | wifi
+    std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;
     bool sysctl = false;
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
@@ -202,6 +204,8 @@ class Machine {
   EinkPanel *panel();
   // the text on the e-ink panel's glass (80x30, centred), as screen()
   std::vector<std::string> panelScreen(std::string *error);
+  // the storage card's microSD socket (the first storage card), or null
+  rp2040js::harness::SdSocket *sd();
 
   std::vector<std::pair<int, std::unique_ptr<Card>>> cards;  // slot order
   std::unique_ptr<SysctlCard> sysctl;

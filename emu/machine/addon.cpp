@@ -5,6 +5,8 @@
 //   powerOn(h)  runFor(h, ns)  ns(h)  state(h)  frame(h)  screen(h)  type(h, text)
 //   press(h, mods, key)  cdcWrite(h, buffer)  cdcRead(h)  setThreaded(h, on)
 //   stats(h)  cards(h)  spiLog(h, slot)  keyboard(h)  destroy(h)
+//   sdInsert(h, image, {highCapacity, writeProtect, initMs, readUs, writeMs, ncr})
+//   sdRemove(h)  sdCard(h) -> null | {initialised, blocks, violations, stats}
 #include <node_api.h>
 
 #include <cstring>
@@ -423,6 +425,74 @@ ENTRY(js_keyboard, {
   return o;
 })
 
+rp2040js::harness::SdSocket &socket(Machine *m) {
+  auto *s = m->sd();
+  if (!s) throw std::runtime_error("no storage card (no microSD socket)");
+  return *s;
+}
+
+ENTRY(js_sdInsert, {
+  rp2040js::harness::SdCard::Options o;
+  if (a.argc > 2 && isType(env, a.argv[2], napi_object)) {
+    auto b = [&](const char *k, bool &out) {
+      napi_value v = prop(env, a.argv[2], k);
+      if (isType(env, v, napi_boolean)) napi_get_value_bool(env, v, &out);
+    };
+    auto d = [&](const char *k, double scale, double &out) {
+      napi_value v = prop(env, a.argv[2], k);
+      if (isType(env, v, napi_number)) {
+        napi_get_value_double(env, v, &out);
+        out *= scale;
+      }
+    };
+    b("highCapacity", o.highCapacity);
+    b("writeProtect", o.writeProtect);
+    d("initMs", 1e6, o.initNs);
+    d("readUs", 1e3, o.readNs);
+    d("writeMs", 1e6, o.writeNs);
+    double ncr = o.ncr;
+    d("ncr", 1, ncr);
+    o.ncr = static_cast<unsigned>(ncr);
+  }
+  socket(m).insert(str(env, a.argv[1]), o);
+  return nullptr;
+})
+
+ENTRY(js_sdRemove, {
+  socket(m).remove();
+  return nullptr;
+})
+
+ENTRY(js_sdCard, {
+  napi_value o;
+  auto *c = socket(m).card();
+  if (!c) {
+    napi_get_null(env, &o);
+    return o;
+  }
+  napi_create_object(env, &o);
+  napi_value b;
+  napi_get_boolean(env, c->initialised(), &b);
+  set(env, o, "initialised", b);
+  set(env, o, "blocks", num(env, static_cast<double>(c->blocks())));
+  napi_value v;
+  napi_create_array_with_length(env, c->violations.size(), &v);
+  for (size_t j = 0; j < c->violations.size(); j++) napi_set_element(env, v, static_cast<uint32_t>(j), jsstr(env, c->violations[j]));
+  set(env, o, "violations", v);
+  napi_value st;
+  napi_create_object(env, &st);
+  set(env, st, "commands", num(env, static_cast<double>(c->stats.commands)));
+  set(env, st, "blocksRead", num(env, static_cast<double>(c->stats.blocksRead)));
+  set(env, st, "blocksWritten", num(env, static_cast<double>(c->stats.blocksWritten)));
+  set(env, st, "crcErrors", num(env, static_cast<double>(c->stats.crcErrors)));
+  set(env, st, "illegal", num(env, static_cast<double>(c->stats.illegal)));
+  set(env, st, "busyNs", num(env, c->stats.busyNs));
+  set(env, st, "maxHz", num(env, c->stats.maxHz));
+  set(env, st, "maxHzBeforeInit", num(env, c->stats.maxHzBeforeInit));
+  set(env, o, "stats", st);
+  return o;
+})
+
 napi_value js_destroy(napi_env env, napi_callback_info info) {
   Args a;
   CALL(getArgs(env, info, a) ? napi_ok : napi_generic_failure);
@@ -441,7 +511,8 @@ napi_value init(napi_env env, napi_value exports) {
       {"state", js_state},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
       {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead},   {"setThreaded", js_setThreaded},
       {"stats", js_stats},     {"cards", js_cards},       {"spiLog", js_spiLog},     {"keyboard", js_keyboard},
-      {"destroy", js_destroy}, {"panel", js_panel},   {"panelScreen", js_panelScreen},
+      {"destroy", js_destroy}, {"sdInsert", js_sdInsert}, {"sdRemove", js_sdRemove}, {"sdCard", js_sdCard},
+      {"panel", js_panel}, {"panelScreen", js_panelScreen},
   };
   for (auto &f : fns) {
     napi_value v;
