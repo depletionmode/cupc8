@@ -2930,18 +2930,18 @@ proc conType(s: string) =
     h = (h + 1) and 63
   mem[ConInHead] = h
 
-proc conRun(steps: int; drain: bool): string =
-  ## guest time passes; with `drain`, the card polls every 2 ms of it
+proc conRun(ms: int; drain: bool): string =
+  ## ms of guest time pass; with `drain`, the card polls every 2 ms of it
   var n = 0
-  while n < steps:
-    runGuest(2000)
-    n += 2000
+  while n < ms:
+    runGuest(2)
+    n += 2
     if drain: result.add(conDrain())
 
 proc conLine(line: string; drain = true): string =
   ## a line typed on the PC, a key's worth of guest time per key
   conType(line & "\r")
-  conRun(3_000_000, drain)
+  conRun(1500, drain)
 
 proc testKernelConsole() =
   ## KRN-030: the kernel's side of the USB console. Boot zeroes the indices
@@ -2978,6 +2978,20 @@ proc testKernelConsole() =
   expectTrue("its echo and output in CON_OUT: " & escape(got), got.startsWith("help\n") and "NEW RUN CLR" in got)
   expect("CON_IN taken: its tail caught up", mem[ConInTail], mem[ConInHead])
 
+  # idle at the prompt, a key from the PC is taken by the key wait's next
+  # wake-up: the 20 Hz tick bounds the latency
+  var worst = 0
+  for i in 0..4:
+    discard conRun(37, true)          # somewhere in the tick's period
+    let t0 = msCount()
+    conType("x")
+    while mem[ConInTail] != mem[ConInHead] and msCount() - t0 < 500:
+      runGuest(1)
+    worst = max(worst, msCount() - t0)
+    conType("\x7f")                   # and take it back
+    discard conRun(100, true)
+  expectTrue("idle, a key in CON_IN is taken within the tick's 50 ms (worst " & $worst & " ms)", worst <= 51)
+
   # BASIC from CON_IN; its output (well over the ring's 128 bytes) comes out
   # whole and in order while the card keeps taking it: the ring wraps
   discard conLine("new")
@@ -2992,10 +3006,10 @@ proc testKernelConsole() =
 
   # HOST set and nobody taking: the kernel waits at the full ring
   conType("run\r")
-  discard conRun(3_000_000, false)
+  discard conRun(1500, false)
   expectTrue("HOST set, ring full: the kernel waits (not back at the prompt)",
              ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail] and not waiting)
-  got = conRun(3_000_000, true)
+  got = conRun(1500, true)
   expectTrue("the card takes it: the rest comes, and the prompt", "line 12 of" in got and got.endsWith(">> "))
 
   # HOST clear (the port closed): the kernel drops what does not fit
@@ -3004,7 +3018,7 @@ proc testKernelConsole() =
   let before = mem[ConOutTail]
   conType("run\r")
   let clrAt = mem[ConInHead]
-  discard conRun(3_000_000, false)
+  discard conRun(1500, false)
   settle(2_000_000)
   expectTrue("HOST clear: the program runs to the prompt without the card",
              waiting and mem[ConInTail] == clrAt and gpuFind(g, "DONE.") >= 0)
