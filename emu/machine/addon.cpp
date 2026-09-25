@@ -3,7 +3,8 @@
 //
 //   const h = create({ slots: { 1: 'hdmi' }, rom, sysctl, root, espTx, espRx, threaded, spiLog })
 //   powerOn(h)  runFor(h, ns)  ns(h)  state(h)  frame(h)  screen(h)  type(h, text)
-//   press(h, mods, key)  cdcWrite(h, buffer)  cdcRead(h)  setThreaded(h, on)
+//   press(h, mods, key)  cdcWrite(h, buffer, port)  cdcRead(h, port)  setThreaded(h, on)
+//   consoleOpen(h, on)   (the system card's ports: 0 the sysctl protocol, 1 the console)
 //   stats(h)  cards(h)  spiLog(h, slot)  keyboard(h)  destroy(h)
 //   sdInsert(h, image, {highCapacity, writeProtect, initMs, readUs, writeMs, ncr})
 //   sdRemove(h)  sdCard(h) -> null | {initialised, blocks, violations, stats}
@@ -315,25 +316,43 @@ ENTRY(js_press, {
   return nullptr;
 })
 
+// the port: argument i, 0 (the sysctl protocol) if absent, or 1 (the console)
+static uint32_t port(napi_env env, const Args &a, size_t i) {
+  uint32_t p = 0;
+  if (a.argc > i && isType(env, a.argv[i], napi_number)) napi_get_value_uint32(env, a.argv[i], &p);
+  if (p > 1) throw std::runtime_error("the system card has ports 0 and 1");
+  return p;
+}
+
 ENTRY(js_cdcWrite, {
   if (!m->sysctl) throw std::runtime_error("no system card");
   void *data;
   size_t len;
   if (napi_get_buffer_info(env, a.argv[1], &data, &len) != napi_ok) throw std::runtime_error("cdcWrite: not a Buffer");
   auto *b = static_cast<uint8_t *>(data);
-  m->sysctl->toCard.insert(m->sysctl->toCard.end(), b, b + len);
+  auto &q = m->sysctl->toCard[port(env, a, 2)];
+  q.insert(q.end(), b, b + len);
   return nullptr;
 })
 
 ENTRY(js_cdcRead, {
-  if (!m->sysctl || m->sysctl->fromCard.empty()) {
+  const uint32_t p = port(env, a, 1);
+  if (!m->sysctl || m->sysctl->fromCard[p].empty()) {
     napi_value u;
     napi_get_null(env, &u);
     return u;
   }
-  napi_value v = buffer(env, m->sysctl->fromCard.data(), m->sysctl->fromCard.size());
-  m->sysctl->fromCard.clear();
+  napi_value v = buffer(env, m->sysctl->fromCard[p].data(), m->sysctl->fromCard[p].size());
+  m->sysctl->fromCard[p].clear();
   return v;
+})
+
+ENTRY(js_consoleOpen, {
+  if (!m->sysctl) throw std::runtime_error("no system card");
+  bool on = false;
+  napi_get_value_bool(env, a.argv[1], &on);
+  m->sysctl->openConsole(on);
+  return nullptr;
 })
 
 ENTRY(js_stats, {
@@ -511,7 +530,7 @@ napi_value init(napi_env env, napi_value exports) {
   } fns[] = {
       {"create", js_create},   {"powerOn", js_powerOn},   {"runFor", js_runFor},     {"ns", js_ns},
       {"state", js_state},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
-      {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead},   {"setThreaded", js_setThreaded},
+      {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead}, {"consoleOpen", js_consoleOpen},   {"setThreaded", js_setThreaded},
       {"stats", js_stats},     {"cards", js_cards},       {"spiLog", js_spiLog},     {"keyboard", js_keyboard},
       {"destroy", js_destroy}, {"sdInsert", js_sdInsert}, {"sdRemove", js_sdRemove}, {"sdCard", js_sdCard},
       {"panel", js_panel}, {"panelScreen", js_panelScreen},

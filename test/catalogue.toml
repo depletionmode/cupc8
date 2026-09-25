@@ -1017,8 +1017,8 @@ cmd = "make -s -C fw test_sysctl"
 [[test]]
 id = "SYS-006"
 title = "Real binary: sysctl over USB"
-checks = "the real sysctl.elf: the mux pins (released until a slot is selected); the UART tunnel at 115200 through a loopback, more bytes than the PIO FIFO holds between polls; SWD at pin level (the wake-up bit-exact, TARGETSEL, a DPIDR read through the turnarounds); drives no machine pin at start-up; enumerates as USB CDC; PING, POWER (CC 0.9 V gives class 2), bridge commands refused with the chipset down; FLASH_* refused until FPGA_HOLD, then ID, erase, program and read back 1500 bytes into the right flash only, the other untouched; FPGA_BOOT releases CRESET_n and sees CDONE, times out on a flash without a bitstream, and lets go of the flash lines; CARD_RESET drives only that slot's expander bit; a bad CRC gets status 1"
-method = "test/emu/test_sysctl.mjs: rp2040js USB CDC host, W25Q and iCE40 CDONE models on SPI1 and the CS/CRESET pins, TCA9555 models on I2C0"
+checks = "the real sysctl.elf: the mux pins (released until a slot is selected); the UART tunnel at 115200 through a loopback, more bytes than the PIO FIFO holds between polls; SWD at pin level (the wake-up bit-exact, TARGETSEL, a DPIDR read through the turnarounds); drives no machine pin at start-up; enumerates as a composite device with two CDC ports (the protocol, the console); PING, POWER (CC 0.9 V gives class 2), bridge commands refused with the chipset down; FLASH_* refused until FPGA_HOLD, then ID, erase, program and read back 1500 bytes into the right flash only, the other untouched; FPGA_BOOT releases CRESET_n and sees CDONE, times out on a flash without a bitstream, and lets go of the flash lines; CARD_RESET drives only that slot's expander bit; a bad CRC gets status 1; the console port: no bridge frame while it is closed or the chipset held, the card polling the rings (BR_CS_n frames) once it is open and the chipset up, and stopping when it closes"
+method = "test/emu/test_sysctl.mjs: a composite USB CDC host (test/emu/cdchost.mjs, emu/rp2040/src/usb/cdchost.cpp), W25Q and iCE40 CDONE models on SPI1 and the CS/CRESET pins, TCA9555 models on I2C0"
 kind = "sim"
 vrow = "2.7"
 cmd = "tools/fw_rp2040.sh sysctl && node test/emu/test_sysctl.mjs"
@@ -1048,11 +1048,20 @@ checks = "RAM_WRITE_FAR/RAM_READ_FAR across bank boundaries, across $0ffff and u
 method = "fw/test/test_sysctl.c sys007_far_ram against the bridge model (RAM_WR24/RAM_RD24, byte-exact to bridge.vhd)"
 kind = "sim"
 vrow = "2.7"
+cmd = "make -s -C fw test_sysctl"
+
+[[test]]
+id = "SYS-008"
+title = "USB console: the rings"
+checks = "the console core against the bridge model's SRAM: no bridge traffic at all while the port is closed (500 ms, typed bytes left with the PC); HOST set on the first poll after opening, and again after the kernel zeroes CON_FLAGS at boot; output with \\n as CR LF, across the ring's wrap, a full ring (127 bytes) whole; the USB side full: nothing taken, then only what fits and never half a CR LF (con_write never given more than con_room); a kernel writing between the card's index read and its data: only the bytes up to the head read go now, the rest on the next poll; polls every CON_POLL_MS (2 ms) and not more often; input with CR as Enter, the LF of CR LF dropped (also split across polls), a lone LF as Enter; CON_IN_HEAD written after the data; the input ring wraps and fills (63 bytes), the rest waiting on the PC; junk in the indices' high bits ignored; the chipset held: no traffic; closing clears HOST once, then no traffic; the protocol port unaffected"
+method = "fw/test/test_sysctl.c sys008_console, with the bridge model's SRAM cycles logged (sysmodels.h on_ram) to check the order of writes and to play the CPU between the card's cycles"
+kind = "sim"
+vrow = "2.7"
+cmd = "make -s -C fw test_sysctl"
 
 # ============================================================================
 # HOST: host tools
 # ============================================================================
-cmd = "make -s -C fw test_sysctl"
 
 [[test]]
 id = "HOST-001"
@@ -1066,7 +1075,7 @@ cmd = "python3 test/host/test_jlcparts.py"
 [[test]]
 id = "HOST-002"
 title = "cupc8.py end to end"
-checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read across $ffff, far RAM by address and BANK:OFFSET up to $7ffff (and refused past it, or for bank 32), run (a .prg's body at $7000 with its header left out, or a bare binary, then API_RUN = 1; refused while API_RUN is 1 or 2, for a version 2 header and for 28673 bytes), CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; the results checked in the models' memory"
+checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read across $ffff, far RAM by address and BANK:OFFSET up to $7ffff (and refused past it, or for bank 32), run (a .prg's body at $7000 with its header left out, or a bare binary, then API_RUN = 1; refused while API_RUN is 1 or 2, for a version 2 header and for 28673 bytes), CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; console on the second port (sysctl_sim --console): the ring's text arrives with \\n as CR LF, piped-in text lands in CON_IN with LF as Enter, CON_OUT_TAIL moved and HOST set; the results checked in the models' memory"
 method = "test/host/test_cupc8.py with build/fw/sysctl_sim --dump"
 cmd = "make -s -C fw sysctl_sim && python3 test/host/test_cupc8.py"
 kind = "sim"

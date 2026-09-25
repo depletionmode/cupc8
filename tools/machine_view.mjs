@@ -13,6 +13,12 @@
 // than real time) instead of test/emu/machine.mjs (~100x slower): the same
 // machine, cycle for cycle (EMU-007), just faster.
 //
+// --console (native only) fits the system card and opens its console port
+// (doc/proposals/usb-console.md): a pane under the screen shows what the
+// kernel's terminal prints, and text typed (or pasted) in its box is typed
+// into the machine. --console-port N instead serves that port on TCP N for a
+// terminal: `cupc8.py console tcp:127.0.0.1:N` (or nc); connecting opens it.
+//
 // With an e-ink card (slot kind eink or eink750, native only) the page shows
 // the panel's glass instead of HDMI: the UC8179 model's picture, which
 // changes only when a refresh completes, as on the real panel (a partial
@@ -44,6 +50,12 @@ usage: node tools/machine_view.mjs [options]
   --sd IMAGE       with a storage card (native only): put this card image in
                    its microSD socket; a missing file is made first, a 16 MB
                    FAT16 card as a PC would format it (test/emu/fatimg.py)
+  --console        (native only) fit the system card and open its console
+                   port: the page shows the kernel's terminal text and
+                   types what you enter in its box (a BASIC program can be
+                   pasted there)
+  --console-port N (native only) fit the system card and serve its console
+                   port on TCP N instead: cupc8.py console tcp:127.0.0.1:N
   --port N         the web page's port (default 8640)
   -h, --help       this text
 
@@ -54,6 +66,7 @@ examples:
   node tools/machine_view.mjs --native --slots hdmi,io,wifi
   node tools/machine_view.mjs --native --slots hdmi,io,wifi --forward tcp:8080:80,udp:5353:53
   node tools/machine_view.mjs --native --slots eink,io,storage --sd card.img
+  node tools/machine_view.mjs --native --console
 
 environment:
   CUPC8_EINK_SCALE   scale the e-ink panel's busy times
@@ -80,7 +93,17 @@ if (eink && !native) throw new Error('the e-ink card runs on the native emulator
 if (forward.length && !native) throw new Error('--forward is for the native emulator only: add --native');
 const sd = arg('sd', null);
 if (sd && !(native && kinds.includes('storage'))) throw new Error('--sd needs --native and a storage card in --slots');
-const m = await Machine.create({ slots, forward });
+const consolePane = process.argv.includes('--console');
+const consolePort = arg('console-port', null);
+if ((consolePane || consolePort) && !native) throw new Error('the console is for the native emulator only: add --native');
+if (consolePane && consolePort) throw new Error('--console or --console-port, not both');
+const m = await Machine.create({ slots, forward, sysctl: !!(consolePane || consolePort) });
+let consoleText = '';             // the console's output so far (the pane)
+if (consolePane) m.console.open();
+if (consolePort) {
+  const p = await m.console.listen(Number(consolePort));
+  console.log(`console: cupc8.py console tcp:127.0.0.1:${p}`);
+}
 if (sd) {
   if (!fs.existsSync(sd)) {
     const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
@@ -106,10 +129,17 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emu
   canvas:focus { border-color: #6a6; }
   #status { margin-top: 8px; white-space: pre; }
   #help { margin-top: 4px; color: #777; }
+  #con { display: none; width: 960px; max-width: 100%; margin-top: 12px; }
+  #con pre { height: 240px; overflow-y: auto; margin: 0; padding: 6px; background: #000; color: #9c9;
+             border: 1px solid #333; white-space: pre-wrap; }
+  #con textarea { width: 100%; box-sizing: border-box; margin-top: 4px; background: #181818; color: #ccc;
+                  border: 1px solid #333; font: inherit; }
 </style></head><body>
 <canvas id="c" width="640" height="480" tabindex="0"></canvas>
 <div id="status">connecting...</div>
 <div id="help">click the screen, then type: keys go to the IO card's USB keyboard</div>
+<div id="con"><div>the USB console (the system card's second serial port)</div><pre id="cout"></pre>
+<textarea id="cin" rows="2" placeholder="type here: Enter sends the line; paste a BASIC program and press Enter"></textarea></div>
 <script>
 const c = document.getElementById('c'), g = c.getContext('2d');
 let img = g.createImageData(640, 480);
@@ -138,6 +168,29 @@ async function tick() {
   setTimeout(tick, 100);
 }
 tick();
+// the console pane
+const con = document.getElementById('con'), cout = document.getElementById('cout'), cin = document.getElementById('cin');
+let conAt = 0;
+async function conTick() {
+  try {
+    const r = await (await fetch('/console?from=' + conAt)).json();
+    if (r.on) con.style.display = 'block';
+    if (r.text) {
+      const end = cout.scrollTop + cout.clientHeight >= cout.scrollHeight - 4;
+      cout.textContent += r.text;
+      if (end) cout.scrollTop = cout.scrollHeight;
+    }
+    conAt = r.to;
+  } catch (e) {}
+  setTimeout(conTick, 200);
+}
+conTick();
+cin.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  e.preventDefault();
+  fetch('/console', { method: 'POST', body: cin.value + '\\r' });
+  cin.value = '';
+});
 // USB HID usages for the keys typed text can't carry
 const USAGE = { Enter: 40, Escape: 41, Backspace: 42, Tab: 43, ArrowRight: 79, ArrowLeft: 80,
                 ArrowDown: 81, ArrowUp: 82, Delete: 76, Home: 74, End: 77 };
@@ -167,6 +220,20 @@ http.createServer((req, res) => {
   } else if (url.pathname === '/frame') {
     res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
     res.end(frame ?? Buffer.alloc(0));
+  } else if (url.pathname === '/console' && req.method === 'POST') {
+    // typed into the console pane: to the machine as the PC's bytes
+    let body = '';
+    req.on('data', (d) => (body += d));
+    req.on('end', () => {
+      if (consolePane) m.console.write(body);
+      res.writeHead(204);
+      res.end();
+    });
+  } else if (url.pathname === '/console') {
+    // the console's text from offset `from` (a terminal's CR LF shown as a newline)
+    const from = Math.min(Number(url.searchParams.get('from') ?? 0), consoleText.length);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ on: consolePane, text: consoleText.slice(from), to: consoleText.length }));
   } else if (url.pathname === '/key' && req.method === 'POST') {
     keyAt ??= m.ns;
     if (!m.keyboard) note = 'no IO card fitted: keys go nowhere';
@@ -193,6 +260,12 @@ for (;;) {
   // capture every `every`, or 5 ms after a key (the echo takes ~2 ms): not at
   // the end of the chunk, which at ~8x slower than real time is seconds away
   await m.runAsync(5e6);
+  if (consolePane) {
+    // a terminal's rendering, roughly: CR LF a newline, backspace takes a character back
+    for (const ch of m.console.read().toString('latin1').replace(/\r\n/g, '\n').replace(/\r/g, '')) {
+      consoleText = ch === '\b' ? consoleText.slice(0, -1) : consoleText + ch;
+    }
+  }
   if (!(keyAt !== null && m.ns - keyAt >= 5e6) && m.ns - shot < every) continue;
   keyAt = null;
   shot = m.ns;
