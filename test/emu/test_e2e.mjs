@@ -394,9 +394,9 @@ async function e2e012() {
   const m = await Machine.create({ slots: { 1: 'eink', 2: 'io' }, sysctl: true });
   m.powerOn();
   const on = (want, ns) => m.runUntil(() => panelText(m).includes(want), ns, 50e6);
-  const idle = (ns) => m.runUntil(() => m.panel().busy === 0 && m.panel().partialsSinceFull === 0, ns, 50e6);
   expect(await on('>>', 10e9), 'the BASIC prompt appears on the panel');
-  expect(await idle(10e9), 'the power-on clean refresh is done');
+  expect(await m.runUntil(() => m.panel().refreshes[0] >= 1 && m.panel().busy === 0, 10e9, 50e6),
+    'the power-on clean refresh is done');
   const p0 = m.panel();
   const r = await cupc8(m, 'run', prg);
   expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run eink_prog.prg: ${r.out.trim()}`);
