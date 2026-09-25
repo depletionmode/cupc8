@@ -273,31 +273,24 @@ FINE_NETS = sorted({"/" + n for n in list(GPIO.values()) + [
 
 def prepare(board):
     """Locked pre-routing: CHIPSET_CDONE's finger (A21, between two GND
-    columns whose ties wall it in) escapes straight up on its own layer to a
-    via in the body, which Freerouting reaches on any layer. Without it the
-    router leaves the finger unrouted at every pass count. Returns the nets
-    escaped, for the pipeline's connectivity check."""
+    columns whose ties wall it in) escapes straight up on its own layer into
+    the body, as the key-notch fingers do; Freerouting joins the stub's end.
+    Without it the router leaves the finger unrouted at every pass count. A
+    via at the end would block B21's escape on F.Cu, in the same column.
+    Returns the nets escaped, for the pipeline's connectivity check."""
     import pcbnew
-    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    mm = pcbnew.FromMM
     fps = {f.GetReference(): f for f in board.GetFootprints()}
     pad = [p for p in fps["J2"].Pads() if p.GetNumber() == "A21"][0]
     x = pad.GetPosition().x
-    y = mm(H - 3.0)
     t = pcbnew.PCB_TRACK(board)
     t.SetStart(pcbnew.VECTOR2I(x, pad.GetBoundingBox().GetTop() + mm(0.1)))
-    t.SetEnd(pcbnew.VECTOR2I(x, y))
+    t.SetEnd(pcbnew.VECTOR2I(x, mm(H - 1.0)))
     t.SetWidth(mm(0.2))
     t.SetLayer(pcbnew.B_Cu)
     t.SetNet(pad.GetNet())
     t.SetLocked(True)
     board.Add(t)
-    v = pcbnew.PCB_VIA(board)
-    v.SetPosition(pcbnew.VECTOR2I(x, y))
-    v.SetWidth(mm(0.6))
-    v.SetDrill(mm(0.3))
-    v.SetNet(pad.GetNet())
-    v.SetLocked(True)
-    board.Add(v)
     return [pad.GetNetname()]
 
 
