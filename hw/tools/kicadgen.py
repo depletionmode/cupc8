@@ -1089,6 +1089,24 @@ RESEAT_REACH = 2.0        # mm: how far from its courtyard a designator may move
 RESEAT_REACH_BIG = 0.45   # of its courtyard's size, for a big part (a QFN inside its ring of fan-out vias)
 
 
+WORD_GAP = 0.5            # mm between two words in one line: closer, "C13" and "C11" read as "C13C11"
+
+
+def _upright(text):
+    return round(text.GetTextAngleDegrees()) % 180 == 90
+
+
+def run_together(a, a_up, b, b_up, gap=WORD_GAP):
+    """Two words (ink boxes, mm) that read as one: the same way round, in
+    one line (their boxes share some of the line's height), and closer than
+    `gap` along it."""
+    if a_up != b_up:
+        return False
+    if a_up:                                  # reading upwards: the line runs along y
+        return a[0] < b[2] and b[0] < a[2] and max(b[1] - a[3], a[1] - b[3]) < gap
+    return a[1] < b[3] and b[1] < a[3] and max(b[0] - a[2], a[0] - b[2]) < gap
+
+
 def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, reseat=False):
     """Put every reference designator horizontal, in the first spot around its
     part that clears all pads and vias, every other part's courtyard, every
@@ -1120,32 +1138,23 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
     inside = (x0 + 0.3, y0 + 0.3, x1 - 0.3, y1 - 0.3)
     dr = board.Drawings()
     # the board's other words (its name and revision): kept clear of too
-    placed = [_ink_box(d) for d in [dr[i].Cast() for i in range(len(dr))]
+    # (box, upright) of each word placed
+    placed = [(_ink_box(d), _upright(d)) for d in [dr[i].Cast() for i in range(len(dr))]
               if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == pcbnew.F_SilkS and
               d.GetText() not in labels.values()]
 
-    def clear(fp, t, others, word_gap=0.1):
+    def clear(fp, t, up, others, word_gap=0.1):
         if t[0] < inside[0] or t[1] < inside[1] or t[2] > inside[2] or t[3] > inside[3]:
             return False
         near = pads + vias + [c for r, c in courts.items() if r != fp.GetReference()] + list(bodies.values())
-        return not any(overlap(t, o, 0.1) for o in near) and not any(overlap(t, o, word_gap) for o in others)
+        return not any(overlap(t, o, 0.1) for o in near) and \
+            not any(overlap(t, o, word_gap) or run_together(t, up, o, o_up) for o, o_up in others)
 
     if reseat:
-        current = {id(ref): _ink_box(ref) for _, ref in items}
-    moved = []
-    for fp, ref in items:
-        if reseat:
-            others = placed + [b for k, b in current.items() if k != id(ref)]
-            if clear(fp, current[id(ref)], others):
-                continue
-        else:
-            others = placed
-            size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
-            ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
-            ref.SetTextThickness(mm(stroke))
-            ref.SetTextAngleDegrees(0)
-            ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
-            ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
+        current = {id(ref): (_ink_box(ref), _upright(ref)) for _, ref in items}
+    def seat(fp, ref, others):
+        """Put `ref` in the first clear spot round its part (see above);
+        returns (ink box, upright, text size, size before) or None."""
         spots = []
         # round the courtyard, then (for an imported footprint whose courtyard
         # is only its body, leads outside it) round its pads
@@ -1168,63 +1177,122 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
                     spots += [(cx0 - gap - 1.0 - out, my + shift), (cx1 + gap + 1.0 + out, my + shift)]
         size = pcbnew.ToMM(ref.GetTextSize().y)
         spots = [(sx, sy, 0, size) for sx, sy in spots]
-        if reseat:
-            # then the nearest clear spot on a 0.2 mm grid, up to RESEAT_REACH
-            # from the courtyard, horizontal and then (a crowd of vias round a
-            # small part leaves only narrow gaps) turned to read upwards; then
-            # the same at JLC's 0.8 mm minimum text height
-            w0, h0 = [b - a for a, b in zip(current[id(ref)][:2], current[id(ref)][2:])]
-            for angle, tsize in ((0, size), (90, size), (0, 0.8), (90, 0.8)):
-                if tsize > size:
-                    continue
-                w, h = w0 * tsize / size, h0 * tsize / size
-                tw, th = (w, h) if angle == 0 else (h, w)
-                grid = []
-                reach = max(RESEAT_REACH, RESEAT_REACH_BIG * max(cx1 - cx0, cy1 - cy0))
-                steps = int((reach + max(w, h)) / 0.2)
-                for i in range(-steps, steps + 1):
-                    for j in range(-steps, steps + 1):
-                        sx, sy = mx + 0.2 * i, my + 0.2 * j
-                        # how far the text's box is from the courtyard's
-                        dx = max(cx0 - (sx + tw / 2), (sx - tw / 2) - cx1, 0)
-                        dy = max(cy0 - (sy + th / 2), (sy - th / 2) - cy1, 0)
-                        if 0 < max(dx, dy) and math.hypot(dx, dy) <= reach:
-                            grid.append((math.hypot(dx, dy), sx, sy))
-                spots += [(sx, sy, angle, tsize) for _, sx, sy in sorted(grid)]
+        # then the nearest clear spot on a 0.2 mm grid, up to RESEAT_REACH
+        # from the courtyard, horizontal and then (a crowd of vias or small
+        # parts leaves only narrow gaps) turned to read upwards; then the
+        # same at JLC's 0.8 mm minimum text height
+        ref.SetTextAngleDegrees(0)
+        box0 = _ink_box(ref)
+        w0, h0 = [b - a for a, b in zip(box0[:2], box0[2:])]
+        for angle, tsize in ((0, size), (90, size), (0, 0.8), (90, 0.8)):
+            if tsize > size:
+                continue
+            w, h = w0 * tsize / size, h0 * tsize / size
+            tw, th = (w, h) if angle == 0 else (h, w)
+            grid = []
+            reach = max(RESEAT_REACH, RESEAT_REACH_BIG * max(cx1 - cx0, cy1 - cy0))
+            steps = int((reach + max(w, h)) / 0.2)
+            for i in range(-steps, steps + 1):
+                for j in range(-steps, steps + 1):
+                    sx, sy = mx + 0.2 * i, my + 0.2 * j
+                    # how far the text's box is from the courtyard's
+                    dx = max(cx0 - (sx + tw / 2), (sx - tw / 2) - cx1, 0)
+                    dy = max(cy0 - (sy + th / 2), (sy - th / 2) - cy1, 0)
+                    if 0 < max(dx, dy) and math.hypot(dx, dy) <= reach:
+                        grid.append((math.hypot(dx, dy), sx, sy))
+            spots += [(sx, sy, angle, tsize) for _, sx, sy in sorted(grid)]
         stroke = pcbnew.ToMM(ref.GetTextThickness())
-        # words 0.5 mm apart where there is room, so two designators don't
-        # read as one ("C20H1"); 0.1 mm where there isn't
+        # words 0.5 mm apart where there is room; 0.1 mm where there isn't
+        # (but never closer than WORD_GAP in one line: run_together)
         for sx, sy, angle, tsize, word_gap in [q + (0.5,) for q in spots] + [q + (0.1,) for q in spots]:
             ref.SetTextSize(pcbnew.VECTOR2I(mm(tsize), mm(tsize)))
             ref.SetTextThickness(mm(min(stroke, max(0.15, tsize * 0.15))))
             ref.SetTextAngleDegrees(angle)
             ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
             t = _ink_box(ref)
-            if clear(fp, t, others, word_gap):
-                if reseat:
-                    current[id(ref)] = t
-                    moved.append(fp.GetReference() + (" (turned)" if angle else "") +
-                                 (" (%.1f mm)" % tsize if tsize != size else ""))
-                else:
-                    placed.append(t)
-                break
-        else:
-            if reseat and isinstance(ref, pcbnew.PCB_FIELD):
-                # walled in by its own fan-out (a QFN's ring of vias, a cap
-                # between them): left off the silkscreen rather than printed
-                # over vias. The CPL places it; the build output lists it
-                ref.SetVisible(False)
-                current.pop(id(ref), None)
-                moved.append(fp.GetReference() + " (left off: no clear spot)")
+            if clear(fp, t, bool(angle), others, word_gap):
+                return t, bool(angle), tsize, size
+        return None
+
+    def note(fp, got):
+        t, up, tsize, size = got
+        return fp.GetReference() + (" (turned)" if up else "") + (" (%.1f mm)" % tsize if tsize != size else "")
+
+    def state(ref):
+        return (ref.GetPosition(), ref.GetTextAngleDegrees(), ref.GetTextSize(), ref.GetTextThickness())
+
+    def restore(ref, st):
+        ref.SetPosition(st[0])
+        ref.SetTextAngleDegrees(st[1])
+        ref.SetTextSize(st[2])
+        ref.SetTextThickness(st[3])
+
+    moved = []
+    for fp, ref in items:
+        if reseat:
+            others = placed + [b for k, b in current.items() if k != id(ref)]
+            if clear(fp, *current[id(ref)], others):
                 continue
-            raise ValueError("%s: no room for its %s%s; move parts apart" % (
-                fp.GetReference(), "designator" if isinstance(ref, pcbnew.PCB_FIELD) else "label %r" % ref.GetText(),
-                " clear of the vias" if reseat else ""))
+        else:
+            others = placed
+            size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
+            ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+            ref.SetTextThickness(mm(stroke))
+            ref.SetTextAngleDegrees(0)
+            ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
+            ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
+        got = seat(fp, ref, others)
+        if got and not reseat:
+            placed.append(got[:2])
+            continue
+        if got:
+            current[id(ref)] = got[:2]
+            moved.append(note(fp, got))
+            continue
+        if reseat:
+            # walled in: the neighbours' designators within reach step aside.
+            # Each is taken off in turn, nearest first; this one is seated,
+            # then the neighbour again. If the neighbour then finds no spot,
+            # both go back as they were and the next neighbour is tried
+            current.pop(id(ref), None)            # its old spot is no obstacle to itself
+            court = courts[fp.GetReference()]
+            cx, cy = (court[0] + court[2]) / 2, (court[1] + court[3]) / 2
+            others_items = [(q, r) for q, r in items if id(r) in current and r is not ref]
+            others_items.sort(key=lambda qr: math.hypot((current[id(qr[1])][0][0] + current[id(qr[1])][0][2]) / 2 - cx,
+                                                        (current[id(qr[1])][0][1] + current[id(qr[1])][0][3]) / 2 - cy))
+            ok = None
+            for q, r in others_items[:6]:
+                saved_r, saved_box = state(r), current.pop(id(r))
+                got = seat(fp, ref, placed + list(current.values()))
+                if got:
+                    current[id(ref)] = got[:2]
+                    got_r = seat(q, r, placed + [b for k, b in current.items() if k != id(r)])
+                    if got_r:
+                        current[id(r)] = got_r[:2]
+                        ok = (got, q, got_r)
+                        break
+                    current.pop(id(ref))
+                restore(r, saved_r)
+                current[id(r)] = saved_box
+            if ok:
+                moved += [note(fp, ok[0]), note(ok[1], ok[2]) + " (to make room)"]
+                continue
+        if reseat and isinstance(ref, pcbnew.PCB_FIELD):
+            # walled in by its own fan-out (a QFN's ring of vias, a cap
+            # between them): left off the silkscreen rather than printed
+            # over vias. The CPL places it; the build output lists it
+            ref.SetVisible(False)
+            current.pop(id(ref), None)
+            moved.append(fp.GetReference() + " (left off: no clear spot)")
+            continue
+        raise ValueError("%s: no room for its %s%s; move parts apart" % (
+            fp.GetReference(), "designator" if isinstance(ref, pcbnew.PCB_FIELD) else "label %r" % ref.GetText(),
+            " clear of the vias" if reseat else ""))
     if reseat:
         # the board's name and revision: a finger tab's GND ties or the
         # presence link can put vias in its corner; it slides up and left
         # from there to the nearest clear spot, still right-aligned
-        near = pads + vias + list(courts.values()) + list(bodies.values()) + list(current.values())
+        near = pads + vias + list(courts.values()) + list(bodies.values()) + [b for b, _ in current.values()]
         for d in [dr[i].Cast() for i in range(len(dr))]:
             if d.Type() != pcbnew.PCB_TEXT_T or " rev " not in d.GetText():
                 continue
@@ -1256,8 +1324,8 @@ def check_designators(board, labels=None):
     words = [(d.GetText(), _ink_box(d)) for d in [dr[i].Cast() for i in range(len(dr))]
              if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == pcbnew.F_SilkS]
     bad = []
-    boxes = [(fp.GetReference(), t.GetText(), _ink_box(t)) for fp, t in items]
-    for ref, text, t in boxes:
+    boxes = [(fp.GetReference(), t.GetText(), _ink_box(t), _upright(t)) for fp, t in items]
+    for i, (ref, text, t, up) in enumerate(boxes):
         what = "designator %s" % ref if text == ref else "label %r (%s)" % (text, ref)
         for v, net in vias:
             if overlap(t, v):
@@ -1268,9 +1336,12 @@ def check_designators(board, labels=None):
         for r, b in bodies.items():
             if overlap(t, b):
                 bad.append("%s over the body of %s" % (what, r))
-        for r, other, o in boxes:
+        for r, other, o, o_up in boxes:
             if r != ref and overlap(t, o):
                 bad.append("%s over the designator of %s" % (what, r))
+        for r, other, o, o_up in boxes[i + 1:]:
+            if not overlap(t, o) and run_together(t, up, o, o_up):
+                bad.append("%s runs into %r: under %.1f mm apart in one line" % (what, other, WORD_GAP))
         for word, o in words:
             if word != text and " rev " in word and overlap(t, o):
                 bad.append("%s over %r" % (what, word))

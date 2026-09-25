@@ -682,3 +682,13 @@ revert = [["hw/tools/kicadgen.py", """        for v, net in vias:
 """, ""]]
 cmd = "python3 test/hw/test_silk.py"
 must_fail = ["FAIL designator over a via"]
+
+[[bug]]
+name = "boards: two designators side by side in one line read as one word (e-ink C13C11, GPU U7C22)"
+fixed_in = "d59238c"
+revert = [["hw/tools/kicadgen.py", """        for r, other, o, o_up in boxes[i + 1:]:
+            if not overlap(t, o) and run_together(t, up, o, o_up):
+                bad.append("%s runs into %r: under %.1f mm apart in one line" % (what, other, WORD_GAP))
+""", ""]]
+cmd = "python3 test/hw/test_silk.py"
+must_fail = ["FAIL designators run together"]

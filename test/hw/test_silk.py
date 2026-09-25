@@ -71,6 +71,18 @@ bad = kg.check_designators(b)
 check("designator over another courtyard", "designator R1 over the courtyard of R2" in bad, str(bad))
 check("designator over a body", "designator R1 over the body of R2" in bad, str(bad))
 
+# two designators in one line, 0.2 mm apart: they read as one word ("R1R2")
+b, net = board()
+t1, t2 = b.FindFootprintByReference("R1").Reference(), b.FindFootprintByReference("R2").Reference()
+t2.SetPosition(pcbnew.VECTOR2I(t1.GetPosition().x, t1.GetPosition().y))
+w = kg._ink_box(t1)[2] - kg._ink_box(t1)[0]
+t2.SetPosition(pcbnew.VECTOR2I(t1.GetPosition().x + mm(w + 0.2), t1.GetPosition().y))
+bad = kg.check_designators(b)
+check("designators run together", "designator R1 runs into 'R2': under 0.5 mm apart in one line" in bad, str(bad))
+t2.SetPosition(pcbnew.VECTOR2I(t1.GetPosition().x + mm(w + 0.8), t1.GetPosition().y))
+bad = [x for x in kg.check_designators(b) if "runs into" in x]
+check("0.8 mm apart is two words", bad == [], str(bad))
+
 # the board's name over a via
 b, net = board()
 via(b, net, (27, 18.5))
