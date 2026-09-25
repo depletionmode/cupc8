@@ -64,6 +64,9 @@ cupc8:HDMI_A_SHOUHAN_HDMI-19PIN-043:
 cupc8:USB_A_SOFNG_USB-302S-T:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-A-SMD_USB-302S (C112455)'
+jlc:HDR-TH_9P-P2.54-H-M-W10.4:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s HDR-TH_9P-P2.54-H-M-W10.4 (C492417)'
 jlc:IND-SMD_L3.0-W3.0_FNR30XXS:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s IND-SMD_L3.0-W3.0_FNR30XXS (C167747)'
