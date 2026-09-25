@@ -39,7 +39,7 @@ def schematic(path, footprint_libs):
     s.connect(u7, "SW", "BOOST_SW")
     s.connect(u7, "VOUT", "VBOOST")
     s.connect(u7, "FB", "BOOST_FB")
-    l1 = s.add("jlc:FXL0420-1R0-M", "L1", "1u", "jlc:IND-SMD_L4.4-W4.2", at=(184 * G, 124 * G),
+    l1 = s.add("Device:L", "L1", "1u", "jlc:IND-SMD_L4.4-W4.2", at=(184 * G, 124 * G),
                fields={"LCSC": "C167203"})
     rc.two(s, l1, "+5V", "BOOST_SW")
     r16 = rc.passive(s, "R", "R16", "750k", (218 * G, 120 * G), fp=rc.R0603, lcsc="C23240")

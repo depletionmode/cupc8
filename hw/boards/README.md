@@ -118,7 +118,13 @@ Spec: `doc/hardware/io-card.md`.
 - **J2, USB-A USB-302S-T** (C112455) at the top edge, with our footprint
   `cupc8:USB_A_SOFNG_USB-302S-T` (EasyEDA's has a malformed courtyard that
   misses the pads' rear ends). The shell face is on the board edge.
-- **U5, SY6280AAC** (C55136) switches the slot's +5V to VBUS, enabled by
+- **U7, TPS61023DRLR** (C919459) boosts the slot's +5V to 5.06 V for the
+  keyboard (power.md, IO card keyboard boost): 1 µH FXL0420 (C167203),
+  10 µF in, 2 × 22 µF out, 750k/100k feedback. Always on. Its pins are
+  0.3 mm pads, so the board script lays their tracks (VIN/EN to the input
+  cap, SW to the inductor, VOUT to the output caps, FB to the divider) with
+  the loops short, as TI's layout guide asks.
+- **U5, SY6280AAC** (C55136) switches the boost's output to VBUS, enabled by
   GPIO7 (100 kΩ pull-down, so VBUS is off while the RP2040 is in reset).
   R_SET = 12 kΩ: I_lim = 6800 / 12k = 0.57 A nominal, 0.42–0.71 A over the
   datasheet's ±25 %, so a keyboard gets its 500 mA and the card stays under
