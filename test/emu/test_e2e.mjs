@@ -84,7 +84,7 @@ async function e2e002() {
   while (end > 0 && rom[end - 1] === 0xff) end--;
   const image = path.join(ROOT, 'build/emu/e2e-rom.bin');
   fs.writeFileSync(image, rom.subarray(0, end));
-  const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff), sysctl: true });
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff), sysctl: true });
   m.powerOn();
   await m.runAsync(20e6);
   const ping = await cupc8(m, 'ping');
@@ -119,7 +119,7 @@ async function e2e003() {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
-  const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io', 3: 'wifi' } });
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' } });
   m.powerOn();
   expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
   m.type('net join cupc8 password\n');
@@ -155,7 +155,7 @@ async function e2e007() {
   fat('mkfs', img, '16', '16');
   fs.writeFileSync(path.join(dir, 'host.bas'), '10 print 100+23\r\n20 print "FROM THE HOST"\r\n');
   fat('put', img, 'HOSTPROG.BAS', path.join(dir, 'host.bas'));
-  const slots = { 1: 'gpu', 2: 'io', 3: 'storage' };
+  const slots = { 1: 'hdmi', 2: 'io', 3: 'storage' };
   const boot = async (opts = {}) => {
     const m = await Machine.create({ slots });
     if (opts.image !== null) m.sd.insert(opts.image ?? img, { highCapacity: false, ...opts.sd });

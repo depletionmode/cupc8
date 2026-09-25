@@ -1,7 +1,7 @@
 // machine.node: the native whole machine (machine.h) for Node; the API is
 // wrapped by test/emu/machinenative.mjs into machine.mjs's Machine.
 //
-//   const h = create({ slots: { 1: 'gpu' }, rom, sysctl, root, espTx, espRx, threaded, spiLog })
+//   const h = create({ slots: { 1: 'hdmi' }, rom, sysctl, root, espTx, espRx, threaded, spiLog })
 //   powerOn(h)  runFor(h, ns)  ns(h)  state(h)  frame(h)  screen(h)  type(h, text)
 //   press(h, mods, key)  cdcWrite(h, buffer)  cdcRead(h)  setThreaded(h, on)
 //   stats(h)  cards(h)  spiLog(h, slot)  keyboard(h)  destroy(h)

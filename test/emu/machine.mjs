@@ -6,7 +6,7 @@
 // clock at a time while any slot or the bridge is selected, 10 us at a time
 // otherwise.
 //
-//   const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io' } });
+//   const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' } });
 //   m.powerOn();  m.runFor(3e9);  m.screen()   // 80x30 text read off the HDMI output
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -212,7 +212,7 @@ function loadFont() {
 }
 
 export class Machine {
-  static async create({ slots = { 1: 'gpu', 2: 'io' }, rom = null, sysctl = false } = {}) {
+  static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
     m.cards = {};
@@ -226,10 +226,10 @@ export class Machine {
         m.cards[slot] = new EspCard(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'));
         continue;
       }
-      const elf = path.join(ROOT, 'build/rp2040', kind + '.elf');
-      const emu = await Emu.load(elf, { mhz: kind === 'gpu' ? 252 : 125 });
+      const elf = path.join(ROOT, 'build/rp2040', (kind === 'hdmi' ? 'gpu' : kind) + '.elf');   // the HDMI card runs gpu.elf
+      const emu = await Emu.load(elf, { mhz: kind === 'hdmi' ? 252 : 125 });
       m.cards[slot] = new Rp2040Card(kind, emu);
-      if (kind === 'gpu') m.tmds = new TmdsCapture(emu);
+      if (kind === 'hdmi') m.tmds = new TmdsCapture(emu);
       if (kind === 'io') {
         emu.mcu.gpio[8].setInputValue(true);                 // VBUS switch: no fault
         m.keyboard = new UsbKeyboard({ speed: 1 });

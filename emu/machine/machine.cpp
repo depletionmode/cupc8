@@ -11,6 +11,8 @@
 #include <cstdlib>
 
 #include <algorithm>
+#include <set>
+#include <stdexcept>
 #include <cctype>
 #include <cerrno>
 #include <cstring>
@@ -308,10 +310,14 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
       cards.emplace_back(slot, std::move(c));
       continue;
     }
-    auto c = std::make_unique<Rp2040Card>(kind, root + "/build/rp2040/" + kind + ".elf", kind == "gpu" ? 252 : 125);
+    // the HDMI card's firmware is the graphics card's, gpu.elf
+    static const std::set<std::string> known{"hdmi", "eink", "eink750", "io", "storage"};
+    if (!known.count(kind)) throw std::runtime_error("unknown slot kind '" + kind + "' (hdmi, eink, eink750, io, storage, wifi)");
+    const std::string elf = kind == "hdmi" ? "gpu" : kind;
+    auto c = std::make_unique<Rp2040Card>(kind, root + "/build/rp2040/" + elf + ".elf", kind == "hdmi" ? 252 : 125);
     c->slot = slot;
     c->logging = o.spiLog;
-    if (kind == "gpu") tmds = std::make_unique<TmdsCapture>(c->e);
+    if (kind == "hdmi") tmds = std::make_unique<TmdsCapture>(c->e);
     if (kind == "eink" || kind == "eink750")  // the panel on its header: 5.83" 648x480 or 7.5" 800x480
       panels[slot] = std::make_unique<EinkPanel>(c->e, EinkPanel::config(kind == "eink" ? 648 : 800, 480));
     if (kind == "storage") c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
@@ -564,7 +570,7 @@ void Machine::startWorkers() {
     if (card->emu()) {
       auto w = std::make_unique<Worker>();
       w->card = card.get();
-      w->volunteer = card->kind != "gpu";
+      w->volunteer = card->kind != "hdmi";
       workers.push_back(std::move(w));
     } else {
       mainCards.push_back(card.get());
