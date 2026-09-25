@@ -9,11 +9,16 @@ engine) built with CONFIG_CUPC8_QEMU: QEMU has no radio and no SPI slave, so
 "joining" brings up its OpenCores Ethernet (user-mode NAT: the host is
 10.0.2.2) and the card frames travel over UART1 with the SPI slave's exact
 preload semantics. Every server the card talks to is real and on this host.
+
+The card's flash is a copy, so what NET_CONFIG saves in NVS stays out of the
+build and survives the second boot (the power cycle) only.
 """
 
 import glob
 import os
+import shutil
 import socket
+import struct
 import ssl
 import subprocess
 import sys
@@ -104,23 +109,43 @@ def string(s):
     return [len(b)] + list(b)
 
 
+def boot(qemu, flash, forwards, boot_no):
+    """QEMU on `flash`, with hostfwd `forwards` [(proto, host port, card port)]: (process, Card)."""
+    frames_port = free_port()
+    log_path = os.path.join(ROOT, "build", "esp32c3-qemu", "uart0-%d.log" % boot_no)
+    log = open(os.path.join(ROOT, "build", "esp32c3-qemu", "qemu-%d.log" % boot_no), "w")
+    fwd = "".join(",hostfwd=%s:127.0.0.1:%d-:%d" % f for f in forwards)
+    q = subprocess.Popen([qemu, "-nographic", "-machine", "esp32c3", "-monitor", "none",
+                          "-drive", "file=%s,if=mtd,format=raw" % flash,
+                          "-nic", "user,model=open_eth" + fwd,
+                          "-serial", "file:" + log_path, "-serial", "tcp:127.0.0.1:%d,server,nowait" % frames_port],
+                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+    return q, Card(frames_port)
+
+
 def main():
     qemu = glob.glob(os.path.join(SDK, "espressif/tools/qemu-riscv32/*/qemu/bin/qemu-system-riscv32"))
     if not qemu or not os.path.exists(IMAGE):
         sys.exit("needs tools/fetch_sdks.sh and tools/fw_esp32c3.sh qemu")
-    frames_port, listen_port = free_port(), free_port()
-    log_path = os.path.join(ROOT, "build", "esp32c3-qemu", "uart0.log")
-    log = open(os.path.join(ROOT, "build", "esp32c3-qemu", "qemu.log"), "w")
-    q = subprocess.Popen([qemu[0], "-nographic", "-machine", "esp32c3", "-monitor", "none",
-                          "-drive", "file=%s,if=mtd,format=raw" % IMAGE,
-                          "-nic", "user,model=open_eth,hostfwd=tcp:127.0.0.1:%d-:7000" % listen_port,
-                          "-serial", "file:" + log_path, "-serial", "tcp:127.0.0.1:%d,server,nowait" % frames_port],
-                         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-    try:
-        run(Card(frames_port), listen_port)
-    finally:
-        q.kill()
-        q.wait()
+    listen_port, udp_port = free_port(), free_port()
+    forwards = [("tcp", listen_port, 7000), ("udp", udp_port, UDP_CARD_PORT)]
+    with tempfile.TemporaryDirectory() as d:
+        flash = os.path.join(d, "flash.bin")
+        shutil.copyfile(IMAGE, flash)
+        q, card = boot(qemu[0], flash, forwards, 1)
+        try:
+            run(card, listen_port)
+            run_net(card, udp_port)
+        finally:
+            q.kill()
+            q.wait()
+        # the power cycle: the same flash, so NVS kept what NET_CONFIG saved
+        q, card = boot(qemu[0], flash, forwards, 2)
+        try:
+            run_power_cycle(card)
+        finally:
+            q.kill()
+            q.wait()
     print("WIFI-003: real ESP-IDF image in QEMU, %d checks, %d failures" % (checks, bad))
     return 1 if bad else 0
 
@@ -293,6 +318,173 @@ def run(card, listen_port):
             print("  online: events after SEND %r, SOCK_STATUS %r" % (evs, list(card.cmd([0x16, s]) or [])))
         expect(got.startswith(b"HTTP/1.1 200"), "online: HTTPS GET answered: %r" % got[:40])
         card.frame([0x17, s])
+
+
+UDP_CARD_PORT = 5300
+STATIC = [10, 0, 2, 20]                     # in QEMU's 10.0.2.0/24, not DHCP's .15
+MASK = [255, 255, 255, 0]
+
+
+def ip_str(b):
+    return ".".join(str(x) for x in b)
+
+
+def net_config(card, mode, ip, mask, gw, dns, dns_port, save):
+    card.frame([0x08, mode] + ip + mask + gw + dns + [dns_port & 255, dns_port >> 8, save])
+
+
+def inet_checksum(b):
+    if len(b) & 1:
+        b += b"\0"
+    total = sum(struct.unpack("!%dH" % (len(b) // 2), b))
+    while total >> 16:
+        total = (total & 0xFFFF) + (total >> 16)
+    return ~total & 0xFFFF
+
+
+def recvfrom(card, sock, max_len=200, timeout=10):
+    """RECVFROM until a datagram comes: (ip, port, data), or None."""
+    end = time.time() + timeout
+    while time.time() < end:
+        r = card.cmd([0x1A, sock, max_len])
+        if r is None or len(r) < 7 or len(r) != 7 + r[6]:
+            expect(False, "RECVFROM's RESP_LEN is 7 + n: %r" % r)
+            return None
+        if r[6]:
+            return list(r[0:4]), r[4] | r[5] << 8, bytes(r[7:])
+        time.sleep(0.02)
+    return None
+
+
+def tcp_round_trip(card, what):
+    """A TCP client connection from the card to this host, both ways."""
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    srv.settimeout(20)
+    port = srv.getsockname()[1]
+    sock = card.cmd([0x10, 0])[0]
+    card.frame([0x11, sock] + HOST + [port & 255, port >> 8])
+    try:
+        conn, _ = srv.accept()
+        ev, seen = card.wait_event(0x10)
+        card.frame([0x14, sock, 2] + list(b"hi"))
+        conn.settimeout(10)
+        got = conn.recv(16)
+        conn.close()
+    except OSError as e:
+        ev, seen, got = None, [], repr(e)
+    expect(ev == sock and got == b"hi", "%s: TCP to the host (%r, %r)" % (what, seen, got))
+    card.frame([0x17, sock])
+    srv.close()
+
+
+def run_net(card, udp_port):
+    # ------------------------------------------------------------- NET_CONFIG
+    cfg = card.cmd([0x09])
+    expect(cfg and list(cfg) == [0] + [0] * 16 + [53, 0, 0],
+           "NET_CONFIG_GET at power-up: DHCP, DNS port 53, not saved: %r" % (cfg and list(cfg)))
+
+    # ------------------------------------------------------------- UDP server
+    us = card.cmd([0x10, 1])[0]
+    card.frame([0x19, us, UDP_CARD_PORT & 255, UDP_CARD_PORT >> 8])
+    r = card.cmd([0x1A, us, 64])
+    expect(r and list(r) == [0] * 7, "RECVFROM with nothing waiting: n 0: %r" % (r and list(r)))
+    a = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    b = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    a.settimeout(10)
+    b.settimeout(10)
+    a.sendto(b"hello card", ("127.0.0.1", udp_port))
+    got = recvfrom(card, us)
+    expect(got and got[2] == b"hello card" and got[0] == HOST,
+           "UDP_BIND + RECVFROM: a datagram through the port forward, from 10.0.2.2: %r" % (got,))
+    if got:
+        ip, port, _ = got
+        card.frame([0x18, us] + ip + [port & 255, port >> 8, 4] + list(b"pong"))
+        try:
+            data, src = a.recvfrom(64)
+        except socket.timeout:
+            data, src = None, None
+        expect(data == b"pong" and src == ("127.0.0.1", udp_port),
+               "UDP_SENDTO answers the sender through the forward: %r %r" % (data, src))
+    b.sendto(b"second", ("127.0.0.1", udp_port))
+    got = recvfrom(card, us)
+    expect(got and got[2] == b"second", "after replying to one client, the bound socket hears another: %r" % (got,))
+    a.close()
+    b.close()
+    card.frame([0x17, us])
+
+    # ------------------------------------------------------------- ICMP
+    ic = card.cmd([0x10, 3])[0]
+    expect(ic < 4, "OPEN type 3 (ICMP) gives a socket: %r" % ic)
+    msg = bytearray(struct.pack("!BBHHH", 8, 0, 0, 0xC8C8, 7) + b"cupc8 ping")
+    struct.pack_into("!H", msg, 2, inet_checksum(bytes(msg)))
+    card.frame([0x18, ic] + HOST + [0, 0, len(msg)] + list(msg))
+    got = recvfrom(card, ic)
+    ok = got and got[0] == HOST and got[1] == 0 and len(got[2]) == len(msg)
+    if ok:
+        typ, code, _, ident, seq = struct.unpack("!BBHHH", got[2][:8])
+        ok = typ == 0 and code == 0 and ident == 0xC8C8 and seq == 7 and got[2][8:] == b"cupc8 ping" \
+            and inet_checksum(got[2]) == 0
+    expect(ok, "ICMP echo to 10.0.2.2: the reply, id and sequence kept, IP header stripped: %r" % (got,))
+    card.frame([0x17, ic])
+
+    # ------------------------------------------------------------- DNS server
+    net_config(card, 0, [0] * 4, [0] * 4, [0] * 4, HOST, 5353, 0)
+    cfg = card.cmd([0x09])
+    expect(cfg and list(cfg) == [0] + [0] * 12 + HOST + [5353 & 255, 5353 >> 8, 0],
+           "NET_CONFIG_GET: DHCP, DNS 10.0.2.2:5353, not saved: %r" % (cfg and list(cfg)))
+    st = card.cmd([0x01])
+    expect(st and st[0] == 2 and list(st[2:6]) == [10, 0, 2, 15] and list(st[10:14]) == HOST,
+           "NET_STATUS: DHCP's address, the configured DNS server: %r" % (st and list(st)))
+
+    # ------------------------------------------------------------- static
+    net_config(card, 1, STATIC, MASK, HOST, [10, 0, 2, 3], 53, 1)
+    st = None
+    for _ in range(100):
+        st = card.cmd([0x01])
+        if st and st[0] == 2 and list(st[2:6]) == STATIC:
+            break
+        time.sleep(0.05)
+    expect(st and st[0] == 2 and list(st[2:6]) == STATIC and list(st[6:10]) == HOST
+           and list(st[10:14]) == [10, 0, 2, 3], "static address in use at once: %r" % (st and list(st)))
+    cfg = card.cmd([0x09])
+    expect(cfg and list(cfg) == [1] + STATIC + MASK + HOST + [10, 0, 2, 3, 53, 0, 1],
+           "NET_CONFIG_GET: static, saved: %r" % (cfg and list(cfg)))
+    tcp_round_trip(card, "static address")
+
+
+def run_power_cycle(card):
+    ident = None
+    for _ in range(100):
+        ident = card.cmd([0xF0], tries=20)
+        if ident:
+            break
+        time.sleep(0.1)
+    expect(ident and ident[0] == 0x03, "IDENT after the power cycle: %r" % ident)
+    cfg = card.cmd([0x09])
+    expect(cfg and list(cfg) == [1] + STATIC + MASK + HOST + [10, 0, 2, 3, 53, 0, 1],
+           "the saved static settings came back from NVS: %r" % (cfg and list(cfg)))
+    card.frame([0x04] + string("qemu-eth") + string("") + [0])
+    ev, seen = card.wait_event(0x02, timeout=30)
+    st = card.cmd([0x01])
+    expect(ev is not None and st and st[0] == 2 and list(st[2:6]) == STATIC,
+           "JOIN after power-up comes up on the saved static address (%r): %r" % (seen, st and list(st)))
+    tcp_round_trip(card, "static address after power-up")
+
+    # back to DHCP, saved: a lease replaces the static address
+    net_config(card, 0, [0] * 4, [0] * 4, [0] * 4, [0] * 4, 53, 1)
+    st = None
+    for _ in range(200):
+        st = card.cmd([0x01])
+        if st and st[0] == 2 and list(st[2:6]) == [10, 0, 2, 15]:
+            break
+        time.sleep(0.05)
+    expect(st and st[0] == 2 and list(st[2:6]) == [10, 0, 2, 15] and list(st[10:14]) == [10, 0, 2, 3],
+           "static to DHCP: a lease again (10.0.2.15, DNS 10.0.2.3): %r" % (st and list(st)))
+    cfg = card.cmd([0x09])
+    expect(cfg and list(cfg) == [0] + [0] * 16 + [53, 0, 1], "DHCP saved: %r" % (cfg and list(cfg)))
+    tcp_round_trip(card, "DHCP again")
 
 
 if __name__ == "__main__":

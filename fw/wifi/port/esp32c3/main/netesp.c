@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
+#include "nvs.h"
 #include "sdkconfig.h"
 
 #if CONFIG_CUPC8_QEMU
@@ -41,6 +42,7 @@ static struct {
 	esock_t s[MAXS];
 	volatile int link;
 	esp_netif_t *netif;
+	wifi_netcfg_t cfg;                  /* NET_CONFIG's settings */
 	/* name lookups run on their own task: getaddrinfo blocks */
 	char resolve_host[64];
 	volatile int resolve_state;         /* 0 idle, 1 running, 2 done, 3 failed */
@@ -54,9 +56,21 @@ static struct {
 
 /* ------------------------------------------------------------------ link */
 
+/* NET_CONFIG's DNS server, if it names one: over DHCP's (a lease sets its
+ * own again, so this runs at every GOT_IP too) */
+static void set_dns(void)
+{
+	if (!(net.cfg.dns[0] | net.cfg.dns[1] | net.cfg.dns[2] | net.cfg.dns[3]))
+		return;
+	esp_netif_dns_info_t d = { .ip.type = ESP_IPADDR_TYPE_V4 };
+	memcpy(&d.ip.u_addr.ip4.addr, net.cfg.dns, 4);
+	esp_netif_set_dns_info(net.netif, ESP_NETIF_DNS_MAIN, &d);
+}
+
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
 	if (base == IP_EVENT && (id == IP_EVENT_STA_GOT_IP || id == IP_EVENT_ETH_GOT_IP)) {
+		set_dns();
 		net.link = WIFI_LINK_UP;
 #if CONFIG_CUPC8_QEMU
 	} else if (base == ETH_EVENT && id == ETHERNET_EVENT_DISCONNECTED) {
@@ -177,6 +191,57 @@ static int n_scan_result(void *ctx, int idx, uint8_t *rssi, uint8_t *auth, char 
 #endif
 }
 
+/* ------------------------------------------------------------------ settings */
+
+/* The same for Wi-Fi and QEMU's Ethernet: esp_netif keeps a static address
+ * while the link is down and raises GOT_IP with it when the link comes up
+ * (esp_netif_action_connected); DHCP starts then too. */
+static void n_net_config(void *ctx, const wifi_netcfg_t *cfg)
+{
+	net.cfg = *cfg;
+	if (cfg->mode == 1) {
+		esp_netif_dhcpc_stop(net.netif);            /* "already stopped" is fine */
+		esp_netif_ip_info_t info;
+		memcpy(&info.ip.addr, cfg->ip, 4);
+		memcpy(&info.netmask.addr, cfg->mask, 4);
+		memcpy(&info.gw.addr, cfg->gw, 4);
+		if (esp_netif_set_ip_info(net.netif, &info) != ESP_OK)
+			ESP_LOGW(TAG, "static address refused");
+	} else {
+		esp_netif_dhcp_status_t st;
+		if (esp_netif_dhcpc_get_status(net.netif, &st) == ESP_OK && st == ESP_NETIF_DHCP_STOPPED) {
+			/* static to DHCP: the address goes until a lease comes */
+			if (net.link == WIFI_LINK_UP)
+				net.link = WIFI_LINK_JOINING;
+			esp_netif_dhcpc_start(net.netif);
+		}
+	}
+	set_dns();
+}
+
+static int n_config_save(void *ctx, const wifi_netcfg_t *cfg)
+{
+	nvs_handle_t h;
+	if (nvs_open("cupc8", NVS_READWRITE, &h) != ESP_OK)
+		return -1;
+	esp_err_t e = nvs_set_blob(h, "netcfg", cfg, sizeof *cfg);
+	if (e == ESP_OK)
+		e = nvs_commit(h);
+	nvs_close(h);
+	return e == ESP_OK ? 0 : -1;
+}
+
+static bool n_config_load(void *ctx, wifi_netcfg_t *cfg)
+{
+	nvs_handle_t h;
+	size_t n = sizeof *cfg;
+	if (nvs_open("cupc8", NVS_READONLY, &h) != ESP_OK)
+		return false;
+	bool ok = nvs_get_blob(h, "netcfg", cfg, &n) == ESP_OK && n == sizeof *cfg;
+	nvs_close(h);
+	return ok;
+}
+
 /* ------------------------------------------------------------------ DNS */
 
 static void resolver_task(void *arg)
@@ -229,8 +294,12 @@ static int n_open(void *ctx, int type)
 		memset(s, 0, sizeof *s);
 		s->type = type;
 		s->fd = -1;
+		if (type > WIFI_ICMP)
+			return -1;
 		if (type != WIFI_TLS) {
-			s->fd = socket(AF_INET, type == WIFI_UDP ? SOCK_DGRAM : SOCK_STREAM, 0);
+			/* ICMP: a raw socket; lwIP adds the IP header, the host built the rest */
+			s->fd = type == WIFI_ICMP ? socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)
+			      : socket(AF_INET, type == WIFI_UDP ? SOCK_DGRAM : SOCK_STREAM, 0);
 			if (s->fd < 0)
 				return -1;
 			fcntl(s->fd, F_SETFL, fcntl(s->fd, F_GETFL, 0) | O_NONBLOCK);
@@ -333,6 +402,58 @@ static int n_recv(void *ctx, int h, uint8_t *data, int len)
 	return n < 0 ? (errno == EAGAIN ? 0 : -1) : n;
 }
 
+static int n_bind(void *ctx, int h, uint16_t port)
+{
+	esock_t *s = get(h);
+	if (!s || s->type != WIFI_UDP)
+		return -1;
+	struct sockaddr_in sa = { .sin_family = AF_INET, .sin_port = htons(port), .sin_addr.s_addr = htonl(INADDR_ANY) };
+	return bind(s->fd, (struct sockaddr *)&sa, sizeof sa);
+}
+
+static int n_sendto(void *ctx, int h, const uint8_t ip[4], uint16_t port, const uint8_t *data, int len)
+{
+	esock_t *s = get(h);
+	if (!s || (s->type != WIFI_UDP && s->type != WIFI_ICMP) || (s->type == WIFI_ICMP && len < 8))
+		return -1;
+	struct sockaddr_in sa = { .sin_family = AF_INET, .sin_port = s->type == WIFI_UDP ? htons(port) : 0 };
+	memcpy(&sa.sin_addr.s_addr, ip, 4);
+	int n = (int)sendto(s->fd, data, (size_t)len, 0, (struct sockaddr *)&sa, sizeof sa);
+	return n < 0 ? (errno == EAGAIN ? 0 : -1) : n;
+}
+
+static int n_recvfrom(void *ctx, int h, uint8_t *data, int len, uint8_t ip[4], uint16_t *port)
+{
+	esock_t *s = get(h);
+	if (!s || (s->type != WIFI_UDP && s->type != WIFI_ICMP))
+		return -1;
+	struct sockaddr_in sa = { 0 };
+	socklen_t sl = sizeof sa;
+	int n;
+	if (s->type == WIFI_UDP) {
+		n = (int)recvfrom(s->fd, data, (size_t)len, 0, (struct sockaddr *)&sa, &sl);
+	} else {
+		/* lwIP's raw sockets deliver the IP header too: the host gets the
+		 * ICMP message only */
+		uint8_t pkt[60 + CARD_RESP_MAX];
+		n = (int)recvfrom(s->fd, pkt, sizeof pkt, 0, (struct sockaddr *)&sa, &sl);
+		if (n > 0) {
+			int hl = (pkt[0] & 15) * 4;
+			if (hl < 20 || hl > n)
+				return 0;
+			n -= hl;
+			if (n > len)
+				n = len;
+			memcpy(data, pkt + hl, (size_t)n);
+		}
+	}
+	if (n < 0)
+		return errno == EAGAIN ? 0 : -1;
+	memcpy(ip, &sa.sin_addr.s_addr, 4);
+	*port = s->type == WIFI_UDP ? ntohs(sa.sin_port) : 0;
+	return n;
+}
+
 static int n_status(void *ctx, int h, int *rx_avail, int *tx_free)
 {
 	esock_t *s = get(h);
@@ -396,7 +517,7 @@ static int n_status(void *ctx, int h, int *rx_avail, int *tx_free)
 		}
 		return WIFI_CONNECTING;
 	}
-	if (!*rx_avail && s->type != WIFI_UDP) {
+	if (!*rx_avail && s->type == WIFI_TCP) {
 		uint8_t b;
 		if (recv(s->fd, &b, 1, MSG_PEEK | MSG_DONTWAIT) == 0)
 			s->peer_closed = true;
@@ -419,8 +540,10 @@ static void n_close(void *ctx, int h)
 const wifi_net_ops netesp_ops = {
 	.join = n_join, .link_state = n_link_state, .leave = n_leave,
 	.scan_start = n_scan_start, .scan_result = n_scan_result, .resolve = n_resolve,
+	.net_config = n_net_config, .config_save = n_config_save, .config_load = n_config_load,
 	.open = n_open, .connect = n_connect, .listen = n_listen, .send = n_send,
-	.recv = n_recv, .status = n_status, .close = n_close,
+	.recv = n_recv, .bind = n_bind, .sendto = n_sendto, .recvfrom = n_recvfrom,
+	.status = n_status, .close = n_close,
 };
 
 void *netesp_init(void)
