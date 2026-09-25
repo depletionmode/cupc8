@@ -177,8 +177,12 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   5.35 mm shoulders, and finger B1 is at the same offset from the body's left
   edge as on the x1 cards. `pipeline(io_card=True, tab=kg.X8_TAB)` draws and
   checks the outline. The width is set by the x8 tab plus its two 5 mm
-  shoulders (61.3 mm, which the existing 62 covers). The height needed no
-  change: everything fits single-sided in 39.05 mm, as described below.
+  shoulders (61.3 mm, which the existing 62 covers).
+- **Status: not yet routable by the pipeline.** Every part fits
+  single-sided in 39.05 mm: placement, silkscreen and courtyards are clean,
+  and so is DRC after pre-routing. But Freerouting leaves 1–10 of the bus
+  connections unrouted in the 10 mm band between the package and the
+  fingers (see the CPU-card report for the numbers and the options).
 - **FPGA pins** are read from `hw/pins.yaml` (`cpu_fpga`), the file that also
   generates `build/hw/cpucard.pcf`, so the schematic and the bitstream agree
   by construction. Each side of the package carries its bus lines in the
@@ -225,10 +229,10 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
 - **Stackup.** 4 layers, JLC04161H-7628, 1.6 mm, with hard-gold fingers,
   bevelled per the fab order spec (`kicadgen.order_spec`). The layers are
   signal + GND pour / signal + GND pour / solid 3V3 plane / signal + GND
-  pour. Between the package and the fingers the bus has a 10 mm band, and
-  two signal layers could not route it. So In1 carries signals too, and its
-  GND pour fills round them. Every piece of that pour is tied by GND vias to
-  the stitched outer pours. 1V2 is routed as tracks.
+  pour. Between the package and the fingers the bus has a 10 mm band, which
+  two signal layers could not route. So In1 carries signals too, and its GND
+  pour fills round them. Every piece of that pour is tied by GND vias to the
+  stitched outer pours. 1V2 is routed as tracks.
 - **Placement.**
   - The FPGA sits against the top edge, with its top pad row 0.85 mm in.
     That leaves the 10 mm band under it for the arrays and the bus fan-out.
