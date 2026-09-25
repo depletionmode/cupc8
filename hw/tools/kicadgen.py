@@ -2016,7 +2016,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     `prepare(board)`, if given, runs after the pad fan-out and before
     Freerouting: a board's own locked pre-routing (layer changes the router
-    would otherwise scatter)."""
+    would otherwise scatter). The nets it returns, if any, are finger escapes
+    of its own, which Freerouting may report open: they are checked on KiCad's
+    connectivity after routing, as the key-notch escapes are."""
     import pcbnew
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
@@ -2073,7 +2075,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # (build_board's (net, layers) zones), which is reached no other way
         state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
         if prepare:                   # the board's own locked pre-routing, before Freerouting
-            prepare(b)
+            # nets it returns are escapes of its own: checked like the key-notch ones
+            state["escaped"] = list(state.get("escaped", [])) + list(prepare(b) or [])
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \

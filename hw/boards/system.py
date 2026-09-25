@@ -271,6 +271,36 @@ FINE_NETS = sorted({"/" + n for n in list(GPIO.values()) + [
     "USB_DP", "USB_DM", "USB_CC1", "USB_CC2"]})   # and J1's 0.5 mm-pitch contacts
 
 
+def prepare(board):
+    """Locked pre-routing: CHIPSET_CDONE's finger (A21, between two GND
+    columns whose ties wall it in) escapes straight up on its own layer to a
+    via in the body, which Freerouting reaches on any layer. Without it the
+    router leaves the finger unrouted at every pass count. Returns the nets
+    escaped, for the pipeline's connectivity check."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    fps = {f.GetReference(): f for f in board.GetFootprints()}
+    pad = [p for p in fps["J2"].Pads() if p.GetNumber() == "A21"][0]
+    x = pad.GetPosition().x
+    y = mm(H - 3.0)
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(pcbnew.VECTOR2I(x, pad.GetBoundingBox().GetTop() + mm(0.1)))
+    t.SetEnd(pcbnew.VECTOR2I(x, y))
+    t.SetWidth(mm(0.2))
+    t.SetLayer(pcbnew.B_Cu)
+    t.SetNet(pad.GetNet())
+    t.SetLocked(True)
+    board.Add(t)
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(x, y))
+    v.SetWidth(mm(0.6))
+    v.SetDrill(mm(0.3))
+    v.SetNet(pad.GetNet())
+    v.SetLocked(True)
+    board.Add(v)
+    return [pad.GetNetname()]
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     logo.footprint(LOGO_MM)
@@ -279,7 +309,7 @@ def main():
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
-        title="CUPC/8 system", revision=REVISION,
+        title="CUPC/8 system", revision=REVISION, prepare=prepare,
         # the presence link crosses on In2.Cu just above the tab (the key notch
         # reaches the body) and above the GND ties' vias: on B.Cu it would wall
         # off the A-side fingers' escapes
