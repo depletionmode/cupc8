@@ -116,7 +116,7 @@ cmd = "python3 tools/cpudirected.py CPU-004"
 [[test]]
 id = "CPU-005"
 title = "Interrupt entry and return"
-checks = "IRQ taken only at instruction boundaries with I=1, lowest number first; push order pch, pcl, f; I cleared; vector read; pop f/pcl/pch returns exactly"
+checks = "IRQ taken only at instruction boundaries with I=1, lowest number first, and never right after POP pcl (a timer due as POP pcl retires is taken after the POP pch; simtest testIrqPopPcl checks sim.nim the same way); push order pch, pcl, f; I cleared; vector read; pop f/pcl/pch returns exactly"
 method = "soc/tb/tb_cpu_directed.vhd running test/cpu/directed.s (labels passed in by tools/cpudirected.py)"
 kind = "sim"
 vrow = "1.3"

@@ -728,6 +728,14 @@ proc testIrqTimer() =
   discard runFile(testdata / "irq_timer.s")
   expect("timer handler wrote $aa", mem[0x2000], 0xaa)
 
+proc testIrqPopPcl() =
+  ## CPU-005 (sim.nim): an IRQ is not taken between POP pcl and POP pch
+  echo "== no IRQ between pop pcl and pop pch =="
+  discard runFile(testdata / "irq_popret.s")
+  expect("the timer handler ran", mem[0x2001], 0x11)
+  expect("the call returned where it should", mem[0x2000], 0x55)
+  expect("SP back at the bottom", SP, 0x0100, 4)
+
 proc testIrqFlags() =
   echo "== pop f restores Z =="
   discard runFile(testdata / "irq_flags.s")
@@ -765,6 +773,7 @@ proc testIrqMaskMmio() =
 
 run testIrqOps
 run testIrqTimer
+run testIrqPopPcl
 run testIrqFlags
 run testIrqCli
 run testIrqKeyb

@@ -50,6 +50,7 @@ var
   IF*: bool = false
   waiting*: bool = false
   pcl*: int = 0
+  lastOp: int = 0                # the opcode of the instruction that retired last
   mem*: array[0..0x10000, int]
   imageEnd*: int = 0
   irqPending*: int = 0
@@ -678,12 +679,18 @@ proc tickTimers() =
 proc serviceIrq() =
   if not IF:
     return
+  # POP pcl and the POP pch after it are one return: an IRQ taken between
+  # them would push over the popped byte and its handler's own POP pcl would
+  # replace the pcl register, so the return would go astray (cpu.vhd)
+  if lastOp == 0x9f:
+    return
   let n = irqReady()
   if n >= 0:
     takeIrq(n)
 
 proc decode() =
   var op = fetch()
+  lastOp = op
   var ins = op and 0xf8
   var r = op and 7
   case ins:
@@ -727,6 +734,7 @@ proc cpuReset*() =
   IF = false
   waiting = false
   pcl = 0
+  lastOp = 0
   imageEnd = 0
   ins_retired = 0
   last_gpo = ""

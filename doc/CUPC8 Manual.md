@@ -100,6 +100,8 @@ Return is the same as a call return plus one extra pop for the flags:
 	pop pcl
 	pop pch
 
+An IRQ is never taken right after *POP pcl*: it and the *POP pch* after it are one return. (Taken between them, the IRQ's frame would go over the byte just popped, and its handler's own *POP pcl* would replace **pcl**, so the return would go astray.)
+
 *POP f* restores **I**, so an IRQ still pending is taken right after it, inside the epilogue and before the return. This nests correctly: the new handler pushes the address of the *POP pcl* (three more stack bytes), and its own return lands back in the epilogue, which then completes. Interrupts can therefore nest one level per pending source; leave room on the stack for it.
 
 Sources are latched. *$f200* is the pending register (write-1-to-clear). *$f201* is the mask (1 = enabled). Reset leaves **I** and the mask clear; the kernel plants the vectors and *STI*s when it is ready.
