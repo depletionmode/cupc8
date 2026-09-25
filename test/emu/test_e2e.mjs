@@ -2,7 +2,10 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007] [--record]
+//
+// E2E-007 (files on the storage card's microSD) needs CUPC8_EMU=native: the
+// SD card model is only in the native emulator.
 //
 // CUPC8_EMU=native runs them on the native emulator (emu/machine,
 // test/emu/machinenative.mjs: the same machine, cycle for cycle, faster);
@@ -11,9 +14,10 @@
 // Screens are compared with recorded text (test/emu/golden/*.txt); --record
 // rewrites them after a human has checked the run.
 
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 const backend = process.env.CUPC8_EMU === 'native' ? 'native' : 'js';
 const { Machine } = await import(backend === 'native' ? './machinenative.mjs' : './machine.mjs');
@@ -129,8 +133,115 @@ async function e2e003() {
   server.close();
 }
 
-const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003 };
+// ------------------------------------------------------------------ E2E-007
+// Files on the storage card (doc/hardware/storage-card.md): the real kernel
+// and BASIC, the real IO and storage card firmware, the SD card model with a
+// FAT image made on the host (test/emu/fatimg.py). Type a program, SAVE it,
+// power the machine off and on (the card keeps the image), LOAD and RUN it;
+// DIR; a program written on the host LOADs; keys typed during a slow SAVE
+// are not lost; SAVE with no card, a full card and a write-protected card
+// gives the kernel's messages. Native only.
+async function e2e007() {
+  log('E2E-007: BASIC SAVE, power cycle, LOAD, RUN, DIR on the storage card (microSD model)');
+  if (backend !== 'native') {
+    expect(false, 'E2E-007 needs CUPC8_EMU=native (the SD card model)');
+    return;
+  }
+  const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-e2e007-'));
+  const fat = (...a) => execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
+  const img = path.join(dir, 'card.img');
+  fat('mkfs', img, '16', '16');
+  fs.writeFileSync(path.join(dir, 'host.bas'), '10 print 100+23\r\n20 print "FROM THE HOST"\r\n');
+  fat('put', img, 'HOSTPROG.BAS', path.join(dir, 'host.bas'));
+  const slots = { 1: 'gpu', 2: 'io', 3: 'storage' };
+  const boot = async (opts = {}) => {
+    const m = await Machine.create({ slots });
+    if (opts.image !== null) m.sd.insert(opts.image ?? img, { highCapacity: false, ...opts.sd });
+    m.powerOn();
+    expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+    return m;
+  };
+  // run a command line and wait for the prompt after it (or `want`)
+  const line = async (m, text, want, ns = 10e9) => {
+    m.type(text + '\n');
+    return m.runUntil(() => {
+      const t = screenText(m);
+      const i = t.toLowerCase().lastIndexOf(text.toLowerCase());
+      if (i < 0) return false;
+      const after = t.slice(i + text.length);
+      return /\n>> ?_?$/.test(after) && (!want || after.includes(want));
+    }, ns, 100e6);
+  };
+  const shown = (m) => '---- screen\n' + screenText(m) + '\n----';
+
+  let m = await boot();
+  m.type('10 print "saved"\n20 print 6*7\n');
+  await m.runAsync(300e6);
+  if (!expect(await line(m, 'save "demo"'), 'SAVE "demo" returns to the prompt')) console.log(shown(m));
+  const afterSave = screenText(m).slice(screenText(m).toLowerCase().lastIndexOf('save "demo"') + 11);
+  expect(!/error|no card|full|protect/i.test(afterSave), `SAVE printed no error (${JSON.stringify(afterSave)})`);
+  const card = m.sd.card();
+  expect(card && card.violations.length === 0, `the storage firmware keeps to the SD protocol (${card?.violations.join('; ')})`);
+  m.stop();
+
+  // the file on the host: text, one line per program line
+  const ls = JSON.parse(fat('ls', img).toString());
+  const saved = ls.find(([n]) => /^DEMO(\.BAS)?$/.test(n));
+  expect(saved, `the host sees the saved program (${JSON.stringify(ls)})`);
+  if (saved) {
+    const body = fat('get', img, saved[0]).toString('latin1');
+    expect(/10 PRINT "saved"/i.test(body) && /20 PRINT 6\*7/i.test(body), `SAVE wrote the program as text: ${JSON.stringify(body)}`);
+  }
+
+  log('power cycle');
+  m = await boot();
+  if (!expect(await line(m, 'load "demo"') && !/not found|error/i.test(screenText(m).split(/load "demo"/i).at(-1)),
+    'LOAD "demo" after the power cycle')) console.log(shown(m));
+  if (!expect(await line(m, 'run', '42'), 'RUN prints "saved" and 42')) console.log(shown(m));
+  expect(screenText(m).includes('saved'), 'the loaded program printed "saved"');
+  if (!expect(await line(m, 'dir', 'HOSTPROG'), 'DIR lists the files')) console.log(shown(m));
+  expect(/DEMO/.test(screenText(m)), 'DIR shows DEMO');
+  if (!expect(await line(m, 'load "hostprog.bas"') && !/not found/i.test(screenText(m).split(/load "hostprog.bas"/i).at(-1)),
+    'LOAD a program written on the host (HOSTPROG.BAS)')) console.log(shown(m));
+  if (!expect(await line(m, 'run', 'FROM THE HOST'), 'it runs: 123 and "FROM THE HOST"')) console.log(shown(m));
+  expect(screenText(m).includes('123'), 'the host program printed 123');
+  m.stop();
+
+  // a slow card: keys typed while SAVE waits on the card still arrive
+  log('slow card: typing during SAVE');
+  m = await boot({ sd: { writeMs: 250 } });
+  m.type('10 print "slow"\n');
+  await m.runAsync(200e6);
+  m.type('save "slow"\n20 print 7*6+1\nrun\n');   // typed at once: most of it while SAVE waits on the card
+  if (!expect(await m.runUntil(() => screenText(m).includes('43'), 20e9, 100e6), 'lines typed during a slow SAVE are kept and run afterwards (43)')) console.log(shown(m));
+  expect(m.sd.card().stats.busyNs >= 250e6, `the card was busy ${m.sd.card().stats.busyNs / 1e6} ms`);
+  m.stop();
+
+  // SAVE with no card, a full card, a write-protected card
+  const errors = [
+    ['no card', { image: null }, /no (sd )?card|no medium/i],
+    ['write-protected', { sd: { writeProtect: true } }, /protect/i],
+    ['full', { image: 'full' }, /full/i],
+  ];
+  for (const [what, opts, msg] of errors) {
+    if (opts.image === 'full') {
+      opts.image = path.join(dir, 'full.img');
+      fat('mkfs', opts.image, '2', '12');
+      fat('fill', opts.image, 'BIG.DAT');
+    }
+    m = await boot(opts);
+    m.type('10 print 1\n');
+    await m.runAsync(200e6);
+    const ok = await line(m, 'save "x"', undefined);
+    if (!expect(ok && msg.test(screenText(m)), `SAVE with ${what}: the error message, then the prompt`)) console.log(shown(m));
+    m.stop();
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007 };
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
-for (const [id, fn] of Object.entries(tests)) if (!only || only === id) await fn();
+for (const [id, fn] of Object.entries(tests)) if (only ? only === id : id !== 'E2E-007' || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

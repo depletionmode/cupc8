@@ -2,7 +2,8 @@
 // machine/machine.node): the same machine and the same API as machine.mjs's
 // Machine, cycle for cycle, with each RP2040 card on its own thread.
 //
-//   const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io' } });
+//   const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io', 3: 'storage' } });
+//   m.sd.insert('card.img', { writeMs: 5 });   // not in machine.mjs: the storage card's microSD
 //   m.powerOn();  await m.runAsync(3e9);  m.screen()
 //
 // test_e2e.mjs uses it with CUPC8_EMU=native. CUPC8_EMU_THREADS=0 runs the
@@ -56,6 +57,16 @@ export class Machine {
       m.keyboard = {
         press: (mods, ...keys) => native.press(h, mods, keys),
         get state() { return native.keyboard(h); },
+      };
+    }
+    if (Object.values(slots).includes('storage')) {
+      // the storage card's microSD socket (emu/rp2040/harness/sdcard.h): an
+      // image file goes in (written through as blocks are programmed), comes out
+      const h = m.h;
+      m.sd = {
+        insert: (image, opts = {}) => native.sdInsert(h, image, opts),
+        remove: () => native.sdRemove(h),
+        card: () => native.sdCard(h),
       };
     }
     return m;

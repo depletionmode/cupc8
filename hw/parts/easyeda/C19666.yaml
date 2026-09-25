@@ -1,0 +1,10 @@
+# JLC's part C19666 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C19666
+jlc_package: '0603'
+easyeda_footprint: C0603
+pins: {'1': '1', '2': '2'}
+pads:
+- ['2', 0.7, 0.0]
+- ['1', -0.7, 0.0]

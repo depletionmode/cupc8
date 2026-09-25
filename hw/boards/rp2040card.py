@@ -301,7 +301,10 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb), preroute=preroute or tie_testen, route_tries=6)
+                       fine_nets=u1_nets(gpios, usb), prepare=preroute or tie_testen, route_tries=6,
+                       # four layers: GND poured on both outer layers, In1 a
+                       # solid GND plane; In2 routes signals
+                       zones=("/GND", ("/GND", ("In1.Cu",))) if layers == 4 else ("/GND",))
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

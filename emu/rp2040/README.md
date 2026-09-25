@@ -79,6 +79,22 @@ CUPC8_EMU_TRACE=1 node test/emu/test_io.mjs 2> js.trace  # every runUntil's ns, 
 The two backends give byte-identical `CUPC8_EMU_TRACE` output on GPU-004,
 GPU-005, IOC-004 (with `DEBUG=1`) and SYS-006.
 
+## SD card model (not in rp2040js)
+
+`harness/sdcard.h` is an SD memory card in SPI mode and the storage card's
+microSD socket (`doc/hardware/storage-card.md`): `SdSocket` answers SPI1's
+frames (`RPSPI::onTransmit`) after their real duration at the programmed SCK
+rate, reads nCS from GPIO13 (a SIO output; SPI1's own CSn is refused, as a
+real card would misbehave), drives card detect on GPIO17 and backs the card
+with an image file (blocks written through when their busy time ends).
+`SdCard` is the protocol, checked against the SD Physical Layer Simplified
+Specification section by section (the header lists what is modelled and
+where the spec says so); host mistakes are recorded in `violations`.
+Tests: `test/sd/test_sdcard.cpp` and `test/emu/test_sdspi.mjs` (EMU-008),
+`test/emu/test_storage.mjs` (STO-010), `test/emu/test_e2e.mjs` E2E-007.
+From Node: `SdSocket` in `test/emu/rp2040native.mjs`, `m.sd` in
+`test/emu/machinenative.mjs` (the machine's `storage` slot kind).
+
 ## Verification
 
 Every module has a seeded differential harness against the patched rp2040js

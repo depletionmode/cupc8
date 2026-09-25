@@ -38,17 +38,26 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## In flight
 
-| Work | Where | State |
-|---|---|---|
-| GPU and IO card boards, then the storage card board | agent worktree (GPU/IO agent) | GPU/IO route; storage card to follow |
-| System card board | agent worktree | routing |
-| CPU card board | agent worktree | routing, plane fan-out |
-| Main board | agent worktree | routing (the largest board) |
-| Storage firmware (`fw/storage`), kernel `storage.s`, BASIC SAVE/LOAD/DIR/DEL, tests | agent worktree | started (retargeted from the IO card) |
-| SD card model in the native emulator, card and end-to-end tests | agent worktree | started (attaches to the storage card) |
-| E-ink graphics card proposal | `proposals/eink-gpu.md` | written; David's decisions recorded at its top (a replacement for the HDMI card, card type $01, 5.83" 648×480 panel on its driver module via a 2.54 mm header + TVS, native 4-grey mode from the start). Not scheduled. |
+| Work | State |
+|---|---|
+| GPU, IO, storage card boards | IO passes every step; GPU one DRC item; storage drawn. IO gets a keyboard-port boost next (David) |
+| System card board | passes every step; merging milestone-1 (kicadgen overlaps with the CPU card's) |
+| Main board | routing; picking up the CPU card's pinout and the new power parts |
+| E-ink card board | pipeline run |
+| E-ink software (firmware, kernel INFO driver, UC8179 model, viewer) | done, all tests pass; merging milestone-1 (renumbers its E2E to E2E-008) |
+| Power: keyboard-port boost (B16), default USB = typical loads (B6/B7), drop THM T5–T7 | power agent |
+| Firmware bugs: storage slot frames at 20 µs gap, ST_EJECT before programming ends, IOC-004 key repeat | firmware agent |
 
 ## Done (recent)
+
+- CPU card board passes every step (4 layers; FPGA pinout reordered to the
+  socket's fingers; fmax 59.5 MHz, bus slack 65/64 %).
+- SD card model in the native emulator (EMU-008), STO-003, E2E-007 (BASIC
+  SAVE/LOAD on the whole machine).
+- Storage card software: FatFs core, RP2040 port, kernel/BASIC, 2668 host
+  checks, KRN-006.
+- Power for four cards and a 3 A source: TPS259470 eFuse, 3.5 A PTC,
+  TLV62569PDDCR, PWR_HI = 3.0 A; below it no radio and no SD writes.
 
 - Wi-Fi card board through the whole pipeline (WIFI-004), TLV62569 buck
   after POW-003/THM-001, TX/RX/LINK LEDs, standard outline.

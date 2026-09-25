@@ -1,0 +1,14 @@
+# 4D03WGJ0330T5E (UNI-ROYAL), 4 x 33 ohm resistor array, convex 0603x4
+datasheet: https://datasheet.lcsc.com/lcsc/1811061524_UNI-ROYAL-Uniroyal-Elec-4D03WGJ0330T5E_C25508.pdf
+source: "UNI-ROYAL 4D03 array datasheet, dimensions drawing: 8 terminals, resistor n between terminal n and 9-n; KiCad's Device:R_Pack04 names each end Rn.1 / Rn.2"
+package: 0603x4
+pins:
+  1: R1.1
+  2: R2.1
+  3: R3.1
+  4: R4.1
+  5: R4.2
+  6: R3.2
+  7: R2.2
+  8: R1.2
+ccw: [1, 8]
