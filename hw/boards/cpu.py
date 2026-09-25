@@ -45,7 +45,7 @@ C0402 = "Capacitor_SMD:C_0402_1005Metric"
 ARRAY = "jlc:RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL"
 LCSC = {
     "100n": "C1525", "1u": "C52923", "4.7u": "C23733",          # 0402 caps (basic)
-    "10k": "C25744", "100": "C25076", "1k": "C11702", "33": "C25105",   # 0402 resistors (basic)
+    "10k": "C25744", "100": "C25076", "1k": "C11702",           # 0402 resistors (basic)
     "33x4": "C25501",                                           # 4D02WGJ0330TCE, 33 ohm x4, 0402x4
 }
 
@@ -67,22 +67,17 @@ def fpga_pins():
 PINS = fpga_pins()
 # card outputs get 33 ohm at the driver: FPGA pin on FPGA_x, finger on x
 DRIVEN = [n for n, d in sorted(PINS.values(), key=lambda v: v[0]) if d in ("out", "inout")]
-# the bus lines that leave the bottom side, in the fingers' order: D and the
-# timer lines through arrays; /STB, RW and SYNC through single resistors, as
-# the /RDY input sits between them
 SERIES = [
-    ["CPU_D0", "CPU_D1", "CPU_D2", "CPU_D3"],
-    ["CPU_D4", "CPU_D5", "CPU_D6", "CPU_D7"],
-    ["CPU_TMR_EXP0", "CPU_TMR_EXP1", "CPU_HALTED", "CPU_WAITING"],
-    # A leaves the right side, bottom up, for the back-side fingers
     ["CPU_A0", "CPU_A1", "CPU_A2", "CPU_A3"],
     ["CPU_A4", "CPU_A5", "CPU_A6", "CPU_A7"],
     ["CPU_A8", "CPU_A9", "CPU_A10", "CPU_A11"],
     ["CPU_A12", "CPU_A13", "CPU_A14", "CPU_A15"],
+    ["CPU_nSTB", "CPU_RW", "CPU_SYNC", None],               # bottom side, after CLK and /RST
+    ["CPU_D0", "CPU_D1", "CPU_D2", "CPU_D3"],               # right side, bottom up
+    ["CPU_D4", "CPU_D5", "CPU_D6", "CPU_D7"],
+    ["CPU_TMR_EXP0", "CPU_TMR_EXP1", "CPU_HALTED", "CPU_WAITING"],
 ]
-SINGLE = {"R11": "CPU_nSTB", "R12": "CPU_RW", "R13": "CPU_SYNC"}
-assert sorted([n for a in SERIES for n in a if n] + list(SINGLE.values())) == sorted(DRIVEN), \
-    "the series resistors miss a card output"
+assert sorted(n for a in SERIES for n in a if n) == sorted(DRIVEN), "series arrays miss a card output"
 
 # socket pin name (doc) -> net
 SOCKET = {"/STB": "CPU_nSTB", "/RDY": "CPU_nRDY", "/CPU_RST": "CPU_nRST", "RW": "CPU_RW",
@@ -197,8 +192,6 @@ def schematic(path, footprint_libs):
             else:
                 s.nc(rn, "R%d.1" % (k + 1), stub=G)
                 s.nc(rn, "R%d.2" % (k + 1), stub=G)
-    for i, (ref, net) in enumerate(SINGLE.items()):
-        res(ref, "33", "FPGA_" + net[4:], net, at=((132 + 8 * i) * G, 108 * G))
 
     # pull-ups (TN-02006 table 3.1)
     row = 124
@@ -320,8 +313,8 @@ def placement():
     p["C8"] = beside(57, along=-0.5)
     # the bottom side's decaps step aside from the arrays under the bus pins
     p["C5"] = beside(6, along=-4.0)
-    p["C1"] = beside(27, along=2.0)
-    p["C6"] = beside(30, along=2.5)
+    p["C1"] = beside(27, along=4.5)
+    p["C6"] = beside(30, along=6.0)
     fx, fy = FPGA[:2]
     p.update({
         # the top side's supply pins (VPP 108, VCC 92, VCCIO1 100 and 89) are
@@ -331,22 +324,20 @@ def placement():
         "C13": beside(72, along=2.5),                               # VCC_SPI
         "C15": (9.0, -21.0, 0), "C16": (54.8, -21.5, 90),          # 3V3 bulk
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.9, -35.6, 90), "R6": (40.9, -38.6, 90),
+        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.5, -17.2, 0), "R6": (40.5, -14.4, 0),
         "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2, 0), "R7": (3.2, -26.6, 0),
-        # 33 ohm series resistors, FPGA side (pads 1-4) towards the package
-        # and in the pins' order. Under the bottom side: /STB, RW and SYNC
-        # singly (the /RDY input runs between them), D in two arrays down
-        # and right, towards their fingers, the timer lines further right.
-        # A in a column right of the right side, bottom up.
-        "R11": (17.5, -12.2, 270), "R12": (19.8, -12.2, 270), "R13": (22.0, -12.2, 270),
-        "RN1": (26.6, -14.0, 0), "RN2": (29.8, -14.0, 0), "RN3": (37.5, -16.6, 0),
-        "RN4": (44.0, -23.4, 90), "RN5": (44.0, -26.2, 90), "RN6": (44.0, -29.0, 90), "RN7": (44.0, -32.5, 90),
+        # 33 ohm arrays at their pins, FPGA side (pads 1-4) towards the
+        # package and in the pins' order, finger side (pads 8-5) away from
+        # it: A and control in a row under the bottom side, D and the timer
+        # lines in a column right of the right side
+        "RN1": (16.5, fy + 15.1, 0), "RN2": (19.5, fy + 15.1, 0), "RN3": (22.3, fy + 15.1, 0),
+        "RN4": (25.1, fy + 15.1, 0), "RN5": (27.9, fy + 15.1, 0),
+        "RN6": (45.8, fy + 7.8, 90), "RN7": (45.8, fy + 5.0, 90), "RN8": (45.8, fy - 0.2, 90),
         # config flash by the config pins, under the top edge beside the
         # hole, its decap, and the configuration pull-ups
         "U2": (45.3, -38.6, 0), "C23": (48.6, -35.6, 90),
-        # (the configuration pull-ups: lower left, over their fingers A5-A10)
-        "R1": (-3.0, -13.6, 0), "R2": (0.0, -13.6, 0), "R3": (3.0, -13.6, 0), "R4": (6.0, -13.6, 0),
-        "R5": (9.0, -13.6, 0),
+        "R1": (49.8, -33.6, 0), "R2": (49.8, -31.2, 0), "R3": (49.8, -28.8, 0), "R4": (49.8, -26.4, 0),
+        "R5": (49.8, -24.0, 0),
         # LEDs along the top edge from the common PWR spot, each resistor
         # under its LED; the 1V2 LED's switch below; the LDO beside them
         "D1": POWER_LED + (0,), "R9": (POWER_LED[0], POWER_LED[1] + 2.6, 0),
@@ -360,22 +351,22 @@ def placement():
 
 def a_vias(board, via=0.6, drill=0.3, track=0.2):
     """Locked pre-routing: each address line leaves its array (finger side,
-    pads 8-5, 0.5 mm apart, facing right) on a short track to its own via,
-    in two staggered columns just right of the arrays. A goes to the
-    back-side fingers, where nothing but A and short GND ties runs, so it
-    can cross under everything; its layer changes placed here keep the
-    front clear for the lines that stay there."""
+    pads 8-5, 0.5 mm apart) on a short track to its own via, in two
+    staggered rows just under the arrays. A goes to the back-side fingers;
+    placing its layer changes here keeps the front below the arrays clear
+    for the control and data lines, which Freerouting otherwise has to
+    thread through vias it scattered itself."""
     import pcbnew
     mm = pcbnew.FromMM
     for fp in board.GetFootprints():
-        if fp.GetReference() not in ("RN4", "RN5", "RN6", "RN7"):
+        if fp.GetReference() not in ("RN1", "RN2", "RN3", "RN4"):
             continue
         for pad in fp.Pads():
             k = int(pad.GetNumber())
             if k <= 4:
                 continue
             px, py = pad.GetPosition().x, pad.GetPosition().y
-            v = pcbnew.VECTOR2I(px + mm(4.0 if k % 2 else 5.2), py)   # past the arrays' designators
+            v = pcbnew.VECTOR2I(px, py + mm(1.2 if k % 2 else 2.4))
             t = pcbnew.PCB_TRACK(board)
             t.SetStart(pad.GetPosition())
             t.SetEnd(v)
