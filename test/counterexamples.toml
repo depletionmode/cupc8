@@ -486,3 +486,52 @@ revert = [
 ]
 cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
 must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
+
+[[bug]]
+name = "kernel net: the clock's tick IRQ, taken between pop pcl and pop pch, returned with its own pop pcl (the CPU does not save the pcl latch), so the interrupted return jumped elsewhere (a DNS answer read half from a dropped frame)"
+fixed_in = "c5b0012"
+revert = [["kernel/ping.s", """	pop r0				; the flags
+	st [net_irq_f], r0
+	pop r0				; the return address, low
+	st [net_irq_a], r0
+	pop r0				; and high
+	st [net_irq_a+1], r0
+	ldd r0, [net_irq_a]
+	eq r0, #0x9e
+	bzf .in_return
+	ld r0, [net_irq_a+1]
+	push r0
+	ld r0, [net_irq_a]
+	push r0
+	ld r0, [net_irq_f]
+	push r0
+	ld r0, [net_irq_r0]
+	pop f
+	pop pcl
+	pop pch
+.in_return:
+	ld r0, [net_irq_f]
+	push r0
+	ld r0, [net_irq_r0]
+	pop f
+	pop pch
+""", """	ld r0, [net_irq_r0]
+	pop f
+	pop pcl
+	pop pch
+"""]]
+cmd = "tools/run_tests.sh testKernelDnsPing"
+must_fail = ["FAIL: net lookup www.example.com"]
+
+[[bug]]
+name = "kernel net: net config ip counted its words in net_pn, which net_parse_ip uses too"
+fixed_in = "c5b0012"
+revert = [["kernel/net.s", """	ld r0, [net_wi]
+	push pch
+	push pcl
+	b net_word_ip""", """	ld r0, [net_pn]
+	push pch
+	push pcl
+	b net_word_ip"""], ["kernel/net.s", "\tld r0, [net_wi]\t\t; net_cfg + 4", "\tld r0, [net_pn]\t\t; net_cfg + 4"], ["kernel/net.s", "\tld r0, [net_wi]\n\tadd r0, #1\n\tst [net_wi], r0", "\tld r0, [net_pn]\n\tadd r0, #1\n\tst [net_pn], r0"]]
+cmd = "tools/run_tests.sh testKernelDnsPing"
+must_fail = ["FAIL: net config ip IP MASK GW"]
