@@ -23,7 +23,7 @@ extras. Stock checked 2026-09-23 (the power parts: 2026-09-24).
 | Chipset FPGA **and** CPU card FPGA | ICE40HX4K-TQ144 | C1521989 | 51 | 5 | main, CPU |
 | ROM | SST39VF040-70-4I-NHE (512 KB, PLCC-32) | C645939 | **11** | 3 | main. ⚠ low stock: fallbacks below |
 | ROM (fallback) | SST39VF010-70-4I-NHE-T (128 KB, PLCC-32) | C632851 | 33 | | same footprint; A17/A18 NC, ROM_BANK 0–63, enough for boot + kernel |
-| SRAM | IS62WV5128EBLL-45HLI (512K×8, 45 ns, sTSOP-32) | C1348955 | 224 | 3 | main; A16–A18 tied low |
+| SRAM | IS62WV5128EBLL-45HLI (512K×8, 45 ns, sTSOP-32) | C1348955 | 224 | 3 | main; A16–A18 to MEM_A16–A18: banked RAM, extended-ram.md |
 | FPGA config flash | W25Q32JVSSIQ | C179173 | 25,178 | 5 | main (FL0), CPU (FL1) |
 | 12 MHz clock | HSO321S 12 MHz 3.3 V CMOS oscillator | C160457 | 3,086 | 3 | main: CLK12 and CPU_CLK, 33 Ω each (cpu-bus.md) |
 | Reset supervisor | MAX811TEUS+T (3.08 V, 140 ms, manual reset) | C7272 | 11,115 | 3 | main: nPOR; MR from the button and SYS_nRST |
@@ -49,6 +49,8 @@ extras. Stock checked 2026-09-23 (the power parts: 2026-09-24).
 | Wi-Fi card 3V3 buck | TLV62569DBVR (2 A), with a 2.2 µH FNR3015S2R2MT (C167747) | C141836 | 251,932 | 2 | Wi-Fi: an LDO failed the TX-burst and thermal checks (`hw/power`, POW-003, THM-001). The system, GPU and IO cards run from the slot's +3V3 (`power.md`). |
 | HDMI connector | HDMI 19PIN 043 (type A, SMD right angle) | C2858275 | 47,920 | 2 | GPU |
 | HDMI ESD | TPD4E05U06DQAR (4 lines) | C138714 | 182,893 | 4 | GPU: two, for the 8 TMDS lines |
+| HDMI +5V buck-boost | TPS63802DLAR (VSON-10), 0.47 µH FXL0420-R47-M (C167200, 14 mΩ, Isat 9.5 A), 825k (C25823) / 91k (C23265) 1 % | C2845237 | 18,125 | 2 | GPU: the pin at 5.03 V (HDMI: 4.8–5.3 V) whether the card's +5V is above or below it (POW-008); replaces the B5819W Schottky |
+| HDMI +5V fuse | SMD0805P020TF (200 mA PTC, 0.5–3.5 Ω) | C20976 | 16,020 | 2 | GPU: ahead of the buck-boost (POW-008); the 100 mA C20975 holds only 0.08 A at 40 °C there |
 | USB-A receptacle | USB-302S-T (SMD right angle) | C112455 | 3,791 | 2 | IO |
 | Wi-Fi module | ESP32-C3-MINI-1U-N4 | C2911374 | 2,225 | 2 | Wi-Fi |
 | Wi-Fi MISO buffer | 74LVC1G125GW | C52140430 | 9,721 | 2 | Wi-Fi: releases MISO when not selected |

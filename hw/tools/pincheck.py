@@ -242,7 +242,7 @@ def check_docs(pins):
 
     # the system slot carries all of sysctl's signals except its own LEDs
     sysctl = {n for _, n, _, _ in flat(pins["devices"]["sysctl"])}
-    on_card_only = {"LED_USB_TX", "LED_USB_RX", "LED_STATUS"}
+    on_card_only = {"LED_USB_TX", "LED_USB_RX", "USB_nVBUS"}
     listed = set()
     for doc_name in pinout_table("system-slot.md"):
         if doc_name in SYSTEM_SLOT_LOOP:

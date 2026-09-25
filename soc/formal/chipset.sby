@@ -1,4 +1,4 @@
-# BUS-004, MMU-004, SPI-004: soc/formal/chipset_props.vhd on soc/chipset.vhd.
+# BUS-004, MMU-004, SPI-004, CLK-002: soc/formal/chipset_props.vhd on soc/chipset.vhd.
 # Run through tools/formal.py (it puts the ghdl-enabled yosys on the path).
 [tasks]
 prove
@@ -12,7 +12,10 @@ bmc: depth 60
 multiclock off
 
 [engines]
-smtbmc bitwuzla
+prove: smtbmc bitwuzla
+# bmc (tools/formal.py --mutants) goes on past the first failure, so every
+# property a mutant breaks is reported, whichever trace the solver finds first
+bmc: smtbmc --keep-going bitwuzla
 
 [script]
 ghdl --std=08 -fpsl spi_master.vhd bridge.vhd chipset.vhd chipset_props.vhd -e chipset

@@ -283,6 +283,23 @@ static bool ext_command(gpu_t *g, const uint8_t *f, int len, bool respond)
 		e->idle10 = a[1];
 		e->full_after = a[2];
 		return true;
+	case 0x0C:                                  /* AUTO_EXT */
+		if (avail < 3 || a[1] < EINK_FAST || a[1] > EINK_GREY) {
+			g->errors++;                    /* short, or full_kind not a full refresh: ignored */
+			return true;
+		}
+		e->cap10 = a[0];
+		e->full_kind = a[1];
+		e->sleep_s = a[2];
+		/* sleep_s counts from here: after sleep_s 0 held past 2^32 us
+		 * (71.6 min), now - last_panel has wrapped to anything */
+		e->last_panel = e->now;
+		return true;
+	case 0x0D: {                                /* AUTO_GET */
+		uint8_t cfg[6] = {e->auto_on, e->idle10, e->full_after, e->cap10, e->full_kind, e->sleep_s};
+		if (respond) card_respond(&g->card, cfg, sizeof cfg);
+		return true;
+	}
 	case 0x0B: {                                /* EPD_STATUS */
 		uint8_t st[3];
 		eink_status(e, st);
@@ -324,6 +341,9 @@ static void ext_reset(gpu_t *g)
 	e->auto_on = true;
 	e->idle10 = 15;
 	e->full_after = 30;
+	e->cap10 = 100;
+	e->full_kind = EINK_FAST;
+	e->sleep_s = 10;
 	e->explicit_req = -1;
 	e->full_next = true;
 	changed(e);
@@ -507,16 +527,18 @@ static void idle(eink_t *e)
 		return;
 	}
 	if (e->auto_on) {
-		if (dirty && (quiet >= e->idle10 * 10000u || e->now - e->unshown_since >= EINK_CAP_US)) {
-			start(e, e->first_clean ? EINK_CLEAN : e->full_next ? EINK_FAST : EINK_PARTIAL, false);
+		/* cap10 * 10000 <= 2.55e6 us, sleep_s * 1e6 below <= 2.55e8 us: both fit a uint32 */
+		bool capped = e->cap10 && e->now - e->unshown_since >= e->cap10 * 10000u;
+		if (dirty && (quiet >= e->idle10 * 10000u || capped)) {
+			start(e, e->first_clean ? EINK_CLEAN : e->full_next ? e->full_kind : EINK_PARTIAL, false);
 			return;
 		}
 		if (e->full_after && e->partials >= e->full_after && quiet >= EINK_FULL_QUIET_US) {
-			start(e, EINK_FAST, false);
+			start(e, e->full_kind, false);
 			return;
 		}
 	}
-	if (e->panel_state == PANEL_READY && e->now - e->last_panel >= EINK_SLEEP_US) {
+	if (e->sleep_s && e->panel_state == PANEL_READY && e->now - e->last_panel >= e->sleep_s * 1000000u) {
 		uc8179_deep_sleep(&e->bus);
 		e->panel_state = PANEL_ASLEEP;
 	}
@@ -543,7 +565,10 @@ static void panel_step(eink_t *e)
 			e->y1 < 0 ? finish(e, true) : (void)(e->step = S_PREP);   /* nothing changed */
 		break;
 	case S_PREP:
-		e->t0 = e->now;
+		/* PWR and RST_N's waits count from the next poll: S_DIFF may have
+		 * run in this one (~14 ms for 480 rows), so `now` is stale here
+		 * (RST_N went high 7.5 us after it fell when waking from deep sleep) */
+		e->t0_fresh = true;
 		if (e->panel_state == PANEL_OFF) {
 			b->pin(b->ctx, EPD_PIN_PWR, true);
 			e->step = S_PWR;

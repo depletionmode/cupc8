@@ -42,7 +42,7 @@
 #include "emu.h"
 #include "sdcard.h"
 #include "tmds.h"
-#include "usb/cdc.h"
+#include "usb/cdchost.h"
 #include "usb/usbkbd.h"
 
 struct MainBoard;
@@ -109,11 +109,19 @@ class Rp2040Card : public Card {
   uint32_t miso() override;
   bool irq() override;
   Emu *emu() override { return &e; }
+  // the chipset's deselects of this card (CS_n going high), and the rising
+  // CS_n edges the card's GPIO latched: a pin has an edge only when it
+  // changes, so csEdges <= csRises (E2E-011 checks it)
+  uint64_t csRises = 0, csEdges = 0;
 
  private:
+  bool selNow = false;
   bool sel = false, sck_ = false;
   std::vector<uint8_t> bits, rbits;
   double t0 = 0;
+  // the levels on the slot pins now: drive() changes a pin only when its
+  // level changes (rp2040js's setInputValue latches an edge on every call)
+  bool pinSck = false, pinMosi = false, pinNcs = true;
 };
 
 // the Wi-Fi card in QEMU: tx/rx are the pipes to its UART1 (machine.mjs EspCard)
@@ -144,17 +152,22 @@ struct BridgePins {
 };
 
 // the system card (machine.mjs SysctlCard): its bridge SPI master clocked
-// into the chipset's BR_* pins at 1 MHz, its USB CDC a byte queue each way
+// into the chipset's BR_* pins at 1 MHz, its two USB serial ports (the
+// sysctl protocol, the console: usb-console.md) a byte queue each way
 class SysctlCard {
  public:
+  enum { PROTOCOL = 0, CONSOLE = 1 };
   Emu e;
-  rp2040js::USBCDC cdc;
+  rp2040js::CdcHost cdc;
   struct Pending {
     uint32_t out, bit, got, half;
   };
   std::optional<Pending> pending;
-  std::deque<uint8_t> toCard;
-  std::vector<uint8_t> fromCard;  // CDC output not yet collected by the host side
+  std::deque<uint8_t> toCard[2];
+  std::vector<uint8_t> fromCard[2];  // CDC output not yet collected by the host side
+  bool consoleOpen = false;
+  // the PC opens or closes the console port (DTR); between runs only
+  void openConsole(bool on);
 
   explicit SysctlCard(const std::string &elf);
   void feed();                    // the CDC half of advance()

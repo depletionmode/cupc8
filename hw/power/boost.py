@@ -39,8 +39,11 @@ I_KBD = d.I_KEYBOARD
 
 
 def deck(corner):
+    """The IO card's +5V fed through the whole chain at a corner, into the
+    boost; the keyboard's 500 mA step through the SY6280 to the port."""
     worst = corner == "worst"
     vbus = d.VBUS_MAX if corner == "high" else None
+    # "high": vSafe5V max with the radio idle, so the card's +5V is as high as it gets
     ch = budget.chain("worst" if worst else "typical", vbus=vbus,
                       **({"wifi_3v3": budget.WIFI_IDLE_3V3} if corner == "high" else {}))
     r_in = d.r_in(worst)
@@ -60,7 +63,7 @@ C2 vout 0 {cout}
 R1 vout fb {r1}
 R2 fb 0 {r2}
 Rsw vout port {ron}
-Ikbd port 0 PWL(0 0 {t1} 0 {t1e} {i1} {t2} {i1} {t2e} 0)
+Iload port 0 PWL(0 0 {t1} 0 {t1e} {i1} {t2} {i1} {t2e} 0)
 .options method=gear reltol=1e-3
 .tran 20n {tend} 0 20n
 .control

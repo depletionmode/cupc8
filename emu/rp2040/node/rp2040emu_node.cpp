@@ -28,6 +28,7 @@
 #include "slothost.h"
 #include "tmds.h"
 #include "usb/cdc.h"
+#include "usb/cdchost.h"
 #include "usb/usbkbd.h"
 
 using namespace rp2040js;
@@ -81,6 +82,9 @@ struct Harness {
   std::vector<std::unique_ptr<UsbKeyboard>> keyboards;
   std::unique_ptr<USBCDC> cdc;
   Ref cdcOnData, cdcOnConnected;
+  std::unique_ptr<rp2040js::CdcHost> cdcHost;
+  std::vector<Ref> cdcHostOnData;
+  Ref cdcHostOnConnected;
   std::array<Ref, 2> spiTx;
   std::array<std::array<Ref, 3>, 2> i2cCb;  // onConnect, onWriteByte, onReadByte
   std::map<int64_t, std::function<void()>> unlisten;
@@ -386,6 +390,20 @@ ENTRY(trapRemove) {
   });
 }
 
+// irqMaxWait(h, irq, reset): the most cycles core 0's interrupt `irq` has
+// waited from pending to its exception entry; reset: start again from 0
+ENTRY(irqMaxWait) {
+  return guard(env, [&] {
+    Args a(env, info);
+    auto &core = a.h->emu.mcu->core0;
+    const uint32_t irq = a.u32(1);
+    if (irq >= 32) throw std::runtime_error("irqMaxWait: irq must be < 32");
+    const double wait = core.irqMaxWait[irq];
+    if (a.boolean(2)) core.irqMaxWait[irq] = 0;
+    return number(env, wait);
+  });
+}
+
 // ------------------------------------------------------------ pins
 ENTRY(pinSet) {
   return guard(env, [&] {
@@ -558,6 +576,13 @@ ENTRY(usbAttach) {
     return undefined(env);
   });
 }
+// the USB controller's SIE_CTRL (its PULLUP_EN bit is the D+ pull-up)
+ENTRY(usbSieCtrl) {
+  return guard(env, [&] {
+    Args a(env, info);
+    return number(env, a.h->emu.mcu->usbCtrl.readUint32(0x4c));  // SIE_CTRL: a plain read
+  });
+}
 ENTRY(usbDetach) {
   return guard(env, [&] {
     Args a(env, info);
@@ -615,6 +640,79 @@ ENTRY(cdcTxCount) {
   return guard(env, [&] {
     Args a(env, info);
     return number(env, a.h->cdc->txFIFO.itemCount());
+  });
+}
+
+// the composite CDC host (usb/cdchost.h, test/emu/cdchost.mjs)
+ENTRY(cdcHostCreate) {
+  return guard(env, [&] {
+    Args a(env, info);
+    Harness &h = *a.h;
+    h.cdcHost = std::make_unique<rp2040js::CdcHost>(h.emu.mcu->usbCtrl, a.u32(1));
+    h.cdcHostOnData.resize(a.u32(1));
+    return undefined(env);
+  });
+}
+// cdcHostOn(h, which, port, fn): 0 port's onSerialData(Uint8Array), 1 onDeviceConnected()
+ENTRY(cdcHostOn) {
+  return guard(env, [&] {
+    Args a(env, info);
+    Harness &h = *a.h;
+    if (!h.cdcHost) throw std::runtime_error("no CdcHost");
+    const uint32_t port = a.u32(2);
+    if (a.u32(1) == 0) {
+      if (port >= h.cdcHost->ports.size()) throw std::runtime_error("CdcHost: no such port");
+      Ref &r = h.cdcHostOnData[port];
+      h.hold(r, a.at(3));
+      if (!r) {
+        h.cdcHost->ports[port].onSerialData = nullptr;
+      } else {
+        h.cdcHost->ports[port].onSerialData = [&h, &r](const std::vector<uint8_t> &buf) {
+          h.call(r, 1,
+                 [&](napi_value *argv) {
+                   void *data;
+                   napi_value ab;
+                   check(h.env, napi_create_arraybuffer(h.env, buf.size(), &data, &ab));
+                   if (!buf.empty()) std::memcpy(data, buf.data(), buf.size());
+                   check(h.env, napi_create_typedarray(h.env, napi_uint8_array, buf.size(), ab, 0, &argv[0]));
+                 },
+                 [](napi_value) {});
+        };
+      }
+    } else {
+      h.hold(h.cdcHostOnConnected, a.at(3));
+      if (!h.cdcHostOnConnected) h.cdcHost->onDeviceConnected = nullptr;
+      else h.cdcHost->onDeviceConnected = [&h] { h.call0(h.cdcHostOnConnected); };
+    }
+    return undefined(env);
+  });
+}
+// cdcHostSend(h, port, byte)
+ENTRY(cdcHostSend) {
+  return guard(env, [&] {
+    Args a(env, info);
+    a.h->cdcHost->sendSerialByte(a.u32(2), a.u32(1));
+    return undefined(env);
+  });
+}
+ENTRY(cdcHostTxCount) {
+  return guard(env, [&] {
+    Args a(env, info);
+    return number(env, a.h->cdcHost->ports.at(a.u32(1)).txFIFO.itemCount());
+  });
+}
+// cdcHostLines(h, port, value): SET_CONTROL_LINE_STATE
+ENTRY(cdcHostLines) {
+  return guard(env, [&] {
+    Args a(env, info);
+    a.h->cdcHost->setLines(a.u32(1), a.u32(2));
+    return undefined(env);
+  });
+}
+ENTRY(cdcHostPorts) {
+  return guard(env, [&] {
+    Args a(env, info);
+    return number(env, a.h->cdcHost->portCount());
   });
 }
 
@@ -889,7 +987,8 @@ static napi_value Init(napi_env env, napi_value exports) {
       FN(adcSet),     FN(adcGet),      FN(kbdCreate),   FN(kbdPress),   FN(kbdState),   FN(usbAttach),
       FN(usbDetach),  FN(cdcCreate),   FN(cdcOn),       FN(cdcSend),    FN(cdcTxCount), FN(tmdsCreate),
       FN(tmdsStart),  FN(tmdsStop),    FN(tmdsData),    FN(hostCreate), FN(hostConfig), FN(hostRun),
-      FN(sdCreate),   FN(sdInsert),    FN(sdRemove),    FN(sdCard),
+      FN(sdCreate),   FN(sdInsert),    FN(sdRemove),    FN(sdCard),     FN(irqMaxWait),
+      FN(usbSieCtrl),    FN(cdcHostCreate), FN(cdcHostOn), FN(cdcHostSend), FN(cdcHostTxCount), FN(cdcHostLines), FN(cdcHostPorts),
 #undef FN
   };
   napi_define_properties(env, exports, sizeof props / sizeof props[0], props);

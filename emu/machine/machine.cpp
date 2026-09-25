@@ -11,6 +11,8 @@
 #include <cstdlib>
 
 #include <algorithm>
+#include <set>
+#include <stdexcept>
 #include <cctype>
 #include <cerrno>
 #include <cstring>
@@ -75,10 +77,21 @@ void Rp2040Card::drive(uint32_t sck, uint32_t mosi, bool selected) {
     sel = selected;
     sck_ = sck;
   }
+  // Only the pins that change. setInputValue (rp2040js's, ported) latches
+  // an edge on every call, so setting CS_n high again while it was high
+  // made a rising edge the card never had: slotspi's CS_n interrupt then
+  // restarted its PIO machine, and when that landed at the start of the
+  // host's next frame the frame lost its first byte (exec's quick chunk
+  // reads went unanswered, E2E-011).
   auto &g = e.mcu->gpio;
-  g[P::MOSI].setInputValue(!!mosi);
-  g[P::SCK].setInputValue(!!sck);
-  g[P::NCS].setInputValue(!selected);
+  constexpr uint32_t EDGE_HIGH = 1u << 3;  // the GPIO's latched rising edge (INTR)
+  const bool edgeWas = g[P::NCS].irqStatus & EDGE_HIGH;
+  if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
+  if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
+  if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);
+  if (!edgeWas && (g[P::NCS].irqStatus & EDGE_HIGH)) csEdges++;
+  if (!selected && selNow) csRises++;
+  selNow = selected;
 }
 
 uint32_t Rp2040Card::miso() {
@@ -167,22 +180,32 @@ uint32_t EspCard::miso() { return selected ? (bit < bits.size() ? bits[bit] : 0)
 
 static constexpr int BR_NCS = 5, SYS_NRST = 23, CHIPSET_CDONE = 7, CPUCARD_CDONE = 17;
 
-SysctlCard::SysctlCard(const std::string &elf) : e(elf, 125), cdc(e.mcu->usbCtrl) {
+SysctlCard::SysctlCard(const std::string &elf) : e(elf, 125), cdc(e.mcu->usbCtrl, 2) {
   auto &g = e.mcu->gpio;
   g[CHIPSET_CDONE].setInputValue(true);  // both FPGAs configured
   g[CPUCARD_CDONE].setInputValue(true);
   g[8].setInputValue(true);
   e.mcu->spi[0].onTransmit = [this](uint32_t b) { pending = Pending{b, 0, 0, 0}; };
-  cdc.onSerialData = [this](const std::vector<uint8_t> &buf) {
-    fromCard.insert(fromCard.end(), buf.begin(), buf.end());
-  };
+  for (size_t p = 0; p < 2; p++) {
+    cdc.ports[p].onSerialData = [this, p](const std::vector<uint8_t> &buf) {
+      fromCard[p].insert(fromCard[p].end(), buf.begin(), buf.end());
+    };
+  }
 }
 
 void SysctlCard::feed() {
-  while (!toCard.empty() && cdc.txFIFO.itemCount() < 256) {
-    cdc.sendSerialByte(toCard.front());
-    toCard.pop_front();
+  for (size_t p = 0; p < 2; p++) {
+    while (!toCard[p].empty() && cdc.ports[p].txFIFO.itemCount() < 256) {
+      cdc.sendSerialByte(toCard[p].front(), p);
+      toCard[p].pop_front();
+    }
   }
+}
+
+void SysctlCard::openConsole(bool on) {
+  if (on == consoleOpen) return;
+  consoleOpen = on;
+  cdc.open(CONSOLE, on);
 }
 
 // the bridge pins, as they are this clock (called once per core clock while busy)
@@ -308,10 +331,14 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
       cards.emplace_back(slot, std::move(c));
       continue;
     }
-    auto c = std::make_unique<Rp2040Card>(kind, root + "/build/rp2040/" + kind + ".elf", kind == "gpu" ? 252 : 125);
+    // the HDMI card's firmware is the graphics card's, gpu.elf
+    static const std::set<std::string> known{"hdmi", "eink", "eink750", "io", "storage"};
+    if (!known.count(kind)) throw std::runtime_error("unknown slot kind '" + kind + "' (hdmi, eink, eink750, io, storage, wifi)");
+    const std::string elf = kind == "hdmi" ? "gpu" : kind;
+    auto c = std::make_unique<Rp2040Card>(kind, root + "/build/rp2040/" + elf + ".elf", kind == "hdmi" ? 252 : 125);
     c->slot = slot;
     c->logging = o.spiLog;
-    if (kind == "gpu") tmds = std::make_unique<TmdsCapture>(c->e);
+    if (kind == "hdmi") tmds = std::make_unique<TmdsCapture>(c->e);
     if (kind == "eink" || kind == "eink750")  // the panel on its header: 5.83" 648x480 or 7.5" 800x480
       panels[slot] = std::make_unique<EinkPanel>(c->e, EinkPanel::config(kind == "eink" ? 648 : 800, 480));
     if (kind == "storage") c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
@@ -564,7 +591,7 @@ void Machine::startWorkers() {
     if (card->emu()) {
       auto w = std::make_unique<Worker>();
       w->card = card.get();
-      w->volunteer = card->kind != "gpu";
+      w->volunteer = card->kind != "hdmi";
       workers.push_back(std::move(w));
     } else {
       mainCards.push_back(card.get());

@@ -23,7 +23,11 @@ Display is piped over the SPI bus. Theoretically any display that works over SPI
 The M1 machine's console is its graphics card, one of two (a machine has one or the other): the **HDMI card**, 80 x 30 text or 320 x 240 graphics in 256 colours on a monitor (`doc/hardware/gpu-protocol.md`), or the **e-ink card**, the same text and graphics on an e-paper panel on the card's cable, a 5.83" 648 x 480 panel (or a 7.5" 800 x 480), plus the panel's own resolution in 4 greys (`doc/hardware/eink-card.md`). On e-paper the text is black on white (each cell's brighter colour is the ink), the cursor does not blink, and the card refreshes the panel by itself: a line typed reaches the panel about half a second later, and continuous output updates it about once a second. The kernel asks the card which it is and drives either.
 
 #### 2.4. Input
-*[TODO]*
+Keys come from a USB keyboard on the IO card (`doc/hardware/io-card.md`).
+
+**The USB console.** With the system card fitted, its USB port is also a terminal for the machine: a PC sees two serial ports (Linux: `/dev/ttyACM0`, the programming port `cupc8.py` uses, and `/dev/ttyACM1`, the console). Open the console with `cupc8.py console`, or any terminal program (`picocom /dev/ttyACM1`, PuTTY; the baud rate does not matter), and everything the terminal prints appears there as well as on the screen, and what you type there is typed into the machine, as on its own keyboard. A BASIC program can be pasted in. Enter is CR (a pasted LF works too), Backspace or DEL takes a character back.
+
+The kernel keeps two small rings in the API block for this (`doc/hardware/memory-map.md`), and the system card moves them to and from the PC every 2 ms, but only while a PC has the console open. Then the terminal waits for the PC when it prints faster than the PC reads; with the console closed, or no system card, nothing waits and the machine runs as without it. A program can see whether a PC is listening: bit 0 of `CON_FLAGS` ($6f26).
 
 #### 2.5. Software Stack
 The software stack consists of a monolithic kernel which provides drivers for the SPI peripherals and filesystem, handles interrupts, etc. It also provides a limited set of fixed-vector 'libc-like' functions and graphic routines that can be used by applications. There is no separation between kernel- and user-space (it's more of a convention) and any application has full access to the entire memory space at any time. Ideally applications would take care not to overwrite kernel regions but there is nothing stopping them from doing so.
@@ -35,8 +39,13 @@ The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1
 Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen), `refresh` (on the e-ink card, a clean full refresh of the panel, which clears the faint ghosts partial refreshes leave; on HDMI it does nothing) and `net`, for the Wi-Fi card:
 
 - `net join SSID PASSWORD` joins that network, keeps the credentials on the card (it joins them again at power-up) and prints the address it was given.
-- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. A name that doesn't resolve or a refused connection prints `connect failed`.
+- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. HOST is a name, looked up by the kernel's own DNS client, or a dotted address used as it is. A refused connection prints `connect failed`.
+- `net lookup NAME` prints the address the DNS client finds for NAME. It asks the DNS server `net config` names (or the one DHCP gave), waits a second, asks once more, and takes the first A record of the answer. It says `name not found` (the server has no such name), `no address for that name` (the name exists, with no IPv4 address), `DNS server not answering`, `DNS server error`, `bad answer from the DNS server` or `no DNS server`.
+- `net ping HOST [COUNT]` sends COUNT (4 unless given, up to 255) ICMP echo requests to HOST (a name or an address), one after the other, and prints each reply's round-trip time in milliseconds (`seq 1 time 3 ms`), or `seq 2 timeout` when none comes within a second, then `4 sent, 3 received, 2-5 ms` (the shortest and longest).
+- `net config` shows the card's settings: `mode dhcp` or `mode static` with its address, mask and gateway; the DNS server (`from dhcp`, or an address) and its port; whether they are saved on the card. `net config dns IP [PORT]` sets the DNS server (port 53 unless given), `net config ip IP MASK GW` a static address, `net config dhcp` goes back to DHCP, and `net config save` keeps the settings on the card, applied at power-up (until then they last until the card is powered off).
 - `net` on its own shows whether the link is up, and the address.
+
+The times come from the chipset's millisecond counter (`doc/hardware/memory-map.md`), so they are exact to the millisecond: a DNS server has 1000 ms to answer each query, and an echo request 1000 ms.
 
 `net` refuses to start the radio on a USB source under 3 A (see the power budget).
 
@@ -46,8 +55,11 @@ Files, on the storage card's microSD card (`doc/hardware/storage-card.md`). A ca
 - `load "NAME"` clears the program (`new`), then takes the file's lines as if they were typed: a line that does not start with a line number (a blank line, say) is skipped, and a line longer than 78 characters is cut. A line that does not fit stops the load with `PROGRAM FULL`.
 - `dir` lists every file with its size in bytes.
 - `del "NAME"` deletes a file.
+- `exec "NAME"` runs a file: a program for $7000 (it starts with the header `C8P` and version 1; `tools/mkprg.py` makes one, and it calls the kernel through `kernel/api.inc`), which comes back to the prompt when it returns or calls `API_EXIT`, or else a BASIC program, which it loads and runs. `cupc8.py run PROG` does the same from the PC through the system card.
 
 They print `SAVED` or `LOADED` when done, or what went wrong: `no SD card`, `no storage card` (none fitted), `file not found`, `card full`, `write protected`, `bad file name` (not 8.3), `no file system on the card` (not formatted) or `card error`. On a USB source under 3 A, `save` and `del` print `USB power under 3A: SD writes off` and leave the card as it was; `load` and `dir` still work.
+
+A program calls the kernel through its jump table at *$1003*: 8 groups of 32 entries, 3 bytes each, entry *n* of group *g* at *$1003* + 96*g* + 3*n* (*$1003*-*$1302*). The groups are system (with the RAM bank routines), console, graphics, e-ink, storage, net (16 routines: sockets, the DNS client, the card's settings), timers (milliseconds since power-on, and a wait) and one reserved; the unused entries answer *$ff*. `kernel/api.inc` names every entry (`API_PUTC`, `API_NET_OPEN`, ...); an entry's address never changes once it is there. Arguments go in **r0**/**r1** and the API block at *$6f00*, and **r0** comes back 0 or an error code (`doc/proposals/kernel-api.md`). The CPU's two timers are left to programs: the kernel's clock is the chipset's millisecond counter.
 
 There is no compiler available for the CUPC/8 ISA. Development tools are cross-platform and consist of an assembler and a simulator which provides 1-to-1 simulation of the full computer (including display and input). The simulator can be executed natively or compiled to JavaScript (using emscripten) and run through a web browser.
 
@@ -100,9 +112,11 @@ Return is the same as a call return plus one extra pop for the flags:
 	pop pcl
 	pop pch
 
+An IRQ is never taken right after *POP pcl*: it and the *POP pch* after it are one return. (Taken between them, the IRQ's frame would go over the byte just popped, and its handler's own *POP pcl* would replace **pcl**, so the return would go astray.)
+
 *POP f* restores **I**, so an IRQ still pending is taken right after it, inside the epilogue and before the return. This nests correctly: the new handler pushes the address of the *POP pcl* (three more stack bytes), and its own return lands back in the epilogue, which then completes. Interrupts can therefore nest one level per pending source; leave room on the stack for it.
 
-Sources are latched. *$f200* is the pending register (write-1-to-clear). *$f201* is the mask (1 = enabled). Reset leaves **I** and the mask clear; the kernel plants the vectors and *STI*s when it is ready.
+Sources are latched. *$f200* is the pending register (write-1-to-clear). *$f201* is the mask (1 = enabled). Reset leaves **I** and the mask clear; the kernel plants the vectors and *STI*s when it is ready. Pending bit 4 is the chipset's tick (every 50 ms); it shares IRQ 3, and its vector, with SPI complete, so that handler reads *$f200* to tell them apart.
 
 *WAI* stops fetching until an IRQ is accepted. If **I** is clear it is a *NOP*. *HALT* still means stop forever.
 
@@ -113,7 +127,7 @@ The stack is an 8-bit stack which can be accessed by *PUSH*/*POP* operations. Th
 This is where the code goes. The CPU will start executing from *$1000* and the **CUPC/8** kernel places a jump to the kernel initialization function vector at this address.
 
 ###### Input/Output Region
-The MMU is responsible for mapping peripherals to the memory space. Currently this region is used for the General Purpose Output (GPO) pins (8-bit mapped to *$f000*), the SPI bus (mapped at *$f1XX*), and the interrupt controller (*$f200*, *$f201*).
+The MMU is responsible for mapping peripherals to the memory space. Currently this region is used for the General Purpose Output (GPO) pins (8-bit mapped to *$f000*), the SPI bus (mapped at *$f1XX*), and the interrupt controller (*$f200*, *$f201*) and the millisecond counter (*$f206*-*$f209*).
 
 
 #### 3.3. Input/Output
@@ -165,9 +179,11 @@ After configuration of the SPI device, a typical transaction might look as follo
 ###### Interrupts
 Address | Operation | Description
 :--- | :--- | :---
-*$f200* | LOAD | Pending bits (bit *n* = IRQ *n*)
+*$f200* | LOAD | Pending bits (bit *n* = IRQ *n*; bit 4, the tick, is IRQ 3 too)
 *$f200* | STORE | Write-1-to-clear pending bits
-*$f201* | LOAD/STORE | Mask (1 = enabled)
+*$f201* | LOAD/STORE | Mask (1 = enabled), bits 4:0
+*$f206* | LOAD | Milliseconds since reset, bits 7:0; latches bits 31:8 for *$f207*-*$f209*
+*$f207*-*$f209* | LOAD | Bits 15:8, 23:16, 31:24 as latched by the last load of *$f206*
 
 *TMR0* / *TMR1* load an 8-bit countdown (immediate or register). The value decrements after every retired instruction, the *TMR* instruction itself included (so *TMR0 #1* fires as it retires, and *TMR0 #3* as the second instruction after it retires). While parked in *WAI* it keeps decrementing, once every 3 CPU clocks. Crossing zero latches the matching timer IRQ. Writing 0 stops the timer without firing.
 

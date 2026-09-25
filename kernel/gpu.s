@@ -16,6 +16,8 @@ gpu_char: resb 1
 gpu_tmp: resb 1
 gpu_args: resb 8
 gpu_tries: resb 1
+gpu_n: resb 1
+gpu_i: resb 1
 
 gpu_init:
 	mov r0, #0xff
@@ -66,18 +68,106 @@ gpu_init:
 gpu_info:
 	mov r0, #0xff
 	st [gpu_kind], r0
-	xor r0, r0
-	st [gpu_tries], r0
-	push pch
-	push pcl
-	b gpu_cs_on
 	mov r0, #0x08			; INFO
+	mov r1, #0
 	push pch
 	push pcl
-	b gpu_send
+	b gpu_query
+	eq r0, #0
+	bzf .answered
+	b .done
+.answered:
+	ld r0, API_ARGS
+	st [gpu_kind], r0
+.done:
+	pop pcl
+	pop pch
+
+; ------------------------------------------------------------ any command
+; (the kernel API's console and graphics calls, sys.s)
+
+; command r0 with the r1 bytes at API_ARGS as its arguments
+gpu_cmd:
+	st [gpu_char], r0
+	mov r0, #0x6f
+	st [gpu_src+1], r0
+	xor r0, r0
+	st [gpu_src], r0
+	ld r0, [gpu_char]
+; command r0 with the r1 bytes at gpu_src
+gpu_cmd_from:
+	push pch
+	push pcl
+	b gpu_cmd_open
+	eq r0, #0
+	bzf .close
+	b .none
+.close:
 	push pch
 	push pcl
 	b gpu_cs_off
+.none:
+	pop pcl
+	pop pch
+
+; the same, but the frame is left open (CS on) for more bytes. r0 = 0, or $ff
+; with no console (nothing sent, CS untouched)
+gpu_cmd_open:
+	st [gpu_char], r0
+	st [gpu_n], r1
+	ld r0, [gpu_spi]
+	eq r0, #0xff
+	bzf .none
+	push pch
+	push pcl
+	b gpu_cs_on
+	ld r0, [gpu_char]
+	push pch
+	push pcl
+	b gpu_send
+	xor r1, r1
+	st [gpu_i], r1
+.loop:
+	ld r1, [gpu_i]
+	ld r0, [gpu_n]
+	eq r1, r0
+	bzf .sent
+	ldd r0, [gpu_src]+r1
+	add r1, #1
+	st [gpu_i], r1
+	push pch
+	push pcl
+	b gpu_send
+	b .loop
+.sent:
+	xor r0, r0
+	b .done
+.none:
+	mov r0, #0xff
+.done:
+	pop pcl
+	pop pch
+
+; command r0 with the r1 bytes at API_ARGS, then its answer into API_ARGS
+gpu_query:
+	st [gpu_char], r0
+	mov r0, #0x6f
+	st [gpu_src+1], r0
+	xor r0, r0
+	st [gpu_src], r0
+	ld r0, [gpu_char]
+; command r0 with the r1 bytes at gpu_src, then its answer into gpu_src. r0 =
+; 0 and r1 = its length, or r0 = $ff (no console, or READ said "not ready"
+; 255 times)
+gpu_query_from:
+	push pch
+	push pcl
+	b gpu_cmd_from
+	ld r0, [gpu_spi]
+	eq r0, #0xff
+	bzf .fail
+	xor r0, r0
+	st [gpu_tries], r0
 .poll:
 	push pch
 	push pcl
@@ -92,14 +182,29 @@ gpu_info:
 	b gpu_send
 	eq r0, #0
 	bzf .again
-	xor r0, r0				; kind
+	st [gpu_n], r0
+	xor r1, r1
+	st [gpu_i], r1
+.byte:
+	ld r1, [gpu_i]
+	ld r0, [gpu_n]
+	eq r1, r0
+	bzf .got
+	xor r0, r0
 	push pch
 	push pcl
 	b gpu_send
-	st [gpu_kind], r0
+	ld r1, [gpu_i]
+	std [gpu_src]+r1, r0
+	add r1, #1
+	st [gpu_i], r1
+	b .byte
+.got:
 	push pch
 	push pcl
 	b gpu_cs_off
+	xor r0, r0
+	ld r1, [gpu_n]
 	b .done
 .again:
 	push pch
@@ -109,8 +214,10 @@ gpu_info:
 	add r0, #1
 	st [gpu_tries], r0
 	eq r0, #0xff
-	bzf .done
+	bzf .fail
 	b .poll
+.fail:
+	mov r0, #0xff
 .done:
 	pop pcl
 	pop pch
@@ -147,8 +254,11 @@ gpu_cs_off:
 	pop pcl
 	pop pch
 
-; print the character in r0
+; print the character in r0 (and mirror it to the USB console, console.s)
 gpu_putc:
+	push pch
+	push pcl
+	b con_putc
 	st [gpu_char], r0
 	ld r0, [gpu_spi]
 	eq r0, #0xff

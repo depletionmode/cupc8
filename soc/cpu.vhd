@@ -341,7 +341,10 @@ begin
 					state <= s_check;
 
 				when s_check =>
-					if iflag = '1' and irq /= "0000" then
+					-- not right after POP pcl: it and the POP pch after it are one
+					-- return. An IRQ between them would push over the popped byte,
+					-- and its handler's own POP pcl would replace pcl.
+					if iflag = '1' and irq /= "0000" and ir /= x"9f" then
 						if irq(0) = '1' then irq_n <= "00";
 						elsif irq(1) = '1' then irq_n <= "01";
 						elsif irq(2) = '1' then irq_n <= "10";

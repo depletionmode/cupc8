@@ -21,7 +21,7 @@ machine.mjs's `$A6`/`$A5` protocol.
 ```sh
 tools/emu_machine_build.sh          # tools/emu_build.sh, then cmake + ninja into build/emu-machine
 CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002
-test/emu/machine_diff.sh            # equivalence with machine.mjs and serial/threaded determinism
+test/emu/machine_diff.sh            # serial/threaded determinism (EMU-007; machine.mjs is legacy, not compared)
 build/emu-machine/machinerun --root . --rom ROM --mode both \
     --until '>>' 6e9 --type '10 print 6*7\nrun\n' --until 42 3e9 --run 200e6
 ```
@@ -37,6 +37,15 @@ system card's TCP port. The system card's CDC output is collected during a
 slice and written to the socket at its end; input from the socket is queued
 between slices, as in machine.mjs (where both only move when the event loop
 turns). `-DMACHINE_LTO=ON`: see Speed.
+
+The system card is a composite USB device with two CDC ports (`sysctl.md`);
+the host side is `rp2040js::CdcHost` (`emu/rp2040/src/usb/cdchost.cpp`, the
+port of `test/emu/cdchost.mjs`). Port 0 is the TCP port above; port 1, the
+USB console (`../../doc/proposals/usb-console.md`), is `m.console` in
+machinenative.mjs: `open()`/`close()` set and clear DTR on it (between
+runs), `write()` queues bytes, `read()` returns what arrived, `listen(port)`
+serves it on TCP (a connection opens it). The addon's `cdcWrite`/`cdcRead`
+take the port as their last argument, and `consoleOpen(h, on)` sets DTR.
 
 ## The loop
 

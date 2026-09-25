@@ -44,7 +44,7 @@ discrete-logic CPU card must both pass the same conformance testbench
 | /STB | card | Cycle request, active low |
 | /RDY | chipset | Cycle completion, active low, one clock wide |
 | SYNC | card | High during an opcode-fetch cycle: the first byte of an instruction. Not asserted for operand, stack or vector cycles. |
-| IRQ[3:0] | chipset | `IRQ_PEND & IRQ_MASK` as levels. The CPU samples them only at its instruction boundary. |
+| IRQ[3:0] | chipset | `IRQ_PEND & IRQ_MASK` as levels; line 3 also carries the chipset tick, IRQ_PEND bit 4 (`memory-map.md`, Interrupts). The CPU samples them only at its instruction boundary. |
 | TMR_EXP[1:0] | card | A one-clock high pulse when timer 0/1 crosses to zero. The chipset latches it into IRQ_PEND bits 1/2. |
 | HALTED | card | High after `HALT` executes, until reset |
 | WAITING | card | High while `WAI` is waiting for an IRQ |
@@ -101,7 +101,9 @@ nobody driving D.
 ## Instruction boundary, interrupts and timers
 
 - **IRQs.** The CPU samples IRQ[3:0] only between instructions, as it does
-  today in `cpu.vhd` `check_irq`. It takes the lowest-numbered one.
+  today in `cpu.vhd` `check_irq`. It takes the lowest-numbered one, but not
+  right after `POP pcl`: that and the `POP pch` after it are one return
+  (an IRQ between them would lose the return address; CPU-005).
 - **IRQ entry.** Entry is the push/vector sequence from the manual: push pch,
   push pcl, push f, clear I, read the vector at $0010+2n. Every one of those is
   a normal bus cycle with SYNC low.

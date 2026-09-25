@@ -3,14 +3,32 @@
 The RP2040 on the removable **system card** ([system-slot.md](system-slot.md)),
 with its own USB port. The host side is `tools/cupc8.py`.
 
+The card runs from the slot's +3V3 and only listens on USB while the host's
+VBUS is there (GPIO29, USB_nVBUS, low): until then the USB controller is off
+and D+ is not pulled up, and it lets go of D+ whenever VBUS goes. GPIO0/1
+light its TX and RX LEDs for ~30 ms after USB data out and in. It has no
+debug UART; its USB link and SWD test pads are the ways in.
+
 The machine does not need it to run. Each FPGA boots from its own flash, and
 the main board has its own clock, reset supervisor and USB-C power sensing.
-sysctl programs, resets and debugs: nothing more. At start-up it touches
+sysctl programs, resets and debugs, and carries the kernel's terminal to a PC
+(the console, below) while a PC has that port open. At start-up it touches
 nothing on the machine.
+
+On USB it is a composite device (VID:PID 1209:C8C8) with **two CDC serial
+ports**, each with its interface association:
+
+| Interface | Port | Linux | |
+|---|---|---|---|
+| 0, 1 | the protocol (below) | `/dev/ttyACM0` | `cupc8.py`; its string is "CUPC/8 sysctl" |
+| 2, 3 | the console | `/dev/ttyACM1` | any terminal program; "CUPC/8 console" |
+
+(The ttyACM numbers are the usual ones with nothing else plugged in;
+`cupc8.py` finds each port by its interface number.)
 
 The firmware is a hardware-independent core (`fw/sysctl/core/`) plus an
 RP2040 HAL, the same split as the cards. The core runs in the host tests
-(SYS-001..005) against models of the bridge, the SST39, the two W25Q flashes,
+(SYS-001..005, SYS-007, SYS-008) against models of the bridge, the SST39, the two W25Q flashes,
 the two iCE40s booting from them, and the TCA9555 expanders.
 
 ## FPGA configuration flash
@@ -30,7 +48,7 @@ flash on the main board; FL1 is the CPU card's, reached through the CPU socket.
 
 ## USB protocol
 
-A byte stream over USB CDC. Requests and replies share one frame format:
+A byte stream over the first USB CDC port. Requests and replies share one frame format:
 
 | Byte | Field |
 |---|---|
@@ -57,15 +75,20 @@ A byte stream over USB CDC. Requests and replies share one frame format:
 | $06 | that FPGA is not held: its flash belongs to it (`FPGA_HOLD` first) |
 | $07 | the chipset is not running (held, or not configured), so its bridge cannot answer |
 
-Addresses are little-endian: 16 bits for RAM, 24 for ROM and flash. `t` is a
-flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
+Addresses are little-endian: 16 bits for RAM (the far forms: 24), 24 for ROM
+and flash. RAM addresses are physical SRAM addresses: the 16-bit forms reach
+$00000–$0ffff (the CPU's view with `RAM_BANK` at its reset value), the far
+forms the whole 512 KB, bank × $4000 + offset (`memory-map.md`, "RAM banks").
+`t` is a flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 
 | Cmd | Request payload | Reply payload |
 |---|---|---|
-| $00 PING | nonce (0–8 bytes, optional) | `CUPC8 sysctl <version>`, then the nonce. Replies carry no request id, so `cupc8.py` opens every session with a PING nonce and drops replies until its echo: a run killed after its request leaves a reply that would otherwise pass for the next run's. |
+| $00 PING | nonce (0–8 bytes, optional) | `CUPC8 sysctl <version>` (2.1: with the console), then the nonce. Replies carry no request id, so `cupc8.py` opens every session with a PING nonce and drops replies until its echo: a run killed after its request leaves a reply that would otherwise pass for the next run's. |
 | $01 STATUS | – | bridge status (0 if the chipset is down), GPO, CDONE (bit0 chipset, bit1 CPU card), held FPGAs, USB-C class, CC mV (16), 1V2 mV (16), cards held in reset, CPU card present |
 | $10 RAM_READ | addr16, len16 | data |
 | $11 RAM_WRITE | addr16, data | – |
+| $12 RAM_READ_FAR | addr24, len16 | data: `addr + len` ≤ $80000 (bridge `RAM_RD24`) |
+| $13 RAM_WRITE_FAR | addr24, data | – : `addr + len` ≤ $80000 (bridge `RAM_WR24`) |
 | $20 ROM_READ | addr24, len16 | data |
 | $21 ROM_ERASE | addr24, len24 (0 = whole chip) | – : erases the 4 KB sectors that cover the range |
 | $22 ROM_PROGRAM | addr24, data | – : programs, polls and reads back each byte, retrying once |
@@ -89,6 +112,18 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 | $58 CARD_PROG | slot (0–5), low8 | – : drives that slot's PROG_n low (1) or releases it (0): with a CARD_RESET pulse, an ESP32 card starts in its ROM bootloader |
 
 $00 PING, $01 STATUS, $32, $4x and $5x work with the chipset down.
+
+**RAM writes while the CPU runs.** `RAM_WRITE` needs no `CPU_CTL` stop. The
+bridge (`soc/bridge.vhd`) hands the chipset one byte at a time; the chipset's
+memory controller serves it only when idle and takes no new CPU cycle while
+the bridge's request is up (`soc/chipset.vhd`: the bridge goes first, the CPU
+waits on /RDY), so every byte is one whole SRAM cycle between CPU cycles: no
+bus contention and no torn byte. Nothing is atomic across bytes, though: the
+CPU can see a block half written. So `cupc8.py run` writes a program at $7000
+first and then, in a separate `RAM_WRITE`, sets `API_RUN` ($6f21) to 1, which
+is the only byte the kernel's terminal looks at; and it refuses while
+`API_RUN` is 2 (a program is running at $7000, which it would write over) or
+still 1 (the last one not started yet).
 
 ### The card programming port
 
@@ -126,6 +161,51 @@ $30 and $31 go through the bridge and return $07 while it is down.
   already reads `$FF`.
 - sysctl stops the CPU (`CPU_CTL` bit 0) around every ROM write and restores
   the previous CPU_CTL afterwards.
+
+## The console port
+
+The second CDC port is the kernel's terminal (`../proposals/usb-console.md`):
+everything the terminal prints comes out of it, and what a PC types into it
+reaches the kernel as keys, as from the USB keyboard. It goes through two
+rings in the API block (`memory-map.md`), `CON_OUT` ($6f40–$6fbf, the
+kernel writes) and `CON_IN` ($6fc0–$6fff, the card writes), with their
+indices at $6f22–$6f25 and `CON_FLAGS` at $6f26.
+
+Only while a PC has the port open (DTR set: opening it in a terminal program
+does that), every 2 ms (`CON_POLL_MS`, `fw/sysctl/core/console.c`) the card:
+
+1. reads the four indices and `CON_FLAGS` in one `RAM_RD` frame, and sets
+   `HOST` (bit 0 of `CON_FLAGS`) if it is clear: the kernel zeroes it at
+   boot, so a reset machine gets it back on the next poll. `CON_FLAGS` with
+   any other bit set is the SRAM as it powered up, before the kernel has
+   run: the card then moves its own indices to the kernel's (dropping both
+   rings), sets `HOST` and sends nothing, so a terminal open across
+   power-on sees the banner first, not a ring of junk;
+2. copies the bytes from `CON_OUT_TAIL` to `CON_OUT_HEAD` to the PC, as many
+   as its USB buffer takes, each `\n` as CR LF (never half of one), then
+   writes `CON_OUT_TAIL`;
+3. copies what the PC typed into `CON_IN`, as much as fits (one slot stays
+   free), then writes `CON_IN_HEAD`. CR is Enter; the LF of a CR LF is
+   dropped, and a lone LF is Enter (a paste with either line ending works).
+   What does not fit stays in the card's USB buffer, and USB holds the PC
+   back once that is full.
+
+When the port closes (DTR clear, or the host's VBUS gone), the card clears
+`HOST` once and stops: with the port closed there is no bridge traffic at
+all, and none while the chipset is held or down. The indices are read afresh
+on every poll (nothing is cached across a kernel reboot); each side writes
+only its own index, after the data it covers, because the bridge's writes are
+atomic per byte and not across bytes.
+
+With `HOST` set the kernel waits for room in a full `CON_OUT`, so a PC that
+holds the port open but stops reading (a terminal program suspended, say)
+holds up the terminal, as a serial terminal with flow control would. Close
+the port and the kernel goes on, dropping what it would have sent.
+
+Open it with `cupc8.py console` (it finds interface 2; `Ctrl-]` quits), or
+any terminal program: `picocom /dev/ttyACM1`, `screen /dev/ttyACM1`, PuTTY.
+The baud rate is ignored. `sysctl_sim --console` serves the port on a second
+pseudo-terminal against the model SRAM (HOST-002).
 
 ## USB-C source class
 

@@ -1,11 +1,11 @@
-# SY6280AAC (Silergy), current-limited load switch, SOT-23-5
+# SY6280AAC (Silergy), current-limited power distribution switch, SOT-23-5
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/0271e5b2ca2a46b8bb16f65855f12fe2.pdf
-source: "Silergy SY6280 datasheet, Pinout (top view) and Pin Description: 1 OUT, 2 GND, 3 ISET, 4 EN, 5 IN"
+source: "SY6280 datasheet, page 1: Pinout (SOT23-5, top view) and Pin Description (1 OUT, 2 GND, 3 ISET, 4 EN, 5 IN)"
 package: SOT-23-5
 pins:
-  1: "OUT"
-  2: "GND"
-  3: "ISET"
-  4: "EN"
-  5: "IN"
+  1: OUT
+  2: GND
+  3: ISET
+  4: EN
+  5: IN
 ccw: [1, 5]

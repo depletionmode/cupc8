@@ -2,7 +2,10 @@
 ;
 ; The card holds a FIFO of keys and pulls IRQ_n low while it is not empty, so
 ; the kernel sleeps in WAI instead of spinning. Keys are ASCII, with $ff
-; meaning "nothing waiting".
+; meaning "nothing waiting". The wait polls the card whenever its line is
+; asserted (SLOT_IRQ, $f202, the live level), so a key is never missed
+; between a poll and the WAI; the chipset's tick (irq.s) wakes the WAI
+; every 50 ms, which bounds that.
 
 %define SLOT_TABLE $0002
 %define KEYB_CFG_DIV2 16
@@ -10,12 +13,16 @@
 keyb_spi: resb 1
 keyb_tmp: resb 1
 keyb_try: resb 1
+keyb_bit: resb 1			; the keyboard's bit in SLOT_IRQ
+keyb_term: resb 1			; 1 while the terminal waits for a line (API_RUN is looked at)
 
 keyb_init:
 	mov r0, #0xff
 	st [keyb_spi], r0
 	xor r0, r0
 	st [keyb_tmp], r0
+	st [keyb_bit], r0
+	st [keyb_term], r0
 .scan:
 	ld r0, [keyb_tmp]
 	ld r1, SLOT_TABLE+r0
@@ -28,6 +35,10 @@ keyb_init:
 	bzf .scan
 	b .done					; no keyboard fitted
 .found:
+	ld r1, [keyb_tmp]
+	mov r0, #1
+	shl r0, r1
+	st [keyb_bit], r0
 	ld r0, [keyb_tmp]
 	shl r0, #4
 	st [keyb_spi], r0
@@ -84,8 +95,16 @@ keyb_cs_off:
 	pop pcl
 	pop pch
 
-; r0 = the next key, or $ff when the FIFO is empty
+; r0 = the next key, or $ff when none is waiting: the USB console's CON_IN
+; first (console.s), then the IO card's FIFO
 keyb_poll:
+	push pch
+	push pcl
+	b con_getc
+	eq r0, #0xff
+	bzf .card
+	b .done
+.card:
 	ld r0, [keyb_spi]
 	eq r0, #0xff
 	bzf .none
@@ -143,7 +162,9 @@ keyb_poll:
 	pop pcl
 	pop pch
 
-; wait for a key and return it in r0
+; wait for a key and return it in r0. While the terminal waits (keyb_term),
+; a program the PC left at $7000 (API_RUN = 1) is run instead: sys_run,
+; which never comes back here (sys_restart takes the terminal back).
 keyb_read_char:
 	push pch
 	push pcl
@@ -152,8 +173,29 @@ keyb_read_char:
 	bzf .wait
 	b .done
 .wait:
-	; sleep until a card raises IRQ_n (the IO card does so while it has keys)
+	; sleep until an IRQ - the IO card's while it has keys, or the tick
 	wai
+	ld r0, [keyb_term]
+	eq r0, #0
+	bzf .key
+	ld r0, API_RUN
+	eq r0, #1
+	bzf .run
+	b .key
+.run:
+	b sys_run
+.key:
+	ld r0, CON_IN_TAIL		; a key from the USB console (console.s)
+	ld r1, CON_IN_HEAD
+	eq r0, r1
+	bzf .card
+	b keyb_read_char
+.card:
+	ld r0, $f202			; the keyboard's line, live
+	ld r1, [keyb_bit]
+	and r0, r1
+	eq r0, #0
+	bzf .wait
 	b keyb_read_char
 .done:
 	pop pcl

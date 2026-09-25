@@ -20,12 +20,16 @@ must_fail = ["FAIL tmr0 r1"]
 name = "kernel BASIC: tokenizer, mem_cmp, precedence, strings, FOR/NEXT, jumps, REM, ELSE, 0, /0, long lines"
 fixed_in = "e635dbd"
 before = "f811788"
-files = ["kernel/ubasic.s", "kernel/ubasic_tokenizer.s", "kernel/printf.s", "kernel/math.s", "kernel/term.s"]
-cmd = "tools/run_tests.sh testBasicPrograms"
-must_fail = ["BASIC precedence", "BASIC string", "BASIC for/next", "BASIC if/then/else", "BASIC goto loop",
-             "BASIC gosub", "BASIC nested for", "BASIC parentheses", "BASIC equals", "BASIC zero",
-             "BASIC rem", "BASIC mod, divide by 0", "BASIC let in then", "BASIC gosub nest",
-             "BASIC longest line"]
+# The fix touched ubasic.s, ubasic_tokenizer.s, printf.s, math.s and term.s;
+# those old files no longer assemble with today's kernel (sys.s, the API,
+# calls routines they lack), so the whole kernel as it was goes back, and
+# the files added since go.
+files = ["kernel"]
+cmd = "rm -f kernel/api.inc kernel/api.s kernel/bank.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
+must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/next", "FAIL: BASIC if/then/else",
+             "FAIL: BASIC goto loop", "FAIL: BASIC gosub", "FAIL: BASIC nested for", "FAIL: BASIC parentheses",
+             "FAIL: BASIC equals", "FAIL: BASIC zero", "FAIL: BASIC rem", "FAIL: BASIC mod, divide by 0",
+             "FAIL: BASIC let in then", "FAIL: BASIC gosub nest", "FAIL: BASIC longest line"]
 
 [[bug]]
 name = "kernel: the BASIC program buffer overflowed"
@@ -67,8 +71,57 @@ must_fail = ["programmed $F0 reads"]
 [[bug]]
 name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on them)"
 fixed_in = "45d051b"
-before = "80c23a6"
-files = ["kernel/ubasic.s"]
+# the empty stubs put back into today's ubasic.s (80c23a6's whole file no
+# longer assembles with the rest of the kernel)
+revert = [
+  ["kernel/ubasic.s", """ubasic_peek_statement:
+	mov r0, TOKENIZER_PEEK
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [ub_peek_var], r0
+	mov r0, TOKENIZER_VARIABLE
+	push pch
+	push pcl
+	b ubasic_accept
+	ldd r1, [ub_mem_ptr]
+	ld r0, [ub_peek_var]
+	push pch
+	push pcl
+	b ubasic_set_variable
+	push pch
+	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+""", """ubasic_peek_statement:
+	pop pcl
+"""],
+  ["kernel/ubasic.s", """ubasic_poke_statement:
+	mov r0, TOKENIZER_POKE
+	push pch
+	push pcl
+	b ubasic_accept
+	push pch
+	push pcl
+	b ubasic_mem_address
+	push pch
+	push pcl
+	b ubasic_expr
+	std [ub_mem_ptr], r0
+	push pch
+	push pcl
+	b ubasic_end_of_statement
+	pop pcl
+""", """ubasic_poke_statement:
+	pop pcl
+"""],
+]
 cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
 must_fail = ["BASIC poke/peek", "BASIC poke expr", "GPO after poke 240, 0, 165"]
 
@@ -77,12 +130,12 @@ name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (
 fixed_in = "5da685c"
 revert = [
   ["fw/gpu/core/gpu.c", """	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
 	uint8_t frame[2 + CARD_FRAME_MAX];
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
@@ -96,12 +149,12 @@ name = "gpu firmware: gpu_run() kept an 8 KB buffer on the RP2040's 2 KB stack (
 fixed_in = "5da685c"
 revert = [
   ["fw/gpu/core/gpu.c", """	int n = 0;
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			g->cmd[i] = fifo_at(g, g->tail + 2 + i);""", """	int n = 0;
 	uint8_t frame[2 + CARD_FRAME_MAX];
-	while (n < max_frames && fifo_used(g) >= 2) {
+	while (n < max_frames && !g->hold && fifo_used(g) >= 2) {
 		uint32_t len = fifo_at(g, g->tail) | (fifo_at(g, g->tail + 1) << 8);
 		for (uint32_t i = 0; i < len; i++)
 			frame[i] = fifo_at(g, g->tail + 2 + i);"""],
@@ -125,7 +178,10 @@ fixed_in = "29cfa8f"
 before = "d7f6145"
 files = ["fw/rp2040/common/slotspi.pio", "fw/rp2040/common/slotspi.c"]
 cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ['typed "Hello" + Enter, got']
+# which of IOC-004's timing-bound checks it trips moves with each build
+# ("Hello", then the repeat test); its polling section (the host polling back
+# to back against a 1 ms keyboard) catches it every time
+must_fail = ["FAIL polling: every status byte has bit 7 clear"]
 
 [[bug]]
 name = "wifi core: CONNECT_HOST connected with no SNI, so TLS could not check the certificate name"
@@ -149,6 +205,20 @@ fixed_in = "3375762"
 revert = [["fw/wifi/core/wifi.c", "bool save = p < len && f[p];", "bool save = false;"]]
 cmd = "make -C fw test_wifi"
 must_fail = ["JOIN save=1 reached the backend as 0"]
+
+[[bug]]
+name = "wifi core: UDP_SENDTO connected the socket, so a bound UDP server heard only its last peer"
+fixed_in = "81d6b74"
+revert = [["fw/wifi/core/wifi.c", "if (w->net->sendto(w->ctx, s->handle, f + 2, port, f + 9, n) != n)", "if (w->net->connect(w->ctx, s->handle, f + 2, port, 0) < 0 || w->net->send(w->ctx, s->handle, f + 9, n) != n)"]]
+cmd = "make -C fw test_wifi"
+must_fail = ["RXREADY for a second client after replying to the first", "a bound socket that replied to A heard B"]
+
+[[bug]]
+name = "wifi host backend: a ping socket has no FIONREAD, so an ICMP reply never set RXREADY"
+fixed_in = "81d6b74"
+revert = [["fw/wifi/host/netposix.c", "if (s->type == WIFI_ICMP) {\n\t\t/* a ping socket", "if (0) {\n\t\t/* a ping socket"]]
+cmd = "make -C fw test_wifi"
+must_fail = ["RXREADY for the echo reply"]
 
 [[bug]]
 name = "wifi firmware: without LWIP_SO_RCVBUF, FIONREAD never counted received TCP data"
@@ -181,14 +251,20 @@ must_fail = ["FAIL UART loopback across two UART_XFERs"]
 [[bug]]
 name = "gpu firmware: the slot SPI interrupt could delay PicoDVI's past its porch, cross-wiring the TMDS lanes"
 fixed_in = "9b4966c"
+# The fix's other half (slotspi masking only its own IRQ) is gone on purpose:
+# slotspi_refresh now turns every interrupt off for a few dozen cycles to swap
+# the preload (18c444f). Whether a delayed DVI interrupt still makes its porch
+# depends on how long the CS_n handler runs, so neither GPU-005's picture
+# checks nor E2E-002's boot (which found it) catch it any more. GPU-005 checks
+# the cause: CS_n rising at every point of a scanline, the DVI interrupt's
+# longest wait (emulator-side, pending to entry) is 113 cycles with the fix,
+# ~570 (the whole CS_n handler) with the bug.
 revert = [
   ["fw/rp2040/gpu/main.c", "	irq_set_priority(DMA_IRQ_0, 0);\n", ""],
   ["fw/rp2040/common/slotspi.c", "	irq_set_priority(IO_IRQ_BANK0, 0x40);", "	irq_set_priority(IO_IRQ_BANK0, 0);"],
-  ["fw/rp2040/common/slotspi.c", "	irq_set_enabled(IO_IRQ_BANK0, false);\n	if (gpio_get(PIN_SLOT_NCS)) {", "	uint32_t irq = save_and_disable_interrupts();\n	if (gpio_get(PIN_SLOT_NCS)) {"],
-  ["fw/rp2040/common/slotspi.c", "		arm_tx();\n	}\n	irq_set_enabled(IO_IRQ_BANK0, true);", "		arm_tx();\n	}\n	restore_interrupts(irq);"],
 ]
-cmd = "tools/fw_rp2040.sh gpu && make -C fw gpu_golden && node test/emu/test_gpu.mjs GPU-005"
-must_fail = ["FAIL GPU-005-traffic"]
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && tools/fw_rp2040.sh gpu && make -s -C fw gpu_golden && CUPC8_EMU=native node test/emu/test_gpu.mjs GPU-005"
+must_fail = ["FAIL PicoDVI's DMA interrupt waits at most 250 cycles"]
 
 [[bug]]
 name = "boot ROM: SPI_RX read straight after SPI_GO, before the transfer is done - every card's IDENT came back a byte late and every slot was recorded empty"
@@ -264,15 +340,11 @@ must_fail = ["FAIL race sweep: every READ framed"]
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
 fixed_in = "52423fa"
-revert = [["kernel/term.s", """term_do:
-	; start with an empty program: .bss is not cleared, and the SRAM
-	; powers up with junk
-	xor r0, r0
+revert = [["kernel/term.s", """	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
 	st [term_basic_prog_buf], r0
-
-""", """term_do:
-"""]]
+	st API_RUN, r0""", """	xor r0, r0
+	st API_RUN, r0"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
 must_fail = ["FAIL: BASIC on junk RAM"]
 
@@ -367,8 +439,10 @@ name = "slot SPI slave: slotspi_refresh stopping the state machine mid-frame - t
 fixed_in = "18c444f"
 before = "e9d8141"
 files = ["fw/rp2040/common/slotspi.c"]
-cmd = "tools/fw_rp2040.sh io && node test/emu/test_io.mjs"
-must_fail = ["FAIL full-speed: held 700 ms gives 1 + ~7 repeats"]
+# the repeat test caught it only by the timing of that build; IOC-004's
+# polling section (a 1 ms keyboard, the host polling back to back) always does
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu.node >/dev/null && tools/fw_rp2040.sh io && CUPC8_EMU=native node test/emu/test_io.mjs"
+must_fail = ["FAIL polling: every status byte has bit 7 clear", "FAIL polling: only \"x\" keys"]
 
 [[bug]]
 name = "eink firmware: the wait for BUSY timed from before the picture went out (POF sent to a refreshing panel)"
@@ -381,3 +455,182 @@ revert = [["fw/eink/core/eink.c", """	if (e->t0_fresh) {
 	}"""]]
 cmd = "make -s -C fw test_eink"
 must_fail = ["while BUSY", "the UC8179 model saw nothing the chip would ignore"]
+
+[[bug]]
+name = "eink firmware: the wake-up reset timed RST_N from the start of the poll that ran the row compare (RST_N low 7.5 us after deep sleep)"
+fixed_in = "cd138c2"
+revert = [["fw/eink/core/eink.c", """		e->t0_fresh = true;
+		if (e->panel_state == PANEL_OFF) {""", """		e->t0 = e->now;
+		if (e->panel_state == PANEL_OFF) {"""]]
+cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-008"
+must_fail = ["FAIL waking from deep sleep: RST_N held low long enough"]
+
+[[bug]]
+name = "eink firmware: AUTO_EXT did not restart the deep-sleep countdown (after sleep_s 0 held past the 71.6 min uint32 us wrap, a new sleep_s fired at once or up to 71 min late)"
+fixed_in = "80dc083"
+revert = [["fw/eink/core/eink.c", """		e->sleep_s = a[2];
+		/* sleep_s counts from here: after sleep_s 0 held past 2^32 us
+		 * (71.6 min), now - last_panel has wrapped to anything */
+		e->last_panel = e->now;
+		return true;""", """		e->sleep_s = a[2];
+		return true;"""]]
+cmd = "make -s -C fw test_eink"
+must_fail = ["FAIL !model.asleep: sleep_s 3 after 72 min of sleep_s 0: awake at 2.8 s"]
+
+[[bug]]
+name = "slot SPI slave: slotspi_poll set busy while replaying READ frames, so a host polling in step never saw the ready response (E2E-007's slow SAVE lost its last Enter)"
+fixed_in = "4d7648a"
+# E2E-007 caught it only with the code layout of 8068f78 (the IO card's loop
+# in step with the kernel's READ polling). IOC-004 makes the overlap certain:
+# short READs sent straight after a 2000-byte READ end while the card is still
+# replaying it (29 of 30 get RESP_LEN 0 with the bug back).
+revert = [
+  ["fw/rp2040/common/slotspi.c", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		card_select(card, true);", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		busy = true;\n		card_select(card, true);"],
+  ["fw/rp2040/common/slotspi.c", "		q_tail++;\n		irq_set_enabled", "		q_tail++;\n		busy = false;\n		irq_set_enabled"],
+]
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && tools/fw_rp2040.sh io && CUPC8_EMU=native node test/emu/test_io.mjs"
+must_fail = ["FAIL READs during a READ's replay"]
+
+[[bug]]
+name = "sim: headless --type hung when no card took the key (no IO card)"
+fixed_in = "000d63c"
+revert = [["tools/sim.nim", """        if not ranSinceKey and msCount() - keyAt >= settleMs:
+          ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
+""", ""]]
+cmd = "python3 test/sim/test_cli.py"
+# (at the kernel's prompt the chipset's tick wakes the CPU every 50 ms now,
+# so it is the parked program that hangs)
+must_fail = ["FAIL: --type at a program parked with nothing to wake it: headless still exits"]
+
+[[bug]]
+name = "kernel: Backspace at the prompt was stored in the line and only moved the cursor"
+fixed_in = "1a53edf"
+revert = [["kernel/printf.s", """	eq r0, #8				; Backspace (DEL too) takes the last character back
+	bzf .erase
+	eq r0, #127
+	bzf .erase
+""", ""]]
+cmd = "tools/run_tests.sh testBackspace"
+must_fail = ["Backspace: the corrected line ran (8, not 7)", "DEL: the corrected line ran (4, not 3)"]
+
+[[bug]]
+name = "graphics card: BS at column 0 did not go back over a wrapped line"
+fixed_in = "1a53edf"
+revert = [["fw/gpu/core/gpu.c", """		if (g->cx > 0) {
+			g->cx--;
+		} else if (g->cy > 0) {                 /* back over a wrapped line */
+			g->cy--;
+			g->cx = GPU_TEXT_COLS - 1;
+		}""", """		if (g->cx > 0)
+			g->cx--;"""]]
+cmd = "make -s -C fw test_gpu"
+must_fail = ["BS at column 0"]
+
+[[bug]]
+name = "sim: an IRQ taken between POP pcl and POP pch lost the return"
+fixed_in = "51c8e35"
+# (it also crashed the kernel at boot while the kernel's clock was a timer-0
+# tick every 250 instructions; the chipset's 50 ms tick meets a POP pcl
+# too rarely for testKernelOnCards to show it)
+revert = [["tools/sim.nim", """  if lastOp == 0x9f:
+    return
+""", ""]]
+cmd = "tools/run_tests.sh testIrqPopPcl"
+must_fail = ["FAIL: the call returned where it should"]
+
+[[bug]]
+name = "cpu: an IRQ taken between POP pcl and POP pch lost the return"
+fixed_in = "51c8e35"
+revert = [["soc/cpu.vhd", """if iflag = '1' and irq /= "0000" and ir /= x"9f" then""", """if iflag = '1' and irq /= "0000" then"""]]
+cmd = "python3 tools/cpudirected.py CPU-005"
+must_fail = ["an IRQ due at POP pcl pushed"]
+
+[[bug]]
+name = "emu/machine: a card's CS_n set high again on every sync latched a rising edge each time; slotspi restarted mid-frame and exec's chunk reads went unanswered"
+fixed_in = "08496f0"
+# exec's chunk reads showed it only by timing (6c88ad2's kernel; later ones
+# hide it), so E2E-011 counts, per card, the rising CS_n edges its GPIO
+# latched against the chipset's deselects (Rp2040Card::csEdges, csRises)
+revert = [["emu/machine/machine.cpp", """  if (!!mosi != pinMosi) g[P::MOSI].setInputValue(pinMosi = !!mosi);
+  if (!!sck != pinSck) g[P::SCK].setInputValue(pinSck = !!sck);
+  if (!selected != pinNcs) g[P::NCS].setInputValue(pinNcs = !selected);""", """  g[P::MOSI].setInputValue(!!mosi);
+  g[P::SCK].setInputValue(!!sck);
+  g[P::NCS].setInputValue(!selected);"""]]
+cmd = "tools/fw_rp2040.sh >/dev/null && tools/emu_machine_build.sh >/dev/null && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-011"
+must_fail = ["FAIL slot 1 (hdmi):", "FAIL slot 2 (io):", "FAIL slot 3 (storage):", "rising CS_n edges latched for"]
+
+[[bug]]
+name = "kernel net: net config ip counted its words in net_pn, which net_parse_ip uses too"
+fixed_in = "c5b0012"
+revert = [["kernel/net.s", """	ld r0, [net_wi]
+	push pch
+	push pcl
+	b net_word_ip""", """	ld r0, [net_pn]
+	push pch
+	push pcl
+	b net_word_ip"""], ["kernel/net.s", "\tld r0, [net_wi]\t\t; net_cfg + 4", "\tld r0, [net_pn]\t\t; net_cfg + 4"], ["kernel/net.s", "\tld r0, [net_wi]\n\tadd r0, #1\n\tst [net_wi], r0", "\tld r0, [net_pn]\n\tadd r0, #1\n\tst [net_pn], r0"]]
+cmd = "tools/run_tests.sh testKernelDnsPing"
+must_fail = ["FAIL: net config ip IP MASK GW"]
+
+[[bug]]
+name = "assembler: any line with a lower-case \"db\" (or \"resb\") in it was taken for data (a %define of $10db, an address, a comment)"
+fixed_in = "2149249"
+revert = [["tools/as.py", """            if directive == 'resb':""", """            if l.find('resb') > -1:"""],
+          ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
+cmd = "python3 test/asm/test_asm.py"
+must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'", "FAIL 'mov r0, #1"]
+
+[[bug]]
+name = "sim: an interactive run slept a millisecond per WAI (0.17 MHz with a timer tick)"
+fixed_in = "ced7599"
+# (as merged with the clock model: guest time is simClocks, held to the host clock)
+revert = [["tools/sim.nim", """          let behind = hostClocks() - simClocks
+          if behind <= 0:
+            sleep(1)
+            steps = 0
+          else:
+            steps = min(behind div 3 + 1, 400_000)""", """          sleep(1)
+          steps = clamp((hostClocks() - simClocks) div 3, 1, 400_000)"""]]
+cmd = "python3 test/sim/test_cli.py"
+must_fail = ["FAIL: interactive: a WAI-heavy guest keeps its 12 MHz clock"]
+
+[[bug]]
+name = "sim: a WAI turn was a microsecond, not 3 clocks, so its timer counts ran 4x slow (API_WAIT_MS ~4x slow)"
+fixed_in = "514c86a"
+# (as merged with the clock model: a turn is 3 of simClocks; the bug puts
+# a microsecond, 12, back)
+revert = [["tools/sim.nim", """    tickTimers()
+    inc ins_retired
+    simClocks += 3""", """    tickTimers()
+    inc ins_retired
+    simClocks += 12"""]]
+cmd = "tools/run_tests.sh testWaiTimer"
+must_fail = ["FAIL: ... 594 clocks, 49.5 us (4 counts a microsecond)"]
+
+
+[[bug]]
+name = "emulator: rp2040js's USBCDC took the composite system card's last CDC port (the console), so SYS-006 lost every reply"
+fixed_in = "7e14c52"
+revert = [["test/emu/test_sysctl.mjs", """const usb = new CdcHost(emu.mcu.usbCtrl, 2);
+const cdc = usb.ports[0];""", """const usb = new (await import('./emu_backend.mjs')).USBCDC(emu.mcu.usbCtrl);
+const cdc = usb;
+usb.ports = [usb];"""]]
+cmd = "tools/fw_rp2040.sh sysctl && node test/emu/test_sysctl.mjs"
+must_fail = ["FAIL PING", "FAIL two CDC serial ports"]
+
+[[bug]]
+name = "emulator: the native backend had no usbCtrl.sieCtrl (SYS-006's D+ pull-up checks failed natively, EMU-006)"
+fixed_in = "7e14c52"
+revert = [["test/emu/rp2040native.mjs", """  get sieCtrl() {
+    return N.usbSieCtrl(this.emu.h);
+  }
+""", ""]]
+cmd = "tools/fw_rp2040.sh sysctl && cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && CUPC8_EMU=native node test/emu/test_sysctl.mjs"
+must_fail = ["FAIL D+ pull-up on while VBUS is there"]
+
+[[bug]]
+name = "sysctl console: power-up junk in the rings went to the PC before the banner"
+fixed_in = "6a6b470"
+revert = [["fw/sysctl/core/console.c", """	if (ix[4] & ~CON_HOST) {""", """	if (0) {"""]]
+cmd = "make -s -C fw test_sysctl"
+must_fail = ["power-up junk in the rings: nothing sent"]

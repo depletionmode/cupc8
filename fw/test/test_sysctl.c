@@ -1,5 +1,5 @@
 /*
- * SYS-001/002/003/005: the system controller core against models of the
+ * SYS-001/002/003/005/007/008: the system controller core against models of the
  * machine (fw/test/sysmodels.h), all driven through the USB protocol the way
  * tools/cupc8.py drives it. Time is virtual: SPI bytes and delays advance it.
  *
@@ -11,6 +11,11 @@
  *   SYS-003  the ROM chip through the bridge: ID, erase, program, verify,
  *            failure reporting, recovery after an interrupted write
  *   SYS-005  USB-C source class; cards run unless deliberately held
+ *   SYS-007  the whole 512 KB SRAM through RAM_READ_FAR/RAM_WRITE_FAR
+ *   SYS-008  the USB console: the two rings in the API block against the
+ *            bridge's SRAM (wrap, full, the USB side full, CR LF out, CR and
+ *            LF in, HOST on open and close and after the kernel reboots),
+ *            no bridge traffic while the port is closed or the chipset held
  *   SYS-004  the card programming port: the slot mux, SWD against a bit-level
  *            RP2040 target (wake-up, multi-drop, power-up, posted reads,
  *            WAIT, FAULT), and the UART tunnel
@@ -107,7 +112,7 @@ static void sys001_protocol(void)
 	uint8_t f[64];
 
 	CHECK_EQ(req(0x00, 0, 0), ST_OK);
-	CHECK(resp_n == 16 && memcmp(resp, "CUPC8 sysctl 2.0", 16) == 0, "PING: %.*s", resp_n, resp);
+	CHECK(resp_n == 16 && memcmp(resp, "CUPC8 sysctl 2.1", 16) == 0, "PING: %.*s", resp_n, resp);
 	/* a nonce comes back after the id (cupc8.py resyncs on it) */
 	CHECK_EQ(REQ(0x00, 0xA5, 0x5A, 0x01, 0x02), ST_OK);
 	CHECK(resp_n == 20 && memcmp(resp + 16, "\xA5\x5A\x01\x02", 4) == 0, "PING nonce: %d bytes", resp_n);
@@ -529,12 +534,347 @@ static void sys004_progport(void)
 	CHECK_EQ(M.prog_slot, -1);
 }
 
+/* SYS-007: RAM_READ_FAR/RAM_WRITE_FAR, the whole 512 KB SRAM through the
+ * bridge's RAM_RD24/RAM_WR24 (extended-ram.md), next to the 16-bit forms */
+static void sys007_far_ram(void)
+{
+	power_on(true, true);
+	static uint8_t p[3 + 3000], data[3000];
+
+	/* across bank boundaries, across $0ffff (the 16-bit forms wrap there),
+	 * and up to the last byte, each crossing the bridge's 256-byte frames */
+	static const uint32_t at[] = {0x00100, 0x0BF80, 0x0FC00, 0x13F00, 0x42ABC, 0x7F448};
+	for (int t = 0; t < (int)(sizeof at / sizeof at[0]); t++) {
+		uint32_t a = at[t];
+		int len = a == 0x7F448 ? 0x80000 - 0x7F448 : 3000;
+		for (int i = 0; i < len; i++)
+			data[i] = (uint8_t)(i * 5 + t * 29 + (i >> 8));
+		p[0] = (uint8_t)a;
+		p[1] = (uint8_t)(a >> 8);
+		p[2] = (uint8_t)(a >> 16);
+		memcpy(p + 3, data, (size_t)len);
+		CHECK_EQ(req(0x13, p, 3 + len), ST_OK);
+		CHECK(memcmp(M.br.ram + a, data, (size_t)len) == 0, "RAM_WRITE_FAR at $%05x in the model", a);
+		CHECK_EQ(REQ(0x12, (uint8_t)a, (uint8_t)(a >> 8), (uint8_t)(a >> 16), (uint8_t)len, (uint8_t)(len >> 8)), ST_OK);
+		CHECK(resp_n == len && memcmp(resp, data, (size_t)len) == 0, "RAM_READ_FAR at $%05x", a);
+	}
+	/* the 16-bit forms keep their meaning: SRAM $00000-$0ffff, wrapping */
+	CHECK_EQ(REQ(0x11, 0xFE, 0xFF, 0xA1, 0xA2, 0xA3, 0xA4), ST_OK);
+	CHECK(M.br.ram[0xFFFE] == 0xA1 && M.br.ram[0xFFFF] == 0xA2 && M.br.ram[0x0000] == 0xA3 &&
+	      M.br.ram[0x0001] == 0xA4 && M.br.ram[0x10000] != 0xA3, "RAM_WRITE wraps past $ffff");
+	CHECK_EQ(REQ(0x12, 0xFE, 0xFF, 0x00, 4, 0), ST_OK);
+	CHECK(resp[0] == 0xA1 && resp[1] == 0xA2 && resp[2] == M.br.ram[0x10000], "RAM_READ_FAR does not wrap");
+
+	/* argument checks */
+	CHECK_EQ(REQ(0x12, 0, 0, 0, 0), ST_ARG);                         /* short */
+	CHECK_EQ(REQ(0x12, 0, 0, 0, 0, 0), ST_ARG);                      /* length 0 */
+	CHECK_EQ(REQ(0x12, 0, 0, 0, 0x01, 0x10), ST_ARG);                /* 4097 bytes */
+	CHECK_EQ(REQ(0x12, 0xFF, 0xFF, 0x07, 2, 0), ST_ARG);             /* past $7ffff */
+	CHECK_EQ(REQ(0x12, 0x00, 0x00, 0x08, 1, 0), ST_ARG);             /* $80000 */
+	CHECK_EQ(REQ(0x12, 0xFF, 0xFF, 0x07, 1, 0), ST_OK);              /* the last byte */
+	CHECK_EQ(REQ(0x13, 0, 0, 0), ST_ARG);                            /* no data */
+	CHECK_EQ(REQ(0x13, 0xFF, 0xFF, 0x07, 1, 2), ST_ARG);             /* past $7ffff */
+	CHECK_EQ(REQ(0x13, 0xFF, 0xFF, 0x07, 0x5A), ST_OK);
+	CHECK_EQ(M.br.ram[0x7FFFF], 0x5A);
+
+	/* with the chipset held they are refused like the other bridge commands */
+	CHECK_EQ(REQ(0x44, 0), ST_OK);
+	CHECK_EQ(REQ(0x12, 0, 0, 1, 1, 0), ST_NOCHIPSET);
+	CHECK_EQ(REQ(0x13, 0, 0, 1, 0), ST_NOCHIPSET);
+	CHECK_EQ(REQ(0x45, 0), ST_OK);
+	CHECK_EQ(M.contention, 0);
+}
+
+/* ---------------------------------------------------------------- console */
+
+#define RAM(a) M.br.ram[(a)]
+
+/* virtual time passes a millisecond at a time, the main loop polling */
+static void con_run(int ms)
+{
+	for (int i = 0; i < ms; i++) {
+		M.now += 1000;
+		tick();
+		sysctl_poll(&S);
+	}
+}
+
+/* the kernel's side: put bytes in CON_OUT (the caller keeps it from filling) */
+static void kput(const char *s, int n)
+{
+	int head = RAM(CON_OUT_HEAD);
+	for (int i = 0; i < n; i++) {
+		RAM(CON_OUT + head) = (uint8_t)s[i];
+		head = (head + 1) & (CON_OUT_SIZE - 1);
+	}
+	RAM(CON_OUT_HEAD) = (uint8_t)head;
+}
+
+/* the kernel's side: take everything in CON_IN */
+static int kget(char *d)
+{
+	int n = 0, tail = RAM(CON_IN_TAIL);
+	while (tail != RAM(CON_IN_HEAD)) {
+		d[n++] = (char)RAM(CON_IN + tail);
+		tail = (tail + 1) & (CON_IN_SIZE - 1);
+	}
+	RAM(CON_IN_TAIL) = (uint8_t)tail;
+	d[n] = 0;
+	return n;
+}
+
+static void pc_type(const char *s)
+{
+	int n = (int)strlen(s);
+	memcpy(M.con.from_pc + M.con.from_pc_n, s, (size_t)n);
+	M.con.from_pc_n += n;
+}
+
+static bool pc_got(const char *s)
+{
+	int n = (int)strlen(s);
+	bool ok = M.con.to_pc_n == n && memcmp(M.con.to_pc, s, (size_t)n) == 0;
+	if (!ok) {
+		fprintf(stderr, "  the PC got %d bytes: '", M.con.to_pc_n);
+		for (int i = 0; i < M.con.to_pc_n; i++)
+			fputc(M.con.to_pc[i] >= 32 && M.con.to_pc[i] < 127 ? M.con.to_pc[i] : '.', stderr);
+		fprintf(stderr, "', expected '%s'\n", s);
+	}
+	M.con.to_pc_n = 0;
+	return ok;
+}
+
+/* the bridge's SRAM cycles, in order: address, and W or R */
+static struct { uint32_t a; bool w; } ramlog[4096];
+static int ramlog_n;
+static void (*cpu_at_read)(uint32_t a);    /* the CPU acting between the card's cycles */
+
+static void log_ram(uint32_t a, bool w)
+{
+	if (ramlog_n < (int)(sizeof ramlog / sizeof ramlog[0]))
+		ramlog[ramlog_n].a = a, ramlog[ramlog_n++].w = w;
+	if (!w && cpu_at_read)
+		cpu_at_read(a);
+}
+
+static int last_write_to(uint32_t lo, uint32_t hi)
+{
+	int at = -1;
+	for (int i = 0; i < ramlog_n; i++)
+		if (ramlog[i].w && ramlog[i].a >= lo && ramlog[i].a <= hi)
+			at = i;
+	return at;
+}
+
+static int first_write_to(uint32_t a)
+{
+	for (int i = 0; i < ramlog_n; i++)
+		if (ramlog[i].w && ramlog[i].a == a)
+			return i;
+	return -1;
+}
+
+/* the kernel prints while the card is between reading CON_OUT_HEAD and its data */
+static void kernel_prints_now(uint32_t a)
+{
+	if (a == CON_OUT_HEAD + 4) {              /* the last byte of the index read */
+		cpu_at_read = NULL;
+		kput("LATE", 4);
+	}
+}
+
+static void sys008_console(void)
+{
+	char in[256];
+	power_on(true, true);
+	M.br.on_ram = log_ram;
+	/* RAM is junk at power-on. A PC with the port open before the kernel has
+	 * booted: CON_FLAGS $A5 is not the kernel's, so the card drops both rings
+	 * (moving only its own indices) instead of sending the PC a ring of junk */
+	memset(M.br.ram + 0x6f00, 0xA5, 0x100);
+	RAM(CON_OUT_HEAD) = 0x31;
+	RAM(CON_IN_TAIL) = 0x17;
+	M.con.open = true;
+	con_run(CON_POLL_MS * 3);
+	CHECK(pc_got(""), "power-up junk in the rings: nothing sent");
+	CHECK(RAM(CON_OUT_TAIL) == 0x31 && RAM(CON_IN_HEAD) == 0x17 && RAM(CON_OUT_HEAD) == 0x31 &&
+	      RAM(CON_IN_TAIL) == 0x17, "junk: the card's indices moved to the kernel's, the kernel's left alone");
+	CHECK_EQ(RAM(CON_FLAGS), CON_HOST);
+	M.con.open = false;
+	con_run(1);
+	M.bridge_frames = 0;
+	/* the kernel zeroes the rings at boot */
+	memset(M.br.ram + 0x6f00, 0xA5, 0x100);
+	memset(M.br.ram + CON_OUT_HEAD, 0, 5);
+
+	/* closed: no bridge traffic at all, nothing written, however long */
+	uint8_t before[0x100];
+	kput("hello\n", 6);
+	memcpy(before, M.br.ram + 0x6f00, sizeof before);
+	pc_type("typed while closed");
+	con_run(500);
+	CHECK_EQ(M.bridge_frames, 0);
+	CHECK(memcmp(before, M.br.ram + 0x6f00, sizeof before) == 0, "closed: the API block untouched");
+	CHECK_EQ(M.con.to_pc_n, 0);
+	CHECK_EQ(M.con.from_pc_n, 18);
+	M.con.from_pc_n = 0;
+
+	/* open: HOST set on the first poll, the waiting output sent, \n as CR LF */
+	M.con.open = true;
+	con_run(1);
+	CHECK_EQ(RAM(CON_FLAGS), CON_HOST);
+	CHECK(pc_got("hello\r\n"), "output with CR LF");
+	CHECK_EQ(RAM(CON_OUT_TAIL), 6);
+	/* the card never writes into the output ring, only its tail */
+	CHECK_EQ(last_write_to(CON_OUT, CON_OUT + CON_OUT_SIZE - 1), -1);
+
+	/* polls come every CON_POLL_MS, not more often */
+	int frames = M.bridge_frames;
+	sysctl_poll(&S);
+	CHECK_EQ(M.bridge_frames, frames);
+	con_run(CON_POLL_MS);
+	CHECK(M.bridge_frames > frames, "polled again after %d ms", CON_POLL_MS);
+
+	/* the ring wraps: 20 bytes from index 120 */
+	RAM(CON_OUT_HEAD) = RAM(CON_OUT_TAIL) = 120;
+	kput("0123456789abcdefghij", 20);
+	CHECK_EQ(RAM(CON_OUT_HEAD), 12);
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("0123456789abcdefghij"), "output across the wrap");
+	CHECK_EQ(RAM(CON_OUT_TAIL), 12);
+
+	/* a full ring (127 bytes, one slot free) comes out whole */
+	char full[CON_OUT_SIZE];
+	for (int i = 0; i < CON_OUT_SIZE - 1; i++)
+		full[i] = (char)('A' + i % 26);
+	full[CON_OUT_SIZE - 1] = 0;
+	kput(full, CON_OUT_SIZE - 1);
+	CHECK_EQ(RAM(CON_OUT_HEAD), (12 + 127) & 127);
+	CHECK_EQ((RAM(CON_OUT_HEAD) + 1) & 127, RAM(CON_OUT_TAIL));      /* full as the kernel sees it */
+	con_run(CON_POLL_MS);
+	CHECK(pc_got(full), "a full ring");
+	CHECK_EQ(RAM(CON_OUT_TAIL), RAM(CON_OUT_HEAD));
+
+	/* the USB side full: nothing taken; then only what fits, never half a CR LF */
+	M.con.room = 0;
+	kput("ab\ncd\n", 6);
+	int tail = RAM(CON_OUT_TAIL);
+	con_run(10);
+	CHECK_EQ(RAM(CON_OUT_TAIL), tail);
+	CHECK_EQ(M.con.to_pc_n, 0);
+	M.con.room = 3;
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("ab"), "3 bytes of room: the \\n's CR LF does not fit");
+	CHECK_EQ(RAM(CON_OUT_TAIL), (tail + 2) & 127);
+	M.con.room = 4;
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("\r\ncd"), "the rest, as room allows");
+	M.con.room = 4096;
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("\r\n"), "and the last");
+	CHECK(M.con.room >= 0, "con_write never got more than con_room");
+
+	/* the kernel writing while the card polls: the card sends only up to the
+	 * head it read, and the rest on its next poll */
+	cpu_at_read = kernel_prints_now;
+	kput("early ", 6);
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("early "), "only what was there when the head was read");
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("LATE"), "the late bytes on the next poll");
+
+	/* input: CR is Enter, the LF of CR LF dropped, a lone LF is Enter */
+	ramlog_n = 0;
+	pc_type("10 print 1\r\n20 goto 10\n");
+	con_run(CON_POLL_MS);
+	CHECK_EQ(kget(in), 22);
+	CHECK(strcmp(in, "10 print 1\r20 goto 10\r") == 0, "input: '%s'", in);
+	CHECK(first_write_to(CON_IN_HEAD) > last_write_to(CON_IN, CON_IN + CON_IN_SIZE - 1),
+	      "CON_IN_HEAD written after the data");
+	/* a CR LF split across polls is still one Enter */
+	pc_type("x\r");
+	con_run(CON_POLL_MS);
+	pc_type("\ny");
+	con_run(CON_POLL_MS);
+	CHECK_EQ(kget(in), 3);
+	CHECK(strcmp(in, "x\ry") == 0, "split CR LF: '%s'", in);
+
+	/* the input ring wraps, and fills: 63 bytes at most, the rest waits on the PC */
+	RAM(CON_IN_HEAD) = RAM(CON_IN_TAIL) = 60;
+	char many[101];
+	for (int i = 0; i < 100; i++)
+		many[i] = (char)('a' + i % 26);
+	many[100] = 0;
+	pc_type(many);
+	con_run(CON_POLL_MS);
+	CHECK_EQ(RAM(CON_IN_HEAD), (60 + 63) & 63);
+	CHECK_EQ(M.con.from_pc_n, 100 - 63);
+	CHECK(RAM(CON_IN + 63) == 'd' && RAM(CON_IN + 0) == 'e', "CON_IN wraps");
+	con_run(10);
+	CHECK_EQ(M.con.from_pc_n, 100 - 63);                             /* full: nothing more */
+	CHECK_EQ(kget(in), 63);
+	CHECK(memcmp(in, many, 63) == 0, "the first 63");
+	con_run(CON_POLL_MS);
+	CHECK_EQ(M.con.from_pc_n, 0);
+	CHECK_EQ(kget(in), 37);
+	CHECK(memcmp(in, many + 63, 37) == 0, "then the rest");
+
+	/* the kernel boots again: it zeroes the indices and CON_FLAGS; the next poll sets HOST */
+	memset(M.br.ram + CON_OUT_HEAD, 0, 5);
+	con_run(CON_POLL_MS);
+	CHECK_EQ(RAM(CON_FLAGS), CON_HOST);
+	kput("again\n", 6);
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("again\r\n"), "after the kernel's reboot");
+
+	/* junk in the indices' high bits is ignored (they count modulo the ring) */
+	RAM(CON_OUT_HEAD) = 0x80 | 3;
+	RAM(CON_OUT_TAIL) = 0x80 | 1;
+	RAM(CON_OUT + 1) = 'j';
+	RAM(CON_OUT + 2) = 'k';
+	con_run(CON_POLL_MS);
+	CHECK(pc_got("jk"), "indices modulo the ring");
+	CHECK_EQ(RAM(CON_OUT_TAIL), 3);
+
+	/* the chipset held: no bridge traffic; booted again: HOST set again */
+	CHECK_EQ(REQ(0x44, 0), ST_OK);
+	RAM(CON_FLAGS) = 0;
+	frames = M.bridge_frames;
+	con_run(20);
+	CHECK_EQ(M.bridge_frames, frames);
+	CHECK_EQ(REQ(0x45, 0), ST_OK);
+	con_run(CON_POLL_MS);
+	CHECK_EQ(RAM(CON_FLAGS), CON_HOST);
+
+	/* closed: HOST cleared once, then no traffic; the kernel then drops */
+	M.con.open = false;
+	con_run(1);
+	CHECK_EQ(RAM(CON_FLAGS), 0);
+	frames = M.bridge_frames;
+	kput("dropped", 7);
+	pc_type("zz");
+	con_run(200);
+	CHECK_EQ(M.bridge_frames, frames);
+	CHECK_EQ(M.con.to_pc_n, 0);
+	CHECK_EQ(M.con.from_pc_n, 2);
+
+	/* the protocol port works the same with the console open and polling */
+	M.con.open = true;
+	con_run(CON_POLL_MS);
+	CHECK_EQ(REQ(0x10, 0x26, 0x6f, 1, 0), ST_OK);
+	CHECK(resp_n == 1 && resp[0] == CON_HOST, "RAM_READ of CON_FLAGS");
+	M.br.on_ram = NULL;
+	cpu_at_read = NULL;
+}
+
 int main(void)
 {
 	sys004_progport();
 	sys001_protocol();
+	sys007_far_ram();
 	sys002_fpga_flash();
 	sys003_rom();
 	sys005_power_and_cards();
-	return check_report("SYS-001..005 sysctl core");
+	sys008_console();
+	return check_report("SYS-001..008 sysctl core");
 }

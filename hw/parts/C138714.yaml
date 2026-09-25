@@ -1,0 +1,17 @@
+# TPD4E05U06DQAR (TI), 4-channel 0.5 pF ESD protection, USON-10 1 x 2.5 mm
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/86fce5e377410b6c2d1b0526f306f55e.pdf
+source: "TPD4E05U06 datasheet SLVSBO7L, page 4: 5 Pin Configuration and Functions, DQA package top view, Pin Functions TPD4E05U06 DQA (6, 7, 9, 10 NC: for straight-through routing)"
+package: USON-10(1x2.5)
+footprints: [USON-10_2.5x1.0mm_P0.5mm]   # KiCad's USON-10 2.5 x 1.0 mm
+pins:
+  1: D1+
+  2: D1-
+  3: GND
+  4: D2+
+  5: D2-
+  6: NC
+  7: NC
+  8: GND
+  9: NC
+  10: NC
+ccw: [1, 10]

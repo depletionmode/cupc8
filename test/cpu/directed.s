@@ -72,6 +72,25 @@ h3:
 	pop pcl
 	pop pch
 
+; timer 0 falls due as POP pcl retires: the IRQ waits for the POP pch
+; after it (the two are one return), so it returns to irq_ret_back
+irq_ret_prog:
+	mov r0, #0x02
+	st $f201, r0
+	sti
+	tmr0 #5
+	push pch
+	push pcl
+	b irq_ret_f
+irq_ret_back:
+	mov r0, #0x55
+	st $0301, r0
+irq_ret_done:
+	b irq_ret_done
+irq_ret_f:
+	pop pcl
+	pop pch
+
 ; ---------------------------------------------------------------- CPU-006
 tmr_prog:
 	tmr0 #3

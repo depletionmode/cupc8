@@ -7,6 +7,7 @@ only through cupc8.py's read-back.
     python3 test/host/test_cupc8.py        (make -C fw sysctl_sim first)
 """
 
+import atexit
 import os
 import random
 import signal
@@ -37,7 +38,12 @@ class Sim:
     def __init__(self, *args):
         self.dir = tempfile.mkdtemp(prefix="sysctl_sim-")
         self.p = subprocess.Popen([SIM, "--dump", self.dir, *args], stdout=subprocess.PIPE, text=True)
+        # a check that fails or raises before stop() must not leave the sim
+        # running: it holds our stdout, and a caller reading to EOF
+        # (tools/counterexamples.py) would wait for it forever
+        atexit.register(self.p.kill)
         self.port = self.p.stdout.readline().strip()
+        self.console = self.p.stdout.readline().strip() if "--console" in args else None
 
     def run(self, *args, ok=True):
         r = subprocess.run(CUPC8 + ["--port", self.port, *args], capture_output=True, text=True, timeout=300)
@@ -50,7 +56,8 @@ class Sim:
         """Stop the sim and return what its models hold."""
         self.p.send_signal(signal.SIGTERM)
         self.p.wait(10)
-        return {n: open(os.path.join(self.dir, n), "rb").read() for n in ("rom.bin", "fl0.bin", "fl1.bin", "card3.bin")}
+        return {n: open(os.path.join(self.dir, n), "rb").read()
+                for n in ("rom.bin", "fl0.bin", "fl1.bin", "card3.bin", "ram.bin")}
 
 
 def main():
@@ -99,7 +106,47 @@ def main():
     sim.run("ram", "read", "0x4000", "5000", "-o", os.path.join(tmp, "ram-back.bin"))
     expect(open(os.path.join(tmp, "ram-back.bin"), "rb").read() == ram, "ram write then read")
     _, out = sim.run("ram", "read", "0xfff8", "16")
-    expect(out.count("\n") == 1, "ram read wrapping past $ffff: %r" % out)
+    expect(out.count("\n") == 1, "ram read across $ffff: %r" % out)
+
+    # the whole 512 KB SRAM (extended-ram.md): far addresses, bank:offset,
+    # across $10000 and bank boundaries, up to the last byte
+    far = bytes(rnd.randrange(256) for _ in range(9000))
+    sim.run("ram", "write", "0xfe00", file_of("far.bin", far))
+    sim.run("ram", "read", "3:0x3e00", "9000", "-o", os.path.join(tmp, "far-back.bin"))
+    expect(open(os.path.join(tmp, "far-back.bin"), "rb").read() == far, "ram write across $10000, read by bank:offset")
+    sim.run("ram", "write", "31:0x3f00", file_of("top.bin", far[:256]))
+    sim.run("ram", "read", "0x7ff00", "256", "-o", os.path.join(tmp, "top-back.bin"))
+    expect(open(os.path.join(tmp, "top-back.bin"), "rb").read() == far[:256], "ram write/read of the last 256 bytes")
+    rc, out = sim.run("ram", "read", "0x7ff00", "257", ok=False)
+    expect(rc == 1 and "past the end of the SRAM" in out, "ram read past $7ffff refused: %r" % out)
+    rc, _ = sim.run("ram", "read", "32:0", "1", ok=False)
+    expect(rc == 2, "bank 32 refused")
+
+    # run: a program for $7000 (a .prg's header stripped, or a bare binary),
+    # then API_RUN = 1 for the kernel's terminal. This machine runs no
+    # kernel, so it is never taken.
+    zero, two = file_of("zero.bin", b"\x00"), file_of("two.bin", b"\x02")
+    prog = bytes(rnd.randrange(256) for _ in range(300))
+    sim.run("ram", "write", "0x6f21", zero)
+    rc, out = sim.run("run", file_of("p.prg", b"C8P\x01" + prog))
+    expect(rc == 0 and "300 bytes at $7000; not started yet" in out, "run p.prg: %r" % out)
+    sim.run("ram", "read", "0x7000", "300", "-o", os.path.join(tmp, "p-back.bin"))
+    expect(open(os.path.join(tmp, "p-back.bin"), "rb").read() == prog, "run: the body at $7000, the header left out")
+    sim.run("ram", "read", "0x6f21", "1", "-o", os.path.join(tmp, "run-back.bin"))
+    expect(open(os.path.join(tmp, "run-back.bin"), "rb").read() == b"\x01", "run: API_RUN = 1")
+    rc, out = sim.run("run", file_of("p.bin", prog[::-1]), ok=False)
+    expect(rc == 1 and "has not started yet" in out, "run again before the first started: refused: %r" % out)
+    sim.run("ram", "write", "0x6f21", two)
+    rc, out = sim.run("run", os.path.join(tmp, "p.bin"), ok=False)
+    expect(rc == 1 and "a program is running" in out, "run while one runs (API_RUN = 2): refused: %r" % out)
+    sim.run("ram", "write", "0x6f21", zero)
+    rc, out = sim.run("run", file_of("v2.prg", b"C8P\x02" + prog), ok=False)
+    expect(rc == 1 and "not a version 1 program" in out, "run a version 2 program: refused: %r" % out)
+    rc, out = sim.run("run", file_of("big.bin", bytes(0x7001)), ok=False)
+    expect(rc == 1 and "more than the 28672" in out, "run 28673 bytes: refused: %r" % out)
+    rc, out = sim.run("run", os.path.join(tmp, "p.bin"))
+    sim.run("ram", "read", "0x7000", "300", "-o", os.path.join(tmp, "p-back.bin"))
+    expect(rc == 0 and open(os.path.join(tmp, "p-back.bin"), "rb").read() == prog[::-1], "run a bare binary")
 
     # the CPU through the bridge
     for op in ("stop", "step", "cycle", "run", "hold", "release"):
@@ -145,9 +192,30 @@ def main():
     expect(rc == 0, "reset (SYS_nRST)")
     got = sim.stop()
     expect(got["rom.bin"][0x1000:0x1000 + len(rom)] == rom, "the ROM chip holds the image")
+    expect(got["ram.bin"][0xfe00:0xfe00 + len(far)] == far, "the SRAM holds the far write at $0fe00")
+    expect(got["ram.bin"][0x7ff00:] == far[:256], "the SRAM's last 256 bytes")
     expect(got["fl1.bin"][:len(bit)] == bit, "the CPU card's flash holds the bitstream")
     img = cupc8.elf_to_flash(elf)
     expect(got["card3.bin"][:len(img)] == img, "slot 3's RP2040 flash holds gpu.elf's image (%d bytes)" % len(img))
+
+    # the console (usb-console.md): cupc8.py console on the card's second
+    # port, the core moving the rings in the model's SRAM; the kernel's side
+    # is played with ram write/read on the protocol port
+    con = Sim("--flashed", "--console")
+    con.run("ram", "write", "0x6f22", file_of("con-zero.bin", bytes(5)))     # as the kernel does at boot
+    term = subprocess.Popen(CUPC8 + ["console", con.console, "--idle", "1"], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(0.5)                                     # it has the port open (and flushed what was there)
+    con.run("ram", "write", "0x6f40", file_of("con-out.bin", b"READY\n>> "))
+    con.run("ram", "write", "0x6f22", file_of("con-head.bin", bytes([9])))
+    out, err = term.communicate(b"10 print 1\n", timeout=60)
+    expect(term.returncode == 0 and out == b"READY\r\n>> ", "console: the ring's text, \\n as CR LF: %r %r" % (out, err))
+    con.run("ram", "read", "0x6f22", "5", "-o", os.path.join(tmp, "con-ix.bin"))
+    ix = open(os.path.join(tmp, "con-ix.bin"), "rb").read()
+    expect(ix == bytes([9, 9, 11, 0, 1]), "console: tail moved, 11 bytes in, HOST set: %s" % ix.hex())
+    con.run("ram", "read", "0x6fc0", "11", "-o", os.path.join(tmp, "con-in.bin"))
+    expect(open(os.path.join(tmp, "con-in.bin"), "rb").read() == b"10 print 1\r", "console: typed text in CON_IN, LF as Enter")
+    con.stop()
 
     print("HOST-002: cupc8.py against sysctl_sim, %d checks, %d failures" % (checks, bad))
     return 1 if bad else 0

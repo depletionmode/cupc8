@@ -219,7 +219,7 @@ void bridge_init(bridge_t *m, sst39_t *rom)
 {
 	memset(m, 0, sizeof *m);
 	m->rom = rom;
-	for (int i = 0; i < 65536; i++)
+	for (int i = 0; i < (int)sizeof m->ram; i++)
 		m->ram[i] = (uint8_t)(i * 13 + 5);    /* power-up contents are not zero */
 }
 
@@ -237,9 +237,19 @@ static uint8_t bridge_status(bridge_t *m)
 	return (uint8_t)((m->ctl & 0x01) | (m->ctl & 0x40 ? 0x80 : 0));
 }
 
+/* the SRAM address: RAM_WR/RAM_RD carry 16 bits, RAM_WR24/RAM_RD24 19 */
+static uint32_t ram_addr(bridge_t *m)
+{
+	return m->addr & (m->cmd == 0x09 || m->cmd == 0x0A ? 0x7FFFF : 0xFFFF);
+}
+
 static uint8_t mem_rd(bridge_t *m, uint64_t now)
 {
-	return m->cmd == 0x03 ? sst39_read(m->rom, m->addr, now) : m->ram[m->addr & 0xFFFF];
+	if (m->cmd == 0x03)
+		return sst39_read(m->rom, m->addr, now);
+	if (m->on_ram)
+		m->on_ram(ram_addr(m), false);
+	return m->ram[ram_addr(m)];
 }
 
 /* one SPI byte; the response to byte k goes out in byte k+2 (see bridge.vhd) */
@@ -256,7 +266,7 @@ uint8_t bridge_byte(bridge_t *m, uint8_t b, uint64_t now)
 		m->argn = 0;
 		m->addr = 0;
 		switch (b) {
-		case 0x01: case 0x02: case 0x03: case 0x04: m->state = B_ARG; break;
+		case 0x01: case 0x02: case 0x03: case 0x04: case 0x09: case 0x0A: m->state = B_ARG; break;
 		case 0x05: next = bridge_status(m); break;
 		case 0x06: next = m->gpo; break;
 		case 0x07: m->state = B_CTL; break;
@@ -292,6 +302,9 @@ uint8_t bridge_byte(bridge_t *m, uint8_t b, uint64_t now)
 			m->ctl_when_busw = m->ctl;
 			sst39_write(m->rom, m->addr, b, now);
 			m->state = B_IGNORE;
+		} else if (m->cmd == 0x09) {
+			m->len = b + 1;
+			m->state = B_WDATA;
 		} else {
 			m->len = b + 1;
 			next = mem_rd(m, now);
@@ -301,7 +314,9 @@ uint8_t bridge_byte(bridge_t *m, uint8_t b, uint64_t now)
 	}
 	case B_WDATA:
 		if (m->len > 0) {
-			m->ram[m->addr & 0xFFFF] = b;
+			m->ram[ram_addr(m)] = b;
+			if (m->on_ram)
+				m->on_ram(ram_addr(m), true);
 			m->addr++;
 			m->len--;
 		}

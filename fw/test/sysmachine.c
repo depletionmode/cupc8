@@ -41,6 +41,8 @@ static void h_spi_select(void *ctx, int bus)
 	if (M.bus != SPI_NONE)
 		bus_select(M.bus, false);
 	M.bus = bus;
+	if (bus == SPI_BRIDGE)
+		M.bridge_frames++;
 	if (bus != SPI_NONE)
 		bus_select(bus, true);
 }
@@ -171,10 +173,35 @@ static int h_uart_read(void *ctx, uint8_t *d, int max)
 	return n;
 }
 
+static bool h_con_open(void *ctx) { (void)ctx; return M.con.open; }
+static int h_con_room(void *ctx) { (void)ctx; return M.con.room; }
+
+static void h_con_write(void *ctx, const uint8_t *d, int n)
+{
+	(void)ctx;
+	if (n > M.con.room)
+		M.con.room = -1;                  /* more than it said it would take: the tests look */
+	else
+		M.con.room -= n;
+	for (int i = 0; i < n && M.con.to_pc_n < (int)sizeof M.con.to_pc; i++)
+		M.con.to_pc[M.con.to_pc_n++] = d[i];
+}
+
+static int h_con_read(void *ctx, uint8_t *d, int max)
+{
+	(void)ctx;
+	int n = M.con.from_pc_n < max ? M.con.from_pc_n : max;
+	memcpy(d, M.con.from_pc, (size_t)n);
+	memmove(M.con.from_pc, M.con.from_pc + n, (size_t)(M.con.from_pc_n - n));
+	M.con.from_pc_n -= n;
+	return n;
+}
+
 static const sysctl_hal hal = {
 	h_spi_select, h_spi_xfer, h_pin_write, h_pin_read, h_adc,
 	h_i2c_write, h_i2c_read, h_delay, h_now_ms, h_usb_write,
 	h_prog_select, h_swd_io, h_uart_open, h_uart_write, h_uart_read,
+	h_con_open, h_con_room, h_con_write, h_con_read,
 };
 
 /* --------------------------------------------------------------- machine */
@@ -196,6 +223,7 @@ void power_on(bool chip_flashed, bool cpu_flashed)
 	M.bus = SPI_NONE;
 	M.sys_nrst = true;
 	M.prog_slot = -1;
+	M.con.room = 4096;                    /* CFG_TUD_CDC_TX_BUFSIZE */
 	swdt_init(&card2);
 	M.card[2] = &card2;
 	sst39_init(&M.rom);

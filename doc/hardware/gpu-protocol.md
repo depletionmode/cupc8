@@ -5,6 +5,14 @@ DVI** on an HDMI type-A connector: no audio, no HDCP. It is an SPI slave
 using the common framing in `slot.md`: one command per CS_n frame, and the
 status byte comes back during the opcode.
 
+**Hardware notes** (the board: `hw/boards/gpu.py`, `hw/boards/README.md`):
+TMDS through 270 Ω series resistors (PicoDVI's DC-coupled output) and
+TPD4E05U06 ESD; the pairs are on GPIO10–17 with the pads inverted
+(`hw/pins.yaml`). The receptacle's +5V comes from a TPS61023 boost at 5.06 V
+(the IO card's circuit, `power.md`), because the slot's +5V can be 4.1 V at
+the card; its 100 mA PTC sits ahead of the boost. HPD through a 22k/33k
+divider; DDC through 2N7002 level shifters.
+
 The protocol is designed for an 8-bit CPU with two registers:
 - every command is an opcode followed by **fixed-size** arguments;
 - 16-bit values are little-endian, and only X coordinates need them;
@@ -71,7 +79,7 @@ bytes, which the host collects with a READ frame (`$FE`, see `slot.md`).
 | $06 | FENCE_READ | → tag | Last executed fence tag. Also releases IRQ_n. |
 | $07 | VSYNC_COUNT | → n | Frames since power-on, mod 256. Useful for timing and animation. |
 | $08 | INFO | → kind, w16, h16, greys, flags, cols, rows | Which graphics card this is: here 0 (HDMI), 640, 480, 0 (colour), 0, 80, 30. The e-ink card answers 1 (e-paper) and its panel (`eink-card.md`). |
-| $09-$0B | REFRESH, AUTO, EPD_STATUS | m / on, idle10, full_after / — | The e-ink card's (`eink-card.md`); NOPs here, so software may send them to either card |
+| $09-$0D | REFRESH, AUTO, EPD_STATUS, AUTO_EXT, AUTO_GET | m / on, idle10, full_after / — / cap10, full_kind, sleep_s / — | The e-ink card's (`eink-card.md`); NOPs here, so software may send them to either card |
 
 ### TEXT mode
 

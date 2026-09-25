@@ -33,6 +33,10 @@ read_string:
 	bzf .done
 	eq r0, #13
 	bzf .done
+	eq r0, #8				; Backspace (DEL too) takes the last character back
+	bzf .erase
+	eq r0, #127
+	bzf .erase
   ; buffers are 80 bytes: 78 characters, then the CR and the terminator
   ld r1, [rs_i]
   eq r1, #78
@@ -52,6 +56,30 @@ read_string:
     add r1, #1
     st [rs_i], r1
     b .loop
+.erase:
+	ld r1, [rs_i]
+	eq r1, #0				; nothing typed, nothing to take back
+	bzf .loop
+	sub r1, #1
+	st [rs_i], r1
+	ld r1, [g_echo_char]
+	eq r1, #1
+	bzf .erase_echo
+	b .loop
+.erase_echo:				; back, space, back, so the character goes from the screen too
+	mov r0, #8
+	push pch
+	push pcl
+	b print_ascii_char
+	mov r0, #32
+	push pch
+	push pcl
+	b print_ascii_char
+	mov r0, #8
+	push pch
+	push pcl
+	b print_ascii_char
+	b .loop
 .done:
     ld r1, [rs_i]
   mov r0, #13

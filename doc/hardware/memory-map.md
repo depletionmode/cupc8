@@ -11,7 +11,9 @@ manual gets updated to match once the hardware is implemented.
 | $0002–$000f | RAM: reserved | same |
 | $0010–$00ff | RAM: interrupt vector table | same |
 | $0100–$0fff | RAM: stack | same |
-| $1000–$dfff | RAM: program | same |
+| $1000–$7fff | RAM: kernel and user program (below) | same |
+| $8000–$bfff | **RAM window**: SRAM bank `RAM_BANK` (reset 2: the identity map) | same |
+| $c000–$dfff | RAM: user program (below) | same |
 | $e000–$e7ff | **ROM fixed window**: ROM $00000–$007ff (boot ROM) | RAM |
 | $e800–$efff | **ROM banked window**: ROM `(bank << 11) \| A[10:0]` | RAM |
 | $f000–$ffff | I/O (never RAM) | same |
@@ -21,8 +23,82 @@ Changes from today's hardware and manual:
 - **ROM is an external chip.** It was 128 bytes inside the FPGA.
 - **$e000–$efff turns back into RAM** once the kernel disables the ROM.
 
-Reads of RAM-backed addresses go to the SRAM. RAM addresses $f000–$ffff exist
-in the SRAM but are never selected.
+Reads of RAM-backed addresses go to the SRAM. SRAM $0f000–$0ffff, under the
+I/O space, is reached only through the RAM window (bank 3).
+
+## RAM banks
+
+The main board's SRAM (IS62WV5128, 512 KB) has all 19 address lines on the
+memory bus (A16–A18 on MEM_A16–A18). It is 32 banks of 16 KB; the chipset
+forms the SRAM address of a CPU RAM cycle as:
+
+| CPU address | SRAM address (19 bits) |
+|---|---|
+| $8000–$bfff | `RAM_BANK[4:0] & A[13:0]` |
+| any other RAM address | `000 & A[15:0]` (as without banking) |
+
+So banks 0, 1 and 3 are the normal memory at $0000–$7fff and $c000–$ffff,
+and bank 2 is what $8000–$bfff shows at reset. The window can show any bank,
+including 0, 1 and 3 (then the same bytes appear at two CPU addresses). The
+ROM windows, `ROM_OFF` RAM at $e000–$efff and the I/O space ignore
+`RAM_BANK`. There are no extra wait states.
+
+| SRAM | Bank | CPU view with `RAM_BANK` = 2 |
+|---|---|---|
+| $00000–$03fff | 0 | $0000–$3fff |
+| $04000–$07fff | 1 | $4000–$7fff |
+| $08000–$0bfff | 2 | $8000–$bfff (the window) |
+| $0c000–$0ffff | 3 | $c000–$dfff, $e000–$efff with `ROM_OFF`; $f000–$ffff only through the window |
+| $10000–$7ffff | 4–31 | only through the window |
+
+**The kernel keeps nothing in $8000–$bfff** (code, data, bss, the stack and
+the API block all sit below it), so interrupts need not save `RAM_BANK`. A
+program that switches banks and has its own interrupt handler using the
+window saves and restores `RAM_BANK` there. The kernel's `api_bank_set`,
+`api_bank_get`, `api_bank_count` and `api_bank_far_copy` (`kernel/bank.s`)
+are the programs' interface; the system card reaches every bank with the
+bridge's 24-bit RAM commands.
+
+### RAM from $1000 (the kernel's layout)
+
+| Range | Use |
+|---|---|
+| $1000–$5fff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
+| $6000–$6eff | kernel data |
+| $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
+| $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
+| $e000–$efff | kernel bss: RAM once the kernel has turned the ROM off (its first instruction), and bss needs no loading |
+
+The USB console's part of the API block (the kernel zeroes $6f22–$6f26 at boot):
+
+| Address | Name | Written by | |
+|---|---|---|---|
+| $6f22 | `CON_OUT_HEAD` | kernel | next free byte of `CON_OUT` |
+| $6f23 | `CON_OUT_TAIL` | system card | next byte the card will take |
+| $6f24 | `CON_IN_HEAD` | system card | next free byte of `CON_IN` |
+| $6f25 | `CON_IN_TAIL` | kernel | next byte the kernel will take |
+| $6f26 | `CON_FLAGS` | system card | bit 0 `HOST`: a PC has the console port open; bits 7:1 are 0 (the card takes any other value for power-up junk and drops both rings) |
+| $6f40–$6fbf | `CON_OUT` | kernel | the terminal's output, a 128-byte ring |
+| $6fc0–$6fff | `CON_IN` | system card | keys from the PC, a 64-byte ring |
+
+Indices are offsets into their ring (modulo its size); head = tail is empty,
+and one slot stays free. Each side writes only its own index, after the data
+it covers (`sysctl.md`, "The console port").
+
+`kernel/assemble.sh` assembles for code $1000, data $6000, bss $e000
+(2026-09-25: the kernel's code outgrew $4fff once the API, the network
+commands and the bank routines were in); `testKernelLayout` (KRN-010) fails
+if any outgrows its area. The kernel keeps nothing in the user area
+$7000–$dfff (so nothing in the banked RAM window $8000–$bfff,
+`../proposals/extended-ram.md`). The jump table and calling convention are in
+`../proposals/kernel-api.md` and `kernel/api.inc`.
+
+**Program file** (`exec "NAME"` on the storage card, `cupc8.py run`): a 4-byte
+header, `"C8P"` then the version, 1, followed by the body, a flat binary for
+$7000 of at most 28672 bytes (`tools/mkprg.py` makes one). `exec` refuses a
+`"C8P"` file of any other version, or one too big for $7000–$dfff, and runs any
+file without the header as BASIC. `cupc8.py run` takes a program file or the
+bare body.
 
 ## I/O registers
 
@@ -35,11 +111,39 @@ in the SRAM but are never selected.
 | $f1X3 | R | SPI_STAT | bit 0: 1 = idle/done, 0 = busy |
 | $f1X4 | R/W | **SPI_CS** (new) | bit 0 = 1 holds this device's CS_n asserted across bytes, which frames a card command. Writing 0 releases CS_n. With bit 0 = 0, CS_n is asserted only for the duration of each SPI_GO byte, as today. |
 | $f1Xf | W | SPI_CFG | `clk_div[7:3] cpha[2] cpol[1] cont[0]`. `clk_div` = 0 is treated as 1. SCK = CPU_CLK / (2 × clk_div), so the fastest is 6 MHz at 12 MHz. `cont` is kept for compatibility, but new code frames with SPI_CS instead. |
-| $f200 | R/W1C | IRQ_PEND | pending IRQ bits 3:0; bits 7:4 read 0 |
-| $f201 | R/W | IRQ_MASK | bits 3:0, 1 = enabled; bits 7:4 read 0 |
+| $f200 | R/W1C | IRQ_PEND | pending IRQ bits 4:0 (bit 4: the chipset tick, see "Interrupts"); bits 7:5 read 0 |
+| $f201 | R/W | IRQ_MASK | bits 4:0, 1 = enabled (reset 0); bits 7:5 read 0 |
 | $f202 | R | **SLOT_IRQ** (new) | bit n = SPI dev n (slots 1–6 → bits 0–5) is currently asserting IRQ_n (level, live). Bits 7:6 read 0. |
 | $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bit 1 `PWR_HI`, read-only: the USB-C source advertises 3.0 A (a comparator on CC, so it works without the system card; `power.md`). When it is 0 the kernel's `net` command refuses to start the radio, and SAVE and DEL refuse to write the SD card. Bits 7:2 reserved, read 0. |
 | $f204 | R/W | **ROM_BANK** (new) | Bank for the $e800 window, 0–255 (reset 0) |
+| $f205 | R/W | **RAM_BANK** (new) | SRAM bank for the RAM window at $8000–$bfff, 0–31 (reset 2, the identity map); bits 7:5 read 0. See "RAM banks". |
+| $f206 | R | **MS_COUNT0** (new) | The millisecond counter, bits 7:0. Reading it also latches bits 31:8 into MS_COUNT1–3. See "Millisecond counter". |
+| $f207 | R | **MS_COUNT1** (new) | Bits 15:8 of the counter as latched by the last read of MS_COUNT0 |
+| $f208 | R | **MS_COUNT2** (new) | Bits 23:16, latched likewise |
+| $f209 | R | **MS_COUNT3** (new) | Bits 31:24, latched likewise |
+
+$f20a–$f2ff read 0 and ignore writes.
+
+### Millisecond counter
+
+The chipset counts milliseconds from its own 12 MHz clock (the same
+oscillator as CPU_CLK, `cpu-bus.md`): a divider counts 12000 clocks, then
+the 32-bit counter goes up by one. Both are 0 after the chipset's own
+reset (n_POR); holding only the CPU in reset (`CPU_CTL` bit 6, or waiting
+for CDONE) neither stops nor clears them. The counter wraps after 2^32 ms
+(49.7 days). Writes are ignored.
+
+A multi-byte read is consistent when it starts with MS_COUNT0: that read
+returns bits 7:0 and, in the same clock, copies bits 31:8 into the latch
+that MS_COUNT1–3 read. So "MS_COUNT0, then MS_COUNT1 (then 2, 3)" is one
+value even when the counter steps (or carries) in between. Read MS_COUNT0
+alone for an 8-bit time (256 ms wrap), MS_COUNT0 and 1 for 16 bits (65.5
+s). An interrupt handler that reads the counter between another routine's
+MS_COUNT0 and MS_COUNT1 re-latches it, so code that reads it from both
+places reads it with interrupts off (the kernel's handlers never read it).
+
+The CPU's own timers (`TMR0`, `TMR1`) count instructions and are left to
+programs; the kernel's clock is this counter.
 
 ### SPI devices
 
@@ -56,12 +160,24 @@ The cards are not fixed to slots. Software identifies them with `IDENT` (see
 
 ### Interrupts
 
-| IRQ | Vector | Source |
-|---|---|---|
-| 0 | $0010 | **Slot IRQ**: a new assertion on any slot's IRQ_n (was: keyboard). The handler reads $f202 to find the slot. |
-| 1 | $0012 | Timer 0 |
-| 2 | $0014 | Timer 1 |
-| 3 | $0016 | SPI transaction complete |
+| IRQ_PEND bit | CPU IRQ line | Vector | Source |
+|---|---|---|---|
+| 0 | 0 | $0010 | **Slot IRQ**: a new assertion on any slot's IRQ_n (was: keyboard). The handler reads $f202 to find the slot. |
+| 1 | 1 | $0012 | Timer 0 (the CPU's `TMR0`) |
+| 2 | 2 | $0014 | Timer 1 (the CPU's `TMR1`) |
+| 3 | 3 | $0016 | SPI transaction complete |
+| 4 | 3 | $0016 | **Tick** (new): every 50 ms (20 Hz) of the millisecond counter |
+
+The CPU has four IRQ lines (`cpu-bus.md`), so the tick shares line 3 with
+SPI complete: `IRQ3 = (IRQ_PEND[3] and IRQ_MASK[3]) or (IRQ_PEND[4] and
+IRQ_MASK[4])`, and lines 0–2 are `IRQ_PEND[n] and IRQ_MASK[n]` as before.
+The handler at $0016 reads IRQ_PEND to tell the two apart and clears what
+it serviced (the kernel's clears both: it only needs the wake-up). The tick
+is set when the millisecond counter reaches a multiple of 50 (it counts from
+the same divider, so ticks are exactly 600,000 clocks apart), and is masked
+at reset. It exists to wake a CPU parked in `WAI` a few times a second: the
+kernel's terminal looks at `API_RUN` (a program the PC left at $7000) each
+time its key wait wakes.
 
 A card holds IRQ_n low until its condition clears. IRQ0 latches when any
 slot line goes from released to asserted, each line on its own, so a card
@@ -113,7 +229,7 @@ is `$ff`, the erased state, so a partial program leaves the rest erased.
 
 ## Boot chain
 
-1. **Reset.** `ROM_OFF=0`, `ROM_BANK=0`, IRQs masked, `I=0`, PC=$e000.
+1. **Reset.** `ROM_OFF=0`, `ROM_BANK=0`, `RAM_BANK=2`, IRQs masked, `I=0`, PC=$e000.
 2. **Boot ROM** runs in place from the fixed window. POST codes on GPO:
 
    | GPO | Stage | On failure |
@@ -155,8 +271,10 @@ period.
 
 | Cmd | Bytes after cmd | Action |
 |---|---|---|
-| $01 RAM_WR | addr16, len8, data × (len+1) | write `len+1` bytes to SRAM |
-| $02 RAM_RD | addr16, len8, dummy, → data × (len+1) | read `len+1` bytes from SRAM |
+| $01 RAM_WR | addr16, len8, data × (len+1) | write `len+1` bytes to SRAM $00000–$0ffff (the address wraps within it) |
+| $02 RAM_RD | addr16, len8, dummy, → data × (len+1) | read `len+1` bytes from SRAM $00000–$0ffff |
+| $09 RAM_WR24 | addr24, len8, data × (len+1) | write to the whole SRAM (19-bit physical address, bank × $4000 + offset; wraps at $7ffff) |
+| $0A RAM_RD24 | addr24, len8, dummy, → data × (len+1) | read from the whole SRAM |
 | $03 ROM_RD | addr24, len8, dummy, → data × (len+1) | read from the ROM chip (19-bit address) |
 | $04 ROM_BUSW | addr24, data8 | one raw bus write cycle to the ROM (/CE_ROM, /WE). sysctl builds the JEDEC erase and program sequences from these. |
 | $05 STATUS | dummy, → status | bit0 CPU stopped (bridge or step), bit1 HALTED, bit2 WAITING, bits5:3 reserved (0; CPU card presence and ID are on sysctl's expander U1), bit6 CPU cycle pending (/STB low), bit7 /CPU_RST asserted (power-on, waiting for the CPU card's CDONE, or `CPU_CTL` bit 6) |

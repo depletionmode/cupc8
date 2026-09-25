@@ -115,6 +115,15 @@ for (const speed of [1, 2]) {
   kbd.press(0);
   wait(100e6);
   expect(kbd.leds.at(-1) === 1, `${name}: Caps Lock LED off again (${kbd.leds})`);
+  // SOFT_RESET puts the locks back to power-on (Num on, Caps off): the LED
+  // report goes out from the main loop, never from the frame's replay
+  kbd.press(0, 57);
+  kbd.press(0);
+  wait(100e6);
+  const capsOn = kbd.leds.at(-1);
+  run(function* () { yield* this.frame([0xf1]); });
+  wait(100e6);
+  expect(capsOn === 3 && kbd.leds.at(-1) === 1, `${name}: SOFT_RESET turns the Caps Lock LED off, Num on (${kbd.leds})`);
 
   // typematic repeat: 500 ms delay, then every 30 ms
   cmd([0x05]);
@@ -128,6 +137,43 @@ for (const speed of [1, 2]) {
   emu.mcu.usbCtrl.detachDevice();
   wait(50e6);
   expect(!(status() & CONNECTED), `${name}: unplugged, KBD_CONNECTED clear`);
+}
+
+// ------------------------------- the host polling while the card refreshes
+// A 1 ms keyboard holding a key: the card refreshes its preload every report
+// and every repeat, while the host polls GETKEYS back to back at slot.md's
+// minimum gaps. Every frame must stay framed: a refresh that stopped the
+// state machine while the host clocked shifted the bytes by the SCK edges
+// it missed (status bytes with bit 7 set, keys like "<" for "x").
+{
+  const kbd = new UsbKeyboard({ speed: 2, interval: 1 });
+  emu.mcu.usbCtrl.attachDevice(kbd);
+  let st = 0;
+  for (let i = 0; i < 100 && !(st & CONNECTED); i++) {
+    wait(10e6);
+    st = status();
+  }
+  expect(st & CONNECTED, 'polling: keyboard enumerated');
+  cmd([0x05]);
+  const n0 = host.log.length;
+  kbd.press(0, usage('x'));
+  const got = run(function* () {
+    const out = [], t0 = emu.ns;
+    while (emu.ns - t0 < 700e6) {                     // 700 ms of polling
+      yield* this.frame([0x01, 16]);
+      const r = yield* this.read({ tries: 20, retryNs: 0 });
+      if (r) out.push(...r.data);
+    }
+    return out;
+  }, 20e9);
+  kbd.press(0);
+  wait(50e6);
+  const keysGot = got.filter((b) => b !== 0xff);
+  const torn = host.log.slice(n0).filter((f) => f.miso.length && f.miso[0] & 0x80);
+  expect(torn.length === 0, `polling: every status byte has bit 7 clear (${torn.length} did: ${[...new Set(torn.map((f) => '$' + f.miso[0].toString(16)))].slice(0, 6).join(' ')})`);
+  expect(keysGot.length >= 6 && keysGot.every((b) => b === 0x78), `polling: only "x" keys, 1 + repeats (${JSON.stringify(String.fromCharCode(...keysGot.slice(0, 20)))})`);
+  emu.mcu.usbCtrl.detachDevice();
+  wait(50e6);
 }
 
 // ------------------------------------- CS_n falling while the card refreshes
@@ -181,6 +227,29 @@ for (const speed of [1, 2]) {
   expect(odd.length === 0, `race sweep: every READ framed as status, RESP_LEN 1 (${framed} ok${odd.length ? '; ' + odd.join('; ') : ''})`);
   emu.mcu.usbCtrl.detachDevice();
   wait(50e6);
+}
+
+// ------------------------------ READs that end while the card replays a READ
+// The card's loop replays every queued frame through the card core
+// (slotspi_poll), and a READ changes nothing, so a READ whose CS_n rises
+// meanwhile must still be armed with the ready response. Setting busy around
+// each replayed frame once withheld it: a host polling READ in step with the
+// loop got RESP_LEN 0 every time, and E2E-007's slow SAVE lost a key. Being
+// in step was a matter of code layout; here the overlap is certain: a READ
+// padded to 2000 bytes takes the card far longer to replay than the short
+// READs sent straight after it take on the wire (~27 us each), so several of
+// them end while it is being replayed.
+{
+  const id = cmd([0xf0]);                             // IDENT: 4 bytes, ready (READ does not take them)
+  const lens = run(function* () {
+    yield* this.frame([0xfe, ...new Array(2000).fill(0)]);
+    const out = [];
+    for (let i = 0; i < 30; i++) out.push((yield* this.frame([0xfe, 0]))[1]);
+    return out;
+  });
+  const withheld = lens.filter((n) => n !== 4).length;
+  expect(id && id.data.length === 4 && withheld === 0,
+    `READs during a READ's replay: all 30 offer IDENT's 4 bytes (${withheld} did not: RESP_LEN ${lens.join(' ')})`);
 }
 
 // ------------------------------------------------------------ VBUS fault

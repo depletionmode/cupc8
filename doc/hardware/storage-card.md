@@ -161,7 +161,7 @@ card loses at most the file being written.
   `tools/fw_rp2040.sh storage` builds `build/rp2040/storage.elf`.
 - `fw/storage/host/imgdisk.c`: a disk image as the medium, for the host
   tests (STO-001/002) and the simulator's storage card (`fw/sim/simcards.c`,
-  KRN-006).
+  KRN-006; interactively `tools/sim --cards:hdmi,io,storage --sd:card.img`).
 
 ## Kernel and BASIC
 

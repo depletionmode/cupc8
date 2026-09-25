@@ -218,6 +218,48 @@ USB_PORT_MIN = 4.40         # SPEC USB 2.0 low-power port (a high-power port: 4.
 USB_PORT_MAX = VBUS_MAX     # SPEC vSafe5V max (USB 2.0 alone: 5.25 V)
 
 # ---------------------------------------------------------------------------
+# GPU card HDMI +5V pin (David, 2026-09-25): a TPS63802 buck-boost from the
+# slot's +5V, feeding HDMI pin 18. As built (+5V -> 100 mA PTC -> B5819W ->
+# pin) the pin was 3.73 V at the worst corner. A TPS61023 boost (POW-008's
+# first version) passed its input through above its set point and put the pin
+# at 5.40 V from a 5.5 V source; the buck-boost regulates both ways.
+# DS TPS63802 SLVSEU9D (sha256 be07deca...), fetched 2026-09-25.
+# ---------------------------------------------------------------------------
+HDMI_PIN_MIN, HDMI_PIN_MAX = 4.8, 5.3           # SPEC HDMI: +5V power at the source, 4.8..5.3 V
+I_HDMI_PIN = 0.055                              # SPEC HDMI: the source supplies >= 55 mA
+# the card's PTCs (Ruilon, DS sha256 7ac532af..., fetched 2026-09-25):
+#   (name, LCSC, Rmin, R1max, hold at 40 C)
+GPU_PTCS = {
+    "P010": ("SMD0805P010TF", "C20975", 0.75, 6.0, 0.08),     # on the card as built
+    "P020": ("SMD0805P020TF", "C20976", 0.50, 3.5, 0.17),
+}
+GPU_PTC = assume("GPU", "HDMI +5V: slot +5V -> PTC SMD0805P020TF (C20976) -> TPS63802DLAR -> pin 18; "
+                 "no Schottky (the TPS63802 disconnects its output when off)", "P020")
+GPU_PTC_POS = "ahead"       # of the converter: POW-008 shows why not after it
+GPUB_PART = assume("GPU", "HDMI +5V buck-boost TPS63802DLAR (C2845237), EN to its VIN, MODE to GND "
+                   "(power save: it never sinks current from the pin)", "TPS63802DLAR")
+GPUB_L = assume("GPU", "buck-boost inductor 0.47 uH FXL0420-R47-M (C167200): 14 mOhm, Isat 9.5 A "
+                "(over the 5.75 A boost-mode peak limit)", 0.47e-6)
+GPUB_L_DCR = 0.014
+GPUB_CIN = assume("GPU", "buck-boost input 10 uF 25 V 0805 (C15850) at VIN", 10e-6)
+GPUB_COUT = assume("GPU", "buck-boost output 2 x 22 uF 25 V 0805 (C45783): TI asks 2 x 22 uF above 3.6 V",
+                   2 * 22e-6)
+GPUB_R1, GPUB_R2 = assume("GPU", "buck-boost feedback 825k (C25823) / 91k (C23265) 1 %: 5.03 V", (825e3, 91e3))
+GPUB_RES_TOL = 0.01
+GPUB_VFB = (0.495, 0.500, 0.505)                # DS: 500 mV +-1 % (PWM mode)
+# DS figure 10-21 (0.1 -> 1 A, power save allowed): a ~50 mVpp band at light
+# load; the DC range is widened by half of it each way
+GPUB_PFM_RIPPLE = 0.050
+GPUB_VIN_OVP = (5.5, 5.7, 5.9)                  # DS: input over-voltage (VIN rising): the device stops
+GPUB_VIN_MIN = 1.3                              # DS input range 1.3..5.5 V
+GPUB_THETA_JA = 81.0                            # DS VSON-10
+GPUB_ETA = 0.80             # at 55 mA in power save: DS curves ~88-90 %, less a generous allowance
+# the behavioural model (models/behavioural.lib BB_BEH), fitted to DS figure
+# 10-21 (0.1 -> 1 A, 15 uF effective: -130 mV, ~20 mV left at 50 us); the fit
+# gives -148 mV and 23 mV, a little worse than the figure
+GPUB_BEH = dict(TSS=500e-6, IQ=11e-6, RDC=0.005, LEQ=4e-6, RP=0.2)
+
+# ---------------------------------------------------------------------------
 # Loads (power.md budget, max column), in A
 # ---------------------------------------------------------------------------
 LOADS_3V3 = {
@@ -253,7 +295,7 @@ EINK_CARD_3V3 = 0.095       # proposals/eink-gpu.md: ~45 mA typ, ~95 mA max, not
 STORAGE_CARD_3V3 = LOADS_3V3["storage card RP2040 + flash"] + LOADS_3V3["storage card microSD (writing)"]
 I_SD_WRITE = LOADS_3V3["storage card microSD (writing)"]
 I_KEYBOARD = 0.500          # USB 2.0 high-power device (IO card's switch limits it)
-I_HDMI_5V = 0.055           # HDMI +5V pin, per spec
+
 FUTURE_SLOTS = 2            # slots 5-6 (slot 4 holds the storage card in M1)
 
 # Capacitance on 5V_SYS, charged through the SY6280 at attach
@@ -338,8 +380,17 @@ def wifi_i_5v(v_card, i3=WIFI_I_3V3):
     return i3 * wifi_vout_range()[1] / (BUCK_ETA_BUDGET * v_card)
 
 
+def gpub_vout_range():
+    """The GPU card's buck-boost output (min, nom, max): VFB +-1 % and its 1 %
+    divider, widened by half the power-save ripple band each way."""
+    r1, r2, t = GPUB_R1, GPUB_R2, GPUB_RES_TOL
+    h = GPUB_PFM_RIPPLE / 2
+    return (GPUB_VFB[0] * (1 + r1 * (1 - t) / (r2 * (1 + t))) - h, GPUB_VFB[1] * (1 + r1 / r2),
+            GPUB_VFB[2] * (1 + r1 * (1 + t) / (r2 * (1 - t))) + h)
+
+
 def iob_vout_range():
-    """The keyboard boost's regulated output (min, nom, max): VREF and 1 % divider."""
+    """The keyboard boost's regulated output (min, nom, max): VREF and its 1 % divider."""
     r1, r2, t = IOB_R1, IOB_R2, IOB_RES_TOL
     return (IOB_VREF[0] * (1 + r1 * (1 - t) / (r2 * (1 + t))), IOB_VREF[1] * (1 + r1 / r2),
             IOB_VREF[2] * (1 + r1 * (1 + t) / (r2 * (1 - t))))
@@ -352,8 +403,21 @@ def iob_i_in(v_in, i_out):
     return i_out if v_in >= vset * 1.01 else vset * i_out / (IOB_ETA * v_in)
 
 
+def gpu_i_5v(v_card, i_pin=I_HDMI_PIN, worst=True):
+    """The GPU card's +5V draw for its HDMI pin: through the PTC (ahead of the
+    buck-boost) and the buck-boost at its highest output. Returns (current,
+    the buck-boost's input voltage)."""
+    r = GPU_PTCS[GPU_PTC][3 if worst else 2]
+    vout = gpub_vout_range()[2]
+    i = 0.0
+    for _ in range(40):
+        v_b = v_card - i * r
+        i = vout * i_pin / (GPUB_ETA * max(v_b, 0.5))
+    return i, v_card - i * r
+
+
 def iob_vout(v_in, i_out, corner):
-    """The port side of the boost: regulated at the corner's set point, or
+    """The output side of the boost: regulated at the corner's set point, or
     v_in less the inductor and high-side drop in pass-through."""
     lo, nom, hi = iob_vout_range()
     vset = {"lo": lo, "nom": nom, "hi": hi}[corner]

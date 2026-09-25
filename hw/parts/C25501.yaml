@@ -1,0 +1,17 @@
+# 4D02WGJ0330TCE (UNI-ROYAL), 4 x 33 ohm resistor array, convex 0402x4
+datasheet: https://datasheet.lcsc.com/lcsc/1811061524_UNI-ROYAL-Uniroyal-Elec-4D02WGJ0330TCE_C25501.pdf
+source: "UNI-ROYAL 4D02/4D03 array datasheet, dimensions drawing: 8 terminals, resistor n between terminal n and 9-n; KiCad's Device:R_Pack04 names each end Rn.1 / Rn.2"
+package: 0402x4
+pins:
+  1: R1.1
+  2: R2.1
+  3: R3.1
+  4: R4.1
+  5: R4.2
+  6: R3.2
+  7: R2.2
+  8: R1.2
+# no ccw rule: JLC's footprint for this part numbers the pads clockwise (1-4
+# along the top, 5-8 back along the bottom). For four identical resistors a
+# mirror is harmless: each still sits between the same facing pads (1-8, 2-7,
+# 3-6, 4-5); the pads are checked pad for pad against JLC's footprint anyway.

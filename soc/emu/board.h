@@ -26,7 +26,7 @@ struct MainBoard {
 
 	Vmachine_core *top = nullptr;
 	sst39_t rom;
-	uint8_t ram[1 << 19];
+	uint8_t ram[1 << 19];                 // the 512 KB SRAM, all 19 address lines (banked RAM, extended-ram.md)
 	uint64_t clocks = 0;
 	int last_we = 1;
 	uint8_t last_din = 0;
@@ -73,15 +73,15 @@ struct MainBoard {
 		// the SST39's toggle bits flip once per read, as on the chip
 		int now_reading = !top->mem_n_oe ? (!top->mem_n_ce_ram ? 1 : !top->mem_n_ce_rom ? 2 : 0) : 0;
 		if (now_reading && (now_reading != reading || a != read_addr))
-			read_data = now_reading == 1 ? ram[a & 0xFFFF] : sst39_read(&rom, a, us);
+			read_data = now_reading == 1 ? ram[a] : sst39_read(&rom, a, us);
 		if (now_reading == 1)
-			read_data = ram[a & 0xFFFF];      // RAM has no read side effects
+			read_data = ram[a];      // RAM has no read side effects
 		reading = now_reading;
 		read_addr = a;
 		uint8_t din = now_reading ? read_data : 0xFF;
 		if (last_we == 0 && top->mem_n_we == 1) {         // /WE rose: the write happens
 			if (!top->mem_n_ce_ram)
-				ram[a & 0xFFFF] = last_din;
+				ram[a] = last_din;
 			else if (!top->mem_n_ce_rom)
 				sst39_write(&rom, a, last_din, us);
 		}

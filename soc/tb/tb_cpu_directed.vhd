@@ -2,7 +2,7 @@
 --
 --   CPU-004  reset state; reset held mid-instruction restarts cleanly; timers
 --            and I are cleared; nothing is driven while in reset
---   CPU-005  IRQs: not taken with I=0; lowest number first; push order pch,
+--   CPU-005  IRQs: not taken with I=0 nor right after POP pcl; lowest number first; push order pch,
 --            pcl, f; I cleared; vector read; the return is exact; taken only
 --            at instruction boundaries (an IRQ raised at every clock phase)
 --   CPU-006  timers count retired instructions (including WAI waits, once
@@ -355,15 +355,26 @@ begin
 				end if;
 			end loop;
 			check(mem300 = x"10", "handler 0 did not run");
+			-- an IRQ due as POP pcl retires is taken after the POP pch: an IRQ
+			-- between the two would push over the popped byte, and its
+			-- handler's POP pcl would replace pcl
+			n := entries;
+			boot(L_irq_ret_prog);
+			wait until rising_edge(clk) and entries = n + 1 for 20 us;
+			check(ent_vec = L_h1 and ent_pch = u8(L_irq_ret_back / 256) and ent_pcl = u8(L_irq_ret_back),
+				  "an IRQ due at POP pcl pushed $" & to_hstring(ent_pch) & to_hstring(ent_pcl) &
+				  " (want irq_ret_back, after the POP pch)");
+			wait_fetch(L_irq_ret_done, "irq_ret_done after the handler");
 		end if;
 
 		---------------------------------------------------------------- CPU-006
 		if run("CPU-006") then
+			n := exp0_n;					-- CPU-005's last test fires TMR0 too
 			boot(L_tmr_prog);
 			wait until rising_edge(clk) and halted = '1' for 50 us;
 			-- TMR0 #3 counts its own retirement: it fires as the 2nd following
 			-- instruction retires, and TMR0 #1 fires on its own retirement
-			check(exp0_n = 2, "TMR0 fired " & integer'image(exp0_n) & " times (want 2)");
+			check(exp0_n - n = 2, "TMR0 fired " & integer'image(exp0_n - n) & " times (want 2)");
 			check(exp0_fetch = L_tmr_self, "the second expiry was not TMR0 #1's own");
 			check(exp1_n = 0, "TMR1 fired after being stopped with 0");
 			-- first expiry position: rerun and stop at it

@@ -36,6 +36,16 @@ struct sysmachine {
 		void (*write)(const uint8_t *d, int n);
 		int (*read)(uint8_t *d, int max);
 	} uart_far;
+	int bridge_frames;                    /* BR_CS_n frames: the bridge's traffic */
+	/* the console's USB serial port, the PC's side */
+	struct {
+		bool open;                        /* DTR */
+		int room;                         /* the card's USB TX buffer: what con_room reports */
+		uint8_t to_pc[16384];             /* what reached the PC */
+		int to_pc_n;
+		uint8_t from_pc[4096];            /* typed on the PC, not yet taken by the card */
+		int from_pc_n;
+	} con;
 };
 
 extern struct sysmachine M;

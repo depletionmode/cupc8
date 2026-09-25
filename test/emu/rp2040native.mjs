@@ -99,6 +99,9 @@ class UsbCtrl {
   detachDevice() {
     N.usbDetach(this.emu.h);
   }
+  get sieCtrl() {
+    return N.usbSieCtrl(this.emu.h);
+  }
 }
 
 export class Emu {
@@ -151,6 +154,11 @@ export class Emu {
   // fn() on every nth cycle from now (see rp2040emu.mjs)
   everyCycles(n, fn) {
     N.every(this.h, n, fn);
+  }
+
+  // see rp2040emu.mjs
+  irqMaxWait(irq, reset = false) {
+    return N.irqMaxWait(this.h, irq, reset);
   }
 
   // see rp2040emu.mjs
@@ -326,6 +334,30 @@ export class USBCDC {
   sendSerialByte(b) {
     N.cdcSend(this.h, b);
   }
+}
+
+// not in rp2040js: the composite CDC host (test/emu/cdchost.mjs), natively
+export class CdcHost {
+  constructor(usbCtrl, nports = 2) {
+    const h = usbCtrl.emu.h;
+    this.h = h;
+    N.cdcHostCreate(h, nports);
+    this._onDeviceConnected = null;
+    this.ports = Array.from({ length: nports }, (_, p) => {
+      let fn = null;
+      return {
+        txFIFO: { get itemCount() { return N.cdcHostTxCount(h, p); } },
+        get onSerialData() { return fn; },
+        set onSerialData(f) { fn = f; N.cdcHostOn(h, 0, p, f ?? undefined); },
+      };
+    });
+  }
+  get onDeviceConnected() { return this._onDeviceConnected; }
+  set onDeviceConnected(fn) { this._onDeviceConnected = fn; N.cdcHostOn(this.h, 1, 0, fn ?? undefined); }
+  get portCount() { return N.cdcHostPorts(this.h); }
+  setLines(p, value) { N.cdcHostLines(this.h, p, value); }
+  open(p, on) { this.setLines(p, on ? 3 : 0); }
+  sendSerialByte(b, p = 0) { N.cdcHostSend(this.h, p, b); }
 }
 
 // not in rp2040js: the storage card's microSD socket on SPI1 (SCK 14, MOSI 15,

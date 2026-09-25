@@ -1,10 +1,11 @@
-# X322512MSB4SI (YXC), 12 MHz crystal, 20 pF load, SMD 3225 4-pad
-datasheet: https://datasheet.lcsc.com/lcsc/1811061923_Yangxing-Tech-X322512MSB4SI_C9002.pdf
-source: "YXC X3225 series datasheet, dimensions drawing (top view): pads 1 and 3 the crystal, 2 and 4 ground"
+# X322512MSB4SI (YXC), 12 MHz crystal, 20 pF load, 3.2 x 2.5 mm, 4 pads
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/a84bd8d530dd46e4b0f6d0ee59d8a89c.pdf
+source: "YXC YSX321SL datasheet, page 1: Dimensions and Recommended Land Pattern, Top View Crystal Connection (#1 and #3 the crystal, #2 and #4 GND)"
 package: SMD3225-4P
+footprints: [Crystal_SMD_3225-4Pin_3.2x2.5mm]   # KiCad's 3225 4-pad crystal
 pins:
-  1: [OSC1, XTAL1, X1]
-  2: GND
-  3: [OSC2, XTAL2, X2]
-  4: GND
+  1: ["1", XTAL1, OSC1, X1]
+  2: [G, GND]
+  3: ["3", XTAL2, OSC2, X2]
+  4: [G, GND]
 ccw: [1, 4]

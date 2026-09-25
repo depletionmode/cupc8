@@ -162,7 +162,10 @@ def load_symbol(lib_id):
     if parent:
         base = load_symbol(lib + ":" + parent[1])
         own = {p[1]: p for p in find(sym, "property")}
-        flat = [e for e in base if not (isinstance(e, list) and e[0] == "property")]
+        # copies: the sub-symbols are renamed below, and `base` shares them
+        # with the cached parent (a second symbol extending it, or the same
+        # one loaded again in this process, would find them renamed already)
+        flat = [copy.deepcopy(e) for e in base if not (isinstance(e, list) and e[0] == "property")]
         props = [own.get(p[1], p) for p in find(base, "property")]
         props += [p for k, p in own.items() if k not in {q[1] for q in props}]
         flat = flat[:2] + props + flat[2:]
@@ -702,7 +705,7 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None, plane=False):
+                zone_outline=None, labels=None, plane=False, silk_text=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -791,7 +794,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
 
     clip_silk_to_board(board, outline)
     clip_silk_to_pads(board)
-    place_designators(board, outline, labels or {})
+    place_designators(board, outline, labels or {}, silk_text=silk_text)
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     if plane and layers == 4:
@@ -853,7 +856,8 @@ def clip_silk_to_board(board, outline, gap=0.15):
         for g in [gi[i].Cast() for i in range(len(gi))]:
             if g.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
                 continue
-            w = (to(g.GetWidth()) if isinstance(g, pcbnew.PCB_SHAPE) else 0) / 2 + gap   # texts have no width
+            # a text's bounding box already includes its stroke
+            w = (to(g.GetWidth()) / 2 if isinstance(g, pcbnew.PCB_SHAPE) else 0) + gap
             lo_x, lo_y, hi_x, hi_y = x0 + w, y0 + w, x1 - w, y1 - w
             if not (isinstance(g, pcbnew.PCB_SHAPE) and g.GetShape() == pcbnew.SHAPE_T_SEGMENT):
                 b = g.GetBoundingBox()
@@ -963,7 +967,7 @@ def mark_revision(board, title, revision, at):
     board.SetTitleBlock(tb)
 
 
-def place_designators(board, outline, labels=None, gap=0.3):
+def place_designators(board, outline, labels=None, gap=0.3, silk_text=None):
     """Put every reference designator horizontal, in the first spot around its
     part that clears all pads, every other part's courtyard, the other
     designators, board-only graphics (logos) and the board edge. A part in
@@ -997,8 +1001,9 @@ def place_designators(board, outline, labels=None, gap=0.3):
             ref.SetText(labels[fp.GetReference()])
             ref.SetLayer(pcbnew.F_SilkS)
             board.Add(ref)
-        ref.SetTextSize(pcbnew.VECTOR2I(mm(SILK_TEXT[0]), mm(SILK_TEXT[0])))
-        ref.SetTextThickness(mm(SILK_TEXT[1]))
+        size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
+        ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+        ref.SetTextThickness(mm(stroke))
         ref.SetTextAngleDegrees(0)
         ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
         ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
@@ -1012,6 +1017,12 @@ def place_designators(board, outline, labels=None, gap=0.3):
             for shift in (0, 1, -1, 2, -2, 3, -3):
                 spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
                           (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
+        # then a ring a little further out: a 0402's text right above it
+        # clips its own pads, which reach nearly to its courtyard
+        cx0, cy0, cx1, cy1 = courts[fp.GetReference()]
+        mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
+        for shift in (0, 1, -1, 2, -2):
+            spots += [(mx + shift, cy0 - gap - 1.0), (mx + shift, cy1 + gap + 1.0)]
         for sx, sy in spots:
             ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
             t = box(ref.GetBoundingBox())
@@ -1277,11 +1288,12 @@ def remove_dangling(board, pours=()):
     return len(gone)
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3):
+def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
-    and an error after `tries`."""
+    and an error after `tries`. `salt` starts the tries' orderings further
+    on, for a second round that must not repeat the first."""
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
@@ -1303,11 +1315,11 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
         # each try orders the problem differently (a UUID salt): Freerouting
         # can stall on one order and complete on another, and the salt keeps
         # every run of the pipeline the same
-        stable_uuids(board, attempt)
+        stable_uuids(board, salt + attempt)
         if not pcbnew.ExportSpecctraDSN(board, dsn):
             raise RuntimeError("DSN export failed")
         with open(dsn) as f:
-            text = canonical_dsn(f.read(), attempt)
+            text = canonical_dsn(f.read(), salt + attempt)
         with open(dsn, "w") as f:
             f.write(text)
         if os.path.exists(ses):
@@ -1351,6 +1363,36 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
+    join_track_ends_to_vias(board)
+
+
+def join_track_ends_to_vias(board):
+    """A track Freerouting ends on (or just touching) the rim of a via of its
+    net, not its centre, meets it through a sliver (0.086 mm seen, under
+    JLC's 0.09): a stub of the track's width from that end to the via's
+    centre, inside the two, so nothing else moves. Returns the count."""
+    import pcbnew
+    tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    vias = [v for v in items if v.Type() == pcbnew.PCB_VIA_T]
+    n = 0
+    for t in [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]:
+        for end in (t.GetStart(), t.GetEnd()):
+            for v in vias:
+                c, r = v.GetPosition(), v.GetWidth(pcbnew.F_Cu) // 2
+                d = (end - c).EuclideanNorm()
+                # the end inside the via, or its round cap overlapping the rim
+                if v.GetNetCode() == t.GetNetCode() and pcbnew.FromMM(0.02) < d <= r + t.GetWidth() // 2:
+                    s = pcbnew.PCB_TRACK(board)
+                    s.SetStart(end)
+                    s.SetEnd(c)
+                    s.SetWidth(t.GetWidth())
+                    s.SetLayer(t.GetLayer())
+                    s.SetNet(t.GetNet())
+                    board.Add(s)
+                    n += 1
+                    break
+    return n
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
@@ -1539,6 +1581,23 @@ def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
             board.Add(tr)
             nets.append(pad.GetNetname())
     return nets
+
+
+def open_escapes(board, nets):
+    """The nets among `nets` whose pads KiCad's connectivity does not join
+    into one: what Freerouting's own report cannot be trusted with."""
+    board.BuildConnectivity()
+    conn = board.GetConnectivity()
+    bad = []
+    for net in nets:
+        pads = [p for fp in board.GetFootprints() for p in fp.Pads() if p.GetNetname() == net]
+        if len(pads) < 2:
+            continue
+        joined = conn.GetConnectedItems(pads[0])
+        keys = {(i.GetParentFootprint().GetReference(), i.GetNumber()) for i in joined if i.GetClass() == "PAD"}
+        if any((p.GetParentFootprint().GetReference(), p.GetNumber()) not in keys for p in pads[1:]):
+            bad.append(net)
+    return bad
 
 
 def clear_fingers(board, nets, margin=0.6):
@@ -1763,14 +1822,19 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
         return False
 
     if fragments:
-        # the pieces of the pour on each layer, joined by vias; walk from the
-        # biggest piece on each layer and give each piece not reached a via
-        # onto copper that is
-        vias = [tracks[i] for i in range(len(tracks))
-                if tracks[i].Type() == pcbnew.PCB_VIA_T and tracks[i].GetNetname() == net]
+        # the pieces of the pour on every copper layer it covers (inner planes
+        # and pours too), and what joins them: the net's vias (all layers),
+        # its pads, and its tracks, end to end. A piece counts as reached when
+        # it is in one connected group with the biggest outer-layer piece; the
+        # others get a via onto reached copper, or are reported
+        items = [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].GetNetname() == net]
+        vias = [v for v in items if v.Type() == pcbnew.PCB_VIA_T]
+        nsegs = [s for s in items if s.Type() == pcbnew.PCB_TRACE_T]
+        npads = [pd for fp in board.GetFootprints() for pd in fp.Pads() if pd.GetNetname() == net]
+        cu = [board.GetLayerID(board.GetLayerName(l)) for l in board.GetEnabledLayers().CuStack()]
         pieces = []                              # (layer, outline)
         for z in pours:
-            for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
+            for layer in cu:
                 if z.IsOnLayer(layer):
                     polys = z.GetFilledPolysList(layer)
                     pieces += [(layer, polys.Outline(i)) for i in range(polys.OutlineCount())]
@@ -1780,28 +1844,56 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
                 if ly == layer and out.PointInside(pt):
                     return k
             return None
-        reached = set()
-        for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
-            own = [k for k, (ly, _) in enumerate(pieces) if ly == layer]
-            if own:
-                reached.add(max(own, key=lambda k: pieces[k][1].Area()))
-        links = []
-        for v in vias:
-            a, b = piece_at(pcbnew.F_Cu, v.GetPosition()), piece_at(pcbnew.B_Cu, v.GetPosition())
+        # union-find over pieces (0..P-1), then vias, pads and tracks
+        P = len(pieces)
+        nodes = P + len(vias) + len(npads) + len(nsegs)
+        parent = list(range(nodes))
+
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+
+        def join(a, b):
             if a is not None and b is not None:
-                links.append((a, b))
-        grew = True
-        while grew:
-            grew = False
-            for a, b in links:
-                if (a in reached) != (b in reached):
-                    reached |= {a, b}
-                    grew = True
+                parent[find(a)] = find(b)
+        for i, v in enumerate(vias):
+            for layer in cu:
+                join(P + i, piece_at(layer, v.GetPosition()))
+        for i, pd in enumerate(npads):
+            for layer in cu:
+                if pd.IsOnLayer(layer):
+                    join(P + len(vias) + i, piece_at(layer, pd.GetPosition()))
+        base = P + len(vias) + len(npads)
+        for i, s in enumerate(nsegs):
+            for end in (s.GetStart(), s.GetEnd()):
+                join(base + i, piece_at(s.GetLayer(), end))
+                for j, v in enumerate(vias):
+                    if v.HitTest(end):
+                        join(base + i, P + j)
+                for j, pd in enumerate(npads):
+                    if pd.IsOnLayer(s.GetLayer()) and pd.HitTest(end):
+                        join(base + i, P + len(vias) + j)
+                for j, o in enumerate(nsegs):
+                    if j != i and o.GetLayer() == s.GetLayer() and o.HitTest(end):
+                        join(base + i, base + j)
+        outer = [k for k, (ly, _) in enumerate(pieces) if ly in (pcbnew.F_Cu, pcbnew.B_Cu)]
+        reached = set()
+        if outer:
+            root = find(max(outer, key=lambda k: pieces[k][1].Area()))
+            reached = {k for k in range(P) if find(k) == root}
+
+        def reached_at(pt, but):
+            """a reached piece on another layer at `pt`: where a via joins"""
+            return any(piece_at(ly, pt) in reached for ly in cu if ly != but)
         count = 0
         for k, (layer, out) in enumerate(pieces):
             if k in reached:
                 continue
             other = pcbnew.B_Cu if layer == pcbnew.F_Cu else pcbnew.F_Cu
+            if layer not in (pcbnew.F_Cu, pcbnew.B_Cu):
+                other = pcbnew.F_Cu                  # an inner piece: fan out from the top
             bb = out.BBox()
             y = to(bb.GetTop())
             found = None
@@ -1809,7 +1901,7 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
                 x = to(bb.GetLeft())
                 while x < to(bb.GetRight()):
                     pt = pcbnew.VECTOR2I(mm(x), mm(y))
-                    if out.PointInside(pt) and piece_at(other, pt) in reached and ok(x, y):
+                    if out.PointInside(pt) and reached_at(pt, layer) and ok(x, y):
                         found = (x, y)
                         break
                     x += 0.25
@@ -1821,13 +1913,14 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
                 continue
             # no room inside (a pocket between one part's pads): fan out from
             # a pad of the net in it, to a via on reached copper beside it
-            fan = fan_out(layer, out, other, lambda pt: piece_at(other, pt) in reached)
+            fan = fan_out(layer, out, other, lambda pt: reached_at(pt, layer)) \
+                if layer in (pcbnew.F_Cu, pcbnew.B_Cu) else False
             if fan:
                 reached.add(k)
                 count += 1
             else:
                 UNJOINED.append("%s piece at %.1f,%.1f..%.1f,%.1f mm" % (
-                    "top" if layer == pcbnew.F_Cu else "bottom",
+                    board.GetLayerName(layer),
                     to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
         return count
     xs = [p[0] for p in polygon]
@@ -1854,8 +1947,18 @@ def fill_zones(board):
 # doc/hardware/slot.md, Mechanical: every I/O card is this shape, in the
 # frame of KiCad's BUS_PCIexpress_x1 (finger B1 at the origin, fingers +y)
 IO_CARD_BODY = (-6.0, -44.0, 56.0, -4.95)
-IO_CARD_EDGE = [(-0.65, -4.95), (-6.0, -4.95), (-6.0, -44.0), (56.0, -44.0), (56.0, -4.95), (19.65, -4.95)]
-IO_CARD_TAB = (-0.65, 19.65)
+IO_CARD_TAB = (-0.65, 19.65)             # where the x1 tab meets the body
+X8_TAB = (-0.65, 50.65)                  # the CPU card's x8 tab, under the same body (cpu-bus.md, CPU card outline)
+
+
+def io_card_edge(tab=IO_CARD_TAB):
+    """The card body's Edge.Cuts, open where a finger tab spanning x
+    tab[0] .. tab[1] meets it (the tab footprint draws the rest)."""
+    x0, y0, x1, y1 = IO_CARD_BODY
+    return [(tab[0], y1), (x0, y1), (x0, y0), (x1, y0), (x1, y1), (tab[1], y1)]
+
+
+IO_CARD_EDGE = io_card_edge()
 IO_CARD_HOLE = (52.0, -40.0)             # M3, non-plated
 IO_CARD_PWR_LED = (-3.0, -41.0)          # the power LED, the same on every board: 3 mm in from top-left
 MOUNTING_HOLE = "MountingHole:MountingHole_3.2mm_M3"
@@ -1943,8 +2046,11 @@ def order_spec(layers, card_edge):
             "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
             "gold_fingers": card_edge, "finger_finish": "hard gold" if card_edge else None,
             "finger_chamfer_deg": 30 if card_edge else None}
-    if layers == 4:
-        spec["stackup"] = "JLC04161H-7628"
+    # JLC's standard 1.6 mm stack-ups (jlcpcb.com/impedance); gold fingers
+    # are offered at any layer count, with ENIG and a board >= 50 mm
+    stackup = {4: "JLC04161H-7628", 6: "JLC06161H-3313"}.get(layers)
+    if stackup:
+        spec["stackup"] = stackup
     return spec
 
 
@@ -1962,7 +2068,8 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False):
+             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
+             tab=IO_CARD_TAB, silk_text=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1976,16 +2083,19 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     `prepare(board)`, if given, runs after the pad fan-out and before
     Freerouting: a board's own locked pre-routing (layer changes the router
-    would otherwise scatter)."""
+    would otherwise scatter). The nets it returns, if any, are finger escapes
+    of its own, which Freerouting may report open: they are checked on KiCad's
+    connectivity after routing, as the key-notch escapes are."""
     import pcbnew
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
         # finger edge and pour come from here, and the parts every card has in
         # the same place are checked
-        if outline not in (None, IO_CARD_BODY) or edge not in (None, IO_CARD_EDGE):
+        # (the CPU card too, on its x8 tab: `tab` is where the tab meets the body)
+        if outline not in (None, IO_CARD_BODY) or edge not in (None, io_card_edge(tab)):
             raise SystemExit("%s: an I/O card has the standard outline (IO_CARD_BODY/EDGE), not its own" % name)
-        outline, edge, card_edge = IO_CARD_BODY, IO_CARD_EDGE, True
-        zone_outline = zone_outline or card_zone(IO_CARD_BODY, IO_CARD_TAB, -1.5)
+        outline, edge, card_edge = IO_CARD_BODY, io_card_edge(tab), True
+        zone_outline = zone_outline or card_zone(IO_CARD_BODY, tab, -1.5)
         for ref, want in (("J1", (0, 0, 0)), ("H1", IO_CARD_HOLE + (0,)), ("D1", IO_CARD_PWR_LED + (0,))):
             if tuple(placement.get(ref, ())[:3]) != want:
                 raise SystemExit("%s: an I/O card has %s at %s (slot.md, Mechanical), not %s" % (
@@ -2009,7 +2119,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def sheet():
         schematic(sch, footprint_libs)
         write_project(pro, power_nets=power_nets, fine_nets=fine_nets,   # before ERC: it carries the library tables
-                      rules=JLC_RULES_4 if layers == 4 else None)
+                      rules=JLC_RULES_4 if layers >= 4 else None)
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
@@ -2024,25 +2134,43 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
-                        plane=plane)
+                        plane=plane, silk_text=silk_text)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, pour_nets[0], outline[3])
-            presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
+            if callable(presence):      # the board routes the link itself, before the fan-out
+                presence(b)
+            else:
+                presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
             tab_via_keepout(b, outline[3])
             state["escaped"] = key_escapes(b, outline[3], skip=pour_nets)
         # every poured net's pads get a via: GND, and any net on a plane
         # (build_board's (net, layers) zones), which is reached no other way
         state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
         if prepare:                   # the board's own locked pre-routing, before Freerouting
-            prepare(b)
+            # nets it returns are escapes of its own: checked like the key-notch ones
+            state["escaped"] = list(state.get("escaped", [])) + list(prepare(b) or [])
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
     def route():
-        autoroute(state["b"], out, passes, pours=tuple(pour_nets) + tuple(state.get("escaped", ())))
+        # Freerouting reports the key-notch escapes' nets unrouted whether or
+        # not it reached them, so they are taken on trust and then checked
+        # here, on KiCad's own connectivity: a try that left one open is
+        # thrown away and the router runs again with more passes
+        escaped = tuple(state.get("escaped", ()))
+        for round_ in range(2):
+            if round_:
+                state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
+            autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped, salt=3 * round_,
+                      tries=route_tries)
+            open_nets = open_escapes(state["b"], escaped)
+            if not open_nets:
+                break
+        else:
+            raise RuntimeError("Freerouting left %s unrouted, twice over 3 tries" % open_nets)
         if card_edge:
             n = clear_fingers(state["b"], pour_nets)
             return "%d pour tracks cleared off the fingers" % n if n else None

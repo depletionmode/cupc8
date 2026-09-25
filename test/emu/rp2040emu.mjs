@@ -56,6 +56,7 @@ export class Emu {
     this.uart = '';
     this.mcu.uart[0].onByte = (b) => (this.uart += String.fromCharCode(b));
     this.onCycle = null; // per-cycle hook: (emu) => void (pin-level test benches)
+    this.watchIrqs(this.mcu.core0);
     if (core1Slow !== 1) {
       const core1 = this.mcu.core1, exec = core1.executeInstruction.bind(core1);
       let owed = 0;
@@ -117,6 +118,31 @@ export class Emu {
       if (++tick % n) return;
       fn();
     };
+  }
+
+  // Read-only: for each external interrupt, core 0's cycle count when it
+  // last became pending, and the most cycles it waited from then to its
+  // exception entry (the native emulator keeps the same in its core).
+  watchIrqs(core) {
+    const since = new Float64Array(32), max = new Float64Array(32);
+    const set = core.setInterrupt.bind(core), entry = core.exceptionEntry.bind(core);
+    core.setInterrupt = (irq, value) => {
+      if (value && !(core.pendingInterrupts & (1 << irq))) since[irq] = core.cycles;
+      set(irq, value);
+    };
+    core.exceptionEntry = (n) => {
+      if (n >= 16) max[n - 16] = Math.max(max[n - 16], core.cycles - since[n - 16]);
+      entry(n);
+    };
+    this.irqWaits = max;
+  }
+
+  // the most cycles core 0's interrupt `irq` has waited from pending to its
+  // exception entry; reset: start again from 0
+  irqMaxWait(irq, reset = false) {
+    const w = this.irqWaits[irq];
+    if (reset) this.irqWaits[irq] = 0;
+    return w;
   }
 
   // A trap on the PPB (NVIC, SysTick) writes: once armed with arm(k, fire),

@@ -68,4 +68,10 @@ add_executable(einkcard einkcard.cpp "${FW}/eink/core/eink.c" "${FW}/eink/core/u
 target_include_directories(einkcard PRIVATE "${FW}/eink/core" "${FW}/gpu/core" "${FW}/common")
 target_compile_definitions(einkcard PRIVATE GPU_GFX_BYTES=96000)
 target_compile_options(einkcard PRIVATE -O2 -Wall -Wextra)
+# GCC's -Wstringop-overflow misattributes gpu_run's font writes (font16[a][16],
+# font8[a][8], a a byte into [256]) to the 8.5 KB card_t at the head of gpu_t
+# once LTO inlines execute() here; the index is bounded and the firmware builds
+# the same core clean with -Werror. Silenced for this test program only.
+target_compile_options(einkcard PRIVATE -Wno-stringop-overflow)
+target_link_options(einkcard PRIVATE -Wno-stringop-overflow)
 target_link_libraries(einkcard PRIVATE machine)

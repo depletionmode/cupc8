@@ -6,7 +6,7 @@
 // clock at a time while any slot or the bridge is selected, 10 us at a time
 // otherwise.
 //
-//   const m = await Machine.create({ slots: { 1: 'gpu', 2: 'io' } });
+//   const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' } });
 //   m.powerOn();  m.runFor(3e9);  m.screen()   // 80x30 text read off the HDMI output
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -19,6 +19,7 @@ import { Emu, SDK } from './rp2040emu.mjs';
 import { kernelRom, ROOT } from './romimage.mjs';
 import { TmdsCapture } from './tmds.mjs';
 import { UsbKeyboard } from './usbkbd.mjs';
+import { CdcHost } from './cdchost.mjs';
 
 const core = createRequire(import.meta.url)(path.join(ROOT, 'build/emu/core.node'));
 const NS_PER_CLOCK = 1000 / 12;
@@ -141,10 +142,12 @@ class EspCard {
 // (SPI0, a master at 1 MHz) meets the chipset's bridge at pin level: each
 // byte it sends is clocked into the chipset's BR_* pins at 1 MHz by the
 // machine, and the transfer completes with the bits BR_MISO gave back. Its
-// USB CDC is a TCP port for cupc8.py (--port tcp:127.0.0.1:N).
+// first USB serial port is a TCP port for cupc8.py (--port tcp:127.0.0.1:N);
+// its second, the console (usb-console.md), is emulated only by
+// machinenative.mjs (m.console): this legacy machine leaves it closed.
 const BR_NCS = 5, SYS_NRST = 23, CHIPSET_CDONE = 7, CPUCARD_CDONE = 17;
 class SysctlCard {
-  constructor(emu, rp) {
+  constructor(emu) {
     this.kind = 'sysctl';
     this.emu = emu;
     const g = emu.mcu.gpio;
@@ -155,7 +158,8 @@ class SysctlCard {
     emu.mcu.spi[0].onTransmit = (b) => {
       this.pending = { out: b, bit: 0, got: 0, half: 0 };
     };
-    this.cdc = new rp.USBCDC(emu.mcu.usbCtrl);
+    this.usb = new CdcHost(emu.mcu.usbCtrl, 2);
+    this.cdc = this.usb.ports[0];
     this.toCard = [];
     this.cdc.onSerialData = (buf) => this.client?.write(Buffer.from(buf));
   }
@@ -170,7 +174,7 @@ class SysctlCard {
   }
   advance(ns) {
     const e = this.emu;
-    while (this.toCard.length && this.cdc.txFIFO.itemCount < 256) this.cdc.sendSerialByte(this.toCard.shift());
+    while (this.toCard.length && this.cdc.txFIFO.itemCount < 256) this.usb.sendSerialByte(this.toCard.shift(), 0);
     while (e.ns < ns) e.step();
   }
   // the bridge pins, as they are this clock (called once per core clock while busy)
@@ -212,13 +216,12 @@ function loadFont() {
 }
 
 export class Machine {
-  static async create({ slots = { 1: 'gpu', 2: 'io' }, rom = null, sysctl = false } = {}) {
+  static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
     m.cards = {};
     if (sysctl) {
-      const rp = await import(path.join(SDK, 'rp2040js/dist/esm/index.js'));
-      m.sysctl = new SysctlCard(await Emu.load(path.join(ROOT, 'build/rp2040/sysctl.elf'), { mhz: 125 }), rp);
+      m.sysctl = new SysctlCard(await Emu.load(path.join(ROOT, 'build/rp2040/sysctl.elf'), { mhz: 125 }));
       m.sysctlPort = await m.sysctl.listen();
     }
     for (const [slot, kind] of Object.entries(slots)) {
@@ -226,10 +229,10 @@ export class Machine {
         m.cards[slot] = new EspCard(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'));
         continue;
       }
-      const elf = path.join(ROOT, 'build/rp2040', kind + '.elf');
-      const emu = await Emu.load(elf, { mhz: kind === 'gpu' ? 252 : 125 });
+      const elf = path.join(ROOT, 'build/rp2040', (kind === 'hdmi' ? 'gpu' : kind) + '.elf');   // the HDMI card runs gpu.elf
+      const emu = await Emu.load(elf, { mhz: kind === 'hdmi' ? 252 : 125 });
       m.cards[slot] = new Rp2040Card(kind, emu);
-      if (kind === 'gpu') m.tmds = new TmdsCapture(emu);
+      if (kind === 'hdmi') m.tmds = new TmdsCapture(emu);
       if (kind === 'io') {
         emu.mcu.gpio[8].setInputValue(true);                 // VBUS switch: no fault
         m.keyboard = new UsbKeyboard({ speed: 1 });

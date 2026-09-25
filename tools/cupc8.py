@@ -5,17 +5,28 @@
 
     ping | status | power | reset
     ram read ADDR LEN [-o FILE] | ram write ADDR FILE
+        ADDR is a physical SRAM address, $00000-$7ffff, or BANK:OFFSET
+        (bank 0-31, offset $0000-$3fff: the 16 KB banks of extended-ram.md)
+    run PROG            (a program for $7000: a .prg from tools/mkprg.py, or the bare binary)
     rom id | rom read ADDR LEN -o FILE | rom erase [ADDR LEN] | rom write FILE [--addr A]
     cpu stop | cpu run | cpu step | cpu cycle | cpu hold | cpu release | trace
     fpga flash chipset|cpu FILE | fpga hold chipset|cpu | fpga boot chipset|cpu
     flash id chipset|cpu | flash read chipset|cpu ADDR LEN -o FILE
     card reset SLOT [--hold|--release] | card flash SLOT FILE [--esp] [--addr A]
+    console [PORT] [--idle S]     (the kernel's terminal: Ctrl-] quits)
 
 The port is --port, or $CUPC8_PORT, or the first system card found on USB
-(VID:PID 1209:C8C8). tcp:HOST:PORT reaches the system card in the
+(VID:PID 1209:C8C8, its first serial port: interface 0). tcp:HOST:PORT reaches the system card in the
 whole-machine emulator (test/emu/machine.mjs). tools/../build/fw/sysctl_sim serves a pseudo-terminal
 that stands in for the card (HOST-002, SYS-004). Slots are numbered 1-6 on
 the command line, as on the board; the protocol numbers them 0-5.
+
+console is the card's second serial port (interface 2; doc/proposals/
+usb-console.md): what the kernel's terminal prints, and keys typed into it.
+Its PORT is the argument, or $CUPC8_CONSOLE, or the card's on USB;
+tcp:HOST:PORT is the emulator's (tools/machine_view.mjs --console-port N).
+With stdin not a terminal (a pipe, a file: a BASIC program to paste) it sends
+it all, then quits once the machine has been quiet for --idle seconds.
 """
 
 import argparse
@@ -55,19 +66,79 @@ def crc8(data):
     return c
 
 
-def find_port():
-    if os.environ.get("CUPC8_PORT"):
-        return os.environ["CUPC8_PORT"]
+def find_port(env="CUPC8_PORT", interface=0):
+    """The system card's serial port on USB: interface 0 is the sysctl
+    protocol, interface 2 the console (usb-console.md)."""
+    if os.environ.get(env):
+        return os.environ[env]
     for dev in sorted(glob.glob("/sys/class/tty/ttyACM*")):
-        usb = os.path.realpath(os.path.join(dev, "device", ".."))
+        itf = os.path.realpath(os.path.join(dev, "device"))
+        usb = os.path.dirname(itf)
         try:
             vid = open(os.path.join(usb, "idVendor")).read().strip()
             pid = open(os.path.join(usb, "idProduct")).read().strip()
-        except OSError:
+            num = int(open(os.path.join(itf, "bInterfaceNumber")).read().strip(), 16)
+        except (OSError, ValueError):
             continue
-        if (vid, pid) == ("1209", "c8c8"):
+        if (vid, pid) == ("1209", "c8c8") and num == interface:
             return "/dev/" + os.path.basename(dev)
     sys.exit("cupc8.py: no system card found (plug it in, or use --port)")
+
+
+def open_port(port):
+    """A raw file descriptor on a serial port, or a TCP connection (the emulator)."""
+    if port.startswith("tcp:"):
+        host, _, p = port[4:].rpartition(":")
+        sock = socket.create_connection((host or "127.0.0.1", int(p)))
+        return sock, sock.fileno()
+    fd = os.open(port, os.O_RDWR | os.O_NOCTTY)
+    if os.isatty(fd):
+        tty.setraw(fd)
+        attrs = termios.tcgetattr(fd)
+        attrs[2] |= termios.CLOCAL
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    return None, fd
+
+
+def console(port, idle=1.0):
+    """The kernel's terminal on the console port. Opening it (DTR) is what
+    makes the card set HOST and carry the rings; closing it clears HOST."""
+    sock, fd = open_port(port)
+    stdin, stdout = sys.stdin.fileno(), sys.stdout.fileno()
+    interactive = os.isatty(stdin)
+    saved = termios.tcgetattr(stdin) if interactive else None
+    if interactive:
+        tty.setraw(stdin)
+        os.write(stdout, b"cupc8.py console on %s: Ctrl-] quits\r\n" % port.encode())
+    scale = float(os.environ.get("CUPC8_TIMEOUT_SCALE", "1"))
+    inputs, last = [fd, stdin], time.monotonic()
+    try:
+        while True:
+            ready = select.select(inputs, [], [], 0.05)[0]
+            if fd in ready:
+                data = os.read(fd, 4096)
+                if not data:
+                    return 0                       # the emulator went away
+                os.write(stdout, data)
+                last = time.monotonic()
+            if stdin in ready:
+                data = os.read(stdin, 4096)
+                if interactive and b"\x1d" in data:
+                    return 0
+                if not data:
+                    inputs.remove(stdin)           # sent it all: wait for the machine to go quiet
+                    last = time.monotonic()
+                else:
+                    os.write(fd, data)
+            if stdin not in inputs and time.monotonic() - last > idle * scale:
+                return 0
+    finally:
+        if saved:
+            termios.tcsetattr(stdin, termios.TCSADRAIN, saved)
+        if sock:
+            sock.close()
+        else:
+            os.close(fd)
 
 
 class Sysctl:
@@ -153,17 +224,32 @@ class Sysctl:
                 "cc_mv": d[5] | d[6] << 8, "v1v2_mv": d[7] | d[8] << 8, "reset_slots": d[9],
                 "cpu_card": bool(d[10])}
 
+    RAM_SIZE = 0x80000                    # the main board's SRAM: 32 banks of 16 KB
+
     def ram_read(self, addr, n):
+        """SRAM by physical address. Within the first 64 KB this uses RAM_READ
+        (every sysctl has it); past it, RAM_READ_FAR."""
+        if addr + n > self.RAM_SIZE:
+            raise SysctlError("past the end of the SRAM ($%05x)" % (self.RAM_SIZE - 1))
         out = b""
         while n:
             k = min(n, 4096)
-            out += self.request(0x10, struct.pack("<HH", addr, k))
-            addr, n = (addr + k) & 0xFFFF, n - k
+            if addr + k <= 0x10000:
+                out += self.request(0x10, struct.pack("<HH", addr, k))
+            else:
+                out += self.request(0x12, struct.pack("<I", addr)[:3] + struct.pack("<H", k))
+            addr, n = addr + k, n - k
         return out
 
     def ram_write(self, addr, data):
+        if addr + len(data) > self.RAM_SIZE:
+            raise SysctlError("past the end of the SRAM ($%05x)" % (self.RAM_SIZE - 1))
         for i in range(0, len(data), 4000):
-            self.request(0x11, struct.pack("<H", (addr + i) & 0xFFFF) + data[i:i + 4000])
+            a, chunk = addr + i, data[i:i + 4000]
+            if a + len(chunk) <= 0x10000:
+                self.request(0x11, struct.pack("<H", a) + chunk)
+            else:
+                self.request(0x13, struct.pack("<I", a)[:3] + chunk)
 
     def rom_read(self, addr, n):
         out = b""
@@ -527,8 +613,62 @@ def esp_flash(sc, slot, image, addr, log=print, stub=True):
 
 # -------------------------------------------------------------------- CLI
 
+PROGRAM_BASE, PROGRAM_END, API_RUN = 0x7000, 0xE000, 0x6F21
+
+
+def program_body(data):
+    """A program file's body: after the "C8P" header (version 1), or the
+    whole file if it has none (doc/proposals/kernel-api.md)."""
+    if data[:3] == b"C8P":
+        if data[3:4] != b"\x01":
+            raise ValueError("not a version 1 program (header %r)" % data[:4])
+        data = data[4:]
+    if len(data) > PROGRAM_END - PROGRAM_BASE:
+        raise ValueError("%d bytes: more than the %d from $7000 to $dfff" % (len(data), PROGRAM_END - PROGRAM_BASE))
+    return data
+
+
+def run_program(sc, data, log=print):
+    """Write the program at $7000 and set API_RUN: the terminal starts it
+    the next time it waits for a key. The bridge's writes are safe while the
+    CPU runs (each stalls it for one memory cycle), but a program running at
+    $7000 would be written over, so the kernel keeps API_RUN at 2 meanwhile
+    and this refuses."""
+    body = program_body(data)
+    state = sc.ram_read(API_RUN, 1)[0]
+    if state == 2:
+        log("a program is running (API_RUN = 2); it ends with API_EXIT or by returning")
+        return 1
+    if state != 0:
+        log("the last program has not started yet (API_RUN = %d): is the terminal at its prompt?" % state)
+        return 1
+    sc.ram_write(PROGRAM_BASE, body)
+    sc.ram_write(API_RUN, b"\x01")      # last: the terminal only looks at API_RUN
+    deadline = time.monotonic() + 2.0 * float(os.environ.get("CUPC8_TIMEOUT_SCALE", "1"))
+    while time.monotonic() < deadline:
+        if sc.ram_read(API_RUN, 1)[0] != 1:
+            log("%d bytes at $7000, running" % len(body))
+            return 0
+        time.sleep(0.05)
+    log("%d bytes at $7000; not started yet (the terminal starts it when it waits for a key)" % len(body))
+    return 0
+
+
 def num(s):
     return int(s, 0)
+
+
+def ram_addr(s):
+    """A physical SRAM address, or BANK:OFFSET (bank * $4000 + offset)."""
+    if ":" in s:
+        bank, off = (int(x, 0) for x in s.split(":", 1))
+        if not (0 <= bank < 32 and 0 <= off < 0x4000):
+            raise argparse.ArgumentTypeError("BANK:OFFSET is 0-31:$0000-$3fff")
+        return bank * 0x4000 + off
+    a = int(s, 0)
+    if not 0 <= a < 0x80000:
+        raise argparse.ArgumentTypeError("the SRAM is $00000-$7ffff")
+    return a
 
 
 def slot_of(s):
@@ -557,8 +697,9 @@ def main(argv=None):
     sub.add_parser("reset")
     sub.add_parser("trace")
     ram = sub.add_parser("ram").add_subparsers(dest="op", required=True)
-    p = ram.add_parser("read"); p.add_argument("addr", type=num); p.add_argument("len", type=num); p.add_argument("-o")
-    p = ram.add_parser("write"); p.add_argument("addr", type=num); p.add_argument("file")
+    p = ram.add_parser("read"); p.add_argument("addr", type=ram_addr); p.add_argument("len", type=num); p.add_argument("-o")
+    p = ram.add_parser("write"); p.add_argument("addr", type=ram_addr); p.add_argument("file")
+    p = sub.add_parser("run"); p.add_argument("file")
     rom = sub.add_parser("rom").add_subparsers(dest="op", required=True)
     rom.add_parser("id")
     p = rom.add_parser("read"); p.add_argument("addr", type=num); p.add_argument("len", type=num); p.add_argument("-o")
@@ -579,7 +720,13 @@ def main(argv=None):
     p.add_argument("--esp", action="store_true", help="an ESP32 card (else: tries SWD, then the ESP bootloader)")
     p.add_argument("--addr", type=num, default=0)
     p.add_argument("--no-stub", action="store_true", help="ESP32: the ROM loader alone (esptool's stub crashes in QEMU)")
+    p = sub.add_parser("console", help="the kernel's terminal on the card's second serial port")
+    p.add_argument("port", nargs="?", help="the console port (default $CUPC8_CONSOLE, or the card's)")
+    p.add_argument("--idle", type=float, default=1.0, help="with stdin not a terminal: quit after this long quiet")
     a = ap.parse_args(argv)
+
+    if a.cmd == "console":
+        return console(a.port or find_port("CUPC8_CONSOLE", 2), a.idle)
 
     sc = Sysctl(a.port or find_port())
     try:
@@ -622,6 +769,12 @@ def run(sc, a):
             write_out(sc.ram_read(a.addr, a.len), a.o)
         else:
             sc.ram_write(a.addr, open(a.file, "rb").read())
+    elif c == "run":
+        try:
+            return run_program(sc, open(a.file, "rb").read())
+        except ValueError as e:
+            print("%s: %s" % (a.file, e), file=sys.stderr)
+            return 1
     elif c == "rom":
         if a.op == "id":
             print("manufacturer $%02x, device $%02x" % sc.rom_id())
