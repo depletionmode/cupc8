@@ -194,4 +194,4 @@ def preroute(board):
 
 if __name__ == "__main__":
     rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
-             layers=LAYERS, passes=100, preroute=preroute)
+             layers=LAYERS, passes=90, preroute=preroute)

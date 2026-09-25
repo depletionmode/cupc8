@@ -1318,6 +1318,36 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3):
     for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
         if v.GetWidth(pcbnew.F_Cu) - v.GetDrillValue() < pcbnew.FromMM(0.3):
             v.SetDrill(v.GetWidth(pcbnew.F_Cu) - pcbnew.FromMM(0.3))
+    join_track_ends_to_vias(board)
+
+
+def join_track_ends_to_vias(board):
+    """A track Freerouting ends on (or just touching) the rim of a via of its
+    net, not its centre, meets it through a sliver (0.086 mm seen, under
+    JLC's 0.09): a stub of the track's width from that end to the via's
+    centre, inside the two, so nothing else moves. Returns the count."""
+    import pcbnew
+    tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    vias = [v for v in items if v.Type() == pcbnew.PCB_VIA_T]
+    n = 0
+    for t in [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]:
+        for end in (t.GetStart(), t.GetEnd()):
+            for v in vias:
+                c, r = v.GetPosition(), v.GetWidth(pcbnew.F_Cu) // 2
+                d = (end - c).EuclideanNorm()
+                # the end inside the via, or its round cap overlapping the rim
+                if v.GetNetCode() == t.GetNetCode() and pcbnew.FromMM(0.02) < d <= r + t.GetWidth() // 2:
+                    s = pcbnew.PCB_TRACK(board)
+                    s.SetStart(end)
+                    s.SetEnd(c)
+                    s.SetWidth(t.GetWidth())
+                    s.SetLayer(t.GetLayer())
+                    s.SetNet(t.GetNet())
+                    board.Add(s)
+                    n += 1
+                    break
+    return n
 
 
 def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0.6, drill=0.3):
