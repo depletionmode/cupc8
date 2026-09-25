@@ -1382,6 +1382,15 @@ vrow = "4.7"
 cmd = "python3 hw/mech/fit.py --check MECH-008"
 
 [[test]]
+id = "SILK-001"
+title = "Designators: never over a via, a part or another word"
+checks = "kicadgen.check_designators (the pipeline's silkscreen step) flags a designator over a via, over another part's courtyard, over a part's body, and the board's name over a via; place_designators(reseat=True) moves a designator off a via that landed under it"
+method = "test/hw/test_silk.py: a two-resistor board built in pcbnew"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_silk.py"
+
+[[test]]
 id = "MECH-009"
 title = "3D models: each STEP where its WRL is"
 checks = "every imported model in hw/lib/jlc.3dshapes: the STEP's surface centroid within 0.2 mm of the WRL's and the same surface area (KiCad renders and check_models the WRL; its STEP export, which MECH-001..008 measure, swaps in the STEP)"

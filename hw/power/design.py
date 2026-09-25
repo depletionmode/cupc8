@@ -244,11 +244,13 @@ GPUB_L_DCR = 0.014
 GPUB_CIN = assume("GPU", "buck-boost input 10 uF 25 V 0805 (C15850) at VIN", 10e-6)
 GPUB_COUT = assume("GPU", "buck-boost output 2 x 22 uF 25 V 0805 (C45783): TI asks 2 x 22 uF above 3.6 V",
                    2 * 22e-6)
-GPUB_R1, GPUB_R2 = assume("GPU", "buck-boost feedback 825k (C25823) / 91k (C23265) 1 %: 5.03 V", (825e3, 91e3))
+# 300k/33k, both JLC basic parts with deep stock (825k, C25823, had 418);
+# R2 <= 100k as the datasheet asks (10.2.2.5)
+GPUB_R1, GPUB_R2 = assume("GPU", "buck-boost feedback 300k (C23024) / 33k (C4216) 1 %: 5.045 V", (300e3, 33e3))
 GPUB_RES_TOL = 0.01
 # what the values above say hw/boards/gpu.py places: gpu_board_mismatches()
 # fails POW-008 and THM-001 if the board script no longer agrees
-GPU_BOARD = {"F1": "200mA", "U7": "TPS63802DLAR", "L1": "470n", "R26": "825k", "R27": "91k",
+GPU_BOARD = {"F1": "200mA", "U7": "TPS63802DLAR", "L1": "470n", "R26": "300k", "R27": "33k",
              "C21": "10u", "C22": "22u", "C23": "22u"}
 GPUB_VFB = (0.495, 0.500, 0.505)                # DS: 500 mV +-1 % (PWM mode)
 # DS figure 10-21 (0.1 -> 1 A, power save allowed): a ~50 mVpp band at light

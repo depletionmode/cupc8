@@ -607,7 +607,6 @@ revert = [["tools/sim.nim", """    tickTimers()
 cmd = "tools/run_tests.sh testWaiTimer"
 must_fail = ["FAIL: ... 594 clocks, 49.5 us (4 counts a microsecond)"]
 
-
 [[bug]]
 name = "emulator: rp2040js's USBCDC took the composite system card's last CDC port (the console), so SYS-006 lost every reply"
 fixed_in = "7e14c52"
@@ -636,6 +635,7 @@ cmd = "make -s -C fw test_sysctl"
 must_fail = ["power-up junk in the rings: nothing sent"]
 
 [[bug]]
+
 name = "GPU card: the board kept the TPS61023 boost and 100 mA PTC after POW-008 moved to the TPS63802 buck-boost"
 fixed_in = "9316238"
 before = "74f1293"
@@ -672,3 +672,13 @@ fixed_in = "c63e125"
 revert = [["tools/fabready.py", "\"__main__\" not in open(script).read()", "\"def main\" not in open(script).read()"]]
 cmd = "python3 tools/fabready.py && python3 -c \"import sys; t = open('doc/hardware/fab-readiness.md').read(); m = [b for b in ('gpu', 'io', 'storage', 'eink') if '| %s |' % b not in t]; sys.exit('boards missing from fab-readiness: %s' % m if m else 0)\""
 must_fail = ["boards missing from fab-readiness: ['gpu', 'io', 'storage', 'eink']"]
+
+[[bug]]
+name = "boards: designators printed over vias on every card (the silkscreen check never looked)"
+fixed_in = "24b5229"
+revert = [["hw/tools/kicadgen.py", """        for v, net in vias:
+            if overlap(t, v):
+                bad.append("%s over a via of %s" % (what, net))
+""", ""]]
+cmd = "python3 test/hw/test_silk.py"
+must_fail = ["FAIL designator over a via"]

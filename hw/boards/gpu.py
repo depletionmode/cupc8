@@ -77,7 +77,7 @@ def schematic(path, footprint_libs):
     # ---- +5V to the sink (its EDID ROM and hot-plug detect; HDMI: 4.8-5.3 V,
     # >= 55 mA). The slot's +5V is 4.1 V at the card at the worst corner and
     # up to 5.4 V at vSafe5V max, so a TPS63802 buck-boost holds the pin at
-    # 5.03 V either way (power.md, GPU card HDMI +5V; POW-008). The 200 mA
+    # 5.045 V either way (power.md, GPU card HDMI +5V; POW-008). The 200 mA
     # PTC is ahead of it, so its drop doesn't come off the pin, and it still
     # trips on a shorted cable (the converter's current limit pulls far more
     # through it). No Schottky: the TPS63802 disconnects its output from its
@@ -101,9 +101,9 @@ def schematic(path, footprint_libs):
     rc.two(s, l1, "BB_L1", "BB_L2")
     c21 = rc.passive(s, "C", "C21", "10u", (150 * G, 104 * G))
     rc.two(s, c21, "HDMI_5V_F", "GND")
-    # 825k / 91k 1 %: 0.5 V x (1 + 825/91) = 5.03 V
-    r26 = rc.passive(s, "R", "R26", "825k", (172 * G, 126 * G), fp=rc.R0603, lcsc="C25823")
-    r27 = rc.passive(s, "R", "R27", "91k", (172 * G, 142 * G), fp=rc.R0603, lcsc="C23265")
+    # 300k / 33k 1 % (basic parts): 0.5 V x (1 + 300/33) = 5.045 V; R2 <= 100k (datasheet)
+    r26 = rc.passive(s, "R", "R26", "300k", (172 * G, 126 * G), fp=rc.R0603, lcsc="C23024")
+    r27 = rc.passive(s, "R", "R27", "33k", (172 * G, 142 * G), fp=rc.R0603, lcsc="C4216")
     rc.two(s, r26, "HDMI_5V", "BB_FB")
     rc.two(s, r27, "BB_FB", "GND")
     c22 = rc.passive(s, "C", "C22", "22u", (180 * G, 142 * G))
@@ -171,7 +171,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "RN1": (HX - 3.8, -27.0, 90),       # 1.4 mm below the ESD GND vias (preroute)
     "RN2": (HX, -27.0, 90),
     # the HDMI +5V buck-boost in the open area left of the receptacle; its
-    # 5.03 V runs over to pin 18 (55 mA). TI's layout (SLVSEU9D, 12): U7
+    # 5.045 V runs over to pin 18 (55 mA). TI's layout (SLVSEU9D, 12): U7
     # turned so its power pins (VIN, L1, GND, L2, VOUT) face up in a row, the
     # inductor across them above, the input cap left and the output caps
     # right, each at its pin; the FB divider below, by FB, away from L1/L2
@@ -209,11 +209,12 @@ def buck_boost(board):
     package to VIN; MODE (GND) joins AGND, which joins GND pin 8 through
     the package's middle, and takes them down by a via that also ties in the
     input cap's ground. FB runs down to its divider, away from L1/L2. The
-    GND pad fan-out's vias for U7 are taken off first: they would sit where
-    this copper goes."""
+    GND pad fan-out's vias for the block's parts are taken off first: they
+    would sit where this copper goes (the caps' and R27's GND pads are on
+    the top pour, which the block's own via ties down)."""
     import pcbnew
-    fp = board.FindFootprintByReference("U7")
-    pads = {(p.GetPosition().x, p.GetPosition().y) for p in fp.Pads()}
+    pads = {(p.GetPosition().x, p.GetPosition().y) for ref in ("U7", "C21", "C22", "C23", "R27")
+            for p in board.FindFootprintByReference(ref).Pads()}
     tr = board.Tracks()                       # indexed: iterating it breaks on Python 3.14
     items = [tr[i].Cast() for i in range(len(tr))]
     ends = {(t.GetEnd().x, t.GetEnd().y) for t in items
