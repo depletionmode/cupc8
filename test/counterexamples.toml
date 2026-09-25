@@ -494,7 +494,9 @@ revert = [["tools/sim.nim", """        if not ranSinceKey and msCount() - keyAt 
           ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
 """, ""]]
 cmd = "python3 test/sim/test_cli.py"
-must_fail = ["FAIL: --type with no IO card: headless still exits"]
+# (at the kernel's prompt the chipset's tick wakes the CPU every 50 ms now,
+# so it is the parked program that hangs)
+must_fail = ["FAIL: --type at a program parked with nothing to wake it: headless still exits"]
 
 [[bug]]
 name = "kernel: Backspace at the prompt was stored in the line and only moved the cursor"

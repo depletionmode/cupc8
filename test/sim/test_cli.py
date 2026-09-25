@@ -105,6 +105,17 @@ def main():
         check("--type with no IO card: headless still exits", "CUPC/8 BASIC" in text, out + text)
     except subprocess.TimeoutExpired:
         check("--type with no IO card: headless still exits", False, "the sim hung")
+    # ... and when nothing at all wakes the CPU (a program parked with only
+    # the slot IRQ unmasked; the kernel's own wait has the chipset's tick)
+    park = os.path.join(work, "park.prg")
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "mkprg.py"),
+                    os.path.join(ROOT, "tools", "testdata", "park.s"), "-o", park], check=True, capture_output=True)
+    try:
+        text, out = sim("--cards:hdmi", "--run:" + park, "--type:ab", timeout=60)
+        check("--type at a program parked with nothing to wake it: headless still exits",
+              "CUPC/8 BASIC" in text and "exit 0" in out, out + text)
+    except subprocess.TimeoutExpired:
+        check("--type at a program parked with nothing to wake it: headless still exits", False, "the sim hung")
 
     # storage: a new image, SAVE / NEW / DIR / LOAD / RUN
     img = os.path.join(work, "card.img")

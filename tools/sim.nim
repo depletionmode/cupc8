@@ -1287,9 +1287,9 @@ Both:
             inc pos
             ranSinceKey = false
             keyAt = msCount()
-          elif idleAt < 0 and mem[ApiRun] == 0:
-            idleAt = msCount()        # (not while a --run program waits to start or runs)
-        if mem[ApiRun] != 0:
+          elif idleAt < 0 and mem[ApiRun] != 1:
+            idleAt = msCount()        # (not while a --run program waits to start)
+        if mem[ApiRun] == 1:
           idleAt = -1
         var steps = 1000
         if not headless:
