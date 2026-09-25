@@ -1,0 +1,19 @@
+# TF-01A (HRO), push-push microSD socket with card detect, SMD
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/7650eac21a54674b08ad4ba21e17fceb.pdf
+source: "HRO TF-01A drawing (hw/datasheets/C91145_HRO_TF-01A.pdf): PCB Layout (Pattern Side), 9 contacts at 1.10 mm (1-8 the microSD pads: DAT2, CD/DAT3, CMD, VDD, CLK, VSS, DAT0, DAT1; then the card-detect contact) and four shell tabs; pin names from the microSD pinout (SD Physical Layer spec, SPI mode in brackets)"
+package: SMD
+footprints: [TF-SMD_TF-01A]   # JLC's own (EasyEDA)
+pins:
+  1: ["DAT2(RSV)", DAT2]
+  2: ["CDDAT3(CS)", CD/DAT3]
+  3: ["CMD(DI)", CMD]
+  4: VDD
+  5: ["CLK(SCLK)", CLK]
+  6: VSS
+  7: ["DAT0(D0)", DAT0]
+  8: ["DAT1(RSV)", DAT1]
+  9: CD
+  10: [GND, shell]
+  11: [GND, shell]
+  12: [GND, shell]
+  13: [GND, shell]

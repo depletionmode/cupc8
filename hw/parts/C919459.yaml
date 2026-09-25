@@ -1,0 +1,12 @@
+# TPS61023DRLR (TI), 3.7 A synchronous boost converter, SOT-563
+datasheet: https://www.ti.com/lit/ds/symlink/tps61023.pdf
+source: "TPS61023 datasheet SLVSF14B, 5 Pin Configuration and Functions: DRL package (SOT-563) top view and Pin Functions (1 FB, 2 EN, 3 VIN, 4 GND, 5 SW, 6 VOUT)"
+package: SOT-563
+pins:
+  1: FB
+  2: EN
+  3: VIN
+  4: GND
+  5: SW
+  6: VOUT
+ccw: [1, 6]

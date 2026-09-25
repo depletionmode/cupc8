@@ -214,7 +214,9 @@ ESP ROM bootloader sync.
   there and refuses a card whose outline, finger connector, M3 hole or power
   LED is not at these positions. The system card, in its own keyed slot, has
   its own outline (`system-slot.md`).
-- **Connectors:** on the card's top edge, facing away from the main board.
+- **Connectors:** on the card's top edge, facing away from the main board, or
+  on its back edge (x = −6.0 mm, the B1 end, the case's rear panel).
+  `hw/mech/fit.py` (MECH-004) checks either.
 - **Mounting:** each card has an M3 hole that lines up with a standoff on a
   main board mounting rail.
 - **Fit check:** the exact drawing is in `hw/lib/cards/card-outline.kicad_pcb`

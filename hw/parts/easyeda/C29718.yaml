@@ -1,0 +1,16 @@
+# JLC's part C29718 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C29718
+jlc_package: 0603x4
+easyeda_footprint: RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL
+pins: {'1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8'}
+pads:
+- ['5', 1.2, 0.8]
+- ['4', 1.2, -0.8]
+- ['6', 0.4, 0.8]
+- ['3', 0.4, -0.8]
+- ['7', -0.4, 0.8]
+- ['2', -0.4, -0.8]
+- ['8', -1.2, 0.8]
+- ['1', -1.2, -0.8]

@@ -1,0 +1,21 @@
+# JLC's part C91145 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C91145
+jlc_package: SMD
+easyeda_footprint: TF-SMD_TF-01A
+pins: {'1': DAT2(RSV), '2': CDDAT3(CS), '3': CMD(DI), '4': VDD, '5': CLK(SCLK), '6': VSS, '7': DAT0(D0), '8': DAT1(RSV), '9': CD, '10': GND, '11': GND, '12': GND, '13': GND}
+pads:
+- ['1', 2.24, 5.28]
+- ['2', 1.14, 5.28]
+- ['3', 0.04, 5.28]
+- ['4', -1.06, 5.28]
+- ['5', -2.16, 5.28]
+- ['6', -3.26, 5.28]
+- ['7', -4.36, 5.28]
+- ['8', -5.46, 5.28]
+- ['9', -6.56, 5.28]
+- ['10', -7.76, 4.43]
+- ['13', 6.92, 4.43]
+- ['12', 7.76, -5.28]
+- ['11', -7.76, -5.28]

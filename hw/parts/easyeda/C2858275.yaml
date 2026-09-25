@@ -1,0 +1,32 @@
+# JLC's part C2858275 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C2858275
+jlc_package: SMD
+easyeda_footprint: HDMI-SMD_HDMI-19PIN-043
+pins: {'1': TMDSData2+, '2': TMDSData2Shield, '3': TMDSData2-, '4': TMDSData1+, '5': TMDSData1Shield, '6': TMDSData1-, '7': TMDSData0+, '8': TMDSData0Shield, '9': TMDSData0-, '10': TMDSClock+, '11': TMDSClockShield,
+  '12': TMDSClock-, '13': CEC, '14': Reserved(N.C.), '15': SCL, '16': SDA, '17': DDC/CECGround, '18': +5VPower, '19': HotPlugDetect, '20': EH}
+pads:
+- ['19', -4.5, 3.36]
+- ['18', -4.0, 3.36]
+- ['17', -3.5, 3.36]
+- ['16', -3.0, 3.36]
+- ['15', -2.5, 3.36]
+- ['14', -2.0, 3.36]
+- ['13', -1.5, 3.36]
+- ['12', -1.0, 3.36]
+- ['11', -0.5, 3.36]
+- ['10', 0.0, 3.36]
+- ['9', 0.5, 3.36]
+- ['8', 1.0, 3.36]
+- ['7', 1.5, 3.36]
+- ['6', 2.0, 3.36]
+- ['5', 2.5, 3.36]
+- ['4', 3.0, 3.36]
+- ['3', 3.5, 3.36]
+- ['2', 4.0, 3.36]
+- ['1', 4.5, 3.36]
+- ['20', -7.25, 2.6]
+- ['20', -7.25, -3.36]
+- ['20', 7.25, -3.36]
+- ['20', 7.25, 2.6]
