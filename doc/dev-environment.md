@@ -58,9 +58,9 @@ does everything except KiCad.
   hello.prg`, then `tools/sim --run:hello.prg`.
   Guest time is the CPU's clocks, counted as `cpu.vhd` and the chipset spend
   them; the chipset's millisecond counter and the cards follow it. The
-  window's sim holds it to the host clock (the speed line then shows about
-  0.8 MHz of instructions: 12 MHz of clocks), so a program's seconds are
-  wall-clock seconds; `--headless` runs as fast as it can.
+  window's sim holds it to the host clock (the speed line then shows 12 MHz
+  of CUPC/8 clock), so a program's seconds are wall-clock seconds;
+  `--headless` runs as fast as it can.
   `tools/sim --help` lists the rest.
 
 ## KiCad 10
