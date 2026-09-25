@@ -57,9 +57,11 @@ Shared rules:
   router's move any that landed under one to the nearest clear spot, up to
   2 mm off its part (45 % of a big part's size, for a QFN in its ring of
   vias), turned upright or at JLC's 0.8 mm minimum if that is what fits.
-  The stitching vias keep off every word. A designator with no clear spot
-  at all is left off (the build output says which); the CPL still places
-  the part. The board's name moves the same way off vias (a wide tab's GND
+  Two words in one line keep 0.5 mm apart (closer, "C13" and "C11" read
+  as "C13C11"). A designator walled in by vias gets room from a
+  neighbour's, which steps aside (the build output says which). The
+  stitching vias keep off every word. A designator with still no clear
+  spot is left off (listed in the build output); none is on the cards. The board's name moves the same way off vias (a wide tab's GND
   ties), and its new spot is then a via keep-out for the router.
 - **Assembly:** nothing is fitted by hand. The Wi-Fi card's antenna lead (MHF III to SMA) is
   the one exception: it is plugged in, not soldered.

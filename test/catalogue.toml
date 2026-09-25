@@ -1384,7 +1384,7 @@ cmd = "python3 hw/mech/fit.py --check MECH-008"
 [[test]]
 id = "SILK-001"
 title = "Designators: never over a via, a part or another word"
-checks = "kicadgen.check_designators (the pipeline's silkscreen step) flags a designator over a via, over another part's courtyard, over a part's body, and the board's name over a via; place_designators(reseat=True) moves a designator off a via that landed under it"
+checks = "kicadgen.check_designators (the pipeline's silkscreen step) flags a designator over a via, over another part's courtyard or over a part's body, two designators under 0.5 mm apart in one line (they read as one word), and the board's name over a via; place_designators(reseat=True) moves a designator off a via that landed under it"
 method = "test/hw/test_silk.py: a two-resistor board built in pcbnew"
 kind = "static"
 vrow = "4.2"
