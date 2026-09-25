@@ -50,10 +50,10 @@ this table.
 | **3V3 total** | | **272** | **617** |
 | 3V3 buck input at 90% efficiency (5.0 V; 535 mA max at the worst-case 4.23 V) | 5V | 200 | 452 |
 | USB keyboard VBUS, through the IO card's boost (500 mA at the port: 746 mA from +5V at the worst corner) | 5V | 110 | 746 |
-| HDMI +5V pin (sink EDID power, per spec) | 5V | 10 | 55 |
+| HDMI +5V pin (sink EDID power, 55 mA per spec), through the GPU card's PTC and boost (81 mA from +5V at the worst corner) | 5V | 10 | 81 |
 | Wi-Fi card (ESP32-C3 via its own TLV62569 buck from +5V; TX peaks, ~260 mA at 5 V) | 5V | 80 | 350 |
 | Slots 5–6 (future cards; not in M1) | 5V | 0 | — |
-| **Total from USB-C (M1 cards)** | 5V | **≈ 400** | **≈ 1690** (worst-case corner, POW-006) |
+| **Total from USB-C (M1 cards)** | 5V | **≈ 400** | **≈ 1720** (worst-case corner, POW-006) |
 
 The worst case assumes a keyboard drawing the full 500 mA (e.g. an RGB
 gaming keyboard), Wi-Fi transmitting at 100 % duty and the SD card writing,
@@ -122,8 +122,9 @@ datasheet figures:
 The TI buck model's switches are 10 mΩ rather than 100/60 mΩ, so buck losses
 come from the datasheet RDS(on) and not from the simulation.
 
-As of 2026-09-25 every test passes except one **decision** in POW-006:
-B10, the IO card's +5V against slot.md's 0.55 A per card (below).
+As of 2026-09-25 two checks fail, both **decisions** for David (below):
+POW-008 H2h (the HDMI pin at a 5.5 V source) and POW-006 B5 (the 1.5 A
+source case, now 8.9 % under 1.5 A).
 
 **The input path, re-sized for 3 A.** The SY6280 (limit at most 2.5 A,
 ±25 %) could not pass the 3 A case with margin. It is replaced on the main
@@ -146,7 +147,14 @@ the port sat at 3.97 V at the worst corner. With it, the port stays at 4.70 V
 or more through a 500 mA step at every corner, against USB 2.0's 4.40 V. The
 circuit is below, for the IO board agent.
 
-### Decision still open (POW-006 B10)
+### Decisions still open
+
+| Check | Result | What it needs |
+|---|---|---|
+| POW-008 H2h, the HDMI pin at vSafe5V max | Above its set point the TPS61023 passes its input through. With a source above **5.45 V** and light loads the pin follows it, up to **5.40 V** at 5.5 V, against HDMI's 5.3 V (−100 mV). USB 2.0 sources stop at 5.25 V; only a Type-C source at the top of vSafe5V gets there. | Accept, since a sink's EDID ROM tolerates it. Or use a **TPS63802DLAR buck-boost** (C2845237, 18,150 in stock), which regulates in both directions. Say which and I'll model it. |
+| POW-006 B5, a 1.5 A source (radio off, SD reading, 500 mA keyboard) | **1.367 A**, 8.9 % under 1.5 A against the 10 % asked. The HDMI boost added 26 mA. | Accept: it is under 1.5 A with every tolerance at its worst at once. Or below 3 A also refuse SD reads (about 95 mA less), or limit the keyboard port. |
+
+### Decided (POW-006 B10)
 
 | Check | Result | What it needs |
 |---|---|---|
@@ -187,6 +195,32 @@ Other observations (not failures):
   POW-007 G0 checks the ported model still regulates at the datasheet's set
   point (0.8 % off).
 
+### GPU card HDMI +5V (for the GPU board agent)
+
+```
+slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
+         ── 10 µF 25 V 0805 (C15850)
+         ── TPS61023DRLR (C919459): VIN, EN to the PTC's output
+              1 µH FXL0420-1R0-M (C167203)
+              VOUT: 2 × 22 µF 25 V 0805 (C45783)
+              FB: 732 kΩ 0.1 % (C2849083) / 100 kΩ 0.1 % (C122538)  → 4.95 V (4.82–5.08 V)
+         ── HDMI pin 18 (and the 2.2 kΩ DDC pull-ups, the HPD divider)
+```
+
+- **The PTC goes ahead of the boost.** After it, 55 mA × 3.5 Ω (R1max)
+  takes the pin to 4.67 V at the worst corner, under 4.8 V. Ahead of it, the
+  PTC's drop only lowers the boost's input.
+- **The PTC is the 200 mA size.** Ahead of the boost it carries the boost's
+  input current: 81 mA at the worst corner. The 100 mA part (C20975) holds
+  only 0.08 A at 40 °C; the 200 mA part holds 0.17 A (+53 %). A shorted
+  cable still trips it: the boost then draws amps from its input.
+- **No Schottky.** The B5819W's ~0.3 V would put the pin under 4.8 V. The
+  TPS61023 disconnects its output from its input when it is off, so a
+  monitor can't back-feed the machine through it.
+- **The divider is the IO card's with R1 = 732 kΩ at 0.1 %.** HDMI's
+  4.8–5.3 V window is narrower than USB's. With 750k/100k 1 %, the pin
+  reached 5.37–5.40 V at the high corner in power-save.
+
 ### Results (margins)
 
 | Test | Key numbers |
@@ -196,9 +230,10 @@ Other observations (not failures):
 | POW-003 Wi-Fi card buck (as built) | ESP32-C3 minimum in a 358 mA TX burst: 3.199 V at the worst corner (+199 mV over 3.0), 3.201 V typical. Maximum 3.495 V (+105 mV under 3.6). Slot +5V at the card 4.116 V in the burst (+587 mV of headroom). |
 | POW-004 inrush | 1 µF ahead of the eFuse (≤ 10 µF). The eFuse ramps 5V_SYS in 1.1–4.4 ms, so the 84 µF behind it charges at 91–427 mA. The whole surge, loads starting included, peaks at 0.85–1.34 A, under the eFuse's 2.63 A minimum limit (+49 %). The receptacle stays ≥ 3.91 V. |
 | POW-005 CC | Realised CC ranges: default 0.317–0.571 V, 1.5 A 0.829–1.090 V, 3.0 A 1.524–1.936 V. PWR_HI trips between 1.203 V (+112 mV clear of 1.5 A) and 1.386 V (+138 mV clear of 3.0 A). The ADC classes clear by 60–102 mV. TI's TLV7011 model agrees at both edges. |
-| POW-006 budget | M1 worst case 1.689 A: +44 % under a 3.0 A source, +36 % under the eFuse's minimum limit, +46 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.341 A (+10.6 %). Default USB at typical loads: 370 mA (+26 % under 500 mA). Slots 5–6 have 0.70 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.399 V highest (+101 mV under 5.5). The IO card's +5V: 0.746 A, +19 % under the new slot fuse's 0.92 A hold (B10b), but over slot.md's 0.55 A (B10, the open decision). OVLO 5.60–5.81 V (+1.8 % over 5.5 V, +3.2 % under 6 V). |
+| POW-006 budget | M1 worst case 1.719 A: +43 % under a 3.0 A source, +35 % under the eFuse's minimum limit, +45 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.367 A (+8.9 %, the open decision B5). Default USB at typical loads: 372 mA (+26 % under 500 mA). Slots 5–6 have 0.67 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.399 V highest (+101 mV under 5.5). Per card +5V: IO 0.748 A (+6.5 % under slot.md's 0.80 A, +19 % under the fuse's 0.92 A hold), GPU 0.081 A, Wi-Fi 0.34 A. OVLO 5.60–5.81 V (+1.8 % over 5.5 V, +3.2 % under 6 V). |
 | POW-007 keyboard boost | Model check: 0.8 % off the set point. Port minimum in a 0→500 mA step at the DC low corner: 4.697 V worst (+297 mV over 4.40), 4.724 V typical, 5.129 V at vSafe5V max (pass-through). Port maximum 5.431 V (+69 mV under 5.5). Up in 0.32–0.36 ms. Inductor current 0.75 A against the 2.7 A valley limit. |
-| THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.4 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. The AMS1117 rows are gone: no M1 card has one. |
+| POW-008 HDMI +5V | Pin minimum in a 10→55 mA step at the DC low corner: 4.863 V worst (+63 mV over 4.8), 4.846 V typical (+46 mV), 5.357 V at 5.5 V. Maximum at the DC high corner: 5.194 V worst (+106 mV under 5.3), 5.170 V typical; **5.400 V at vSafe5V max** (pass-through, −100 mV, the open decision). PTC after the boost instead: 4.670 V. PTC current 0.081 A against its 0.17 A hold (+53 %). |
+| THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.4 °C, GPU card boost 42.1 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. The AMS1117 rows are gone: no M1 card has one. |
 
 ### Assumptions the boards must meet
 
@@ -224,6 +259,8 @@ Other observations (not failures):
 - **Cards:** slot +5V contacts ≤ 30 mΩ each. IO, GPU and system cards
   ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.80 A of +5V (raised from
   0.55 A for the keyboard boost, B10), ≤ 300 mA of +3V3.
+- **GPU card:** the HDMI +5V circuit above: PTC SMD0805P020TF ahead of
+  a TPS61023DRLR, 732k/100k 0.1 %, no Schottky.
 - **IO card:** the keyboard boost above: TPS61023DRLR, 1 µH FXL0420-1R0-M,
   10 µF in, 2 × 22 µF out, 750k/100k 1 %, feeding the SY6280 port switch.
 - **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's

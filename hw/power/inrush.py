@@ -74,7 +74,7 @@ meas tran esw integ pw from=0 to={tend}
 """.format(vbus=vbus, lc=L_CABLE, rc=d.CABLE_R_VBUS + d.CABLE_R_GND + d.R_RECEPTACLE, cpre=d.C_VBUS_PRE,
            rf=d.FUSE_IN_R_MIN, ron=d.INSW_RON_TYP, ilim=ilim, ton=ton, tend="%g" % (ton + 3e-3),
            tfin="%g" % (ton + 2.9e-3), c5=c_main, ib=i_buck,
-           rh=5.0 / d.I_HDMI_5V, rslot=d.SLOT_PTC_R_MIN + d.R_SLOT_LINK + d.R_SLOT_SENSE + d.R_SLOT_CONTACTS,
+           rh=5.0 / d.gpu_i_5v(5.0, d.I_HDMI_PIN, False)[0], rslot=d.SLOT_PTC_R_MIN + d.R_SLOT_LINK + d.R_SLOT_SENSE + d.R_SLOT_CONTACTS,
            cwin=d.WIFI_CIN, iw=i_wifi)
     name = "pow004_%s" % corner
     m = spice.run(name, deck.replace("{name}", name))

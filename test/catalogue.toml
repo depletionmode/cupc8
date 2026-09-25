@@ -1152,7 +1152,7 @@ cmd = "python3 hw/power/budget.py"
 [[test]]
 id = "THM-001"
 title = "Regulator junction temperatures at 40 C ambient"
-checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 5-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, the IO card's keyboard boost at 500 mA, the input eFuse and the IO card's SY6280, from datasheet theta_JA"
+checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 5-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, the IO card's keyboard boost at 500 mA, the GPU card's HDMI boost at 55 mA, the input eFuse and the IO card's SY6280, from datasheet theta_JA"
 method = "hw/power/thermal.py: dissipation at each part's hottest corner x theta_JA"
 kind = "static"
 vrow = "4.5"
@@ -1166,6 +1166,15 @@ method = "hw/power/boost.py: TI's PSpice transient model (fetched, sha256-pinned
 kind = "sim"
 vrow = "4.4"
 cmd = "python3 hw/power/boost.py"
+
+[[test]]
+id = "POW-008"
+title = "GPU card HDMI +5V pin through its boost (TI TPS61023 model)"
+checks = "the HDMI +5V pin >= 4.8 V through a 0->55 mA step at the boost's DC low corner and <= 5.3 V at its DC high corner, with the card's PTC ahead of the boost (worst, typical, vSafe5V max) and, for comparison, after it (worst); the PTC ahead carries the boost's input current within its 40 C hold"
+method = "hw/power/boost.py gpu: TI's PSpice transient model, fed through the source-to-card chain, the PTC at R1max (worst) or Rmin"
+kind = "sim"
+vrow = "4.4"
+cmd = "python3 hw/power/boost.py gpu"
 
 
 # ============================================================================
