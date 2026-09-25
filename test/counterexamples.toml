@@ -437,3 +437,16 @@ revert = [["fw/eink/core/eink.c", """	if (e->t0_fresh) {
 	}"""]]
 cmd = "make -s -C fw test_eink"
 must_fail = ["while BUSY", "the UC8179 model saw nothing the chip would ignore"]
+
+[[bug]]
+name = "slot SPI slave: slotspi_poll set busy while replaying READ frames, so a host polling in step never saw the ready response (E2E-007's slow SAVE lost its last Enter)"
+fixed_in = "4d7648a"
+# timing-bound: it shows with the code layout of 8068f78 (the IO card's loop
+# in step with the kernel's READ polling); if a later layout hides it, this
+# entry will say so ("PASSES with the bug back")
+revert = [
+  ["fw/rp2040/common/slotspi.c", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		card_select(card, true);", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		busy = true;\n		card_select(card, true);"],
+  ["fw/rp2040/common/slotspi.c", "		q_tail++;\n		irq_set_enabled", "		q_tail++;\n		busy = false;\n		irq_set_enabled"],
+]
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
+must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
