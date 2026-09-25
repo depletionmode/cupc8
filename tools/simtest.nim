@@ -1288,10 +1288,71 @@ proc testSlotIrqShared() =
 
 run testSlotIrqShared
 
+# DNS messages and a scripted DNS server on host sockets (KRN-004, KRN-010)
+
+proc dnsName(name: string): seq[int] =
+  for part in name.split('.'):
+    result.add(part.len)
+    for c in part: result.add(ord(c))
+  result.add(0)
+
+proc dnsHeader(id, flags, qd, an: int): seq[int] =
+  @[id shr 8, id and 0xff, flags shr 8, flags and 0xff, qd shr 8, qd and 0xff,
+    an shr 8, an and 0xff, 0, 0, 0, 0]
+
+proc dnsRR(name: seq[int]; typ, class, rdata: seq[int]): seq[int] =
+  ## a resource record: name, TYPE, CLASS, TTL 60, RDLENGTH, RDATA
+  result = name & @[0, typ[0]] & @[0, class[0]] & @[0, 0, 0, 60] &
+           @[rdata.len shr 8, rdata.len and 0xff] & rdata
+
+proc dnsQname(q: seq[int]): string =
+  var i = 12
+  while i < q.len and q[i] != 0:
+    if result.len > 0: result.add('.')
+    for j in 1..q[i]: result.add(chr(q[i + j]))
+    i += q[i] + 1
+
+proc dnsAnswerTo(q: seq[int]; rcode = 0; answers: seq[seq[int]] = @[]; idDelta = 0): seq[int] =
+  ## a response to query q: its id (plus idDelta), QR RD RA, its question
+  let id = (((q[0] shl 8) or q[1]) + idDelta) and 0xffff
+  result = dnsHeader(id, 0x8180 or rcode, 1, answers.len) & q[12 .. ^1]
+  for a in answers: result &= a
+
+type DnsBench = ref object
+  sock: Socket
+  port: int
+  queries: seq[seq[int]]
+  script: proc(q: seq[int]; nth: int): seq[seq[int]]
+
+proc newDnsBench(script: proc(q: seq[int]; nth: int): seq[seq[int]]): DnsBench =
+  ## A DNS server on 127.0.0.1 (a free UDP port) that answers each query with
+  ## what the script gives for it (nth: how many before it had its name)
+  result = DnsBench(script: script)
+  result.sock = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+  result.sock.bindAddr(Port(0), "127.0.0.1")
+  result.port = int(result.sock.getLocalAddr()[1])
+  result.sock.getFd.setBlocking(false)
+
+proc service(b: DnsBench) =
+  var readable = @[b.sock.getFd]
+  while selectRead(readable, 0) > 0:
+    var data, address: string
+    var port: Port
+    if b.sock.recvFrom(data, 512, address, port) <= 0: break
+    let q = data.mapIt(ord(it))
+    var nth = 0
+    for old in b.queries:
+      if dnsQname(old) == dnsQname(q): inc nth
+    b.queries.add(q)
+    for r in b.script(q, nth):
+      b.sock.sendTo(address, port, r.mapIt(chr(it)).join)
+    readable = @[b.sock.getFd]
+
 proc testKernelNetwork() =
   ## KRN-004: the kernel's "net" command. "net join SSID PASSWORD" joins
   ## through the Wi-Fi card and prints the address; "net get HOST PORT"
-  ## sends an HTTP/1.0 GET to a server running in this process and prints
+  ## resolves HOST with the kernel's DNS client (a DNS server in this
+  ## process), then sends an HTTP/1.0 GET to a server running here and prints
   ## the reply until the server closes; "net" shows the link; anything else
   ## prints the usage.
   echo "== kernel networking =="
@@ -1311,6 +1372,12 @@ proc testKernelNetwork() =
     ioModel = imLegacy
     return
   server.listen()
+  # net get resolves the name with the kernel's DNS client: this server
+  # answers localhost
+  let dns = newDnsBench(proc(q: seq[int]; nth: int): seq[seq[int]] =
+    if dnsQname(q) == "localhost":
+      @[dnsAnswerTo(q, answers = @[dnsRR(@[0xc0, 12], @[1], @[1], @[127, 0, 0, 1])])]
+    else: @[dnsAnswerTo(q, rcode = 3)])
 
   proc runUntilShown(want: string, limit = 8_000_000): bool =
     var n = 0
@@ -1333,6 +1400,7 @@ proc testKernelNetwork() =
   typeLine("net")
   expectTrue("net shows the link", runUntilShown("link up, address 127.0.0.1", 2_000_000))
   settle()
+  typeLine("net config dns 127.0.0.1 " & $dns.port)
 
   # serve the request while the machine keeps running (never block: the CPU
   # only advances in this loop)
@@ -1352,6 +1420,7 @@ proc testKernelNetwork() =
     if cpuStep() != sOk: break
     inc n
     if (n mod 1000) == 0:
+      dns.service()
       if gpuFind(g, "CUPC8-OK") >= 0 or gpuFind(g, "net timeout") >= 0:
         break
       if not accepted:
@@ -1379,7 +1448,9 @@ proc testKernelNetwork() =
       let line = gpuLine(g, row)
       if line.len > 0: echo "  |" & line
   expectTrue("the reply is printed up to the server closing", gpuFind(g, "CUPC8-OK") >= 0 and gpuFind(g, "HTTP/1.0 200 OK") >= 0)
+  expectTrue("the name was resolved by the kernel's DNS client", dns.queries.len == 1)
   server.close()
+  dns.sock.close()
   ioModel = imLegacy
 
 run testKernelNetwork
@@ -1476,21 +1547,6 @@ proc cksumRef(b: openArray[int]): int =
   while (s shr 16) != 0: s = (s and 0xffff) + (s shr 16)
   (not s) and 0xffff
 
-proc dnsName(name: string): seq[int] =
-  for part in name.split('.'):
-    result.add(part.len)
-    for c in part: result.add(ord(c))
-  result.add(0)
-
-proc dnsHeader(id, flags, qd, an: int): seq[int] =
-  @[id shr 8, id and 0xff, flags shr 8, flags and 0xff, qd shr 8, qd and 0xff,
-    an shr 8, an and 0xff, 0, 0, 0, 0]
-
-proc dnsRR(name: seq[int]; typ, class, rdata: seq[int]): seq[int] =
-  ## a resource record: name, TYPE, CLASS, TTL 60, RDLENGTH, RDATA
-  result = name & @[0, typ[0]] & @[0, class[0]] & @[0, 0, 0, 60] &
-           @[rdata.len shr 8, rdata.len and 0xff] & rdata
-
 proc testNetRoutines() =
   ## KRN-010: the kernel's networking routines called one by one on the CPU:
   ## the Internet checksum against RFC 1071 (lengths odd and even, sums that
@@ -1554,6 +1610,34 @@ proc testNetRoutines() =
   var built: seq[int]
   for i in 0..<40: built.add(mem[pkt + i])
   expectTrue("ping_build: an echo request with its checksum", built == echoReq)
+
+  # ping_match: only the echo reply to that request, from the host pinged
+  for i in 0..3: mem[sym["ping_ip"] + i] = [10, 0, 2, 2][i]
+  proc match(msg: seq[int]; src = @[10, 0, 2, 2]): int =
+    putBytes(pkt, msg)
+    mem[sym["ping_len"]] = msg.len
+    putBytes(sym["net_buf"], src & @[0, 0, msg.len])
+    if not callKernel(sym, "ping_match"): return -1
+    R0
+  proc reply(id, seq: int; typ = 0; payload = 32): seq[int] =
+    result = @[typ, 0, 0, 0, 0xc8, id, 0, seq]
+    for i in 0..<payload: result.add(64 + i)
+    let c = cksumRef(result)
+    result[2] = c shr 8
+    result[3] = c and 0xff
+  let good = reply(7, 1)
+  var ipHdr = @[0x45, 0, 0, 20 + good.len, 0, 0, 0, 0, 64, 1, 0, 0, 10, 0, 2, 2, 10, 0, 2, 15]
+  expect("ping_match: the echo reply", match(good), 1)
+  expect("ping_match: the echo reply behind an IPv4 header", match(ipHdr & good), 1)
+  expect("ping_match: another identifier", match(reply(8, 1)), 0)
+  expect("ping_match: another sequence", match(reply(7, 2)), 0)
+  expect("ping_match: an echo request, not a reply", match(reply(7, 1, typ = 8)), 0)
+  var badSum = good
+  badSum[20] = badSum[20] xor 1
+  expect("ping_match: a bad checksum", match(badSum), 0)
+  expect("ping_match: from another host", match(good, @[10, 0, 2, 3]), 0)
+  expect("ping_match: shorter than an ICMP header", match(good[0..6]), 0)
+  expect("ping_match: an 8-byte reply (no payload)", match(reply(7, 1, payload = 0)), 1)
 
   # ---- the DNS query
   proc build(host: string): (int, seq[int]) =
@@ -1658,6 +1742,147 @@ proc testNetRoutines() =
              num("65536")[0] == 0 and num("99999")[0] == 0 and num("12a")[0] == 0 and num("")[0] == 0)
 
 run testNetRoutines
+
+proc check(name: string; cond: bool): bool =
+  ## expectTrue, and the result
+  expectTrue(name, cond)
+  cond
+
+proc screenText(g: SimCard): string =
+  for row in 0..29:
+    let line = gpuLine(g, row)
+    if line.len > 0: result.add(line & "\n")
+
+proc netCommand(g: SimCard; b: DnsBench; cmd: string; limit = 30_000_000): string =
+  ## Clear the screen, type cmd, and run (serving DNS) until the kernel waits
+  ## for a key again; the screen
+  typeLine("clr")
+  for ch in cmd:
+    pushKey(ord(ch))
+    settle(400_000)
+    if waiting: discard cpuStep()
+  pushKey(13)
+  var n = 0
+  discard cpuStep()
+  while n < limit:
+    if cpuStep() != sOk: break
+    inc n
+    if (n mod 1000) == 0:
+      if not b.isNil: b.service()
+      if waiting: break
+  screenText(g)
+
+proc testKernelDnsPing() =
+  ## KRN-010: the kernel's DNS client, net lookup, net config and net ping on
+  ## the Wi-Fi card core over host sockets. A DNS server in this process
+  ## answers from a script: an A record behind a compressed name, a CNAME and
+  ## its A (compression through a pointer to a pointer), NXDOMAIN, no answer,
+  ## an answer with another id (ignored) before the right one, only answers
+  ## with another id, no answer at all (a timeout after one retry), one
+  ## answered only the second time, a malformed answer. Ping goes to the
+  ## host's loopback (Linux answers) and to an address nobody answers.
+  echo "== kernel DNS client, net config, ping =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo, CardWifi])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+  let ptrQ = @[0xc0, 12]
+  proc a(ip: seq[int]): seq[int] = dnsRR(ptrQ, @[1], @[1], ip)
+  let bench = newDnsBench(proc(q: seq[int]; nth: int): seq[seq[int]] =
+    case dnsQname(q)
+    of "www.example.com": @[dnsAnswerTo(q, answers = @[a(@[93, 184, 216, 34])])]
+    of "cdn.example.com":
+      # CNAME edge.example.com ("edge" + a pointer into the question), then
+      # the A record named by a pointer to the CNAME's data
+      let at = 12 + (q.len - 12) + 12
+      @[dnsAnswerTo(q, answers = @[dnsRR(ptrQ, @[5], @[1], @[4] & "edge".mapIt(ord(it)) & @[0xc0, 16]),
+                                   dnsRR(@[0xc0, at], @[1], @[1], @[10, 0, 2, 99])])]
+    of "nx.example.com": @[dnsAnswerTo(q, rcode = 3)]
+    of "empty.example.com": @[dnsAnswerTo(q)]
+    of "late.example.com": @[dnsAnswerTo(q, answers = @[a(@[6, 6, 6, 6])], idDelta = 1),
+                             dnsAnswerTo(q, answers = @[a(@[1, 2, 3, 4])])]
+    of "wrongid.example.com": @[dnsAnswerTo(q, answers = @[a(@[6, 6, 6, 6])], idDelta = 0x100)]
+    of "silent.example.com": @[]
+    of "retry.example.com": (if nth == 0: @[] else: @[dnsAnswerTo(q, answers = @[a(@[5, 6, 7, 8])])])
+    of "bad.example.com": @[dnsHeader((q[0] shl 8) or q[1], 0x8180, 1, 1) & @[40, 97, 98]]
+    of "localhost": @[dnsAnswerTo(q, answers = @[a(@[127, 0, 0, 1])])]
+    else: @[dnsAnswerTo(q, rcode = 3)])
+
+  settle(6_000_000)
+  typeLine("net join cupc8 password")
+  settle()
+  var s = netCommand(g, bench, "net config")
+  expectTrue("net config: DHCP, DHCP's DNS server, port 53, not saved",
+             "mode dhcp" in s and "dns from dhcp port 53" in s and "not saved" in s)
+  if "mode dhcp" notin s: echo s
+  s = netCommand(g, bench, "net config dns 127.0.0.1 " & $bench.port)
+  expectTrue("net config dns IP PORT", ("dns 127.0.0.1 port " & $bench.port) in s)
+  if "dns 127.0.0.1" notin s: echo s
+
+  proc lookup(name, want: string; queries = 1) =
+    let before = bench.queries.len
+    let s = netCommand(g, bench, "net lookup " & name)
+    let asked = bench.queries.len - before
+    if not check("net lookup " & name & ": " & want & " (" & $queries & " queries)",
+                      want in s and asked == queries):
+      echo "  queries: ", asked, "\n", s
+  lookup("www.example.com", "www.example.com 93.184.216.34")
+  let q = bench.queries[^1]
+  expectTrue("the query: RD, one question, A, IN, the name in labels",
+             q[2] == 1 and q[3] == 0 and q[4 .. 11] == @[0, 1, 0, 0, 0, 0, 0, 0] and
+             q[12 .. ^1] == dnsName("www.example.com") & @[0, 1, 0, 1])
+  lookup("cdn.example.com", "cdn.example.com 10.0.2.99")
+  lookup("nx.example.com", "name not found")
+  lookup("empty.example.com", "no address for that name")
+  lookup("late.example.com", "late.example.com 1.2.3.4")
+  lookup("wrongid.example.com", "DNS server not answering", 2)
+  lookup("silent.example.com", "DNS server not answering", 2)
+  let ids = bench.queries[^2 .. ^1].mapIt((it[0] shl 8) or it[1])
+  expectTrue("the retry is a new query (another id)", ids[0] != ids[1])
+  lookup("retry.example.com", "retry.example.com 5.6.7.8", 2)
+  lookup("bad.example.com", "bad answer from the DNS server")
+  lookup("10.1.2.3", "10.1.2.3 10.1.2.3", 0)
+  lookup("a..b", "net lookup NAME", 0)
+  expectTrue("the clock is stopped after the lookups (TMR1 masked and off)",
+             (irqMask and 4) == 0 and tmr1 == 0)
+
+  # ping: the host's loopback answers (Linux's ping socket, fw/wifi/host)
+  s = netCommand(g, bench, "net ping 127.0.0.1 3")
+  if not check("net ping 127.0.0.1 3: three replies with their times, the summary",
+                    "ping 127.0.0.1" in s and "seq 1 time " in s and "seq 3 time " in s and
+                    "3 sent, 3 received, " in s and " ms" in s):
+    echo s
+  s = netCommand(g, bench, "net ping localhost 1")
+  expectTrue("net ping NAME resolves it with the DNS client", "ping 127.0.0.1" in s and "1 sent, 1 received" in s)
+  s = netCommand(g, bench, "net ping 192.0.2.1 2")
+  if not check("net ping to an address that never answers: timeouts, then 2 sent, 0 received",
+                    "seq 1 timeout" in s and "seq 2 timeout" in s and "2 sent, 0 received" in s):
+    echo s
+  s = netCommand(g, bench, "net ping nx.example.com")
+  expectTrue("net ping of a name that does not exist", "name not found" in s)
+  expectTrue("the clock is stopped after ping", (irqMask and 4) == 0 and tmr1 == 0)
+
+  # static address, back to DHCP, save
+  s = netCommand(g, bench, "net config ip 10.0.2.50 255.255.255.0 10.0.2.2")
+  expectTrue("net config ip IP MASK GW",
+             "mode static, ip 10.0.2.50 mask 255.255.255.0 gw 10.0.2.2" in s and "not saved" in s)
+  if "mode static" notin s: echo s
+  s = netCommand(g, bench, "net config ip 10.0.2.50 255.255.255.0")
+  expectTrue("net config ip without the gateway prints the usage", "net config [dns IP" in s)
+  s = netCommand(g, bench, "net config dhcp")
+  expectTrue("net config dhcp", "mode dhcp" in s)
+  s = netCommand(g, bench, "net config dns 10.0.2.3")
+  expectTrue("net config dns IP: port 53", "dns 10.0.2.3 port 53" in s)
+  s = netCommand(g, bench, "net config dns 10.0.2.3 70000")
+  expectTrue("net config dns IP PORT refuses a port over 65535", "net config [dns IP" in s)
+  s = netCommand(g, bench, "net config save")
+  expectTrue("net config save", "dns 10.0.2.3 port 53" in s and "\nsaved" in "\n" & s)
+  bench.sock.close()
+  ioModel = imLegacy
+
+run testKernelDnsPing
 
 # ---------------------------------------------------------------------------
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)

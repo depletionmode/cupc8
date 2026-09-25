@@ -95,8 +95,16 @@ net_clock_off:
 	pop pcl
 	pop pch
 
+; The CPU keeps what "pop pcl" popped in a latch that an IRQ does not save,
+; and takes IRQs between "pop pcl" and "pop pch". A handler returning with
+; its own "pop pcl" would overwrite that latch, and the interrupted "pop pch"
+; would jump somewhere else. So when the instruction to return to is a "pop
+; pch" ($9e), this returns by doing that "pop pch" itself- the latch is still
+; the interrupted routine's, its high byte still on the stack below the
+; frame. (Another IRQ taken between the "pop f" and "pop pch" here returns
+; the same way.)
 net_irq_tick:
-	push r0
+	st [net_irq_r0], r0
 	tmr1 #NET_TICK
 	mov r0, #4
 	st $f200, r0
@@ -105,17 +113,36 @@ net_irq_tick:
 	st [net_ticks], r0
 	eq r0, #0
 	bzf .carry
-	pop r0
-	pop f
-	pop pcl
-	pop pch
+	b .ret
 .carry:
 	ld r0, [net_ticks+1]
 	add r0, #1
 	st [net_ticks+1], r0
-	pop r0
+.ret:
+	pop r0				; the flags
+	st [net_irq_f], r0
+	pop r0				; the return address, low
+	st [net_irq_a], r0
+	pop r0				; and high
+	st [net_irq_a+1], r0
+	ldd r0, [net_irq_a]
+	eq r0, #0x9e
+	bzf .in_return
+	ld r0, [net_irq_a+1]
+	push r0
+	ld r0, [net_irq_a]
+	push r0
+	ld r0, [net_irq_f]
+	push r0
+	ld r0, [net_irq_r0]
 	pop f
 	pop pcl
+	pop pch
+.in_return:
+	ld r0, [net_irq_f]
+	push r0
+	ld r0, [net_irq_r0]
+	pop f
 	pop pch
 
 ; net_u16 = net_ticks (read again if the high byte moved meanwhile)
@@ -656,8 +683,7 @@ ping_send:
 	pop pch
 
 ; RECVFROM one ICMP message (up to 64 bytes) into net_pkt- r0 = 1 when it is
-; the reply to the request just sent, else 0 (nothing, or not ours). An IPv4
-; header in front of it, if the card leaves one, is skipped
+; the reply to the request just sent, else 0 (nothing, or not ours)
 ping_recv:
 	mov r0, #0x1a
 	push pch
@@ -692,7 +718,17 @@ ping_recv:
 	gt r0, #64
 	bzf .no
 	st [ping_len], r0
-	; from the host pinged
+	b ping_match
+.no:
+	xor r0, r0
+	pop pcl
+	pop pch
+
+; r0 = 1 when the ICMP message in net_pkt (ping_len bytes, from the address
+; in net_buf) is the reply to the request just sent, else 0
+ping_match:
+	; from the host pinged (an IPv4 header in front, should the card leave one,
+	; is skipped)
 	xor r1, r1
 .from:
 	ld r0, [net_buf]+r1

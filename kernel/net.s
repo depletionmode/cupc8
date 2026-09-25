@@ -126,11 +126,15 @@ net_pv: resb 1
 net_pd: resb 1
 net_pc: resb 1
 net_pz: resb 1
+net_wi: resb 1                  ; net config ip- the word
 net_pkt: resb 256               ; a datagram- DNS answers, ICMP messages
 net_a0: resb 1                  ; the API caller's r0 and r1
 net_a1: resb 1
 net_ticks: resb 2               ; ping.s's clock- quarter milliseconds while it runs
 net_clk_n: resb 1               ;   how many use it
+net_irq_r0: resb 1               ; ping.s's tick handler
+net_irq_f: resb 1
+net_irq_a: resb 2
 net_ck: resb 3                  ; ping.s's checksum- sum high, low, carries
 
 net_init:
@@ -1694,15 +1698,15 @@ net_c_config:
 
 .ip:
 	mov r0, #3			; address, mask, gateway- words 3, 4, 5 into net_cfg 1, 5, 9
-	st [net_pn], r0
+	st [net_wi], r0
 .ip_word:
-	ld r0, [net_pn]
+	ld r0, [net_wi]
 	push pch
 	push pcl
 	b net_word_ip
 	eq r0, #0
 	bzf .usage
-	ld r0, [net_pn]		; net_cfg + 4 * (word - 3) + 1
+	ld r0, [net_wi]		; net_cfg + 4 * (word - 3) + 1
 	sub r0, #3
 	shl r0, #2
 	add r0, #1
@@ -1721,9 +1725,9 @@ net_c_config:
 	bzf .ip_next
 	b .ip_copy
 .ip_next:
-	ld r0, [net_pn]
+	ld r0, [net_wi]
 	add r0, #1
-	st [net_pn], r0
+	st [net_wi], r0
 	eq r0, #6
 	bzf .ip_done
 	b .ip_word
