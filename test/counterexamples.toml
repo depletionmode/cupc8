@@ -494,7 +494,7 @@ revert = [["tools/sim.nim", """  if lastOp == 0x9f:
     return
 """, ""]]
 cmd = "tools/run_tests.sh testIrqPopPcl testKernelOnCards"
-must_fail = ["FAIL: the call returned where it should", "FAIL: kernel reached the keyboard wait"]
+must_fail = ["FAIL: the call returned where it should", "FAIL: BASIC banner on screen"]
 
 [[bug]]
 name = "cpu: an IRQ taken between POP pcl and POP pch lost the return"
