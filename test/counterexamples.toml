@@ -632,3 +632,22 @@ revert = [["tools/sim.nim", """    for k in 0..3:
 cmd = "tools/run_tests.sh testWaiTimer"
 must_fail = ["tmr0 #200 wakes WAI after 50 steps"]
 
+
+[[bug]]
+name = "emulator: rp2040js's USBCDC took the composite system card's last CDC port (the console), so SYS-006 lost every reply"
+fixed_in = "7e14c52"
+revert = [["test/emu/test_sysctl.mjs", """const usb = new CdcHost(emu.mcu.usbCtrl, 2);
+const cdc = usb.ports[0];""", """const usb = new (await import('./emu_backend.mjs')).USBCDC(emu.mcu.usbCtrl);
+const cdc = usb;"""]]
+cmd = "tools/fw_rp2040.sh sysctl && node test/emu/test_sysctl.mjs"
+must_fail = ["FAIL PING", "FAIL two CDC serial ports"]
+
+[[bug]]
+name = "emulator: the native backend had no usbCtrl.sieCtrl (SYS-006's D+ pull-up checks failed natively, EMU-006)"
+fixed_in = "7e14c52"
+revert = [["test/emu/rp2040native.mjs", """  get sieCtrl() {
+    return N.usbSieCtrl(this.emu.h);
+  }
+""", ""]]
+cmd = "tools/fw_rp2040.sh sysctl && cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && CUPC8_EMU=native node test/emu/test_sysctl.mjs"
+must_fail = ["FAIL D+ pull-up on while VBUS is there"]
