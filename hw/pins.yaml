@@ -146,8 +146,8 @@ devices:
       misc:
         signals:
           - {name: SYS_nRST, gpio: 23, dir: out, note: open drain onto the reset supervisor output}
-          - {name: DBG_UART_TX, gpio: 0, dir: out}
-          - {name: DBG_UART_RX, gpio: 1, dir: in}
+          - {name: LED_USB_TX, gpio: 0, dir: out, note: "USB activity to the host, lit ~30 ms (milestone-1.md, Indicator LEDs); was the debug UART, which nothing used"}
+          - {name: LED_USB_RX, gpio: 1, dir: out, note: USB activity from the host, lit ~30 ms}
           - {name: CC1_SENSE, gpio: 26, dir: adc}
           - {name: CC2_SENSE, gpio: 27, dir: adc}
           - {name: V1V2_SENSE, gpio: 28, dir: adc}
@@ -157,14 +157,14 @@ devices:
     board: gpu-card
     part: RP2040
     lcsc: C2040
-    note: "TMDS pairs are GPIO n (P) and n+1 (N), as on the Pico DVI Sock, but green is on 10/11 (the Sock uses 18/19), so the firmware has its own PicoDVI serialiser config: lanes {12, 10, 16}, clock 14, not inverted"
+    note: "TMDS pairs are GPIO n and n+1 with P on n+1 (PicoDVI invert_diffpairs): lanes {12, 14, 16}, clock 10, inverted. Around the RP2040 that puts the pairs in the HDMI receptacle's own order (D2, D1, D0, clock, each P before N), so the GPU card routes them as coupled pairs with no crossings or vias (hw/boards/README.md)"
     groups:
       dvi:
         signals:
-          - {name: TMDS_D0, width: 2, gpio: [12, 13], dir: out, note: blue pair}
-          - {name: TMDS_D1, width: 2, gpio: [10, 11], dir: out, note: green pair}
-          - {name: TMDS_D2, width: 2, gpio: [16, 17], dir: out, note: red pair}
-          - {name: TMDS_CLK, width: 2, gpio: [14, 15], dir: out}
+          - {name: TMDS_D0, width: 2, gpio: [12, 13], dir: out, note: "blue pair, P on 13"}
+          - {name: TMDS_D1, width: 2, gpio: [14, 15], dir: out, note: "green pair, P on 15"}
+          - {name: TMDS_D2, width: 2, gpio: [16, 17], dir: out, note: "red pair, P on 17"}
+          - {name: TMDS_CLK, width: 2, gpio: [10, 11], dir: out, note: "P on 11"}
           - {name: HDMI_HPD, gpio: 18, dir: in}
           - {name: HDMI_SCL, gpio: 19, dir: inout}
           - {name: HDMI_SDA, gpio: 20, dir: inout}
@@ -200,7 +200,8 @@ devices:
           - {name: SLOT_nIRQ, gpio: 6, dir: out, note: open drain}
       debug:
         signals:
-          - {name: LED_KBD, gpio: 25, dir: out}
+          - {name: LED_KBD, gpio: 25, dir: out, note: keyboard connected}
+          - {name: LED_KEY, gpio: 24, dir: out, note: "keyboard activity: lit ~30 ms after each HID report"}
           - {name: UART_TX, gpio: 16, dir: out}
 
   storage_mcu:

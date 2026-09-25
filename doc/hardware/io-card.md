@@ -9,13 +9,19 @@ common SPI framing in `slot.md`.
 - **USB-A receptacle.** D+/D− go straight to the RP2040's USB pins, with 27 Ω
   series resistors per the RP2040 hardware design guide and ESD protection
   (USBLC6-2 class).
-- **VBUS:** +5V from the slot through a current-limited power switch, 500 mA
-  limit with soft start (SY6280/AP2553 class). Its fault flag goes to an
-  RP2040 GPIO.
-- **15 kΩ pull-downs on D+/D−,** as host mode requires.
+- **VBUS:** the slot's +5V → a TPS61023 boost to 5.06 V (the slot's +5V can
+  sag to 3.97 V at the card; `power.md`, IO card keyboard boost) → an
+  SY6280AAC current-limited switch (500 mA, soft start, enabled by GPIO7) →
+  the receptacle. The SY6280AAC has no fault flag, so GPIO8 (VBUS_nFAULT)
+  reads VBUS through a 15k/22k divider: it goes low when the switch limits
+  and VBUS sags below ~3.4 V.
+- **Host pull-downs on D+/D−:** the RP2040's USB PHY switches on its own
+  15 kΩ pull-downs in host mode; the board adds none (external ones would
+  halve them, out of USB's range).
 - **Standard RP2040 minimal design:** 12 MHz crystal, W25Q16 QSPI flash, 3V3
   from the slot.
-- **LEDs:** power, keyboard connected, and activity.
+- **LEDs:** power, keyboard connected (GPIO25) and keyboard activity
+  (GPIO24, lit 30 ms after each HID report).
 - **Debug pads:** BOOTSEL and a UART TX pad. SWD comes via the slot.
 
 ## Behaviour

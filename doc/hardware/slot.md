@@ -60,9 +60,11 @@ and 12. The pinout is custom. Never plug a real PCIe card in.
 | +5V | main → card | Each slot is fed through its own 750 mA-hold PTC fuse, a 0 Ω isolation link and a 50 mΩ sense resistor with test pads. |
 | +3V3 | main → card | From the main 3V3 buck. Max 300 mA per card. Cards with heavy loads regulate from +5V instead. |
 
-Budget per card: ≤ 0.55 A from +5V and ≤ 300 mA from +3V3. The +5V figure is
-what the slot's 0.75 A-hold PTC fuse still holds at 40 °C (0.65 A) less a
-margin (`hw/power`, POW-006 B9). Every M1 card is well inside it. The
+Budget per card: ≤ 0.80 A from +5V and ≤ 300 mA from +3V3. The +5V figure is
+what the slot's 1.1 A-hold PTC fuse (SMD1206P110TFT) still holds at 40 °C
+(0.92 A) less a margin (`hw/power`, POW-006 B8/B10b). It was 0.55 A until
+2026-09-24, when David raised it for the IO card's keyboard boost, which
+draws up to 0.75 A at the worst corner (POW-006 B10, POW-007). The
 whole-system budget is in `power.md`.
 
 ## Common card protocol
@@ -176,7 +178,22 @@ ESP ROM bootloader sync.
 
 ## Mechanical
 
-- **Slot pitch:** 20.32 mm, for the full-height cards. Six slots take ≈ 122 mm.
+- **One row of cards** (David, 2026-09-24): on the main board the **CPU
+  socket comes first, then the six I/O slots, side by side in one row** at
+  the slot pitch, every socket the same way round and at the same height, so
+  the cards stand in a line with their top edges, M3 holes, power LEDs and
+  LED rows aligned. **Every card in the row has exactly the same outline;
+  only the finger tab differs (x8 or x1).** If the CPU card doesn't fit the
+  outline below, the outline grows for every card (David allows up to about
+  68 × 40 mm), keeping the hole and LED 4 mm and 3 mm in from their corners.
+  **No finger tab ends at the body's edge:** every tab, the CPU card's x8
+  included, has at least 5 mm of body beyond each of its ends (a shoulder),
+  as the x1 cards have; the common outline widens if the x8 needs it. The CPU card has the I/O card outline (below) on its
+  wider x8 tab (`cpu-bus.md`, CPU card outline). The **system card is not in
+  the row**: its x4 socket sits off to one side of the main board, and the
+  card keeps its own outline (`system-slot.md`).
+- **Slot pitch:** 20.32 mm, for the full-height cards, the CPU socket
+  included. Seven sockets in the row take ≈ 142 mm.
 - **Card outline:** every I/O card has the **same outline**, so that cards
   line up in the case and their power LEDs sit in one row. In KiCad's
   `BUS_PCIexpress_x1` footprint frame (finger B1 at the origin, fingers
@@ -197,7 +214,9 @@ ESP ROM bootloader sync.
   there and refuses a card whose outline, finger connector, M3 hole or power
   LED is not at these positions. The system card, in its own keyed slot, has
   its own outline (`system-slot.md`).
-- **Connectors:** on the card's top edge, facing away from the main board.
+- **Connectors:** on the card's top edge, facing away from the main board, or
+  on its back edge (x = −6.0 mm, the B1 end, the case's rear panel).
+  `hw/mech/fit.py` (MECH-004) checks either.
 - **Mounting:** each card has an M3 hole that lines up with a standoff on a
   main board mounting rail.
 - **Fit check:** the exact drawing is in `hw/lib/cards/card-outline.kicad_pcb`

@@ -1,0 +1,24 @@
+# JLC's part C165948 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C165948
+jlc_package: SMD
+easyeda_footprint: USB-C_SMD-TYPE-C-31-M-12_1
+pins: {'1': EH, '2': EH, '3': EH, '4': EH, A5: CC1, A6: DP1, A7: DN1, A8: SBU1, B5: CC2, B6: DP2, B7: DN2, B8: SBU2, A4B9: VBUS, B4A9: VBUS, A1B12: GND, B1A12: GND}
+pads:
+- [B8, -1.75, 2.47]
+- [A5, -1.25, 2.47]
+- [B7, -0.75, 2.47]
+- [A6, -0.25, 2.47]
+- [A7, 0.25, 2.47]
+- [B6, 0.75, 2.47]
+- [A8, 1.25, 2.47]
+- [B5, 1.75, 2.47]
+- [A1B12, -3.2, 2.47]
+- [B1A12, 3.2, 2.47]
+- [B4A9, 2.4, 2.47]
+- [A4B9, -2.4, 2.47]
+- ['2', 4.33, -2.47]
+- ['1', 4.33, 1.71]
+- ['4', -4.33, 1.71]
+- ['3', -4.33, -2.47]

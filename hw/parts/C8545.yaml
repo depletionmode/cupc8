@@ -1,0 +1,9 @@
+# 2N7002 (CJ), N-channel MOSFET, SOT-23
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/a141b8bd86b14475955ac8c4d3eea0a8.pdf
+source: "CJ 2N7002 datasheet, page 1: SOT-23 pinout (1 GATE, 2 SOURCE, 3 DRAIN)"
+package: SOT-23
+pins:
+  1: [G, GATE]
+  2: [S, SOURCE]
+  3: [D, DRAIN]
+ccw: [1, 3]

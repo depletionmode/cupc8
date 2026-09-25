@@ -213,10 +213,22 @@ def fits(kpads, epads, key):
     return True
 
 
+# JLC package strings that no footprint name spells out: what the name says
+# instead (upper case). The pads are still compared with EasyEDA's.
+PACKAGE_NAMES = {
+    "LQFN-56(7X7)": "QFN-56-1EP_7X7MM",          # RP2040
+    "SOIC-8-208MIL": "SOIC-8_5.3X5.3MM",         # W25Q16JVSSIQ
+    "SOT-23-6L": "SOT-23-6",                     # USBLC6-2SC6
+    "SMD3225-4P": "SMD_4P-L3.2-W2.5",            # 3225 crystal
+}
+
+
 def package_ok(pkg, fp_name):
     """JLC's package string names the footprint's package."""
     p = pkg.upper().replace(" ", "")
     name = fp_name.upper()
+    if p in PACKAGE_NAMES and PACKAGE_NAMES[p] in name:
+        return True
     if p.startswith("SMD,") and "X" in p:           # "SMD,13.2x12.5mm": the body size
         a, b = (float(v) for v in p[4:].rstrip("M").split("X")[:2])
         # as numbers: JLC writes "3x3mm" where the footprint says L3.0-W3.0
@@ -293,7 +305,11 @@ def check_line(fpid, lcsc, refs, parts, table, problems, notes, refetch=False):
         notes.add("%s not recorded in hw/parts/easyeda and CUPC8_OFFLINE: package and rotation unchecked" % lcsc)
         return None
     pkg = jlc["jlc_package"]
-    if not package_ok(pkg, fp_name):
+    # a footprint whose name doesn't spell JLC's package ("LQFN-56(7x7)" for
+    # KiCad's QFN-56-1EP_7x7mm_..., "SMD" for a connector) passes when the
+    # part's datasheet table names it under `footprints:`, checked by hand;
+    # the pads are still compared with EasyEDA's below
+    if not package_ok(pkg, fp_name) and not (ds and fp_name in (ds[0].get("footprints") or [])):
         say("JLC's package is %r, the footprint is %s" % (pkg, fp_name))
     if ds and ds[0].get("package") and pkg.upper().replace(" ", "") != ds[0]["package"].upper().replace(" ", ""):
         say("JLC's package is %r, the datasheet table's %r" % (pkg, ds[0]["package"]))

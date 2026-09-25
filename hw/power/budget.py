@@ -39,23 +39,31 @@ def i_buck_in(v5, i3=None):
     return (i3 if i3 is not None else i_3v3()) * 3.3 / (d.BUCK_ETA_BUDGET * v5)
 
 
-def chain(corner, keyboard=d.I_KEYBOARD, wifi_3v3=d.WIFI_I_3V3, extra_3v3=0.0, extra_5v=0.0, sd_write=True):
+def chain(corner, keyboard=d.I_KEYBOARD, wifi_3v3=d.WIFI_I_3V3, extra_3v3=0.0, extra_5v=0.0, sd_write=True,
+          typ_loads=False, vbus=None):
     """Node voltages (V) and the total VBUS current (A) at one corner.
-    wifi_3v3 is the Wi-Fi card's 3V3 load; its +5V draw is solved here."""
+    wifi_3v3 is the Wi-Fi card's 3V3 load and keyboard the IO card's port load;
+    their +5V draws, through each card's converter, are solved here.
+    typ_loads: power.md's Typ column instead of Max (B6/B7)."""
     worst = corner == "worst"
-    vbus = d.VBUS_MIN if worst else d.VBUS_NOM
+    vbus = vbus if vbus is not None else (d.VBUS_MIN if worst else d.VBUS_NOM)
     r_in = d.r_in(worst)
     r_slot = ((d.SLOT_PTC_R_MAX if worst else d.SLOT_PTC_R_MIN) + d.R_SLOT_LINK
               + d.R_SLOT_SENSE + d.R_SLOT_CONTACTS)
-    r_kbd = r_slot + (d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP)     # the IO card's port switch
-    v5 = v_card = vbus
-    for _ in range(50):                     # both bucks' input currents depend on their input
+    i3 = (sum(d.LOADS_3V3_TYP.values()) if typ_loads else i_3v3(sd_write)) + extra_3v3
+    hdmi = d.I_HDMI_5V_TYP if typ_loads else d.I_HDMI_5V
+    v5 = v_card = v_io = vbus
+    for _ in range(80):                     # the converters' input currents depend on their input
         wifi = d.wifi_i_5v(v_card, wifi_3v3)
-        itot = i_buck_in(v5, i_3v3(sd_write) + extra_3v3) + keyboard + d.I_HDMI_5V + wifi + extra_5v
+        io = d.iob_i_in(v_io, keyboard)     # the IO card's keyboard boost
+        itot = i_buck_in(v5, i3) + io + hdmi + wifi + extra_5v
         v5 = vbus - itot * r_in
         v_card = v5 - wifi * r_slot
-    return {"vbus": vbus, "itot": itot, "v5": v5, "r_slot": r_slot, "iwifi": wifi,
-            "wifi_in": v_card, "kbd_port": v5 - keyboard * r_kbd}
+        v_io = v5 - io * r_slot
+    ron = d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP        # the port switch after the boost
+    return {"vbus": vbus, "itot": itot, "v5": v5, "r_slot": r_slot, "iwifi": wifi, "iio": io,
+            "wifi_in": v_card, "io_in": v_io,
+            "kbd_port": d.iob_vout(v_io, keyboard, "lo" if worst else "nom") - keyboard * ron}
 
 
 def main():
@@ -92,16 +100,16 @@ def main():
     red = chain("worst", wifi_3v3=WIFI_IDLE_3V3)
     c.check("B5", "1.5 A source: radio off, SD reading (100 mA), 500 mA keyboard", red["itot"],
             d.SOURCE_CLASSES[d.REDUCED_CLASS], "<=", "A", need=MARGIN)
-    # default USB: the same policy; what it can run is stated, not promised
-    for ident, name, kbd in (("B6", "default USB 2.0", 0.100), ("B7", "default USB 3.x", d.I_KEYBOARD)):
-        dflt = chain("worst", keyboard=kbd, wifi_3v3=WIFI_IDLE_3V3, sd_write=False)
-        typ = chain("typical", keyboard=kbd, wifi_3v3=WIFI_IDLE_3V3, sd_write=False)
-        c.info(name, "radio off, SD idle, %.0f mA keyboard: %.0f mA at the max budget, %.0f mA typical corner"
-               % (1e3 * kbd, 1e3 * dflt["itot"], 1e3 * typ["itot"]))
-        c.check(ident, "%s, radio off, SD idle, %.0f mA keyboard (max budget)" % (name, 1e3 * kbd),
-                dflt["itot"], d.SOURCE_CLASSES[name], "<=", "A",
-                fix="a decision: power.md says default USB runs the machine only at typical loads "
-                    "(not guaranteed at the max budget), or the policy also turns the keyboard port off")
+    # default USB: power.md promises typical loads only (the same policy: radio
+    # off, no SD writes). The typical loads at the worst-case voltage corner
+    for ident, name in (("B6", "default USB 2.0"), ("B7", "default USB 3.x")):
+        mx = chain("worst", keyboard=0.100, wifi_3v3=WIFI_IDLE_3V3, sd_write=False)
+        typ = chain("worst", keyboard=d.I_KEYBOARD_TYP, wifi_3v3=WIFI_IDLE_3V3, typ_loads=True)
+        c.info(name, "radio off: %.0f mA at typical loads (power.md Typ, %.0f mA keyboard); at the max "
+               "budget with the SD idle and a 100 mA keyboard %.0f mA, which is not promised" % (
+                   1e3 * typ["itot"], 1e3 * d.I_KEYBOARD_TYP, 1e3 * mx["itot"]))
+        c.check(ident, "%s, radio off, typical loads (power.md: default USB runs typical loads only)" % name,
+                typ["itot"], d.SOURCE_CLASSES[name], "<=", "A", need=MARGIN)
 
     # slots
     hold = d.SLOT_PTC_IHOLD_40C
@@ -109,20 +117,33 @@ def main():
             d.SLOT_5V_MAX, hold, "<=", "A", need=MARGIN)
     c.check("B9", "Wi-Fi card +5V (worst) vs slot.md's %.2f A" % d.SLOT_5V_MAX, w["iwifi"], d.SLOT_5V_MAX,
             "<=", "A", need=MARGIN)
-    # 500 mA is USB 2.0's hard limit for a device, not an estimate: no extra margin
-    c.check("B10", "IO card +5V (keyboard, USB 2.0's 500 mA device maximum) vs slot.md's %.2f A" %
-            d.SLOT_5V_MAX, d.I_KEYBOARD, d.SLOT_5V_MAX, "<=", "A")
+    # the keyboard's 500 mA (USB 2.0's device maximum) through the boost, at its
+    # highest set point, from the worst-case card input
+    c.check("B10", "IO card +5V (500 mA keyboard through its boost, card input %.2f V) vs slot.md's %.2f A"
+            % (w["io_in"], d.SLOT_5V_MAX), w["iio"], d.SLOT_5V_MAX, "<=", "A",
+            fix="a decision: slot.md's +5V per card 0.55 A -> 0.80 A (the SMD1206P110TFT slot PTC holds "
+                "%.2f A at 40 C, B10b) - no boost can hold the port at USB's 4.40 V for 500 mA from a 4 V "
+                "card input on 0.55 A" % hold)
+    c.check("B10b", "IO card +5V (worst, through its boost) vs slot PTC hold at 40 C", w["iio"], hold, "<=",
+            "A", need=MARGIN)
     for ident, name, i in (("B11", "HDMI card", d.GPU_CARD_3V3), ("B12", "e-ink card", d.EINK_CARD_3V3),
                            ("B13", "storage card", d.STORAGE_CARD_3V3),
                            ("B14", "IO card", d.LOADS_3V3["IO card RP2040 + flash"])):
         c.check(ident, "%s +3V3 vs slot +3V3 limit" % name, i, d.SLOT_3V3_MAX, "<=", "A", need=MARGIN)
     c.check("B15", "Wi-Fi card: slot feed (PTC hold at 40 C) vs Espressif's >= 0.5 A supply", hold,
             d.ESP32_SUPPLY_MIN, ">=", "A")
-    c.check("B16", "keyboard VBUS at the IO card port, worst (USB 2.0 low-power port >= 4.40 V)",
-            w["kbd_port"], 4.40, ">=",
-            fix="a decision: accept (keyboards run their logic at 3.3 V; typical passes, B17) - no board "
-                "change reaches 4.40 V at vSafe5V min with a full-drop cable")
-    c.check("B17", "keyboard VBUS at the IO card port, typical", t["kbd_port"], 4.40, ">=")
+    lo_b, nom_b, hi_b = d.iob_vout_range()
+    c.info("keyboard boost", "TPS61023 set %.3f / %.3f / %.3f V (VREF +-2.5 %%, 1 %% divider); the "
+           "port = that less the SY6280's drop at 500 mA (the droop in a step is POW-007)" % (lo_b, nom_b, hi_b))
+    c.check("B16", "keyboard VBUS at the IO card port, worst: boost at its low set point (USB 2.0 "
+            "low-power port >= 4.40 V)", w["kbd_port"], d.USB_PORT_MIN, ">=")
+    c.check("B17", "keyboard VBUS at the IO card port, typical", t["kbd_port"], d.USB_PORT_MIN, ">=")
+    hi_c = chain("typical", keyboard=0.0, wifi_3v3=WIFI_IDLE_3V3, vbus=d.VBUS_MAX)
+    port_hi = max(hi_b, d.iob_vout(hi_c["io_in"], 0.0, "hi"))
+    c.check("B17b", "keyboard VBUS highest: VBUS %.1f V, light loads (boost set point %.3f V, or "
+            "pass-through at %.3f V)" % (d.VBUS_MAX, hi_b, hi_c["io_in"]), port_hi, d.USB_PORT_MAX, "<=")
+    c.check("B17c", "IO card +5V highest (the eFuse's OVLO trip, max) vs the boost's %.1f V absolute max"
+            % d.IOB_VIN_ABS, d.insw_ovlo()[1], d.IOB_VIN_ABS, "<=")
 
     # slots 5-6: what is left for them to declare with a 3.0 A source
     cap = min(d.SOURCE_CLASSES[d.FULL_CLASS], lo, d.FUSE_IN_IHOLD_40C) / (1 + MARGIN)

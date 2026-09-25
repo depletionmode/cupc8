@@ -1,0 +1,13 @@
+# USBLC6-2SC6 (ST), USB ESD protection, SOT-23-6
+datasheet: https://datasheet.lcsc.com/datasheet/pdf/0d3a2ab954b34651a0695e7ccf534db0.pdf
+source: "USBLC6-2 datasheet, page 1: Figure 1 Functional diagram (top view)"
+package: SOT-23-6L
+footprints: [SOT-23-6]   # KiCad's SOT-23-6
+pins:
+  1: ["I/O1", IO1]
+  2: GND
+  3: ["I/O2", IO2]
+  4: ["I/O2", IO2]
+  5: VBUS
+  6: ["I/O1", IO1]
+ccw: [1, 6]
