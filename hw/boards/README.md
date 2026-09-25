@@ -74,7 +74,7 @@ Spec: `doc/hardware/wifi-card.md`.
 
 sysctl, the RP2040 that programs and debugs the machine
 ([system-slot.md](../../doc/hardware/system-slot.md),
-[sysctl.md](../../doc/hardware/sysctl.md)), on a 56 × 44 mm card above a
+[sysctl.md](../../doc/hardware/sysctl.md)), on a 56 × 48 mm card above a
 PCIe x4 finger tab (the shared card rules above), with a USB-C port on
 the top edge for the host PC. Everything is placed by JLC; nothing is fitted
 by hand.
@@ -127,10 +127,21 @@ device configured). All 30 GPIOs were assigned, so the activity LEDs take
 GPIO0/1, which `hw/pins.yaml` had as a debug UART that no firmware used; the
 USB CDC link and the SWD pads cover debugging.
 
-**Board.** Four layers (JLC04161H-7628), GND poured on both outer layers.
-The fan-out of a 0.4 mm QFN-56 with 50-odd slot nets through the finger
-tab did not route cleanly on two, nor in a 38 mm-tall body. The RP2040's
-nets are in kicadgen's "Fine" class (0.15 mm track, 0.2 mm clearance): a
-0.2 mm track leaves no room between its 0.2 mm pads at 0.4 mm pitch. J1 is
+**Board.** Four layers (JLC04161H-7628), 56 × 48 mm above the tab. GND is
+poured on F.Cu, B.Cu and In1.Cu; all four layers route (In1 as a power
+plane left the QFN-56 fan-out unroutable). The body is taller than the parts
+need: the 10 mm band above the tab is where 50-odd slot nets fan out of the
+fingers. The RP2040's and J1's nets are in kicadgen's "Fine" class (0.15 mm
+track and clearance, 0.7 mm vias): at 0.2 mm clearance Freerouting counts
+every pair of the QFN's 0.2 mm-apart pads a violation and routes none of
+them. Freerouting necks those tracks to 0.11 mm at the pads, inside JLC's
+4-layer minimum (0.09 mm), which 4-layer boards now check against (0.1 mm).
+The presence link (A1 to B32) crosses on In2.Cu 1.8 mm above the tab. J1 is
 JLC's own footprint (jlc: import), since KiCad's splits the paired contacts
-(A1/B12 ...) that JLC places as one pad. Passives are 0603 basic parts.
+(A1/B12 ...) that JLC places as one pad; its EasyEDA 3D model is moved
+2.27 mm onto the footprint. Passives are 0603 basic parts.
+
+**Firmware and pins.** `hw/pins.yaml` gives GPIO0/1 to LED_USB_TX/RX (they
+were a debug UART that nothing used; every other GPIO is taken).
+`fw/rp2040/sysctl/main.c` lights each for 30 ms after USB data in its
+direction. SYS-006 checks they light after a request and go dark after.
