@@ -187,8 +187,8 @@ def schematic(path, footprint_libs):
                    at=((16 + 16 * i) * G, 108 * G), fields={"LCSC": LCSC["33x4"]})
         for k, net in enumerate(nets):
             if net:
-                s.connect(rn, "R%d.1" % (k + 1), net)                      # finger side
-                s.connect(rn, "R%d.2" % (k + 1), "FPGA_" + net[4:])        # FPGA side
+                s.connect(rn, "R%d.1" % (k + 1), "FPGA_" + net[4:])        # FPGA side: pads 1-4
+                s.connect(rn, "R%d.2" % (k + 1), net)                      # finger side: pads 8-5
             else:
                 s.nc(rn, "R%d.1" % (k + 1), stub=G)
                 s.nc(rn, "R%d.2" % (k + 1), stub=G)
@@ -326,12 +326,13 @@ def placement():
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
         "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.5, -17.2, 0), "R6": (40.5, -14.4, 0),
         "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2, 0), "R7": (3.2, -26.6, 0),
-        # 33 ohm arrays at their pins, finger side (pads 1-4) towards the
-        # fingers: A and control in a row under the bottom side, D and the
-        # timer lines in a column right of the right side
-        "RN1": (16.5, fy + 15.1, 180), "RN2": (19.5, fy + 15.1, 180), "RN3": (22.3, fy + 15.1, 180),
-        "RN4": (25.1, fy + 15.1, 180), "RN5": (27.9, fy + 15.1, 180),
-        "RN6": (45.8, fy + 7.8, 270), "RN7": (45.8, fy + 5.0, 270), "RN8": (45.8, fy - 0.2, 270),
+        # 33 ohm arrays at their pins, FPGA side (pads 1-4) towards the
+        # package and in the pins' order, finger side (pads 8-5) away from
+        # it: A and control in a row under the bottom side, D and the timer
+        # lines in a column right of the right side
+        "RN1": (16.5, fy + 15.1, 0), "RN2": (19.5, fy + 15.1, 0), "RN3": (22.3, fy + 15.1, 0),
+        "RN4": (25.1, fy + 15.1, 0), "RN5": (27.9, fy + 15.1, 0),
+        "RN6": (45.8, fy + 7.8, 90), "RN7": (45.8, fy + 5.0, 90), "RN8": (45.8, fy - 0.2, 90),
         # config flash by the config pins, under the top edge beside the
         # hole, its decap, and the configuration pull-ups
         "U2": (45.3, -38.6, 0), "C23": (48.6, -35.6, 90),
@@ -350,7 +351,7 @@ def placement():
 
 def a_vias(board, via=0.6, drill=0.3, track=0.2):
     """Locked pre-routing: each address line leaves its array (finger side,
-    pads 1-4, 0.8 mm apart) on a short track to its own via, in two
+    pads 8-5, 0.5 mm apart) on a short track to its own via, in two
     staggered rows just under the arrays. A goes to the back-side fingers;
     placing its layer changes here keeps the front below the arrays clear
     for the control and data lines, which Freerouting otherwise has to
@@ -362,7 +363,7 @@ def a_vias(board, via=0.6, drill=0.3, track=0.2):
             continue
         for pad in fp.Pads():
             k = int(pad.GetNumber())
-            if k > 4:
+            if k <= 4:
                 continue
             px, py = pad.GetPosition().x, pad.GetPosition().y
             v = pcbnew.VECTOR2I(px, py + mm(1.2 if k % 2 else 2.4))
