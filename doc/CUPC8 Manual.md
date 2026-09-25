@@ -35,8 +35,13 @@ The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1
 Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen), `refresh` (on the e-ink card, a clean full refresh of the panel, which clears the faint ghosts partial refreshes leave; on HDMI it does nothing) and `net`, for the Wi-Fi card:
 
 - `net join SSID PASSWORD` joins that network, keeps the credentials on the card (it joins them again at power-up) and prints the address it was given.
-- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. A name that doesn't resolve or a refused connection prints `connect failed`.
+- `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. HOST is a name, looked up by the kernel's own DNS client, or a dotted address used as it is. A refused connection prints `connect failed`.
+- `net lookup NAME` prints the address the DNS client finds for NAME. It asks the DNS server `net config` names (or the one DHCP gave), waits about a second, asks once more, and takes the first A record of the answer. It says `name not found` (the server has no such name), `no address for that name` (the name exists, with no IPv4 address), `DNS server not answering`, `DNS server error`, `bad answer from the DNS server` or `no DNS server`.
+- `net ping HOST [COUNT]` sends COUNT (4 unless given, up to 255) ICMP echo requests to HOST (a name or an address), one after the other, and prints each reply's round-trip time in milliseconds (`seq 1 time 3 ms`), or `seq 2 timeout` when none comes within about a second, then `4 sent, 3 received, 2-5 ms` (the shortest and longest).
+- `net config` shows the card's settings: `mode dhcp` or `mode static` with its address, mask and gateway; the DNS server (`from dhcp`, or an address) and its port; whether they are saved on the card. `net config dns IP [PORT]` sets the DNS server (port 53 unless given), `net config ip IP MASK GW` a static address, `net config dhcp` goes back to DHCP, and `net config save` keeps the settings on the card, applied at power-up (until then they last until the card is powered off).
 - `net` on its own shows whether the link is up, and the address.
+
+The times come from a clock the kernel runs only while it waits for the network: timer 1 counting instructions, so a millisecond is about a thousand instructions and the times are approximate.
 
 `net` refuses to start the radio on a USB source under 3 A (see the power budget).
 

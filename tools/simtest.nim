@@ -1884,6 +1884,107 @@ proc testKernelDnsPing() =
 
 run testKernelDnsPing
 
+const apiNetEntries = ["status", "join", "open", "connect", "connect_host", "listen", "send", "recv",
+                       "sock_status", "close", "udp_bind", "sendto", "recvfrom", "events", "resolve", "config"]
+
+proc buildNetExample(name: string; sym: Table[string, int]): string =
+  ## examples/net/NAME.s assembled for $7000, after kernel/api.inc when it
+  ## exists, else after API_NET_* names for the kernel's api_net_* routines
+  let outDir = rootDir / "build" / "examples"
+  createDir(outDir)
+  var head = ""
+  if fileExists(kernelDir / "api.inc"):
+    head = readFile(kernelDir / "api.inc")
+  else:
+    for e in apiNetEntries:
+      head.add("%define API_NET_" & e.toUpperAscii & " $" & toHex(sym["api_net_" & e], 4).toLowerAscii & "\n")
+  let src = outDir / name & ".ss"
+  writeFile(src, head & "\n" & readFile(rootDir / "examples" / "net" / name & ".s"))
+  result = outDir / name & ".bin"
+  let r = execCmdEx("python3 " & quoteShell(asPy) & " " & quoteShell(src) & " " & quoteShell(result) & " 0x7000,0x7400,0x7800")
+  if r.exitCode != 0: raise newException(IOError, "example " & name & ": " & r.output)
+
+proc startProgram(bin: string) =
+  ## the program at $7000, called from where the kernel waits for a key (a
+  ## return lands on a HALT)
+  let code = readFile(bin)
+  for i, c in code: mem[0x7000 + i] = ord(c)
+  mem[0x0e00] = 0xf8
+  mem[SP] = 0x0e
+  mem[SP + 1] = 0x00
+  SP += 2
+  PC = 0x7000
+  waiting = false
+
+proc testNetExamples() =
+  ## KRN-010: the example TCP and UDP echo servers (examples/net), user
+  ## programs at $7000 on the net API, serve clients on this host: two TCP
+  ## clients one after the other, and UDP datagrams from two ports.
+  echo "== example echo servers on the net API =="
+  let rom = buildKernelRom()
+  let sym = kernelSyms()
+  proc boot() =
+    machineCards([CardGpu, CardIo, CardWifi])
+    cpuReset()
+    cpuLoadRom(rom)
+    cpuBootRom()
+    settle(6_000_000)
+    typeLine("net join cupc8 password")
+    settle()
+  proc steps(n: int) =
+    for i in 0..<n:
+      if cpuStep() != sOk: break
+
+  boot()
+  startProgram(buildNetExample("tcpecho", sym))
+  steps(1_000_000)
+  for msg in ["hello cupc8\n", "second client, a longer line of text to echo back\n"]:
+    var c = newSocket()
+    try:
+      c.connect("127.0.0.1", Port(7007))
+    except OSError:
+      fail("tcpecho: no server on 127.0.0.1:7007")
+      break
+    c.send(msg)
+    c.getFd.setBlocking(false)
+    var got = ""
+    var n = 0
+    while n < 400 and got.len < msg.len:
+      steps(10_000)
+      var buf = newString(256)
+      let k = c.getFd.recv(addr buf[0], 256, 0)
+      if k > 0: got.add(buf[0 ..< k])
+      inc n
+    expectTrue("tcpecho: \"" & msg.strip & "\" comes back", got == msg)
+    c.close()
+    steps(500_000)
+  expectTrue("tcpecho: still running (not halted)", not HF)
+
+  boot()
+  startProgram(buildNetExample("udpecho", sym))
+  steps(1_000_000)
+  for msg in ["ping over UDP", "another datagram"]:
+    var u = newSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+    u.bindAddr(Port(0), "127.0.0.1")
+    u.getFd.setBlocking(false)
+    u.sendTo("127.0.0.1", Port(7007), msg)
+    var got = ""
+    var n = 0
+    while n < 400 and got.len == 0:
+      steps(10_000)
+      var readable = @[u.getFd]
+      if selectRead(readable, 0) > 0:
+        var address: string
+        var port: Port
+        discard u.recvFrom(got, 512, address, port)
+      inc n
+    expectTrue("udpecho: \"" & msg & "\" comes back to its sender", got == msg)
+    u.close()
+  expectTrue("udpecho: still running (not halted)", not HF)
+  ioModel = imLegacy
+
+run testNetExamples
+
 # ---------------------------------------------------------------------------
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
 # ---------------------------------------------------------------------------
