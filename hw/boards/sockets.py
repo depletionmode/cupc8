@@ -81,6 +81,9 @@ def derive():
                           r"\1 (size 1.2 1.2) \2(drill 0.75)", text)
             text = re.sub(r'(\(pad "" np_thru_hole circle \(at [^)]*\)) \(size [\d.]+ [\d.]+\) \(drill [\d.]+\)',
                           r"\1 (size 2.35 2.35) (drill 2.35)", text)
+            # the row letters "A" and "B" 2 mm further out: 0.15 mm off pin 1 is JLC's minimum
+            text = re.sub(r"(\(fp_text user [AB] \(at )([-\d.]+)",
+                          lambda m: m.group(1) + "%.2f" % (float(m.group(2)) - 2.0), text)
         else:
             def nail(m):
                 x = float(m.group(1))

@@ -69,7 +69,7 @@ R0603 = {"0": "C21189", "33": "C23140", "100": "C22775", "1k": "C21190", "2.2k":
 C0603 = {"100n": "C14663", "1u": "C15849", "4.7u": "C19666", "10u": "C19702"}
 FP_R = "Resistor_SMD:R_0603_1608Metric"
 FP_C = "Capacitor_SMD:C_0603_1608Metric"
-TP_FP = "TestPoint:TestPoint_Pad_D1.0mm"
+TP_FP = "cupc8:TestPad_D1.0mm"           # its silk ring 0.3 mm off the pad (KiCad's is 0.14)
 
 
 class Spec:
