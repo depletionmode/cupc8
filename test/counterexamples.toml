@@ -626,3 +626,11 @@ fixed_in = "ef9ae93"
 revert = [["hw/tools/kicadgen.py", "        if logo_keepout and name.startswith(LOGO):\n            silk_keepout(board, fp)\n", ""]]
 cmd = "python3 hw/boards/storage.py"
 must_fail = ["runs under the artwork KaplanLabs_Logo_12mm"]
+
+[[bug]]
+name = "3D models: EasyEDA STEPs off their WRLs (MECH saw the HDMI legs 3.8 mm under the GPU card, the microSD face 5 mm inside the edge)"
+fixed_in = "ec4df47"
+before = "1d162fc"
+files = ["hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.step", "hw/lib/jlc.3dshapes/TF-SMD_TF-01A.step"]
+cmd = "freecadcmd hw/tools/modelcheck.py"
+must_fail = ["FAIL HDMI-SMD_HDMI-9PIN-043: the STEP is 3.89 mm from the WRL", "FAIL TF-SMD_TF-01A: the STEP is 5.28 mm from the WRL"]
