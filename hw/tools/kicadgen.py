@@ -700,7 +700,7 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None, plane=False):
+                zone_outline=None, labels=None, plane=False, silk_text=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -789,7 +789,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
 
     clip_silk_to_board(board, outline)
     clip_silk_to_pads(board)
-    place_designators(board, outline, labels or {})
+    place_designators(board, outline, labels or {}, silk_text=silk_text)
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     if plane and layers == 4:
@@ -958,7 +958,7 @@ def mark_revision(board, title, revision, at):
     board.SetTitleBlock(tb)
 
 
-def place_designators(board, outline, labels=None, gap=0.3):
+def place_designators(board, outline, labels=None, gap=0.3, silk_text=None):
     """Put every reference designator horizontal, in the first spot around its
     part that clears all pads, every other part's courtyard, the other
     designators, board-only graphics (logos) and the board edge. A part in
@@ -992,8 +992,9 @@ def place_designators(board, outline, labels=None, gap=0.3):
             ref.SetText(labels[fp.GetReference()])
             ref.SetLayer(pcbnew.F_SilkS)
             board.Add(ref)
-        ref.SetTextSize(pcbnew.VECTOR2I(mm(SILK_TEXT[0]), mm(SILK_TEXT[0])))
-        ref.SetTextThickness(mm(SILK_TEXT[1]))
+        size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
+        ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+        ref.SetTextThickness(mm(stroke))
         ref.SetTextAngleDegrees(0)
         ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
         ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
@@ -1967,7 +1968,8 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, tab=IO_CARD_TAB):
+             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, tab=IO_CARD_TAB,
+             silk_text=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2028,7 +2030,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
-                        plane=plane)
+                        plane=plane, silk_text=silk_text)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, pour_nets[0], outline[3])

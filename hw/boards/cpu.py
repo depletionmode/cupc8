@@ -259,6 +259,10 @@ def schematic(path, footprint_libs):
 # is kg.IO_CARD_BODY, the M3 hole and the power LED where every card has them,
 # and the x8 tab (x -0.65 .. 50.65) under it with 5.35 mm shoulders. Nothing
 # is placed in the 4.5 mm strip above the fingers (their GND ties and vias).
+# The FPGA sits against the top edge, which leaves a 10 mm band between its
+# bottom pins and the fingers for the arrays and the bus's fan-out (5.7 mm
+# with the decaps above it did not route); the top side's four supply pins
+# are decoupled from the package's top corners instead, all on planes.
 # The FPGA's bank-3 side (A[15:0], then CLK and the control lines) faces the
 # fingers and its bank-2 side (D, IRQ, timers, then config) faces right, each
 # in the fingers' left-to-right order, so the front-side bus lines reach
@@ -266,11 +270,12 @@ def schematic(path, footprint_libs):
 
 BODY = kg.IO_CARD_BODY
 TAB_TOP = BODY[3]                      # where the tab meets the body
-FPGA = (24.5, -27.0, 0)
+FPGA = (24.5, -31.3, 0)      # its top pad row 0.85 mm from the top edge
 ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
 LOGO_MM = 12
-LOGO_AT = (2.5, -17.5)
+LOGO_AT = (49.4, -14.6)              # the empty lower right: D and timer lines pass under it
 TITLE, REVISION = "CUPC/8 CPU", "A"
+SILK_TEXT = (0.8, 0.15)              # designators at JLC's minimum height: this card is 0402s
 POWER_LED = kg.IO_CARD_PWR_LED
 
 
@@ -303,42 +308,42 @@ def placement():
         if pin:
             p[ref] = beside(pin)
     # the PLL filter caps sit between these and their pins' neighbours
-    p["C11"] = beside(123, along=-1.75)
+    p["C11"] = beside(123, along=-3.0)
+    p["C12"] = beside(131, along=1.5)
     p["C8"] = beside(57, along=-0.5)
-    # VCC_SPI's decap slides past the corner, out of pin 71's (FL1_nCS) lane to the flash
-    p["C13"] = beside(72, along=-2.0)
     # the bottom side's decaps step aside from the arrays under the bus pins
-    p["C5"] = beside(6, along=-7.0)
+    p["C5"] = beside(6, along=-4.0)
     p["C1"] = beside(27, along=4.5)
     p["C6"] = beside(30, along=6.0)
-    # the top side's sit closer in: room for their designators under the board edge
-    for ref in ("C3", "C9", "C10", "C14"):
-        p[ref] = beside(DECOUPLING[ref][2], dist=2.5)
-    x0 = FPGA[0] - 8.0
+    fx, fy = FPGA[:2]
     p.update({
-        "C15": (4.5, -25.0, 0), "C16": (53.0, -25.0, 90),          # 3V3 bulk
+        # the top side's supply pins (VPP 108, VCC 92, VCCIO1 100 and 89) are
+        # decoupled from the package's top corners: the pad row is at the edge
+        "C14": (fx - 12.5, fy - 11.2, 0), "C3": beside(37, along=2.0),
+        "C10": (fx + 12.2, fy - 11.0, 90), "C9": (fx - 14.15, -26.2, 180),
+        "C13": beside(72, along=2.5),                               # VCC_SPI
+        "C15": (9.0, -21.0, 0), "C16": (54.8, -21.5, 90),          # 3V3 bulk
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.9, -26.5, 270), "R6": (40.9, -30.2, 90),
-        "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (5.6, -27.0, 90), "R7": (5.6, -23.2, 90),
+        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (40.5, -17.2, 0), "R6": (40.5, -14.4, 0),
+        "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2, 0), "R7": (3.2, -26.6, 0),
         # 33 ohm arrays at their pins, finger side (pads 1-4) towards the
         # fingers: A and control in a row under the bottom side, D and the
         # timer lines in a column right of the right side
-        # (3.5 mm apart, a little wider than their pins: room for five designators)
-        "RN1": (x0 - 2.0, -13.4, 180), "RN2": (x0 + 1.5, -13.4, 180), "RN3": (x0 + 5.0, -13.4, 180),
-        "RN4": (x0 + 8.5, -13.4, 180), "RN5": (x0 + 12.0, -13.4, 180),
-        "RN6": (44.0, -19.4, 270), "RN7": (44.0, -22.3, 270), "RN8": (44.0, -28.8, 270),
-        # config flash under the top edge beside the hole, its decap and the
-        # configuration pull-ups
-        "U2": (43.0, -40.8, 90), "C23": (43.0, -37.3, 0),
-        "R1": (45.6, -33.0, 90), "R2": (47.8, -33.0, 90), "R3": (50.0, -33.0, 90), "R4": (52.2, -33.0, 90),
-        "R5": (54.4, -33.0, 90),
+        "RN1": (16.5, fy + 15.1, 180), "RN2": (19.5, fy + 15.1, 180), "RN3": (22.3, fy + 15.1, 180),
+        "RN4": (25.1, fy + 15.1, 180), "RN5": (27.9, fy + 15.1, 180),
+        "RN6": (45.8, fy + 7.8, 270), "RN7": (45.8, fy + 5.0, 270), "RN8": (45.8, fy - 0.2, 270),
+        # config flash by the config pins, under the top edge beside the
+        # hole, its decap, and the configuration pull-ups
+        "U2": (45.3, -38.6, 0), "C23": (48.6, -35.6, 90),
+        "R1": (49.8, -33.6, 0), "R2": (49.8, -31.2, 0), "R3": (49.8, -28.8, 0), "R4": (49.8, -26.4, 0),
+        "R5": (49.8, -24.0, 0),
         # LEDs along the top edge from the common PWR spot, each resistor
-        # under its LED; the 1V2 LED's switch below; then the LDO
-        "D1": POWER_LED + (0,), "R9": (POWER_LED[0], POWER_LED[1] + 2.9, 90),
-        "D2": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R10": (POWER_LED[0] + 4.5, POWER_LED[1] + 2.9, 90),
-        "Q1": (POWER_LED[0] + 4.5, POWER_LED[1] + 8.5, 0), "R8": (POWER_LED[0] + 4.5, POWER_LED[1] + 12.0, 0),
-        "U3": (7.6, -40.6, 0), "C21": (10.6, -40.6, 90), "C22": (7.6, -37.2, 0),
-        "TP1": (-3.5, -34.0, 0), "TP2": (-3.5, -29.5, 0), "TP3": (-3.5, -25.0, 0),
+        # under its LED; the 1V2 LED's switch below; the LDO beside them
+        "D1": POWER_LED + (0,), "R9": (POWER_LED[0], POWER_LED[1] + 2.6, 0),
+        "D2": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R10": (POWER_LED[0] + 4.5, POWER_LED[1] + 2.6, 0),
+        "Q1": (POWER_LED[0] + 0.2, POWER_LED[1] + 8.8, 0), "R8": (POWER_LED[0] + 3.8, POWER_LED[1] + 12.6, 0),
+        "U3": (5.4, -40.8, 0), "C21": (4.2, -36.4, 0), "C22": (4.2, -33.4, 0),
+        "TP1": (-3.0, -19.0, 0), "TP2": (1.0, -19.0, 0), "TP3": (5.0, -19.0, 0),
     })
     return p
 
@@ -564,6 +569,7 @@ def main():
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence={"layer": "In2.Cu"},   # a B.Cu run would wall the address lines off their fingers
         passes=60,                      # 40 leaves one of the long FL1 nets unrouted about half the time
+        silk_text=SILK_TEXT,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])
     print("LCSC:", " ".join(sorted(lcsc)))
 
