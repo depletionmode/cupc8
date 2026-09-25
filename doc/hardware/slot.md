@@ -224,12 +224,18 @@ ESP ROM bootloader sync.
   - The script is `hw/mech/fit.py` (MECH-001…008 in `test/catalogue.toml`,
     verification.md 4.7). It checks the outline against `IO_CARD_*` as
     built, since `hw/lib/cards/card-outline.kicad_pcb` does not exist yet.
-    Until the main board is drawn, it places the slots from a stand-in:
-    six C404113 sockets at 20.32 mm.
+    It places the CPU card in position 1 of the row and the I/O cards in
+    each slot. Until the main board is drawn, the row comes from a stand-in:
+    one C404111 socket, then six C404113 sockets, 20.32 mm apart. The system
+    card is checked on its own, off the row.
   - *Measured 2026-09-24, from the datasheets.* The x1 socket (UMAX
     3183-10200P1T) is 11.25 mm tall, with a 1.78 mm slot 7.60 mm deep. So a
     seated card's edge sits 3.65 mm above the main board, and the card's
     shoulder sits 0.80 mm above the housing (the finger tab is 8.40 mm).
+  - *Measured 2026-09-25.* The x8 socket (UMAX 3183-10112P1T) is on the
+    same UMAX drawing (318307001), at the same 11.25 mm height and 7.60 mm
+    depth. So the CPU card and the I/O cards seat at the same height: 0.00
+    mm apart.
   - With the Wi-Fi card in every slot: 16.28 mm between one card's tallest
     part (the ESP32-C3 module, 2.44 mm) and the next card's back. The 20.32
     mm pitch leaves 18.72 mm clear of the 1.6 mm board. The PCIe CEM

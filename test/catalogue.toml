@@ -1013,9 +1013,9 @@ cmd = "python3 hw/smoke/smoke.py"
 # ============================================================================
 # MECH: the mechanical fit of every board together (verification.md 4.7).
 # One run of hw/mech/fit.py (cached in build/mech/results.json) answers all
-# of them; it picks up each board as its build appears, and uses a stand-in
-# for the six I/O slots (20.32 mm pitch, the C404113 datasheet) until the
-# main board exists. Report: build/mech/report.txt, render: overview.png.
+# of them; it picks up each board as its build appears, and until the main
+# board exists uses a stand-in for the row (slot.md, "One row of cards"): the
+# CPU socket (C404111) then six I/O slots (C404113), 20.32 mm pitch. Report: build/mech/report.txt, render: overview.png.
 # ============================================================================
 [[test]]
 id = "MECH-001"
@@ -1037,8 +1037,8 @@ cmd = "python3 hw/mech/fit.py --check MECH-002"
 
 [[test]]
 id = "MECH-003"
-title = "Card-to-card clearance, each card in each slot"
-checks = "every I/O card in every slot next to every I/O card: no collision and >= 1.0 mm (two cards' IPC-6012 bow); each card inside the CEM envelope (14.47 component side, 2.67 solder side); clear of the other sockets and the main board's parts"
+title = "Card-to-card clearance along the row, CPU card included"
+checks = "the CPU card in position 1 and every I/O card in every I/O slot, next to every other: no collision and >= 1.0 mm (two cards' IPC-6012 bow), CPU card -> I/O slot 1 included (the FPGA's height); each card inside the CEM envelope (14.47 component side, 2.67 solder side); clear of the other sockets and the main board's parts. Fails while no CPU card is built"
 method = "hw/mech/fit.py: STEP from kicad-cli, placed in FreeCAD; exact distances and intersection volumes"
 kind = "static"
 vrow = "4.7"
@@ -1055,8 +1055,8 @@ cmd = "python3 hw/mech/fit.py --check MECH-004"
 
 [[test]]
 id = "MECH-005"
-title = "M3 holes line up for the rail; rail keep-out clear"
-checks = "each I/O card's 3.2 mm hole at slot.md's (52, -40); sockets 20.32 mm apart, in line and the same way round; every card's hole on one axis in every slot (<= 0.05 mm); a 6.4 mm cylinder along that axis through all six slots hits no part"
+title = "One row: sockets in line at one height, M3 holes on the rail"
+checks = "1 x8 and 6 x1 sockets, the CPU socket at one end, 20.32 mm apart, finger B1 in line (<= 0.05 mm), the same way round; x8 and x1 seat heights equal (C404111 vs C404113 datasheets, difference reported in mm); each row card's 3.2 mm hole at slot.md's (52, -40), on one axis in every position (<= 0.05 mm); a 6.4 mm rail keep-out through the row hits no part"
 method = "hw/mech/fit.py (pcbnew + FreeCAD)"
 kind = "static"
 vrow = "4.7"
@@ -1064,8 +1064,8 @@ cmd = "python3 hw/mech/fit.py --check MECH-005"
 
 [[test]]
 id = "MECH-006"
-title = "Power LEDs in one place on every I/O card"
-checks = "the LED labelled PWR on each I/O card at slot.md's (-3, -41) on the component side, and in one row across all slots (<= 0.01 mm)"
+title = "One row: one outline, top edges and power LEDs aligned"
+checks = "the CPU card's and every I/O card's body is slot.md's outline (x -6..56, y -44..-4.95 in the finger frame, a plain rectangle, whatever the tab); the LED labelled PWR at (-3, -41) on the component side; across all seven positions the top edges and power LEDs line up (<= 0.01 mm spread)"
 method = "hw/mech/fit.py (pcbnew + FreeCAD)"
 kind = "static"
 vrow = "4.7"
@@ -1082,8 +1082,8 @@ cmd = "python3 hw/mech/fit.py --check MECH-007"
 
 [[test]]
 id = "MECH-008"
-title = "CPU card and system card clearance"
-checks = "the CPU card in the x8 socket and the system card in the x4 socket: no collision with, and >= 0.5-1.0 mm from, the I/O cards in every slot, the sockets and the main board's parts; CEM envelope. Fails until the main board, CPU card and system card are built"
+title = "System card off the row: envelope and clearance"
+checks = "the system card inside the CEM envelope; in its x4 socket (off the row, system-slot.md): no collision with, and >= 0.5-1.0 mm from, the row's cards, the sockets and the main board's parts. Fails until the main board and the system card are built"
 method = "hw/mech/fit.py (FreeCAD), sockets from the main board's footprints (pads A1/B1)"
 kind = "static"
 vrow = "4.7"
