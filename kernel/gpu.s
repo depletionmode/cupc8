@@ -254,8 +254,11 @@ gpu_cs_off:
 	pop pcl
 	pop pch
 
-; print the character in r0
+; print the character in r0 (and mirror it to the USB console, console.s)
 gpu_putc:
+	push pch
+	push pcl
+	b con_putc
 	st [gpu_char], r0
 	ld r0, [gpu_spi]
 	eq r0, #0xff
