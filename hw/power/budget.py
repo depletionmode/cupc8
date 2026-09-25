@@ -51,18 +51,20 @@ def chain(corner, keyboard=d.I_KEYBOARD, wifi_3v3=d.WIFI_I_3V3, extra_3v3=0.0, e
     r_slot = ((d.SLOT_PTC_R_MAX if worst else d.SLOT_PTC_R_MIN) + d.R_SLOT_LINK
               + d.R_SLOT_SENSE + d.R_SLOT_CONTACTS)
     i3 = (sum(d.LOADS_3V3_TYP.values()) if typ_loads else i_3v3(sd_write)) + extra_3v3
-    hdmi = d.I_HDMI_5V_TYP if typ_loads else d.I_HDMI_5V
-    v5 = v_card = v_io = vbus
+    i_pin = d.I_HDMI_5V_TYP if typ_loads else d.I_HDMI_PIN      # the HDMI pin's load
+    v5 = v_card = v_io = v_gpu = vbus
     for _ in range(80):                     # the converters' input currents depend on their input
         wifi = d.wifi_i_5v(v_card, wifi_3v3)
         io = d.iob_i_in(v_io, keyboard)     # the IO card's keyboard boost
+        hdmi, _ = d.gpu_i_5v(v_gpu, i_pin, worst)    # the GPU card's HDMI boost, behind its PTC
         itot = i_buck_in(v5, i3) + io + hdmi + wifi + extra_5v
         v5 = vbus - itot * r_in
         v_card = v5 - wifi * r_slot
         v_io = v5 - io * r_slot
+        v_gpu = v5 - hdmi * r_slot
     ron = d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP        # the port switch after the boost
     return {"vbus": vbus, "itot": itot, "v5": v5, "r_slot": r_slot, "iwifi": wifi, "iio": io,
-            "wifi_in": v_card, "io_in": v_io,
+            "igpu": hdmi, "gpu_in": v_gpu, "wifi_in": v_card, "io_in": v_io,
             "kbd_port": d.iob_vout(v_io, keyboard, "lo" if worst else "nom") - keyboard * ron}
 
 
@@ -99,7 +101,9 @@ def main():
     # so the SD stays in this budget at its full 100 mA)
     red = chain("worst", wifi_3v3=WIFI_IDLE_3V3)
     c.check("B5", "1.5 A source: radio off, SD reading (100 mA), 500 mA keyboard", red["itot"],
-            d.SOURCE_CLASSES[d.REDUCED_CLASS], "<=", "A", need=MARGIN)
+            d.SOURCE_CLASSES[d.REDUCED_CLASS], "<=", "A", need=MARGIN,
+            fix="a decision: accept the margin (every tolerance at its worst at once, and still under "
+                "1.5 A), or below 3 A also refuse SD reads (~95 mA less) or limit the keyboard port")
     # default USB: power.md promises typical loads only (the same policy: radio
     # off, no SD writes). The typical loads at the worst-case voltage corner
     for ident, name in (("B6", "default USB 2.0"), ("B7", "default USB 3.x")):
@@ -124,6 +128,8 @@ def main():
             fix="a decision: slot.md's +5V per card 0.55 A -> 0.80 A (the SMD1206P110TFT slot PTC holds "
                 "%.2f A at 40 C, B10b) - no boost can hold the port at USB's 4.40 V for 500 mA from a 4 V "
                 "card input on 0.55 A" % hold)
+    c.check("B9b", "GPU card +5V (HDMI pin's 55 mA through its PTC and boost, worst) vs slot.md's %.2f A"
+            % d.SLOT_5V_MAX, w["igpu"], d.SLOT_5V_MAX, "<=", "A", need=MARGIN)
     c.check("B10b", "IO card +5V (worst, through its boost) vs slot PTC hold at 40 C", w["iio"], hold, "<=",
             "A", need=MARGIN)
     for ident, name, i in (("B11", "HDMI card", d.GPU_CARD_3V3), ("B12", "e-ink card", d.EINK_CARD_3V3),
