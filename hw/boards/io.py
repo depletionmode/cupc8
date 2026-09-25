@@ -122,4 +122,4 @@ TITLE, REVISION = "CUPC/8 IO", "A"
 
 if __name__ == "__main__":
     rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS,
-             TITLE, REVISION, usb=True, layers=4, passes=100)
+             TITLE, REVISION, usb=True, layers=4, passes=100, preroute=rc.io_preroute)

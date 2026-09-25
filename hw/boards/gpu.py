@@ -115,14 +115,14 @@ def schematic(path, footprint_libs):
 
 
 POWER_NETS = rc.POWER_NETS         # HDMI_5V (55 mA) stays a signal-width track: pin 18 is 0.3 mm wide
-CX, CY = 26, -18               # the RP2040, turned round: its TMDS edge (GPIO10-17) faces the receptacle
+CX, CY = 26, -16               # the RP2040, turned round: its TMDS edge (GPIO10-17) faces the receptacle
 HX = CX + 1.5                  # the receptacle's centre: pin n at HX - 4.5 + 0.5 (n - 1), so D2 runs straight up
 # Up from the chip: the arrays, the ESD, the receptacle at the top edge. The
 # edge's middle pins (RUN, SWD, DVDD, IOVDD, XIN/XOUT) sit between the D2
 # and D1 pairs: DVDD's and IOVDD's caps stay in that pocket at their pins,
 # the rest leave it through vias, and the crystal sits off to the left.
 PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
-    "C12": (CX - 0.7, CY - 5.3, 90),     # DVDD 23
+    "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23 (its pin escapes by a via: pocket_escapes)
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
     "C5": (CX + 8.5, CY + 2.4, 0),       # IOVDD 22: out of the pocket, so XIN/XOUT can leave it
@@ -130,9 +130,9 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "C16": (CX - 11.2, CY - 4.0, 90),
     "C17": (CX - 8.5, CY - 1.4, 0),
     "R2": (CX - 5.8, CY - 6.2, 90),      # XOUT
-    "U3": (CX + 9, CY + 9, 0),       # flash, by the QSPI pins (now on the bottom edge)
-    "C15": (CX + 10.5, CY + 4.6, 0),
-    "R1": (CX + 14.5, CY + 9, 90),
+    "U3": (CX + 9.5, CY + 6.0, 0),     # flash, by the QSPI pins (now on the bottom edge)
+    "C15": (CX + 15.2, CY + 2.8, 90),
+    "R1": (CX + 15.0, CY + 6.0, 90),
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up: by its finger, clear of the SWD pins
@@ -159,7 +159,7 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
 LAYERS = 4
 LOGO_MM = 12
-GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 46, -16, 0)]
+GRAPHICS = [("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 48, -19, 0)]
 TITLE, REVISION = "CUPC/8 GPU", "A"
 
 
@@ -169,18 +169,27 @@ def preroute(board):
       between signal pins: each gets a via 2 mm behind its pad, under the
       receptacle's body, on a track along the pad
     - each ESD's GND pins (3 and 8) are in the middle of its rows, between
-      two pairs: a track joins them through the package and on to a via
-      1.4 mm towards the chip, and the lines pass either side of it
-    - TESTEN, as on every RP2040 card"""
-    rc.tie_testen(board)
+      two pairs: a track joins them through the package, and pin 3's
+      fan-out via (or one of ours, 1.4 mm towards the chip) takes them down
+    - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)"""
+    rc.pocket_escapes(board)
     for pin in (2, 5, 8, 11, 17):
         x, y = rc.pad_at(board, "J2", pin)
         rc.via(board, "/GND", (x, y - 2.0))
         rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
+    import pcbnew
     for ref in ("U5", "U6"):
         (x8, y8), (x3, y3) = rc.pad_at(board, ref, 8), rc.pad_at(board, ref, 3)
-        rc.via(board, "/GND", (x3, y3 + 1.4))
-        rc.track(board, "/GND", (x8, y8), (x3, y3 + 1.4), width=0.2)
+        rc.track(board, "/GND", (x8, y8), (x3, y3), width=0.2)
+        # a via 1.4 mm towards the chip, unless the fan-out gave pin 3 one
+        tracks = board.Tracks()
+        near = [tracks[i] for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T and
+                tracks[i].GetNetname() == "/GND" and
+                abs(pcbnew.ToMM(tracks[i].GetPosition().x) - x3) < 1.0 and
+                abs(pcbnew.ToMM(tracks[i].GetPosition().y) - y3) < 2.0]
+        if not near:
+            rc.via(board, "/GND", (x3, y3 + 1.4))
+            rc.track(board, "/GND", (x3, y3), (x3, y3 + 1.4), width=0.2)
 
 
 if __name__ == "__main__":
