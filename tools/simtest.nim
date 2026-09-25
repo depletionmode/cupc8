@@ -795,7 +795,7 @@ proc testKernelKeybWaits() =
     inc n
   expectTrue("kernel waiting for key", waiting)
   expectTrue("I enabled while waiting", IF)
-  expect("slot and SPI IRQs unmasked", irqMask, 9)
+  expect("slot, timer 0 and SPI IRQs unmasked", irqMask, 11)
 
 run testKernelKeybWaits
 
@@ -1623,6 +1623,309 @@ proc testStorage() =
   ioModel = imLegacy
 
 run testStorage
+
+# ---------------------------------------------------------------------------
+# the kernel API, programs at $7000 (kernel/api.s, sys.s; kernel-api.md)
+# ---------------------------------------------------------------------------
+
+proc kernelMap(): tuple[syms: Table[int, string], lines: seq[string]] =
+  for line in lines(kernelDir / "kernel.map"):
+    result.lines.add(line)
+    let f = line.splitWhitespace()
+    if f.len >= 3 and f[0] == "sym":
+      result.syms[parseHexInt(f[1])] = f[2]
+
+proc incDefines(text: string): seq[(string, int)] =
+  ## the `%define NAME $hex` lines of an api.inc
+  for line in text.splitLines():
+    let f = line.splitWhitespace()
+    if f.len >= 3 and f[0] == "%define" and f[2].startsWith("$"):
+      result.add((f[1], parseHexInt(f[2][1 .. ^1])))
+
+proc defineOf(defs: seq[(string, int)]; name: string): int =
+  result = -1
+  for (n, v) in defs:
+    if n == name: return v
+
+proc testKernelLayout() =
+  ## KRN-010: the kernel's code, data and bss stay in their areas
+  ## (memory-map.md): code $1000-$4fff, data $5000-$5fff, bss $6000-$6eff;
+  ## $6f00 is the API block and $7000- the user program's.
+  echo "== kernel memory layout =="
+  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
+  if assembled.exitCode != 0:
+    fail("kernel assembly failed: " & assembled.output)
+    return
+  var codeEnd, dataEnd, bssEnd = 0
+  var bases = ""
+  for line in kernelMap().lines:
+    let f = line.splitWhitespace()
+    if f.len == 0: continue
+    case f[0]
+    of "base": bases = line
+    of "line": codeEnd = max(codeEnd, parseHexInt(f[1]) + 3)     # an instruction is at most 3 bytes
+    of "data": dataEnd = max(dataEnd, parseHexInt(f[1]) + parseInt(f[2]))
+    of "bss": bssEnd = max(bssEnd, parseHexInt(f[1]) + parseInt(f[2]))
+    else: discard
+  expectTrue("assembled for code $1000, data $5000, bss $6000 (" & bases & ")",
+             bases == "base 0x1000 data 0x5000 bss 0x6000")
+  expectTrue("code ends by $4fff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x5000)
+  expectTrue("data ends by $5fff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6000)
+  expectTrue("bss ends by $6eff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0x6f00)
+
+run testKernelLayout
+
+proc testKernelApi() =
+  ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 16 entries
+  ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
+  ## goes to api_<name> (or api_none, a stub for now); every other to
+  ## api_none. Entries are only added: every committed api.inc's entries are
+  ## still there at the same addresses.
+  echo "== kernel API table =="
+  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
+  if assembled.exitCode != 0:
+    fail("kernel assembly failed: " & assembled.output)
+    return
+  let image = readFile(kernelDir / "kernel.o")
+  let syms = kernelMap().syms
+  let defs = incDefines(readFile(kernelDir / "api.inc"))
+  var named = initTable[int, string]()
+  for (name, value) in defs:
+    if value >= 0x1003 and value < 0x1183:
+      if (value - 0x1003) mod 3 != 0:
+        fail(name & " $" & toHex(value, 4) & " is not an entry's address")
+      elif named.hasKey(value):
+        fail(name & " and " & named[value] & " share $" & toHex(value, 4))
+      else:
+        named[value] = name
+  var bad: seq[string]
+  var stubs: seq[string]
+  for g in 0..7:
+    for n in 0..15:
+      let a = 0x1003 + 48 * g + 3 * n
+      let o = a - 0x1000
+      if image[o].ord != 0xb0:
+        bad.add("$" & toHex(a, 4) & " is not a B")
+        continue
+      let target = image[o + 1].ord or (image[o + 2].ord shl 8)
+      let sym = syms.getOrDefault(target, "$" & toHex(target, 4))
+      if named.hasKey(a):
+        let want = "api_" & named[a][4 .. ^1].toLowerAscii
+        if sym == "api_none":
+          stubs.add(named[a])
+        elif sym != want:
+          bad.add(named[a] & " ($" & toHex(a, 4) & ") goes to " & sym & ", not " & want)
+      elif sym != "api_none":
+        bad.add("$" & toHex(a, 4) & " goes to " & sym & " but api.inc names no entry there")
+  for b in bad: echo "  ", b
+  expectTrue("the table matches api.inc (" & $named.len & " entries named)", bad.len == 0)
+  if stubs.len > 0: echo "  stubs (api_none for now): ", stubs.join(" ")
+  expectTrue("the table ends at $1182: api_none follows it",
+             syms.getOrDefault(0x1183, "") == "api_none")
+  # the API block's addresses: the kernel's (api.s) and the programs' (api.inc)
+  for (name, value) in incDefines(readFile(kernelDir / "api.s")):
+    expect(name & " in api.inc as in api.s", defineOf(defs, name), value, 4)
+  # only added, never moved: every committed api.inc against this one
+  let log = execCmdEx("git log --format=%H -- kernel/api.inc", workingDir = rootDir)
+  var versions = 0
+  var moved: seq[string]
+  for commit in log.output.splitLines():
+    if commit.len != 40: continue
+    let old = execCmdEx("git show " & commit & ":kernel/api.inc", workingDir = rootDir)
+    if old.exitCode != 0: continue
+    inc versions
+    for (name, value) in incDefines(old.output):
+      let now = defineOf(defs, name)
+      if now != value:
+        moved.add(name & " was $" & toHex(value, 4) & " in " & commit[0 .. 6] & ", now " &
+                  (if now < 0: "gone" else: "$" & toHex(now, 4)))
+  for m in moved: echo "  ", m
+  expectTrue("no entry of " & $versions & " committed api.inc versions moved or went", moved.len == 0)
+
+run testKernelApi
+
+proc mkprg(src, dest: string) =
+  let r = execCmdEx("python3 " & quoteShell(toolsDir / "mkprg.py") & " " & quoteShell(src) &
+                    " -o " & quoteShell(dest))
+  if r.exitCode != 0:
+    raise newException(IOError, "mkprg " & src & ": " & r.output)
+
+proc runUntil(cond: proc (): bool; limit: int): bool =
+  var n = 0
+  while n < limit:
+    if cond(): return true
+    if cpuStep() != sOk: break
+    inc n
+  cond()
+
+proc testApiProgram() =
+  ## KRN-011: a program at $7000 (tools/testdata/api_prog.s) calling entries
+  ## of every API group, started the way `cupc8.py run` does (the body at
+  ## $7000, then API_RUN = 1, which the terminal takes while it waits for a
+  ## key), on HDMI with the storage card; it returns to the terminal, whose
+  ## stack is as before. Then one that calls API_EXIT with bytes still on
+  ## the stack.
+  echo "== kernel API: a program calling every group =="
+  let rom = buildKernelRom()
+  createDir(storeDir)
+  let img = storeDir / "api.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  let prg = testdata / "api_prog.prg"
+  mkprg(testdata / "api_prog.s", prg)
+  bootStorage(rom, img)
+  expectTrue("the terminal waits for a key", waiting)
+  let sp0 = SP
+  expect("API_RUN is 0 after power-up", mem[ApiRun], 0)
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("the program ran to its end",
+             runUntil(proc (): bool = mem[0x7e3f] == 0xa5, 30_000_000))
+  expect("API_RUN 2 while it ran", mem[0x7e30], 2)
+  settle(2_000_000)
+  expect("API_RUN 0 again at the prompt", mem[ApiRun], 0)
+  let g = gpuCard()
+  expectTrue("back at the prompt", waiting and gpuFind(g, ">>") >= 0)
+  expect("the terminal's stack as before", SP, sp0, 4)
+  # group 0
+  expect("API_VERSION", mem[0x7e00], 1)
+  expect("API_BLOCK low", mem[0x7e01], 0x00)
+  expect("API_BLOCK high", mem[0x7e02], 0x6f)
+  expect("API_SLOTS low", mem[0x7e03], 0x02)
+  expect("API_SLOTS high", mem[0x7e04], 0x00)
+  # group 1
+  expectTrue("API_PUTS and API_PUTC (" & gpuLine(g, 0) & ")", gpuLine(g, 0).startsWith("API HELLO!"))
+  let x = int(simcard_gpu_cell(g, 10, 20))
+  expect("API_GOTOXY then API_PUTC: X at 10,20", x and 0xff, ord('X'))
+  expect("API_ATTR: its attribute", (x shr 8) and 0xff, 0x1e)
+  expect("API_GETXY ok", mem[0x7e05], 0)
+  expect("API_GETXY column", mem[0x7e06], 11)
+  expect("API_GETXY row", mem[0x7e07], 20)
+  expect("API_POLLKEY with no key", mem[0x7e08], 0xff)
+  let p = int(simcard_gpu_cell(g, 0, 29))
+  expectTrue("API_POKE: P at 0,29 in $4e", (p and 0xff) == ord('P') and ((p shr 8) and 0xff) == 0x4e)
+  # group 2
+  expect("API_GFX_GETPIXEL ok", mem[0x7e09], 0)
+  expect("API_GFX_PIXEL then GETPIXEL", mem[0x7e0a], 42)
+  expect("API_GFX_FILL_RECT then GETPIXEL", mem[0x7e0b], 7)
+  expect("API_GFX_VSYNC ok", mem[0x7e0c], 0)
+  # group 3, on HDMI: nothing, $ff
+  expect("API_EINK_GET on HDMI", mem[0x7e0d], 0xff)
+  expect("API_EINK_GET leaves $ff (first)", mem[0x7e0e], 0xff)
+  expect("API_EINK_GET leaves $ff (last)", mem[0x7e0f], 0xff)
+  expect("API_EINK_STATUS on HDMI", mem[0x7e10], 0xff)
+  expect("API_EINK_STATUS leaves $ff", mem[0x7e11], 0xff)
+  expect("API_EINK_AUTO on HDMI", mem[0x7e12], 0xff)
+  # group 4
+  expect("API_ST_INFO", mem[0x7e13], 0)
+  expect("API_ST_INFO media: SD", mem[0x7e14], 1)
+  expect("API_ST_OPEN to write", mem[0x7e15], 0)
+  expect("API_ST_WRITE", mem[0x7e16], 0)
+  expect("API_ST_CLOSE", mem[0x7e17], 0)
+  expect("API_ST_OPEN to read", mem[0x7e18], 0)
+  expect("API_ST_SEEK", mem[0x7e19], 0)
+  expect("API_ST_READ", mem[0x7e1a], 0)
+  expect("API_ST_READ read the 4 bytes after the seek", mem[0x7e1b], 4)
+  var got = ""
+  for i in 0..3: got.add(char(mem[0x7e40 + i]))
+  expectTrue("API_ST_READ data: ello (" & got & ")", got == "ello")
+  expect("API_ST_RENAME", mem[0x7e1c], 0)
+  expect("API_ST_DIR_FIRST", mem[0x7e1d], 0)
+  expect("API_ST_DIR_FIRST size", mem[0x7e1e], 5)
+  expect("API_ST_DIR_FIRST name length", mem[0x7e1f], 8)
+  expect("API_ST_DIR_FIRST the renamed name", mem[0x7e20], ord('2'))
+  expect("API_ST_DIR_NEXT: no more", mem[0x7e21], 0xff)
+  expect("API_ST_DELETE", mem[0x7e22], 0)
+  expect("API_ST_OPEN a deleted file: not found", mem[0x7e23], 3)
+  r = fatcheck("check " & quoteShell(img) & " --absent API.TXT --absent API2.TXT")
+  if r.exitCode != 0: echo r.output
+  expectTrue("the card as a PC sees it: nothing left", r.exitCode == 0)
+  # groups 5 and 7: not there yet
+  expect("an empty net entry: $ff", mem[0x7e24], 0xff)
+  expect("... and API_ERR $ff", mem[0x7e25], 0xff)
+  expect("an empty reserved entry: $ff", mem[0x7e27], 0xff)
+  # group 6
+  expect("API_WAIT_MS", mem[0x7e26], 0)
+  let t0 = mem[0x7e28] or (mem[0x7e29] shl 8)
+  let t1 = mem[0x7e2c] or (mem[0x7e2d] shl 8)
+  expectTrue("API_TICKS counts the 20 ms API_WAIT_MS waited (" & $t0 & " to " & $t1 & ")",
+             t1 - t0 >= 18 and t1 - t0 <= 30)
+
+  echo "== kernel API: API_EXIT =="
+  let ex = testdata / "api_exit.prg"
+  mkprg(testdata / "api_exit.s", ex)
+  expectTrue("the program goes in", runProgram(readFile(ex)))
+  expectTrue("it ran", runUntil(proc (): bool = mem[0x7e00] == 0x5a and mem[ApiRun] == 0, 2_000_000))
+  settle(2_000_000)
+  expect("API_EXIT does not return", mem[0x7e00], 0x5a)
+  expectTrue("back at the prompt", waiting)
+  expect("the terminal's stack as before, 6 bytes left behind", SP, sp0, 4)
+  expectTrue("the terminal still works", cmdOutput("10 print 7*6").len == 0 and runOutput() == @["42"])
+  expectTrue("a bad header is refused", not runProgram("C8P\x02" & "junk"))
+  ioModel = imLegacy
+
+run testApiProgram
+
+proc testExec() =
+  ## KRN-012: `exec "NAME"` from the storage card: a program file (the "C8P"
+  ## header, version 1) loaded at $7000 over several chunks and run; one
+  ## that fills $7000-$dfff exactly; any other file as BASIC (LOAD, RUN); a
+  ## bad header version, a header cut short and one too big are refused
+  ## with a message and nothing runs; a missing file; no name.
+  echo "== exec from the storage card =="
+  let rom = buildKernelRom()
+  createDir(storeDir)
+  let img = storeDir / "exec.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  let prg = storeDir / "exec.prg"
+  mkprg(testdata / "exec_prog.s", prg)
+  let file = readFile(prg)
+  let body = file[4 .. ^1]
+  var full = body
+  while full.len < 0x7000 - 1: full.add('\0')
+  full.add('\x5a')                              # the last byte, at $dfff
+  proc put(name, data: string) =
+    writeFile(storeDir / "put.bin", data)
+    let r = fatcheck("put " & quoteShell(img) & " " & name & " " & quoteShell(storeDir / "put.bin"))
+    if r.exitCode != 0: fail("fatcheck put " & name & ": " & r.output)
+  put("PROG.PRG", file)
+  put("FULL.PRG", "C8P\x01" & full)
+  put("BIG.PRG", "C8P\x01" & full & "x")
+  put("BADVER.PRG", "C8P\x02" & body)
+  put("CUT.PRG", "C8P")
+  put("BAS", "10 print 6*7\r\n20 print \"BASIC OK\"\r\n")
+  bootStorage(rom, img)
+  let sp0 = SP
+  expectTrue("exec a program", cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"])
+  var same = true
+  for i in 0 ..< body.len:
+    if mem[0x7000 + i] != body[i].ord: same = false
+  expectTrue("its " & $body.len & " bytes at $7000 (three chunks)", same)
+  expect("the terminal's stack as before", SP, sp0, 4)
+  mem[0xdfff] = 0
+  expectTrue("exec one that fills $7000-$dfff", cmdOutput("exec full.prg") == @["NATIVE OK"])
+  expect("its last byte at $dfff", mem[0xdfff], 0x5a)
+  let bas = cmdOutput("exec \"bas\"", "DONE.")
+  expectTrue("exec a BASIC program (" & $bas & ")", bas == @["42", "BASIC OK"])
+  for i in 0x7000 .. 0x7010: mem[i] = 0          # anything run from here now would not print
+  expectTrue("a bad header version is refused",
+             cmdOutput("exec \"badver.prg\"") == @["bad program header"])
+  expectTrue("a header cut short is refused", cmdOutput("exec \"cut.prg\"") == @["bad program header"])
+  expectTrue("one byte too big is refused", cmdOutput("exec \"big.prg\"") == @["program too big"])
+  expectTrue("a missing file", cmdOutput("exec \"nothing\"") == @["file not found"])
+  expectTrue("no name", cmdOutput("exec") == @["EXEC \"NAME\""])
+  expect("the terminal's stack as before, after all that", SP, sp0, 4)
+  let help = cmdOutput("help")
+  expectTrue("help lists exec", help.len > 0 and help[0].endsWith("EXEC"))
+  bootStorage(rom, "", fitted = false)
+  expectTrue("no storage card", cmdOutput("exec \"prog.prg\"") == @["no storage card"])
+  ioModel = imLegacy
+
+run testExec
 
 if failures > 0:
   echo "FAILED ", failures, " check(s)"

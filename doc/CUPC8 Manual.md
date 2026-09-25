@@ -46,6 +46,7 @@ Files, on the storage card's microSD card (`doc/hardware/storage-card.md`). A ca
 - `load "NAME"` clears the program (`new`), then takes the file's lines as if they were typed: a line that does not start with a line number (a blank line, say) is skipped, and a line longer than 78 characters is cut. A line that does not fit stops the load with `PROGRAM FULL`.
 - `dir` lists every file with its size in bytes.
 - `del "NAME"` deletes a file.
+- `exec "NAME"` runs a file: a program for $7000 (it starts with the header `C8P` and version 1; `tools/mkprg.py` makes one, and it calls the kernel through `kernel/api.inc`), which comes back to the prompt when it returns or calls `API_EXIT`, or else a BASIC program, which it loads and runs. `cupc8.py run PROG` does the same from the PC through the system card.
 
 They print `SAVED` or `LOADED` when done, or what went wrong: `no SD card`, `no storage card` (none fitted), `file not found`, `card full`, `write protected`, `bad file name` (not 8.3), `no file system on the card` (not formatted) or `card error`. On a USB source under 3 A, `save` and `del` print `USB power under 3A: SD writes off` and leave the card as it was; `load` and `dir` still work.
 

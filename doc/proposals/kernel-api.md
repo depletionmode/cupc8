@@ -71,17 +71,55 @@ rest reserved.
 
 ## Loading and running programs
 
-- **Format:** a flat binary assembled for $7000 (`tools/as.py prog.s
-  prog.bin 0x7000,<data>,<bss>`, with `kernel/api.inc` included). Up to
-  28 KB.
+- **Format:** a flat binary assembled for $7000 (`tools/mkprg.py prog.s -o
+  prog.prg` puts `kernel/api.inc` in front, assembles it with its data right
+  after the code and its bss after that, and adds the header). Up to 28 KB.
+- **Program file header** (decided by David): 4 bytes, `'C'`, `'8'`, `'P'`,
+  then the version, 1. The body follows and is loaded at $7000.
+  `tools/mkprg.py prog.bin -o prog.prg` wraps a binary assembled some other
+  way.
 - **From the storage card:** the terminal command `exec "NAME"` reads the
-  file to $7000 and calls it. `ret` (`pop pcl`/`pop pch`) or the `exit` API
-  entry returns to the terminal, which resets its stack.
-- **From the PC:** `cupc8.py run prog.bin` writes the binary with
-  `RAM_WRITE`, then sets `API_RUN` to 1. The terminal checks `API_RUN` while
-  it waits for a key (a timer tick wakes its `WAI`, ~20 Hz), clears it, and
-  calls $7000 as `exec` does. Needs the system card. The implementer checks
-  the bridge's RAM writes are safe while the CPU runs.
+  file. With the header (version 1) the body goes to $7000, 128-byte chunk
+  by chunk, and is called. `"C8P"` with another version, or cut short, gives
+  `bad program header`; a body past $dfff gives `program too big`; neither
+  runs anything. Any other file is a BASIC program as SAVE writes it: `exec`
+  does LOAD's work (NEW, then the lines as if typed), then RUN. `ret`
+  (`pop pcl`/`pop pch`) or the `exit` API entry returns to the terminal,
+  which resets its stack.
+- **From the PC:** `cupc8.py run prog.prg` (or the bare binary) writes the
+  body at $7000 with `RAM_WRITE`, then sets `API_RUN` to 1. The terminal
+  looks at `API_RUN` every time its key wait wakes: the kernel's clock
+  (timer 0) wakes the `WAI` about every 60 µs, more often than the ~20 Hz
+  planned, and the look is three instructions. It then calls $7000 as `exec`
+  does. `API_RUN` is 2 while a program runs and 0 again at the prompt, and
+  `cupc8.py run` refuses unless it is 0. Needs the system card. The bridge's
+  RAM writes are safe while the CPU runs, byte by byte (`sysctl.md`), which
+  is why `API_RUN` goes last.
+- **In the simulator** (no system card): `runProgram` in `tools/sim.nim` does
+  what `cupc8.py run` does.
+
+### As implemented (2026-09-25)
+
+- `kernel/api.s` holds the table, `kernel/sys.s` the routines (each one's
+  comment is its contract) and the loader, `kernel/api.inc` the names.
+  Pointers in `API_ARGS` are low byte first; routines that return a pointer
+  in registers give r0 = low, r1 = high.
+- **Resetting the stack:** nothing reads SP, so the terminal finds it once at
+  start-up (a pushed byte lands at SP: the address that takes two different
+  pushed markers is SP), and a program's end pops until the same probe says
+  SP is back there. A program that pops more than it pushed cannot be
+  recovered.
+- **The clock:** timer 0 counts instructions (and WAI idle turns, one per 3
+  clocks), so the kernel's ms since boot is weighted: 1/16 ms per expiry
+  while waiting in WAI, 4/16 while running. About right (±25%), not exact.
+  The tick costs a program about 17 instructions in 250.
+- **CPU fix found on the way:** an IRQ taken right after `POP pcl` lost the
+  return (its frame went over the popped byte, its handler's `POP pcl`
+  replaced pcl). `cpu.vhd` and `sim.nim` now take no IRQ at that boundary
+  (CPU-005).
+- Graphics has no BLIT8/BLIT1/DEFCHAR entries yet (a frame over 64 bytes
+  needs the card's FREE check); they can be added in group 2's spare
+  entries.
 
 ## Networking
 

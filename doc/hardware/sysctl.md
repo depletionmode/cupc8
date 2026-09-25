@@ -96,6 +96,18 @@ flash/FPGA target: 0 = chipset (FL0), 1 = CPU card (FL1).
 
 $00 PING, $01 STATUS, $32, $4x and $5x work with the chipset down.
 
+**RAM writes while the CPU runs.** `RAM_WRITE` needs no `CPU_CTL` stop. The
+bridge (`soc/bridge.vhd`) hands the chipset one byte at a time; the chipset's
+memory controller serves it only when idle and takes no new CPU cycle while
+the bridge's request is up (`soc/chipset.vhd`: the bridge goes first, the CPU
+waits on /RDY), so every byte is one whole SRAM cycle between CPU cycles: no
+bus contention and no torn byte. Nothing is atomic across bytes, though: the
+CPU can see a block half written. So `cupc8.py run` writes a program at $7000
+first and then, in a separate `RAM_WRITE`, sets `API_RUN` ($6f21) to 1, which
+is the only byte the kernel's terminal looks at; and it refuses while
+`API_RUN` is 2 (a program is running at $7000, which it would write over) or
+still 1 (the last one not started yet).
+
 ### The card programming port
 
 The port is two wires, SWCLK and SWDIO, switched to one slot by the mux

@@ -788,6 +788,28 @@ proc cpuBootRom*() =
 proc cpuLoadFile*(path: string) =
   cpuLoadImage(readFile(path))
 
+const
+  ProgramBase* = 0x7000          ## user programs (memory-map.md)
+  ProgramEnd* = 0xe000
+  ApiRun* = 0x6f21               ## the API block's API_RUN mailbox (kernel/api.s)
+
+proc runProgram*(data: string): bool =
+  ## What `cupc8.py run` does through the system card: the program's body at
+  ## $7000, then API_RUN = 1; the kernel's terminal starts it while it waits
+  ## for a key. A file with the "C8P" header must be version 1; a file
+  ## without one is the body itself. False (nothing written) otherwise.
+  var body = data
+  if body.len >= 3 and body[0 .. 2] == "C8P":
+    if body.len < 4 or body[3] != '\x01':
+      return false
+    body = body[4 .. ^1]
+  if body.len > ProgramEnd - ProgramBase:
+    return false
+  for i, c in body:
+    mem[ProgramBase + i] = ord(c)
+  mem[ApiRun] = 1
+  true
+
 proc cpuStep*(): StepResult =
   ## Fetch/decode/execute one instruction and report why execution stopped.
   # A direct step consumes the resume allowance from a prior breakpoint hit.

@@ -106,6 +106,32 @@ def main():
     _, out = sim.run("ram", "read", "0xfff8", "16")
     expect(out.count("\n") == 1, "ram read wrapping past $ffff: %r" % out)
 
+    # run: a program for $7000 (a .prg's header stripped, or a bare binary),
+    # then API_RUN = 1 for the kernel's terminal. This machine runs no
+    # kernel, so it is never taken.
+    zero, two = file_of("zero.bin", b"\x00"), file_of("two.bin", b"\x02")
+    prog = bytes(rnd.randrange(256) for _ in range(300))
+    sim.run("ram", "write", "0x6f21", zero)
+    rc, out = sim.run("run", file_of("p.prg", b"C8P\x01" + prog))
+    expect(rc == 0 and "300 bytes at $7000; not started yet" in out, "run p.prg: %r" % out)
+    sim.run("ram", "read", "0x7000", "300", "-o", os.path.join(tmp, "p-back.bin"))
+    expect(open(os.path.join(tmp, "p-back.bin"), "rb").read() == prog, "run: the body at $7000, the header left out")
+    sim.run("ram", "read", "0x6f21", "1", "-o", os.path.join(tmp, "run-back.bin"))
+    expect(open(os.path.join(tmp, "run-back.bin"), "rb").read() == b"\x01", "run: API_RUN = 1")
+    rc, out = sim.run("run", file_of("p.bin", prog[::-1]), ok=False)
+    expect(rc == 1 and "has not started yet" in out, "run again before the first started: refused: %r" % out)
+    sim.run("ram", "write", "0x6f21", two)
+    rc, out = sim.run("run", os.path.join(tmp, "p.bin"), ok=False)
+    expect(rc == 1 and "a program is running" in out, "run while one runs (API_RUN = 2): refused: %r" % out)
+    sim.run("ram", "write", "0x6f21", zero)
+    rc, out = sim.run("run", file_of("v2.prg", b"C8P\x02" + prog), ok=False)
+    expect(rc == 1 and "not a version 1 program" in out, "run a version 2 program: refused: %r" % out)
+    rc, out = sim.run("run", file_of("big.bin", bytes(0x7001)), ok=False)
+    expect(rc == 1 and "more than the 28672" in out, "run 28673 bytes: refused: %r" % out)
+    rc, out = sim.run("run", os.path.join(tmp, "p.bin"))
+    sim.run("ram", "read", "0x7000", "300", "-o", os.path.join(tmp, "p-back.bin"))
+    expect(rc == 0 and open(os.path.join(tmp, "p-back.bin"), "rb").read() == prog[::-1], "run a bare binary")
+
     # the CPU through the bridge
     for op in ("stop", "step", "cycle", "run", "hold", "release"):
         rc, out = sim.run("cpu", op)
