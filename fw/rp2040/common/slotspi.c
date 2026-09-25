@@ -148,6 +148,16 @@ void slotspi_init(card_t *c, slotspi_status_fn status)
 	sm_config_set_in_shift(&cfg, false, true, 8);
 	sm_config_set_out_shift(&cfg, false, false, 32);
 	pio_gpio_init(pio, PIN_SLOT_MISO);
+	/* MISO reaches the slot through a 74LVC1G125 enabled by CS_n
+	 * (hw/boards/README.md), so this pad only feeds the buffer's input. The
+	 * SM drives it only while selected; the rest of the time it floats, so
+	 * it needs a pull to keep the CMOS input from floating. Replace the
+	 * reset pull-down with a pull-up: the input then idles high, as the
+	 * shared line does. 4 mA and slow slew are plenty for one gate input a
+	 * few mm away at SCK <= 6 MHz, and ring less. */
+	gpio_set_pulls(PIN_SLOT_MISO, true, false);
+	gpio_set_drive_strength(PIN_SLOT_MISO, GPIO_DRIVE_STRENGTH_4MA);
+	gpio_set_slew_rate(PIN_SLOT_MISO, GPIO_SLEW_RATE_SLOW);
 	gpio_init(PIN_SLOT_SCK);
 	gpio_init(PIN_SLOT_MOSI);
 	gpio_init(PIN_SLOT_NCS);
