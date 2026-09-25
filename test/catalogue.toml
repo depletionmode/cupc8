@@ -1002,6 +1002,15 @@ kind = "sim"
 vrow = "3.2"
 
 [[test]]
+id = "E2E-010"
+title = "Networking in assembly on the real Wi-Fi firmware"
+checks = "the kernel's DNS client asks a DNS server on the PC (net config dns 10.0.2.2 PORT, the settings shown), net lookup prints its address and NXDOMAIN's message, net get NAME PORT resolves the name itself and fetches from the PC (Host header is the name), net ping 10.0.2.2 gets QEMU's echo replies over the card's raw ICMP socket with times and the summary, net config shows the settings"
+method = "test/emu/test_e2e.mjs E2E-010 (CUPC8_EMU=native): the native emulator, esp32c3 firmware in QEMU, a Node DNS server and HTTP server on 127.0.0.1"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-010"
+
+[[test]]
 id = "E2E-004"
 title = "Negative system tests"
 checks = "empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power source: each behaves as specified (a missing CPU card and hot-plugging are out of scope)"
