@@ -270,10 +270,11 @@ def schematic(path, footprint_libs):
 
 BODY = kg.IO_CARD_BODY
 TAB_TOP = BODY[3]                      # where the tab meets the body
-FPGA = (24.5, -31.3, 0)      # its top pad row 0.85 mm from the top edge
+DY = BODY[1] + 44.0                  # the layout is drawn for a 39.05 mm body; a taller one adds at the top
+FPGA = (24.5, -31.3 + DY, 0)         # its top pad row 0.85 mm from the top edge
 ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In2.Cu",)))
 LOGO_MM = 12
-LOGO_AT = (49.4, -14.6)              # the empty lower right: D and timer lines pass under it
+LOGO_AT = (49.4, -14.6 + DY)              # the empty lower right: D and timer lines pass under it
 TITLE, REVISION = "CUPC/8 CPU", "A"
 SILK_TEXT = (0.8, 0.15)              # designators at JLC's minimum height: this card is 0402s
 POWER_LED = kg.IO_CARD_PWR_LED
@@ -320,12 +321,12 @@ def placement():
         # the top side's supply pins (VPP 108, VCC 92, VCCIO1 100 and 89) are
         # decoupled from the package's top corners: the pad row is at the edge
         "C14": (fx - 12.5, fy - 11.2, 0), "C3": beside(37, along=2.0),
-        "C10": (fx + 12.2, fy - 11.0, 90), "C9": (fx - 14.15, -26.2, 180),
+        "C10": (fx + 12.2, fy - 11.0, 90), "C9": (fx - 14.15, -26.2 + DY, 180),
         "C13": beside(72, along=2.5),                               # VCC_SPI
-        "C15": (9.0, -21.0, 0), "C16": (54.8, -21.5, 90),          # 3V3 bulk
+        "C15": (9.0, -21.0 + DY, 0), "C16": (54.8, -21.5 + DY, 90),          # 3V3 bulk
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
-        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (51.4, -20.9, 0), "R6": (48.2, -20.9, 0),
-        "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2, 0), "R7": (3.2, -26.6, 0),
+        "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (51.4, -20.9 + DY, 0), "R6": (48.2, -20.9 + DY, 0),
+        "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2 + DY, 0), "R7": (3.2, -26.6 + DY, 0),
         # 33 ohm arrays at their pins, FPGA side (pads 1-4) towards the
         # package and in the pins' order, finger side (pads 8-5) away from
         # it: A and control in a row under the bottom side, D and the timer
@@ -335,16 +336,16 @@ def placement():
         "RN6": (45.8, fy + 7.8, 90), "RN7": (45.8, fy + 5.0, 90), "RN8": (45.8, fy - 0.2, 90),
         # config flash by the config pins, under the top edge beside the
         # hole, its decap, and the configuration pull-ups
-        "U2": (45.3, -38.6, 0), "C23": (48.6, -35.6, 90),
-        "R1": (49.8, -33.6, 0), "R2": (49.8, -31.2, 0), "R3": (49.8, -28.8, 0), "R4": (49.8, -26.4, 0),
-        "R5": (49.8, -24.0, 0),
+        "U2": (45.3, -38.6 + DY, 0), "C23": (48.6, -35.6 + DY, 90),
+        "R1": (49.8, -33.6 + DY, 0), "R2": (49.8, -31.2 + DY, 0), "R3": (49.8, -28.8 + DY, 0), "R4": (49.8, -26.4 + DY, 0),
+        "R5": (49.8, -24.0 + DY, 0),
         # LEDs along the top edge from the common PWR spot, each resistor
         # under its LED; the 1V2 LED's switch below; the LDO beside them
         "D1": POWER_LED + (0,), "R9": (POWER_LED[0], POWER_LED[1] + 2.6, 0),
         "D2": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R10": (POWER_LED[0] + 4.5, POWER_LED[1] + 2.6, 0),
         "Q1": (POWER_LED[0] + 0.2, POWER_LED[1] + 8.8, 0), "R8": (POWER_LED[0] + 3.8, POWER_LED[1] + 12.6, 0),
-        "U3": (5.4, -40.8, 0), "C21": (4.2, -36.4, 0), "C22": (4.2, -33.4, 0),
-        "TP1": (-3.0, -19.0, 0), "TP2": (1.0, -19.0, 0), "TP3": (5.0, -19.0, 0),
+        "U3": (5.4, -40.8 + DY, 0), "C21": (4.2, -36.4 + DY, 0), "C22": (4.2, -33.4 + DY, 0),
+        "TP1": (-3.0, -19.0 + DY, 0), "TP2": (1.0, -19.0 + DY, 0), "TP3": (5.0, -19.0 + DY, 0),
     })
     return p
 
