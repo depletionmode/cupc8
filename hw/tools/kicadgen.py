@@ -1530,6 +1530,23 @@ def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
     return nets
 
 
+def open_escapes(board, nets):
+    """The nets among `nets` whose pads KiCad's connectivity does not join
+    into one: what Freerouting's own report cannot be trusted with."""
+    board.BuildConnectivity()
+    conn = board.GetConnectivity()
+    bad = []
+    for net in nets:
+        pads = [p for fp in board.GetFootprints() for p in fp.Pads() if p.GetNetname() == net]
+        if len(pads) < 2:
+            continue
+        joined = conn.GetConnectedItems(pads[0])
+        keys = {(i.GetParentFootprint().GetReference(), i.GetNumber()) for i in joined if i.GetClass() == "PAD"}
+        if any((p.GetParentFootprint().GetReference(), p.GetNumber()) not in keys for p in pads[1:]):
+            bad.append(net)
+    return bad
+
+
 def clear_fingers(board, nets, margin=0.6):
     """Remove routed tracks of the pour `nets` that reach down over a card's
     fingers (below their top `margin` mm): Freerouting joins neighbouring
@@ -2063,7 +2080,25 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             "%d GND pad vias" % state["fanout"]
     step("board", build)
     def route():
-        autoroute(state["b"], out, passes, pours=tuple(pour_nets) + tuple(state.get("escaped", ())))
+        # Freerouting reports the key-notch escapes' nets unrouted whether or
+        # not it reached them, so they are taken on trust and then checked
+        # here, on KiCad's own connectivity: a try that left one open is
+        # thrown away and the router runs again with more passes
+        escaped = tuple(state.get("escaped", ()))
+        for attempt in range(3):
+            if attempt:
+                state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
+            try:
+                autoroute(state["b"], out, passes * (attempt + 1), pours=tuple(pour_nets) + escaped, tries=1)
+            except RuntimeError:
+                if attempt == 2:
+                    raise
+                continue
+            open_nets = open_escapes(state["b"], escaped)
+            if not open_nets:
+                break
+            if attempt == 2:
+                raise RuntimeError("Freerouting left %s unrouted after 3 tries" % open_nets)
         if card_edge:
             n = clear_fingers(state["b"], pour_nets)
             return "%d pour tracks cleared off the fingers" % n if n else None
