@@ -276,6 +276,12 @@ FPGA = (24.5, -31.3 + DY, 0)         # its top pad row 0.85 mm from the top edge
 # solid; GND also poured on the outer layers (zones[0], which the pipeline
 # ties the fingers to and stitches)
 LAYERS = 6
+# the bus and configuration nets route at 0.15 mm track and clearance
+# (kicadgen's Fine class): between the TQ144's 0.5 mm-pitch pads there is
+# 0.22 mm, so at the Default 0.2 mm clearance no track passes between two
+# pins and Freerouting left 1-13 nets unrouted whatever the layer count
+FINE_NETS = sorted({"/" + n for n in SOCKET.values() if n.startswith(("CPU_", "FL1_", "CRESET", "CDONE"))} |
+                   {"/FPGA_" + n[4:] for n in DRIVEN} | {"/FL1_WPHOLD"})
 ZONES = ("/GND", ("/GND", ("In1.Cu",)), ("/3V3", ("In4.Cu",)))
 LOGO_MM = 12
 LOGO_AT = (49.4, -14.6 + DY)              # the empty lower right: D and timer lines pass under it
@@ -578,6 +584,7 @@ def main():
     # fingers to and stitches) and as the In1 plane; 3V3 is the In2 plane
     lcsc = kg.pipeline(
         "cpu", schematic, placement(), None, out=out, io_card=True, tab=kg.X8_TAB, layers=LAYERS, zones=ZONES,
+        fine_nets=FINE_NETS,
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence=presence_ring,         # round the edge, before the pad fan-out places its vias
         passes=40, route_tries=8,       # Freerouting converges early; what differs is each try's ordering
