@@ -20,6 +20,34 @@
 
 import http from 'node:http';
 
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`Watch the CUPC/8 machine emulator in a browser.
+
+usage: node tools/machine_view.mjs [options]
+
+  --native         run the native emulator (emu/machine; build it with
+                   tools/emu_machine_build.sh). Also CUPC8_EMU=native.
+                   Without it: the legacy JS emulator (test/emu/machine.mjs).
+  --slots LIST     the cards in slots 1, 2, ... (default gpu,io). Kinds:
+                   gpu, io, wifi, storage, and (native only) eink (5.83")
+                   or eink750 in place of gpu.
+  --every MS       emulated time between captured frames (default 250)
+  --port N         the web page's port (default 8640)
+  -h, --help       this text
+
+Then open http://127.0.0.1:<port>, click the screen and type.
+
+examples:
+  node tools/machine_view.mjs --native
+  node tools/machine_view.mjs --native --slots gpu,io,wifi
+  node tools/machine_view.mjs --native --slots eink,io,storage
+
+environment:
+  CUPC8_EINK_SCALE   scale the e-ink panel's busy times
+  CUPC8_EMU_THREADS  0 runs the native emulator single-threaded`);
+  process.exit(0);
+}
+
 const native = process.argv.includes('--native') || process.env.CUPC8_EMU === 'native';
 const { Machine } = await import(native ? '../test/emu/machinenative.mjs' : '../test/emu/machine.mjs');
 
