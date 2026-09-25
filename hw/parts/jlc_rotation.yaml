@@ -109,6 +109,9 @@ jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL:
 jlc:USB-C_SMD-TYPE-C-31-M-12_1:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-C_SMD-TYPE-C-31-M-12_1 (C165948)'
+jlc:VSON-10_L3.0-W2.0-P0.50-TL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s VSON-10_L3.0-W2.0-P0.50-TL (C2845237)'
 jlc:WIFIM-SMD_61P-L13.2-W12.5-P0.80:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s WIFIM-SMD_61P-L13.2-W12.5-P0.80 (C2911374)'
