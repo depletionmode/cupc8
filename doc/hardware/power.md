@@ -15,7 +15,7 @@ USB-C receptacle (main board)
                     │               ├── CPU socket +3V3 → CPU card (own 1V2 LDO)
                     │               └── slots +3V3 (≤ 300 mA each)
                     ├── CPU socket +5V
-                    └── slots +5V, each via a 750 mA PTC + 0 Ω link + 50 mΩ sense
+                    └── slots +5V, each via a 1.1 A PTC + 0 Ω link + 50 mΩ sense
 ```
 
 - **Rail LEDs:** each rail (5V_SYS, 3V3, 1V2, and the CPU card's 1V2) has an
@@ -49,11 +49,11 @@ this table.
 | LEDs (~16 at 1–2 mA) | 3V3 | 15 | 30 |
 | **3V3 total** | | **272** | **617** |
 | 3V3 buck input at 90% efficiency (5.0 V; 535 mA max at the worst-case 4.23 V) | 5V | 200 | 452 |
-| USB keyboard VBUS | 5V | 100 | 500 (switch limit) |
+| USB keyboard VBUS, through the IO card's boost (500 mA at the port: 746 mA from +5V at the worst corner) | 5V | 110 | 746 |
 | HDMI +5V pin (sink EDID power, per spec) | 5V | 10 | 55 |
 | Wi-Fi card (ESP32-C3 via its own TLV62569 buck from +5V; TX peaks, ~260 mA at 5 V) | 5V | 80 | 350 |
 | Slots 5–6 (future cards; not in M1) | 5V | 0 | — |
-| **Total from USB-C (M1 cards)** | 5V | **≈ 390** | **≈ 1420** (worst-case corner, POW-006) |
+| **Total from USB-C (M1 cards)** | 5V | **≈ 400** | **≈ 1690** (worst-case corner, POW-006) |
 
 The worst case assumes a keyboard drawing the full 500 mA (e.g. an RGB
 gaming keyboard), Wi-Fi transmitting at 100 % duty and the SD card writing,
@@ -106,27 +106,24 @@ Run with `test/run.py POW THM`, or each script on its own (for example
 the margin. The values and their sources (datasheet, spec, board script, or
 assumption) are in `hw/power/design.py`.
 
-**Models.** The 3V3 buck and the PWR_HI comparator use TI's own PSpice models
-(TLV62569, TLV7011). `hw/power/models/fetch.py` downloads them from pinned
-URLs, checks their SHA-256, and ports PSpice's `VSWITCH` to ngspice. They
-aren't committed, because TI's licence doesn't grant redistribution. There
-are no vendor models for the RT9013 or the AMS1117, and the input eFuse's
-inrush check (POW-004) uses a behavioural switch with its datasheet slew
-rate, limit and RON. These are **behavioural** models
-(`hw/power/models/behavioural.lib`) built from datasheet figures:
-- the LDOs' output impedance is fitted to a datasheet load-step figure. Each
-  run re-simulates that figure first.
-- the AMS1117's datasheet has no load-step figure, so its model is fitted to
-  the LM1117's, a part of the same 1117 family.
-- the LDO models have no control loop, so they say nothing about stability.
+**Models.** The 3V3 bucks, the IO card's keyboard boost and the PWR_HI
+comparator use TI's own PSpice models (TLV62569, TPS61023, TLV7011).
+`hw/power/models/fetch.py` downloads them from pinned URLs, checks their
+SHA-256, and ports them to ngspice. They aren't committed, because TI's
+licence doesn't grant redistribution. There is no vendor model for the
+RT9013, and the input eFuse's inrush check (POW-004) uses a behavioural
+switch with its datasheet slew rate, limit and RON. These are
+**behavioural** models (`hw/power/models/behavioural.lib`) built from
+datasheet figures:
+- the LDO's output impedance is fitted to its datasheet load-step figure.
+  Each run re-simulates that figure first.
+- the LDO model has no control loop, so it says nothing about stability.
 
 The TI buck model's switches are 10 mΩ rather than 100/60 mΩ, so buck losses
 come from the datasheet RDS(on) and not from the simulation.
 
-As of 2026-09-24 (milestone-1 after the 3 A decision), every test passes
-except three **decisions** in POW-006: B6/B7 (default USB at the max budget)
-and B16 (keyboard VBUS at the worst corner). Each prints what it needs. No
-board change fixes them.
+As of 2026-09-25 every test passes except one **decision** in POW-006:
+B10, the IO card's +5V against slot.md's 0.55 A per card (below).
 
 **The input path, re-sized for 3 A.** The SY6280 (limit at most 2.5 A,
 ±25 %) could not pass the 3 A case with margin. It is replaced on the main
@@ -139,20 +136,56 @@ eFuse's 23 V rating. The main 3V3 buck is the **TLV62569PDDCR** (C398365):
 the DBV package reaches 100 °C at 1.21 A, and slots 5–6 can bring the 3V3 to
 1.22 A.
 
-### Decisions still open (POW-006)
+**Default USB (B6/B7)** now checks power.md's statement as written: a
+default source runs the machine at typical loads (the Typ column, a 100 mA
+keyboard, the radio off). That is 370 mA, 26 % under USB 2.0's 500 mA. The
+max budget (637 mA) is not promised.
+
+**The keyboard port (B16, POW-007)** has a boost on the IO card. Without it
+the port sat at 3.97 V at the worst corner. With it, the port stays at 4.70 V
+or more through a 500 mA step at every corner, against USB 2.0's 4.40 V. The
+circuit is below, for the IO board agent.
+
+### Decision still open (POW-006 B10)
 
 | Check | Result | What it needs |
 |---|---|---|
-| B6/B7, default USB, radio off, SD idle, max budget | 606 mA with a 100 mA keyboard against 500 mA (USB 2.0); 1.022 A with a 500 mA keyboard against 900 mA (USB 3.x). Typical-corner figures are 573 mA and 980 mA, still over, because they use the max loads. | Say default USB runs the machine only at typical loads (the source table above does), or have the policy also switch the keyboard port off on default sources. |
-| B16, keyboard VBUS at the worst corner | 3.965 V at the USB-A port against 4.40 V (USB 2.0 low-power port). Typical: 4.588 V (B17 passes). The Type-C cable alone takes 0.36 V at 4.75 V. | Accept: keyboards run their logic at 3.3 V. No board change reaches 4.40 V at vSafe5V min with a full-drop cable. |
+| B10, the IO card's +5V against slot.md's 0.55 A | A 500 mA keyboard through the boost draws **0.746 A** from a 3.89 V card input at the worst corner. No boost can do better on 0.55 A: even an ideal one needs 0.57 A. | Raise slot.md's per-card +5V budget from 0.55 A to **0.80 A**. The slot fuse goes up one size to **SMD1206P110TFT** (C143975), which holds 0.92 A at 40 °C. With that fuse the IO card passes against the fuse itself (B10b, +19 %), and 0.80 A is 13 % under its hold (B8 at 10 %). |
+
+### IO card keyboard boost (for the IO board agent)
+
+```
+slot +5V ──┬── C 10 µF 25 V 0805 (C15850)
+           └── TPS61023DRLR (C919459, SOT-563)
+                 VIN, EN ── slot +5V (always on; it idles at ~1 µA)
+                 SW ── L 1 µH FXL0420-1R0-M (C167203, 27 mΩ, Isat 7 A) ── slot +5V
+                 VOUT ──┬── 2 × 22 µF 25 V 0805 (C45783)
+                        ├── R1 750 kΩ 1 % (C23240) ── FB ── R2 100 kΩ 1 % (C25803) ── GND
+                        └── SY6280AAC (C55136), as before: its RSET sets the 500 mA
+                            limit, EN from the RP2040, FLT to GPIO8 ── USB-A VBUS
+```
+
+- The output is 5.06 V nominal, 4.84–5.28 V over VREF and the divider's
+  tolerance. At a card input above ~5.1 V the TPS61023 passes its input
+  straight through: at vSafe5V max the port reaches 5.43 V at most, under
+  5.5 V.
+- No feedforward capacitor is needed: 2 × 22 µF derates to about 26 µF at
+  5 V, under the 40 µF above which TI recommends one.
+- The SY6280 keeps the 500 mA limit and the fault flag the firmware reads. It
+  only switches the boost's output.
+- Layout follows TI's (SLVSF14B, section 10): the input and output capacitors
+  go right at VIN/VOUT and GND, and the SW loop stays short.
 
 Other observations (not failures):
 - The SMF5.0A's 5.0 V standoff is below vSafe5V max (5.5 V). Leakage rises,
   but it stays under breakdown (B21 passes).
 - The eFuse's OVLO needs a **0.1 %** divider: with 1 % the trip can reach
-  6.00 V, the absolute maximum of the TLV62569 and SY6280 behind it.
-- The AMS1117 rows in THM-001 (T5–T7) cover a card regulating from +5V. No M1
-  card does, so they could be removed.
+  6.00 V, the absolute maximum of the TLV62569, SY6280 and TPS61023 behind it.
+- Porting TI's TPS61023 model to ngspice needed three fixes, all in
+  `models/fetch.py`. A current source written "10A" read as atto amps; ideal
+  diodes (emission coefficient 0.01 → 0.1); and 1 pF on its pre-charge FET.
+  POW-007 G0 checks the ported model still regulates at the datasheet's set
+  point (0.8 % off).
 
 ### Results (margins)
 
@@ -163,8 +196,9 @@ Other observations (not failures):
 | POW-003 Wi-Fi card buck (as built) | ESP32-C3 minimum in a 358 mA TX burst: 3.199 V at the worst corner (+199 mV over 3.0), 3.201 V typical. Maximum 3.495 V (+105 mV under 3.6). Slot +5V at the card 4.116 V in the burst (+587 mV of headroom). |
 | POW-004 inrush | 1 µF ahead of the eFuse (≤ 10 µF). The eFuse ramps 5V_SYS in 1.1–4.4 ms, so the 84 µF behind it charges at 91–427 mA. The whole surge, loads starting included, peaks at 0.85–1.34 A, under the eFuse's 2.63 A minimum limit (+49 %). The receptacle stays ≥ 3.91 V. |
 | POW-005 CC | Realised CC ranges: default 0.317–0.571 V, 1.5 A 0.829–1.090 V, 3.0 A 1.524–1.936 V. PWR_HI trips between 1.203 V (+112 mV clear of 1.5 A) and 1.386 V (+138 mV clear of 3.0 A). The ADC classes clear by 60–102 mV. TI's TLV7011 model agrees at both edges. |
-| POW-006 budget | M1 worst case 1.424 A: +52 % under a 3.0 A source, +46 % under the eFuse's minimum limit, +55 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.109 A (+26 %). Slots 5–6 have 1.03 A left. Every card is within slot.md's 0.55 A of +5V and 300 mA of +3V3 (the keyboard's 500 mA: +9 %). OVLO 5.60–5.81 V (+1.8 % over 5.5 V, +3.2 % under 6 V). |
-| THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. |
+| POW-006 budget | M1 worst case 1.689 A: +44 % under a 3.0 A source, +36 % under the eFuse's minimum limit, +46 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.341 A (+10.6 %). Default USB at typical loads: 370 mA (+26 % under 500 mA). Slots 5–6 have 0.70 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.399 V highest (+101 mV under 5.5). The IO card's +5V: 0.746 A, +19 % under the new slot fuse's 0.92 A hold (B10b), but over slot.md's 0.55 A (B10, the open decision). OVLO 5.60–5.81 V (+1.8 % over 5.5 V, +3.2 % under 6 V). |
+| POW-007 keyboard boost | Model check: 0.8 % off the set point. Port minimum in a 0→500 mA step at the DC low corner: 4.697 V worst (+297 mV over 4.40), 4.724 V typical, 5.129 V at vSafe5V max (pass-through). Port maximum 5.431 V (+69 mV under 5.5). Up in 0.32–0.36 ms. Inductor current 0.75 A against the 2.7 A valley limit. |
+| THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.4 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. The AMS1117 rows are gone: no M1 card has one. |
 
 ### Assumptions the boards must meet
 
@@ -185,8 +219,13 @@ Other observations (not failures):
   1 % to the TLV7011's IN+ (averaged, since one comparator serves both
   lines). IN− at **0.648 V from 3V3 via 41.2k / 10.0k 1 %**, so PWR_HI means
   a 3.0 A source.
+- **Main board, slots:** slot +5V fuses **SMD1206P110TFT** (C143975; was
+  SMD1206P075TFT).
 - **Cards:** slot +5V contacts ≤ 30 mΩ each. IO, GPU and system cards
-  ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.55 A of +5V, ≤ 300 mA of +3V3.
+  ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.55 A of +5V (0.80 A proposed,
+  B10), ≤ 300 mA of +3V3.
+- **IO card:** the keyboard boost above: TPS61023DRLR, 1 µH FXL0420-1R0-M,
+  10 µF in, 2 × 22 µF out, 750k/100k 1 %, feeding the SY6280 port switch.
 - **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's
   listing gives 2.2 µH ±20 %, Isat 2 A and DCR 78 mΩ, which the checks use.
   CJiang's own datasheet hasn't been read yet. R10 (C25803) is UNI-ROYAL
