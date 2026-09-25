@@ -4,12 +4,12 @@ source: "W25Q16JV datasheet, 3.1 Pin Configuration SOIC 150/208-mil (Figure 1a, 
 package: SOIC-8-208mil
 footprints: [SOIC-8_5.3x5.3mm_P1.27mm]   # KiCad's 208 mil (5.3 mm body) SOIC-8
 pins:
-  1: ["~{CS}", /CS]
-  2: ["DO/IO_{1}", DO (IO1)]
-  3: ["~{WP}/IO_{2}", /WP (IO2)]
+  1: ["~{CS}", "/CS", CS]
+  2: ["DO/IO_{1}", "DO (IO1)", DO, IO1]
+  3: ["~{WP}/IO_{2}", "/WP (IO2)", "/WP", IO2]
   4: GND
-  5: ["DI/IO_{0}", DI (IO0)]
+  5: ["DI/IO_{0}", "DI (IO0)", DI, IO0]
   6: CLK
-  7: ["~{HOLD}/~{RESET}/IO_{3}", /HOLD or /RESET (IO3)]
+  7: ["~{HOLD}/~{RESET}/IO_{3}", "/HOLD or /RESET (IO3)", "/HOLD", "/RESET", IO3]
   8: VCC
 ccw: [1, 8]

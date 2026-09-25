@@ -646,15 +646,21 @@ JLC_RULES = {
     "max_error": 0.005,
 }
 
+# JLC's 4-layer capability is finer (0.09 mm track and space): Freerouting
+# necks a Fine track down to 0.11 mm where it meets a fine-pitch pad, and
+# 0.075 mm onto a finger's stub, which the 2-layer minimum would refuse
+JLC_RULES_4 = {"min_track_width": 0.1, "min_connection": 0.1}
+
 NET_CLASSES = [
     # name, track, clearance, via diameter, via drill
     ("Default", 0.2, 0.2, 0.6, 0.3),        # 0.2: two 0.6/0.3 vias then keep holes 0.5 apart (JLC)
     ("Power", 0.5, 0.2, 0.8, 0.4),
-    # nets on 0.4 mm pitch pads (QFN): 0.15 mm tracks and 0.15 mm clearance
-    # (JLC: 0.127), or a track can't turn out of a pad beside its neighbour
-    # (a pad gap is 0.2). Its vias are 0.65 mm, so two of them 0.15 apart
-    # still keep their 0.3 mm holes 0.5 apart (JLC: 0.5)
-    ("Fine", 0.15, 0.15, 0.65, 0.3),
+    # nets on a 0.4 mm-pitch part (the RP2040's QFN-56): its pads are 0.2 mm
+    # apart, so at 0.2 mm clearance Freerouting counts every neighbouring pair
+    # a violation and routes none of them. 0.15 mm track and clearance (JLC's
+    # minimum is 0.1, and min_clearance above is 0.15). Its vias are 0.7 mm,
+    # so one 0.15 mm from a 0.6 mm Default via keeps the holes 0.5 mm apart (JLC).
+    ("Fine", 0.15, 0.15, 0.7, 0.3),
 ]
 
 
@@ -694,7 +700,7 @@ def run(cmd, **kw):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None):
+                zone_outline=None, labels=None, plane=False):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -786,14 +792,21 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     place_designators(board, outline, labels or {})
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
+    if plane and layers == 4:
+        # plane=True (the system card): the outer layers' pour on In1.Cu too,
+        # which stays a signal layer (as a power layer a QFN-56 fan-out no
+        # longer routed) and fills what the routes leave. A (net, layers)
+        # zone instead (the CPU card) makes the named inner layers planes.
+        copper.append(pcbnew.In1_Cu)
+    outer = [pcbnew.F_Cu, pcbnew.B_Cu]
     for zone in zones:
-        # a zone is a net on both outer layers, or (net, ("In1.Cu", ...)):
+        # a zone is a net on the pour layers above, or (net, ("In1.Cu", ...)):
         # inner layers named that way become planes (power layers), which
         # Freerouting reaches with vias and never routes signals on
         net, names = (zone, None) if isinstance(zone, str) else zone
         layers = [board.GetLayerID(n) for n in names] if names else copper
         for layer in layers:
-            if layer not in copper:
+            if names and layer not in outer:
                 board.SetLayerType(layer, pcbnew.LT_POWER)
             z = pcbnew.ZONE(board)
             z.SetLayer(layer)
@@ -1197,13 +1210,17 @@ def remove_dangling(board, pours=()):
     are not filled yet, so their vias would look dangling. Returns the count."""
     import pcbnew
     removed = 0
-    copper = [pcbnew.F_Cu, pcbnew.B_Cu] + ([pcbnew.In1_Cu, pcbnew.In2_Cu] if board.GetCopperLayerCount() == 4 else [])
+    copper = list(board.GetEnabledLayers().CuStack())
     while True:
         tracks = board.Tracks()                  # indexed: iterating it breaks on Python 3.14
         items = [tracks[i].Cast() for i in range(len(tracks))]
         items = [t for t in items if t.GetNetname() not in pours]
         segs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T]
         vias = [t for t in items if t.Type() == pcbnew.PCB_VIA_T]
+        # what can go: anything, locked pre-routes too (a board's prepare()
+        # vias the router didn't use). A via counts as joined on any copper
+        # layer, so the inner-layer presence link's vias stay.
+        removable = segs + vias
         pads = [p for fp in board.GetFootprints() for p in fp.Pads()]
 
         def seg_dist(pt, t):
@@ -1226,13 +1243,14 @@ def remove_dangling(board, pours=()):
                     return True
             return False
         gone = []
-        for v in vias:
-            # any copper layer: a via can join an outer track to an inner-layer run
-            copper = [board.GetLayerID(board.GetLayerName(l)) for l in board.GetEnabledLayers().CuStack()]
+        # any copper layer: a via can join an outer track to an inner-layer run
+        # (layer IDs through their names, as CuStack() hands back ordinals)
+        copper = [board.GetLayerID(board.GetLayerName(l)) for l in board.GetEnabledLayers().CuStack()]
+        for v in [v for v in vias if v in removable]:
             layers = [l for l in copper if joined(v.GetPosition(), l, v.GetNetname(), v.GetWidth(pcbnew.F_Cu) // 2, skip=v)]
             if len(layers) < 2:
                 gone.append(v)
-        for t in segs:
+        for t in [t for t in segs if t in removable]:
             for end in (t.GetStart(), t.GetEnd()):
                 if not joined(end, t.GetLayer(), t.GetNetname(), t.GetWidth() // 2, skip=t):
                     gone.append(t)
@@ -1241,7 +1259,11 @@ def remove_dangling(board, pours=()):
             return removed
         for t in gone:
             board.Remove(t)
+            t.thisown = False
         removed += len(gone)
+        # drop every proxy before asking for the tracks again: with them alive,
+        # the next board.Tracks() comes back as a bare SwigPyObject
+        del tracks, items, segs, vias, removable, gone
 
 
 def autoroute(board, workdir, passes=40, pours=(), tries=3):
@@ -1423,9 +1445,10 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge")]
     others = []                                   # other nets' pads, grown for a via / a track
     for p, _ in pads:
-        # paste-only pads (a QFN's exposed pad is printed in pieces) have no
-        # copper and no net: not obstacles, or the exposed pad gets no via
-        if p.GetNetname() != net and p.IsOnCopperLayer():
+        # not paste-only apertures (a QFN's exposed-pad stencil windows): no
+        # copper, no hole, no net, but they would keep every via off the
+        # exposed pad. Holes (NPTH pegs) still count.
+        if p.GetNetname() != net and (p.IsOnCopperLayer() or p.GetDrillSize().x > 0):
             bb = p.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []
@@ -1454,10 +1477,16 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             # row of GND pins' vias would wall in the pins between them
             base += math.pi
         layer = pcbnew.F_Cu if p.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu
+        # a fine-pitch pin (a QFN's TESTEN between two signals) leaves at its own width
+        w = min(track, to(min(p.GetSize().x, p.GetSize().y)))
         placed = False
+        # after the fan of directions, straight along the pad's long side
+        # (its pin's own lane, the only way out between fine-pitch neighbours)
+        lane = (math.pi / 2 if p.GetSize().y > p.GetSize().x else 0.0) + (p.GetOrientation().AsRadians())
+        if math.cos(lane - base) < 0:
+            lane += math.pi
         for r in (1.0, 1.3, 1.6, 2.0):
-            for da in (0, 30, -30, 60, -60, 90, -90, 135, -135, 180):
-                a = base + math.radians(da)
+            for a in [base + math.radians(da) for da in (0, 30, -30, 60, -60, 90, -90, 135, -135, 180)] + [lane]:
                 vx, vy = cx + r * math.cos(a), cy + r * math.sin(a)
                 if not (ex0 < vx < ex1 and ey0 < vy < ey1):
                     continue
@@ -1468,15 +1497,15 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
                 if any(l[4] != net and seg_dist(vx, vy, *l[:4]) < via / 2 + gap + 0.25 for l in locked):
                     continue
                 samples = [(cx + (vx - cx) * i / 12, cy + (vy - cy) * i / 12) for i in range(13)]
-                if not all(clear_of(sx, sy, track / 2 + gap) for sx, sy in samples):
+                if not all(clear_of(sx, sy, w / 2 + gap) for sx, sy in samples):
                     continue
-                if any(l[4] != net and seg_dist(sx, sy, *l[:4]) < track / 2 + gap + 0.25
+                if any(l[4] != net and seg_dist(sx, sy, *l[:4]) < w / 2 + gap + 0.25
                        for l in locked for sx, sy in samples):
                     continue
                 t = pcbnew.PCB_TRACK(board)
                 t.SetStart(p.GetPosition())
                 t.SetEnd(pcbnew.VECTOR2I(mm(vx), mm(vy)))
-                t.SetWidth(mm(track))
+                t.SetWidth(mm(w))
                 t.SetLayer(layer)
                 t.SetNet(ni)
                 t.SetLocked(True)
@@ -1497,15 +1526,108 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     return n
 
 
+def key_escapes(board, tab_top, skip=(), rise=1.0, width=0.2):
+    """Pre-route a straight escape for each signal finger beside the key
+    notch: a locked track on the finger's own layer from its top to `rise` mm
+    above the tab. Those pads sit 0.2 mm from the notch's edge, which
+    Freerouting treats as a clearance violation, so it never starts a route
+    from them; it joins the track's end instead, but still reports the pad
+    unconnected (DRC's connectivity check is the judge of these). `skip`: nets
+    tied some other way (the pour). Returns the nets escaped."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    nets = []
+    for fp in board.GetFootprints():
+        if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
+            continue
+        xs = sorted({round(to(p.GetPosition().x), 3) for p in fp.Pads()})
+        beside = {x for i, x in enumerate(xs)
+                  if (i > 0 and x - xs[i - 1] > 1.5) or (i + 1 < len(xs) and xs[i + 1] - x > 1.5)}
+        for pad in fp.Pads():
+            x = round(to(pad.GetPosition().x), 3)
+            if x not in beside or not pad.GetNetname() or pad.GetNetname() in skip \
+                    or pad.GetNetname().startswith("unconnected-"):
+                continue
+            tr = pcbnew.PCB_TRACK(board)
+            tr.SetStart(pcbnew.VECTOR2I(mm(x), mm(to(pad.GetBoundingBox().GetTop()) + width / 2)))
+            tr.SetEnd(pcbnew.VECTOR2I(mm(x), mm(tab_top - rise)))
+            tr.SetWidth(mm(width))
+            tr.SetLayer(pcbnew.F_Cu if pad.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu)
+            tr.SetNet(pad.GetNet())
+            tr.SetLocked(True)
+            board.Add(tr)
+            nets.append(pad.GetNetname())
+    return nets
+
+
+def clear_fingers(board, nets, margin=0.6):
+    """Remove routed tracks of the pour `nets` that reach down over a card's
+    fingers (below their top `margin` mm): Freerouting joins neighbouring
+    GND fingers with thin wires across the contact surface. ground_fingers
+    ties each of them into the pour from its top instead. Returns the count."""
+    import pcbnew
+    to = pcbnew.ToMM
+    areas = []
+    for fp in board.GetFootprints():
+        if str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
+            bb = fp.GetBoundingBox(False)
+            top = min(to(p.GetBoundingBox().GetTop()) for p in fp.Pads())
+            areas.append((to(bb.GetLeft()), top + margin, to(bb.GetRight()), to(bb.GetBottom())))
+    tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
+    gone = []
+    for tr in [tracks[i].Cast() for i in range(len(tracks))]:
+        if tr.Type() != pcbnew.PCB_TRACE_T or tr.IsLocked() or tr.GetNetname() not in nets:
+            continue
+        for e in (tr.GetStart(), tr.GetEnd()):
+            if any(a[0] <= to(e.x) <= a[2] and a[1] <= to(e.y) <= a[3] for a in areas):
+                gone.append(tr)
+                break
+    for tr in gone:
+        board.Remove(tr)
+        tr.thisown = False
+    return len(gone)
+
+
+def tab_via_keepout(board, tab_top, margin=1.0):
+    """A rule area with no vias over each card-edge footprint's finger tab,
+    from `tab_top` down past the tab's bottom: Freerouting otherwise drops
+    vias between and below the fingers, where the slot's contacts slide and
+    the bevel grinds. Tracks (the fingers' escapes) are still allowed."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    n = 0
+    for fp in board.GetFootprints():
+        if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge"):
+            continue
+        bb = fp.GetBoundingBox(False)
+        x0, x1, y1 = to(bb.GetLeft()) - margin, to(bb.GetRight()) + margin, to(bb.GetBottom()) + margin
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowTracks(False)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        ol = z.Outline()
+        ol.NewOutline()
+        for px, py in ((x0, tab_top), (x1, tab_top), (x1, y1), (x0, y1)):
+            ol.Append(mm(px), mm(py))
+        board.Add(z)
+        n += 1
+    return n
+
+
 def presence_link(board, tab_top, rise=3.0, width=0.25, via=0.6, drill=0.3, layer="B.Cu"):
     """Pre-route the presence link every card makes (PRSNT1_n on A1 joined
     to PRSNT2_n on the last B finger): up from A1 on B.Cu, across `rise` mm
     above the tab, a via, and down to the B finger on F.Cu. It must cross
     the other fingers' escapes, and Freerouting gives up on it; the few it
     crosses it routes round. `layer` carries the run across: on a wide card
-    whose bottom-side fingers all have signals (the CPU card's address bus)
-    a B.Cu run walls them off, so it goes on an inner layer between vias.
-    Returns True if a link was drawn."""
+    whose bottom-side fingers all have signals (the CPU card's address bus),
+    or on a 4-layer card whose fingers escape upward on B.Cu (the system
+    card), a B.Cu run walls them off, so it goes on an inner layer between
+    vias. Returns True if a link was drawn."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     for fp in board.GetFootprints():
@@ -1859,7 +1981,7 @@ def check_order(spec, card_edge):
 def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), power_nets=(),
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
-             io_card=False, prepare=None, presence=None, fine_nets=(), route_tries=3):
+             io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -1903,11 +2025,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def sheet():
         schematic(sch, footprint_libs)
-        # JLC's multilayer minimum is 0.09 mm track and space (2 layers:
-        # 0.127): Freerouting necks a Fine track to 0.1124 mm where it leaves
-        # a QFN pad, which a 4-layer board may keep
-        rules = {"min_track_width": 0.1, "min_connection": 0.1} if layers >= 4 else None
-        write_project(pro, power_nets=power_nets, fine_nets=fine_nets, rules=rules)   # before ERC: it carries the library tables
+        write_project(pro, power_nets=power_nets, fine_nets=fine_nets,   # before ERC: it carries the library tables
+                      rules=JLC_RULES_4 if layers == 4 else None)
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)
@@ -1921,11 +2040,14 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
-                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels)
+                        graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
+                        plane=plane)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
-            state["fingers"] = ground_fingers(b, zones[0], outline[3])
+            state["fingers"] = ground_fingers(b, pour_nets[0], outline[3])
             presence_link(b, outline[3], **(presence or {}))   # e.g. {"layer": "In2.Cu"}
+            tab_via_keepout(b, outline[3])
+            state["escaped"] = key_escapes(b, outline[3], skip=pour_nets)
         # every poured net's pads get a via: GND, and any net on a plane
         # (build_board's (net, layers) zones), which is reached no other way
         state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
@@ -1936,7 +2058,13 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"]
     step("board", build)
-    step("autoroute", lambda: autoroute(state["b"], out, passes, pours=pour_nets, tries=route_tries))
+    def route():
+        autoroute(state["b"], out, passes, pours=tuple(pour_nets) + tuple(state.get("escaped", ())),
+                  tries=route_tries)
+        if card_edge:
+            n = clear_fingers(state["b"], pour_nets)
+            return "%d pour tracks cleared off the fingers" % n if n else None
+    step("autoroute", route)
 
     def fill():
         x0, y0, x1, y1 = outline

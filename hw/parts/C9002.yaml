@@ -4,8 +4,8 @@ source: "YXC YSX321SL datasheet, page 1: Dimensions and Recommended Land Pattern
 package: SMD3225-4P
 footprints: [Crystal_SMD_3225-4Pin_3.2x2.5mm]   # KiCad's 3225 4-pad crystal
 pins:
-  1: ["1", XTAL1]
+  1: ["1", XTAL1, OSC1, X1]
   2: [G, GND]
-  3: ["3", XTAL2]
+  3: ["3", XTAL2, OSC2, X2]
   4: [G, GND]
 ccw: [1, 4]
