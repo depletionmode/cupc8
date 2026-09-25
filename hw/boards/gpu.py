@@ -209,11 +209,12 @@ def buck_boost(board):
     package to VIN; MODE (GND) joins AGND, which joins GND pin 8 through
     the package's middle, and takes them down by a via that also ties in the
     input cap's ground. FB runs down to its divider, away from L1/L2. The
-    GND pad fan-out's vias for U7 are taken off first: they would sit where
-    this copper goes."""
+    GND pad fan-out's vias for the block's parts are taken off first: they
+    would sit where this copper goes (the caps' and R27's GND pads are on
+    the top pour, which the block's own via ties down)."""
     import pcbnew
-    fp = board.FindFootprintByReference("U7")
-    pads = {(p.GetPosition().x, p.GetPosition().y) for p in fp.Pads()}
+    pads = {(p.GetPosition().x, p.GetPosition().y) for ref in ("U7", "C21", "C22", "C23", "R27")
+            for p in board.FindFootprintByReference(ref).Pads()}
     tr = board.Tracks()                       # indexed: iterating it breaks on Python 3.14
     items = [tr[i].Cast() for i in range(len(tr))]
     ends = {(t.GetEnd().x, t.GetEnd().y) for t in items

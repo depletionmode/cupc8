@@ -718,6 +718,7 @@ def silk_keepout(board, fp, margin=0.3):
     x1, y1 = to(bb.GetRight()) + margin, to(bb.GetBottom()) + margin
     z = pcbnew.ZONE(board)
     z.SetIsRuleArea(True)
+    z.SetZoneName("logo")
     z.SetDoNotAllowTracks(True)
     z.SetDoNotAllowVias(True)
     z.SetDoNotAllowPads(False)
@@ -970,6 +971,33 @@ def clip_silk_to_pads(board, gap=0.15):
 SILK_TEXT = (1.0, 0.15)                 # designator height and stroke (JLC minimum stroke)
 
 
+def name_keepout(board, grow=0.1):
+    """A rule area with no vias over the board's name and revision, on every
+    copper layer, for the router (the fan-out and the stitching keep off
+    every silkscreen word by themselves)."""
+    import pcbnew
+    mm = pcbnew.FromMM
+    dr = board.Drawings()
+    for d in [dr[i].Cast() for i in range(len(dr))]:
+        if d.Type() != pcbnew.PCB_TEXT_T or " rev " not in d.GetText():
+            continue
+        x0, y0, x1, y1 = _ink_box(d, grow)
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetZoneName("revision")
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowTracks(False)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        ol = z.Outline()
+        ol.NewOutline()
+        for px, py in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+            ol.Append(mm(px), mm(py))
+        board.Add(z)
+
+
 def mark_revision(board, title, revision, at):
     """The board's name and revision, "<title> rev <revision>", on the top
     silkscreen with its bottom-right corner at `at` (mm; normally 1 mm in from
@@ -994,79 +1022,269 @@ def mark_revision(board, title, revision, at):
     board.SetTitleBlock(tb)
 
 
-def place_designators(board, outline, labels=None, gap=0.3, silk_text=None):
+def _mm_box(bb, grow=0.0):
+    import pcbnew
+    return (pcbnew.ToMM(bb.GetLeft()) - grow, pcbnew.ToMM(bb.GetTop()) - grow,
+            pcbnew.ToMM(bb.GetRight()) + grow, pcbnew.ToMM(bb.GetBottom()) + grow)
+
+
+def _ink_box(text, grow=0.0):
+    """A silkscreen text's box as printed (its strokes), in mm: KiCad's
+    bounding box adds line spacing and padding, ~0.5 mm round a 1 mm text."""
+    return _mm_box(text.GetEffectiveTextShape().BBox(), grow)
+
+
+def silk_keepouts(board):
+    """What a designator must stay off (mm boxes): every pad (grown by JLC's
+    0.15 mm silk clearance), every via (a tented via under a letter is a bump
+    in it, and JLC clips silk off an untented one), and each part's
+    courtyard and its body (F.Fab outline: a connector's body can reach past
+    its courtyard, over the board edge). Returns (pads, vias, {ref:
+    courtyard}, {ref: body}); board-only artwork (the logo) has its outline
+    as its courtyard."""
+    import pcbnew
+    fps = list(board.GetFootprints())
+    pads = [_mm_box(p.GetBoundingBox(), 0.15) for fp in fps for p in fp.Pads()]
+    tr = board.Tracks()
+    vias = [(_mm_box(t.GetBoundingBox()), t.GetNetname()) for t in [tr[i] for i in range(len(tr))]
+            if t.Type() == pcbnew.PCB_VIA_T]
+    courts, bodies = {}, {}
+    for fp in fps:
+        side = pcbnew.B_CrtYd if fp.IsFlipped() else pcbnew.F_CrtYd
+        cy = fp.GetCourtyard(side)
+        courts[fp.GetReference()] = _mm_box(cy.BBox()) if cy.OutlineCount() else _mm_box(fp.GetBoundingBox(False))
+        gi = fp.GraphicalItems()             # indexed: iterating it breaks on Python 3.14
+        # the body: its F.Fab outline, and its own silkscreen marks with it
+        fab = pcbnew.B_Fab if fp.IsFlipped() else pcbnew.F_Fab
+        silk = pcbnew.B_SilkS if fp.IsFlipped() else pcbnew.F_SilkS
+        boxes = [_mm_box(g.GetBoundingBox()) for g in [gi[i] for i in range(len(gi))]
+                 if g.GetLayer() in (fab, silk) and g.Type() == pcbnew.PCB_SHAPE_T]
+        if boxes:
+            bodies[fp.GetReference()] = union(boxes)
+    return pads, vias, courts, bodies
+
+
+def silk_designators(board, labels=None):
+    """[(footprint, text)]: each part's designator on the silkscreen, its own
+    reference or, for a part in `labels`, the board text that stands for it."""
+    import pcbnew
+    labels = labels or {}
+    dr = board.Drawings()
+    words = {}
+    for d in [dr[i].Cast() for i in range(len(dr))]:
+        if d.Type() == pcbnew.PCB_TEXT_T:
+            words.setdefault(d.GetText(), d)
+    out = []
+    for fp in sorted(board.GetFootprints(), key=lambda f: f.GetReference()):
+        if fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
+            continue
+        if labels.get(fp.GetReference()) in words and not fp.Reference().IsVisible():
+            out.append((fp, words[labels[fp.GetReference()]]))
+        elif fp.Reference().IsVisible():
+            out.append((fp, fp.Reference()))
+    return out
+
+
+RESEAT_REACH = 2.0        # mm: how far from its courtyard a designator may move off the vias
+RESEAT_REACH_BIG = 0.45   # of its courtyard's size, for a big part (a QFN inside its ring of fan-out vias)
+
+
+def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, reseat=False):
     """Put every reference designator horizontal, in the first spot around its
-    part that clears all pads, every other part's courtyard, the other
-    designators, board-only graphics (logos) and the board edge. A part in
-    `labels` ({ref: word}) gets that word there instead, and its designator
-    is hidden: an LED says what it shows, not "D3"."""
+    part that clears all pads and vias, every other part's courtyard, every
+    part's body, the other designators and board texts, board-only graphics
+    (logos) and the board edge. A part in `labels` ({ref: word}) gets that
+    word there instead, and its designator is hidden: an LED says what it
+    shows, not "D3".
+
+    `reseat`: after routing, move only the designators that a via (the
+    fan-out's, the router's) or anything else now sits under, and leave the
+    rest where they are. Returns the designators moved."""
     import pcbnew
     mm = pcbnew.FromMM
-
-    def box(bb, grow=0.0):
-        return (pcbnew.ToMM(bb.GetLeft()) - grow, pcbnew.ToMM(bb.GetTop()) - grow,
-                pcbnew.ToMM(bb.GetRight()) + grow, pcbnew.ToMM(bb.GetBottom()) + grow)
-
-    def courtyard(fp):
-        cy = fp.GetCourtyard(pcbnew.F_CrtYd if not fp.IsFlipped() else pcbnew.B_CrtYd)
-        return box(cy.BBox()) if cy.OutlineCount() else box(fp.GetBoundingBox(False))
-
-    fps = list(board.GetFootprints())
-    pads = [box(p.GetBoundingBox(), 0.15) for fp in fps for p in fp.Pads()]
-    courts = {fp.GetReference(): courtyard(fp) for fp in fps}
+    labels = labels or {}
+    if not reseat:
+        for fp in board.GetFootprints():
+            if fp.GetReference() in labels and fp.Reference().IsVisible() and \
+                    not fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
+                fp.Reference().SetVisible(False)
+                t = pcbnew.PCB_TEXT(board)
+                t.SetText(labels[fp.GetReference()])
+                t.SetLayer(pcbnew.F_SilkS)
+                board.Add(t)
+    items = silk_designators(board, labels)
+    pads, vias, courts, bodies = silk_keepouts(board)
+    # a via right at a letter reads as part of it: 0.25 mm clear of the ring
+    vias = [(v[0] - 0.15, v[1] - 0.15, v[2] + 0.15, v[3] + 0.15) for v, _ in vias]
     x0, y0, x1, y1 = outline
     inside = (x0 + 0.3, y0 + 0.3, x1 - 0.3, y1 - 0.3)
-    placed = []
-    labels = labels or {}
-    for fp in sorted(fps, key=lambda f: f.GetReference()):
-        ref = fp.Reference()
-        if not ref.IsVisible() or fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
-            continue
-        if fp.GetReference() in labels:
-            ref.SetVisible(False)
-            ref = pcbnew.PCB_TEXT(board)
-            ref.SetText(labels[fp.GetReference()])
-            ref.SetLayer(pcbnew.F_SilkS)
-            board.Add(ref)
-        size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
-        ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
-        ref.SetTextThickness(mm(stroke))
-        ref.SetTextAngleDegrees(0)
-        ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
-        ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
-        others = [c for r, c in courts.items() if r != fp.GetReference()]
+    dr = board.Drawings()
+    # the board's other words (its name and revision): kept clear of too
+    placed = [_ink_box(d) for d in [dr[i].Cast() for i in range(len(dr))]
+              if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == pcbnew.F_SilkS and
+              d.GetText() not in labels.values()]
+
+    def clear(fp, t, others, word_gap=0.1):
+        if t[0] < inside[0] or t[1] < inside[1] or t[2] > inside[2] or t[3] > inside[3]:
+            return False
+        near = pads + vias + [c for r, c in courts.items() if r != fp.GetReference()] + list(bodies.values())
+        return not any(overlap(t, o, 0.1) for o in near) and not any(overlap(t, o, word_gap) for o in others)
+
+    if reseat:
+        current = {id(ref): _ink_box(ref) for _, ref in items}
+    moved = []
+    for fp, ref in items:
+        if reseat:
+            others = placed + [b for k, b in current.items() if k != id(ref)]
+            if clear(fp, current[id(ref)], others):
+                continue
+        else:
+            others = placed
+            size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
+            ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
+            ref.SetTextThickness(mm(stroke))
+            ref.SetTextAngleDegrees(0)
+            ref.SetHorizJustify(pcbnew.GR_TEXT_H_ALIGN_CENTER)
+            ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
         spots = []
         # round the courtyard, then (for an imported footprint whose courtyard
         # is only its body, leads outside it) round its pads
-        for cx0, cy0, cx1, cy1 in (courts[fp.GetReference()],
-                                   union([courts[fp.GetReference()]] + [box(p.GetBoundingBox(), 0.5) for p in fp.Pads()])):
+        court = courts[fp.GetReference()]
+        for cx0, cy0, cx1, cy1 in (court, union([court] + [_mm_box(p.GetBoundingBox(), 0.5) for p in fp.Pads()])):
             mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
             for shift in (0, 1, -1, 2, -2, 3, -3):
                 spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
                           (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
-        # then a ring a little further out: a 0402's text right above it
-        # clips its own pads, which reach nearly to its courtyard
-        cx0, cy0, cx1, cy1 = courts[fp.GetReference()]
+        # then rings a little further out: a 0402's text right above it
+        # clips its own pads, which reach nearly to its courtyard; after
+        # routing, the vias round a part leave gaps only a little further off
+        cx0, cy0, cx1, cy1 = court
         mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
-        for shift in (0, 1, -1, 2, -2):
-            spots += [(mx + shift, cy0 - gap - 1.0), (mx + shift, cy1 + gap + 1.0)]
-        for sx, sy in spots:
+        for out in (1.0, 1.5, 2.0) if reseat else (1.0,):
+            for shift in (0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2) if reseat else (0, 1, -1, 2, -2):
+                spots += [(mx + shift, cy0 - gap - out), (mx + shift, cy1 + gap + out)]
+            if reseat:
+                for shift in (0, 0.5, -0.5, 1, -1):
+                    spots += [(cx0 - gap - 1.0 - out, my + shift), (cx1 + gap + 1.0 + out, my + shift)]
+        size = pcbnew.ToMM(ref.GetTextSize().y)
+        spots = [(sx, sy, 0, size) for sx, sy in spots]
+        if reseat:
+            # then the nearest clear spot on a 0.2 mm grid, up to RESEAT_REACH
+            # from the courtyard, horizontal and then (a crowd of vias round a
+            # small part leaves only narrow gaps) turned to read upwards; then
+            # the same at JLC's 0.8 mm minimum text height
+            w0, h0 = [b - a for a, b in zip(current[id(ref)][:2], current[id(ref)][2:])]
+            for angle, tsize in ((0, size), (90, size), (0, 0.8), (90, 0.8)):
+                if tsize > size:
+                    continue
+                w, h = w0 * tsize / size, h0 * tsize / size
+                tw, th = (w, h) if angle == 0 else (h, w)
+                grid = []
+                reach = max(RESEAT_REACH, RESEAT_REACH_BIG * max(cx1 - cx0, cy1 - cy0))
+                steps = int((reach + max(w, h)) / 0.2)
+                for i in range(-steps, steps + 1):
+                    for j in range(-steps, steps + 1):
+                        sx, sy = mx + 0.2 * i, my + 0.2 * j
+                        # how far the text's box is from the courtyard's
+                        dx = max(cx0 - (sx + tw / 2), (sx - tw / 2) - cx1, 0)
+                        dy = max(cy0 - (sy + th / 2), (sy - th / 2) - cy1, 0)
+                        if 0 < max(dx, dy) and math.hypot(dx, dy) <= reach:
+                            grid.append((math.hypot(dx, dy), sx, sy))
+                spots += [(sx, sy, angle, tsize) for _, sx, sy in sorted(grid)]
+        stroke = pcbnew.ToMM(ref.GetTextThickness())
+        # words 0.5 mm apart where there is room, so two designators don't
+        # read as one ("C20H1"); 0.1 mm where there isn't
+        for sx, sy, angle, tsize, word_gap in [q + (0.5,) for q in spots] + [q + (0.1,) for q in spots]:
+            ref.SetTextSize(pcbnew.VECTOR2I(mm(tsize), mm(tsize)))
+            ref.SetTextThickness(mm(min(stroke, max(0.15, tsize * 0.15))))
+            ref.SetTextAngleDegrees(angle)
             ref.SetPosition(pcbnew.VECTOR2I(mm(sx), mm(sy)))
-            t = box(ref.GetBoundingBox())
-            if t[0] < inside[0] or t[1] < inside[1] or t[2] > inside[2] or t[3] > inside[3]:
-                continue
-            if any(overlap(t, o, 0.1) for o in pads + others + placed):
-                continue
-            placed.append(t)
-            break
+            t = _ink_box(ref)
+            if clear(fp, t, others, word_gap):
+                if reseat:
+                    current[id(ref)] = t
+                    moved.append(fp.GetReference() + (" (turned)" if angle else "") +
+                                 (" (%.1f mm)" % tsize if tsize != size else ""))
+                else:
+                    placed.append(t)
+                break
         else:
-            raise ValueError("%s: no room for its designator; move parts apart" % fp.GetReference())
+            if reseat and isinstance(ref, pcbnew.PCB_FIELD):
+                # walled in by its own fan-out (a QFN's ring of vias, a cap
+                # between them): left off the silkscreen rather than printed
+                # over vias. The CPL places it; the build output lists it
+                ref.SetVisible(False)
+                current.pop(id(ref), None)
+                moved.append(fp.GetReference() + " (left off: no clear spot)")
+                continue
+            raise ValueError("%s: no room for its %s%s; move parts apart" % (
+                fp.GetReference(), "designator" if isinstance(ref, pcbnew.PCB_FIELD) else "label %r" % ref.GetText(),
+                " clear of the vias" if reseat else ""))
+    if reseat:
+        # the board's name and revision: a finger tab's GND ties or the
+        # presence link can put vias in its corner; it slides up and left
+        # from there to the nearest clear spot, still right-aligned
+        near = pads + vias + list(courts.values()) + list(bodies.values()) + list(current.values())
+        for d in [dr[i].Cast() for i in range(len(dr))]:
+            if d.Type() != pcbnew.PCB_TEXT_T or " rev " not in d.GetText():
+                continue
+            if not any(overlap(_ink_box(d), o, 0.1) for o in near):
+                continue
+            x, y = pcbnew.ToMM(d.GetPosition().x), pcbnew.ToMM(d.GetPosition().y)
+            for dx, dy in sorted(((0.5 * i, 0.25 * j) for i in range(61) for j in range(65)),
+                                 key=lambda s: s[0] + 2 * s[1]):
+                d.SetPosition(pcbnew.VECTOR2I(mm(x - dx), mm(y - dy)))
+                t = _ink_box(d)
+                if t[0] >= inside[0] and t[1] >= inside[1] and t[2] <= inside[2] and t[3] <= inside[3] and \
+                        not any(overlap(t, o, 0.1) for o in near):
+                    moved.append(repr(d.GetText()))
+                    break
+            else:
+                raise ValueError("%r: no clear spot for the board's name near its corner" % d.GetText())
+    return moved
 
 
-def check_silk(board, clearance=0.15, artwork=False):          # JLC: silkscreen 0.15 mm from pads
+def check_designators(board, labels=None):
+    """Designators (and the LED words standing for them) that sit over a via,
+    over another part's courtyard, over any part's body (its own included:
+    a connector overhanging its courtyard), or over another word on the
+    silkscreen. Returns problems."""
+    import pcbnew
+    items = silk_designators(board, labels)
+    _, vias, courts, bodies = silk_keepouts(board)
+    dr = board.Drawings()
+    words = [(d.GetText(), _ink_box(d)) for d in [dr[i].Cast() for i in range(len(dr))]
+             if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == pcbnew.F_SilkS]
+    bad = []
+    boxes = [(fp.GetReference(), t.GetText(), _ink_box(t)) for fp, t in items]
+    for ref, text, t in boxes:
+        what = "designator %s" % ref if text == ref else "label %r (%s)" % (text, ref)
+        for v, net in vias:
+            if overlap(t, v):
+                bad.append("%s over a via of %s" % (what, net))
+        for r, c in courts.items():
+            if r != ref and overlap(t, c):
+                bad.append("%s over the courtyard of %s" % (what, r))
+        for r, b in bodies.items():
+            if overlap(t, b):
+                bad.append("%s over the body of %s" % (what, r))
+        for r, other, o in boxes:
+            if r != ref and overlap(t, o):
+                bad.append("%s over the designator of %s" % (what, r))
+        for word, o in words:
+            if word != text and " rev " in word and overlap(t, o):
+                bad.append("%s over %r" % (what, word))
+    for word, o in words:                        # the board's name and revision
+        if " rev " in word:
+            bad += ["%r over a via of %s" % (word, net) for v, net in vias if overlap(o, v)]
+    return bad
+
+
+def check_silk(board, clearance=0.15, artwork=False, labels=None):          # JLC: silkscreen 0.15 mm from pads
     """Silkscreen lines and texts that touch a pad (KiCad's DRC does not check
-    a footprint's silkscreen against its own pads), and with `artwork`, tracks
-    and vias under a board-only graphic (the logo). Returns problems."""
+    a footprint's silkscreen against its own pads), designators out of place
+    (check_designators), and with `artwork`, tracks and vias under a
+    board-only graphic (the logo). Returns problems."""
     import pcbnew
     mm = pcbnew.FromMM
     pads = []
@@ -1106,7 +1324,8 @@ def check_silk(board, clearance=0.15, artwork=False):          # JLC: silkscreen
                 hit = lambda bb, pad, probes=probes: any(                        # noqa: E731
                     bb.Contains(pt) and pad.HitTest(pt, mm(clearance)) for pt in probes)
             else:
-                gb = g.GetBoundingBox()
+                # a text by its strokes: its bounding box pads it by ~0.25 mm a side
+                gb = g.GetEffectiveTextShape().BBox() if isinstance(g, pcbnew.EDA_TEXT) else g.GetBoundingBox()
                 hit = lambda bb, pad, gb=gb: bb.Intersects(gb)           # noqa: E731
             for ref, num, on_f, on_b, bb, pad in pads:
                 if (on_f if front else on_b) and hit(bb, pad):
@@ -1125,7 +1344,7 @@ def check_silk(board, clearance=0.15, artwork=False):          # JLC: silkscreen
     for d in [dr[i].Cast() for i in range(len(dr))]:
         if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS):
             front = d.GetLayer() == pcbnew.F_SilkS
-            gb = d.GetBoundingBox()
+            gb = d.GetEffectiveTextShape().BBox()
             for ref, num, on_f, on_b, bb, _ in pads:
                 if (on_f if front else on_b) and bb.Intersects(gb):
                     bad.append("label %r touches pad %s of %s" % (d.GetText(), num, ref))
@@ -1133,6 +1352,7 @@ def check_silk(board, clearance=0.15, artwork=False):          # JLC: silkscreen
                 for ref, on_f, cb in courts:
                     if on_f == front and cb.Intersects(gb):
                         bad.append("label %r overlaps the courtyard of %s" % (d.GetText(), ref))
+    bad += check_designators(board, labels)
     if artwork:
         # no track or via on the copper under the artwork (the logo): it
         # would show through the mask as a ridge across it (silk_keepout)
@@ -1522,8 +1742,8 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     zs = board.Zones()
     for z in [zs[i] for i in range(len(zs))]:
-        # the artwork keep-outs (silk_keepout): no fan-out via or track under the logo
-        if z.GetIsRuleArea() and z.GetDoNotAllowTracks() and z.GetDoNotAllowVias():
+        # the logo's keep-out (silk_keepout): no fan-out via or track under it
+        if z.GetIsRuleArea() and z.GetZoneName() == "logo":
             bb = z.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
     vias = []
@@ -1789,6 +2009,17 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
                              pad.GetNetname(), pad))
         if not len(fp.Pads()):                   # artwork (the logo): no via through its silkscreen
             add_box(fp.GetBoundingBox(False), keep)
+    # nor through a word on the silkscreen (a designator, an LED's word, the
+    # board's name), unless a cut-off piece of pour has no other way down:
+    # the designator then moves off it (pipeline's fill step)
+    words = []
+    drawings = board.Drawings()
+    texts = [fp.Reference() for fp in board.GetFootprints() if fp.Reference().IsVisible()]
+    texts += [d for d in [drawings[i].Cast() for i in range(len(drawings))]
+              if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() in (pcbnew.F_SilkS, pcbnew.B_SilkS)]
+    for t in texts:
+        x0, y0, x1, y1 = _ink_box(t, via / 2 + 0.25)
+        words.append((x0, y0, x1, y1))
     segs = []
     tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
     for t in [tracks[i] for i in range(len(tracks))]:
@@ -1822,9 +2053,10 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
         pt = pcbnew.VECTOR2I(mm(px), mm(py))
         return all(any(z.HitTestFilledArea(layer, pt, 0) for z in pours if z.IsOnLayer(layer))
                    for layer in (pcbnew.F_Cu, pcbnew.B_Cu))
-    def ok(x, y):
+    def ok(x, y, spare_words=True):
         return (inside(x, y) and edge_ok(x, y) and filled(x, y)
                 and not any(b[0] < x < b[2] and b[1] < y < b[3] for b in boxes)
+                and not (spare_words and any(b[0] < x < b[2] and b[1] < y < b[3] for b in words))
                 and all(seg_dist(x, y, *sg[:4]) >= sg[4] for sg in segs))
 
     def place(x, y):
@@ -1949,15 +2181,19 @@ def stitch(board, net, polygon, pitch=4.0, via=0.6, drill=0.3, clearance=0.3, fr
             bb = out.BBox()
             y = to(bb.GetTop())
             found = None
-            while found is None and y < to(bb.GetBottom()):
-                x = to(bb.GetLeft())
-                while x < to(bb.GetRight()):
-                    pt = pcbnew.VECTOR2I(mm(x), mm(y))
-                    if out.PointInside(pt) and reached_at(pt, layer) and ok(x, y):
-                        found = (x, y)
-                        break
-                    x += 0.25
-                y += 0.25
+            for spare in (True, False):
+                y = to(bb.GetTop())
+                while found is None and y < to(bb.GetBottom()):
+                    x = to(bb.GetLeft())
+                    while x < to(bb.GetRight()):
+                        pt = pcbnew.VECTOR2I(mm(x), mm(y))
+                        if out.PointInside(pt) and reached_at(pt, layer) and ok(x, y, spare):
+                            found = (x, y)
+                            break
+                        x += 0.25
+                    y += 0.25
+                if found:
+                    break
             if found:
                 place(*found)
                 reached.add(k)
@@ -2203,33 +2439,70 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         if prepare:                   # the board's own locked pre-routing, before Freerouting
             # nets it returns are escapes of its own: checked like the key-notch ones
             state["escaped"] = list(state.get("escaped", [])) + list(prepare(b) or [])
+        # the fixed vias are in (finger ties, presence link, fan-out, the
+        # board's own): designators and the name move off them. A name that
+        # had to move (off a wide tab's ties) has its new spot kept free of
+        # the router's vias; one that didn't is left to the router as before
+        # (a keep-out changes the routing) and moves after it if it must
+        state["pre_moved"] = place_designators(b, outline, labels, silk_text=silk_text, reseat=True)
+        if any(" rev " in m for m in state["pre_moved"]):
+            name_keepout(b)
         pcbnew.SaveBoard(pcb, b, True)
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
-            "%d GND pad vias" % state["fanout"]
+            "%d GND pad vias" % state["fanout"] + \
+            ("; designators moved off them: " + " ".join(state["pre_moved"]) if state["pre_moved"] else "")
     step("board", build)
     def route():
         # Freerouting reports the key-notch escapes' nets unrouted whether or
         # not it reached them, so they are taken on trust and then checked
         # here, on KiCad's own connectivity: a try that left one open is
         # thrown away and the router runs again with more passes
+        # Freerouting also, now and then, lays a track closer to a fixed via
+        # than the two nets' classes allow (a Fine track by a Default via):
+        # KiCad's DRC on the routed copper throws such a try away too
         escaped = tuple(state.get("escaped", ()))
-        for round_ in range(2):
+        routed = os.path.join(out, name + "-routed.kicad_pcb")
+        for round_ in range(3):
             if round_:
                 state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
-            autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped, salt=3 * round_,
-                      tries=route_tries)
+            try:
+                autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped, salt=route_tries * round_,
+                          tries=route_tries)
+            except RuntimeError as e:        # nets left unrouted: the next round's orderings
+                open_nets, too_close = [str(e)], []
+                continue
             open_nets = open_escapes(state["b"], escaped)
+            too_close = []
             if not open_nets:
-                break
+                pcbnew.SaveBoard(routed, state["b"])
+                report = os.path.join(out, "drc-routed.json")
+                subprocess.run(["kicad-cli", "pcb", "drc", "--format", "json", "-o", report, routed],
+                               capture_output=True)
+                import json
+                too_close = [v["description"] for v in json.load(open(report))["violations"]
+                             if v["type"] == "clearance"]
+                if not too_close:
+                    break
         else:
-            raise RuntimeError("Freerouting left %s unrouted, twice over 3 tries" % open_nets)
-        if card_edge:
-            n = clear_fingers(state["b"], pour_nets)
-            return "%d pour tracks cleared off the fingers" % n if n else None
+            raise RuntimeError("Freerouting left %s unrouted, or copper too close (%s), over 3 rounds of %d tries"
+                               % (open_nets, "; ".join(too_close[:3]), route_tries))
+        n = clear_fingers(state["b"], pour_nets) if card_edge else 0
+        # the routed board, before the pours: what the later steps start from
+        pcbnew.SaveBoard(routed, state["b"])
+        return ("%d pour tracks cleared off the fingers" % n if n else "") + \
+            (" (round %d: the ones before had copper too close)" % (round_ + 1) if round_ else "")
     step("autoroute", route)
 
     def fill():
+        # designators the fan-out's or the router's vias landed under move
+        # clear of them first; the stitching vias then keep off every one
+        moved = place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True)
+        # the name's via keep-out has done its work for the router (and is
+        # stale if the name moved); the stitching keeps off the name by itself
+        zs = state["b"].Zones()
+        for z in [zs[i] for i in range(len(zs)) if zs[i].GetZoneName() == "revision"]:
+            state["b"].Remove(z)
         x0, y0, x1, y1 = outline
         # the body only: no vias on a card's finger tab, even where the pour reaches it
         poly = [(x0 + .5, y0 + .5), (x1 - .5, y0 + .5), (x1 - .5, y1 - .5), (x0 + .5, y1 - .5)]
@@ -2252,12 +2525,14 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
                 break
             n += k
             fill_zones(state["b"])
+        moved += place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True)
         pcbnew.SaveBoard(pcb, state["b"])
-        return "%d stitching vias" % n + ("; NOT JOINED: " + "; ".join(UNJOINED) if UNJOINED else "")
+        return "%d stitching vias" % n + ("; designators moved off vias: " + " ".join(moved) if moved else "") + \
+            ("; NOT JOINED: " + "; ".join(UNJOINED) if UNJOINED else "")
     step("stitch + zones + save", fill)
 
     def silk():
-        bad = check_silk(state["b"], artwork=logo_keepout) + check_models()
+        bad = check_silk(state["b"], artwork=logo_keepout, labels=labels) + check_models()
         if bad:
             raise SystemExit("silkscreen / 3D models:\n  " + "\n  ".join(bad))
     step("silkscreen, 3D models", silk)

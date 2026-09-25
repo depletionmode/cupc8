@@ -49,6 +49,18 @@ Shared rules:
   card's logo is the 10 mm size (milestone-1.md's minimum): with the 12 mm
   one's keep-out, Freerouting left QFN nets unrouted or pour pockets
   unjoined at every position tried.
+- **Designators** (`kicadgen.place_designators`, checked by
+  `check_designators` in the silkscreen step, SILK-001): never over a pad
+  or a via, another part's courtyard, any part's body or another word, by
+  their printed strokes. They are placed before routing; the fixed vias
+  (finger ties, presence link, fan-out, a board's own) and then the
+  router's move any that landed under one to the nearest clear spot, up to
+  2 mm off its part (45 % of a big part's size, for a QFN in its ring of
+  vias), turned upright or at JLC's 0.8 mm minimum if that is what fits.
+  The stitching vias keep off every word. A designator with no clear spot
+  at all is left off (the build output says which); the CPL still places
+  the part. The board's name moves the same way off vias (a wide tab's GND
+  ties), and its new spot is then a via keep-out for the router.
 - **Assembly:** nothing is fitted by hand. The Wi-Fi card's antenna lead (MHF III to SMA) is
   the one exception: it is plugged in, not soldered.
 
