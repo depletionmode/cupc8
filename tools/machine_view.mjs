@@ -8,7 +8,7 @@
 //
 // then open http://127.0.0.1:8640. --every is the emulated time between
 // captured frames, in ms. --native (or CUPC8_EMU=native) runs the native
-// emulator (emu/machine, built by tools/emu_machine_build.sh; about 15x slower
+// emulator (emu/machine, built by tools/emu_machine_build.sh; about 8x slower
 // than real time) instead of test/emu/machine.mjs (~100x slower): the same
 // machine, cycle for cycle (EMU-007), just faster.
 //
@@ -66,6 +66,7 @@ const m = await Machine.create({ slots });
 let frame = null;                 // the last good frame, RGB888
 let fw = 640, fh = 480;           // its size (the e-ink panel's is its own)
 let frames = 0, note = 'powering on', started = Date.now();
+let keyAt = null;                 // emulated time of the first key not yet shown
 
 // ------------------------------------------------------------------- the page
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emulator</title>
@@ -107,7 +108,7 @@ async function tick() {
       }
     }
   } catch (e) { status.textContent = 'emulator not reachable: ' + e; }
-  setTimeout(tick, 300);
+  setTimeout(tick, 100);
 }
 tick();
 // USB HID usages for the keys typed text can't carry
@@ -140,6 +141,7 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
     res.end(frame ?? Buffer.alloc(0));
   } else if (url.pathname === '/key' && req.method === 'POST') {
+    keyAt ??= m.ns;
     if (!m.keyboard) note = 'no IO card fitted: keys go nowhere';
     else if (url.searchParams.has('text')) m.type(url.searchParams.get('text'));
     else if (url.searchParams.has('usage')) {
@@ -159,9 +161,14 @@ http.createServer((req, res) => {
 // ------------------------------------------------------------- the emulator
 m.powerOn();
 started = Date.now();
-let seq = -1;
+let seq = -1, shot = 0;
 for (;;) {
-  await m.runAsync(every);
+  // capture every `every`, or 5 ms after a key (the echo takes ~2 ms): not at
+  // the end of the chunk, which at ~8x slower than real time is seconds away
+  await m.runAsync(5e6);
+  if (!(keyAt !== null && m.ns - keyAt >= 5e6) && m.ns - shot < every) continue;
+  keyAt = null;
+  shot = m.ns;
   if (eink) {
     // the panel's glass: it changes when a refresh completes
     const p = m.panel();
