@@ -7,7 +7,7 @@ import path from 'node:path';
 export const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 
 export function kernelRom() {
-  // the layout kernel/assemble.sh uses (code $1000, data $5e00, bss $6400).
+  // the layout kernel/assemble.sh uses (code $1000, data $6000, bss $e000).
   // a private directory, so tests running side by side can't clobber each
   // other's build (kernel/assemble.sh merges in place): the same merge, here
   fs.mkdirSync(path.join(ROOT, 'build'), { recursive: true });

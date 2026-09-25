@@ -660,7 +660,7 @@ cmd = "tools/run_tests.sh testKernelBanks"
 [[test]]
 id = "KRN-010"
 title = "Kernel memory layout and the API jump table"
-checks = "the kernel is assembled for code $1000, data $5e00, bss $6400 and its code, data and bss end by $5dff, $63ff and $6eff (the API block $6f00 and the user program $7000- stay free); the jump table from $1003 is 8 groups x 32 B instructions, each entry kernel/api.inc names goes to api_<name> (the bank entries to kernel/bank.s, the net group's 16 to kernel/net.s; api_none for a stub) and every other to api_none, api_none follows at $1303; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc of the 32-entry table still has its entries at the same addresses (entries are only added)"
+checks = "the kernel is assembled for code $1000, data $6000, bss $e000 and its code, data and bss end by $5fff, $6eff and $efff (the API block $6f00 and the user program $7000-$dfff stay free); the jump table from $1003 is 8 groups x 32 B instructions, each entry kernel/api.inc names goes to api_<name> (the bank entries to kernel/bank.s, the net group's 16 to kernel/net.s; api_none for a stub) and every other to api_none, api_none follows at $1303; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc of the 32-entry table still has its entries at the same addresses (entries are only added)"
 method = "tools/simtest.nim testKernelLayout and testKernelApi on the kernel's map and image (every committed version of kernel/api.inc)"
 kind = "sim"
 vrow = "2.3"
@@ -696,6 +696,15 @@ cmd = "tools/run_tests.sh testEinkApi"
 # ============================================================================
 # CARD: common card protocol (every card firmware)
 # ============================================================================
+
+[[test]]
+id = "KRN-020"
+title = "Backspace at the prompt"
+checks = "Backspace takes the last typed character back from the line and from the screen (back, space, back); on an empty line it does nothing; DEL ($7F) does the same; it goes back over a line that wrapped at column 80 (the graphics card's BS at column 0 moves to the end of the row above, GPU-001); a corrected BASIC line runs as corrected"
+method = "tools/simtest.nim testBackspace: the real kernel on the simulator's HDMI and IO cards"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBackspace"
 
 [[test]]
 id = "CARD-001"

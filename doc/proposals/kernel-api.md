@@ -27,17 +27,17 @@ loader do not fit the 2.8 KB left, so:
 | Range | Use |
 |---|---|
 | $0000–$0fff | vectors, boot ROM variables, stack (as now) |
-| $1000–$5dff | kernel code (19.5 KB); the jump table first |
-| $5e00–$63ff | kernel data (1.5 KB) |
-| $6400–$6eff | kernel bss (2.75 KB) |
+| $1000–$5fff | kernel code (20 KB); the jump table first |
+| $6000–$6eff | kernel data (3.75 KB) |
 | $6f00–$6fff | **API block**: fixed addresses shared with programs (below) |
 | $7000–$dfff | **user program** (28 KB): loaded at $7000, entered at $7000 |
+| $e000–$efff | kernel bss (4 KB): RAM once the kernel turns the ROM off, its first instruction |
 
-`kernel/assemble.sh` passes `0x1000,0x5e00,0x6400`; a test (KRN-010) fails
+`kernel/assemble.sh` passes `0x1000,0x6000,0xe000`; a test (KRN-010) fails
 the build if code, data or bss outgrow their areas. (Decided first as code
-$1000–$4fff, data $5000, bss $6000; with networking the code reached $5623,
-so the code area grew to $5dff and data and bss moved up, leaving about 2 KB
-of code, 270 bytes of data and 520 bytes of bss free, 2026-09-25.)
+$1000–$4fff, data $5000, bss $6000; with the API, networking and the bank
+routines the code reached $5623, so on 2026-09-25 the code area grew to
+$5fff, data moved to $6000 and bss to $e000.)
 
 ## The jump table
 

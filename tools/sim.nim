@@ -28,11 +28,16 @@ var ins_retired*: int = 0
 ## its tick run from it (memory-map.md).
 var simClocks*: int = 0
 
+var statusShown = false  ## the speed line is on screen, without its newline
+
 proc log(lvl : int, msg : string) =
   if (lvl and log_mask) > 0:
     when defined(emscripten):
       echo msg
     else:
+        if statusShown:
+          stdout.write("\r\e[K")   # the next line takes the speed line's place
+          statusShown = false
         case lvl:
             of 8:
                 setStyle({styleBright})
@@ -48,6 +53,23 @@ proc log(lvl : int, msg : string) =
                 discard
         writeLine(stdout, msg)
         resetAttributes()
+
+proc status(msg: string) =
+  ## the speed line: rewritten in place, not one line per second
+  if (8 and log_mask) > 0:
+    when defined(emscripten):
+      echo msg
+    else:
+      setStyle({styleBright})
+      setForegroundColor(fgBlue, true)
+      stdout.write("\r\e[K" & msg)
+      resetAttributes()
+      flushFile(stdout)
+      statusShown = true
+
+when isMainModule and not defined(emscripten):
+  addExitProc(proc () =
+    if statusShown: stdout.write("\n"))   # leave the last speed line for the shell
 
 var
   PC*: int = 0x1000
@@ -1268,7 +1290,7 @@ Both:
           display_render()
           lastPresent = now
         if now - lastMhz >= 1.0:
-          log(8, "$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / (now - lastMhz) / 1_000_000, ffDecimal, 2))
+          status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / (now - lastMhz) / 1_000_000, ffDecimal, 2))
           lastMhz = now
           lastMhzIns = ins_retired
       lastReal = epochTime()
@@ -1344,7 +1366,7 @@ Both:
             lastPresent = now
           if now - lastMhz >= 1.0:
             let dt = now - lastMhz
-            log(8, "$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / dt / 1_000_000, ffDecimal, 2))
+            status("$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / dt / 1_000_000, ffDecimal, 2))
             lastMhz = now
             lastMhzIns = ins_retired
     if dumpFb.len > 0:
