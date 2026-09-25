@@ -257,12 +257,18 @@ analysis assumes for CC sensing (power.md: ±3 %, ≤ 12 LSB).
 
 **USB-C.** A data-only device port: 5.1 kΩ Rd on CC1 and CC2, 27 Ω on
 D+/D−, and a USBLC6-2SC6 between the receptacle and the resistors.
-**VBUS is not connected to anything**, so the card cannot back-feed the host
-or the slot rails. The USBLC6's rail pin goes to +3V3, not VBUS: tied to VBUS,
-its steering diode would lift VBUS to about 2.7 V from the D+ pull-up
-whenever the card is on and the host is not. VBUS is not sensed either, since
-all 30 GPIOs are assigned; the firmware forces the USB controller's VBUS
-detect on (the pico-sdk and TinyUSB default for the RP2040).
+**VBUS powers nothing**, so the card cannot back-feed the host or the slot
+rails. The USBLC6's rail pin goes to +3V3, not VBUS: tied to VBUS, its
+steering diode would lift VBUS to about 2.7 V from the D+ pull-up whenever the
+card is on and the host is not. **VBUS is sensed**, because a self-powered
+device must not pull D+ up while VBUS is absent (USB 2.0, 7.1.5): it drives
+the gate of Q1, a 2N7002 (10 kΩ in, 100 kΩ to GND: ~4.5 V from 5 V, Vth ≤ 2.5 V),
+whose drain (10 kΩ to +3V3) is GPIO29, USB_nVBUS, low while a host is there.
+The RP2040 pin never sees VBUS, so no 5 V on a 3.3 V pin and no current into
+it while the card is unpowered. The firmware starts USB only once VBUS is
+seen and calls `tud_disconnect()` (D+ pull-up off) whenever it goes. The pin
+is active low so that a model with nothing driving it (the whole-machine
+emulators) reads "host present" and behaves as before.
 
 **RP2040.** Raspberry Pi's minimal design: W25Q16JVSSIQ on QSPI, a 12 MHz
 X322512MSB4SI crystal (C_L 20 pF, so 33 pF load caps with about 4 pF of
@@ -286,12 +292,12 @@ GND while powering up for the USB boot ROM; it reaches QSPI_SS through
 
 **LEDs** ([milestone-1.md](../../doc/milestone-1.md), Indicator LEDs):
 power (D1, red KT-0603R, 1 kΩ from +3V3) at `kg.power_led_at`, 3 mm in from
-the body's top-left; USB activity to the host (D3, TX, GPIO0) and from it
-(D4, RX, GPIO1), green KT-0603G with 100 Ω, each lit for ~30 ms after data
-in its direction; status (D2, green, GPIO29: on while the host has the USB
-device configured). All 30 GPIOs were assigned, so the activity LEDs take
-GPIO0/1, which `hw/pins.yaml` had as a debug UART that no firmware used; the
-USB CDC link and the SWD pads cover debugging.
+the body's top-left; USB activity to the host (D2, TX, GPIO0) and from it
+(D3, RX, GPIO1), green KT-0603G with 100 Ω, each lit for ~30 ms after data
+in its direction. All 30 GPIOs were assigned, so the activity LEDs take
+GPIO0/1, which `hw/pins.yaml` had as a debug UART that no firmware used (the
+USB CDC link and the SWD pads cover debugging), and the VBUS sense takes
+GPIO29, which was a status LED.
 
 **Board.** Four layers (JLC04161H-7628), 56 × 48 mm above the tab. GND is
 poured on F.Cu, B.Cu and In1.Cu; all four layers route (In1 as a power
@@ -302,15 +308,22 @@ track and clearance, 0.7 mm vias): at 0.2 mm clearance Freerouting counts
 every pair of the QFN's 0.2 mm-apart pads a violation and routes none of
 them. Freerouting necks those tracks to 0.11 mm at the pads, inside JLC's
 4-layer minimum (0.09 mm), which 4-layer boards now check against (0.1 mm).
-The presence link (A1 to B32) crosses on In2.Cu 1.8 mm above the tab. J1 is
+The presence link (A1 to B32) crosses on In2.Cu 1.8 mm above the tab. The
+script's `prepare()` pre-routes one finger's escape, CHIPSET_CDONE on A21:
+it sits between two all-GND columns whose ties wall it in, and Freerouting
+left it unrouted at every pass count. The pipeline checks it (and the
+key-notch escapes) on KiCad's connectivity after routing. J1 is
 JLC's own footprint (jlc: import), since KiCad's splits the paired contacts
 (A1/B12 ...) that JLC places as one pad; its EasyEDA 3D model is moved
 2.27 mm onto the footprint. Passives are 0603 basic parts.
 
 **Firmware and pins.** `hw/pins.yaml` gives GPIO0/1 to LED_USB_TX/RX (they
-were a debug UART that nothing used; every other GPIO is taken).
-`fw/rp2040/sysctl/main.c` lights each for 30 ms after USB data in its
-direction. SYS-006 checks they light after a request and go dark after.
+were a debug UART that nothing used) and GPIO29 to USB_nVBUS (it was the
+status LED); every other GPIO is taken. `fw/rp2040/sysctl/main.c` lights each
+LED for 30 ms after USB data in its direction and follows VBUS as above.
+SYS-006 checks the LEDs light after a request and go dark after, that
+without VBUS there is no D+ pull-up and no enumeration, and that the pull-up
+goes and comes back with VBUS.
 
 ## CPU card (`cpu.py`)
 

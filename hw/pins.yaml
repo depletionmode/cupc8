@@ -151,7 +151,7 @@ devices:
           - {name: CC1_SENSE, gpio: 26, dir: adc}
           - {name: CC2_SENSE, gpio: 27, dir: adc}
           - {name: V1V2_SENSE, gpio: 28, dir: adc}
-          - {name: LED_STATUS, gpio: 29, dir: out}
+          - {name: USB_nVBUS, gpio: 29, dir: in, note: "low while the host's VBUS is there (a 2N7002 on the card); high with no host, when the D+ pull-up must stay off (USB 2.0, 7.1.5). Was the status LED"}
 
   gpu_mcu:
     board: gpu-card

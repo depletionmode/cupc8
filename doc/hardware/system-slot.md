@@ -95,8 +95,24 @@ card. PRSNT2_n goes to a test pad.
 
 ## The system card
 
-- RP2040 (C2040) with a W25Q16 for its own firmware, a 12 MHz crystal, and a
-  USB-C receptacle for the host (data only; the card takes power from the slot)
-- ESD protection on USB D+/D−
-- LEDs: power, and a status LED on GPIO29
-- A BOOTSEL button, and SWD test pads, for bring-up of the card itself
+As built (`hw/boards/system.py`; the design notes are in `hw/boards/README.md`):
+
+- **Power: the slot's +3V3 only** (B1, B2, A2), the main board's 3V3 rail, which
+  the chipset, flashes and expanders it drives share. No regulator on the card;
+  +5V (A11) is not connected. The ADC reference is that same +3V3.
+- RP2040 (C2040) with a W25Q16 for its own firmware and a 12 MHz crystal
+- A USB-C receptacle for the host, **data only**: 5.1 kΩ Rd on CC1/CC2, 27 Ω
+  on D+/D−, USBLC6-2SC6 ESD (its rail pin on +3V3, not VBUS). VBUS powers
+  nothing: it only drives a 2N7002's gate, which pulls GPIO29 (USB_nVBUS) low
+  while a host is there. The firmware starts USB, and pulls D+ up, only then,
+  and lets go of D+ when VBUS goes (a self-powered device, USB 2.0 7.1.5)
+- 33 Ω source termination on the SPI outputs it drives (SCK, MOSI, nCS of the
+  bridge and both flash buses); 10 kΩ I2C pull-ups
+- **LEDs**, in a row along the top edge: PWR (red, +3V3), TX and RX (green,
+  GPIO0/1: USB data to and from the host, lit ~30 ms). There is no status LED
+  and no debug UART: GPIO0/1 were the UART, GPIO29 the status LED.
+- **Test pads**, not a button: SWCLK, SWDIO, RUN, BOOTSEL (short it to GND
+  while powering up for the USB boot ROM; it reaches QSPI_SS through 1 kΩ),
+  +3V3, 1V1, GND, and RSVD_B1/B2
+- PRSNT1_n (A1) is joined to PRSNT2_n (B32); RSVD_A1–A3 are not connected
+- 4 layers, a 56 × 48 mm body above the x4 finger tab
