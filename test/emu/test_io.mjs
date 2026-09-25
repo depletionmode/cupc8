@@ -138,6 +138,8 @@ for (const speed of [1, 2]) {
 // by the timing of that build). Hit the window on purpose: the swap starts by
 // masking IO_IRQ_BANK0 (an NVIC ICER write, bit 13); drop CS_n k cycles
 // after that write, for k across the swap, and check every READ is framed.
+// (The swap now comes after the new preload is filled, some 200 cycles in:
+// the sweep runs to 300.)
 {
   const kbd = new UsbKeyboard({ speed: 2, interval: 1 });
   emu.mcu.usbCtrl.attachDevice(kbd);
@@ -161,7 +163,7 @@ for (const speed of [1, 2]) {
     });
   let framed = 0;
   const odd = [];
-  for (let k = 0; k <= 120; k += 3) {
+  for (let k = 0; k <= 300; k += 3) {
     cmd([0x05]);                          // FLUSH: the FIFO is empty
     cmd([0x00]);                          // GETKEY: a 1-byte response is pending
     wait(2e6);
