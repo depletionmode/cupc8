@@ -1503,6 +1503,23 @@ def tab_via_keepout(board, tab_top, margin=1.0):
             ol.Append(mm(px), mm(py))
         board.Add(z)
         n += 1
+        # and no tracks over the fingers themselves: Freerouting otherwise
+        # joins two GND fingers across the contact surface (0.075 mm wires
+        # at their centres). A track reaches a finger from its top end.
+        top = min(to(p.GetBoundingBox().GetTop()) for p in fp.Pads())
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowTracks(True)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        ol = z.Outline()
+        ol.NewOutline()
+        for px, py in ((x0, top + 0.6), (x1, top + 0.6), (x1, y1), (x0, y1)):
+            ol.Append(mm(px), mm(py))
+        board.Add(z)
     return n
 
 
