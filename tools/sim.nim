@@ -14,6 +14,8 @@ when isMainModule:
   import os
   import parseopt
   import std/exitprocs
+  import sequtils
+  import simmachine
 
 var log_mask* = 9
 var last_gpo*: string = ""
@@ -885,6 +887,53 @@ when isMainModule:
   var doTrace = false
   var wantDisplay = true
   var dumpFb = ""
+  # the Milestone 1 machine (the default; --legacy for the old I/O model)
+  var legacy = defined(emscripten)
+  var cardList = "hdmi,io"
+  var sdPath = ""
+  var romPath = ""
+  var typed = ""                 # --type: the keys to type
+  var dumpText = ""
+  var settleMs = 2000
+  var scaleSet = false
+
+  const usage = """usage: sim [options] [kernel.o]
+
+The Milestone 1 machine (the default): reset runs the boot ROM, which loads
+the kernel from the ROM chip; the slot cards run the real card firmware cores.
+  --cards:LIST      slot cards, slots 1.. in order (default hdmi,io); kinds:
+                    """ & CardKindNames & """
+
+  --sd:IMAGE        the storage card's SD card: a FAT image (a blank 32 MB one
+                    is made if the file does not exist)
+  --rom:FILE        boot this ROM image (default: built from rom/boot.s and
+                    kernel.o, or from kernel/ when no kernel.o is given)
+  --type:TEXT       type TEXT on the keyboard (\n = Enter), one key each time
+                    the CPU parks in WAI (the kernel's keyboard wait); repeatable
+  --dump-text:PATH  at exit, write the console's text (- = stdout)
+  --settle:MS       headless: guest ms to run on once the typed text is used up
+                    and the machine is idle again (default 2000); then exit
+The Wi-Fi card uses the host's own sockets: any SSID joins, and the machine
+reaches the real network and localhost directly.
+  --legacy          the old I/O model (ILI9340 display, SD on SPI 1, keyboard on
+                    SPI 2); kernel.o (or stdin) is loaded at $1000 and run
+Both:
+  --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --trace  --log-mask:N"""
+
+  proc unescapeTyped(t: string): string =
+    ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash.
+    var i = 0
+    while i < t.len:
+      if t[i] == '\\' and i + 1 < t.len:
+        inc i
+        case t[i]
+        of 'n', 'r': result.add('\r')
+        of 't': result.add('\t')
+        of 'e': result.add('\x1b')
+        else: result.add(t[i])
+      else:
+        result.add(if t[i] == '\n': '\r' else: t[i])
+      inc i
 
   var p = initOptParser()
   for kind, key, val in p.getopt():
@@ -904,10 +953,25 @@ when isMainModule:
         log_mask = parseInt(val)
       of "scale":
         display_setScale(parseInt(val))
+        scaleSet = true
       of "dump-fb":
         dumpFb = val
+      of "legacy":
+        legacy = true
+      of "cards":
+        cardList = val
+      of "sd":
+        sdPath = val
+      of "rom":
+        romPath = val
+      of "type":
+        typed.add(unescapeTyped(val))
+      of "dump-text":
+        dumpText = val
+      of "settle":
+        settleMs = parseInt(val)
       of "help", "h":
-        echo "usage: sim [--headless] [--max-ins:N] [--scale:N] [--dump-fb:path] [--trace] <kernel.o>"
+        echo usage
         quit(0)
       else:
         echo "unknown option: ", key
@@ -915,7 +979,53 @@ when isMainModule:
     of cmdEnd:
       discard
 
-  if binPath.len == 0:
+  proc die(msg: string) =
+    stderr.writeLine("sim: " & msg)
+    quit(1)
+
+  proc setupCards() =
+    ## The M1 machine: the cards in their slots, the SD image in the storage
+    ## card, the ROM image in the ROM chip, and reset into the boot ROM.
+    var kinds: seq[int]
+    for name in cardList.split(','):
+      let k = cardKind(name)
+      if k < 0:
+        die("unknown card kind '" & name & "' (" & CardKindNames & ")")
+      kinds.add(k)
+    if kinds.len > 6:
+      die("6 slots, " & $kinds.len & " cards")
+    if kinds.filterIt(it == CardStorage).len > 1:
+      die("one storage card at most (the card's FatFs has one volume per process)")
+    machineCards(kinds)
+    if sdPath.len > 0:
+      if CardStorage notin kinds:
+        die("--sd needs a storage card in --cards")
+      if not fileExists(sdPath):
+        try:
+          makeFatImage(sdPath)
+        except IOError as e:
+          die(e.msg)
+        echo "made a blank FAT image ", sdPath
+      for c in slots:
+        if not c.isNil and simcard_type(c) == CardStorage and
+           simcard_storage_image(c, cstring(sdPath), 0) != 0:
+          die("cannot open the SD image " & sdPath)
+    try:
+      if romPath.len == 0:
+        romPath = if binPath.len > 0: makeRom(buildBootRom(), binPath, binPath.changeFileExt("rom"))
+                  else: buildKernelRom()
+    except IOError as e:
+      die(e.msg)
+    cpuReset()
+    cpuLoadRom(romPath)
+    cpuBootRom()
+    if not scaleSet:
+      display_setScale(2)          # 640x480 at 3x does not fit most screens
+    display_setSize(GpuOutW, GpuOutH)
+
+  if not legacy:
+    setupCards()
+  elif binPath.len == 0:
     if paramCount() > 0:
       binPath = paramStr(1)
     else:
@@ -928,7 +1038,8 @@ when isMainModule:
       stderr.writeLine("display init failed: " & display_init_error)
       quit(2)
 
-  discard sd_try_init()
+  if legacy:
+    discard sd_try_init()
 
   var atend = false
   var evt = defaultEvent
@@ -952,10 +1063,111 @@ when isMainModule:
               pushKey(13)
             of K_BACKSPACE:
               pushKey(8)
+            of K_ESCAPE:
+              pushKey(27)
+            of K_TAB:
+              pushKey(9)
             else:
-              discard
+              # Ctrl+letter (no TextInput comes for it)
+              let sym = int(e.keysym.sym)
+              if (e.keysym.modstate and KMOD_CTRL) != 0 and sym >= ord('a') and sym <= ord('z'):
+                pushKey(sym - ord('a') + 1)
         else:
           discard
+
+  # Hooks for later features (a program to load and run, ...): each runs
+  # once, when the kernel first parks in WAI (it is at its prompt).
+  var onKernelReady: seq[proc()] = @[]
+
+  proc runCards() =
+    ## The M1 machine's main loop. The CPU runs flat out; while it is parked
+    ## in WAI, guest time follows the host clock (interactive) or runs on
+    ## without sleeping (headless). --type keys go in one at a time, each
+    ## once the CPU has run and parked in WAI again.
+    var pos = 0                       # next key of `typed`
+    var ranSinceKey = true
+    var keyAt = 0                     # ins_retired when the last key went in
+    var readyDone = false
+    var idleAt = -1                   # ins_retired when the typed text was used up and the CPU parked
+    var lastReal = epochTime()
+    var lastPresent = 0.0
+    var lastMhz = lastReal
+    var lastMhzIns = 0
+    while not atend:
+      if HF or PC >= imageEnd:
+        echo "HALT!"
+        break
+      if maxIns > 0 and ins_retired >= maxIns:
+        break
+      if headless and idleAt >= 0 and ins_retired - idleAt >= settleMs * 1000:
+        break
+      if waiting:
+        if not readyDone:
+          readyDone = true
+          for hook in onKernelReady: hook()
+        if not ranSinceKey and ins_retired - keyAt >= settleMs * 1000:
+          ranSinceKey = true          # the key woke nothing (no IO card, IRQs off): go on
+        if ranSinceKey:
+          if pos < typed.len:
+            pushKey(ord(typed[pos]))
+            inc pos
+            ranSinceKey = false
+            keyAt = ins_retired
+          elif idleAt < 0:
+            idleAt = ins_retired
+        var steps = 1000
+        if not headless:
+          sleep(1)
+          steps = clamp(int((epochTime() - lastReal) * 1_000_000), 1, 100_000)
+        if maxIns > 0:
+          steps = min(steps, maxIns - ins_retired)
+        var i = 0
+        while i < steps and waiting and not HF:
+          discard cpuStep()
+          inc i
+      else:
+        ranSinceKey = true
+        var batch = 4096
+        if maxIns > 0:
+          batch = min(batch, maxIns - ins_retired)
+        if doTrace:
+          echo "TRACE pc=$1 op=$2" % [toHex(PC, 4), toHex(memRead(PC), 2)]
+          batch = 1
+        discard cpuRun(batch)
+      if not headless:
+        let now = epochTime()
+        if now - lastPresent >= 0.016:
+          pumpInput()
+          gpuPresent()
+          display_render()
+          lastPresent = now
+        if now - lastMhz >= 1.0:
+          log(8, "$1 MHz" % formatFloat(float(ins_retired - lastMhzIns) / (now - lastMhz) / 1_000_000, ffDecimal, 2))
+          lastMhz = now
+          lastMhzIns = ins_retired
+      lastReal = epochTime()
+    echo cpuStatusLine()
+    if dumpText.len > 0:
+      let g = gpuCard()
+      if g.isNil:
+        stderr.writeLine("sim: --dump-text: no graphics card")
+      else:
+        let text = screenLines(g).join("\n") & "\n"
+        if dumpText == "-": stdout.write(text)
+        else: writeFile(dumpText, text)
+    if dumpFb.len > 0:
+      gpuPresent()
+      display_dumpPpm(dumpFb)
+      echo "wrote framebuffer ", dumpFb
+    if not headless and maxIns == 0 and not atend:
+      while not atend:                # halted: keep the window up until it is closed
+        pumpInput()
+        display_render()
+        sleep(16)
+
+  if not legacy:
+    runCards()
+    quit(0)
 
   proc exec() {.cdecl.} =
     if PC >= imageEnd or HF:

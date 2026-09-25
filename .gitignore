@@ -1,6 +1,7 @@
 # assembler / simulator build outputs
 kernel/kernel.o
 kernel/kernel.map
+kernel/kernel.rom
 kernel/merged.ss
 tools/sim
 tools/simtest

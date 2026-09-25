@@ -12,6 +12,7 @@ import tables
 import sim
 import simdisplay
 import simcards
+import simmachine
 import disasm
 import symbols
 import tui
@@ -882,20 +883,10 @@ run testCardsMode
 
 proc buildRom(kernelSrc: string): string =
   ## Assemble the boot ROM and a kernel, then build a ROM image.
-  let outDir = rootDir / "build" / "rom"
-  createDir(outDir)
-  let boot = outDir / "boot.bin"
-  let kernel = outDir / "kernel.o"
-  let rom = outDir / "test.rom"
-  var r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "as.py") & " " &
-                    quoteShell(rootDir / "rom" / "boot.s") & " " & quoteShell(boot) &
-                    " 0xe000,0xe600,0x0f00")
-  if r.exitCode != 0: raise newException(IOError, "boot ROM: " & r.output)
+  let kernel = rootDir / "build" / "rom" / "kernel.o"
+  let boot = buildBootRom()
   assemble(kernelSrc, kernel)
-  r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "mkrom.py") & " " &
-                quoteShell(boot) & " " & quoteShell(kernel) & " -o " & quoteShell(rom))
-  if r.exitCode != 0: raise newException(IOError, "mkrom: " & r.output)
-  rom
+  makeRom(boot, kernel, rootDir / "build" / "rom" / "test.rom")
 
 proc testBootChain() =
   ## BOOT-001: reset into the boot ROM, POST, banner, kernel copy, and go.
@@ -997,22 +988,6 @@ proc gpuFind(g: SimCard; want: string): int =
     if gpuLine(g, row).contains(want):
       return row
   -1
-
-proc buildKernelRom(): string =
-  ## Assemble the real kernel and the boot ROM into build/rom/kernel.rom.
-  let outDir = rootDir / "build" / "rom"
-  createDir(outDir)
-  var r = execCmdEx("cd " & quoteShell(kernelDir) & " && bash assemble.sh")
-  if r.exitCode != 0: raise newException(IOError, "kernel build: " & r.output)
-  r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "as.py") & " " &
-                quoteShell(rootDir / "rom" / "boot.s") & " " & quoteShell(outDir / "boot.bin") &
-                " 0xe000,0xe600,0x0f00")
-  if r.exitCode != 0: raise newException(IOError, "boot ROM: " & r.output)
-  r = execCmdEx("python3 " & quoteShell(rootDir / "tools" / "mkrom.py") & " " &
-                quoteShell(outDir / "boot.bin") & " " & quoteShell(kernelDir / "kernel.o") &
-                " -o " & quoteShell(outDir / "kernel.rom"))
-  if r.exitCode != 0: raise newException(IOError, "mkrom: " & r.output)
-  outDir / "kernel.rom"
 
 proc testKernelOnCards() =
   ## KRN-001: the real kernel, booted from ROM, reaches the BASIC prompt on
