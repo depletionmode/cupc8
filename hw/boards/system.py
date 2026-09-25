@@ -255,8 +255,8 @@ PLACEMENT = {
     "D1": kg.power_led_at(OUTLINE) + (0,), "R9": (3, 5.5, 0),
     "D2": (9, 3, 0), "R20": (9, 5.5, 0),
     "D3": (15, 3, 0), "R21": (15, 5.5, 0),
-    # VBUS sense, between the LED row and J1
-    "Q1": (29, 4.2, 0), "R10": (24.5, 3, 0), "R22": (24.5, 5.5, 0), "R23": (33.5, 4.2, 0),
+    # VBUS sense, down the right edge below the logo, away from the RP2040
+    "Q1": (52, 34, 0), "R10": (52, 37, 0), "R22": (52, 39.5, 0), "R23": (52, 31, 0),
 }
 for _i, _n in enumerate(TERMINATED):
     PLACEMENT["R%d" % (11 + _i)] = (21.5 + 3.3 * _i, 31, 90)   # over the fingers they drive
