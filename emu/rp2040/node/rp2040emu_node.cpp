@@ -386,6 +386,20 @@ ENTRY(trapRemove) {
   });
 }
 
+// irqMaxWait(h, irq, reset): the most cycles core 0's interrupt `irq` has
+// waited from pending to its exception entry; reset: start again from 0
+ENTRY(irqMaxWait) {
+  return guard(env, [&] {
+    Args a(env, info);
+    auto &core = a.h->emu.mcu->core0;
+    const uint32_t irq = a.u32(1);
+    if (irq >= 32) throw std::runtime_error("irqMaxWait: irq must be < 32");
+    const double wait = core.irqMaxWait[irq];
+    if (a.boolean(2)) core.irqMaxWait[irq] = 0;
+    return number(env, wait);
+  });
+}
+
 // ------------------------------------------------------------ pins
 ENTRY(pinSet) {
   return guard(env, [&] {
@@ -889,7 +903,7 @@ static napi_value Init(napi_env env, napi_value exports) {
       FN(adcSet),     FN(adcGet),      FN(kbdCreate),   FN(kbdPress),   FN(kbdState),   FN(usbAttach),
       FN(usbDetach),  FN(cdcCreate),   FN(cdcOn),       FN(cdcSend),    FN(cdcTxCount), FN(tmdsCreate),
       FN(tmdsStart),  FN(tmdsStop),    FN(tmdsData),    FN(hostCreate), FN(hostConfig), FN(hostRun),
-      FN(sdCreate),   FN(sdInsert),    FN(sdRemove),    FN(sdCard),
+      FN(sdCreate),   FN(sdInsert),    FN(sdRemove),    FN(sdCard),     FN(irqMaxWait),
 #undef FN
   };
   napi_define_properties(env, exports, sizeof props / sizeof props[0], props);

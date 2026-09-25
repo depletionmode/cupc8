@@ -253,15 +253,18 @@ name = "gpu firmware: the slot SPI interrupt could delay PicoDVI's past its porc
 fixed_in = "9b4966c"
 # The fix's other half (slotspi masking only its own IRQ) is gone on purpose:
 # slotspi_refresh now turns every interrupt off for a few dozen cycles to swap
-# the preload (18c444f). GPU-005's traffic check never caught this bug, even at
-# 9b4966c with the bug put back; the whole machine's boot (as when it was
-# found) does: no picture at all.
+# the preload (18c444f). Whether a delayed DVI interrupt still makes its porch
+# depends on how long the CS_n handler runs, so neither GPU-005's picture
+# checks nor E2E-002's boot (which found it) catch it any more. GPU-005 checks
+# the cause: CS_n rising at every point of a scanline, the DVI interrupt's
+# longest wait (emulator-side, pending to entry) is 113 cycles with the fix,
+# ~570 (the whole CS_n handler) with the bug.
 revert = [
   ["fw/rp2040/gpu/main.c", "	irq_set_priority(DMA_IRQ_0, 0);\n", ""],
   ["fw/rp2040/common/slotspi.c", "	irq_set_priority(IO_IRQ_BANK0, 0x40);", "	irq_set_priority(IO_IRQ_BANK0, 0);"],
 ]
-cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002"
-must_fail = ["FAIL the BASIC prompt appears on HDMI after the reset"]
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && tools/fw_rp2040.sh gpu && make -s -C fw gpu_golden && CUPC8_EMU=native node test/emu/test_gpu.mjs GPU-005"
+must_fail = ["FAIL PicoDVI's DMA interrupt waits at most 250 cycles"]
 
 [[bug]]
 name = "boot ROM: SPI_RX read straight after SPI_GO, before the transfer is done - every card's IDENT came back a byte late and every slot was recorded empty"
@@ -477,15 +480,16 @@ must_fail = ["FAIL !model.asleep: sleep_s 3 after 72 min of sleep_s 0: awake at 
 [[bug]]
 name = "slot SPI slave: slotspi_poll set busy while replaying READ frames, so a host polling in step never saw the ready response (E2E-007's slow SAVE lost its last Enter)"
 fixed_in = "4d7648a"
-# timing-bound: it shows with the code layout of 8068f78 (the IO card's loop
-# in step with the kernel's READ polling); if a later layout hides it, this
-# entry will say so ("PASSES with the bug back")
+# E2E-007 caught it only with the code layout of 8068f78 (the IO card's loop
+# in step with the kernel's READ polling). IOC-004 makes the overlap certain:
+# short READs sent straight after a 2000-byte READ end while the card is still
+# replaying it (29 of 30 get RESP_LEN 0 with the bug back).
 revert = [
   ["fw/rp2040/common/slotspi.c", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		card_select(card, true);", "		 * E2E-007's slow SAVE.) It would also clear a caller's busy. */\n		busy = true;\n		card_select(card, true);"],
   ["fw/rp2040/common/slotspi.c", "		q_tail++;\n		irq_set_enabled", "		q_tail++;\n		busy = false;\n		irq_set_enabled"],
 ]
-cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-007"
-must_fail = ["FAIL lines typed during a slow SAVE are kept and run afterwards"]
+cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu_node >/dev/null && tools/fw_rp2040.sh io && CUPC8_EMU=native node test/emu/test_io.mjs"
+must_fail = ["FAIL READs during a READ's replay"]
 
 [[bug]]
 name = "sim: headless --type hung when no card took the key (no IO card)"

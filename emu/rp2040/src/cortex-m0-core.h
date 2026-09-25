@@ -82,6 +82,16 @@ class CortexM0Core {
    */
   std::function<uint32_t()> executeInstructionOverride;
 
+  /**
+   * Not in TS: read-only instrumentation for the tests (rp2040emu_node.cpp
+   * irqMaxWait; test/emu/rp2040emu.mjs does the same on rp2040js). For each
+   * external interrupt: `cycles` when it last became pending (through
+   * setInterrupt), and the most cycles it has waited from then to its
+   * exception entry. The emulation never reads them.
+   */
+  std::array<double, 32> irqPendingSince{};
+  std::array<double, 32> irqMaxWait{};
+
   RP2040 &rp2040;
 
   explicit CortexM0Core(RP2040 &rp2040);

@@ -229,6 +229,29 @@ for (const speed of [1, 2]) {
   wait(50e6);
 }
 
+// ------------------------------ READs that end while the card replays a READ
+// The card's loop replays every queued frame through the card core
+// (slotspi_poll), and a READ changes nothing, so a READ whose CS_n rises
+// meanwhile must still be armed with the ready response. Setting busy around
+// each replayed frame once withheld it: a host polling READ in step with the
+// loop got RESP_LEN 0 every time, and E2E-007's slow SAVE lost a key. Being
+// in step was a matter of code layout; here the overlap is certain: a READ
+// padded to 2000 bytes takes the card far longer to replay than the short
+// READs sent straight after it take on the wire (~27 us each), so several of
+// them end while it is being replayed.
+{
+  const id = cmd([0xf0]);                             // IDENT: 4 bytes, ready (READ does not take them)
+  const lens = run(function* () {
+    yield* this.frame([0xfe, ...new Array(2000).fill(0)]);
+    const out = [];
+    for (let i = 0; i < 30; i++) out.push((yield* this.frame([0xfe, 0]))[1]);
+    return out;
+  });
+  const withheld = lens.filter((n) => n !== 4).length;
+  expect(id && id.data.length === 4 && withheld === 0,
+    `READs during a READ's replay: all 30 offer IDENT's 4 bytes (${withheld} did not: RESP_LEN ${lens.join(' ')})`);
+}
+
 // ------------------------------------------------------------ VBUS fault
 emu.mcu.gpio[VBUS_NFAULT].setInputValue(false);
 wait(10e6);

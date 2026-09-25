@@ -154,6 +154,11 @@ export class Emu {
   }
 
   // see rp2040emu.mjs
+  irqMaxWait(irq, reset = false) {
+    return N.irqMaxWait(this.h, irq, reset);
+  }
+
+  // see rp2040emu.mjs
   ppbWriteTrap(offset, mask) {
     const h = this.h;
     N.trapInstall(h, offset, mask);
