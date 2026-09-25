@@ -1,4 +1,4 @@
--- Chipset testbench (MMU, ROM, SPI, IRQ, BRG, DBG tests).
+-- Chipset testbench (MMU, ROM, SPI, IRQ, BRG, DBG, XRAM tests).
 --
 -- A CPU-bus BFM stands in for the CPU card and a bridge BFM for sysctl; the
 -- memory bus has the SRAM and SST39 timing models, and slot 4 (dev 3) has an
@@ -38,6 +38,7 @@ architecture sim of tb_chipset is
 	signal mem_d_oe, mem_n_oe, mem_n_we, mem_n_ce_ram, mem_n_ce_rom: std_logic;
 	signal ram_a: std_logic_vector(18 downto 0);
 	signal ram_viol, rom_viol: natural;
+	signal last_ram_a: std_logic_vector(18 downto 0) := (others => '0');	-- SRAM address of the last RAM access
 
 	-- SPI
 	signal spi_sck, spi_mosi, spi_miso: std_logic;
@@ -89,7 +90,11 @@ begin
 		br_sck => br_sck, br_mosi => br_mosi, br_miso => br_miso, br_n_cs => br_n_cs);
 
 	mem_d <= mem_d_out when mem_d_oe = '1' else (others => 'Z');
-	ram_a <= "000" & mem_a(15 downto 0);		-- SRAM A16-A18 are tied low on the board
+	ram_a <= mem_a;			-- SRAM A16-A18 on MEM_A16-A18: banked RAM (extended-ram.md)
+	ram_seen: process(clk)
+	begin
+		if rising_edge(clk) and mem_n_ce_ram = '0' then last_ram_a <= mem_a; end if;
+	end process;
 
 	ram: entity work.sram_model port map(a => ram_a, d => mem_d, n_ce => mem_n_ce_ram,
 		n_oe => mem_n_oe, n_we => mem_n_we, violations => ram_viol);
@@ -259,11 +264,18 @@ begin
 			for i in 0 to count - 1 loop br_tx(buf(i)); end loop;
 			br_end;
 		end procedure;
+		procedure br_ram_write24(addr: natural; count: natural) is	-- RAM_WR24 of buf(0..count-1)
+		begin
+			br_begin; br_tx(x"09"); br_tx(b8(addr)); br_tx(b8(addr / 256)); br_tx(b8(addr / 65536));
+			br_tx(b8(count - 1));
+			for i in 0 to count - 1 loop br_tx(buf(i)); end loop;
+			br_end;
+		end procedure;
 		procedure br_read(cmd: std_logic_vector(7 downto 0); addr: natural; count: natural) is
 			variable r: std_logic_vector(7 downto 0);
 		begin
 			br_begin; br_tx(cmd); br_tx(b8(addr)); br_tx(b8(addr / 256));
-			if cmd = x"03" then br_tx(b8(addr / 65536)); end if;
+			if cmd = x"03" or cmd = x"0a" then br_tx(b8(addr / 65536)); end if;
 			br_tx(b8(count - 1));
 			br_tx(x"00");								-- dummy
 			for i in 0 to count - 1 loop br_xfer(x"00", r); buf(i) := r; end loop;
@@ -536,6 +548,140 @@ begin
 			wr(16#f200#, x"0f");
 			wr(16#f201#, x"00");
 			models_clean("IRQ-001");
+		end if;
+
+		---------------------------------------------------------------- MMU-005
+		if run("MMU-005") then
+			-- RAM_BANK ($f205): reset 2, the identity map
+			expect(16#f205#, x"02", "RAM_BANK after reset");
+			wr(16#8123#, x"a7");
+			check(last_ram_a = "000" & x"8123", "identity map: $8123 went to SRAM $" & to_hstring(last_ram_a));
+			br_read(x"0a", 16#08123#, 1);
+			check(buf(0) = x"a7", "identity map: SRAM $08123 holds $" & to_hstring(buf(0)));
+			-- readback: 5 bits, bits 7:5 read 0
+			for v in 0 to 255 loop
+				wr(16#f205#, b8(v));
+				expect(16#f205#, b8(v mod 32), "RAM_BANK readback of $" & to_hstring(b8(v)));
+			end loop;
+			-- every bank: each window address line, both window edges; the SRAM
+			-- sees {bank, A[13:0]} on writes and reads
+			for bank in 0 to 31 loop
+				wr(16#f205#, b8(bank));
+				for k in 0 to 15 loop
+					if k < 14 then n := 2 ** k; elsif k = 14 then n := 0; else n := 16#3fff#; end if;
+					wr(16#8000# + n, b8(bank * 7 + k * 3 + 1));
+					check(to_integer(unsigned(last_ram_a)) = bank * 16384 + n,
+						  "bank " & integer'image(bank) & ": write to $" & to_hstring(to_unsigned(16#8000# + n, 16)) &
+						  " went to SRAM $" & to_hstring(last_ram_a));
+				end loop;
+			end loop;
+			-- read back after every bank was written (so an alias would show)
+			for bank in 0 to 31 loop
+				wr(16#f205#, b8(bank));
+				for k in 0 to 15 loop
+					if k < 14 then n := 2 ** k; elsif k = 14 then n := 0; else n := 16#3fff#; end if;
+					expect(16#8000# + n, b8(bank * 7 + k * 3 + 1), "bank " & integer'image(bank) & " readback");
+					check(to_integer(unsigned(last_ram_a)) = bank * 16384 + n,
+						  "bank " & integer'image(bank) & ": read went to SRAM $" & to_hstring(last_ram_a));
+					br_read(x"0a", bank * 16384 + n, 1);
+					check(buf(0) = b8(bank * 7 + k * 3 + 1), "bank " & integer'image(bank) &
+						  ": RAM_RD24 of SRAM $" & to_hstring(to_unsigned(bank * 16384 + n, 20)) & " = $" & to_hstring(buf(0)));
+				end loop;
+			end loop;
+			-- banks 0, 1 and 3 are the normal memory: the window aliases it
+			wr(16#f205#, x"00");
+			wr(16#0f81#, x"c3");
+			expect(16#8f81#, x"c3", "bank 0 through the window is $0000-$3fff");
+			wr(16#f205#, x"01");
+			wr(16#b456#, x"3c");
+			expect(16#7456#, x"3c", "bank 1 through the window is $4000-$7fff");
+			wr(16#f205#, x"03");
+			wr(16#8765#, x"69");
+			expect(16#c765#, x"69", "bank 3 through the window is $c000-$ffff");
+			-- ... including $f000-$ffff, which the CPU otherwise never reaches
+			wr(16#b000#, x"96");
+			check(last_ram_a = "000" & x"f000", "bank 3 $b000 went to SRAM $" & to_hstring(last_ram_a));
+			br_read(x"02", 16#f000#, 1);
+			check(buf(0) = x"96", "SRAM $0f000 through the window: $" & to_hstring(buf(0)));
+			-- nothing outside the window moves: bank 9, the edges and the other ranges
+			wr(16#f205#, x"09");
+			for i in 0 to 5 loop
+				case i is
+					when 0 => n := 16#0000#; when 1 => n := 16#7fff#; when 2 => n := 16#c000#;
+					when 3 => n := 16#dfff#; when 4 => n := 16#4000#; when others => n := 16#1234#;
+				end case;
+				wr(n, b8(i + 16#50#));
+				check(to_integer(unsigned(last_ram_a)) = n, "bank 9: $" & to_hstring(to_unsigned(n, 16)) &
+					  " went to SRAM $" & to_hstring(last_ram_a));
+				expect(n, b8(i + 16#50#), "outside the window with bank 9");
+			end loop;
+			-- the ROM windows, ROM_OFF RAM and I/O ignore RAM_BANK
+			expect(16#e000#, rom_pattern(0), "fixed ROM window with RAM_BANK 9");
+			wr(16#f204#, x"05");
+			expect(16#e8ff#, rom_pattern(5 * 2048 + 16#ff#), "banked ROM window with RAM_BANK 9");
+			wr(16#f000#, x"81");
+			check(gpo = x"81", "GPO with RAM_BANK 9");
+			expect(16#f204#, x"05", "ROM_BANK with RAM_BANK 9");
+			wr(16#f203#, x"01");
+			wr(16#e456#, x"42");
+			check(last_ram_a = "000" & x"e456", "ROM_OFF RAM $e456 went to SRAM $" & to_hstring(last_ram_a));
+			expect(16#e456#, x"42", "ROM_OFF RAM with RAM_BANK 9");
+			wr(16#f203#, x"00"); wr(16#f204#, x"00");
+			-- a power-on reset puts the identity map back
+			n_por <= '0';
+			wait for 5 * T;
+			n_por <= '1';
+			wait for 60 * T;
+			check(cpu_n_rst = '1', "CPU not released after the reset");
+			expect(16#f205#, x"02", "RAM_BANK after a second reset");
+			models_clean("MMU-005");
+		end if;
+
+		---------------------------------------------------------------- BRG-004
+		if run("BRG-004") then
+			-- RAM_WR24/RAM_RD24: 19-bit physical addresses, every length class,
+			-- across bank boundaries and across $0ffff, which the 16-bit forms wrap
+			for tc in 0 to 7 loop
+				case tc is
+					when 0 => n := 16#00100#; when 1 => n := 16#0bff0#; when 2 => n := 16#0fff8#;
+					when 3 => n := 16#13ffe#; when 4 => n := 16#42abc#; when 5 => n := 16#7ff00#;
+					when 6 => n := 16#5c000#; when others => n := 16#20000#;
+				end case;
+				for len in 1 to 256 loop
+					if len = 1 or len = 2 or len = 37 or len = 256 then
+						for i in 0 to len - 1 loop buf(i) := b8(tc * 31 + len + i * 5); end loop;
+						br_ram_write24(n, len);
+						for i in 0 to len - 1 loop buf(i) := x"00"; end loop;
+						br_read(x"0a", n, len);
+						for i in 0 to len - 1 loop
+							check(buf(i) = b8(tc * 31 + len + i * 5), "RAM_RD24 at $" & to_hstring(to_unsigned(n + i, 20)) &
+								  " (len " & integer'image(len) & "): $" & to_hstring(buf(i)));
+						end loop;
+					end if;
+				end loop;
+				-- the CPU sees the last write through the window
+				wr(16#f205#, b8((n + 255) / 16384));
+				expect(16#8000# + (n + 255) mod 16384, b8(tc * 31 + 256 + 255 * 5), "RAM_WR24 seen through the window");
+			end loop;
+			wr(16#f205#, x"02");
+			-- the 16-bit forms keep their meaning: SRAM $00000-$0ffff, wrapping
+			for i in 0 to 15 loop buf(i) := b8(16#e0# + i); end loop;
+			br_ram_write(16#fff8#, 16);
+			br_read(x"0a", 16#00000#, 8);
+			for i in 0 to 7 loop
+				check(buf(i) = b8(16#e8# + i), "RAM_WR wrapped past $ffff to $" & to_hstring(to_unsigned(i, 16)) &
+					  ": $" & to_hstring(buf(i)));
+			end loop;
+			br_read(x"0a", 16#10000#, 8);
+			check(buf(0) /= x"e8" or buf(1) /= x"e9", "RAM_WR reached SRAM $10000");
+			br_read(x"02", 16#fffc#, 8);
+			check(buf(3) = x"e7" and buf(4) = x"e8", "RAM_RD wrap: $" & to_hstring(buf(3)) & " $" & to_hstring(buf(4)));
+			-- RAM_RD24 does not touch the ROM, nor ROM_RD the RAM
+			br_read(x"0a", 16#00100#, 1);
+			check(buf(0) = b8(0 * 31 + 256 + 0), "RAM_RD24 $00100: $" & to_hstring(buf(0)));
+			br_read(x"03", 16#00100#, 1);
+			check(buf(0) = rom_pattern(16#100#), "ROM_RD $00100 after RAM_WR24: $" & to_hstring(buf(0)));
+			models_clean("BRG-004");
 		end if;
 
 		---------------------------------------------------------------- BRG-001

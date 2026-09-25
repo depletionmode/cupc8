@@ -17,7 +17,7 @@ OSS = "/opt/oss-cad-suite/bin"
 
 
 # (name, file under soc/, [(text in the fixed RTL, the bug)], property that must
-# fail, tb_chipset sections that must fail on the mutant too)
+# fail (None: simulation only), tb_chipset sections that must fail on the mutant too)
 MUTANTS = [
     # the reset race BUS-004 found, exactly as it was before the fix: cycles
     # taken and completed while /CPU_RST is asserted
@@ -47,6 +47,22 @@ MUTANTS = [
       """					rdy_r <= '0';
 					cyc_busy <= '0';""")],
      "bus_rdy_one_clock", []),
+    # banked RAM (extended-ram.md): the window ignoring RAM_BANK ...
+    ("ram-window-ignored", "chipset.vhd", [
+     ("""							phys := unsigned(ram_bank) & a(13 downto 0);	-- the RAM window""",
+      """							phys := "000" & a;""")],
+     "mmu_ram_window", ["MMU-005"]),
+    # ... RAM_BANK coming out of reset as 0 instead of the identity map ...
+    ("ram-bank-reset-0", "chipset.vhd", [
+     ("""rom_bank <= x"00"; ram_bank <= "00010";""",
+      """rom_bank <= x"00"; ram_bank <= "00000";""")],
+     "mmu_ram_bank_reset", ["MMU-005"]),
+    # ... and the bridge's RAM_WR24/RAM_RD24 cut to 16 bits (no property:
+    # the bridge's protocol is checked by simulation only)
+    ("far-ram-16bit", "bridge.vhd", [
+     ('cmd = x"03" or cmd = x"04" or cmd = x"09" or cmd = x"0a"\n',
+      'cmd = x"03" or cmd = x"04"\n')],
+     None, ["BRG-004"]),
 ]
 
 
@@ -91,13 +107,14 @@ def mutants(env, wrapper):
         with open(path, "w") as f:
             f.write(text)
         sbydir = os.path.join(base, "soc", "formal")
-        run_sby(sbydir, os.path.join(base, "run"), "bmc", env, wrapper)
-        log = open(os.path.join(base, "run", "logfile.txt")).read()
-        if "failed assertion chipset.\\chipset_props.%s" % prop in log:
-            print("ok   %-12s caught by %s" % (name, prop))
-        else:
-            print("FAIL %-12s NOT caught by %s" % (name, prop))
-            bad += 1
+        if prop:
+            run_sby(sbydir, os.path.join(base, "run"), "bmc", env, wrapper)
+            log = open(os.path.join(base, "run", "logfile.txt")).read()
+            if "failed assertion chipset.\\chipset_props.%s" % prop in log:
+                print("ok   %-12s caught by %s" % (name, prop))
+            else:
+                print("FAIL %-12s NOT caught by %s" % (name, prop))
+                bad += 1
         for section in sims:
             if sim_fails(base, section):
                 print("ok   %-12s caught by tb_chipset %s" % (name, section))

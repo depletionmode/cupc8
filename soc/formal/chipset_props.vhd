@@ -52,6 +52,23 @@ vunit chipset_props(chipset(rtl)) {
 	inv_noe_read: assert always (n_oe_r = '0') -> (m_we = '0');
 	inv_ce_access: assert always (mstate = m_1 or mstate = m_2) -> (mem_n_ce_ram = '0' or mem_n_ce_rom = '0');
 
+	---------------------------------------------------------------- MMU-004: the RAM window
+	-- where a CPU memory access goes (checked as the controller starts it, in
+	-- m_1, from the cycle's latched address): $8000-$bfff to {RAM_BANK,
+	-- A[13:0]}; every other RAM address to {000, A}; the ROM windows to the
+	-- ROM chip as before; I/O never to memory. RAM_BANK resets to 2 (the
+	-- identity map).
+	mmu_ram_window: assert always (mstate = m_1 and m_owner_br = '0' and m_rom = '0' and cyc_a(15 downto 14) = "10") ->
+		(ma_r = unsigned(std_logic_vector'(ram_bank & cyc_a(13 downto 0))));
+	mmu_ram_flat: assert always (mstate = m_1 and m_owner_br = '0' and m_rom = '0' and cyc_a(15 downto 14) /= "10") ->
+		(ma_r = unsigned(std_logic_vector'("000" & cyc_a)));
+	mmu_rom_fixed: assert always (mstate = m_1 and m_owner_br = '0' and m_rom = '1' and cyc_a(11) = '0') ->
+		(cyc_a(15 downto 12) = x"e" and ma_r = unsigned(std_logic_vector'("00000000" & cyc_a(10 downto 0))));
+	mmu_rom_banked: assert always (mstate = m_1 and m_owner_br = '0' and m_rom = '1' and cyc_a(11) = '1') ->
+		(cyc_a(15 downto 12) = x"e" and ma_r = unsigned(std_logic_vector'(rom_bank & cyc_a(10 downto 0))));
+	mmu_io_not_memory: assert always (mstate = m_1 and m_owner_br = '0') -> (cyc_a(15 downto 12) /= x"f");
+	mmu_ram_bank_reset: assert always (rst = '1') -> next (ram_bank = "00010");
+
 	---------------------------------------------------------------- SPI-004
 	spi_one_cs: assert always onehot0(not spi_n_cs);
 }

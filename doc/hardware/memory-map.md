@@ -11,7 +11,9 @@ manual gets updated to match once the hardware is implemented.
 | $0002–$000f | RAM: reserved | same |
 | $0010–$00ff | RAM: interrupt vector table | same |
 | $0100–$0fff | RAM: stack | same |
-| $1000–$dfff | RAM: program | same |
+| $1000–$7fff | RAM: program | same |
+| $8000–$bfff | **RAM window**: SRAM bank `RAM_BANK` (reset 2: the identity map) | same |
+| $c000–$dfff | RAM: program | same |
 | $e000–$e7ff | **ROM fixed window**: ROM $00000–$007ff (boot ROM) | RAM |
 | $e800–$efff | **ROM banked window**: ROM `(bank << 11) \| A[10:0]` | RAM |
 | $f000–$ffff | I/O (never RAM) | same |
@@ -21,8 +23,41 @@ Changes from today's hardware and manual:
 - **ROM is an external chip.** It was 128 bytes inside the FPGA.
 - **$e000–$efff turns back into RAM** once the kernel disables the ROM.
 
-Reads of RAM-backed addresses go to the SRAM. RAM addresses $f000–$ffff exist
-in the SRAM but are never selected.
+Reads of RAM-backed addresses go to the SRAM. SRAM $0f000–$0ffff, under the
+I/O space, is reached only through the RAM window (bank 3).
+
+## RAM banks
+
+The main board's SRAM (IS62WV5128, 512 KB) has all 19 address lines on the
+memory bus (A16–A18 on MEM_A16–A18). It is 32 banks of 16 KB; the chipset
+forms the SRAM address of a CPU RAM cycle as:
+
+| CPU address | SRAM address (19 bits) |
+|---|---|
+| $8000–$bfff | `RAM_BANK[4:0] & A[13:0]` |
+| any other RAM address | `000 & A[15:0]` (as without banking) |
+
+So banks 0, 1 and 3 are the normal memory at $0000–$7fff and $c000–$ffff,
+and bank 2 is what $8000–$bfff shows at reset. The window can show any bank,
+including 0, 1 and 3 (then the same bytes appear at two CPU addresses). The
+ROM windows, `ROM_OFF` RAM at $e000–$efff and the I/O space ignore
+`RAM_BANK`. There are no extra wait states.
+
+| SRAM | Bank | CPU view with `RAM_BANK` = 2 |
+|---|---|---|
+| $00000–$03fff | 0 | $0000–$3fff |
+| $04000–$07fff | 1 | $4000–$7fff |
+| $08000–$0bfff | 2 | $8000–$bfff (the window) |
+| $0c000–$0ffff | 3 | $c000–$dfff, $e000–$efff with `ROM_OFF`; $f000–$ffff only through the window |
+| $10000–$7ffff | 4–31 | only through the window |
+
+**The kernel keeps nothing in $8000–$bfff** (code, data, bss, the stack and
+the API block all sit below it), so interrupts need not save `RAM_BANK`. A
+program that switches banks and has its own interrupt handler using the
+window saves and restores `RAM_BANK` there. The kernel's `api_bank_set`,
+`api_bank_get`, `api_bank_count` and `api_bank_far_copy` (`kernel/bank.s`)
+are the programs' interface; the system card reaches every bank with the
+bridge's 24-bit RAM commands.
 
 ## I/O registers
 
@@ -40,6 +75,7 @@ in the SRAM but are never selected.
 | $f202 | R | **SLOT_IRQ** (new) | bit n = SPI dev n (slots 1–6 → bits 0–5) is currently asserting IRQ_n (level, live). Bits 7:6 read 0. |
 | $f203 | R/W | **SYSCTL** (new) | bit 0 `ROM_OFF` (reset 0). Bit 1 `PWR_HI`, read-only: the USB-C source advertises 3.0 A (a comparator on CC, so it works without the system card; `power.md`). When it is 0 the kernel's `net` command refuses to start the radio, and SAVE and DEL refuse to write the SD card. Bits 7:2 reserved, read 0. |
 | $f204 | R/W | **ROM_BANK** (new) | Bank for the $e800 window, 0–255 (reset 0) |
+| $f205 | R/W | **RAM_BANK** (new) | SRAM bank for the RAM window at $8000–$bfff, 0–31 (reset 2, the identity map); bits 7:5 read 0. See "RAM banks". |
 
 ### SPI devices
 
@@ -113,7 +149,7 @@ is `$ff`, the erased state, so a partial program leaves the rest erased.
 
 ## Boot chain
 
-1. **Reset.** `ROM_OFF=0`, `ROM_BANK=0`, IRQs masked, `I=0`, PC=$e000.
+1. **Reset.** `ROM_OFF=0`, `ROM_BANK=0`, `RAM_BANK=2`, IRQs masked, `I=0`, PC=$e000.
 2. **Boot ROM** runs in place from the fixed window. POST codes on GPO:
 
    | GPO | Stage | On failure |
@@ -155,8 +191,10 @@ period.
 
 | Cmd | Bytes after cmd | Action |
 |---|---|---|
-| $01 RAM_WR | addr16, len8, data × (len+1) | write `len+1` bytes to SRAM |
-| $02 RAM_RD | addr16, len8, dummy, → data × (len+1) | read `len+1` bytes from SRAM |
+| $01 RAM_WR | addr16, len8, data × (len+1) | write `len+1` bytes to SRAM $00000–$0ffff (the address wraps within it) |
+| $02 RAM_RD | addr16, len8, dummy, → data × (len+1) | read `len+1` bytes from SRAM $00000–$0ffff |
+| $09 RAM_WR24 | addr24, len8, data × (len+1) | write to the whole SRAM (19-bit physical address, bank × $4000 + offset; wraps at $7ffff) |
+| $0A RAM_RD24 | addr24, len8, dummy, → data × (len+1) | read from the whole SRAM |
 | $03 ROM_RD | addr24, len8, dummy, → data × (len+1) | read from the ROM chip (19-bit address) |
 | $04 ROM_BUSW | addr24, data8 | one raw bus write cycle to the ROM (/CE_ROM, /WE). sysctl builds the JEDEC erase and program sequences from these. |
 | $05 STATUS | dummy, → status | bit0 CPU stopped (bridge or step), bit1 HALTED, bit2 WAITING, bits5:3 reserved (0; CPU card presence and ID are on sysctl's expander U1), bit6 CPU cycle pending (/STB low), bit7 /CPU_RST asserted (power-on, waiting for the CPU card's CDONE, or `CPU_CTL` bit 6) |

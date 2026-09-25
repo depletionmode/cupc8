@@ -5,6 +5,8 @@
 
     ping | status | power | reset
     ram read ADDR LEN [-o FILE] | ram write ADDR FILE
+        ADDR is a physical SRAM address, $00000-$7ffff, or BANK:OFFSET
+        (bank 0-31, offset $0000-$3fff: the 16 KB banks of extended-ram.md)
     rom id | rom read ADDR LEN -o FILE | rom erase [ADDR LEN] | rom write FILE [--addr A]
     cpu stop | cpu run | cpu step | cpu cycle | cpu hold | cpu release | trace
     fpga flash chipset|cpu FILE | fpga hold chipset|cpu | fpga boot chipset|cpu
@@ -153,17 +155,32 @@ class Sysctl:
                 "cc_mv": d[5] | d[6] << 8, "v1v2_mv": d[7] | d[8] << 8, "reset_slots": d[9],
                 "cpu_card": bool(d[10])}
 
+    RAM_SIZE = 0x80000                    # the main board's SRAM: 32 banks of 16 KB
+
     def ram_read(self, addr, n):
+        """SRAM by physical address. Within the first 64 KB this uses RAM_READ
+        (every sysctl has it); past it, RAM_READ_FAR."""
+        if addr + n > self.RAM_SIZE:
+            raise SysctlError("past the end of the SRAM ($%05x)" % (self.RAM_SIZE - 1))
         out = b""
         while n:
             k = min(n, 4096)
-            out += self.request(0x10, struct.pack("<HH", addr, k))
-            addr, n = (addr + k) & 0xFFFF, n - k
+            if addr + k <= 0x10000:
+                out += self.request(0x10, struct.pack("<HH", addr, k))
+            else:
+                out += self.request(0x12, struct.pack("<I", addr)[:3] + struct.pack("<H", k))
+            addr, n = addr + k, n - k
         return out
 
     def ram_write(self, addr, data):
+        if addr + len(data) > self.RAM_SIZE:
+            raise SysctlError("past the end of the SRAM ($%05x)" % (self.RAM_SIZE - 1))
         for i in range(0, len(data), 4000):
-            self.request(0x11, struct.pack("<H", (addr + i) & 0xFFFF) + data[i:i + 4000])
+            a, chunk = addr + i, data[i:i + 4000]
+            if a + len(chunk) <= 0x10000:
+                self.request(0x11, struct.pack("<H", a) + chunk)
+            else:
+                self.request(0x13, struct.pack("<I", a)[:3] + chunk)
 
     def rom_read(self, addr, n):
         out = b""
@@ -531,6 +548,19 @@ def num(s):
     return int(s, 0)
 
 
+def ram_addr(s):
+    """A physical SRAM address, or BANK:OFFSET (bank * $4000 + offset)."""
+    if ":" in s:
+        bank, off = (int(x, 0) for x in s.split(":", 1))
+        if not (0 <= bank < 32 and 0 <= off < 0x4000):
+            raise argparse.ArgumentTypeError("BANK:OFFSET is 0-31:$0000-$3fff")
+        return bank * 0x4000 + off
+    a = int(s, 0)
+    if not 0 <= a < 0x80000:
+        raise argparse.ArgumentTypeError("the SRAM is $00000-$7ffff")
+    return a
+
+
 def slot_of(s):
     n = int(s)
     if not 1 <= n <= 6:
@@ -557,8 +587,8 @@ def main(argv=None):
     sub.add_parser("reset")
     sub.add_parser("trace")
     ram = sub.add_parser("ram").add_subparsers(dest="op", required=True)
-    p = ram.add_parser("read"); p.add_argument("addr", type=num); p.add_argument("len", type=num); p.add_argument("-o")
-    p = ram.add_parser("write"); p.add_argument("addr", type=num); p.add_argument("file")
+    p = ram.add_parser("read"); p.add_argument("addr", type=ram_addr); p.add_argument("len", type=num); p.add_argument("-o")
+    p = ram.add_parser("write"); p.add_argument("addr", type=ram_addr); p.add_argument("file")
     rom = sub.add_parser("rom").add_subparsers(dest="op", required=True)
     rom.add_parser("id")
     p = rom.add_parser("read"); p.add_argument("addr", type=num); p.add_argument("len", type=num); p.add_argument("-o")

@@ -1590,6 +1590,219 @@ proc testStorage() =
 
 run testStorage
 
+proc testRamBanks() =
+  ## SIM-005: the simulator's RAM_BANK ($f205, extended-ram.md) matches the
+  ## chipset's (MMU-005): reset 2 is the identity map, 5 bits read back,
+  ## $8000-$bfff shows {bank, A[13:0]} of the 512 KB SRAM, nothing else moves,
+  ## and banks 0, 1 and 3 alias the normal memory.
+  echo "== banked RAM in the simulator =="
+  machineCards([])
+  cpuReset()
+  expect("RAM_BANK after reset", cardsLoadTest(0xf205), 2)
+  cardsStoreTest(0x8123, 0x5a)
+  expect("identity map: $8123 is SRAM $08123", physRead(0x08123), 0x5a)
+  cardsStoreTest(0xf205, 0xff)
+  expect("RAM_BANK reads back 5 bits", cardsLoadTest(0xf205), 0x1f)
+  for bank in 0..31:
+    cardsStoreTest(0xf205, bank)
+    for off in [0, 1, 0x155, 0x2aa, 0x3fff]:
+      cardsStoreTest(0x8000 + off, (bank * 7 + off) and 0xff)
+  var bad = 0
+  for bank in 0..31:
+    cardsStoreTest(0xf205, bank)
+    for off in [0, 1, 0x155, 0x2aa, 0x3fff]:
+      if physRead(bank * 0x4000 + off) != ((bank * 7 + off) and 0xff) or
+         cardsLoadTest(0x8000 + off) != ((bank * 7 + off) and 0xff):
+        inc bad
+  expect("every bank through the window", bad, 0)
+  cardsStoreTest(0xf205, 0)
+  expect("bank 0 aliases $0000", cardsLoadTest(0x8155), mem[0x0155])
+  cardsStoreTest(0xf205, 3)
+  cardsStoreTest(0xb000, 0x96)
+  expect("bank 3 reaches SRAM $0f000, not the I/O shadows", physRead(0x0f000), 0x96)
+  expect("GPO untouched by it", cardsLoadTest(0xf000), 0)
+  cardsStoreTest(0xf205, 9)
+  cardsStoreTest(0x7fff, 0x11)
+  cardsStoreTest(0xc000, 0x22)
+  expect("$7fff outside the window", mem[0x7fff], 0x11)
+  expect("$c000 outside the window", mem[0xc000], 0x22)
+  # the stack follows the window too
+  SP = 0x8100
+  R0 = 0x77
+  mem[0x7000] = 0x90              # push r0
+  PC = 0x7000
+  imageEnd = 0x10000
+  discard cpuStep()
+  expect("a push through the window lands in bank 9", physRead(9 * 0x4000 + 0x100), 0x77)
+  cpuReset()
+  expect("RAM_BANK back to 2 after reset", cardsLoadTest(0xf205), 2)
+  ioModel = imLegacy
+
+run testRamBanks
+
+proc callKernel(at: int; r0 = 0; limit = 20_000_000): int =
+  ## Call a kernel routine the way a program does (its return address on
+  ## the stack), returning to a HALT at $7000.
+  mem[0x7000] = 0xf8
+  mem[SP] = 0x70
+  inc SP
+  mem[SP] = 0x00
+  inc SP
+  R0 = r0
+  PC = at
+  HF = false
+  waiting = false
+  IF = false
+  var n = 0
+  while n < limit and cpuStep() == sOk:
+    inc n
+  if not HF or PC != 0x7001:
+    fail("kernel call at $" & toHex(at, 4) & " did not return (pc=$" & toHex(PC, 4) & ")")
+  R0
+
+proc testKernelBanks() =
+  ## KRN-008: the kernel's bank routines (kernel/bank.s) on the M1 machine
+  ## model: a pattern in all 32 banks through api_bank_set, api_bank_get and
+  ## api_bank_count, and api_bank_far_copy's edge cases against memmove on a
+  ## copy of the SRAM (same bank, overlapping both ways, misaligned chunks,
+  ## bank boundaries, length 0, 16 KB, the largest length, the end of the
+  ## SRAM, bad arguments), each leaving the caller's bank selected.
+  echo "== kernel banked RAM =="
+  let rom = buildKernelRom()
+  let table = loadMap(kernelDir / "kernel.map")
+  # the kernel keeps nothing in the window
+  var inWindow: seq[string]
+  for (a, name) in table.sortedSyms:
+    if a >= 0x8000 and a < 0xc000: inWindow.add(name)
+  for d in table.dataSyms:
+    if d.a + d.size > 0x8000 and d.a < 0xc000: inWindow.add(d.name)
+  expectTrue("no kernel code, data or bss in $8000-$bfff " & $inWindow, inWindow.len == 0)
+  let setAt = table.resolve("api_bank_set")
+  let getAt = table.resolve("api_bank_get")
+  let countAt = table.resolve("api_bank_count")
+  let copyAt = table.resolve("api_bank_far_copy")
+  expectTrue("bank routines in the kernel map", setAt > 0 and getAt > 0 and countAt > 0 and copyAt > 0)
+
+  machineCards([CardGpu, CardIo])
+  ramJunk = true
+  cpuReset()
+  ramJunk = false
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  expectTrue("kernel ready", waiting)
+  let sp0 = SP
+
+  expect("bank_count", callKernel(countAt), 32)
+  expect("bank_get at reset", callKernel(getAt), 2)
+  expect("bank_set 17", callKernel(setAt, 17), 0)
+  expect("RAM_BANK after bank_set 17", ramBank, 17)
+  expect("bank_get after bank_set 17", callKernel(getAt), 17)
+  expect("bank_set 32 refused", callKernel(setAt, 32), 1)
+  expect("bank_set 255 refused", callKernel(setAt, 255), 1)
+  expect("RAM_BANK unchanged by a refused bank_set", ramBank, 17)
+  expect("bank_set 2", callKernel(setAt, 2), 0)
+  expect("stack balanced after the calls", SP, sp0)
+
+  # a pattern in every bank, by a program at $7000
+  let src = rootDir / "build" / "rom" / "bank_pattern.s"
+  let bin = rootDir / "build" / "rom" / "bank_pattern.o"
+  writeFile(src, "%define BANK_SET $" & toHex(setAt, 4) & "\n" & readFile(testdata / "bank_pattern.s"))
+  let r = execCmdEx("python3 " & quoteShell(asPy) & " " & quoteShell(src) & " " & quoteShell(bin) &
+                    " 0x7000,0x7300,0x7400")
+  if r.exitCode != 0: raise newException(IOError, "bank_pattern: " & r.output)
+  let code = readFile(bin)
+  expectTrue("pattern program fits below its bss", code.len <= 0x400)
+  for i in 0..<code.len: mem[0x7000 + i] = int(uint8(code[i]))
+  mem[0x7400] = 0xee
+  PC = 0x7000
+  HF = false
+  waiting = false
+  IF = false
+  var n = 0
+  while n < 40_000_000 and cpuStep() == sOk:
+    inc n
+  expectTrue("pattern program finished", HF)
+  expect("pattern program: mismatches", mem[0x7400], 0)
+  var bad = 0
+  for bank in 0..31:
+    let pages = if bank == 0: 14..14 elif bank == 1: 56..63 else: 0..63
+    for page in pages:
+      for lo in 0..255:
+        if physRead(bank * 0x4000 + page * 256 + lo) != ((lo + 3 * page + 7 * bank) and 0xff):
+          inc bad
+  expect("pattern in the SRAM model, every bank", bad, 0)
+  expect("bank 3's pattern at $c000 too", mem[0xc123], (0x23 + 3 * 1 + 7 * 3) and 0xff)
+  expect("RAM_BANK back to 2", ramBank, 2)
+
+  # far_copy against memmove on a copy of the SRAM
+  proc farCopy(sBank, sOff, dBank, dOff, len: int; want = 0; name: string) =
+    mem[0x6f00] = sBank
+    mem[0x6f01] = sOff and 0xff
+    mem[0x6f02] = sOff shr 8
+    mem[0x6f03] = dBank
+    mem[0x6f04] = dOff and 0xff
+    mem[0x6f05] = dOff shr 8
+    mem[0x6f06] = len and 0xff
+    mem[0x6f07] = len shr 8
+    mem[0x7000] = 0xf8                 # callKernel's HALT, before the snapshot
+    for p in 0..<0x80000:            # a fresh pattern everywhere but the kernel's own RAM
+      if p >= 0x10000 or (p >= 0x8000 and p < 0xe000):
+        physWrite(p, (p * 7 + p shr 8 + p shr 16) and 0xff)
+    var model = newSeq[int](0x80000)
+    for p in 0..<0x80000: model[p] = physRead(p)
+    if want == 0 and len > 0:
+      let s = sBank * 0x4000 + sOff
+      let d = dBank * 0x4000 + dOff
+      let tmp = model[s ..< s + len]
+      for i in 0..<len: model[d + i] = tmp[i]
+    cardsStoreTest(0xf205, 23)
+    expect(name & ": r0", callKernel(copyAt), want)
+    expect(name & ": caller's bank restored", ramBank, 23)
+    var diffs = 0
+    var first = -1
+    for p in 0..<0x80000:
+      # the kernel's bss (the buffer and far_copy's variables) and the stack page change
+      if (p >= 0x6000 and p < 0x6f00) or (p >= 0x0100 and p < 0x1000): continue
+      if physRead(p) != model[p]:
+        inc diffs
+        if first < 0: first = p
+    if diffs == 0: ok(name & ": SRAM matches memmove")
+    else: fail(name & ": " & $diffs & " bytes differ from memmove, first at $" & toHex(first, 5))
+    expect(name & ": stack balanced", SP, sp0)
+
+  farCopy(5, 0x0100, 5, 0x2000, 300, name = "same bank")
+  farCopy(6, 0x0100, 6, 0x0180, 1000, name = "overlapping, destination above")
+  farCopy(6, 0x0180, 6, 0x0100, 1000, name = "overlapping, destination below")
+  farCopy(6, 0x0100, 6, 0x0101, 700, name = "overlapping by one byte, destination above")
+  farCopy(6, 0x0101, 6, 0x0100, 700, name = "overlapping by one byte, destination below")
+  farCopy(6, 0x0200, 6, 0x0200, 500, name = "onto itself")
+  farCopy(7, 0x00f0, 9, 0x0033, 600, name = "misaligned: chunks cross 256-byte pages")
+  farCopy(7, 0x00ff, 9, 0x0000, 1, name = "one byte")
+  farCopy(7, 0x0010, 9, 0x0020, 256, name = "256 bytes")
+  farCopy(7, 0x0010, 9, 0x0020, 257, name = "257 bytes")
+  farCopy(8, 0x0000, 9, 0x0000, 0, name = "length 0")
+  farCopy(10, 0x0000, 11, 0x0000, 0x4000, name = "16 KB, bank to bank")
+  farCopy(12, 0x3f80, 20, 0x3ff0, 1000, name = "both ranges cross a bank boundary (from the end down)")
+  farCopy(20, 0x3ff0, 12, 0x3f80, 1000, name = "both ranges cross a bank boundary (from the start up)")
+  farCopy(15, 0x3f33, 16, 0x3e77, 0x800, name = "misaligned across bank boundaries (from the end down)")
+  farCopy(13, 0x3f00, 13, 0x3f40, 0x200, name = "overlapping across a bank boundary, destination above")
+  farCopy(14, 0x0040, 13, 0x3f00, 0x300, name = "overlapping across a bank boundary, destination below")
+  farCopy(3, 0x0000, 8, 0x0000, 0x1000, name = "from bank 3 ($c000, the normal memory)")
+  farCopy(9, 0x0000, 3, 0x3000, 0x1000, name = "to bank 3's $f000-$ffff, which the CPU otherwise never reaches")
+  farCopy(31, 0x3f00, 30, 0x0000, 0x100, name = "the last bytes of the SRAM")
+  farCopy(28, 0x0000, 4, 0x0000, 0xffff, name = "the largest length")
+  farCopy(31, 0x3f01, 30, 0x0000, 0x100, want = 1, name = "source past the end refused")
+  farCopy(30, 0x0000, 31, 0x3f01, 0x100, want = 1, name = "destination past the end refused")
+  farCopy(29, 0x0000, 4, 0x0000, 0xffff, want = 1, name = "a long copy past the end refused")
+  farCopy(32, 0x0000, 4, 0x0000, 16, want = 1, name = "source bank 32 refused")
+  farCopy(4, 0x0000, 40, 0x0000, 16, want = 1, name = "destination bank 40 refused")
+  farCopy(4, 0x4000, 5, 0x0000, 16, want = 1, name = "source offset $4000 refused")
+  farCopy(4, 0x0000, 5, 0x8000, 16, want = 1, name = "destination offset $8000 refused")
+  ioModel = imLegacy
+
+run testKernelBanks
+
 if failures > 0:
   echo "FAILED ", failures, " check(s)"
   quit(1)

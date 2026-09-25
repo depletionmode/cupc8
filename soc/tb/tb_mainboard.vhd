@@ -103,7 +103,7 @@ begin
 	d <= cs_dout when cs_doe = '1' else (others => 'Z');
 
 	mem_d <= mem_dout when mem_doe = '1' else (others => 'Z');
-	ram_a <= "000" & mem_a(15 downto 0);
+	ram_a <= mem_a;			-- SRAM A16-A18 on MEM_A16-A18 (banked RAM, extended-ram.md)
 	ram: entity work.sram_model generic map(INIT_FILE => IMAGE, INIT_BASE => 16#1000#)
 		port map(a => ram_a, d => mem_d, n_ce => n_ce_ram, n_oe => mem_n_oe, n_we => mem_n_we,
 				 violations => ram_viol);
