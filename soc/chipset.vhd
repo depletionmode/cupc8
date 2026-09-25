@@ -3,7 +3,7 @@
 --   CPU bus front-end  doc/hardware/cpu-bus.md (answers every cycle, /RDY)
 --   address decode     doc/hardware/memory-map.md (RAM, ROM windows, I/O)
 --   memory controller  SRAM + ROM chip, 4-clock cycles; the bridge goes first
---   registers          GPO, SPI (via spi_master), IRQ, SLOT_IRQ, SYSCTL, ROM_BANK
+--   registers          GPO, SPI (via spi_master), IRQ, SLOT_IRQ, SYSCTL, ROM_BANK, RAM_BANK
 --   bridge             sysctl's SPI port: memory access, CPU control, trace
 --   stop/step/trace    via /RDY; every completed CPU cycle goes into a ring
 
@@ -95,6 +95,9 @@ architecture rtl of chipset is
 	signal pending, mask: std_logic_vector(3 downto 0) := "0000";
 	signal rom_off: std_logic := '0';
 	signal rom_bank: std_logic_vector(7 downto 0) := x"00";
+	-- the 16 KB RAM window at $8000-$bfff shows SRAM bank ram_bank (reset 2:
+	-- the identity map; doc/proposals/extended-ram.md)
+	signal ram_bank: std_logic_vector(4 downto 0) := "00010";
 	signal slot_s1, slot_s2: std_logic_vector(5 downto 0) := (others => '0');
 	signal slot_s3: std_logic_vector(5 downto 0) := (others => '0');	-- previous slot_s2
 
@@ -212,7 +215,7 @@ begin
 				cyc_busy <= '0'; rdy_r <= '1'; mstate <= m_idle;
 				n_oe_r <= '1'; n_we_r <= '1'; n_ce_ram_r <= '1'; n_ce_rom_r <= '1'; d_oe_r <= '0';
 				gpo_r <= x"00"; spi_hold <= x"00"; p := "0000"; mask <= "0000";
-				rom_off <= '0'; rom_bank <= x"00";
+				rom_off <= '0'; rom_bank <= x"00"; ram_bank <= "00010";
 				step_instr <= '0'; step_cycle <= '0';
 				tr_wr <= (others => '0'); tr_rd <= (others => '0'); tr_count <= (others => '0');
 				tr_ovf <= '0';
@@ -283,7 +286,9 @@ begin
 						a := unsigned(cpu_a);
 						is_io := a(15 downto 12) = x"f";
 						rom := '0';
-						if a < x"e000" then
+						if a(15 downto 14) = "10" then
+							phys := unsigned(ram_bank) & a(13 downto 0);	-- the RAM window
+						elsif a < x"e000" then
 							phys := "000" & a;
 						elsif a(15 downto 12) = x"e" and rom_off = '1' then
 							phys := "000" & a;
@@ -351,6 +356,9 @@ begin
 								when x"04" =>
 									rd := rom_bank;
 									if cpu_rw = '0' then rom_bank <= cpu_d_in; end if;
+								when x"05" =>
+									rd := "000" & ram_bank;
+									if cpu_rw = '0' then ram_bank <= cpu_d_in(4 downto 0); end if;
 								when others => null;
 								end case;
 							when others => null;
@@ -383,9 +391,7 @@ begin
 						m_owner_br <= '1';
 						m_rom <= br_rom;
 						m_we <= br_we;
-						if br_rom = '1' then ma_r <= br_addr;
-						else ma_r <= "000" & br_addr(15 downto 0);
-						end if;
+						ma_r <= br_addr;			-- 19 bits: the bridge limits its 16-bit forms
 						md_r <= br_wdata;
 						n_ce_ram_r <= br_rom;
 						n_ce_rom_r <= not br_rom;
