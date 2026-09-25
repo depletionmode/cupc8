@@ -115,6 +115,15 @@ for (const speed of [1, 2]) {
   kbd.press(0);
   wait(100e6);
   expect(kbd.leds.at(-1) === 1, `${name}: Caps Lock LED off again (${kbd.leds})`);
+  // SOFT_RESET puts the locks back to power-on (Num on, Caps off): the LED
+  // report goes out from the main loop, never from the frame's replay
+  kbd.press(0, 57);
+  kbd.press(0);
+  wait(100e6);
+  const capsOn = kbd.leds.at(-1);
+  run(function* () { yield* this.frame([0xf1]); });
+  wait(100e6);
+  expect(capsOn === 3 && kbd.leds.at(-1) === 1, `${name}: SOFT_RESET turns the Caps Lock LED off, Num on (${kbd.leds})`);
 
   // typematic repeat: 500 ms delay, then every 30 ms
   cmd([0x05]);

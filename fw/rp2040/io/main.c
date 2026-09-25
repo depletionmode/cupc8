@@ -14,6 +14,7 @@ static iocard_t io;
 static uint8_t kbd_addr, kbd_instance;
 static bool have_kbd;
 static uint8_t led_report;            /* must outlive the control transfer */
+static bool leds_pending;             /* led_report still to send */
 static bool changed;                  /* status or response may differ: re-arm the preload */
 
 static uint32_t now_ms(void)
@@ -21,13 +22,24 @@ static uint32_t now_ms(void)
 	return to_ms_since_boot(get_absolute_time());
 }
 
-/* the core decided the lock LEDs (bit 0 Num, 1 Caps): HID output report bit 0 Num, 1 Caps */
+/* the core decided the lock LEDs (bit 0 Num, 1 Caps): HID output report bit
+ * 0 Num, 1 Caps. Only noted here: the main loop sends it (send_leds). The
+ * core calls this from a replayed slot frame too (SOFT_RESET), and frames
+ * are replayed inside tusb_time_delay_ms_api, i.e. inside TinyUSB's own
+ * enumeration code, where starting a control transfer would re-enter it. */
 static void set_leds(iocard_t *c, uint8_t leds)
 {
 	(void)c;
 	led_report = leds;
-	if (have_kbd)
-		tuh_hid_set_report(kbd_addr, kbd_instance, 0, HID_REPORT_TYPE_OUTPUT, &led_report, 1);
+	leds_pending = true;
+}
+
+/* from the main loop only; a busy control endpoint: try again next time */
+static void send_leds(void)
+{
+	if (leds_pending && have_kbd &&
+	    tuh_hid_set_report(kbd_addr, kbd_instance, 0, HID_REPORT_TYPE_OUTPUT, &led_report, 1))
+		leds_pending = false;
 }
 
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc, uint16_t len)
@@ -106,6 +118,7 @@ int main(void)
 	bool fault = false;
 	for (;;) {
 		tuh_task();
+		send_leds();
 		if (slotspi_poll())
 			changed = true;
 		uint8_t before = io.count;
