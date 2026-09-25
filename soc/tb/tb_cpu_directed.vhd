@@ -369,11 +369,12 @@ begin
 
 		---------------------------------------------------------------- CPU-006
 		if run("CPU-006") then
+			n := exp0_n;					-- CPU-005's last test fires TMR0 too
 			boot(L_tmr_prog);
 			wait until rising_edge(clk) and halted = '1' for 50 us;
 			-- TMR0 #3 counts its own retirement: it fires as the 2nd following
 			-- instruction retires, and TMR0 #1 fires on its own retirement
-			check(exp0_n = 2, "TMR0 fired " & integer'image(exp0_n) & " times (want 2)");
+			check(exp0_n - n = 2, "TMR0 fired " & integer'image(exp0_n - n) & " times (want 2)");
 			check(exp0_fetch = L_tmr_self, "the second expiry was not TMR0 #1's own");
 			check(exp1_n = 0, "TMR1 fired after being stopped with 0");
 			-- first expiry position: rerun and stop at it
