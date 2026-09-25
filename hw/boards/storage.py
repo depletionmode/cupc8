@@ -80,18 +80,19 @@ POWER_NETS = rc.POWER_NETS
 CX, CY = 26, -19               # the RP2040, turned round: its SD pins (GPIO12-19) face the socket
 SX = 40                        # the socket: its opening on the top edge
 PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
-    # the chip's top edge after the turn: SD pins at its right end and on its
-    # left side, so the middle (DVDD, IOVDD, XIN/XOUT, SWD) is open: the
-    # crystal goes straight above XIN/XOUT, the flash by the QSPI pins (now
-    # at the bottom)
-    "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23 (its pin escapes by a via: pocket_escapes)
+    # the chip's top edge after the turn: SD pins at its right end and on the
+    # top of its left side, and the left group crosses over the middle to the
+    # socket; so the middle pins (SWD, DVDD, IOVDD, XIN/XOUT) escape by vias
+    # (pocket_escapes) and the crystal sits to the left, the flash by the
+    # QSPI pins (now at the bottom)
+    "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23
     "C5": (CX - 3.2, CY - 4.6, 0),       # IOVDD 22
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 3.2, CY + 7.2, 90),      # IOVDD 49
-    "R2": (CX + 3.7, CY - 7.2, 90),      # XOUT
-    "Y1": (CX + 0.4, CY - 9.6, 0),
-    "C16": (CX - 2.9, CY - 9.6, 90),
-    "C17": (CX + 3.7, CY - 9.6, 90),
+    "Y1": (CX - 13.0, CY - 3.0, 0),
+    "C16": (CX - 15.7, CY - 3.0, 90),
+    "C17": (CX - 13.0, CY - 0.4, 0),
+    "R2": (CX - 13.0, CY - 5.6, 0),      # XOUT
     "U3": (CX + 7, CY + 9.5, 0),
     "C15": (CX + 7, CY + 5.6, 0),
     "R1": (CX + 12.5, CY + 9.5, 90),

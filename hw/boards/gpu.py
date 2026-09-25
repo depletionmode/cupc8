@@ -169,8 +169,8 @@ def preroute(board):
       between signal pins: each gets a via 2 mm behind its pad, under the
       receptacle's body, on a track along the pad
     - each ESD's GND pins (3 and 8) are in the middle of its rows, between
-      two pairs: a track joins them through the package and on to a via
-      1.4 mm towards the chip, and the lines pass either side of it
+      two pairs: a track joins them through the package, and the fan-out
+      via of pin 3 takes them to the planes
     - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)"""
     rc.pocket_escapes(board)
     for pin in (2, 5, 8, 11, 17):
@@ -179,8 +179,7 @@ def preroute(board):
         rc.track(board, "/GND", (x, y), (x, y - 2.0), width=0.25)
     for ref in ("U5", "U6"):
         (x8, y8), (x3, y3) = rc.pad_at(board, ref, 8), rc.pad_at(board, ref, 3)
-        rc.via(board, "/GND", (x3, y3 + 1.4))
-        rc.track(board, "/GND", (x8, y8), (x3, y3 + 1.4), width=0.2)
+        rc.track(board, "/GND", (x8, y8), (x3, y3), width=0.2)
 
 
 if __name__ == "__main__":
