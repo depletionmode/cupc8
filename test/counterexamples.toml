@@ -818,3 +818,28 @@ revert = [["tools/simmachine.nim", """  let d = if dir.len > 0: dir else: romDir
   simRoot / "kernel" / "kernel.o\""""], ["tools/simmachine.nim", """  romDir() / "kernel.map\"""", """  simRoot / "kernel" / "kernel.map\""""]]
 cmd = "tools/run_tests.sh testKernelBuildsConcurrent"
 must_fail = ["FAIL: 8 builds, two at a time: every ROM and map equals the one built alone"]
+
+[[bug]]
+name = "simtest wrote its programs, maps and SD images beside the sources (tools/testdata, build/storage) - two runs at once overwrote each other's"
+fixed_in = "da37914"
+revert = [["tools/simtest.nim", """let workDir = romDir() / "work\"""", """let workDir = testdata"""],
+          ["tools/simtest.nim", """let storeDir = workDir / "storage\"""", """let storeDir = rootDir / "build" / "storage\""""]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: two runs at once: each keeps its own SD image and program"]
+
+[[bug]]
+name = "simtest's network tests took fixed host ports (7007, 8088) with no lock - two runs at once took each other's and the echo servers answered the wrong run"
+fixed_in = "238e987"
+revert = [["tools/simtest.nim", "runOnHostPorts testNetExamples\n", "run testNetExamples\n"]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: run"]
+
+[[bug]]
+name = "sim: a freed Wi-Fi card kept its host sockets open (netposix_new cleared them without closing) - its ports stayed taken until the process ended"
+fixed_in = "238e987"
+revert = [["fw/sim/simcards.c", """	if (c->wifi)
+		netposix_free(c->wifi->ctx);    /* its host sockets closed: their ports free again */
+""", ""], ["fw/wifi/host/netposix.c", """	netposix_free(&g_net);                  /* the last card's sockets, if it was not freed */
+""", ""]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: run"]

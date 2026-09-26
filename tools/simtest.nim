@@ -10,6 +10,7 @@ import strutils
 import sequtils
 import tables
 import streams
+from posix import O_CREAT, O_RDWR, F_LOCK, F_ULOCK, lockf
 import sim
 import simdisplay
 import simcards
@@ -25,6 +26,13 @@ let
   testdata = toolsDir / "testdata"
   testDir = rootDir / "test"
   kernelDir = rootDir / "kernel"
+
+# what the tests write (assembled programs, maps, .prg files, SD images) goes
+# in this run's own directory (simmachine.nim romDir(): removed at exit, and a
+# killed run's swept by the next), never beside the sources: two runs at once
+# (simtest twice, simtest beside SIM-010) cannot overwrite each other's files
+let workDir = romDir() / "work"
+createDir(workDir)
 
 var failures = 0
 
@@ -54,6 +62,24 @@ template run(test: untyped) =
   if onlyTests.len == 0 or astToStr(test) in onlyTests:
     test()
 
+template runOnHostPorts(test: untyped) =
+  ## A test whose guest serves or fetches on a fixed port of this host
+  ## (8088, 7007: the Wi-Fi card's sockets are the host's): one run at a time
+  ## on the host, under build/.simtest-ports.lock, so two runs side by side
+  ## do not take each other's port
+  if onlyTests.len == 0 or astToStr(test) in onlyTests:
+    createDir(rootDir / "build")
+    let lockFd = posix.open(cstring(rootDir / "build" / ".simtest-ports.lock"), O_CREAT or O_RDWR, 0o644)
+    discard lockf(lockFd, F_LOCK, 0)
+    try:
+      test()
+    finally:
+      let model = ioModel
+      machineCards([])                # the cards freed: the Wi-Fi card's host sockets closed
+      ioModel = model
+      discard lockf(lockFd, F_ULOCK, 0)
+      discard posix.close(lockFd)
+
 proc expect(name: string, got, want: int, width = 2) =
   if got != want:
     fail("$1: got $#$2 want $#$3" % [name, toHex(got, width), toHex(want, width)])
@@ -76,7 +102,7 @@ proc assemble(src, dest: string; echoOut = false) =
     raise newException(IOError, "assembler failed for " & src & ":\n" & r.output)
 
 proc loadProgram(src: string; boot = true) =
-  let dest = testdata / src.extractFilename.changeFileExt("o")
+  let dest = workDir / src.extractFilename.changeFileExt("o")
   assemble(src, dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -110,7 +136,7 @@ proc kernelBuild(): tuple[output: string, exitCode: int] =
 proc testTinyProgram() =
   echo "== tiny assembled program =="
   let src = testdata / "movst.s"
-  let dest = testdata / "movst.o"
+  let dest = workDir / "movst.o"
   assemble(src, dest, echoOut = true)
   let blob = readFile(dest)
   doAssert blob.len > 3
@@ -245,8 +271,8 @@ proc testAssemblerMap() =
   echo "== assembler map =="
   let
     src = testdata / "movst.s"
-    dest = testdata / "movst.o"
-    mapPath = testdata / "movst.map"
+    dest = workDir / "movst.o"
+    mapPath = workDir / "movst.map"
   if fileExists(dest): removeFile(dest)
   if fileExists(mapPath): removeFile(mapPath)
   let command = "python3 " & quoteShell(asPy) & " " & quoteShell(src) &
@@ -275,7 +301,7 @@ proc testAssemblerMap() =
   expect("map entry matches image", mappedEntry, expectedEntry, 4)
   expectTrue("map contains main symbol", sawMain)
   expect("first mapped instruction", firstLineAddress, 0x1003, 4)
-  let explicitMap = testdata / "movst.explicit.map"
+  let explicitMap = workDir / "movst.explicit.map"
   if fileExists(explicitMap): removeFile(explicitMap)
   let explicit = execCmdEx(command.replace("--map", "--map=" & quoteShell(explicitMap)))
   expectTrue("explicit map path", explicit.exitCode == 0 and fileExists(explicitMap))
@@ -379,7 +405,7 @@ proc testTuiDiff() =
 proc testAssemblerRejects() =
   echo "== assembler rejects bad input =="
   for src in [testdata / "no_main.s", testdata / "bad_ins.s"]:
-    let dest = testdata / src.extractFilename.changeFileExt("o")
+    let dest = workDir / src.extractFilename.changeFileExt("o")
     if fileExists(dest):
       removeFile(dest)
     try:
@@ -535,7 +561,7 @@ proc testDefine() =
 
 proc testStepResult() =
   echo "== cpuStep result states =="
-  let dest = testdata / "nohalt.o"
+  let dest = workDir / "nohalt.o"
   assemble(testdata / "nohalt.s", dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -577,7 +603,7 @@ proc testMemHook() =
 
 proc testCpuRunBreak() =
   echo "== batched run and breakpoint =="
-  let dest = testdata / "callret.o"
+  let dest = workDir / "callret.o"
   assemble(testdata / "callret.s", dest)
   cpuReset()
   clearAllBreaks()
@@ -605,7 +631,7 @@ proc testCpuRunBreak() =
 
 proc testStepOut() =
   echo "== step out =="
-  let dest = testdata / "callret.o"
+  let dest = workDir / "callret.o"
   assemble(testdata / "callret.s", dest)
   cpuReset()
   clearAllBreaks()
@@ -897,7 +923,7 @@ proc testDisplayRect() =
   else:
     ok("window " & $DispWidth & "x" & $DispHeight & " at " & $DispScaleDefault & "x")
 
-  let dest = testdata / "fillrect.o"
+  let dest = workDir / "fillrect.o"
   assemble(testdata / "fillrect.s", dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -945,7 +971,7 @@ proc testCardsMode() =
   romOff = false
 
   # a guest program drives both cards
-  let dest = testdata / "cards_gpu.o"
+  let dest = workDir / "cards_gpu.o"
   assemble(testdata / "cards_gpu.s", dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -1837,7 +1863,7 @@ proc testKernelNetwork() =
   dns.sock.close()
   ioModel = imLegacy
 
-run testKernelNetwork
+runOnHostPorts testKernelNetwork
 
 proc testKernelNetWeakPower() =
   ## KRN-004: on a USB source under 3 A (SYSCTL.PWR_HI = 0) the "net"
@@ -2284,7 +2310,7 @@ const apiNetEntries = ["status", "join", "open", "connect", "connect_host", "lis
 proc buildNetExample(name: string; sym: Table[string, int]): string =
   ## examples/net/NAME.s assembled for $7000, after kernel/api.inc when it
   ## exists, else after API_NET_* names for the kernel's api_net_* routines
-  let outDir = rootDir / "build" / "examples"
+  let outDir = workDir / "examples"
   createDir(outDir)
   var head = ""
   if fileExists(kernelDir / "api.inc"):
@@ -2377,16 +2403,36 @@ proc testNetExamples() =
   expectTrue("udpecho: still running (not halted)", not HF)
   ioModel = imLegacy
 
-run testNetExamples
+runOnHostPorts testNetExamples
 
 # ---------------------------------------------------------------------------
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
 # ---------------------------------------------------------------------------
 
-let storeDir = rootDir / "build" / "storage"
+let storeDir = workDir / "storage"
 
 proc fatcheck(args: string): tuple[output: string, exitCode: int] =
   execCmdEx("python3 " & quoteShell(toolsDir / "fatcheck.py") & " " & args)
+
+# `simtest --own-files a|b GOFILE` (testRunsSideBySide): write what tests
+# write, where they write it (an SD image in storeDir, an assembled program in
+# workDir), each run its own content; say "ready", wait for GOFILE, then say
+# whether both are still its own. Two of these at once share nothing.
+if onlyTests.len == 3 and onlyTests[0] == "--own-files":
+  let mine = onlyTests[1] == "a"
+  createDir(storeDir)
+  let img = storeDir / "card.img"
+  discard fatcheck("blank " & quoteShell(img) & (if mine: " 2048" else: " 4096"))
+  let imgSize = getFileSize(img)
+  let obj = workDir / "probe.o"
+  assemble(testdata / (if mine: "alu.s" else: "cmp.s"), obj)
+  let objText = readFile(obj)
+  echo "ready"
+  flushFile(stdout)
+  while not fileExists(onlyTests[2]): sleep(10)
+  let same = fileExists(img) and getFileSize(img) == imgSize and fileExists(obj) and readFile(obj) == objText
+  echo(if same: "own files kept" else: "own files overwritten")
+  quit(if same: 0 else: 1)
 
 proc storageCard(): SimCard =
   for c in slots:
@@ -2902,6 +2948,52 @@ proc testKernelBuildsConcurrent() =
 
 run testKernelBuildsConcurrent
 
+proc testRunsSideBySide() =
+  ## KRN-022: two simtest runs at once both pass. Two copies of this binary
+  ## run the same tests together: ones that write assembled programs and
+  ## maps (testdata's .o, .map, .prg), build ROM images and the kernel,
+  ## make, fill and check SD images, and serve on a fixed port of the host
+  ## (examples/net on 7007); each writes only to its own directory (workDir,
+  ## romDir()), so neither sees the other's files, and the port is taken one
+  ## run at a time (runOnHostPorts). First, deterministically: two
+  ## `simtest --own-files` write an SD image and a program where the tests
+  ## do, the second while the first waits, and the first's must be its own.
+  echo "== two simtest runs side by side =="
+  # first, for certain: each run writes an SD image and a program where the
+  # tests do, the second while the first waits; the first's must be its own
+  let go = workDir / "go"
+  var pa = startProcess(getAppFilename(), args = ["--own-files", "a", go], options = {poStdErrToStdOut})
+  let ra = pa.outputStream.readLine()
+  var pb = startProcess(getAppFilename(), args = ["--own-files", "b", go], options = {poStdErrToStdOut})
+  let rb = pb.outputStream.readLine()
+  writeFile(go, "")
+  let outA = pa.outputStream.readAll()
+  let codeA = pa.waitForExit()
+  let outB = pb.outputStream.readAll()
+  let codeB = pb.waitForExit()
+  pa.close()
+  pb.close()
+  expectTrue("two runs at once: each keeps its own SD image and program (" & ra & ", " & rb & "; " &
+             outA.strip & "; " & outB.strip & ")",
+             ra == "ready" and rb == "ready" and codeA == 0 and codeB == 0)
+  let subset = ["testAssemblerMap", "testAssemblerRejects", "testAluImm", "testBootChain",
+                "testApiProgram", "testExec", "testNetExamples"]
+  var ps: seq[Process]
+  for k in 0..1:
+    ps.add(startProcess(getAppFilename(), args = subset, options = {poStdErrToStdOut}))
+  for k, p in ps:
+    let output = p.outputStream.readAll()
+    let code = p.waitForExit()
+    p.close()
+    var fails: seq[string]
+    for line in output.splitLines():
+      if line.startsWith("FAIL"): fails.add(line)
+    for f in fails: echo "  run ", k, ": ", f
+    expectTrue("run " & $k & " of two at once passes (" & $subset.len & " tests, exit " & $code & ")",
+               code == 0 and fails.len == 0 and "ALL TESTS PASSED" in output)
+
+run testRunsSideBySide
+
 proc testKernelApi() =
   ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 32 entries
   ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
@@ -3003,7 +3095,7 @@ proc testApiProgram() =
   if r.exitCode != 0:
     fail("fatcheck blank: " & r.output)
     return
-  let prg = testdata / "api_prog.prg"
+  let prg = workDir / "api_prog.prg"
   mkprg(testdata / "api_prog.s", prg)
   bootStorage(rom, img)
   expectTrue("the terminal waits for a key", waiting)
@@ -3086,7 +3178,7 @@ proc testApiProgram() =
              t1 - t0 >= 21 and t1 - t0 <= 22)
 
   echo "== kernel API: API_EXIT =="
-  let ex = testdata / "api_exit.prg"
+  let ex = workDir / "api_exit.prg"
   mkprg(testdata / "api_exit.s", ex)
   expectTrue("the program goes in", runProgram(readFile(ex)))
   expectTrue("it ran", runUntil(proc (): bool = mem[0x7e00] == 0x5a and mem[ApiRun] == 0, 2_000_000))
@@ -3168,7 +3260,7 @@ proc testEinkApi() =
   ## calls give $ff and leave $ff.
   echo "== kernel API: the e-ink entries =="
   let rom = buildKernelRom()
-  let prg = testdata / "eink_prog.prg"
+  let prg = workDir / "eink_prog.prg"
   mkprg(testdata / "eink_prog.s", prg)
   for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
     machineCards([card, CardIo])
@@ -3204,7 +3296,7 @@ proc testGfx2Api() =
   ## gives $ff and nothing reaches the card: it stays in TEXT with no error.
   echo "== kernel API: mode 2 =="
   let rom = buildKernelRom()
-  let prg = testdata / "gfx2_prog.prg"
+  let prg = workDir / "gfx2_prog.prg"
   mkprg(testdata / "gfx2_prog.s", prg)
   for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
     machineCards([card, CardIo])
@@ -3276,7 +3368,7 @@ proc testText8Free() =
   ## the frame.
   echo "== kernel API: TEXT8 waits for FREE =="
   let rom = buildKernelRom()
-  let prg = testdata / "text8_prog.prg"
+  let prg = workDir / "text8_prog.prg"
   mkprg(testdata / "text8_prog.s", prg)
   machineCards([CardGpu, CardIo])
   cpuReset()
@@ -3314,8 +3406,8 @@ proc testHello() =
   ## apart. A key stops it, and the terminal is back.
   echo "== examples/hello =="
   let rom = buildKernelRom()
-  let prg = rootDir / "build" / "examples" / "hello.prg"
-  createDir(rootDir / "build" / "examples")
+  let prg = workDir / "examples" / "hello.prg"
+  createDir(workDir / "examples")
   mkprg(rootDir / "examples" / "hello" / "hello.s", prg)
   machineCards([CardGpu, CardIo])
   cpuReset()
