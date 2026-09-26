@@ -1059,7 +1059,7 @@ ROUTE_PARALLEL = 6                          # orderings routed at once per try (
 def fine_nets():
     power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL0", "VCCPLL1"}
     return sorted({"/" + n for s in build_parts() if s.ref in FINE_PARTS for n in s.conns.values()
-                   if n and n not in power} | {"unconnected-(U2-*"})
+                   if n and n not in power} | {"unconnected-(U2-*", "/GND"})   # GND: the eFuse QFN GND pad sits 0.18 mm from DVDT
 
 
 def main():
