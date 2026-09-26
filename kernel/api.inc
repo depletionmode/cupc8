@@ -28,6 +28,8 @@
 %define API_BANK_GET $1012
 %define API_BANK_COUNT $1015
 %define API_BANK_FAR_COPY $1018
+%define API_MEM_CMP $101b
+%define API_MEM_CPY $101e
 
 ; group 1: console ($1063)
 %define API_PUTC $1063

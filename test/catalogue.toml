@@ -775,6 +775,15 @@ kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testText8Free"
 
+[[test]]
+id = "KRN-022"
+title = "Kernel API: API_MEM_CMP and API_MEM_CPY"
+checks = "tools/testdata/mem_prog.s calls the group-0 entries ($101b, $101e) with 16-bit lengths: compare equal (0), less ($ff, r1 the difference, the pointers at byte 4), greater unsigned ($f0 against $10: 1), length 0 (equal, nothing moved), 300 bytes across pages differing at byte 290 (1, 9 left); copy 300 bytes (the bytes round the target untouched), 0 bytes (nothing written), overlapping with dst above src (backwards: the source's bytes, not a repeat) and below it, onto itself (memmove)"
+method = "tools/simtest.nim testMemApi"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testMemApi"
+
 # ============================================================================
 # CARD: common card protocol (every card firmware)
 # ============================================================================

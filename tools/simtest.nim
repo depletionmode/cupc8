@@ -3248,6 +3248,103 @@ proc testText8Free() =
 
 run testText8Free
 
+proc testMemApi() =
+  ## KRN-022: API_MEM_CMP and API_MEM_CPY (group 0, $101b and $101e) called
+  ## by tools/testdata/mem_prog.s with the cases the test puts in memory:
+  ## equal, less, greater (unsigned: $f0 above $10), length 0, a 300-byte
+  ## compare across pages differing at byte 290 (16-bit length and pointers);
+  ## copies of 300 bytes, of 0, overlapping with dst above src (backwards)
+  ## and below it (forwards), and onto itself (memmove). The bytes on either
+  ## side of a copy are untouched; API_ARGS after the call as the contracts say.
+  echo "== kernel API: mem_cmp, mem_cpy =="
+  let rom = buildKernelRom()
+  let prg = testdata / "mem_prog.prg"
+  mkprg(testdata / "mem_prog.s", prg)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  proc peek(a: int): int = cardsLoadTest(a)
+  proc poke(a, v: int) = cardsStoreTest(a, v)
+  proc pokes(a: int; s: seq[int]) =
+    for i, v in s: poke(a + i, v)
+  proc pattern(a, n, seed: int) =
+    for i in 0 ..< n: poke(a + i, (i * 7 + seed) and 0xff)
+  # the buffers
+  pokes(0x8000, "HELLO".mapIt(ord(it)))
+  pokes(0x8010, "HELLO".mapIt(ord(it)))
+  pokes(0x8020, "HELLA".mapIt(ord(it)))
+  pokes(0x8030, @[0xf0, 1])
+  pokes(0x8038, @[0x10, 1])
+  pattern(0x80f0, 300, 3)                  # 300 bytes across pages ...
+  pattern(0x85f8, 300, 3)                  # ... the same, but byte 290
+  poke(0x85f8 + 290, peek(0x80f0 + 290) - 1)
+  pattern(0x9000, 300, 5)                  # copy sources
+  for a in 0x87fe .. 0x8930: poke(a, 0xee) # the copy's target, guards round it
+  pattern(0xa0f0, 0x130, 11)               # overlap, dst above src
+  pattern(0xa400, 300, 13)                 # overlap, dst below src
+  pattern(0xa700, 16, 17)                  # onto itself
+  poke(0xa7ff, 0x55)                       # copy of 0 there
+  type Case = tuple[op, dst, src, len: int]
+  let cases: seq[Case] = @[
+    (0, 0x8000, 0x8010, 5),      # 0 equal
+    (0, 0x8020, 0x8010, 5),      # 1 less at byte 4
+    (0, 0x8030, 0x8038, 2),      # 2 greater at byte 0, unsigned
+    (0, 0x8020, 0x8038, 0),      # 3 length 0
+    (0, 0x80f0, 0x85f8, 300),    # 4 across pages, byte 290
+    (1, 0x8800, 0x9000, 300),    # 5 copy 300
+    (1, 0xa7ff, 0x9000, 0),      # 6 copy 0
+    (1, 0xa100, 0xa0f0, 0x120),  # 7 overlap, dst above src
+    (1, 0xa3f0, 0xa400, 300),    # 8 overlap, dst below src
+    (1, 0xa700, 0xa700, 16)]     # 9 onto itself
+  poke(0x7d00, cases.len)
+  for i, c in cases:
+    pokes(0x7d10 + 8 * i, @[c.op, c.dst and 0xff, c.dst shr 8, c.src and 0xff, c.src shr 8,
+                            c.len and 0xff, c.len shr 8])
+  poke(0x7cff, 0)
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("it ran every case", runUntil(proc (): bool = peek(0x7cff) == 0xa5 and mem[ApiRun] == 0,
+                                           30_000_000))
+  proc res(i: int): seq[int] =
+    for k in 0..7: result.add(peek(0x7e00 + 8 * i + k))
+  proc after(r0, r1, dst, src, len: int): seq[int] =
+    @[r0, r1, dst and 0xff, dst shr 8, src and 0xff, src shr 8, len and 0xff, len shr 8]
+  let r1s = res(0)[1]                      # r1 is not part of the equal answer
+  expectTrue("cmp equal: 0, the pointers past the 5 bytes, len 0 " & $res(0),
+             res(0) == after(0, r1s, 0x8005, 0x8015, 0))
+  expectTrue("cmp less: $ff, r1 'A' - 'O', at byte 4 " & $res(1),
+             res(1) == after(0xff, (ord('A') - ord('O')) and 0xff, 0x8024, 0x8014, 0))
+  expectTrue("cmp greater, unsigned ($f0 against $10): 1, r1 $e0, at byte 0, 1 left " & $res(2),
+             res(2) == after(1, 0xe0, 0x8030, 0x8038, 1))
+  expectTrue("cmp of 0 bytes: equal, nothing moved " & $res(3),
+             res(3)[0] == 0 and res(3)[2..7] == after(0, 0, 0x8020, 0x8038, 0)[2..7])
+  expectTrue("cmp of 300 across pages: 1 at byte 290, 9 left " & $res(4),
+             res(4) == after(1, 1, 0x80f0 + 290, 0x85f8 + 290, 9))
+  var copied = true
+  for i in 0 ..< 300:
+    if peek(0x8800 + i) != ((i * 7 + 5) and 0xff): copied = false
+  expectTrue("copy 300: every byte, r0 0", copied and res(5)[0] == 0)
+  expectTrue("copy 300: the bytes round it untouched",
+             peek(0x87ff) == 0xee and peek(0x8800 + 300) == 0xee)
+  expectTrue("copy 0: nothing written, r0 0", peek(0xa7ff) == 0x55 and res(6)[0] == 0)
+  var up = true
+  for i in 0 ..< 0x120:
+    if peek(0xa100 + i) != ((i * 7 + 11) and 0xff): up = false
+  expectTrue("overlap, dst 16 above src: the source's bytes, not a repeat", up and res(7)[0] == 0)
+  expectTrue("overlap up: the byte below dst is src's own", peek(0xa0ff) == ((15 * 7 + 11) and 0xff))
+  var down = true
+  for i in 0 ..< 300:
+    if peek(0xa3f0 + i) != ((i * 7 + 13) and 0xff): down = false
+  expectTrue("overlap, dst 16 below src: the source's bytes", down and res(8)[0] == 0)
+  var same = true
+  for i in 0 ..< 16:
+    if peek(0xa700 + i) != ((i * 7 + 17) and 0xff): same = false
+  expectTrue("copy onto itself: unchanged", same and res(9)[0] == 0)
+  ioModel = imLegacy
+
+run testMemApi
+
 proc testHello() =
   ## KRN-015: examples/hello (tools/mkprg.py: kernel/api.inc, then the
   ## program, for $7000) on the HDMI machine: its banner and API version,

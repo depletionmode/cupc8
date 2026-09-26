@@ -32,8 +32,8 @@
 	b api_bank_get
 	b api_bank_count
 	b api_bank_far_copy
-	b api_none
-	b api_none
+	b api_mem_cmp
+	b api_mem_cpy
 	b api_none
 	b api_none
 	b api_none

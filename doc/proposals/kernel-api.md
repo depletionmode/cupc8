@@ -53,7 +53,7 @@ $5fff, data moved to $6000 and bss to $e000.)
 
 | Group | Base | Contents (first entries) |
 |---|---|---|
-| 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table, bank_set, bank_get, bank_count, bank_far_copy (`kernel/bank.s`, as they are: they leave `API_ERR` alone) |
+| 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table, bank_set, bank_get, bank_count, bank_far_copy (`kernel/bank.s`, as they are: they leave `API_ERR` alone), mem_cmp, mem_cpy |
 | 1 console | $1063 | putc, puts, getkey (wait), pollkey, cls, cursor set/get, attr |
 | 2 graphics | $10c3 | mode, pixel, rect, line, palette, text-plane helpers (what `gfx.s`/the GPU protocol offer); from $10e4 the e-ink card's native mode 2 (`basic-graphics.md`) |
 | 3 e-ink | $1123 | eink_auto, eink_get, eink_status, eink_refresh (`eink-card.md`) |
@@ -141,6 +141,21 @@ ring is dropped.
 - Graphics has no BLIT8/BLIT1/DEFCHAR entries for GFX mode yet; they can
   be added in group 2's spare entries (the mode-2 BLITs below show how: a
   frame over 64 bytes waits for the card's FREE first).
+
+### mem_cmp and mem_cpy (2026-09-26)
+
+Two group-0 entries give programs the kernel's memory routines, with
+16-bit lengths (`kernel/printf.s`'s `mem_cmp` and `mem_cpy`, which the
+kernel keeps for itself, take 8-bit ones on the stack). `API_ARGS` = dst
+(lo, hi), src (lo, hi), len16 (lo, hi), len 0-65535:
+
+| Entry | Address | Result |
+|---|---|---|
+| `API_MEM_CMP` | $101b | memcmp, bytes unsigned: r0 = 0 all equal; else at the first pair that differs 1 (dst's byte the greater) or $ff (the less), r1 = dst's byte - src's, `API_ARGS[0..3]` point at that pair and `API_ARGS[4..5]` = the bytes after it |
+| `API_MEM_CPY` | $101e | **memmove**: overlapping areas copy right (backwards when dst is above src). r0 = 0 |
+
+r0 is also left in `API_ERR`; `API_ARGS` is used up as they work (the
+pointers step, len counts down). About 50 instructions a byte. KRN-022.
 
 ### Mode 2 (2026-09-26, `basic-graphics.md`)
 
