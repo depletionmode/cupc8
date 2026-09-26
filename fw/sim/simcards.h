@@ -40,6 +40,7 @@ int simcard_eink_refreshes(simcard_t *c, int waveform);
 int simcard_eink_errors(simcard_t *c);
 int simcard_eink_pixel2(simcard_t *c, int x, int y);  /* mode 2's grey 0-3, -1 off the panel or not e-ink */
 int simcard_gpu_errors(simcard_t *c);       /* the graphics card's command errors (bad frames, bad greys) */
+void simcard_gpu_hold(simcard_t *c, int on); /* hold execution: frames queue in the FIFO */
 
 /* IO: type an ASCII character (press + release of the matching US key) */
 void simcard_type_ascii(simcard_t *c, uint8_t ch, uint32_t now_ms);

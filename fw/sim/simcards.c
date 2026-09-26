@@ -254,6 +254,14 @@ int simcard_eink_pixel2(simcard_t *c, int x, int y)
 
 int simcard_gpu_errors(simcard_t *c) { return c->gpu ? (int)c->gpu->errors : -1; }
 
+/* hold the graphics card's execution (as an e-ink REFRESH does): frames keep
+ * queuing in its FIFO, FREE goes down */
+void simcard_gpu_hold(simcard_t *c, int on)
+{
+	if (c->gpu)
+		c->gpu->hold = on != 0;
+}
+
 void simcard_hid(simcard_t *c, const uint8_t report[8], uint32_t now_ms)
 {
 	if (c->io)

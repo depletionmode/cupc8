@@ -3205,6 +3205,46 @@ proc testGfx2Api() =
 
 run testGfx2Api
 
+proc testText8Free() =
+  ## KRN-021: API_GFX_TEXT8 waits for room in the card's FIFO (FREE). With
+  ## the HDMI card's execution held (as an e-ink REFRESH holds it),
+  ## tools/testdata/text8_prog.s queues 1150 PIXEL frames (8050 of the 8192
+  ## bytes), then a 255-character TEXT8 (a 262-byte frame): the call waits,
+  ## asking FREE with $FF frames, which queue nothing; the card released,
+  ## the text arrives whole (every visible pixel of its row drawn), and the
+  ## card saw no dropped frame. It used to send at once, and the card dropped
+  ## the frame.
+  echo "== kernel API: TEXT8 waits for FREE =="
+  let rom = buildKernelRom()
+  let prg = testdata / "text8_prog.prg"
+  mkprg(testdata / "text8_prog.s", prg)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  let g = gpuCard()
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("it reaches GFX mode", runUntil(proc (): bool = simcard_gpu_mode(g) == 1, 5_000_000))
+  simcard_gpu_hold(g, 1)
+  discard runUntil(proc (): bool = mem[0x7e00] == 1, 15_000_000)
+  expect("TEXT8 waits while the FIFO has no room for it", mem[0x7e00], 0)
+  expect("... and nothing was dropped", int(simcard_gpu_errors(g)), 0)
+  simcard_gpu_hold(g, 0)
+  expectTrue("the card released: TEXT8 returns, the program ends",
+             runUntil(proc (): bool = mem[0x7e01] == 2 and mem[ApiRun] == 0, 20_000_000))
+  settle(2_000_000)
+  var blank = 0
+  for y in 100..107:
+    for x in 0..319:
+      if simcard_gpu_pixel(g, cint(x), cint(y)) notin [1.cint, 15.cint]: inc blank
+  expectTrue("the text arrived whole: its row drawn across the screen (" & $blank & " pixels not)", blank == 0)
+  expect("the card dropped no frame", int(simcard_gpu_errors(g)), 0)
+  expect("the PIXELs before it ran too", int(simcard_gpu_pixel(g, 125, 200)), 7)
+  ioModel = imLegacy
+
+run testText8Free
+
 proc testHello() =
   ## KRN-015: examples/hello (tools/mkprg.py: kernel/api.inc, then the
   ## program, for $7000) on the HDMI machine: its banner and API version,

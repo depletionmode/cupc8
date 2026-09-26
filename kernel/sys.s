@@ -186,7 +186,8 @@ api_gfx_palette_reset:
 
 ; API_GFX_TEXT8 - 8x8 text, no wrapping: API_ARGS = x16, y8, fg, bg ($ff
 ; transparent); API_ARGS[6..7] = a pointer to the NUL-terminated text (at
-; most 255 characters). The kernel puts the length in API_ARGS[5].
+; most 255 characters). The kernel puts the length in API_ARGS[5]. It waits
+; for the card to have room for the whole frame (FREE).
 api_gfx_text8:
 	ld r1, $6f06
 	ld r0, $6f07
@@ -194,6 +195,11 @@ api_gfx_text8:
 	push pcl
 	b str_len
 	st $6f05, r0
+	shr r0, #6				; the frame, 7 + length bytes, in 64s (rounded up, and 1 over)
+	add r0, #2
+	push pch
+	push pcl
+	b gpu_wait_free			; the card drops a frame it has no room for
 	mov r0, #0x6f
 	st [gpu_src+1], r0
 	xor r0, r0

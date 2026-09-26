@@ -766,6 +766,15 @@ kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testGfx2Api"
 
+[[test]]
+id = "KRN-021"
+title = "Kernel API: long frames wait for the card's FREE"
+checks = "tools/testdata/text8_prog.s on the simulator's HDMI card with its execution held (as an e-ink REFRESH holds it): 1150 PIXEL frames fill 8050 of the FIFO's 8192 bytes, then API_GFX_TEXT8 with 255 characters (a 262-byte frame) waits instead of sending, asking FREE with $FF frames that queue nothing (no dropped frame); released, it returns, the text arrives whole (its row drawn across the screen), the PIXELs ran, the card dropped no frame"
+method = "tools/simtest.nim testText8Free (simcard_gpu_hold in fw/sim/simcards.c)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testText8Free"
+
 # ============================================================================
 # CARD: common card protocol (every card firmware)
 # ============================================================================
