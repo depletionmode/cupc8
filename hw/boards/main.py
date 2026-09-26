@@ -1038,7 +1038,11 @@ def _graphics():
 
 
 # the nets that carry amps: 0.5 mm tracks (kicadgen's Power class)
-POWER_NETS = ("/VBUS", "/VBUS_F", "/5V_SYS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
+POWER_NETS = ("/VBUS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
+# the eFuse's input and output: 0.5 mm tracks, but the QFN's pins are
+# 0.15-0.19 mm apart, so Fine's clearance (kicadgen FinePower). In the Fine
+# class they were routed 0.15 mm wide, 77 mm of them, for 3.5 A.
+FINE_POWER_NETS = ("/VBUS_F", "/5V_SYS")
 # In1 a solid GND plane; In2 carries signals too (two signal layers leave ~80
 # connections unrouted), with a +3V3 pour filled round them after routing
 # 6 layers, as the CPU card: F.Cu / In1 GND / In2 / In3 / In4 +3V3 / B.Cu.
@@ -1057,10 +1061,17 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
 ROUTE_PARALLEL = 8                          # orderings routed at once per try (kicadgen route_parallel)
+# the fan-out vias a clearance off their own pads, 0.05 mm further from other
+# nets' and clear of the NPTH holes' keep-outs, as Freerouting judges them:
+# at KiCad's own margins they were ~117 violations it carried through every
+# pass (kicadgen ground_fanout). 4 remain: the eFuse QFN's own pins, 0.15-0.19
+# mm apart, which Freerouting holds to 0.2 whatever their class.
+FANOUT_MARGIN = 0.05
 
 
 def fine_nets():
-    power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL0", "VCCPLL1"}
+    # the eFuse's VBUS_F and 5V_SYS carry the input current: FINE_POWER_NETS
+    power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL0", "VCCPLL1", "VBUS_F", "5V_SYS"}
     return sorted({"/" + n for s in build_parts() if s.ref in FINE_PARTS for n in s.conns.values()
                    if n and n not in power} | {"unconnected-(U2-*", "/GND"})   # GND: the eFuse QFN GND pad sits 0.18 mm from DVDT
 
@@ -1073,7 +1084,7 @@ def prepare(board):
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     fp = board.FindFootprintByReference("U2")
-    pad = [p for p in fp.Pads() if p.GetNumber() == "8"][0]
+    pad =[p for p in fp.Pads() if p.GetNumber() == "8"][0]
     px, py = to(pad.GetPosition().x), to(pad.GetPosition().y)
     cx, cy = to(fp.GetPosition().x), to(fp.GetPosition().y)
     # out along the pad's own axis (the side it sits on), 1.2 mm past it
@@ -1229,9 +1240,9 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
                        fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
-                       route_parallel=ROUTE_PARALLEL, prepare=prepare,
-                       power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3,
-                       title=TITLE, revision=REVISION, revision_at=REV_AT)
+                       route_parallel=ROUTE_PARALLEL, fanout_margin=FANOUT_MARGIN, prepare=prepare,
+                       power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
+                       boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
     n = pincheck.check_mainboard(load_pins(), net)
     if pincheck.errors:

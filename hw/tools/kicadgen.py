@@ -667,9 +667,13 @@ NET_CLASSES = [
     # so one 0.15 mm from a 0.6 mm Default via keeps the holes 0.5 mm apart (JLC).
     ("Fine", 0.15, 0.15, 0.7, 0.3),
 ]
+# power nets on a fine-pitch part (the main board's eFuse QFN): Power's track
+# and via, Fine's clearance (its pins are 0.15-0.19 mm apart). Only in a
+# project given fine_power_nets.
+FINE_POWER_CLASS = ("FinePower", 0.5, 0.15, 0.8, 0.4)
 
 
-def write_project(path, power_nets=(), rules=None, fine_nets=()):
+def write_project(path, power_nets=(), rules=None, fine_nets=(), fine_power_nets=()):
     """A .kicad_pro with the design rules and net classes kicad-cli DRC uses."""
     import json
     classes = [{"name": n, "track_width": w, "clearance": c, "via_diameter": vd, "via_drill": vdr,
@@ -677,7 +681,7 @@ def write_project(path, power_nets=(), rules=None, fine_nets=()):
                 "microvia_diameter": 0.3, "microvia_drill": 0.1, "bus_width": 12, "wire_width": 6,
                 "line_style": 0, "pcb_color": "rgba(0, 0, 0, 0.000)",
                 "schematic_color": "rgba(0, 0, 0, 0.000)", "priority": 2147483647 if n == "Default" else 0}
-               for n, w, c, vd, vdr in NET_CLASSES]
+               for n, w, c, vd, vdr in NET_CLASSES + ([FINE_POWER_CLASS] if fine_power_nets else [])]
     pro = {
         "board": {"design_settings": {
             "rules": dict(JLC_RULES, **(rules or {})),
@@ -688,7 +692,8 @@ def write_project(path, power_nets=(), rules=None, fine_nets=()):
         }},
         "net_settings": {"classes": classes, "meta": {"version": 4},
                          "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets] +
-                                              [{"netclass": "Fine", "pattern": n} for n in fine_nets]},
+                                              [{"netclass": "Fine", "pattern": n} for n in fine_nets] +
+                                              [{"netclass": "FinePower", "pattern": n} for n in fine_power_nets]},
         "meta": {"filename": os.path.basename(path), "version": 3},
     }
     with open(path, "w") as f:
@@ -1888,13 +1893,21 @@ def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0
     return n
 
 
-def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
+def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2, margin=0.0):
     """Before routing, give every SMD pad on `net` (edge fingers aside) a
     short track to its own via, pointing away from a small part's centre
     (towards a big one's), so the
     router routes round it instead of walling it in (a pad boxed in by
     signals reaches the pour through a sliver or not at all). No sharing a
     neighbour's via: a signal routed between them would cut the pad off.
+    `margin` > 0 keeps each via that much further from other nets' pads, a
+    further 0.3 mm from NPTH holes, and `gap` + `margin` from its own net's
+    pads too: Freerouting holds a via's hole to the clearance from every
+    pad, its own net's included (its DRC: "hole clearance"), draws a via as
+    an octagon round its circle, and gets each NPTH hole as a keep-out
+    already grown by a clearance, then adds its own; each of those vias
+    KiCad passes stayed a violation for the whole run (~1 per via: ~117 on
+    the main board, found with `freerouting -de board.dsn -drc report.json`).
     Returns the vias placed."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
@@ -1902,19 +1915,24 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     pads = [(p, fp) for fp in board.GetFootprints() for p in fp.Pads()
             if not str(fp.GetFPID().GetLibNickname()).startswith("Connector_PCBEdge")]
     others = []                                   # other nets' pads, grown for a via / a track
+    own = []                                      # this net's pads (kept off with `margin`)
     for p, _ in pads:
+        if margin and p.GetNetname() == net and p.IsOnCopperLayer():
+            bb = p.GetBoundingBox()
+            own.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
         # not paste-only apertures (a QFN's exposed-pad stencil windows): no
         # copper, no hole, no net, but they would keep every via off the
         # exposed pad. Holes (NPTH pegs) still count.
         if p.GetNetname() != net and (p.IsOnCopperLayer() or p.GetDrillSize().x > 0):
             bb = p.GetBoundingBox()
-            others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
+            others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom()),
+                           0.3 if p.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH else 0.0))
     zs = board.Zones()
     for z in [zs[i] for i in range(len(zs))]:
         # the logo's keep-out (silk_keepout): no fan-out via or track under it
         if z.GetIsRuleArea() and z.GetZoneName() == "logo":
             bb = z.GetBoundingBox()
-            others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
+            others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom()), 0.0))
     vias = []
     edge = board.GetBoardEdgesBoundingBox()
     ex0, ey0, ex1, ey1 = to(edge.GetLeft()) + 0.8, to(edge.GetTop()) + 0.8, to(edge.GetRight()) - 0.8, to(edge.GetBottom()) - 0.8
@@ -1922,8 +1940,9 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
     locked = [(to(tracks[i].GetStart().x), to(tracks[i].GetStart().y), to(tracks[i].GetEnd().x),
                to(tracks[i].GetEnd().y), tracks[i].GetNetname()) for i in range(len(tracks))]
 
-    def clear_of(x, y, grow):
-        return not any(b[0] - grow < x < b[2] + grow and b[1] - grow < y < b[3] + grow for b in others)
+    def clear_of(x, y, grow, m=0.0):
+        return not any(b[0] - g < x < b[2] + g and b[1] - g < y < b[3] + g
+                       for b in others for g in (grow + (m + b[4] if m else 0.0),))
 
     def seg_dist(px, py, ax, ay, bx, by):
         dx, dy = bx - ax, by - ay
@@ -1954,7 +1973,10 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2):
                 vx, vy = cx + r * math.cos(a), cy + r * math.sin(a)
                 if not (ex0 < vx < ex1 and ey0 < vy < ey1):
                     continue
-                if not clear_of(vx, vy, via / 2 + gap):
+                if not clear_of(vx, vy, via / 2 + gap, margin):
+                    continue
+                if any(b[0] - g < vx < b[2] + g and b[1] - g < vy < b[3] + g
+                       for b in own for g in (via / 2 + gap + margin,)):
                     continue
                 if any(math.hypot(vx - ox, vy - oy) < via + 0.25 for ox, oy in vias):
                     continue
@@ -2526,7 +2548,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
-             tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0):
+             tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
+             fine_power_nets=()):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2578,7 +2601,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
 
     def sheet():
         schematic(sch, footprint_libs)
-        write_project(pro, power_nets=power_nets, fine_nets=fine_nets,   # before ERC: it carries the library tables
+        write_project(pro, power_nets=power_nets, fine_nets=fine_nets, fine_power_nets=fine_power_nets,   # before ERC: it carries the library tables
                       rules=JLC_RULES_4 if layers >= 4 else None)
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
@@ -2606,7 +2629,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             state["escaped"] = key_escapes(b, outline[3], skip=pour_nets)
         # every poured net's pads get a via: GND, and any net on a plane
         # (build_board's (net, layers) zones), which is reached no other way
-        state["fanout"] = sum(ground_fanout(b, n) for n in pour_nets)
+        state["fanout"] = sum(ground_fanout(b, n, margin=fanout_margin) for n in pour_nets)
         if prepare:                   # the board's own locked pre-routing, before Freerouting
             # nets it returns are escapes of its own: checked like the key-notch ones
             state["escaped"] = list(state.get("escaped", [])) + list(prepare(b) or [])
