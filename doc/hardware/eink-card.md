@@ -18,6 +18,23 @@ the console with no change; the kernel asks `INFO` and knows which it has.
 | LED | REFRESH (GPIO 24): lit while the panel refreshes |
 | Panel | **Good Display GDEY0583T81, 5.83", 648 x 480** (the build `eink.elf`); the 7.5" GDEY075T7, 800 x 480, works with `eink750.elf`. Both have the UltraChip **UC8179** controller. |
 
+**Buying the panel (checked 2026-09-26).** The panel and its driver module
+are not JLC parts: they are bought separately and plug into the header by
+cable (no soldering).
+
+| Option | Price | Stock (2026-09-26) |
+|---|---|---|
+| GDEY0583T81 at MicroHello | $19.90 | in stock |
+| GDEY0583T81 at buy-lcd, Evelta, Good Display | $24.48 / INR 2,928 / - | out of stock |
+| DESPI-C02 adapter at buy-lcd | $8.50 | out of stock |
+| DESPI-C02 at AliExpress (Good Display's store) | $49.90 + $6.80 | available |
+| Waveshare 5.83" e-Paper HAT, 648 x 480 (panel, driver board, 9-pin GH1.25 cable) | $39.99 | available (Waveshare, Amazon) |
+
+The Waveshare HAT is the simplest (one box, the header follows its pinout);
+**to verify before relying on it**: that its panel takes the UC8179 commands
+and timings this firmware uses for the GDEY0583T81 (Waveshare's V2 driver
+suggests so; check its datasheet).
+
 The card cannot ask the panel which it is (the header has no MISO), so the
 panel is chosen by the firmware image. `INFO` reports it.
 
