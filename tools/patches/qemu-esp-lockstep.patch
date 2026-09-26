@@ -1,0 +1,539 @@
+diff --git i/accel/tcg/icount-common.c w/accel/tcg/icount-common.c
+index 30bf850..33dae6c 100644
+--- i/accel/tcg/icount-common.c
++++ w/accel/tcg/icount-common.c
+@@ -36,6 +36,7 @@
+ #include "sysemu/runstate.h"
+ #include "hw/core/cpu.h"
+ #include "sysemu/cpu-timers.h"
++#include "sysemu/cupc8-lockstep.h"
+ #include "sysemu/cpu-timers-internal.h"
+ 
+ /*
+@@ -308,6 +309,11 @@ void icount_start_warp_timer(void)
+             return;
+         }
+ 
++        /* CUPC/8: an idle guest's clock stops where the emulator stops it */
++        if (cupc8_lockstep_due()) {
++            return;
++        }
++
+         if (qtest_enabled()) {
+             /* When testing, qtest commands advance icount.  */
+             return;
+diff --git i/accel/tcg/tcg-accel-ops-rr.c w/accel/tcg/tcg-accel-ops-rr.c
+index 8ebadf8..d573573 100644
+--- i/accel/tcg/tcg-accel-ops-rr.c
++++ w/accel/tcg/tcg-accel-ops-rr.c
+@@ -35,6 +35,7 @@
+ #include "tcg/startup.h"
+ #include "tcg-accel-ops.h"
+ #include "tcg-accel-ops-rr.h"
++#include "sysemu/cupc8-lockstep.h"
+ #include "tcg-accel-ops-icount.h"
+ 
+ /* Kick all RR vCPUs */
+@@ -109,7 +110,7 @@ static void rr_wait_io_event(void)
+ {
+     CPUState *cpu;
+ 
+-    while (all_cpu_threads_idle()) {
++    while (all_cpu_threads_idle() && !cupc8_lockstep_due()) {
+         rr_stop_kick_timer();
+         qemu_cond_wait_bql(first_cpu->halt_cond);
+     }
+@@ -232,6 +233,8 @@ static void *rr_cpu_thread_fn(void *arg)
+              * waking up the I/O thread and waiting for completion.
+              */
+             icount_handle_deadline();
++            /* CUPC/8: wait here for the emulator to let the guest run on */
++            cupc8_lockstep_sync();
+ 
+             cpu_budget = icount_percpu_budget(cpu_count);
+         }
+diff --git i/hw/riscv/esp32c3.c w/hw/riscv/esp32c3.c
+index ed698fb..e56aee9 100644
+--- i/hw/riscv/esp32c3.c
++++ w/hw/riscv/esp32c3.c
+@@ -8,6 +8,7 @@
+  * (at your option) any later version.
+  */
+ #include "qemu/osdep.h"
++#include "qemu/guest-random.h"
+ #include "qemu/log.h"
+ #include "qemu/error-report.h"
+ #include "hw/qdev-properties.h"
+@@ -151,13 +152,10 @@ static uint64_t esp32c3_io_read(void *opaque, hwaddr addr, unsigned int size)
+         /* Return "QEMU" as a 32-bit value */
+         return 0x51454d55;
+     } else if (addr + ESP32C3_IO_START_ADDR == DR_REG_SYSCON_BASE + A_SYSCON_RND_DATA_REG) {
+-        /* Return a random 32-bit value */
+-        static bool init = false;
+-        if (!init) {
+-            srand(time(NULL));
+-            init = true;
+-        }
+-        return rand();
++        /* Return a random 32-bit value (CUPC/8: from -seed, if given) */
++        uint32_t r;
++        qemu_guest_getrandom_nofail(&r, sizeof(r));
++        return r;
+     } else if (addr + ESP32C3_IO_START_ADDR == DR_REG_ASSIST_DEBUG_BASE + A_ASSIST_DEBUG_CORE_0_DEBUG_MODE_REG) {
+         return 0;
+     } else {
+diff --git i/include/sysemu/cupc8-lockstep.h w/include/sysemu/cupc8-lockstep.h
+new file mode 100644
+index 0000000..2fde4ca
+--- /dev/null
++++ w/include/sysemu/cupc8-lockstep.h
+@@ -0,0 +1,18 @@
++/*
++ * CUPC/8 lockstep (system/cupc8-lockstep.c): the Wi-Fi card's QEMU runs in
++ * step with the CUPC/8 whole-machine emulator. Hooks called by the TCG
++ * round-robin loop, the icount warp and user networking; each does nothing
++ * unless a `-chardev cupc8` exists.
++ */
++#ifndef SYSEMU_CUPC8_LOCKSTEP_H
++#define SYSEMU_CUPC8_LOCKSTEP_H
++
++/* the vCPU loop's top, BQL held: talk to the emulator until the guest may run */
++void cupc8_lockstep_sync(void);
++/* true while the guest must not run (nor its clock warp) until sync() */
++bool cupc8_lockstep_due(void);
++/* user networking: the guest sent a packet (tx) or was given one (rx) */
++void cupc8_lockstep_net_tx(void);
++void cupc8_lockstep_net_rx(void);
++
++#endif
+diff --git i/net/slirp.c w/net/slirp.c
+index 102bec7..2ef6a36 100644
+--- i/net/slirp.c
++++ w/net/slirp.c
+@@ -25,6 +25,7 @@
+ #include "qemu/osdep.h"
+ #include "qemu/log.h"
+ #include "net/slirp.h"
++#include "sysemu/cupc8-lockstep.h"
+ 
+ 
+ #if defined(CONFIG_SMBD_COMMAND)
+@@ -126,6 +127,7 @@ static ssize_t net_slirp_send_packet(const void *pkt, size_t pkt_len,
+             pkt_len = min_pktsz;
+         }
+     }
++    cupc8_lockstep_net_rx();
+ 
+     return qemu_send_packet(&s->nc, pkt, pkt_len);
+ }
+@@ -135,6 +137,7 @@ static ssize_t net_slirp_receive(NetClientState *nc, const uint8_t *buf, size_t
+     SlirpState *s = DO_UPCAST(SlirpState, nc, nc);
+ 
+     slirp_input(s->slirp, buf, size);
++    cupc8_lockstep_net_tx();
+ 
+     return size;
+ }
+diff --git i/system/cupc8-lockstep.c w/system/cupc8-lockstep.c
+new file mode 100644
+index 0000000..dc1c887
+--- /dev/null
++++ w/system/cupc8-lockstep.c
+@@ -0,0 +1,385 @@
++/*
++ * CUPC/8 lockstep: the Wi-Fi card's QEMU in step with the CUPC/8
++ * whole-machine emulator (emu/machine in the CUPC/8 repository).
++ *
++ *   -icount shift=N,sleep=off -chardev cupc8,id=frames,path=FIFO -serial chardev:frames
++ *
++ * With icount the guest's clock (QEMU_CLOCK_VIRTUAL) is a function of the
++ * instructions executed, and with sleep=off an idle guest's clock jumps to
++ * the next timer; so the guest is deterministic except for its inputs. This
++ * chardev makes the one that matters, the UART carrying the card's SPI
++ * frames, arrive at defined guest times, and runs the guest only as far as
++ * the emulator allows. It talks to the emulator over FIFO.in (commands) and
++ * FIFO.out (replies), little-endian:
++ *
++ *   'G' t:i64                    grant: the guest may run until its clock is t
++ *   'X' t:i64 k:u32 n:u16 b[n]   exchange: run to t, the UART receives b at t,
++ *                                run until the UART has sent k bytes, reply
++ *   'R' now:i64 b[k]             the k bytes, and the guest time they were done
++ *   'T' now:i64                  no k bytes within 10 s of guest time
++ *
++ * The guest never runs past the last grant or exchange time except to answer
++ * an exchange, so it is never ahead of the emulator when input arrives.
++ * Everything the UART sends is kept and handed out only by 'R'.
++ *
++ * User networking (slirp) is the host's, on the host's clock: it can never be
++ * in step. When the guest sends a packet the vCPU stops right after that
++ * instruction and QEMU waits (wall clock) until slirp has given the guest
++ * nothing new for CUPC8_LOCKSTEP_SETTLE_MS (default 20 ms, at most
++ * CUPC8_LOCKSTEP_SETTLE_MAX_MS, 2000): a host that answers within that time
++ * is seen at a defined guest time. Anything later, or unasked, arrives
++ * whenever the main loop sees it.
++ */
++#include "qemu/osdep.h"
++#include "qapi/error.h"
++#include "qemu/main-loop.h"
++#include "qemu/module.h"
++#include "qemu/option.h"
++#include "qemu/timer.h"
++#include "qemu/atomic.h"
++#include "qemu/error-report.h"
++#include "sysemu/sysemu.h"
++#include "chardev/char.h"
++#include "hw/core/cpu.h"
++#include "sysemu/cpu-timers.h"
++#include "sysemu/cupc8-lockstep.h"
++
++#define TYPE_CHARDEV_CUPC8 "chardev-cupc8"
++#define ANSWER_NS (10 * NANOSECONDS_PER_SECOND)
++
++typedef struct {
++    Chardev parent;
++    int fd_in, fd_out;
++    GByteArray *out;           /* sent by the UART, not yet handed out */
++    GByteArray *in;            /* for the UART, not yet taken */
++} CharCupc8;
++
++DECLARE_INSTANCE_CHECKER(CharCupc8, CHARDEV_CUPC8, TYPE_CHARDEV_CUPC8)
++
++static struct {
++    CharCupc8 *chr;            /* NULL: no lockstep */
++    QEMUTimer *timer;          /* at the next stop */
++    int64_t grant;
++    bool xpending;             /* an exchange waits for the clock to reach xt */
++    int64_t xt;
++    uint32_t xk;
++    GByteArray *xbytes;
++    uint32_t awaiting;         /* bytes the exchange waits for the UART to send */
++    int64_t answer_by;
++    bool net_tx;               /* the guest sent a packet: let the host answer */
++    uint64_t net_rx;           /* packets given to the guest (atomic) */
++    int64_t settle_us, settle_max_us;
++} ls;
++
++static int64_t now_ns(void)
++{
++    return qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
++}
++
++/* the guest time at which the vCPU must stop next */
++static int64_t stop_time(void)
++{
++    if (ls.awaiting) {
++        return ls.answer_by;
++    }
++    return ls.xpending ? ls.xt : ls.grant;
++}
++
++bool cupc8_lockstep_due(void)
++{
++    if (!ls.chr) {
++        return false;
++    }
++    if (ls.net_tx || (ls.awaiting && ls.chr->out->len >= ls.awaiting)) {
++        return true;
++    }
++    return now_ns() >= stop_time();
++}
++
++static void read_full(void *buf, size_t n)
++{
++    uint8_t *p = buf;
++    while (n) {
++        ssize_t r = read(ls.chr->fd_in, p, n);
++        if (r < 0 && errno == EINTR) {
++            continue;
++        }
++        if (r <= 0) {
++            exit(0);           /* the emulator has gone */
++        }
++        p += r;
++        n -= r;
++    }
++}
++
++static void write_full(const void *buf, size_t n)
++{
++    const uint8_t *p = buf;
++    while (n) {
++        ssize_t r = write(ls.chr->fd_out, p, n);
++        if (r < 0 && errno == EINTR) {
++            continue;
++        }
++        if (r <= 0) {
++            exit(0);
++        }
++        p += r;
++        n -= r;
++    }
++}
++
++/* move queued input into the UART as far as its FIFO takes it */
++static void push_input(void)
++{
++    CharCupc8 *c = ls.chr;
++    while (c->in->len) {
++        int room = qemu_chr_be_can_write(&c->parent);
++        if (room <= 0) {
++            break;
++        }
++        int n = MIN((guint)room, c->in->len);
++        qemu_chr_be_write(&c->parent, c->in->data, n);
++        g_byte_array_remove_range(c->in, 0, n);
++    }
++}
++
++static void reply(char kind, uint32_t k)
++{
++    int64_t now = now_ns();
++    uint8_t h[9];
++    h[0] = kind;
++    memcpy(h + 1, &now, 8);    /* x86-64 and aarch64 hosts: little-endian */
++    write_full(h, 9);
++    if (k) {
++        write_full(ls.chr->out->data, k);
++        g_byte_array_remove_range(ls.chr->out, 0, k);
++    }
++}
++
++/* one command from the emulator; the BQL is dropped while waiting for it */
++static void read_command(void)
++{
++    uint8_t kind;
++    int64_t t;
++    bql_unlock();
++    read_full(&kind, 1);
++    read_full(&t, 8);
++    if (kind == 'X') {
++        uint32_t k;
++        uint16_t n;
++        read_full(&k, 4);
++        read_full(&n, 2);
++        g_byte_array_set_size(ls.xbytes, n);
++        read_full(ls.xbytes->data, n);
++        ls.xk = k;
++    } else if (kind != 'G') {
++        fprintf(stderr, "cupc8 lockstep: unknown command %02x\n", kind);
++        exit(1);
++    }
++    bql_lock();
++    if (kind == 'X') {
++        ls.xpending = true;
++        ls.xt = t;
++    }
++    ls.grant = MAX(ls.grant, t);
++}
++
++/* the guest sent a packet: wait until the host has had its say */
++static void net_settle(void)
++{
++    uint64_t seen = qatomic_read(&ls.net_rx);
++    int64_t start = g_get_monotonic_time(), last = start;
++    bql_unlock();
++    /* the packet may have opened a host socket (a TCP connect): the main
++     * loop polls it only once it has gone round, so wake it now */
++    qemu_notify_event();
++    for (;;) {
++        g_usleep(500);
++        int64_t t = g_get_monotonic_time();
++        uint64_t rx = qatomic_read(&ls.net_rx);
++        if (rx != seen) {
++            seen = rx;
++            last = t;
++        }
++        if (t - last >= ls.settle_us || t - start >= ls.settle_max_us) {
++            break;
++        }
++    }
++    bql_lock();
++}
++
++static void stop_timer_cb(void *opaque)
++{
++    /* a halted vCPU waits in rr_wait_io_event until due() */
++    qemu_cpu_kick(first_cpu);
++}
++
++void cupc8_lockstep_sync(void)
++{
++    if (!ls.chr) {
++        return;
++    }
++    for (;;) {
++        int64_t now = now_ns();
++        if (ls.net_tx) {
++            ls.net_tx = false;
++            net_settle();
++            continue;
++        }
++        if (ls.awaiting) {
++            if (ls.chr->out->len >= ls.awaiting) {
++                reply('R', ls.awaiting);
++                ls.awaiting = 0;
++                continue;
++            }
++            if (now >= ls.answer_by) {
++                reply('T', 0);
++                ls.awaiting = 0;
++                continue;
++            }
++            break;
++        }
++        if (ls.xpending && now >= ls.xt) {
++            ls.xpending = false;
++            g_byte_array_append(ls.chr->in, ls.xbytes->data, ls.xbytes->len);
++            push_input();
++            ls.awaiting = ls.xk;
++            ls.answer_by = now + ANSWER_NS;
++            if (!ls.awaiting) {
++                reply('R', 0);
++            }
++            continue;
++        }
++        if (ls.xpending || now < ls.grant) {
++            break;
++        }
++        read_command();
++    }
++    if (!ls.timer) {
++        ls.timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, stop_timer_cb, NULL);
++    }
++    /* only when it moves: arming a virtual timer kicks the vCPU out of its loop */
++    if (timer_expire_time_ns(ls.timer) != stop_time()) {
++        timer_mod_ns(ls.timer, stop_time());
++    }
++}
++
++void cupc8_lockstep_net_tx(void)
++{
++    if (ls.chr) {
++        ls.net_tx = true;
++        if (current_cpu) {
++            cpu_exit(current_cpu);
++        }
++    }
++}
++
++void cupc8_lockstep_net_rx(void)
++{
++    if (ls.chr) {
++        qatomic_inc(&ls.net_rx);
++    }
++}
++
++static int cupc8_chr_write(Chardev *chr, const uint8_t *buf, int len)
++{
++    CharCupc8 *c = CHARDEV_CUPC8(chr);
++    g_byte_array_append(c->out, buf, len);
++    if (ls.awaiting && c->out->len >= ls.awaiting && current_cpu) {
++        cpu_exit(current_cpu);  /* stop after this instruction and reply */
++    }
++    return len;
++}
++
++static void cupc8_chr_accept_input(Chardev *chr)
++{
++    push_input();
++}
++
++static int64_t env_ms(const char *name, int64_t def)
++{
++    const char *v = getenv(name);
++    return (v && *v ? atoll(v) : def) * 1000;
++}
++
++/* chardevs are made before -icount is applied: check once the machine is up */
++static void check_icount(Notifier *n, void *data)
++{
++    if (!icount_enabled()) {
++        error_report("chardev: cupc8 needs -icount shift=N,sleep=off");
++        exit(1);
++    }
++}
++static Notifier icount_check = { .notify = check_icount };
++
++static void cupc8_chr_open(Chardev *chr, ChardevBackend *backend,
++                           bool *be_opened, Error **errp)
++{
++    CharCupc8 *c = CHARDEV_CUPC8(chr);
++    const char *path = backend->u.pipe.data->device;
++    g_autofree char *in = g_strdup_printf("%s.in", path);
++    g_autofree char *out = g_strdup_printf("%s.out", path);
++
++    if (ls.chr) {
++        error_setg(errp, "chardev: cupc8: only one");
++        return;
++    }
++    /* O_RDWR: a FIFO opens without waiting for the other end (as char-pipe) */
++    c->fd_in = qemu_open(in, O_RDWR, errp);
++    if (c->fd_in < 0) {
++        return;
++    }
++    c->fd_out = qemu_open(out, O_RDWR, errp);
++    if (c->fd_out < 0) {
++        close(c->fd_in);
++        return;
++    }
++    c->out = g_byte_array_new();
++    c->in = g_byte_array_new();
++    ls.xbytes = g_byte_array_new();
++    ls.settle_us = env_ms("CUPC8_LOCKSTEP_SETTLE_MS", 20);
++    ls.settle_max_us = env_ms("CUPC8_LOCKSTEP_SETTLE_MAX_MS", 2000);
++    ls.chr = c;
++    qemu_add_machine_init_done_notifier(&icount_check);
++    *be_opened = true;
++}
++
++static void cupc8_chr_parse(QemuOpts *opts, ChardevBackend *backend,
++                            Error **errp)
++{
++    const char *path = qemu_opt_get(opts, "path");
++    ChardevHostdev *dev;
++
++    if (path == NULL) {
++        error_setg(errp, "chardev: cupc8: no path given");
++        return;
++    }
++    backend->type = CHARDEV_BACKEND_KIND_PIPE;
++    dev = backend->u.pipe.data = g_new0(ChardevHostdev, 1);
++    qemu_chr_parse_common(opts, qapi_ChardevHostdev_base(dev));
++    dev->device = g_strdup(path);
++}
++
++static void char_cupc8_class_init(ObjectClass *oc, void *data)
++{
++    ChardevClass *cc = CHARDEV_CLASS(oc);
++
++    cc->parse = cupc8_chr_parse;
++    cc->open = cupc8_chr_open;
++    cc->chr_write = cupc8_chr_write;
++    cc->chr_accept_input = cupc8_chr_accept_input;
++}
++
++static const TypeInfo char_cupc8_type_info = {
++    .name = TYPE_CHARDEV_CUPC8,
++    .parent = TYPE_CHARDEV,
++    .instance_size = sizeof(CharCupc8),
++    .class_init = char_cupc8_class_init,
++};
++
++static void register_types(void)
++{
++    type_register_static(&char_cupc8_type_info);
++}
++
++type_init(register_types);
+diff --git i/system/meson.build w/system/meson.build
+index 4952f4b..c7ca550 100644
+--- i/system/meson.build
++++ w/system/meson.build
+@@ -11,6 +11,7 @@ system_ss.add(files(
+   'bootdevice.c',
+   'cpus.c',
+   'cpu-timers.c',
++  'cupc8-lockstep.c',
+   'datadir.c',
+   'dirtylimit.c',
+   'dma-helpers.c',
