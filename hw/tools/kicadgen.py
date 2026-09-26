@@ -1839,10 +1839,17 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, 
         raise RuntimeError("Freerouting wrote no session file")
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
+    # the router's own copper on those nets stays (removing it opened every
+    # connection it made: the main board's VBUS_F, pre-routed on In3); what
+    # the import dropped of the pre-routing goes back
     tracks = board.Tracks()
+    have = set()
     for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:
-        board.Remove(t)
+        via = t.Type() == pcbnew.PCB_VIA_T
+        have.add((via, t.GetStart().x, t.GetStart().y) + (() if via else (t.GetEnd().x, t.GetEnd().y, t.GetLayer())))
     for is_via, start, end, width, layer, net, drill in inner:
+        if (is_via, start.x, start.y) + (() if is_via else (end.x, end.y, layer)) in have:
+            continue
         if is_via:
             t = pcbnew.PCB_VIA(board)
             t.SetPosition(start)

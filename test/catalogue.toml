@@ -1400,6 +1400,15 @@ vrow = "4.2"
 cmd = "python3 test/hw/test_ledrow.py"
 
 [[test]]
+id = "ROUTE-001"
+title = "kicadgen.autoroute keeps the router's copper on a net pre-routed partly on an inner layer"
+checks = "a 4-layer test board, one net pre-routed as two vias and a locked In2 track, the pads joined to the vias by Freerouting: after the session import the net is one piece (KiCad connectivity) and the In2 track is still there"
+method = "test/hw/test_route_held.py: pcbnew and Freerouting on a 30 x 20 mm board"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_route_held.py"
+
+[[test]]
 id = "MECH-009"
 title = "3D models: each STEP where its WRL is"
 checks = "every imported model in hw/lib/jlc.3dshapes: the STEP's surface centroid within 0.2 mm of the WRL's and the same surface area (KiCad renders and check_models the WRL; its STEP export, which MECH-001..008 measure, swaps in the STEP)"
