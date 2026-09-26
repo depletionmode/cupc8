@@ -845,7 +845,7 @@ must_fail = ["FAIL: run"]
 
 [[bug]]
 name = "kernel BASIC: every typed line was appended - lines out of order ran out of order, a line typed again was kept twice, a line number alone was kept as an empty line"
-fixed_in = "the line editing commit (KRN-027)"
+fixed_in = "37a6c41"
 before = "44bbccb"
 files = ["kernel/term.s"]
 cmd = "tools/run_tests.sh testBasicEdit"
@@ -854,7 +854,7 @@ must_fail = ["FAIL: typed out of order, kept in order", "FAIL: replace, the same
 
 [[bug]]
 name = "kernel BASIC: LOAD took line numbers past 32767 (typing refuses them) - kept in order, 40000 went first, as -25536"
-fixed_in = "the line editing commit (KRN-027)"
+fixed_in = "be81d03"
 revert = [["kernel/ubasic.s", """	gt r1, #0x7f			; a line number is 1-32767, as typed
 	bzf .done
 """, ""]]
