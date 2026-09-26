@@ -1081,7 +1081,7 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # at most 30 + 60 + 90 passes. On 6 layers try 1 left 4 connections
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
-ROUTE_PARALLEL = 6                          # orderings routed at once per try (kicadgen route_parallel)
+ROUTE_PARALLEL = 8                          # orderings routed at once per try (kicadgen route_parallel)
 
 
 def fine_nets():
