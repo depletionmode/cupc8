@@ -30,8 +30,8 @@ the drivers and the API.
   the console says which BASIC started when it is the card's). After a
   native program ends the kernel reloads the same BASIC it started with.
 - **Native programs:** `exec` / `cupc8.py run` load a native program over
-  BASIC at $7000; when it returns, the kernel reloads BASIC from ROM (a copy
-  of ~7 KB, a few milliseconds) and BASIC finds the program text at $c000
+  BASIC at $7000; when it returns, the kernel reloads the BASIC it started
+  with, the card's or the ROM's (~7 KB, a few milliseconds from ROM) and BASIC finds the program text at $c000
   unchanged, **unless the native program used $c000 and up** (programs over
   20 KB), which `memory-map.md` already warns of. BASIC checks a signature
   and a length at $c000 and starts empty if they are not right.
