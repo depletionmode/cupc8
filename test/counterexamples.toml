@@ -878,7 +878,8 @@ before = "44bbccb"
 # the lockstep kept, the guest's clock from the host again (adaptive icount, idle in real time)
 revert = [["test/emu/machinenative.mjs", "'-icount', 'shift=3,sleep=off'", "'-icount', 'shift=auto,sleep=on'"]]
 cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
-must_fail = ["DIFFERENT"]
+# (on the host's clock the guest now also misses its task watchdog: the join fails)
+must_fail = ["wifi_lockstep: FAIL"]
 
 [[bug]]
 name = "Espressif QEMU: the ESP32-C3's random number register was rand() seeded from time(NULL), so the Wi-Fi card's DHCP transaction IDs and TCP sequence numbers changed run to run"

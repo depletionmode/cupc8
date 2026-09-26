@@ -71,10 +71,16 @@ async function run(threaded) {
   const t = Date.now();
   m.powerOn();
   const steps = [];
+  let failed = false;
   const waitFor = async (want, ns) => {
+    if (failed) return;   // a step not seen: the rest cannot follow, and waiting for them takes long
     const ok = await m.runUntil(() => screenText(m).includes(want), ns, 100e6);
     steps.push(`${want}: ${ok ? m.ns : 'not seen'}`);
-    if (!ok) bad++;
+    if (!ok) {
+      console.log(`FAIL: '${want}' not seen`);
+      failed = true;
+      bad++;
+    }
   };
   await waitFor('>>', 6e9);
   m.type('net join cupc8 password\n');
