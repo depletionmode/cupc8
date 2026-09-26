@@ -65,6 +65,8 @@ class Card {
  public:
   std::string kind;
   int slot = 0;
+  bool logging = false;
+  std::vector<SpiFrame> log;  // every slot SPI frame, when logging
   virtual ~Card() = default;
   virtual void advance(double) {}
   virtual void drive(uint32_t sck, uint32_t mosi, bool selected) = 0;
@@ -96,8 +98,6 @@ class TmdsCapture : public rp2040js::harness::TmdsCapture {
 class Rp2040Card : public Card {
  public:
   Emu e;
-  bool logging = false;
-  std::vector<SpiFrame> log;
   std::unique_ptr<rp2040js::harness::SdSocket> sd;  // the storage card's microSD socket (SPI1)
 
   Rp2040Card(const std::string &kind, const std::string &elf, double mhz);
@@ -124,27 +124,34 @@ class Rp2040Card : public Card {
   bool pinSck = false, pinMosi = false, pinNcs = true;
 };
 
-// the Wi-Fi card in QEMU: tx/rx are the pipes to its UART1 (machine.mjs EspCard)
+// The Wi-Fi card: its firmware in QEMU, in step with the machine (machine.cpp,
+// "EspCard"). tx/rx are the FIFOs of QEMU's `-chardev cupc8`, its UART1.
 class EspCard : public Card {
  public:
+  static constexpr double GRANT_NS = 100e3;  // QEMU may run up to the board's time, in steps of this
   EspCard(int tx, int rx);
   ~EspCard() override;
   // CUPC8_ESP_TRACE=FILE: every exchange with QEMU, with the board's time
+  // and QEMU's
   std::function<double()> now;
+  void advance(double ns) override;
   void drive(uint32_t sck, uint32_t mosi, bool selected) override;
   uint32_t miso() override;
   bool irq() override { return false; }
+  int64_t guestNs = 0;  // QEMU's clock when it last answered
 
  private:
   int tx, rx;
   FILE *trace = nullptr;
-  void traceBytes(const char *dir, const uint8_t *b, size_t n);
+  double granted = 0;
+  double start = 0;
   bool selected = false;
   std::vector<uint8_t> bits, mosi_;
   size_t bit = 0;
   uint32_t lastSck = 0;
-  void read(uint8_t *b, size_t n);
-  void write(const std::vector<uint8_t> &b);
+  std::vector<uint8_t> exchange(uint32_t k, const std::vector<uint8_t> &send);
+  void readAll(uint8_t *b, size_t n);
+  void writeAll(const std::vector<uint8_t> &b);
 };
 
 struct BridgePins {

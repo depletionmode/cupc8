@@ -370,11 +370,13 @@ ENTRY(js_cards, {
   napi_value arr;
   napi_create_array(env, &arr);
   uint32_t i = 0;
-  auto add = [&](int slot, const std::string &kind, machine::Emu *e, const machine::Rp2040Card *rc = nullptr) {
+  auto add = [&](int slot, const std::string &kind, machine::Emu *e, const machine::Rp2040Card *rc = nullptr,
+                 const machine::EspCard *esp = nullptr) {
     napi_value o;
     napi_create_object(env, &o);
     set(env, o, "slot", num(env, slot));
     set(env, o, "kind", jsstr(env, kind));
+    if (esp) set(env, o, "ns", num(env, static_cast<double>(esp->guestNs)));  // QEMU's clock at its last answer
     if (rc) {
       set(env, o, "csRises", num(env, static_cast<double>(rc->csRises)));
       set(env, o, "csEdges", num(env, static_cast<double>(rc->csEdges)));
@@ -393,7 +395,8 @@ ENTRY(js_cards, {
     napi_set_element(env, arr, i++, o);
   };
   if (m->sysctl) add(0, "sysctl", &m->sysctl->e);
-  for (auto &[slot, c] : m->cards) add(slot, c->kind, c->emu(), dynamic_cast<const machine::Rp2040Card *>(c.get()));
+  for (auto &[slot, c] : m->cards) add(slot, c->kind, c->emu(), dynamic_cast<const machine::Rp2040Card *>(c.get()),
+                                       dynamic_cast<const machine::EspCard *>(c.get()));
   return arr;
 })
 
@@ -403,10 +406,9 @@ ENTRY(js_spiLog, {
   napi_value arr;
   napi_create_array(env, &arr);
   for (auto &[s, c] : m->cards) {
-    if (s != slot || !c->emu()) continue;
-    auto *rc = static_cast<machine::Rp2040Card *>(c.get());
+    if (s != slot) continue;
     uint32_t i = 0;
-    for (auto &f : rc->log) {
+    for (auto &f : c->log) {
       napi_value o, bytes, miso;
       napi_create_object(env, &o);
       set(env, o, "start", num(env, f.start));

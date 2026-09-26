@@ -25,7 +25,6 @@ import path from 'node:path';
 import { kernelRom, ROOT } from './romimage.mjs';
 
 const native = createRequire(import.meta.url)(path.join(ROOT, 'build/emu-machine/machine.node'));
-const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
 
 // QEMU user networking's port forwards: 'tcp:8080:80' makes the PC's
 // 127.0.0.1:8080 reach the card's port 80 (hostfwd)
@@ -37,19 +36,26 @@ function hostfwd(forward) {
   }).join('');
 }
 
-// The Wi-Fi card's QEMU, started exactly as machine.mjs's EspCard does; the
-// native EspCard speaks the same $A6/$A5 protocol over these pipes.
-function startEsp(image, forward = []) {
+// The Wi-Fi card's QEMU (tools/qemu_build.sh: Espressif's, with the cupc8
+// chardev), in step with the machine: icount (one instruction 8 ns, and an
+// idle guest's clock jumps to its next timer), the guest's random numbers
+// from a fixed seed, and UART1 the cupc8 chardev, whose FIFOs the native
+// EspCard drives (emu/machine/README.md, "The Wi-Fi card").
+// pcap: a file for the guest's network traffic (QEMU's filter-dump; guest
+// times, plus a whole-seconds offset of the wall clock at start).
+function startEsp(image, forward = [], pcap = null) {
+  const qemu = path.join(ROOT, 'build/qemu-esp/bin/qemu-system-riscv32');
+  if (!fs.existsSync(qemu)) throw new Error(`machinenative: no ${qemu}: run tools/qemu_build.sh`);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-esp-'));
   const fifo = path.join(dir, 'uart1');
   execFileSync('mkfifo', [fifo + '.in', fifo + '.out']);
   const flash = path.join(dir, 'flash.bin');
   fs.copyFileSync(image, flash);
-  const qemu = fs.readdirSync(path.join(SDK, 'espressif/tools/qemu-riscv32'))
-    .map((v) => path.join(SDK, 'espressif/tools/qemu-riscv32', v, 'qemu/bin/qemu-system-riscv32'))[0];
   const proc = spawn(qemu, ['-nographic', '-machine', 'esp32c3', '-monitor', 'none',
-    '-drive', `file=${flash},if=mtd,format=raw`, '-nic', 'user,model=open_eth' + hostfwd(forward),
-    '-serial', 'file:' + path.join(dir, 'uart0.log'), '-chardev', `pipe,id=frames,path=${fifo}`,
+    '-icount', 'shift=3,sleep=off', '-seed', '1',
+    '-drive', `file=${flash},if=mtd,format=raw`, '-nic', 'user,id=net0,model=open_eth' + hostfwd(forward),
+    ...(pcap ? ['-object', `filter-dump,id=dump,netdev=net0,file=${pcap}`] : []),
+    '-serial', 'file:' + path.join(dir, 'uart0.log'), '-chardev', `cupc8,id=frames,path=${fifo}`,
     '-serial', 'chardev:frames'], { stdio: 'ignore' });
   const tx = fs.openSync(fifo + '.in', 'w');
   const rx = fs.openSync(fifo + '.out', 'r');
@@ -111,16 +117,17 @@ class Console {
 }
 
 export class Machine {
-  // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53']
+  // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53'];
+  // pcap: a file for the Wi-Fi card's network traffic
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false,
-    threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [] } = {}) {
+    threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
     const wifi = Object.entries(slots).filter(([, k]) => k === 'wifi');
     if (wifi.length > 1) throw new Error('machinenative: one Wi-Fi card at most');
     if (forward.length && !wifi.length) throw new Error('machinenative: forward needs a Wi-Fi card');
     hostfwd(forward);                    // a bad entry throws before QEMU starts
-    if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward);
+    if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward, pcap);
     m.h = native.create({ slots, rom: m.rom, sysctl, root: ROOT, threaded, spiLog,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
