@@ -504,7 +504,7 @@ the eFuse's VBUS_F and 5V_SYS in FinePower (0.5 mm track, Fine's
 clearance between the QFN's pins). Each routing try runs 16 differently
 ordered Freerouting runs at once and keeps the lowest-ordered one that
 completes (kicadgen `route_parallel`); tries are capped at 30 passes, then
-60, then 90 (`ROUTE_PASSES`, `ROUTE_TRIES`), each run at 90 minutes of wall
+60, then 90 (`ROUTE_PASSES`, `ROUTE_TRIES`), each run at 3 hours of wall
 time (`ROUTE_TIMEOUT`) and a 1 GB Java heap (`ROUTE_HEAP`; uncapped, each
 JVM reserved a quarter of the RAM). The eFuse's IN/OUT escapes, EN's stub,
 and the VBUS_F/5V_SYS connections the router kept leaving open are locked
