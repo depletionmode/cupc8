@@ -574,7 +574,8 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
 - **LEDs:** PWR (3V3, top-left corner as on every board), rails 5V, 3V3, 1V2
   (the 1V2 one through an NPN), CDONE (through an NPN, 100 kΩ base so CDONE
   still reads high), and GPO bits 0–7 (the POST code) down the east edge,
-  where the cards do not hide them. All red 0603 (C2286), labelled on silk.
+  where the cards do not hide them: one column, 2.6 mm apart, each label
+  east of its LED (`LABEL_SIDE`). All red 0603 (C2286), labelled on silk.
 - **Headers and pads:** J4, 2 × 5 AUX SPI (SPI dev 6: 1 +3V3, 3 SCK,
   5 MOSI, 7 MISO, 8 AUX_CS_n, 9 +5V, even pins GND). Test pads on every rail,
   the clock, the resets, both flash buses, the bridge, the slot SPI, I2C, the
