@@ -2,10 +2,11 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013|E2E-014] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013|E2E-014|E2E-015|E2E-016|E2E-020] [--record]
 //
 // E2E-007 (files on the storage card's microSD), E2E-008 (the e-ink card),
-// E2E-010..012 (programs at $7000) and E2E-013..014 (networking) need
+// E2E-010..012 (programs at $7000), E2E-013..014 (networking) and
+// E2E-015..016 (BASIC graphics on the HDMI picture and the e-ink glass) need
 // CUPC8_EMU=native: the SD card, panel and Wi-Fi models are only in the
 // native emulator.
 //
@@ -667,6 +668,97 @@ async function e2e014() {
   m.stop();
 }
 
+// ------------------------------------------------------------------ E2E-015
+// BASIC's graphics statements (doc/proposals/basic-graphics.md) on the HDMI
+// card: a program draws in GFX mode (mode, cls, box filled and outlined,
+// line, plot, palette) and the card's picture, decoded from its TMDS
+// output, has the colours at the places drawn (each GFX pixel is 2 x 2).
+// The ended program keeps the picture until a key; then TEXT and DONE.
+async function e2e015() {
+  log('E2E-015: a BASIC program draws in GFX mode; the HDMI picture, decoded');
+  if (!expect(backend === 'native', 'E2E-015 needs the native emulator (CUPC8_EMU=native)')) return;
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' } });
+  m.powerOn();
+  expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
+  const prog = ['10 mode 1', '20 cls 1', '30 box 20, 20, 60, 40, 196, 1', '40 line 0, 120, 319, 120, 15',
+    '50 plot 160, 200, 226', '60 box 200, 150, 50, 30, 46', '70 palette 100, 0, 0, 255',
+    '80 box 250, 20, 20, 20, 100, 1'];
+  for (const l of prog) {
+    m.type(l + '\n');
+    await m.runAsync(150e6);
+  }
+  m.type('run\n');
+  // [x, y, [r, g, b], what]: the default palette's VGA blue 1, the cube's
+  // red 196, yellow 226 and green 46, white 15; entry 100 set to blue
+  const want = [[5, 5, [0, 0, 170], 'cls 1: VGA blue'], [50, 40, [255, 0, 0], 'the filled box: red 196'],
+    [20, 20, [255, 0, 0], 'the filled box\'s corner'], [79, 59, [255, 0, 0], 'its far corner'],
+    [80, 60, [0, 0, 170], 'just past it: the background'], [0, 120, [255, 255, 255], 'the line: white 15'],
+    [319, 120, [255, 255, 255], 'its far end'], [160, 200, [255, 255, 0], 'plot: yellow 226'],
+    [200, 150, [0, 255, 0], 'the outline: green 46'], [249, 179, [0, 255, 0], 'its far corner'],
+    [225, 165, [0, 0, 170], 'inside the outline: the background'], [260, 30, [0, 0, 255], 'palette 100 set to blue']];
+  const near = (v, w) => Math.abs(v - w) <= 12;
+  let f = null;
+  let bad = [];
+  const check = () => {
+    f = m.frame();
+    if (f.error) return false;
+    bad = [];
+    for (const [x, y, rgb, what] of want) {
+      for (const [dx, dy] of [[0, 0], [1, 1]]) {
+        const p = f.rgb[(2 * y + dy) * 640 + 2 * x + dx];
+        const got = [(p >> 16) & 0xff, (p >> 8) & 0xff, p & 0xff];
+        if (!got.every((v, i) => near(v, rgb[i]))) bad.push(`${what} (${x}, ${y}): ${got} not ${rgb}`);
+      }
+    }
+    return bad.length === 0;
+  };
+  if (!expect(await m.runUntil(check, 20e9, 200e6), 'the picture has the colours drawn')) {
+    console.log(f?.error ?? bad.join('\n'));
+  }
+  expect(!screenText(m).includes('DONE.'), 'the program waits for a key with its picture up');
+  m.type(' ');
+  if (!expect(await waitFor(m, 'DONE.', 3e9), 'a key: TEXT again, and DONE.')) console.log('---- screen\n' + screenText(m));
+  m.type('new\n10 print 6*7\nrun\n');
+  expect(await waitFor(m, '42', 3e9), 'the terminal works on');
+  m.stop();
+}
+
+// ------------------------------------------------------------------ E2E-016
+// The e-ink card's native mode 2 from BASIC: mode 2, boxes in greys 0, 1
+// and 2 on white, a line, an outline, then refresh (greyscale in mode 2).
+// Once the UC8179 model has finished the refresh, its glass has the four
+// greys at the places drawn. A key brings TEXT back on the panel.
+async function e2e016() {
+  log('E2E-016: a BASIC program draws in the e-ink card\'s mode 2; the four greys on the glass');
+  if (!expect(backend === 'native', 'E2E-016 needs the native emulator (CUPC8_EMU=native)')) return;
+  const m = await Machine.create({ slots: { 1: 'eink', 2: 'io' } });
+  m.powerOn();
+  const on = (text, ns) => m.runUntil(() => panelText(m).includes(text), ns, 50e6);
+  expect(await on('>>', 10e9), 'the BASIC prompt appears on the panel');
+  const prog = ['10 mode 2', '20 cls', '30 box 20, 20, 100, 60, 0, 1', '40 box 140, 20, 100, 60, 1, 1',
+    '50 box 260, 20, 100, 60, 2, 1', '60 line 0, 300, 647, 300, 0', '70 box 400, 200, 50, 50, 1', '80 refresh'];
+  for (const l of prog) {
+    m.type(l + '\n');
+    await m.runAsync(150e6);
+  }
+  const g0 = m.panel().refreshes[2];
+  m.type('run\n');
+  expect(await m.runUntil(() => m.panel().refreshes[2] > g0 && m.panel().busy === 0, 20e9, 50e6),
+    'refresh: a greyscale refresh of the panel');
+  const p = m.panel();
+  const at = (x, y) => p.grey[y * p.w + x];
+  const want = [[70, 50, 0, 'grey 0: black'], [190, 50, 85, 'grey 1: dark grey'], [310, 50, 170, 'grey 2: light grey'],
+    [500, 400, 255, 'cls: white'], [0, 300, 0, 'the line\'s start'], [647, 300, 0, 'its end, at the panel\'s edge'],
+    [400, 200, 85, 'the outline in grey 1'], [449, 249, 85, 'its far corner'], [425, 225, 255, 'inside it: white'],
+    [20, 20, 0, 'the black box\'s corner'], [119, 79, 0, 'its far corner'], [120, 80, 255, 'just past it']];
+  const bad = want.filter(([x, y, v]) => Math.abs(at(x, y) - v) > 8).map(([x, y, v, what]) => `${what} (${x}, ${y}): ${at(x, y)} not ${v}`);
+  if (!expect(bad.length === 0, 'the four greys on the glass where drawn')) console.log(bad.join('\n'));
+  expect(p.errors === 0, `the panel model saw nothing the chip would ignore (${p.errors}: ${p.error})`);
+  m.type(' ');
+  if (!expect(await on('DONE.', 20e9), 'a key: TEXT again on the panel, and DONE.')) console.log(panelText(m));
+  m.stop();
+}
+
 // ------------------------------------------------------------------ E2E-020
 // The USB console (doc/proposals/usb-console.md) on the real system card
 // firmware and the real kernel: the banner and a command's output read from
@@ -753,8 +845,9 @@ async function e2e020() {
 
 const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009,
   'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012, 'E2E-013': e2e013,
-  'E2E-014': e2e014, 'E2E-020': e2e020 };
-const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013', 'E2E-014', 'E2E-020'];
+  'E2E-014': e2e014, 'E2E-015': e2e015, 'E2E-016': e2e016, 'E2E-020': e2e020 };
+const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013', 'E2E-014', 'E2E-015', 'E2E-016',
+  'E2E-020'];
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !nativeOnly.includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
