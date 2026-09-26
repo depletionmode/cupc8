@@ -716,7 +716,7 @@ must_fail = ["FAIL EN/UVLO on its own net (PWR_EN)", "/PWR_EN track within 0.1 m
 
 [[bug]]
 name = "kicadgen: autoroute dropped the router's copper on a net pre-routed on an inner layer (the main board's VBUS_F came back open)"
-fixed_in = "HEAD"
+fixed_in = "036e0ad"
 revert = [["hw/tools/kicadgen.py", "    for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:\n        via = t.Type() == pcbnew.PCB_VIA_T", "    for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:\n        board.Remove(t)\n        continue\n        via = t.Type() == pcbnew.PCB_VIA_T"]]
 cmd = "python3 test/hw/test_route_held.py"
 must_fail = ["FAIL the held net is one piece after routing"]
