@@ -1049,6 +1049,7 @@ when isMainModule:
   var doTrace = false
   var wantDisplay = true
   var dumpFb = ""
+  var dumpWindow = ""
   # the Milestone 1 machine (the default; --legacy for the old I/O model)
   var legacy = defined(emscripten)
   var cardList = "hdmi,io"
@@ -1092,7 +1093,7 @@ reaches the real network and localhost directly.
   --legacy          the old I/O model (ILI9340 display, SD on SPI 1, keyboard on
                     SPI 2); kernel.o (or stdin) is loaded at $1000 and run
 Both:
-  --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --trace  --log-mask:N"""
+  --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --dump-window:PATH (the window, LEDs included; not headless)  --trace  --log-mask:N"""
 
   proc unescapeTyped(t: string): string =
     ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash.
@@ -1130,6 +1131,8 @@ Both:
         scaleSet = true
       of "dump-fb":
         dumpFb = val
+      of "dump-window":
+        dumpWindow = val
       of "legacy":
         legacy = true
       of "cards":
@@ -1303,6 +1306,8 @@ Both:
   else:
     cpuLoadFile(binPath)
 
+  if not legacy:
+    display_leds = 0                  # the M1 machine: the GPO LED strip under the picture
   if wantDisplay:
     if not display_init():
       stderr.writeLine("display init failed: " & display_init_error)
@@ -1452,6 +1457,7 @@ Both:
         if now - lastPresent >= 0.016:
           pumpInput()
           gpuPresent()
+          display_leds = mem[0xf000] and 0xff
           display_render()
           lastPresent = now
         if now - lastMhz >= 1.0:
@@ -1473,6 +1479,11 @@ Both:
       gpuPresent()
       display_dumpPpm(dumpFb)
       note("wrote framebuffer " & dumpFb)
+    if dumpWindow.len > 0:
+      gpuPresent()
+      display_leds = mem[0xf000] and 0xff
+      display_dumpWindow(dumpWindow)
+      note("wrote window " & dumpWindow)
     if not headless and maxIns == 0 and not atend:
       while not atend:                # halted: keep the window up until it is closed
         pumpInput()

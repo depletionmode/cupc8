@@ -241,6 +241,20 @@ def main():
     check("interactive: a WAI-heavy guest keeps its 12 MHz clock (last %s)" % (mhz[-3:],),
           len(mhz) >= 3 and all(11 <= x <= 13 for x in mhz[-3:]), out[-400:])
 
+    # the window's GPO LED strip: D8..D1 under the picture, lit from $f000
+    win = os.path.join(work, "win.ppm")
+    env = dict(os.environ, SDL_VIDEODRIVER="offscreen", SDL_AUDIODRIVER="dummy")
+    subprocess.run([SIM, "--cards:hdmi,io", "--type:10 poke 240,0,165\\nrun\\n", "--max-ins:20000000",
+                    "--dump-window:" + win], capture_output=True, text=True, timeout=120, env=env)
+    lights = ""
+    if os.path.exists(win):
+        d = open(win, "rb").read()
+        parts = d.split(b"\n", 3)
+        w, h = map(int, parts[1].split())
+        y, x0 = h - 14, (w - (8 * 14 + 7 * 12)) // 2
+        lights = "".join("1" if parts[3][(y * w + x0 + i * 26 + 7) * 3] > 200 else "0" for i in range(8))
+    check("the window's LED strip shows GPO $A5 as 10100101 (%s)" % lights, lights == "10100101")
+
     # the old I/O model
     obj = os.path.join(work, "gpo.o")
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "as.py"),
