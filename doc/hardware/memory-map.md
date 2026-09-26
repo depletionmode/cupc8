@@ -234,7 +234,7 @@ anywhere does.
 
 The kernel copies BASIC from ROM banks 16 (the header) and 17 on, a
 256-byte page at a time through the banked window, with the ROM windows on
-and interrupts off for the copy (about 70 ms for 6.5 KB); it checks the
+and interrupts off for the copy (about 100 ms for 6.5 KB, most of it the sum); it checks the
 header (its sum, "CUP8" version 1, flags 0, load and entry $7000, the
 length) and the body's sum, and starts no BASIC if either is wrong. A ROM
 with no BASIC (`mkrom.py` without `--basic`) boots to the terminal alone:
