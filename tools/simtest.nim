@@ -3798,6 +3798,11 @@ proc testKernelNoBasic() =
   data = readFile(good)
   data[0x8900] = char(ord(data[0x8900]) xor 1)   # a body byte
   writeFile(romDir() / "sumbasic.rom", data)
+  let withBasic = bootStorageTimed(good, "", fitted = false)
+  let without = bootStorageTimed(none, "", fitted = false)
+  echo "  at the prompt ", withBasic, " ms after reset with the ROM's BASIC, ", without, " with none"
+  expectTrue("copying the ROM's BASIC takes under 50 ms (" & $(withBasic - without) & ")",
+             withBasic - without < 50)
   for (what, rom) in [("no BASIC", none), ("a bad BASIC header", romDir() / "badbasic.rom"),
                       ("a BASIC body with a bad sum", romDir() / "sumbasic.rom")]:
     bootBasic(rom)

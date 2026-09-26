@@ -25,9 +25,10 @@ before = "f811788"
 # calls routines they lack), so the whole kernel as it was goes back, and
 # the .s files added since go. (Since 2026-09-26 BASIC is basic/, a program
 # the ROM carries: that old kernel has its own BASIC and never loads it;
-# kernel/api.inc stays, for basic/build.sh.)
+# kernel/api.inc stays, for basic/build.sh; today's kernel/assemble.sh, which
+# builds in the test's own directory, replaces that time's.)
 files = ["kernel"]
-cmd = "rm -f kernel/api.s kernel/bank.s kernel/console.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
+cmd = "git checkout HEAD -- kernel/assemble.sh && rm -f kernel/api.s kernel/bank.s kernel/console.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
 must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/next", "FAIL: BASIC if/then/else",
              "FAIL: BASIC goto loop", "FAIL: BASIC gosub", "FAIL: BASIC nested for", "FAIL: BASIC parentheses",
              "FAIL: BASIC equals", "FAIL: BASIC zero", "FAIL: BASIC rem", "FAIL: BASIC mod, divide by 0",
