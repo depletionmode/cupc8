@@ -363,28 +363,6 @@ print_ascii_char_inverse:
 	pop pcl
 	pop pch
 
-clr_screen:
-	ld r0, [gpu_spi]
-	eq r0, #0xff
-	bzf .none
-	push pch
-	push pcl
-	b gpu_cs_on
-	mov r0, #0x02			; CLS
-	push pch
-	push pcl
-	b gpu_send
-	mov r0, #0x07			; light grey on black
-	push pch
-	push pcl
-	b gpu_send
-	push pch
-	push pcl
-	b gpu_cs_off
-.none:
-	pop pcl
-	pop pch
-
 ; FILL_RECT with the old stack ABI - callers push colour, h, w, y, x
 gpu_fill_rect:
 	pop r0

@@ -1,9 +1,10 @@
 ; https://github.com/adamdunkels/ubasic
 ;
 ; CUPC/8 BASIC (doc/CUPC8 Manual.md; doc/proposals/basic-graphics.md): uBASIC
-; with 16-bit signed numbers (-32768..32767, wrapping; kernel/math.s), line
-; numbers 1-32767, one-letter variables a-z, and graphics statements through
-; the kernel API. The program is text in $c000-$dfff (kernel/term.s).
+; with 16-bit signed numbers (-32768..32767, wrapping; basic/n16.s,
+; kernel/math.s), line numbers 1-32767, one-letter variables a-z, and
+; graphics statements through the kernel API. The program is text in
+; $c000-$dfff (basic/basic.s).
 ;
 ; A number in registers is r0 = its low byte, r1 = its high byte; a pointer
 ; into the program is r0 = high, r1 = low (ubasic_tokenizer_goto's).
@@ -536,7 +537,7 @@ ubasic_print_statement:
 	mov r0, #32
 	push pch
 	push pcl
-	b print_ascii_char
+	b API_PUTC
 	push pch
 	push pcl
 	b ubasic_tokenizer_next
@@ -571,7 +572,7 @@ ubasic_print_statement:
 	mov r0, #10
 	push pch
 	push pcl
-	b print_ascii_char
+	b API_PUTC
 	push pch
 	push pcl
 	b ubasic_end_of_statement
@@ -1238,7 +1239,7 @@ ub_mode_statement:
 	push r0
 	push pch
 	push pcl
-	b api_gfx_mode
+	b API_GFX_MODE
 	pop r1
 	eq r0, #0
 	bzf .set
@@ -1267,16 +1268,16 @@ ub_cls_statement:
 	eq r0, #2
 	bzf .white
 	mov r0, #0x07
-	b api_cls
+	b API_CLS
 .black:
 	xor r0, r0
-	b api_cls
+	b API_CLS
 .white:
 	mov r0, #3
-	b api_cls
+	b API_CLS
 .given:
 	ld r0, [ub_argv]
-	b api_cls
+	b API_CLS
 
 ; color fg [, bg]: the TEXT attribute (16 colours each; bg 0 if not given)
 ub_color_statement:
@@ -1297,7 +1298,7 @@ ub_color_statement:
 	ld r1, [ub_argv]
 	and r1, #15
 	or r0, r1
-	b api_attr
+	b API_ATTR
 
 ; plot x, y, c
 ub_plot_statement:
@@ -1326,7 +1327,7 @@ ub_plot_statement:
 	push pch
 	push pcl
 	b ub_arg8
-	b api_gfx_pixel
+	b API_GFX_PIXEL
 .native:
 	mov r0, #1
 	mov r1, #2
@@ -1338,7 +1339,7 @@ ub_plot_statement:
 	push pch
 	push pcl
 	b ub_arg8
-	b api_gfx2_pixel
+	b API_GFX2_PIXEL
 
 ; line x0, y0, x1, y1, c
 ub_line_statement:
@@ -1365,12 +1366,12 @@ ub_line_statement:
 	push pch
 	push pcl
 	b ub_arg8
-	b api_gfx_line
+	b API_GFX_LINE
 .native:
 	push pch
 	push pcl
 	b ub_args16_4
-	b api_gfx2_line
+	b API_GFX2_LINE
 
 ; box x, y, w, h, c [, f]: an outline, or filled when f is given and not 0
 ub_box_statement:
@@ -1403,9 +1404,9 @@ ub_box_statement:
 	push pcl
 	b ub_filled
 	bzf .fill
-	b api_gfx_rect
+	b API_GFX_RECT
 .fill:
-	b api_gfx_fill_rect
+	b API_GFX_FILL_RECT
 .native:
 	push pch
 	push pcl
@@ -1414,9 +1415,9 @@ ub_box_statement:
 	push pcl
 	b ub_filled
 	bzf .fill2
-	b api_gfx2_rect
+	b API_GFX2_RECT
 .fill2:
-	b api_gfx2_fill_rect
+	b API_GFX2_FILL_RECT
 
 ; Z set when box's sixth argument is there and not 0
 ub_filled:
@@ -1479,7 +1480,7 @@ ub_palette_statement:
 	bzf .set
 	b ub_syntax
 .reset:
-	b api_gfx_palette_reset
+	b API_GFX_PALETTE_RESET
 .set:
 	mov r0, #3
 .arg:
@@ -1494,7 +1495,7 @@ ub_palette_statement:
 	sub r0, #1
 	b .arg
 .send:
-	b api_gfx_palette
+	b API_GFX_PALETTE
 
 ; refresh [m]: the e-ink panel now, m as REFRESH (3 greyscale in mode 2,
 ; else 0 partial); nothing on HDMI
@@ -1512,13 +1513,13 @@ ub_refresh_statement:
 	eq r0, #2
 	bzf .grey
 	xor r0, r0
-	b api_eink_refresh
+	b API_EINK_REFRESH
 .grey:
 	mov r0, #3
-	b api_eink_refresh
+	b API_EINK_REFRESH
 .given:
 	ld r0, [ub_argv]
-	b api_eink_refresh
+	b API_EINK_REFRESH
 
 ; after a run: a program that left a graphics mode keeps its picture until
 ; a key, then TEXT comes back (cleared; a fatal error's message again)
@@ -1528,12 +1529,12 @@ ubasic_gfx_done:
 	bzf .done
 	push pch
 	push pcl
-	b keyb_read_char
+	b API_GETKEY
 	xor r0, r0
 	st [ub_mode], r0
 	push pch
 	push pcl
-	b api_gfx_mode
+	b API_GFX_MODE
 	ld r0, [ub_failed]
 	eq r0, #0
 	bzf .done
@@ -1867,30 +1868,27 @@ ubasic_index_find:
 	pop pch
 
 ; ------------------------------------------------------------ files on the storage card
-; SAVE "NAME", LOAD "NAME", DIR, DEL "NAME" (kernel/storage.s). A program is
-; saved as text, a CR LF after each line, so a PC can read and edit it.
+; SAVE "NAME", LOAD "NAME" (the kernel API's storage group; DIR and DEL are
+; the terminal's). A program is saved as text, a CR LF after each line, so a
+; PC can read and edit it. Handle 0.
 
 ub_ni: resb 1
-ub_si: resb 2				; SAVE: the next program byte ($c000 on)
+ub_si: resb 2				; SAVE: the next program byte (from $c004)
 ub_li: resb 1
 ub_ri: resb 1
 ub_full: resb 1
-ub_num: resb 4
-ub_rem: resb 1
-ub_bit: resb 1
-ub_carry: resb 1
-ub_dig: resb 1
-ub_digs: resb 12
+ub_n: resb 1				; bytes in ub_buf
+ub_buf: resb 128
 
 ub_s_saved db "\nSAVED\n"
 ub_s_loaded db "\nLOADED\n"
 ub_s_usage db "\nSAVE, LOAD or DEL \"NAME\"\n"
 
-; the name after the command word, quoted or not, into st_name; r0 = its length
+; the name after the command word, quoted or not, into ub_name; r0 = its length
 ub_get_name:
 	xor r1, r1
 .skip_word:
-	ld r0, [term_line_buf]+r1
+	ld r0, [bas_line]+r1
 	gt r0, #32
 	bzf .in_word
 	b .skip_space
@@ -1898,7 +1896,7 @@ ub_get_name:
 	add r1, #1
 	b .skip_word
 .skip_space:
-	ld r0, [term_line_buf]+r1
+	ld r0, [bas_line]+r1
 	eq r0, #32
 	bzf .space
 	eq r0, #34				; an opening quote
@@ -1913,7 +1911,7 @@ ub_get_name:
 	xor r0, r0
 	st [ub_ni], r0
 .loop:
-	ld r0, [term_line_buf]+r1
+	ld r0, [bas_line]+r1
 	gt r0, #32				; ends at a space, the CR or the terminator
 	bzf .char
 	b .end
@@ -1924,7 +1922,7 @@ ub_get_name:
 	ld r1, [ub_ni]
 	eq r1, #13				; longer than 8.3 - the card refuses 13
 	bzf .next
-	st [st_name]+r1, r0
+	st [ub_name]+r1, r0
 	add r1, #1
 	st [ub_ni], r1
 .next:
@@ -1934,10 +1932,49 @@ ub_get_name:
 .end:
 	ld r1, [ub_ni]
 	xor r0, r0
-	st [st_name]+r1, r0
+	st [ub_name]+r1, r0
 	ld r0, [ub_ni]
 	pop pcl
 	pop pch
+
+; open ub_name as handle 0, mode r1 (0 read, 1 write)
+ub_open:
+	mov r0, #<[ub_name]
+	st API_ARGS, r0
+	mov r0, #>[ub_name]
+	st $6f01, r0
+	xor r0, r0
+	b API_ST_OPEN
+
+; the ub_n bytes of ub_buf to handle 0
+ub_write:
+	mov r0, #<[ub_buf]
+	st API_ARGS, r0
+	mov r0, #>[ub_buf]
+	st $6f01, r0
+	ld r1, [ub_n]
+	xor r0, r0
+	b API_ST_WRITE
+
+; up to 128 bytes of handle 0 into ub_buf, ub_n = how many
+ub_read:
+	mov r0, #<[ub_buf]
+	st API_ARGS, r0
+	mov r0, #>[ub_buf]
+	st $6f01, r0
+	mov r1, #128
+	xor r0, r0
+	push pch
+	push pcl
+	b API_ST_READ
+	st [ub_n], r1
+	pop pcl
+	pop pch
+
+; close handle 0
+ub_close:
+	xor r0, r0
+	b API_ST_CLOSE
 
 ub_cmd_save:
 	push pch
@@ -1945,59 +1982,57 @@ ub_cmd_save:
 	b ub_get_name
 	eq r0, #0
 	bzf .usage
-	xor r0, r0
-	st [st_h], r0
-	mov r0, #1
-	st [st_mode], r0
+	mov r1, #1
 	push pch
 	push pcl
-	b st_open
+	b ub_open
 	eq r0, #0
 	bzf .opened
 	b .error
 .opened:
 	xor r0, r0
-	st [st_n], r0
-	st [ub_si], r0
+	st [ub_n], r0
 	st [ub_si+1], r0
+	mov r0, #4				; from the first line
+	st [ub_si], r0
 .loop:
-	ld r1, [ub_si]			; the program's end - the length
-	ld r0, [term_basic_prog_buf_idx]
+	ld r1, [ub_si]			; the program's end
+	ld r0, $c002
 	eq r1, r0
 	bzf .lo_end
 	b .byte
 .lo_end:
 	ld r1, [ub_si+1]
-	ld r0, [term_basic_prog_buf_idx+1]
+	ld r0, $c003
 	eq r1, r0
 	bzf .last
 .byte:
 	ld r0, [ub_si+1]
-	add r0, TERM_PROG_HI
+	add r0, PROG_HI
 	st [ub_si+1], r0
 	ldd r0, [ub_si]
 	ld r1, [ub_si+1]
-	sub r1, TERM_PROG_HI
+	sub r1, PROG_HI
 	st [ub_si+1], r1
 	push r0
-	ld r1, [st_n]
+	ld r1, [ub_n]
 	gt r1, #126				; a full chunk - room for a CR LF is left
 	bzf .flush
 .append:
 	pop r0
-	ld r1, [st_n]
-	st [st_buf]+r1, r0
+	ld r1, [ub_n]
+	st [ub_buf]+r1, r0
 	add r1, #1
-	st [st_n], r1
+	st [ub_n], r1
 	eq r0, #13
 	bzf .lf
 	b .next
 .lf:
 	mov r0, #10
-	ld r1, [st_n]
-	st [st_buf]+r1, r0
+	ld r1, [ub_n]
+	st [ub_buf]+r1, r0
 	add r1, #1
-	st [st_n], r1
+	st [ub_n], r1
 .next:
 	ld r1, [ub_si]
 	add r1, #1
@@ -2013,29 +2048,29 @@ ub_cmd_save:
 .flush:
 	push pch
 	push pcl
-	b st_write
+	b ub_write
 	eq r0, #0
 	bzf .flushed
 	pop r1					; the byte waiting to be appended
 	b .close_error
 .flushed:
 	xor r0, r0
-	st [st_n], r0
+	st [ub_n], r0
 	b .append
 .last:
-	ld r0, [st_n]
+	ld r0, [ub_n]
 	eq r0, #0
 	bzf .close
 	push pch
 	push pcl
-	b st_write
+	b ub_write
 	eq r0, #0
 	bzf .close
 	b .close_error
 .close:
 	push pch
 	push pcl
-	b st_close
+	b ub_close
 	eq r0, #0
 	bzf .saved
 	b .error
@@ -2050,12 +2085,12 @@ ub_cmd_save:
 	push r0
 	push pch
 	push pcl
-	b st_close
+	b ub_close
 	pop r0
 .error:
 	push pch
 	push pcl
-	b st_print_err
+	b API_ST_PERROR
 	b .done
 .usage:
 	mov r0, #>[ub_s_usage]
@@ -2067,23 +2102,20 @@ ub_cmd_save:
 	pop pcl
 	pop pch
 
-; the line gathered in term_line_buf (ub_li characters) into the program, as
-; if typed - lines that do not start with a line number are skipped
+; the line gathered in bas_line (ub_li characters) into the program, as if
+; typed - lines that do not start with a line number are skipped
 ub_load_line:
 	ld r1, [ub_li]
 	eq r1, #0
 	bzf .done
 	mov r0, #13
-	st [term_line_buf]+r1, r0
+	st [bas_line]+r1, r0
 	add r1, #1
 	xor r0, r0
-	st [term_line_buf]+r1, r0
-	ld r0, [ub_li]
-	st [rs_i], r0
-	xor r0, r0
+	st [bas_line]+r1, r0
 	st [ub_li], r0
-	mov r0, #>[term_line_buf]
-	mov r1, #<[term_line_buf]
+	mov r0, #>[bas_line]
+	mov r1, #<[bas_line]
 	push pch
 	push pcl
 	b str_atoi
@@ -2094,8 +2126,8 @@ ub_load_line:
 	bzf .done
 	push pch
 	push pcl
-	b term_cmd_basicline
-	ld r0, [term_full]		; refused - the program is full
+	b bas_cmd_line
+	ld r0, [bas_full]		; refused - the program is full
 	eq r0, #0
 	bzf .done
 	b .full
@@ -2121,7 +2153,7 @@ ub_cmd_load:
 	bzf .loaded
 	push pch
 	push pcl
-	b st_print_err
+	b API_ST_PERROR
 	b .done
 .loaded:
 	mov r0, #>[ub_s_loaded]
@@ -2140,31 +2172,27 @@ ub_cmd_load:
 	pop pcl
 	pop pch
 
-; LOAD's work (also exec's): NEW, then the file st_name's lines as if typed.
+; LOAD's work (also exec's): NEW, then the file ub_name's lines as if typed.
 ; r0 = 0, or the error
 ub_load_file:
-	xor r0, r0
-	st [st_h], r0
-	st [st_mode], r0
+	xor r1, r1
 	push pch
 	push pcl
-	b st_open
+	b ub_open
 	eq r0, #0
 	bzf .opened
 	b .done
 .opened:
 	push pch
 	push pcl
-	b term_cmd_new
+	b bas_cmd_new
 	xor r0, r0
 	st [ub_li], r0
 	st [ub_full], r0
 .read:
-	mov r0, #128
-	st [st_n], r0
 	push pch
 	push pcl
-	b st_read
+	b ub_read
 	eq r0, #0
 	bzf .got
 	b .close_error
@@ -2178,12 +2206,12 @@ ub_load_file:
 	b .close
 .more:
 	ld r1, [ub_ri]
-	ld r0, [st_n]
+	ld r0, [ub_n]
 	eq r1, r0
 	bzf .chunk_done
-	add r1, #1				; the data starts at st_rbuf+1
+	ld r0, [ub_buf]+r1
+	add r1, #1
 	st [ub_ri], r1
-	ld r0, [st_rbuf]+r1
 	eq r0, #13
 	bzf .eol
 	eq r0, #10
@@ -2191,7 +2219,7 @@ ub_load_file:
 	ld r1, [ub_li]
 	eq r1, #78				; the longest line that can be typed
 	bzf .byte
-	st [term_line_buf]+r1, r0
+	st [bas_line]+r1, r0
 	add r1, #1
 	st [ub_li], r1
 	b .byte
@@ -2201,7 +2229,7 @@ ub_load_file:
 	b ub_load_line
 	b .byte
 .chunk_done:
-	ld r0, [st_n]
+	ld r0, [ub_n]
 	eq r0, #128				; a short chunk is the end of the file
 	bzf .read
 	push pch
@@ -2210,192 +2238,14 @@ ub_load_file:
 .close:
 	push pch
 	push pcl
-	b st_close
+	b ub_close
 	b .done
 .close_error:
 	push r0
 	push pch
 	push pcl
-	b st_close
+	b ub_close
 	pop r0
-.done:
-	pop pcl
-	pop pch
-
-ub_cmd_del:
-	push pch
-	push pcl
-	b ub_get_name
-	eq r0, #0
-	bzf .usage
-	push pch
-	push pcl
-	b st_delete
-	eq r0, #0
-	bzf .done
-	push pch
-	push pcl
-	b st_print_err
-	b .done
-.usage:
-	mov r0, #>[ub_s_usage]
-	mov r1, #<[ub_s_usage]
-	push pch
-	push pcl
-	b str_printstr
-.done:
-	pop pcl
-	pop pch
-
-; every file - its name, then its size in bytes
-ub_cmd_dir:
-	mov r0, #10
-	push pch
-	push pcl
-	b print_ascii_char
-	push pch
-	push pcl
-	b st_dir_first
-.entry:
-	eq r0, #0
-	bzf .show
-	eq r0, #255				; after the last file
-	bzf .done
-	push pch
-	push pcl
-	b st_print_err
-	b .done
-.show:
-	xor r1, r1
-.name:
-	ld r0, [st_rbuf+5]		; the name's length
-	eq r1, r0
-	bzf .pad
-	push r1
-	ld r0, [st_rbuf+6]+r1
-	push pch
-	push pcl
-	b print_ascii_char
-	pop r1
-	add r1, #1
-	b .name
-.pad:
-	gt r1, #12
-	bzf .size
-	push r1
-	mov r0, #32
-	push pch
-	push pcl
-	b print_ascii_char
-	pop r1
-	add r1, #1
-	b .pad
-.size:
-	ld r0, [st_rbuf]
-	st [ub_num], r0
-	ld r0, [st_rbuf+1]
-	st [ub_num+1], r0
-	ld r0, [st_rbuf+2]
-	st [ub_num+2], r0
-	ld r0, [st_rbuf+3]
-	st [ub_num+3], r0
-	push pch
-	push pcl
-	b ub_print_u32
-	mov r0, #10
-	push pch
-	push pcl
-	b print_ascii_char
-	push pch
-	push pcl
-	b st_dir_next
-	b .entry
-.done:
-	pop pcl
-	pop pch
-
-; print ub_num (4 bytes, low first) in decimal - each digit is the remainder
-; of a 32-step shift-and-subtract division by 10
-ub_print_u32:
-	xor r0, r0
-	st [ub_dig], r0
-.digit:
-	xor r0, r0
-	st [ub_rem], r0
-	mov r0, #32
-	st [ub_bit], r0
-.bit:
-	ld r0, [ub_num+3]
-	shr r0, #7
-	st [ub_carry], r0
-	ld r0, [ub_num+2]
-	shr r0, #7
-	ld r1, [ub_num+3]
-	shl r1, #1
-	or r1, r0
-	st [ub_num+3], r1
-	ld r0, [ub_num+1]
-	shr r0, #7
-	ld r1, [ub_num+2]
-	shl r1, #1
-	or r1, r0
-	st [ub_num+2], r1
-	ld r0, [ub_num]
-	shr r0, #7
-	ld r1, [ub_num+1]
-	shl r1, #1
-	or r1, r0
-	st [ub_num+1], r1
-	ld r1, [ub_num]
-	shl r1, #1
-	st [ub_num], r1
-	ld r0, [ub_rem]
-	shl r0, #1
-	ld r1, [ub_carry]
-	or r0, r1
-	st [ub_rem], r0
-	lt r0, #10
-	bzf .no_sub
-	sub r0, #10
-	st [ub_rem], r0
-	ld r0, [ub_num]
-	or r0, #1
-	st [ub_num], r0
-.no_sub:
-	ld r0, [ub_bit]
-	sub r0, #1
-	st [ub_bit], r0
-	eq r0, #0
-	bzf .digit_done
-	b .bit
-.digit_done:
-	ld r0, [ub_rem]
-	add r0, #48
-	ld r1, [ub_dig]
-	st [ub_digs]+r1, r0
-	add r1, #1
-	st [ub_dig], r1
-	ld r0, [ub_num]
-	ld r1, [ub_num+1]
-	or r0, r1
-	ld r1, [ub_num+2]
-	or r0, r1
-	ld r1, [ub_num+3]
-	or r0, r1
-	eq r0, #0
-	bzf .print
-	b .digit
-.print:
-	ld r1, [ub_dig]
-	eq r1, #0
-	bzf .done
-	sub r1, #1
-	st [ub_dig], r1
-	ld r0, [ub_digs]+r1
-	push pch
-	push pcl
-	b print_ascii_char
-	b .print
 .done:
 	pop pcl
 	pop pch

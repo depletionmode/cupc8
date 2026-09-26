@@ -2,7 +2,7 @@
 ; API_GFX_PIXEL frames (7 bytes each in the card's FIFO: 8050 of its 8192)
 ; while the test holds the card's execution, then a 255-character TEXT8 at
 ; (0, 100), fg 15 on bg 1: its 262-byte frame does not fit until the card runs
-; again. $7e00 = 1 once the TEXT8 call has returned, $7e01 = 2 at the end.
+; again. $be00 = 1 once the TEXT8 call has returned, $be01 = 2 at the end.
 
 tbuf: resb 256
 n: resb 2
@@ -13,8 +13,8 @@ main:
 	push pcl
 	b API_GFX_MODE
 	xor r0, r0
-	st $7e00, r0
-	st $7e01, r0
+	st $be00, r0
+	st $be01, r0
 	st [n], r0
 	st [n+1], r0
 .pixel:
@@ -85,8 +85,8 @@ main:
 	push pcl
 	b API_GFX_TEXT8
 	mov r0, #1
-	st $7e00, r0
+	st $be00, r0
 	mov r0, #2
-	st $7e01, r0
+	st $be01, r0
 	pop pcl
 	pop pch

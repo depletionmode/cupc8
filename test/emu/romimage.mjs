@@ -1,5 +1,6 @@
-// The real ROM image: the boot ROM (rom/boot.s) and the kernel, as simtest
-// builds it (tools/simtest.nim buildKernelRom).
+// The real ROM image: the boot ROM (rom/boot.s), the kernel and BASIC
+// (basic/build.sh, at ROM $08000), as simtest builds it (tools/simmachine.nim
+// buildKernelRom).
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +22,9 @@ export function kernelRom() {
     fs.readFileSync(path.join(kdir, 'assemble.sh'), 'utf8'));
   execFileSync('python3', [path.join(ROOT, 'tools/as.py'), 'merged.ss', 'kernel.o', ...(bases ? [bases[1]] : []), '--map'], { cwd: out, stdio: 'pipe' });
   execFileSync('python3', [path.join(ROOT, 'tools/as.py'), path.join(ROOT, 'rom/boot.s'), path.join(out, 'boot.bin'), '0xe000,0xe600,0x0f00'], { stdio: 'pipe' });
-  execFileSync('python3', [path.join(ROOT, 'tools/mkrom.py'), path.join(out, 'boot.bin'), path.join(out, 'kernel.o'), '-o', path.join(out, 'kernel.rom')], { stdio: 'pipe' });
+  execFileSync('bash', [path.join(ROOT, 'basic/build.sh'), out], { stdio: 'pipe' });
+  execFileSync('python3', [path.join(ROOT, 'tools/mkrom.py'), path.join(out, 'boot.bin'), path.join(out, 'kernel.o'),
+    '--basic', path.join(out, 'BASIC.PRG'), '-o', path.join(out, 'kernel.rom')], { stdio: 'pipe' });
   const rom = fs.readFileSync(path.join(out, 'kernel.rom'));
   fs.rmSync(out, { recursive: true });
   return rom;

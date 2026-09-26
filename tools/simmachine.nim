@@ -1,7 +1,7 @@
 # The Milestone 1 machine as the simulator CLI (sim.nim) and its tests
 # (simtest.nim) set it up: slot card kinds by name, the ROM image (boot ROM
-# + kernel, built as the hardware's ROM chip holds it), the console's text,
-# and a blank FAT image for the storage card.
+# + kernel + BASIC, built as the hardware's ROM chip holds it), the console's
+# text, and a blank FAT image for the storage card.
 
 import os
 import std/tempfiles
@@ -63,11 +63,27 @@ proc buildBootRom*(): string =
       quoteShell(simRoot / "rom" / "boot.s") & " " & quoteShell(result) &
       " 0xe000,0xe600,0x0f00", "boot ROM")
 
-proc makeRom*(boot, kernel, dest: string): string =
-  ## The ROM image: the boot ROM and the kernel with its header (tools/mkrom.py).
+proc buildBasic*(dir = ""): string =
+  ## BASIC as a program for $7000 (basic/build.sh) into `dir` (default
+  ## romDir()): its BASIC.PRG, the path returned, and basic.map beside it.
+  let d = if dir.len > 0: dir else: romDir()
+  run("bash " & quoteShell(simRoot / "basic" / "build.sh") & " " & quoteShell(d), "BASIC build")
+  d / "BASIC.PRG"
+
+proc basicMapPath*(): string =
+  ## The map of the BASIC buildBasic built last (in romDir())
+  romDir() / "basic.map"
+
+proc makeRom*(boot, kernel, dest: string; basic = "*"): string =
+  ## The ROM image: the boot ROM, the kernel with its header and BASIC at ROM
+  ## $08000 (tools/mkrom.py). `basic` is a BASIC.PRG; "*" builds basic/
+  ## (buildBasic), "" leaves it out (a kernel with no BASIC).
   createDir(dest.parentDir)
+  let prg = if basic == "*": buildBasic() else: basic
   run("python3 " & quoteShell(simRoot / "tools" / "mkrom.py") & " " &
-      quoteShell(boot) & " " & quoteShell(kernel) & " -o " & quoteShell(dest), "mkrom")
+      quoteShell(boot) & " " & quoteShell(kernel) &
+      (if prg.len > 0: " --basic " & quoteShell(prg) else: "") &
+      " -o " & quoteShell(dest), "mkrom")
   dest
 
 proc buildKernel*(dir = ""): string =
@@ -82,7 +98,7 @@ proc kernelMapPath*(): string =
   romDir() / "kernel.map"
 
 proc buildKernelRom*(): string =
-  ## The real kernel and the boot ROM as the ROM chip holds them:
+  ## The real kernel, BASIC and the boot ROM as the ROM chip holds them:
   ## romDir()/kernel.rom.
   makeRom(buildBootRom(), buildKernel(), romDir() / "kernel.rom")
 

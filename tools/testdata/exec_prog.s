@@ -1,8 +1,11 @@
 ; KRN-012: a program `exec` runs from the storage card (tools/mkprg.py).
-; It prints NATIVE OK; its 300 bytes of data make the file span three of
-; exec's 128-byte chunks.
+; Its 300 bytes of data make the file span three of exec's 128-byte chunks;
+; it prints NATIVE OK if they all came in (their sum is 226 mod 256), else
+; NATIVE BAD. (The kernel loads BASIC over it once it ends, so the test
+; cannot look at $7000 afterwards.)
 
 s_ok db "NATIVE OK"
+s_bad db "NATIVE BAD"
 t0 db 3,10,17,24,31,38,45,52,59,66,73,80,87,94,101,108,115,122,129,136
 t1 db 143,150,157,164,171,178,185,192,199,206,213,220,227,234,241,248,255,6,13,20
 t2 db 27,34,41,48,55,62,69,76,83,90,97,104,111,118,125,132,139,146,153,160
@@ -19,11 +22,69 @@ t12 db 147,154,161,168,175,182,189,196,203,210,217,224,231,238,245,252,3,10,17,2
 t13 db 31,38,45,52,59,66,73,80,87,94,101,108,115,122,129,136,143,150,157,164
 t14 db 171,178,185,192,199,206,213,220,227,234,241,248,255,6,13,20,27,34,41,48
 
+sum: resb 1
+ptr: resb 2
+left: resb 2
+
 main:
+	mov r0, #<[t0]
+	st [ptr], r0
+	mov r0, #>[t0]
+	st [ptr+1], r0
+	xor r0, r0
+	st [sum], r0
+	mov r0, #44				; 300 bytes
+	st [left], r0
+	mov r0, #1
+	st [left+1], r0
+.byte:
+	ldd r0, [ptr]
+	ld r1, [sum]
+	add r1, r0
+	st [sum], r1
+	ld r0, [ptr]
+	add r0, #1
+	st [ptr], r0
+	eq r0, #0
+	bzf .ptr_hi
+	b .count
+.ptr_hi:
+	ld r0, [ptr+1]
+	add r0, #1
+	st [ptr+1], r0
+.count:
+	ld r0, [left]
+	eq r0, #0
+	sub r0, #1
+	st [left], r0
+	bzf .left_hi
+	b .more
+.left_hi:
+	ld r0, [left+1]
+	sub r0, #1
+	st [left+1], r0
+.more:
+	ld r0, [left]
+	ld r1, [left+1]
+	or r0, r1
+	eq r0, #0
+	bzf .summed
+	b .byte
+.summed:
+	ld r0, [sum]
+	eq r0, #226
+	bzf .ok
+	mov r0, #<[s_bad]
+	st $6f00, r0
+	mov r0, #>[s_bad]
+	st $6f01, r0
+	b .print
+.ok:
 	mov r0, #<[s_ok]
 	st $6f00, r0
 	mov r0, #>[s_ok]
 	st $6f01, r0
+.print:
 	push pch
 	push pcl
 	b API_PUTS

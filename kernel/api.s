@@ -34,7 +34,7 @@
 	b api_bank_far_copy
 	b api_mem_cmp
 	b api_mem_cpy
-	b api_none
+	b api_term_hook
 	b api_none
 	b api_none
 	b api_none
@@ -69,7 +69,7 @@
 	b api_scroll
 	b api_cleol
 	b api_poke
-	b api_none
+	b api_readline
 	b api_none
 	b api_none
 	b api_none
@@ -166,7 +166,7 @@
 	b api_st_dir_next
 	b api_st_delete
 	b api_st_rename
-	b api_none
+	b api_st_perror
 	b api_none
 	b api_none
 	b api_none

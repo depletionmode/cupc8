@@ -1,7 +1,8 @@
 # BASIC as a loadable program
 
 Status: **decided 2026-09-26 by David** ("do 1, 4 and 5": the code area
-to $67ff, BASIC as a program, and shrinking the kernel's code), with: "the
+to $67ff, BASIC as a program, and shrinking the kernel's code); **built
+2026-09-26** (below, "As built"), with: "the
 kernel should auto load its ROM BASIC after boot unless there is a BASIC on
 the SD card (the SD card and the storage board are optional)". It follows the line-editing work (BASIC keeps lines sorted,
 replaces and deletes them), which is in progress and touches the same code.
@@ -75,3 +76,46 @@ saved per change.
 - BASIC at $7000 and reloaded after native programs is the default; the
   alternative (a RAM bank run from the window) was not chosen.
 - Networking (6.5 KB) could move out the same way later; not decided.
+
+## As built (2026-09-26)
+
+- **BASIC** is `basic/`: `basic.s` (main, the terminal's hook, the
+  commands, the program editor, from `term.s`), `ubasic.s` and
+  `ubasic_tokenizer.s` (from `kernel/`), `n16.s` (the 16-bit arithmetic the
+  kernel does not need, and `str_atoi`); `basic/build.sh` assembles them
+  with `kernel/math.s` (the kernel's `n16_shl1`, `n16_mul`, `n16_udiv`) as a
+  program for $7000 (`tools/mkprg.py`, which now takes several sources and
+  `--map`). About 6.3 KB of code, $7000 to about $9000 with its bss. It uses
+  only the API; SAVE and LOAD through the storage group, their messages
+  through the new `API_ST_PERROR`.
+- **The program text** at $c000: `"BA"`, the end (two bytes), then the lines
+  from $c004 (`memory-map.md`). The 4 bytes cost the longest program 4
+  bytes: 8187 instead of 8191 (KRN-017, KRN-027 changed to match).
+- **The ROM image** (`tools/mkrom.py --basic`; `romimage.mjs`,
+  `simmachine.nim` pass it): BASIC's header at ROM $08000 (as the kernel's:
+  load and entry $7000), its body from $08800, 0s to a page. The kernel body
+  must end before $08000 (`mkrom.py` checks).
+- **Boot** (`kernel/term.s term_do`, `sys.s sys_basic_boot`): the banner,
+  then `BASIC.PRG` from the SD card through exec's loader (`sys_load`, to
+  $bfff at most; too big is found before loading, by a byte past the room),
+  with `BASIC from the SD card` under the banner; any failure: the ROM's,
+  copied a page at a time with the ROM windows on and interrupts off, the
+  header and body sums checked; neither: no BASIC (the terminal alone).
+  Then BASIC's `main` at $7000: the program at $c000 kept if right, else
+  empty; the hook set.
+- **API** (only added): `API_TERM_HOOK` $1021, `API_READLINE` $1087,
+  `API_ST_PERROR` $11a1 (`kernel-api.md`).
+- **After a native program** (`sys_restart`: it returned or called
+  `API_EXIT`) the kernel loads the BASIC it started with again (the ROM's if
+  the card's no longer loads) and calls `main`; `API_RUN` is 2 meanwhile and
+  while the hook runs, so `cupc8.py run` does not write over BASIC while it
+  runs. `exec` of a file with no header goes to the hook (r0 = 1), and
+  BASIC loads and runs it; a failed `exec` that had already loaded part of
+  a program loads BASIC again.
+- **Tests:** KRN-031 (reloaded after `cupc8.py run` and exec, the program
+  kept or started empty), KRN-032 (BASIC.PRG on the card; the fallbacks with
+  no delay; no BASIC in the ROM), KRN-033 (the new entries), KRN-010 (the
+  layouts, the ROM header), SIM-010 (BASIC.PRG in the simulator). Test
+  programs that leave results for the test now leave them at $bc00-$beff,
+  above BASIC, which is loaded again over $7000 when they end.
+

@@ -2,7 +2,7 @@
 ; policy through the kernel API (API_EINK_AUTO: on, idle10 5, full_after 2,
 ; cap10 50, full_kind 3 greyscale, sleep_s 3), reads it back (API_EINK_GET)
 ; and asks the panel's state (API_EINK_STATUS). It leaves what they gave at
-; $7e00-$7e0b and prints it:
+; $be00-$be0b and prints it:
 ;   AUTO rr
 ;   GET rr on idle10 full_after cap10 full_kind sleep_s
 ;   ST rr busy dirty partials
@@ -30,15 +30,15 @@ main:
 	push pch
 	push pcl
 	b API_EINK_AUTO
-	st $7e00, r0
+	st $be00, r0
 	push pch
 	push pcl
 	b API_EINK_GET
-	st $7e01, r0
+	st $be01, r0
 	xor r1, r1
 .get:
 	ld r0, $6f00+r1
-	st $7e02+r1, r0
+	st $be02+r1, r0
 	add r1, #1
 	eq r1, #6
 	bzf .status
@@ -47,13 +47,13 @@ main:
 	push pch
 	push pcl
 	b API_EINK_STATUS
-	st $7e08, r0
+	st $be08, r0
 	ld r0, $6f00
-	st $7e09, r0
+	st $be09, r0
 	ld r0, $6f01
-	st $7e0a, r0
+	st $be0a, r0
 	ld r0, $6f02
-	st $7e0b, r0
+	st $be0b, r0
 
 	mov r0, #10
 	push pch
@@ -64,7 +64,7 @@ main:
 	push pch
 	push pcl
 	b puts
-	ld r0, $7e00
+	ld r0, $be00
 	push pch
 	push pcl
 	b hex
@@ -105,13 +105,13 @@ puts:
 	st $6f01, r1
 	b API_PUTS
 
-; print the bytes $7e00+r0 up to $7e00+r1-1 in hex, a space between
+; print the bytes $be00+r0 up to $be00+r1-1 in hex, a space between
 bytes:
 	st [pi], r0
 	st [pe], r1
 .loop:
 	ld r1, [pi]
-	ld r0, $7e00+r1
+	ld r0, $be00+r1
 	push pch
 	push pcl
 	b hex

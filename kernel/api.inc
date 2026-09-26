@@ -30,6 +30,7 @@
 %define API_BANK_FAR_COPY $1018
 %define API_MEM_CMP $101b
 %define API_MEM_CPY $101e
+%define API_TERM_HOOK $1021
 
 ; group 1: console ($1063)
 %define API_PUTC $1063
@@ -44,6 +45,7 @@
 %define API_SCROLL $107e
 %define API_CLEOL $1081
 %define API_POKE $1084
+%define API_READLINE $1087
 
 ; group 2: graphics ($10c3)
 %define API_GFX_MODE $10c3
@@ -86,6 +88,7 @@
 %define API_ST_DIR_NEXT $1198
 %define API_ST_DELETE $119b
 %define API_ST_RENAME $119e
+%define API_ST_PERROR $11a1
 
 ; group 5: net ($11e3)
 %define API_NET_STATUS $11e3

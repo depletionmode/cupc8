@@ -7,7 +7,8 @@ Runs the sim binary headless, typing with --type and reading the console with
     and runs a typed program;
   - hdmi,io,storage,wifi with --sd on an image that does not exist yet (the
     sim makes a blank FAT one): SAVE, NEW, DIR, LOAD, RUN; the image as a PC
-    reads it (tools/fatcheck.py); a second run of the sim LOADs it again;
+    reads it (tools/fatcheck.py); BASIC.PRG on the card is the BASIC the
+    machine starts (KRN-032); a second run of the sim LOADs it again;
     `net join` any SSID, `net get` from an HTTP server this script runs on
     localhost (the Wi-Fi card uses the host's own sockets);
   - the e-ink cards (eink, eink750): the program runs, and the dumped picture
@@ -215,6 +216,21 @@ def main():
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "check", img, expect],
                        capture_output=True, text=True)
     check("the image is valid FAT with the saved file (fatcheck, fsck.fat)", r.returncode == 0, r.stdout + r.stderr)
+
+    # KRN-032 in the sim: BASIC.PRG on the card replaces the ROM's BASIC
+    # (basic/build.sh's, with D0NE. for DONE. to tell them apart)
+    subprocess.run(["bash", os.path.join(ROOT, "basic", "build.sh"), work], check=True, capture_output=True)
+    prg = open(os.path.join(work, "BASIC.PRG"), "rb").read().replace(b"\nDONE.\n", b"\nD0NE.\n")
+    with open(os.path.join(work, "basic.bin"), "wb") as f:
+        f.write(prg)
+    img2 = os.path.join(work, "card2.img")
+    shutil.copy(img, img2)
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "put", img2, "BASIC.PRG",
+                        os.path.join(work, "basic.bin")], capture_output=True, text=True)
+    text, out = sim("--cards:hdmi,io,storage", "--sd:" + img2, '--type:load "t.bas"\nrun\n')
+    lines = text.split("\n")
+    check("BASIC.PRG on the SD card: the line under the banner", "BASIC from the SD card" in lines, text)
+    check("... the card's BASIC runs the program", "LOADED" in lines and "15" in lines and "D0NE." in lines, text)
 
     # a second run of the sim: the file is still there; then the network
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)

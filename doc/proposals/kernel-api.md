@@ -55,11 +55,11 @@ to $6800, which it fills to about 80 %.)
 
 | Group | Base | Contents (first entries) |
 |---|---|---|
-| 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table, bank_set, bank_get, bank_count, bank_far_copy (`kernel/bank.s`, as they are: they leave `API_ERR` alone), mem_cmp, mem_cpy |
-| 1 console | $1063 | putc, puts, getkey (wait), pollkey, cls, cursor set/get, attr |
+| 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table, bank_set, bank_get, bank_count, bank_far_copy (`kernel/bank.s`, as they are: they leave `API_ERR` alone), mem_cmp, mem_cpy, term_hook |
+| 1 console | $1063 | putc, puts, getkey (wait), pollkey, cls, cursor set/get, attr, ..., readline |
 | 2 graphics | $10c3 | mode, pixel, rect, line, palette, text-plane helpers (what `gfx.s`/the GPU protocol offer); from $10e4 the e-ink card's native mode 2 (`basic-graphics.md`) |
 | 3 e-ink | $1123 | eink_auto, eink_get, eink_status, eink_refresh (`eink-card.md`) |
-| 4 storage | $1183 | info, open, read, write, close, seek, dir first/next, delete, rename |
+| 4 storage | $1183 | info, open, read, write, close, seek, dir first/next, delete, rename, perror |
 | 5 net | $11e3 | 16 routines (`kernel/net.s`): status, join, open, connect, connect_host, listen, send, recv, sock_status, close, udp_bind, sendto, recvfrom, events, resolve (the kernel's DNS client), config (r0 0 get, 1 set); then 16 blank |
 | 6 timers | $1243 | ticks (ms since boot), wait ms |
 | 7 reserved | $12a3 | |
@@ -99,9 +99,11 @@ ring is dropped.
 - **From the storage card:** the terminal command `exec "NAME"` reads the
   file. With the header (version 1) the body goes to $7000, 128-byte chunk
   by chunk, and is called. `"C8P"` with another version, or cut short, gives
-  `bad program header`; a body past $dfff gives `program too big`; neither
-  runs anything. Any other file is a BASIC program as SAVE writes it: `exec`
-  does LOAD's work (NEW, then the lines as if typed), then RUN. `ret`
+  `bad program header`; a body past $dfff gives `program too big` (found
+  before anything is loaded); neither runs anything. Any other file is a
+  BASIC program as SAVE writes it: `exec` hands its name to the terminal's
+  hook (`API_TERM_HOOK`, r0 = 1), and BASIC does LOAD's work (NEW, then the
+  lines as if typed), then RUN. `ret`
   (`pop pcl`/`pop pch`) or the `exit` API entry returns to the terminal,
   which resets its stack.
 - **From the PC:** `cupc8.py run prog.prg` (or the bare binary) writes the
@@ -147,8 +149,8 @@ ring is dropped.
 ### mem_cmp and mem_cpy (2026-09-26)
 
 Two group-0 entries give programs the kernel's memory routines, with
-16-bit lengths (`kernel/printf.s`'s `mem_cmp` and `mem_cpy`, which the
-kernel keeps for itself, take 8-bit ones on the stack). `API_ARGS` = dst
+16-bit lengths (`kernel/printf.s`'s `mem_cmp` and `mem_cpy`, which took
+8-bit ones on the stack, went on 2026-09-26: nothing called them). `API_ARGS` = dst
 (lo, hi), src (lo, hi), len16 (lo, hi), len 0-65535:
 
 | Entry | Address | Result |
@@ -188,6 +190,25 @@ have room for the whole frame (NOP frames until FREE says so,
 `gpu-protocol.md`), since the card drops a frame that does not fit (it can
 fill while a REFRESH holds it). BASIC's graphics statements use these and
 the GFX entries.
+
+### BASIC as a program (2026-09-26, `basic-program.md`)
+
+BASIC (`basic/`) is a program at $7000 like any other and uses only this
+API. The kernel loads it at boot and after each native program (from the
+ROM, or `BASIC.PRG` on the SD card; `memory-map.md`) and calls its `main`.
+Three entries were added for it (KRN-033):
+
+| Entry | Address | |
+|---|---|---|
+| `API_TERM_HOOK` | $1021 | r0, r1 = the address (low, high) of a routine in the program at $7000, or 0, 0 for none: the terminal's hook. The terminal runs its own commands (`help`, `dir`, `del`, `net`, `refresh`, `exec`) and calls the hook, as a routine, with every other line: r0 = 0, `API_ARGS[0..1]` = a pointer to the line as typed (up to 78 characters, a CR, a 0). `exec "NAME"` calls it for a file with no program header: r0 = 1, `API_ARGS[0..1]` = a pointer to the name. `API_RUN` is 2 while it runs. With no hook the line is `ERROR: invalid cmd!` (and the file `bad program header`). The kernel clears the hook when it loads a program over $7000; BASIC sets it again in `main`. r0 = 0 |
+| `API_READLINE` | $1087 | a line from the keyboard with the terminal's line editor (echoed; Backspace or DEL takes the last character back; Enter ends it) into the 80-byte buffer at the pointer in `API_ARGS[0..1]`: up to 78 characters, a CR, a 0. r1 = the characters' count, r0 = 0 |
+| `API_ST_PERROR` | $11a1 | print the terminal's message for storage error r0 (not 0), as SAVE, LOAD, DIR and DEL do: `no SD card`, `file not found`, ... |
+
+So the terminal owns the prompt, the line editor and the loop; BASIC owns
+the lines it is handed: numbered lines (the editor), `new`, `run`, `list`,
+`clr`, `save`, `load`. BASIC's program text is at $c000 (`memory-map.md`),
+outside its own memory, so a native program that stays below $c000 leaves
+it for BASIC to find when it is loaded again.
 
 ## Networking
 

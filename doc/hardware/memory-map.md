@@ -66,8 +66,8 @@ bridge's 24-bit RAM commands.
 | $1000–$67ff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
 | $6800–$6eff | kernel data (2026-09-26: moved up from $6000, as the code needed more room and the data used 1.4 KB of 3.75) |
 | $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
-| $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
-| $c000–$dfff | … whose top 8 KB holds the **BASIC program** (`kernel/term.s`): its text, each line ending in a CR, then a 0 |
+| $7000–$dfff | **user program** (28 KB), loaded and entered at $7000; **BASIC** (`basic/`, a program like any other: about 8 KB with its bss, $7000–$9fff) is there whenever no native program is |
+| $c000–$dfff | … whose top 8 KB holds the **BASIC program** (`basic/basic.s`): `"BA"` at $c000, the end at $c002 (two bytes: the offset of its 0 from $c000, 4 when empty), from $c004 its text, each line ending in a CR, then the 0 |
 | $e000–$efff | kernel bss: RAM once the kernel has turned the ROM off (its first instruction), and bss needs no loading |
 
 The USB console's part of the API block (the kernel zeroes $6f22–$6f26 at boot):
@@ -86,26 +86,42 @@ Indices are offsets into their ring (modulo its size); head = tail is empty,
 and one slot stays free. Each side writes only its own index, after the data
 it covers (`sysctl.md`, "The console port").
 
-`kernel/assemble.sh` assembles for code $1000, data $6000, bss $e000
+`kernel/assemble.sh` assembles for code $1000, data $6800, bss $e000
 (2026-09-25: the kernel's code outgrew $4fff once the API, the network
-commands and the bank routines were in); `testKernelLayout` (KRN-010) fails
-if any outgrows its area. The kernel keeps nothing of its own in the user
-area $7000–$dfff (so nothing in the banked RAM window $8000–$bfff,
-`../proposals/extended-ram.md`), but the BASIC program lives in its top 8 KB,
-$c000–$dfff (2026-09-26, `../proposals/basic-graphics.md`; its line index,
-300 lines, is in the kernel's bss). **A program for $7000 that uses
-$c000–$dfff (a body over 20 KB, or data there) overwrites the BASIC
-program**, as on the home computers this is modelled on: `exec` and
-`cupc8.py run` say nothing about it, and `run` afterwards finds what the
-program left. Programs up to $bfff leave it alone. The jump table and calling convention are in
-`../proposals/kernel-api.md` and `kernel/api.inc`.
+commands and the bank routines were in; 2026-09-26: BASIC moved out, the
+code is about 14.5 KB); `testKernelLayout` (KRN-010) fails if any outgrows
+its area. The kernel keeps nothing of its own in the user area $7000–$dfff
+(so nothing in the banked RAM window $8000–$bfff,
+`../proposals/extended-ram.md`).
 
-**Program file** (`exec "NAME"` on the storage card, `cupc8.py run`): a 4-byte
-header, `"C8P"` then the version, 1, followed by the body, a flat binary for
-$7000 of at most 28672 bytes (`tools/mkprg.py` makes one). `exec` refuses a
-`"C8P"` file of any other version, or one too big for $7000–$dfff, and runs any
-file without the header as BASIC. `cupc8.py run` takes a program file or the
-bare body.
+**BASIC is a program at $7000** (2026-09-26, `../proposals/basic-program.md`):
+`basic/build.sh` builds it with `tools/mkprg.py`, and it talks to the machine
+only through the kernel API. At boot the kernel loads **`BASIC.PRG` from the
+SD card** when a storage card is fitted, a card is in it and the file has a
+good header (the line `BASIC from the SD card` under the banner), otherwise
+**the ROM's** (below); any failure falls back to the ROM's with no message.
+It calls BASIC's `main` at $7000, which sets the terminal's hook
+(`API_TERM_HOOK`): the terminal runs its own commands and hands BASIC every
+other line. **After a native program ends** (it returns or calls `API_EXIT`,
+from `exec` or `cupc8.py run`) the kernel loads the same BASIC again (the
+ROM's if the card's no longer loads) and calls `main`, so a program's memory
+at $7000 up to BASIC's end is BASIC's again. The BASIC program at
+$c000–$dfff is not in BASIC's memory, so it outlives a native program: `main`
+keeps it when `"BA"` and the end are right and the 0 is there, else starts
+empty. **A program for $7000 that uses $c000–$dfff (a body over 20 KB, or
+data there) overwrites the BASIC program**, as on the home computers this is
+modelled on, and BASIC then starts with none. Programs up to $bfff leave it
+alone. BASIC's line index (300 lines) and its variables are in its own bss.
+The jump table and calling convention are in `../proposals/kernel-api.md`
+and `kernel/api.inc`.
+
+**Program file** (`exec "NAME"` on the storage card, `cupc8.py run`,
+`BASIC.PRG`): a 4-byte header, `"C8P"` then the version, 1, followed by the
+body, a flat binary for $7000 of at most 28672 bytes (`tools/mkprg.py` makes
+one). `exec` refuses a `"C8P"` file of any other version, or one too big for
+$7000–$dfff (found before anything is loaded), and hands any file without
+the header to BASIC, which loads and runs it. `BASIC.PRG` must fit
+$7000–$bfff. `cupc8.py run` takes a program file or the bare body.
 
 ## I/O registers
 
@@ -211,8 +227,18 @@ anywhere does.
 |---|---|---|
 | $00000 | 2 KB | Boot ROM (`rom/boot.s`), assembled for $e000 |
 | $00800 | 16 B | Kernel header |
-| $00810 | ≤ 52 KB | Kernel body |
+| $00810 | ≤ 30 KB | Kernel body (to $07fff) |
+| $08000 | 16 B | **BASIC's header** (2026-09-26): as the kernel's, load and entry $7000, 1 to $5000 bytes |
+| $08800 | ≤ 20 KB | **BASIC's body** (`BASIC.PRG` without its `"C8P"` header), then 0s to a 256-byte boundary |
 | … | | Free (future cupfs ROM disk) |
+
+The kernel copies BASIC from ROM banks 16 (the header) and 17 on, a
+256-byte page at a time through the banked window, with the ROM windows on
+and interrupts off for the copy (about 70 ms for 6.5 KB); it checks the
+header (its sum, "CUP8" version 1, flags 0, load and entry $7000, the
+length) and the body's sum, and starts no BASIC if either is wrong. A ROM
+with no BASIC (`mkrom.py` without `--basic`) boots to the terminal alone:
+its commands work and every other line is an invalid command.
 
 Kernel header (all fields little-endian):
 
@@ -231,8 +257,9 @@ Kernel header (all fields little-endian):
 The limit on `load address + length` is **$e000**. The boot ROM rejects
 anything larger.
 
-`tools/mkrom.py boot.bin kernel.bin -o rom.bin` builds the image. Unused space
-is `$ff`, the erased state, so a partial program leaves the rest erased.
+`tools/mkrom.py boot.bin kernel.bin --basic BASIC.PRG -o rom.bin` builds the
+image (`basic/build.sh` makes `BASIC.PRG`). Unused space is `$ff`, the erased
+state, so a partial program leaves the rest erased.
 
 ## Boot chain
 
@@ -253,7 +280,10 @@ is `$ff`, the erased state, so a partial program leaves the rest erased.
    Failures also print a message if a console exists. "Halt" means `CLI`
    followed by `HALT`.
 3. **Kernel** (entry $1000) sets `SYSCTL.ROM_OFF=1` first, reads the slot
-   table at $0002–$0007 left by the boot ROM, and continues as today.
+   table at $0002–$0007 left by the boot ROM, starts the card drivers,
+   prints the banner and loads BASIC into $7000: `BASIC.PRG` from the SD
+   card if it loads, else the ROM's (it turns the ROM windows on again for
+   the copy), and calls its `main`.
 
 The slot table at $0002–$0007 holds one byte per slot (slots 1–6): the card
 type from `IDENT` (`$00` = empty). It lives in the reserved $0002–$000f area.

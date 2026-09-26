@@ -130,6 +130,23 @@ api_mem_cpy:
 	xor r0, r0
 	b api_ret
 
+; API_TERM_HOOK - set the terminal's hook: r0, r1 = the address (low, high)
+; of a routine in the program at $7000 (0, 0: none). The terminal runs its own
+; commands (help, dir, del, net, refresh, exec) and calls the hook, as a
+; routine, with every other line: r0 = 0, API_ARGS[0..1] = a pointer to the
+; line as typed (up to 78 characters, a CR, a 0). exec "NAME" calls it for a
+; file with no program header: r0 = 1, API_ARGS[0..1] = a pointer to the
+; name (BASIC loads and runs it). With no hook the terminal says "invalid
+; cmd" (and exec "bad program header"). API_RUN is 2 while the hook runs.
+; The kernel clears the hook when it loads a program over $7000; BASIC, which
+; it loads there at boot and after each native program, sets it again. r0 = 0
+sys_hook: resb 2
+api_term_hook:
+	st [sys_hook], r0
+	st [sys_hook+1], r1
+	xor r0, r0
+	b api_ret
+
 ; mem_d = 1
 mem_one:
 	mov r0, #1
@@ -261,6 +278,20 @@ api_poke:
 	mov r0, #0x17
 	mov r1, #4
 	b gpu_cmd
+
+; API_READLINE - a line from the keyboard with the terminal's line editor
+; (echoed; Backspace or DEL takes the last character back, Enter ends it)
+; into the buffer at the pointer in API_ARGS[0..1], 80 bytes: up to 78
+; characters, then a CR and a 0. r1 = the characters' count, r0 = 0
+api_readline:
+	ld r1, API_ARGS
+	ld r0, $6f01
+	push pch
+	push pcl
+	b read_string
+	ld r1, [rs_i]
+	xor r0, r0
+	b api_ret
 
 ; command r1 with the argument r0
 api_gpu1:
@@ -980,6 +1011,12 @@ api_st_rename:
 	b st_rename
 	b api_ret
 
+; API_ST_PERROR - print the terminal's message for storage error r0 (not 0),
+; as SAVE, LOAD, DIR and DEL do: "no SD card", "file not found", ... on a
+; line of its own
+api_st_perror:
+	b st_print_err
+
 ; the name at the pointer in API_ARGS[0..1] into st_name (one longer than
 ; 12 characters is cut at 13, which the card refuses)
 api_st_name:
@@ -1097,13 +1134,18 @@ api_wait_ms:
 ; reset. The console is left as the program left it.
 ;
 ; A program file on the storage card starts with a header - "C8P", then
-; version 1 - and the body follows it. exec "NAME" runs any other file as a
-; BASIC program (LOAD, then RUN).
+; version 1 - and the body follows it. exec "NAME" hands any other file to
+; the terminal's hook: BASIC loads and runs it (LOAD, then RUN).
 
 sys_sp: resb 2				; the terminal's stack pointer at its prompt
 sys_ptr: resb 2				; exec - where this chunk's byte 0 goes
 sys_end: resb 2
 sys_skip: resb 1			; exec - header bytes at the start of this chunk
+sys_basic_src: resb 1		; 1: the machine started with the card's BASIC.PRG
+; sys_dirty: sys_load wrote to $7000
+sys_dirty db 0
+; sys_top: sys_load's limit: the high byte past the last address
+sys_top db 0
 
 sys_s_usage db "\nEXEC \"NAME\"\n"
 sys_s_header db "\nbad program header\n"
@@ -1159,7 +1201,7 @@ sys_mark:
 
 ; back to the terminal's prompt: pop until SP is sys_sp again (the same
 ; probe), the interrupt vectors planted again (a program may have changed
-; them), then the prompt
+; them), BASIC loaded again (the program was over it), then the prompt
 sys_restart:
 	cli
 .probe:
@@ -1179,11 +1221,16 @@ sys_restart:
 	bzf .there
 	b .drop
 .there:
-	xor r0, r0
+	mov r0, #2				; API_RUN 2 while BASIC loads
 	st API_RUN, r0
 	push pch
 	push pcl
 	b irq_setup
+	push pch
+	push pcl
+	b sys_basic
+	xor r0, r0
+	st API_RUN, r0
 	b term_do.loop
 
 ; run the program at $7000. API_RUN is 2 while it runs (cupc8.py run then
@@ -1199,14 +1246,67 @@ sys_run:
 	b $7000
 	b sys_restart
 
-; the terminal's exec "NAME"
+; the terminal's exec "NAME": a program file runs at $7000; any other file
+; goes to the hook (BASIC: LOAD, then RUN)
 sys_cmd_exec:
 	push pch
 	push pcl
-	b ub_get_name
+	b term_get_name
 	eq r0, #0
 	bzf .usage
+	mov r0, #0xe0			; up to $dfff
+	st [sys_top], r0
+	push pch
+	push pcl
+	b sys_load
+	eq r0, #0
+	bzf sys_run
+	eq r0, #0xfe
+	bzf .basic
+	push r0
+	ld r0, [sys_dirty]		; BASIC back, if a part was loaded over it
+	eq r0, #0
+	bzf .said
+	push pch
+	push pcl
+	b sys_basic
+.said:
+	pop r0
+	eq r0, #0xfd
+	bzf .bad_header
+	eq r0, #0xfc
+	bzf .big
+	b st_print_err
+.basic:
+	mov r0, #<[st_name]
+	st API_ARGS, r0
+	mov r0, #>[st_name]
+	st $6f01, r0
+	mov r0, #1
+	b term_hook
+.bad_header:
+	mov r0, #>[sys_s_header]
+	mov r1, #<[sys_s_header]
+	b str_printstr
+.big:
+	mov r0, #>[sys_s_big]
+	mov r1, #<[sys_s_big]
+	b str_printstr
+.usage:
+	mov r0, #>[sys_s_usage]
+	mov r1, #<[sys_s_usage]
+	b str_printstr
+
+; the program file named in st_name into $7000 (handle 0; exec's and
+; BASIC.PRG's): r0 = 0 loaded; $fe the file does not start with "C8P";
+; $fd "C8P" but not version 1 (or cut short); $fc it goes past sys_top (the
+; high byte of the first address it may not reach: a byte there is looked
+; for first, so nothing is loaded); or the card's error. The file is closed.
+; sys_dirty is 1 once bytes have gone to $7000 (the hook is cleared then:
+; its program is going).
+sys_load:
 	xor r0, r0
+	st [sys_dirty], r0
 	st [st_h], r0
 	st [st_mode], r0
 	push pch
@@ -1214,7 +1314,7 @@ sys_cmd_exec:
 	b st_open
 	eq r0, #0
 	bzf .opened
-	b .error
+	b .done
 .opened:
 	mov r0, #0xfc			; the 4 header bytes fall before $7000
 	st [sys_ptr], r0
@@ -1227,35 +1327,92 @@ sys_cmd_exec:
 	b sys_chunk
 	eq r0, #0
 	bzf .header
-	b .close_error
+	b .close
 .header:
-	ld r0, [st_n]
-	lt r0, #3
-	bzf .basic
-	ld r0, [st_rbuf+1]
-	eq r0, #67				; C
+	mov r0, #0xfe
+	ld r1, [st_n]
+	lt r1, #3
+	bzf .close
+	ld r1, [st_rbuf+1]
+	eq r1, #67				; C
 	bzf .c
-	b .basic
+	b .close
 .c:
-	ld r0, [st_rbuf+2]
-	eq r0, #56				; 8
+	ld r1, [st_rbuf+2]
+	eq r1, #56				; 8
 	bzf .c8
-	b .basic
+	b .close
 .c8:
-	ld r0, [st_rbuf+3]
-	eq r0, #80				; P
+	ld r1, [st_rbuf+3]
+	eq r1, #80				; P
 	bzf .c8p
-	b .basic
+	b .close
 .c8p:
-	ld r0, [st_n]
-	lt r0, #4
-	bzf .bad_header
-	ld r0, [st_rbuf+4]
-	eq r0, #1				; version 1
-	bzf .copy
-	b .bad_header
+	mov r0, #0xfd
+	ld r1, [st_n]
+	lt r1, #4
+	bzf .close
+	ld r1, [st_rbuf+4]
+	eq r1, #1				; version 1
+	bzf .accepted
+	b .close
+.accepted:
+	; too big is known before anything is loaded: is there a byte at
+	; sys_top - $7000 + 4 (past the header and the room)?
+	mov r0, #4
+	st [st_pos], r0
+	ld r0, [sys_top]
+	sub r0, #0x70
+	st [st_pos+1], r0
+	xor r0, r0
+	st [st_pos+2], r0
+	st [st_pos+3], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .probe
+	b .close
+.probe:
+	mov r0, #1
+	st [st_n], r0
+	push pch
+	push pcl
+	b st_read
+	eq r0, #0
+	bzf .probed
+	b .close
+.probed:
+	ld r1, [st_n]
+	eq r1, #0
+	bzf .room
+	mov r0, #0xfc
+	b .close
+.room:
+	xor r0, r0				; back to the start, the first chunk again
+	st [st_pos], r0
+	st [st_pos+1], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .again
+	b .close
+.again:
+	push pch
+	push pcl
+	b sys_chunk
+	eq r0, #0
+	bzf .load
+	b .close
+.load:
+	mov r0, #1
+	st [sys_dirty], r0
+	xor r0, r0
+	st [sys_hook], r0
+	st [sys_hook+1], r0
 .copy:
-	ld r0, [sys_ptr]		; sys_end = sys_ptr + st_n, at most $e000
+	ld r0, [sys_ptr]		; sys_end = sys_ptr + st_n, at most sys_top
 	ld r1, [st_n]
 	add r0, r1
 	st [sys_end], r0
@@ -1267,16 +1424,19 @@ sys_cmd_exec:
 	add r1, #1
 .end_hi:
 	st [sys_end+1], r1
-	gt r1, #0xe0
+	ld r0, [sys_top]
+	gt r1, r0
 	bzf .big
-	eq r1, #0xe0
-	bzf .at_e0
+	eq r1, r0
+	bzf .at_top
 	b .fits
-.at_e0:
+.at_top:
 	ld r0, [sys_end]
 	eq r0, #0
 	bzf .fits
-	b .big
+.big:
+	mov r0, #0xfc
+	b .close
 .fits:
 	ld r1, [sys_skip]
 .byte:
@@ -1297,71 +1457,237 @@ sys_cmd_exec:
 	ld r0, [st_n]
 	eq r0, #128				; a short chunk is the end of the file
 	bzf .more
-	push pch
-	push pcl
 	b st_close
-	eq r0, #0
-	bzf .run
-	b .error
-.run:
-	b sys_run
 .more:
 	push pch
 	push pcl
 	b sys_chunk
 	eq r0, #0
 	bzf .copy
-	b .close_error
-.basic:
-	push pch
-	push pcl
-	b st_close
-	push pch
-	push pcl
-	b ub_load_file
-	eq r0, #0
-	bzf .run_basic
-	b .error
-.run_basic:
-	b term_cmd_run
-.bad_header:
-	push pch
-	push pcl
-	b st_close
-	mov r0, #>[sys_s_header]
-	mov r1, #<[sys_s_header]
-	b .print
-.big:
-	push pch
-	push pcl
-	b st_close
-	mov r0, #>[sys_s_big]
-	mov r1, #<[sys_s_big]
-	b .print
-.usage:
-	mov r0, #>[sys_s_usage]
-	mov r1, #<[sys_s_usage]
-.print:
-	push pch
-	push pcl
-	b str_printstr
-	b .done
-.close_error:
+.close:
 	push r0
 	push pch
 	push pcl
 	b st_close
 	pop r0
-.error:
-	push pch
-	push pcl
-	b st_print_err
 .done:
 	pop pcl
 	pop pch
+
+; handle 0 to st_pos; r0 = error
+sys_seek:
+	xor r0, r0
+	st [st_h], r0
+	b st_seek
 
 ; the next 128 bytes of handle 0 into st_rbuf+1 (st_n = how many); r0 = error
 sys_chunk:
 	mov r0, #128
 	st [st_n], r0
 	b st_read
+
+; ------------------------------------------------------------ BASIC
+; BASIC is a program for $7000 (basic/, doc/proposals/basic-program.md). At
+; boot the kernel loads BASIC.PRG from the SD card when it can (a storage
+; card, an SD card in it, the file, a good header), else the ROM's (always
+; in the ROM image); after a native program it loads the same one again
+; (the ROM's if the card's no longer loads). It calls BASIC's main, which
+; sets the terminal's hook.
+
+sys_s_basic_prg db "BASIC.PRG"
+sys_s_basic_card db "BASIC from the SD card\n"
+
+; at boot: the card's BASIC if it loads (a line says so), else the ROM's
+sys_basic_boot:
+	mov r0, #1
+	st [sys_basic_src], r0
+	push pch
+	push pcl
+	b sys_basic_card
+	eq r0, #0
+	bzf .card
+	xor r0, r0
+	st [sys_basic_src], r0
+	b sys_basic
+.card:
+	mov r0, #>[sys_s_basic_card]
+	mov r1, #<[sys_s_basic_card]
+	push pch
+	push pcl
+	b str_printstr
+	b $7000
+
+; BASIC into $7000 and its main called (it sets the hook): the card's if the
+; machine started with it and it loads, else the ROM's; neither - no hook
+sys_basic:
+	xor r0, r0
+	st [sys_hook], r0
+	st [sys_hook+1], r0
+	ld r0, [sys_basic_src]
+	eq r0, #0
+	bzf .rom
+	push pch
+	push pcl
+	b sys_basic_card
+	eq r0, #0
+	bzf .start
+.rom:
+	push pch
+	push pcl
+	b sys_rom_basic
+	eq r0, #0
+	bzf .start
+	pop pcl
+	pop pch
+.start:
+	b $7000
+
+; BASIC.PRG from the SD card into $7000, as exec loads a program but no
+; higher than $bfff (the BASIC program is at $c000): r0 = 0, or sys_load's
+; error
+sys_basic_card:
+	xor r1, r1
+.name:
+	ld r0, [sys_s_basic_prg]+r1
+	st [st_name]+r1, r0
+	eq r0, #0
+	bzf .named
+	add r1, #1
+	b .name
+.named:
+	mov r0, #0xc0
+	st [sys_top], r0
+	b sys_load
+
+; the ROM's BASIC (memory-map.md, "ROM image layout"): a header as the
+; kernel's at ROM $08000, its body from $08800, 0s after it to a 256-byte
+; boundary. Into $7000: r0 = 0, or $ff if there is none - a bad header (not
+; "CUP8" version 1, flags 0, load and entry $7000, 1 to $5000 bytes; bytes
+; 0-13 summing to 0) or a body whose sum is not byte 12. The ROM windows
+; are on meanwhile, with interrupts off: $e000-$efff shows the ROM, not the
+; kernel's bss, so this keeps to the data area and the stack.
+sys_rom_hdr db 67, 85, 80, 56, 1, 0, 0, 112, 0, 0, 0, 112
+; sys_rp: where in the ROM window
+sys_rp db 0, 0
+; sys_wp: where in RAM
+sys_wp db 0, 0
+; sys_pages: pages still to copy
+sys_pages db 0
+sys_sum db 0
+sys_rom_basic:
+	cli
+	xor r0, r0
+	st $f203, r0			; ROM_OFF 0 - the ROM windows on
+	mov r0, #16				; ROM bank 16 - ROM $08000 at $e800
+	st $f204, r0
+	xor r1, r1				; the header's sum
+	st [sys_sum], r1
+.hsum:
+	ld r0, $e800+r1
+	push r1
+	ld r1, [sys_sum]
+	add r0, r1
+	st [sys_sum], r0
+	pop r1
+	add r1, #1
+	eq r1, #14
+	bzf .summed
+	b .hsum
+.summed:
+	eq r0, #0
+	bzf .fields
+	b .none
+.fields:
+	xor r1, r1				; bytes 0-7 and 10-11 as sys_rom_hdr
+.field:
+	ld r0, $e800+r1
+	push r1
+	ld r1, [sys_rom_hdr]+r1
+	eq r0, r1
+	pop r1
+	bzf .same
+	b .none
+.same:
+	add r1, #1
+	eq r1, #8
+	bzf .past_len
+	eq r1, #12
+	bzf .length
+	b .field
+.past_len:
+	mov r1, #10
+	b .field
+.length:
+	ld r0, $e80c			; the body's sum, to compare at the end
+	st [sys_sum], r0
+	ld r0, $e808			; 1 to $5000 bytes ($7000-$bfff), in pages
+	ld r1, $e809
+	gt r1, #0x50
+	bzf .none
+	eq r0, #0
+	bzf .whole
+	eq r1, #0x50
+	bzf .none
+	add r1, #1				; a part page is a page
+.whole:
+	eq r1, #0
+	bzf .none
+	st [sys_pages], r1
+	xor r0, r0
+	st [sys_rp], r0
+	st [sys_wp], r0
+	mov r0, #0xe8
+	st [sys_rp+1], r0
+	mov r0, #0x70
+	st [sys_wp+1], r0
+	mov r0, #17				; the body - ROM $08800, bank 17
+	st $f204, r0
+.page:
+	xor r1, r1
+.byte:
+	ldd r0, [sys_rp]+r1
+	std [sys_wp]+r1, r0
+	push r1					; the sum counts down from byte 12's
+	ld r1, [sys_sum]
+	sub r1, r0
+	st [sys_sum], r1
+	pop r1
+	add r1, #1
+	eq r1, #0
+	bzf .paged
+	b .byte
+.paged:
+	ld r0, [sys_wp+1]
+	add r0, #1
+	st [sys_wp+1], r0
+	ld r0, [sys_rp+1]
+	add r0, #1
+	eq r0, #0xf0
+	bzf .bank
+	st [sys_rp+1], r0
+	b .count
+.bank:
+	mov r0, #0xe8			; the next bank, from the window's start
+	st [sys_rp+1], r0
+	ld r0, $f204
+	add r0, #1
+	st $f204, r0
+.count:
+	ld r0, [sys_pages]
+	sub r0, #1
+	st [sys_pages], r0
+	eq r0, #0
+	bzf .copied
+	b .page
+.copied:
+	ld r0, [sys_sum]		; 0 if the body summed to byte 12
+	eq r0, #0
+	bzf .off
+.none:
+	mov r0, #0xff
+.off:
+	mov r1, #1
+	st $f203, r1			; ROM_OFF 1 - RAM at $e000-$efff again
+	sti
+	pop pcl
+	pop pch

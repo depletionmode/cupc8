@@ -1,16 +1,16 @@
 ; KRN-019: a program that draws in the e-ink card's native mode 2 through
 ; the kernel API: API_GFX_MODE 2, API_CLS 3 (white), then every API_GFX2
-; entry. It leaves what they gave at $7e00-$7e11:
-;   $7e00 API_GFX_MODE 2
-;   $7e01 PIXEL (10, 20) grey 0          $7e02 FILL_RECT (100, 50) 20 x 10 grey 1
-;   $7e03 RECT (200, 50) 30 x 20 grey 0  $7e04 LINE (0, 400) - (640, 400) grey 2
-;   $7e05 BLIT1 (300, 100) 16 x 2        $7e06 BLIT2 (300, 110) 8 x 1
-;   $7e07 TEXT16 "Hi" (400, 200)         $7e08 TEXT8 "A" (400, 250) on grey 2
-;   $7e09, $7e0a GETPIXEL (10, 20): r0, r1   $7e0b GETPIXEL (105, 55): r1
-;   $7e0c BLIT1 1021 wide (too wide)     $7e0d BLIT1 800 x 100 (too big)
-;   $7e0e BLIT1 1020 x 1 (the widest), from $7000, at (0, 470)
-;   $7e0f VSCROLL down 8 rows, grey 1
-;   $7e10 GETPIXEL (10, 28): r1          $7e11 GETPIXEL (0, 0): r1
+; entry. It leaves what they gave at $be00-$be11:
+;   $be00 API_GFX_MODE 2
+;   $be01 PIXEL (10, 20) grey 0          $be02 FILL_RECT (100, 50) 20 x 10 grey 1
+;   $be03 RECT (200, 50) 30 x 20 grey 0  $be04 LINE (0, 400) - (640, 400) grey 2
+;   $be05 BLIT1 (300, 100) 16 x 2        $be06 BLIT2 (300, 110) 8 x 1
+;   $be07 TEXT16 "Hi" (400, 200)         $be08 TEXT8 "A" (400, 250) on grey 2
+;   $be09, $be0a GETPIXEL (10, 20): r0, r1   $be0b GETPIXEL (105, 55): r1
+;   $be0c BLIT1 1021 wide (too wide)     $be0d BLIT1 800 x 100 (too big)
+;   $be0e BLIT1 1020 x 1 (the widest), from $7000, at (0, 470)
+;   $be0f VSCROLL down 8 rows, grey 1
+;   $be10 GETPIXEL (10, 28): r1          $be11 GETPIXEL (0, 0): r1
 ; On HDMI every r0 is $ff.
 
 t_pixel db 10,0,20,0,0
@@ -40,7 +40,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX_MODE
-	st $7e00, r0
+	st $be00, r0
 	mov r0, #3
 	push pch
 	push pcl
@@ -54,7 +54,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_PIXEL
-	st $7e01, r0
+	st $be01, r0
 
 	mov r0, #<[t_fill]
 	mov r1, #>[t_fill]
@@ -64,7 +64,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_FILL_RECT
-	st $7e02, r0
+	st $be02, r0
 
 	mov r0, #<[t_rect]
 	mov r1, #>[t_rect]
@@ -74,7 +74,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_RECT
-	st $7e03, r0
+	st $be03, r0
 
 	mov r0, #<[t_line]
 	mov r1, #>[t_line]
@@ -84,7 +84,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_LINE
-	st $7e04, r0
+	st $be04, r0
 
 	mov r0, #<[t_blit1]
 	mov r1, #>[t_blit1]
@@ -98,7 +98,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_BLIT1
-	st $7e05, r0
+	st $be05, r0
 
 	mov r0, #<[t_blit2]
 	mov r1, #>[t_blit2]
@@ -112,7 +112,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_BLIT2
-	st $7e06, r0
+	st $be06, r0
 
 	mov r0, #<[t_text16]
 	mov r1, #>[t_text16]
@@ -126,7 +126,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_TEXT16
-	st $7e07, r0
+	st $be07, r0
 
 	mov r0, #<[t_text8]
 	mov r1, #>[t_text8]
@@ -140,7 +140,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_TEXT8
-	st $7e08, r0
+	st $be08, r0
 
 	mov r0, #<[t_get1]
 	mov r1, #>[t_get1]
@@ -150,8 +150,8 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_GETPIXEL
-	st $7e09, r0
-	st $7e0a, r1
+	st $be09, r0
+	st $be0a, r1
 
 	mov r0, #<[t_get2]
 	mov r1, #>[t_get2]
@@ -161,7 +161,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_GETPIXEL
-	st $7e0b, r1
+	st $be0b, r1
 
 	mov r0, #<[t_big1]
 	mov r1, #>[t_big1]
@@ -171,7 +171,7 @@ main:
 	push pch
 	push pcl
 	b blit_here
-	st $7e0c, r0
+	st $be0c, r0
 
 	mov r0, #<[t_big2]
 	mov r1, #>[t_big2]
@@ -181,7 +181,7 @@ main:
 	push pch
 	push pcl
 	b blit_here
-	st $7e0d, r0
+	st $be0d, r0
 
 	mov r0, #<[t_edge]
 	mov r1, #>[t_edge]
@@ -191,7 +191,7 @@ main:
 	push pch
 	push pcl
 	b blit_here
-	st $7e0e, r0
+	st $be0e, r0
 
 	mov r0, #<[t_vscroll]
 	mov r1, #>[t_vscroll]
@@ -201,7 +201,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_VSCROLL
-	st $7e0f, r0
+	st $be0f, r0
 
 	mov r0, #<[t_get3]
 	mov r1, #>[t_get3]
@@ -211,7 +211,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_GETPIXEL
-	st $7e10, r1
+	st $be10, r1
 
 	mov r0, #<[t_get4]
 	mov r1, #>[t_get4]
@@ -221,7 +221,7 @@ main:
 	push pch
 	push pcl
 	b API_GFX2_GETPIXEL
-	st $7e11, r1
+	st $be11, r1
 	pop pcl
 	pop pch
 

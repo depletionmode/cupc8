@@ -1009,7 +1009,7 @@ proc buildRom(kernelSrc: string): string =
   let kernel = romDir() / "kernel.o"
   let boot = buildBootRom()
   assemble(kernelSrc, kernel)
-  makeRom(boot, kernel, romDir() / "test.rom")
+  makeRom(boot, kernel, romDir() / "test.rom", basic = "")
 
 proc testBootChain() =
   ## BOOT-001: reset into the boot ROM, POST, banner, kernel copy, and go.
@@ -1397,18 +1397,19 @@ proc testBasicList() =
 
 run testBasicList
 
-proc progIdxAt(): int =
-  ## term_basic_prog_buf_idx, the BASIC program's length, in the kernel just built
-  loadMap(romDir() / "kernel.map").resolve("term_basic_prog_buf_idx")
+# The BASIC program (basic/basic.s): "BA" at $c000, its end at $c002 (the
+# offset of its 0 from $c000), the lines from $c004 each ending in a CR,
+# then the 0; at most $c004-$dffe, the 0 at $dfff
+const progMax = 8187
 
 proc progIdx(): int =
-  let a = progIdxAt()
-  mem[a] or (mem[a + 1] shl 8)
+  ## the BASIC program's length: from $c004 to its 0
+  (mem[0xc002] or (mem[0xc003] shl 8)) - 4
 
 proc prefillProgram(lines: openArray[string]): int =
-  ## The program as if typed, straight into its buffer at $c000: each line,
-  ## a CR, then a 0; the kernel's length set. The bytes used.
-  var a = 0xc000
+  ## The program as if typed, straight into its place at $c004: each line, a
+  ## CR, then a 0; "BA" and its end at $c000. The bytes used.
+  var a = 0xc004
   for line in lines:
     for ch in line:
       mem[a] = ord(ch)
@@ -1416,17 +1417,17 @@ proc prefillProgram(lines: openArray[string]): int =
     mem[a] = 13
     inc a
   mem[a] = 0
-  let n = a - 0xc000
-  let at = progIdxAt()
-  mem[at] = n and 0xff
-  mem[at + 1] = n shr 8
-  n
+  mem[0xc000] = ord('B')
+  mem[0xc001] = ord('A')
+  mem[0xc002] = (a - 0xc000) and 0xff
+  mem[0xc003] = (a - 0xc000) shr 8
+  a - 0xc004
 
 proc bigProgram(): tuple[head, tail: seq[string], fillers: int] =
   ## KRN-017's program, near 8 KB: over 300 lines (past the line index), a
   ## GOSUB to the far end, a FOR loop past the index. `head` goes into the
-  ## buffer (8177 bytes, a REM padding it to that), then `tail` is typed:
-  ## "32010 return " (13 characters) fills it to its last byte.
+  ## buffer (progMax - 14 bytes, a REM padding it to that), then `tail` is
+  ## typed: "32010 return " (13 characters) fills it to its last byte.
   var body = @["1 let s = 0", "2 gosub 32000"]
   let ending = @["31000 for i = 1 to 3", "31010 let s = s + 100", "31020 next i", "31030 print s",
                  "31040 print t", "31050 end", "32000 let t = 7"]
@@ -1435,11 +1436,11 @@ proc bigProgram(): tuple[head, tail: seq[string], fillers: int] =
   var n = 0
   while true:
     let l = $(100 + n) & " let s = s + 1"
-    if used + l.len + 1 + 30 > 8177: break
+    if used + l.len + 1 + 30 > progMax - 14: break
     body.add(l)
     used += l.len + 1
     inc n
-  let pad = 8177 - used                        # a REM line: pad - 1 characters and its CR
+  let pad = progMax - 14 - used                        # a REM line: pad - 1 characters and its CR
   body.add("30000 rem " & "x".repeat(pad - 1 - 10))
   (body & ending, @["32010 return "], n)
 
@@ -1455,9 +1456,9 @@ proc typeRun(limit: int) =
   settle(limit)
 
 proc testProgramFull() =
-  ## KRN-017: the 8 KB program buffer at $c000-$dfff: a program 8177 bytes
-  ## long takes a typed 13-character line (its CR and the 0 after it end at
-  ## $dfff), after refusing the same line one character longer, and then
+  ## KRN-017: the 8 KB program buffer at $c000-$dfff: a program 8173 bytes
+  ## long (from $c004) takes a typed 13-character line (its CR and the 0
+  ## after it end at $dfff), after refusing the same line one character longer, and then
   ## refuses another ("PROGRAM FULL"), writing nothing past $dfff; the
   ## program (over 400 lines, line numbers to 32010: past the 300-line
   ## index, a GOSUB to its far end, a FOR loop beyond the index) runs.
@@ -1470,22 +1471,22 @@ proc testProgramFull() =
   settle(6_000_000)
   let (head, tail, fillers) = bigProgram()
   let used = prefillProgram(head)
-  expect("the program before the last line", used, 8177, 4)
+  expect("the program before the last line", used, progMax - 14, 4)
   let bss0 = mem[0xe000]
   let g = gpuCard()
   typeLine("32010 return  ")                   # one character too many
   expectTrue("a line that would end past $dfff is refused", gpuFind(g, "PROGRAM FULL") >= 0)
-  expect("... and the program is as it was", progIdx(), 8177, 4)
+  expect("... and the program is as it was", progIdx(), progMax - 14, 4)
   typeLine("clr")
   typeLine(tail[0])
   expectTrue("the line that fits exactly is taken", gpuFind(g, "PROGRAM FULL") < 0)
-  expect("the program is 8191 bytes", progIdx(), 8191, 4)
+  expect("the program is " & $progMax & " bytes", progIdx(), progMax, 4)
   expect("its CR at $dffe", mem[0xdffe], 13)
   expect("the 0 after it at $dfff", mem[0xdfff], 0)
   typeLine("32020 print 1")
   expectTrue("a line past it is refused (PROGRAM FULL)", gpuFind(g, "PROGRAM FULL") >= 0)
   expect("nothing written past $dfff", mem[0xe000], bss0)
-  expect("the program still 8191 bytes", progIdx(), 8191, 4)
+  expect("the program still " & $progMax & " bytes", progIdx(), progMax, 4)
   typeLine("clr")
   typeRun(300_000_000)
   let want = @[$(fillers + 300), "7", "DONE."]
@@ -2535,12 +2536,12 @@ proc testStorage() =
   discard fatcheck("put " & quoteShell(img) & " PC.BAS " & quoteShell(storeDir / "pc.txt"))
   discard fatcheck("put " & quoteShell(img) & " BIG.DAT " & quoteShell(storeDir / "big.dat"))
   # more than the 8 KB buffer: "1 print "long"", then 300 REM lines; a line
-  # goes in while it, its CR and a 0 end by $dfff
+  # goes in while it, its CR and a 0 end by $dfff (the program from $c004)
   var long = "1 print \"long\"\r\n"
   var longFit = 15
   for i in 1..300:
     long.add($(i * 10 + 10000) & " rem " & "a".repeat(20) & "\r\n")
-    if longFit + 32 <= 8192: longFit += 31     # 30 characters and the CR
+    if longFit + 31 <= progMax: longFit += 31     # 30 characters and the CR
   writeFile(storeDir / "long.txt", long)
   discard fatcheck("put " & quoteShell(img) & " LONG.BAS " & quoteShell(storeDir / "long.txt"))
 
@@ -2684,12 +2685,12 @@ run testStorage
 # ---------------------------------------------------------------------------
 
 proc progText(): string =
-  ## The BASIC program as the kernel keeps it: its length's bytes from $c000,
-  ## each CR as "|", and "!" unless a 0 follows them
+  ## The BASIC program as BASIC keeps it: its length's bytes from $c004,
+  ## each CR as "|", and "!" unless a 0 follows them (or "BA" is not at $c000)
   let n = progIdx()
-  for a in 0xc000 ..< 0xc000 + n:
+  for a in 0xc004 ..< 0xc004 + n:
     result.add(if mem[a] == 13: '|' else: char(mem[a]))
-  if mem[0xc000 + n] != 0: result.add("!")
+  if mem[0xc004 + n] != 0 or mem[0xc000] != ord('B') or mem[0xc001] != ord('A'): result.add("!")
 
 proc expectText(name, got, want: string) =
   if got == want: ok(name)
@@ -2717,7 +2718,7 @@ proc testBasicEdit() =
   ## every edit (the lines, each CR, the 0 and the length); list and run see
   ## the sorted program, GOTO and GOSUB reach lines typed out of order and
   ## lines added or changed after a run. PROGRAM FULL stays exact at $dfff
-  ## for a replacement: one that grows the program to 8191 bytes is taken,
+  ## for a replacement: one that grows the program to 8187 bytes is taken,
   ## one byte more refused with the program and $e000 untouched, a shorter
   ## one taken on a full program. A line above the last typed one is looked
   ## for from that one's place: typing in order after 263 lines is as quick
@@ -2773,18 +2774,19 @@ proc testBasicEdit() =
        "lines deleted, inserted and changed")
   expectTrue("GOTO and GOSUB after more edits", runOutput() == @["1", "5", "2", "55"])
 
-  # PROGRAM FULL for replacements: 8180 bytes, then line 1 (7 characters)
-  # replaced by 18 (the program to 8191, its 0 at $dfff) and by 19
+  # PROGRAM FULL for replacements: progMax - 11 bytes, then line 1 (7
+  # characters) replaced by 18 (the program to progMax, its 0 at $dfff) and by 19
   bootBasic(rom)
+  let before = progMax - 11
   var head = @["1 rem a"]
   var used = 8
   var n = 0
-  while used + 31 + 20 <= 8180:
+  while used + 31 + 20 <= before:
     head.add($(1000 + n) & " rem " & "b".repeat(21))   # 30 characters and the CR
     used += 31
     inc n
-  head.add("30000 rem " & "c".repeat(8180 - used - 11))
-  expect("the program before the edits", prefillProgram(head), 8180, 4)
+  head.add("30000 rem " & "c".repeat(before - used - 11))
+  expect("the program before the edits", prefillProgram(head), before, 4)
   var rest = ""
   for l in head[1..^1]: rest.add(l & "|")
   let bss0 = mem[0xe000]
@@ -2792,7 +2794,7 @@ proc testBasicEdit() =
   typeLine("1 rem " & "a".repeat(12))
   expectTrue("a replacement that ends the program at $dfff is taken", gpuFind(g, "PROGRAM FULL") < 0)
   expectText("... the line replaced, the rest moved up", progText(), "1 rem " & "a".repeat(12) & "|" & rest)
-  expect("... 8191 bytes", progIdx(), 8191, 4)
+  expect("... " & $progMax & " bytes", progIdx(), progMax, 4)
   expect("... the last CR at $dffe", mem[0xdffe], 13)
   expect("... and the 0 at $dfff", mem[0xdfff], 0)
   typeLine("1 rem " & "a".repeat(13))
@@ -2808,7 +2810,7 @@ proc testBasicEdit() =
   expectText("... the rest moved down", progText(), "1 rem a|" & rest)
   typeLine("2 rem " & "d".repeat(4))
   expectTrue("then a new line of 10 characters fits exactly", gpuFind(g, "PROGRAM FULL") < 0)
-  expect("... 8191 bytes", progIdx(), 8191, 4)
+  expect("... " & $progMax & " bytes", progIdx(), progMax, 4)
   expectText("... in its place", progText(), "1 rem a|2 rem dddd|" & rest)
   expect("... nothing written past $dfff", mem[0xe000], bss0)
 
@@ -3133,6 +3135,44 @@ proc testKernelLayout() =
   expectTrue("code ends by $67ff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x6800)
   expectTrue("data ends by $6eff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6f00)
   expectTrue("bss ends by $efff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0xf000)
+  echo "  kernel code $1000-$", toHex(codeEnd - 1, 4), ": ", codeEnd - 0x1000, " bytes"
+  var basicInKernel: seq[string]
+  for s in kernelMap().syms.values:
+    if s.startsWith("bas_") or s.startsWith("ubasic") or s.startsWith("ub_"): basicInKernel.add(s)
+  expectTrue("no BASIC in the kernel (" & basicInKernel[0 .. min(4, basicInKernel.high)].join(" ") & ")",
+             basicInKernel.len == 0)
+  # BASIC (basic/build.sh): a program for $7000, all of it below the tests'
+  # buffers at $9400 and so below its program at $c000
+  let prg = buildBasic()
+  var bCode, bEnd = 0
+  var bBase = ""
+  for line in lines(basicMapPath()):
+    let f = line.splitWhitespace()
+    if f.len == 0: continue
+    case f[0]
+    of "base": bBase = line
+    of "line": bCode = max(bCode, parseHexInt(f[1]) + 3)
+    of "data": bEnd = max(bEnd, parseHexInt(f[1]) + parseInt(f[2]))
+    of "bss": bEnd = max(bEnd, parseHexInt(f[1]) + parseInt(f[2]))
+    else: discard
+  bEnd = max(bEnd, bCode)
+  echo "  BASIC $7000-$", toHex(bEnd - 1, 4), " with its bss (code to $", toHex(bCode - 1, 4), ", ",
+       readFile(prg).len - 4, " bytes in BASIC.PRG)"
+  expectTrue("BASIC is assembled for $7000 (" & bBase & ")", bBase.startsWith("base 0x7000 "))
+  expectTrue("BASIC ends below $9400 (at $" & toHex(bEnd - 1, 4) & ")", bEnd <= 0x9400)
+  # the ROM image: the kernel before ROM $08000, BASIC's header there
+  let rom = readFile(buildKernelRom())
+  proc u16(o: int): int = ord(rom[o]) or (ord(rom[o + 1]) shl 8)
+  expectTrue("the kernel ends before ROM $08000", 0x810 + u16(0x808) <= 0x8000)
+  let body = readFile(prg)[4 .. ^1]
+  var hsum, bsum = 0
+  for i in 0 .. 13: hsum += ord(rom[0x8000 + i])
+  for c in body: bsum += ord(c)
+  expectTrue("BASIC's header at ROM $08000: CUP8, load and entry $7000, its length, the sums",
+             rom[0x8000 ..< 0x8004] == "CUP8" and u16(0x8006) == 0x7000 and u16(0x800a) == 0x7000 and
+             u16(0x8008) == body.len and (hsum and 0xff) == 0 and ord(rom[0x800c]) == (bsum and 0xff))
+  expectTrue("its body at ROM $08800, 0s to a page", rom[0x8800 ..< 0x8800 + body.len] == body and
+             rom[0x8800 + body.len ..< 0x8800 + ((body.len + 255) and not 255)].allIt(it == '\0'))
 
 run testKernelLayout
 
@@ -3152,7 +3192,7 @@ proc testKernelBuildsConcurrent() =
   for line in map0.splitLines():
     if line.startsWith("sym "): inc syms
   expectTrue("the map built alone is whole (" & $syms & " symbols, term_do and main in it)",
-             syms > 1000 and "term_do" in map0 and " main\n" in map0)
+             syms > 500 and "term_do" in map0 and " main\n" in map0)
   let dir = romDir() / "side"
   createDir(dir)
   var bad: seq[string]
@@ -3332,74 +3372,74 @@ proc testApiProgram() =
   expect("API_RUN is 0 after power-up", mem[ApiRun], 0)
   expectTrue("the program goes in", runProgram(readFile(prg)))
   expectTrue("the program ran to its end",
-             runUntil(proc (): bool = mem[0x7e3f] == 0xa5, 30_000_000))
-  expect("API_RUN 2 while it ran", mem[0x7e30], 2)
+             runUntil(proc (): bool = mem[0xbe3f] == 0xa5, 30_000_000))
+  expect("API_RUN 2 while it ran", mem[0xbe30], 2)
   settle(2_000_000)
   expect("API_RUN 0 again at the prompt", mem[ApiRun], 0)
   let g = gpuCard()
   expectTrue("back at the prompt", waiting and gpuFind(g, ">>") >= 0)
   expect("the terminal's stack as before", SP, sp0, 4)
   # group 0
-  expect("API_VERSION", mem[0x7e00], 1)
-  expect("API_BLOCK low", mem[0x7e01], 0x00)
-  expect("API_BLOCK high", mem[0x7e02], 0x6f)
-  expect("API_SLOTS low", mem[0x7e03], 0x02)
-  expect("API_SLOTS high", mem[0x7e04], 0x00)
+  expect("API_VERSION", mem[0xbe00], 1)
+  expect("API_BLOCK low", mem[0xbe01], 0x00)
+  expect("API_BLOCK high", mem[0xbe02], 0x6f)
+  expect("API_SLOTS low", mem[0xbe03], 0x02)
+  expect("API_SLOTS high", mem[0xbe04], 0x00)
   # group 1
   expectTrue("API_PUTS and API_PUTC (" & gpuLine(g, 0) & ")", gpuLine(g, 0).startsWith("API HELLO!"))
   let x = int(simcard_gpu_cell(g, 10, 20))
   expect("API_GOTOXY then API_PUTC: X at 10,20", x and 0xff, ord('X'))
   expect("API_ATTR: its attribute", (x shr 8) and 0xff, 0x1e)
-  expect("API_GETXY ok", mem[0x7e05], 0)
-  expect("API_GETXY column", mem[0x7e06], 11)
-  expect("API_GETXY row", mem[0x7e07], 20)
-  expect("API_POLLKEY with no key", mem[0x7e08], 0xff)
+  expect("API_GETXY ok", mem[0xbe05], 0)
+  expect("API_GETXY column", mem[0xbe06], 11)
+  expect("API_GETXY row", mem[0xbe07], 20)
+  expect("API_POLLKEY with no key", mem[0xbe08], 0xff)
   let p = int(simcard_gpu_cell(g, 0, 29))
   expectTrue("API_POKE: P at 0,29 in $4e", (p and 0xff) == ord('P') and ((p shr 8) and 0xff) == 0x4e)
   # group 2
-  expect("API_GFX_GETPIXEL ok", mem[0x7e09], 0)
-  expect("API_GFX_PIXEL then GETPIXEL", mem[0x7e0a], 42)
-  expect("API_GFX_FILL_RECT then GETPIXEL", mem[0x7e0b], 7)
-  expect("API_GFX_VSYNC ok", mem[0x7e0c], 0)
+  expect("API_GFX_GETPIXEL ok", mem[0xbe09], 0)
+  expect("API_GFX_PIXEL then GETPIXEL", mem[0xbe0a], 42)
+  expect("API_GFX_FILL_RECT then GETPIXEL", mem[0xbe0b], 7)
+  expect("API_GFX_VSYNC ok", mem[0xbe0c], 0)
   # group 3, on HDMI: nothing, $ff
-  expect("API_EINK_GET on HDMI", mem[0x7e0d], 0xff)
-  expect("API_EINK_GET leaves $ff (first)", mem[0x7e0e], 0xff)
-  expect("API_EINK_GET leaves $ff (last)", mem[0x7e0f], 0xff)
-  expect("API_EINK_STATUS on HDMI", mem[0x7e10], 0xff)
-  expect("API_EINK_STATUS leaves $ff", mem[0x7e11], 0xff)
-  expect("API_EINK_AUTO on HDMI", mem[0x7e12], 0xff)
+  expect("API_EINK_GET on HDMI", mem[0xbe0d], 0xff)
+  expect("API_EINK_GET leaves $ff (first)", mem[0xbe0e], 0xff)
+  expect("API_EINK_GET leaves $ff (last)", mem[0xbe0f], 0xff)
+  expect("API_EINK_STATUS on HDMI", mem[0xbe10], 0xff)
+  expect("API_EINK_STATUS leaves $ff", mem[0xbe11], 0xff)
+  expect("API_EINK_AUTO on HDMI", mem[0xbe12], 0xff)
   # group 4
-  expect("API_ST_INFO", mem[0x7e13], 0)
-  expect("API_ST_INFO media: SD", mem[0x7e14], 1)
-  expect("API_ST_OPEN to write", mem[0x7e15], 0)
-  expect("API_ST_WRITE", mem[0x7e16], 0)
-  expect("API_ST_CLOSE", mem[0x7e17], 0)
-  expect("API_ST_OPEN to read", mem[0x7e18], 0)
-  expect("API_ST_SEEK", mem[0x7e19], 0)
-  expect("API_ST_READ", mem[0x7e1a], 0)
-  expect("API_ST_READ read the 4 bytes after the seek", mem[0x7e1b], 4)
+  expect("API_ST_INFO", mem[0xbe13], 0)
+  expect("API_ST_INFO media: SD", mem[0xbe14], 1)
+  expect("API_ST_OPEN to write", mem[0xbe15], 0)
+  expect("API_ST_WRITE", mem[0xbe16], 0)
+  expect("API_ST_CLOSE", mem[0xbe17], 0)
+  expect("API_ST_OPEN to read", mem[0xbe18], 0)
+  expect("API_ST_SEEK", mem[0xbe19], 0)
+  expect("API_ST_READ", mem[0xbe1a], 0)
+  expect("API_ST_READ read the 4 bytes after the seek", mem[0xbe1b], 4)
   var got = ""
-  for i in 0..3: got.add(char(mem[0x7e40 + i]))
+  for i in 0..3: got.add(char(mem[0xbe40 + i]))
   expectTrue("API_ST_READ data: ello (" & got & ")", got == "ello")
-  expect("API_ST_RENAME", mem[0x7e1c], 0)
-  expect("API_ST_DIR_FIRST", mem[0x7e1d], 0)
-  expect("API_ST_DIR_FIRST size", mem[0x7e1e], 5)
-  expect("API_ST_DIR_FIRST name length", mem[0x7e1f], 8)
-  expect("API_ST_DIR_FIRST the renamed name", mem[0x7e20], ord('2'))
-  expect("API_ST_DIR_NEXT: no more", mem[0x7e21], 0xff)
-  expect("API_ST_DELETE", mem[0x7e22], 0)
-  expect("API_ST_OPEN a deleted file: not found", mem[0x7e23], 3)
+  expect("API_ST_RENAME", mem[0xbe1c], 0)
+  expect("API_ST_DIR_FIRST", mem[0xbe1d], 0)
+  expect("API_ST_DIR_FIRST size", mem[0xbe1e], 5)
+  expect("API_ST_DIR_FIRST name length", mem[0xbe1f], 8)
+  expect("API_ST_DIR_FIRST the renamed name", mem[0xbe20], ord('2'))
+  expect("API_ST_DIR_NEXT: no more", mem[0xbe21], 0xff)
+  expect("API_ST_DELETE", mem[0xbe22], 0)
+  expect("API_ST_OPEN a deleted file: not found", mem[0xbe23], 3)
   r = fatcheck("check " & quoteShell(img) & " --absent API.TXT --absent API2.TXT")
   if r.exitCode != 0: echo r.output
   expectTrue("the card as a PC sees it: nothing left", r.exitCode == 0)
   # a blank entry of group 5 (after the 16 net routines), and group 7
-  expect("a blank net entry: $ff", mem[0x7e24], 0xff)
-  expect("... and API_ERR $ff", mem[0x7e25], 0xff)
-  expect("an empty reserved entry: $ff", mem[0x7e27], 0xff)
+  expect("a blank net entry: $ff", mem[0xbe24], 0xff)
+  expect("... and API_ERR $ff", mem[0xbe25], 0xff)
+  expect("an empty reserved entry: $ff", mem[0xbe27], 0xff)
   # group 6
-  expect("API_WAIT_MS", mem[0x7e26], 0)
-  let t0 = mem[0x7e28] or (mem[0x7e29] shl 8)
-  let t1 = mem[0x7e2c] or (mem[0x7e2d] shl 8)
+  expect("API_WAIT_MS", mem[0xbe26], 0)
+  let t0 = mem[0xbe28] or (mem[0xbe29] shl 8)
+  let t1 = mem[0xbe2c] or (mem[0xbe2d] shl 8)
   # the wait is to the counter's next step, then 20 more (20 to 21 ms), so
   # the counter moves 21 between the two TICKS (22 if it stepped between
   # the first TICKS and the wait's first look)
@@ -3410,9 +3450,9 @@ proc testApiProgram() =
   let ex = workDir / "api_exit.prg"
   mkprg(testdata / "api_exit.s", ex)
   expectTrue("the program goes in", runProgram(readFile(ex)))
-  expectTrue("it ran", runUntil(proc (): bool = mem[0x7e00] == 0x5a and mem[ApiRun] == 0, 2_000_000))
+  expectTrue("it ran", runUntil(proc (): bool = mem[0xbe00] == 0x5a and mem[ApiRun] == 0, 2_000_000))
   settle(2_000_000)
-  expect("API_EXIT does not return", mem[0x7e00], 0x5a)
+  expect("API_EXIT does not return", mem[0xbe00], 0x5a)
   expectTrue("back at the prompt", waiting)
   expect("the terminal's stack as before, 6 bytes left behind", SP, sp0, 4)
   expectTrue("the terminal still works", cmdOutput("10 print 7*6").len == 0 and runOutput() == @["42"])
@@ -3454,11 +3494,10 @@ proc testExec() =
   put("BAS", "10 print 6*7\r\n20 print \"BASIC OK\"\r\n")
   bootStorage(rom, img)
   let sp0 = SP
-  expectTrue("exec a program", cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"])
-  var same = true
-  for i in 0 ..< body.len:
-    if mem[0x7000 + i] != body[i].ord: same = false
-  expectTrue("its " & $body.len & " bytes at $7000 (three chunks)", same)
+  # NATIVE OK: its data came in whole (the program sums it; BASIC is loaded
+  # over $7000 again once it has ended)
+  expectTrue("exec a program: its " & $body.len & " bytes in three chunks",
+             cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"])
   expect("the terminal's stack as before", SP, sp0, 4)
   mem[0xdfff] = 0
   expectTrue("exec one that fills $7000-$dfff", cmdOutput("exec full.prg") == @["NATIVE OK"])
@@ -3481,6 +3520,289 @@ proc testExec() =
 
 run testExec
 
+# ---------------------------------------------------------------------------
+# BASIC as a program at $7000 (basic/, doc/proposals/basic-program.md)
+# ---------------------------------------------------------------------------
+
+proc basicBody(prg: string): string =
+  ## a BASIC.PRG's body, as it goes to $7000
+  prg[4 .. ^1]
+
+proc bodyAt7000(body: string): bool =
+  ## `body` is what $7000 holds
+  for i in 0 ..< body.len:
+    if mem[0x7000 + i] != body[i].ord: return false
+  true
+
+proc hookAt(): int =
+  ## the terminal's hook (kernel/sys.s sys_hook, API_TERM_HOOK)
+  let a = loadMap(kernelMapPath()).resolve("sys_hook")
+  mem[a] or (mem[a + 1] shl 8)
+
+proc pcRun(data: string): bool =
+  ## `cupc8.py run`: the program in, then until it has ended and the terminal
+  ## is back at its prompt (BASIC loaded again)
+  if not runProgram(data): return false
+  if not runUntil(proc (): bool = mem[ApiRun] == 2, 5_000_000): return false
+  if not runUntil(proc (): bool = mem[ApiRun] == 0, 40_000_000): return false
+  settle(5_000_000)
+  true
+
+proc bootStorageTimed(rom, img: string; fitted = true): int =
+  ## bootStorage; the milliseconds from reset to the prompt
+  if fitted:
+    machineCards([CardGpu, CardIo, 0, CardStorage])
+    if img.len > 0 and simcard_storage_image(storageCard(), img, 0) != 0:
+      fail("cannot insert " & img)
+  else:
+    machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let t0 = msCount()
+  settle(20_000_000)
+  msCount() - t0
+
+proc breakFatChain(img, name: string) =
+  ## The file `name` (8.3, in the root of a FAT12 or FAT16 image) left with
+  ## its first cluster's FAT entry 1, which no reader follows: its first
+  ## cluster reads, the rest gives an error (FatFs FR_INT_ERR).
+  var d = readFile(img)
+  proc u16(o: int): int = ord(d[o]) or (ord(d[o + 1]) shl 8)
+  let bps = u16(11)
+  let spc = ord(d[13])
+  let rsv = u16(14)
+  let nfats = ord(d[16])
+  let rootN = u16(17)
+  let spf = u16(22)
+  let total = if u16(19) != 0: u16(19) else: u16(32) or (u16(34) shl 16)
+  let rootSecs = (rootN * 32 + bps - 1) div bps
+  let clusters = (total - rsv - nfats * spf - rootSecs) div spc
+  let fat12 = clusters < 4085
+  let root = (rsv + nfats * spf) * bps
+  var want = name.split('.')[0].alignLeft(8) & name.split('.')[1].alignLeft(3)
+  var clus = -1
+  for e in 0 ..< rootN:
+    if d[root + 32 * e ..< root + 32 * e + 11] == want.toUpperAscii:
+      clus = u16(root + 32 * e + 26)
+  doAssert clus >= 2, name & " not in the image's root"
+  for f in 0 ..< nfats:
+    let base = (rsv + f * spf) * bps
+    if fat12:
+      let o = base + clus * 3 div 2
+      if clus mod 2 == 0:
+        d[o] = '\x01'
+        d[o + 1] = char(ord(d[o + 1]) and 0xf0)
+      else:
+        d[o] = char((ord(d[o]) and 0x0f) or 0x10)
+        d[o + 1] = '\x00'
+    else:
+      d[base + clus * 2] = '\x01'
+      d[base + clus * 2 + 1] = '\x00'
+  writeFile(img, d)
+  echo "  ", name, ": first cluster ", clus, " of ", clusters, (if fat12: " (FAT12)" else: " (FAT16)"),
+       ", ", spc * bps, " bytes a cluster"
+
+proc testBasicReload() =
+  ## KRN-031: BASIC is a program for $7000 that the kernel copies from the
+  ## ROM at boot and again after every native program, which went over it:
+  ## `cupc8.py run` (API_RUN) and exec from the card alike. Each time $7000
+  ## holds BASIC.PRG's body again and the terminal's hook is BASIC's. A
+  ## program typed before a native program that stayed below $c000 is still
+  ## there after it (list, run); after one that wrote over $c000 (as one over
+  ## 20 KB would) BASIC starts with no program, and a new one runs.
+  echo "== BASIC loaded again after a native program =="
+  let rom = buildKernelRom()
+  let body = basicBody(readFile(romDir() / "BASIC.PRG"))
+  let bhook = loadMap(basicMapPath()).resolve("bas_hook")
+  createDir(storeDir)
+  let img = storeDir / "reload.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  let prog = workDir / "exec_prog.prg"
+  let big = workDir / "big_prog.prg"
+  mkprg(testdata / "exec_prog.s", prog)
+  mkprg(testdata / "big_prog.s", big)
+  discard fatcheck("put " & quoteShell(img) & " PROG.PRG " & quoteShell(prog))
+  discard fatcheck("put " & quoteShell(img) & " BIG.PRG " & quoteShell(big))
+  bootStorage(rom, img)
+  let g = gpuCard()
+  expectTrue("after boot: the ROM's BASIC at $7000 (" & $body.len & " bytes)", bodyAt7000(body))
+  expect("... and the hook is BASIC's (bas_hook)", hookAt(), bhook, 4)
+  typeLine("10 print 6*7")
+  typeLine("20 print \"KEPT\"")
+  let sp0 = SP
+  expectTrue("cupc8.py run: a native program runs", pcRun(readFile(prog)) and gpuFind(g, "NATIVE OK") >= 0)
+  expectTrue("... BASIC at $7000 again", bodyAt7000(body))
+  expect("... its hook again", hookAt(), bhook, 4)
+  expect("... the terminal's stack as before", SP, sp0, 4)
+  expectTrue("... the program kept: list", cmdOutput("list") == @["10 print 6*7", "20 print \"KEPT\""])
+  expectTrue("... and run", runOutput() == @["42", "KEPT"])
+  expectTrue("exec from the card", cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"])
+  expectTrue("... BASIC at $7000 again, the program kept",
+             bodyAt7000(body) and hookAt() == bhook and runOutput() == @["42", "KEPT"])
+  typeLine("clr")
+  expectTrue("cupc8.py run: one that writes over $c000", pcRun(readFile(big)) and gpuFind(g, "BIG OK") >= 0)
+  expectTrue("... BASIC at $7000 again", bodyAt7000(body) and hookAt() == bhook)
+  expectText("... with no program (\"BA\" and the end at $c000 again)", progText(), "")
+  expectTrue("... list shows nothing", cmdOutput("list").len == 0)
+  typeLine("10 print 5")
+  expectTrue("... a new program runs", runOutput() == @["5"])
+  expectTrue("exec one that writes over $c000", cmdOutput("exec \"big.prg\"") == @["BIG OK"])
+  expectTrue("... no program, BASIC works",
+             cmdOutput("list").len == 0 and bodyAt7000(body) and cmdOutput("30 print 3").len == 0 and
+             runOutput() == @["3"])
+  ioModel = imLegacy
+
+run testBasicReload
+
+proc testBasicFromCard() =
+  ## KRN-032: at boot the kernel loads BASIC.PRG from the SD card when a
+  ## storage card is fitted, an SD card is in it and the file has a good
+  ## header ("BASIC from the SD card" under the banner), else the ROM's
+  ## BASIC, with no message and no delay: no storage card, no SD card, no
+  ## file, a header of another version, one that is not "C8P", one cut short,
+  ## a file too big for $7000-$bfff, a read error in the middle of it. The
+  ## card's BASIC (here the ROM's with "D0NE." for "DONE.") is loaded again
+  ## after a native program; when it no longer loads (the SD card taken out),
+  ## the ROM's.
+  echo "== BASIC.PRG from the SD card =="
+  let rom = buildKernelRom()
+  let prg = readFile(romDir() / "BASIC.PRG")
+  let romBody = basicBody(prg)
+  doAssert prg.count("\nDONE.\n") == 1
+  let card = prg.replace("\nDONE.\n", "\nD0NE.\n")
+  let cardBody = basicBody(card)
+  let prog = workDir / "exec_prog.prg"
+  mkprg(testdata / "exec_prog.s", prog)
+  createDir(storeDir)
+  proc image(name: string; basic = ""; corrupt = false): string =
+    result = storeDir / name
+    let r = fatcheck("blank " & quoteShell(result) & " 4096")
+    if r.exitCode != 0: fail("fatcheck blank: " & r.output)
+    discard fatcheck("put " & quoteShell(result) & " PROG.PRG " & quoteShell(prog))
+    if basic.len > 0:
+      writeFile(storeDir / "basic.bin", basic)
+      discard fatcheck("put " & quoteShell(result) & " BASIC.PRG " & quoteShell(storeDir / "basic.bin"))
+      if corrupt: breakFatChain(result, "BASIC.PRG")
+
+  let plain = bootStorageTimed(rom, "", fitted = false)
+  echo "  the ROM's BASIC, no storage card: at the prompt ", plain, " ms after reset"
+  expectTrue("no storage card: the ROM's BASIC, no message",
+             bodyAt7000(romBody) and gpuFind(gpuCard(), "SD card") < 0 and runOutput() == @[] and
+             gpuFind(gpuCard(), "DONE.") >= 0)
+
+  # the card's BASIC
+  let good = image("basic-good.img", card)
+  let t = bootStorageTimed(rom, good)
+  echo "  BASIC.PRG from the card: ", t, " ms"
+  let g = gpuCard()
+  expectTrue("BASIC.PRG on the card: its body at $7000", bodyAt7000(cardBody))
+  expect("... the line under the banner", gpuFind(g, "BASIC from the SD card"), gpuFind(g, "CUPC/8 BASIC") + 1)
+  typeLine("10 print 6*7")
+  expectTrue("... it runs programs (its D0NE.)", cmdOutput("run", "D0NE.") == @["42"] and gpuFind(g, "D0NE.") >= 0)
+  expectTrue("... a native program, then the card's BASIC again, the program kept",
+             pcRun(readFile(prog)) and bodyAt7000(cardBody) and cmdOutput("run", "D0NE.") == @["42"])
+  expectTrue("... exec, then the card's again", cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"] and
+             bodyAt7000(cardBody))
+  discard simcard_storage_image(storageCard(), nil, 0)      # the SD card out
+  expectTrue("... the SD card out, a native program: the ROM's BASIC, the program kept",
+             pcRun(readFile(prog)) and bodyAt7000(romBody) and runOutput() == @["42"])
+
+  # the fallbacks: the ROM's BASIC, no message, no delay
+  var big = "C8P\x01" & cardBody
+  while big.len < 4 + 0x5001: big.add('\0')
+  # (no delay: within 20 ms of a machine with no storage card; the read
+  # error comes after 2 KB are read, sooner than the card's BASIC loads)
+  let cases = @[
+    ("no SD card", "", plain + 20),
+    ("no BASIC.PRG", image("basic-none.img"), plain + 20),
+    ("a header of another version", image("basic-ver.img", "C8P\x02" & cardBody), plain + 20),
+    ("not a program file", image("basic-text.img", "10 print 1\r\n"), plain + 20),
+    ("a header cut short", image("basic-cut.img", "C8"), plain + 20),
+    ("too big for $7000-$bfff", image("basic-big.img", big), plain + 20),
+    ("a read error after its first cluster", image("basic-err.img", card, corrupt = true), t)]
+  for (what, img, most) in cases:
+    let ms = bootStorageTimed(rom, img)
+    let g = gpuCard()
+    echo "  ", what, ": at the prompt ", ms, " ms after reset"
+    expectTrue(what & ": the ROM's BASIC, no message",
+               bodyAt7000(romBody) and gpuFind(g, "SD card") < 0 and gpuFind(g, ">>") >= 0)
+    expectTrue(what & ": no delay (" & $ms & " ms, at most " & $most & ")", ms <= most)
+    typeLine("10 print 7")
+    expectTrue(what & ": it runs programs", runOutput() == @["7"])
+  ioModel = imLegacy
+
+run testBasicFromCard
+
+proc testKernelNoBasic() =
+  ## KRN-032: a ROM image with no BASIC, one whose BASIC header is bad, and
+  ## one whose BASIC body does not match its sum: the kernel starts with no
+  ## BASIC (no hook) and the terminal works - the banner, the prompt, its
+  ## commands; every other line is an invalid command.
+  echo "== the kernel with no BASIC =="
+  let good = buildKernelRom()
+  let none = makeRom(buildBootRom(), buildKernel(), romDir() / "nobasic.rom", basic = "")
+  var data = readFile(good)
+  data[0x8000] = 'X'                             # the magic
+  writeFile(romDir() / "badbasic.rom", data)
+  data = readFile(good)
+  data[0x8900] = char(ord(data[0x8900]) xor 1)   # a body byte
+  writeFile(romDir() / "sumbasic.rom", data)
+  for (what, rom) in [("no BASIC", none), ("a bad BASIC header", romDir() / "badbasic.rom"),
+                      ("a BASIC body with a bad sum", romDir() / "sumbasic.rom")]:
+    bootBasic(rom)
+    let g = gpuCard()
+    expectTrue(what & ": the banner and the prompt", gpuFind(g, "CUPC/8 BASIC") >= 0 and gpuFind(g, ">>") >= 0)
+    expect(what & ": no hook", hookAt(), 0, 4)
+    expectTrue(what & ": help", cmdOutput("help").len == 3)
+    expectTrue(what & ": a BASIC line is an invalid command",
+               cmdOutput("10 print 1") == @["ERROR: invalid cmd!"])
+    expectTrue(what & ": run too", cmdOutput("run") == @["ERROR: invalid cmd!"])
+  ioModel = imLegacy
+
+run testKernelNoBasic
+
+proc testApiLine() =
+  ## KRN-033: the API entries BASIC as a program brought (kernel/sys.s):
+  ## API_ST_PERROR prints the terminal's message for a storage error;
+  ## API_READLINE reads a line with the terminal's editor (Backspace takes a
+  ## character back) into a buffer: the characters, a CR, a 0, r1 = their
+  ## count, r0 = 0; API_TERM_HOOK sets the hook (0, 0: none), r0 = 0; the
+  ## kernel loads BASIC after the program, which sets its hook again.
+  echo "== kernel API: API_ST_PERROR, API_READLINE, API_TERM_HOOK =="
+  let rom = buildKernelRom()
+  let prg = workDir / "api_line.prg"
+  mkprg(testdata / "api_line.s", prg)
+  let bhook = loadMap(basicMapPath()).resolve("bas_hook")
+  bootBasic(rom)
+  let g = gpuCard()
+  mem[0xbe3f] = 0
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("it waits for a line", runUntil(proc (): bool = mem[ApiRun] == 2 and waiting, 20_000_000))
+  expectTrue("API_ST_PERROR 3: file not found", gpuFind(g, "file not found") >= 0)
+  for k in ["h", "i", "\b", "e", "y"]:
+    pushKey(ord(k[0]))
+    settle(400_000)
+    if waiting: discard cpuStep()
+  pushKey(13)
+  expectTrue("it ran", runUntil(proc (): bool = mem[0xbe3f] == 0xa5, 5_000_000))
+  expect("API_READLINE: r0 0", mem[0xbe00], 0)
+  expect("API_READLINE: 3 characters", mem[0xbe01], 3)
+  var got = ""
+  for i in 0..4: got.add(char(mem[0xbe40 + i]))
+  expectTrue("API_READLINE: hey, a CR, a 0 (" & got.escape & ")", got == "hey\r\0")
+  expectTrue("... echoed, the i taken back", gpuFind(g, "hey") >= 0 and gpuFind(g, "hi") < 0)
+  expect("API_TERM_HOOK 0, 0: r0 0", mem[0xbe02], 0)
+  expectTrue("back at the prompt", runUntil(proc (): bool = mem[ApiRun] == 0 and waiting, 40_000_000))
+  expect("BASIC's hook again", hookAt(), bhook, 4)
+  expectTrue("the terminal works", cmdOutput("10 print 6*7").len == 0 and runOutput() == @["42"])
+  ioModel = imLegacy
+
+run testApiLine
+
 proc testEinkApi() =
   ## KRN-013: the e-ink API entries (kernel/eink.s eink_auto, eink_get,
   ## eink_status) on the simulator's e-ink card (fw/eink/core, AUTO_EXT and
@@ -3497,11 +3819,11 @@ proc testEinkApi() =
     cpuLoadRom(rom)
     cpuBootRom()
     settle(6_000_000)
-    for a in 0x7e00 .. 0x7e0b: mem[a] = 0x55
+    for a in 0xbe00 .. 0xbe0b: mem[a] = 0x55
     expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
     expectTrue(name & ": it ran", runUntil(proc (): bool = mem[ApiRun] == 0, 20_000_000))
     var got: seq[int]
-    for a in 0x7e00 .. 0x7e0b: got.add(mem[a])
+    for a in 0xbe00 .. 0xbe0b: got.add(mem[a])
     let want = if card == CardGpu: @[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
                else: @[0, 0, 1, 5, 2, 50, 3, 3, 0, got[9], got[10], got[11]]
     expectTrue(name & ": AUTO, GET (the settings back), STATUS: " & $got, got == want)
@@ -3533,13 +3855,13 @@ proc testGfx2Api() =
     cpuLoadRom(rom)
     cpuBootRom()
     settle(6_000_000)
-    for a in 0x7e00 .. 0x7e11: mem[a] = 0x55
+    for a in 0xbe00 .. 0xbe11: mem[a] = 0x55
     expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
-    expectTrue(name & ": it ran", runUntil(proc (): bool = mem[0x7e11] != 0x55 and mem[ApiRun] == 0, 40_000_000))
+    expectTrue(name & ": it ran", runUntil(proc (): bool = mem[0xbe11] != 0x55 and mem[ApiRun] == 0, 40_000_000))
     let g = gpuCard()
     var r: seq[int]
-    for a in [0x7e00, 0x7e01, 0x7e02, 0x7e03, 0x7e04, 0x7e05, 0x7e06, 0x7e07, 0x7e08, 0x7e09, 0x7e0c, 0x7e0d,
-              0x7e0e, 0x7e0f]: r.add(mem[a])
+    for a in [0xbe00, 0xbe01, 0xbe02, 0xbe03, 0xbe04, 0xbe05, 0xbe06, 0xbe07, 0xbe08, 0xbe09, 0xbe0c, 0xbe0d,
+              0xbe0e, 0xbe0f]: r.add(mem[a])
     if card == CardGpu:
       expectTrue("HDMI: every entry $ff " & $r, r == newSeqWith(14, 0xff))
       expect("HDMI: still TEXT", int(simcard_gpu_mode(g)), 0)
@@ -3548,10 +3870,10 @@ proc testGfx2Api() =
     expectTrue("e-ink: MODE 2 .. VSCROLL 0, the big BLITs $fe " & $r,
                r == @[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xfe, 0xfe, 0, 0])
     expect("e-ink: mode 2", int(simcard_gpu_mode(g)), 2)
-    expect("GETPIXEL (10, 20) before the scroll", mem[0x7e0a], 0)
-    expect("GETPIXEL (105, 55) before the scroll: the fill", mem[0x7e0b], 1)
-    expect("GETPIXEL (10, 28) after VSCROLL -8: the pixel moved down", mem[0x7e10], 0)
-    expect("GETPIXEL (0, 0) after VSCROLL -8: the new rows in grey 1", mem[0x7e11], 1)
+    expect("GETPIXEL (10, 20) before the scroll", mem[0xbe0a], 0)
+    expect("GETPIXEL (105, 55) before the scroll: the fill", mem[0xbe0b], 1)
+    expect("GETPIXEL (10, 28) after VSCROLL -8: the pixel moved down", mem[0xbe10], 0)
+    expect("GETPIXEL (0, 0) after VSCROLL -8: the new rows in grey 1", mem[0xbe11], 1)
     proc g2(x, y: int): int = int(simcard_eink_pixel2(g, cint(x), cint(y)))
     let d = 8                                   # everything moved down 8 rows
     expectTrue("VSCROLL: rows 0-7 grey 1, row 8 white", g2(300, 0) == 1 and g2(300, 7) == 1 and g2(300, 8) == 3)
@@ -3608,12 +3930,12 @@ proc testText8Free() =
   expectTrue("the program goes in", runProgram(readFile(prg)))
   expectTrue("it reaches GFX mode", runUntil(proc (): bool = simcard_gpu_mode(g) == 1, 5_000_000))
   simcard_gpu_hold(g, 1)
-  discard runUntil(proc (): bool = mem[0x7e00] == 1, 15_000_000)
-  expect("TEXT8 waits while the FIFO has no room for it", mem[0x7e00], 0)
+  discard runUntil(proc (): bool = mem[0xbe00] == 1, 15_000_000)
+  expect("TEXT8 waits while the FIFO has no room for it", mem[0xbe00], 0)
   expect("... and nothing was dropped", int(simcard_gpu_errors(g)), 0)
   simcard_gpu_hold(g, 0)
   expectTrue("the card released: TEXT8 returns, the program ends",
-             runUntil(proc (): bool = mem[0x7e01] == 2 and mem[ApiRun] == 0, 20_000_000))
+             runUntil(proc (): bool = mem[0xbe01] == 2 and mem[ApiRun] == 0, 20_000_000))
   settle(2_000_000)
   var blank = 0
   for y in 100..107:
@@ -3649,75 +3971,77 @@ proc testMemApi() =
     for i, v in s: poke(a + i, v)
   proc pattern(a, n, seed: int) =
     for i in 0 ..< n: poke(a + i, (i * 7 + seed) and 0xff)
-  # the buffers
-  pokes(0x8000, "HELLO".mapIt(ord(it)))
-  pokes(0x8010, "HELLO".mapIt(ord(it)))
-  pokes(0x8020, "HELLA".mapIt(ord(it)))
-  pokes(0x8030, @[0xf0, 1])
-  pokes(0x8038, @[0x10, 1])
-  pattern(0x80f0, 300, 3)                  # 300 bytes across pages ...
-  pattern(0x85f8, 300, 3)                  # ... the same, but byte 290
-  poke(0x85f8 + 290, peek(0x80f0 + 290) - 1)
-  pattern(0x9000, 300, 5)                  # copy sources
-  for a in 0x87fe .. 0x8930: poke(a, 0xee) # the copy's target, guards round it
-  pattern(0xa0f0, 0x130, 11)               # overlap, dst above src
-  pattern(0xa400, 300, 13)                 # overlap, dst below src
-  pattern(0xa700, 16, 17)                  # onto itself
-  poke(0xa7ff, 0x55)                       # copy of 0 there
+  # the buffers, $9400-$bbff: above BASIC ($7000 to its bss's end, under
+  # $9400), which the kernel loads again after the program, and below the
+  # results ($bc00-$beff)
+  pokes(0x9400, "HELLO".mapIt(ord(it)))
+  pokes(0x9410, "HELLO".mapIt(ord(it)))
+  pokes(0x9420, "HELLA".mapIt(ord(it)))
+  pokes(0x9430, @[0xf0, 1])
+  pokes(0x9438, @[0x10, 1])
+  pattern(0x94f0, 300, 3)                  # 300 bytes across pages ...
+  pattern(0x99f8, 300, 3)                  # ... the same, but byte 290
+  poke(0x99f8 + 290, peek(0x94f0 + 290) - 1)
+  pattern(0xa400, 300, 5)                  # copy sources
+  for a in 0x9bfe .. 0x9d30: poke(a, 0xee) # the copy's target, guards round it
+  pattern(0xb4f0, 0x130, 11)               # overlap, dst above src
+  pattern(0xb800, 300, 13)                 # overlap, dst below src
+  pattern(0xbb00, 16, 17)                  # onto itself
+  poke(0xbbff, 0x55)                       # copy of 0 there
   type Case = tuple[op, dst, src, len: int]
   let cases: seq[Case] = @[
-    (0, 0x8000, 0x8010, 5),      # 0 equal
-    (0, 0x8020, 0x8010, 5),      # 1 less at byte 4
-    (0, 0x8030, 0x8038, 2),      # 2 greater at byte 0, unsigned
-    (0, 0x8020, 0x8038, 0),      # 3 length 0
-    (0, 0x80f0, 0x85f8, 300),    # 4 across pages, byte 290
-    (1, 0x8800, 0x9000, 300),    # 5 copy 300
-    (1, 0xa7ff, 0x9000, 0),      # 6 copy 0
-    (1, 0xa100, 0xa0f0, 0x120),  # 7 overlap, dst above src
-    (1, 0xa3f0, 0xa400, 300),    # 8 overlap, dst below src
-    (1, 0xa700, 0xa700, 16)]     # 9 onto itself
-  poke(0x7d00, cases.len)
+    (0, 0x9400, 0x9410, 5),      # 0 equal
+    (0, 0x9420, 0x9410, 5),      # 1 less at byte 4
+    (0, 0x9430, 0x9438, 2),      # 2 greater at byte 0, unsigned
+    (0, 0x9420, 0x9438, 0),      # 3 length 0
+    (0, 0x94f0, 0x99f8, 300),    # 4 across pages, byte 290
+    (1, 0x9c00, 0xa400, 300),    # 5 copy 300
+    (1, 0xbbff, 0xa400, 0),      # 6 copy 0
+    (1, 0xb500, 0xb4f0, 0x120),  # 7 overlap, dst above src
+    (1, 0xb7f0, 0xb800, 300),    # 8 overlap, dst below src
+    (1, 0xbb00, 0xbb00, 16)]     # 9 onto itself
+  poke(0xbd00, cases.len)
   for i, c in cases:
-    pokes(0x7d10 + 8 * i, @[c.op, c.dst and 0xff, c.dst shr 8, c.src and 0xff, c.src shr 8,
+    pokes(0xbd10 + 8 * i, @[c.op, c.dst and 0xff, c.dst shr 8, c.src and 0xff, c.src shr 8,
                             c.len and 0xff, c.len shr 8])
-  poke(0x7cff, 0)
+  poke(0xbcff, 0)
   expectTrue("the program goes in", runProgram(readFile(prg)))
-  expectTrue("it ran every case", runUntil(proc (): bool = peek(0x7cff) == 0xa5 and mem[ApiRun] == 0,
+  expectTrue("it ran every case", runUntil(proc (): bool = peek(0xbcff) == 0xa5 and mem[ApiRun] == 0,
                                            30_000_000))
   proc res(i: int): seq[int] =
-    for k in 0..7: result.add(peek(0x7e00 + 8 * i + k))
+    for k in 0..7: result.add(peek(0xbe00 + 8 * i + k))
   proc after(r0, r1, dst, src, len: int): seq[int] =
     @[r0, r1, dst and 0xff, dst shr 8, src and 0xff, src shr 8, len and 0xff, len shr 8]
   let r1s = res(0)[1]                      # r1 is not part of the equal answer
   expectTrue("cmp equal: 0, the pointers past the 5 bytes, len 0 " & $res(0),
-             res(0) == after(0, r1s, 0x8005, 0x8015, 0))
+             res(0) == after(0, r1s, 0x9405, 0x9415, 0))
   expectTrue("cmp less: $ff, r1 'A' - 'O', at byte 4 " & $res(1),
-             res(1) == after(0xff, (ord('A') - ord('O')) and 0xff, 0x8024, 0x8014, 0))
+             res(1) == after(0xff, (ord('A') - ord('O')) and 0xff, 0x9424, 0x9414, 0))
   expectTrue("cmp greater, unsigned ($f0 against $10): 1, r1 $e0, at byte 0, 1 left " & $res(2),
-             res(2) == after(1, 0xe0, 0x8030, 0x8038, 1))
+             res(2) == after(1, 0xe0, 0x9430, 0x9438, 1))
   expectTrue("cmp of 0 bytes: equal, nothing moved " & $res(3),
-             res(3)[0] == 0 and res(3)[2..7] == after(0, 0, 0x8020, 0x8038, 0)[2..7])
+             res(3)[0] == 0 and res(3)[2..7] == after(0, 0, 0x9420, 0x9438, 0)[2..7])
   expectTrue("cmp of 300 across pages: 1 at byte 290, 9 left " & $res(4),
-             res(4) == after(1, 1, 0x80f0 + 290, 0x85f8 + 290, 9))
+             res(4) == after(1, 1, 0x94f0 + 290, 0x99f8 + 290, 9))
   var copied = true
   for i in 0 ..< 300:
-    if peek(0x8800 + i) != ((i * 7 + 5) and 0xff): copied = false
+    if peek(0x9c00 + i) != ((i * 7 + 5) and 0xff): copied = false
   expectTrue("copy 300: every byte, r0 0", copied and res(5)[0] == 0)
   expectTrue("copy 300: the bytes round it untouched",
-             peek(0x87ff) == 0xee and peek(0x8800 + 300) == 0xee)
-  expectTrue("copy 0: nothing written, r0 0", peek(0xa7ff) == 0x55 and res(6)[0] == 0)
+             peek(0x9bff) == 0xee and peek(0x9c00 + 300) == 0xee)
+  expectTrue("copy 0: nothing written, r0 0", peek(0xbbff) == 0x55 and res(6)[0] == 0)
   var up = true
   for i in 0 ..< 0x120:
-    if peek(0xa100 + i) != ((i * 7 + 11) and 0xff): up = false
+    if peek(0xb500 + i) != ((i * 7 + 11) and 0xff): up = false
   expectTrue("overlap, dst 16 above src: the source's bytes, not a repeat", up and res(7)[0] == 0)
-  expectTrue("overlap up: the byte below dst is src's own", peek(0xa0ff) == ((15 * 7 + 11) and 0xff))
+  expectTrue("overlap up: the byte below dst is src's own", peek(0xb4ff) == ((15 * 7 + 11) and 0xff))
   var down = true
   for i in 0 ..< 300:
-    if peek(0xa3f0 + i) != ((i * 7 + 13) and 0xff): down = false
+    if peek(0xb7f0 + i) != ((i * 7 + 13) and 0xff): down = false
   expectTrue("overlap, dst 16 below src: the source's bytes", down and res(8)[0] == 0)
   var same = true
   for i in 0 ..< 16:
-    if peek(0xa700 + i) != ((i * 7 + 17) and 0xff): same = false
+    if peek(0xbb00 + i) != ((i * 7 + 17) and 0xff): same = false
   expectTrue("copy onto itself: unchanged", same and res(9)[0] == 0)
   ioModel = imLegacy
 
