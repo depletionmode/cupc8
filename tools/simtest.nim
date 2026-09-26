@@ -26,6 +26,13 @@ let
   testDir = rootDir / "test"
   kernelDir = rootDir / "kernel"
 
+# what the tests write (assembled programs, maps, .prg files, SD images) goes
+# in this run's own directory (simmachine.nim romDir(): removed at exit, and a
+# killed run's swept by the next), never beside the sources: two runs at once
+# (simtest twice, simtest beside SIM-010) cannot overwrite each other's files
+let workDir = romDir() / "work"
+createDir(workDir)
+
 var failures = 0
 
 proc fail(msg: string) =
@@ -76,7 +83,7 @@ proc assemble(src, dest: string; echoOut = false) =
     raise newException(IOError, "assembler failed for " & src & ":\n" & r.output)
 
 proc loadProgram(src: string; boot = true) =
-  let dest = testdata / src.extractFilename.changeFileExt("o")
+  let dest = workDir / src.extractFilename.changeFileExt("o")
   assemble(src, dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -110,7 +117,7 @@ proc kernelBuild(): tuple[output: string, exitCode: int] =
 proc testTinyProgram() =
   echo "== tiny assembled program =="
   let src = testdata / "movst.s"
-  let dest = testdata / "movst.o"
+  let dest = workDir / "movst.o"
   assemble(src, dest, echoOut = true)
   let blob = readFile(dest)
   doAssert blob.len > 3
@@ -245,8 +252,8 @@ proc testAssemblerMap() =
   echo "== assembler map =="
   let
     src = testdata / "movst.s"
-    dest = testdata / "movst.o"
-    mapPath = testdata / "movst.map"
+    dest = workDir / "movst.o"
+    mapPath = workDir / "movst.map"
   if fileExists(dest): removeFile(dest)
   if fileExists(mapPath): removeFile(mapPath)
   let command = "python3 " & quoteShell(asPy) & " " & quoteShell(src) &
@@ -275,7 +282,7 @@ proc testAssemblerMap() =
   expect("map entry matches image", mappedEntry, expectedEntry, 4)
   expectTrue("map contains main symbol", sawMain)
   expect("first mapped instruction", firstLineAddress, 0x1003, 4)
-  let explicitMap = testdata / "movst.explicit.map"
+  let explicitMap = workDir / "movst.explicit.map"
   if fileExists(explicitMap): removeFile(explicitMap)
   let explicit = execCmdEx(command.replace("--map", "--map=" & quoteShell(explicitMap)))
   expectTrue("explicit map path", explicit.exitCode == 0 and fileExists(explicitMap))
@@ -379,7 +386,7 @@ proc testTuiDiff() =
 proc testAssemblerRejects() =
   echo "== assembler rejects bad input =="
   for src in [testdata / "no_main.s", testdata / "bad_ins.s"]:
-    let dest = testdata / src.extractFilename.changeFileExt("o")
+    let dest = workDir / src.extractFilename.changeFileExt("o")
     if fileExists(dest):
       removeFile(dest)
     try:
@@ -535,7 +542,7 @@ proc testDefine() =
 
 proc testStepResult() =
   echo "== cpuStep result states =="
-  let dest = testdata / "nohalt.o"
+  let dest = workDir / "nohalt.o"
   assemble(testdata / "nohalt.s", dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -577,7 +584,7 @@ proc testMemHook() =
 
 proc testCpuRunBreak() =
   echo "== batched run and breakpoint =="
-  let dest = testdata / "callret.o"
+  let dest = workDir / "callret.o"
   assemble(testdata / "callret.s", dest)
   cpuReset()
   clearAllBreaks()
@@ -605,7 +612,7 @@ proc testCpuRunBreak() =
 
 proc testStepOut() =
   echo "== step out =="
-  let dest = testdata / "callret.o"
+  let dest = workDir / "callret.o"
   assemble(testdata / "callret.s", dest)
   cpuReset()
   clearAllBreaks()
@@ -897,7 +904,7 @@ proc testDisplayRect() =
   else:
     ok("window " & $DispWidth & "x" & $DispHeight & " at " & $DispScaleDefault & "x")
 
-  let dest = testdata / "fillrect.o"
+  let dest = workDir / "fillrect.o"
   assemble(testdata / "fillrect.s", dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -945,7 +952,7 @@ proc testCardsMode() =
   romOff = false
 
   # a guest program drives both cards
-  let dest = testdata / "cards_gpu.o"
+  let dest = workDir / "cards_gpu.o"
   assemble(testdata / "cards_gpu.s", dest)
   cpuReset()
   cpuLoadFile(dest)
@@ -2284,7 +2291,7 @@ const apiNetEntries = ["status", "join", "open", "connect", "connect_host", "lis
 proc buildNetExample(name: string; sym: Table[string, int]): string =
   ## examples/net/NAME.s assembled for $7000, after kernel/api.inc when it
   ## exists, else after API_NET_* names for the kernel's api_net_* routines
-  let outDir = rootDir / "build" / "examples"
+  let outDir = workDir / "examples"
   createDir(outDir)
   var head = ""
   if fileExists(kernelDir / "api.inc"):
@@ -2383,7 +2390,7 @@ run testNetExamples
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
 # ---------------------------------------------------------------------------
 
-let storeDir = rootDir / "build" / "storage"
+let storeDir = workDir / "storage"
 
 proc fatcheck(args: string): tuple[output: string, exitCode: int] =
   execCmdEx("python3 " & quoteShell(toolsDir / "fatcheck.py") & " " & args)
@@ -2902,6 +2909,31 @@ proc testKernelBuildsConcurrent() =
 
 run testKernelBuildsConcurrent
 
+proc testRunsSideBySide() =
+  ## KRN-022: two simtest runs at once both pass. Two copies of this binary
+  ## run the same tests together: ones that write assembled programs and
+  ## maps (testdata's .o, .map, .prg), build ROM images and the kernel, and
+  ## make, fill and check SD images; each writes only to its own directory
+  ## (workDir, romDir()), so neither sees the other's files.
+  echo "== two simtest runs side by side =="
+  let subset = ["testAssemblerMap", "testAssemblerRejects", "testAluImm", "testBootChain",
+                "testApiProgram", "testExec"]
+  var ps: seq[Process]
+  for k in 0..1:
+    ps.add(startProcess(getAppFilename(), args = subset, options = {poStdErrToStdOut}))
+  for k, p in ps:
+    let output = p.outputStream.readAll()
+    let code = p.waitForExit()
+    p.close()
+    var fails: seq[string]
+    for line in output.splitLines():
+      if line.startsWith("FAIL"): fails.add(line)
+    for f in fails: echo "  run ", k, ": ", f
+    expectTrue("run " & $k & " of two at once passes (" & $subset.len & " tests, exit " & $code & ")",
+               code == 0 and fails.len == 0 and "ALL TESTS PASSED" in output)
+
+run testRunsSideBySide
+
 proc testKernelApi() =
   ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 32 entries
   ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
@@ -3003,7 +3035,7 @@ proc testApiProgram() =
   if r.exitCode != 0:
     fail("fatcheck blank: " & r.output)
     return
-  let prg = testdata / "api_prog.prg"
+  let prg = workDir / "api_prog.prg"
   mkprg(testdata / "api_prog.s", prg)
   bootStorage(rom, img)
   expectTrue("the terminal waits for a key", waiting)
@@ -3086,7 +3118,7 @@ proc testApiProgram() =
              t1 - t0 >= 21 and t1 - t0 <= 22)
 
   echo "== kernel API: API_EXIT =="
-  let ex = testdata / "api_exit.prg"
+  let ex = workDir / "api_exit.prg"
   mkprg(testdata / "api_exit.s", ex)
   expectTrue("the program goes in", runProgram(readFile(ex)))
   expectTrue("it ran", runUntil(proc (): bool = mem[0x7e00] == 0x5a and mem[ApiRun] == 0, 2_000_000))
@@ -3168,7 +3200,7 @@ proc testEinkApi() =
   ## calls give $ff and leave $ff.
   echo "== kernel API: the e-ink entries =="
   let rom = buildKernelRom()
-  let prg = testdata / "eink_prog.prg"
+  let prg = workDir / "eink_prog.prg"
   mkprg(testdata / "eink_prog.s", prg)
   for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
     machineCards([card, CardIo])
@@ -3204,7 +3236,7 @@ proc testGfx2Api() =
   ## gives $ff and nothing reaches the card: it stays in TEXT with no error.
   echo "== kernel API: mode 2 =="
   let rom = buildKernelRom()
-  let prg = testdata / "gfx2_prog.prg"
+  let prg = workDir / "gfx2_prog.prg"
   mkprg(testdata / "gfx2_prog.s", prg)
   for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
     machineCards([card, CardIo])
@@ -3276,7 +3308,7 @@ proc testText8Free() =
   ## the frame.
   echo "== kernel API: TEXT8 waits for FREE =="
   let rom = buildKernelRom()
-  let prg = testdata / "text8_prog.prg"
+  let prg = workDir / "text8_prog.prg"
   mkprg(testdata / "text8_prog.s", prg)
   machineCards([CardGpu, CardIo])
   cpuReset()
@@ -3314,8 +3346,8 @@ proc testHello() =
   ## apart. A key stops it, and the terminal is back.
   echo "== examples/hello =="
   let rom = buildKernelRom()
-  let prg = rootDir / "build" / "examples" / "hello.prg"
-  createDir(rootDir / "build" / "examples")
+  let prg = workDir / "examples" / "hello.prg"
+  createDir(workDir / "examples")
   mkprg(rootDir / "examples" / "hello" / "hello.s", prg)
   machineCards([CardGpu, CardIo])
   cpuReset()

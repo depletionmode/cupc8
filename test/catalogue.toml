@@ -778,11 +778,11 @@ cmd = "tools/run_tests.sh testText8Free"
 [[test]]
 id = "KRN-022"
 title = "Kernel builds side by side"
-checks = "every test builds the kernel in a directory of its own (tools/simmachine.nim romDir(): build/rom-PID-*, removed at exit; kernel/assemble.sh OUTDIR), never in kernel/: four rounds of two `simtest --build-kernel` at once each give a ROM and a map equal to the one built alone, and that map is whole (over 1000 symbols, term_do and main)"
-method = "tools/simtest.nim testKernelBuildsConcurrent: the test's own binary started twice at once (startProcess)"
+checks = "every test builds the kernel in a directory of its own (tools/simmachine.nim romDir(): build/rom-PID-*, removed at exit, a killed run's swept by the next; kernel/assemble.sh OUTDIR), never in kernel/: four rounds of two `simtest --build-kernel` at once each give a ROM and a map equal to the one built alone, and that map is whole (over 1000 symbols, term_do and main); simtest's programs, maps, .prg files and SD images go in its own directory too (workDir): two runs of six tests that write them (testAssemblerMap, testAssemblerRejects, testAluImm, testBootChain, testApiProgram, testExec) at once both pass; tools/run_tests.sh and SIM-010 build under a lock and run a copy of their own of the binary"
+method = "tools/simtest.nim testKernelBuildsConcurrent, testRunsSideBySide: the test's own binary started twice at once (startProcess)"
 kind = "sim"
 vrow = "2.3"
-cmd = "tools/run_tests.sh testKernelBuildsConcurrent"
+cmd = "tools/run_tests.sh testKernelBuildsConcurrent testRunsSideBySide"
 
 # ============================================================================
 # CARD: common card protocol (every card firmware)

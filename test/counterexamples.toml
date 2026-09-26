@@ -818,3 +818,11 @@ revert = [["tools/simmachine.nim", """  let d = if dir.len > 0: dir else: romDir
   simRoot / "kernel" / "kernel.o\""""], ["tools/simmachine.nim", """  romDir() / "kernel.map\"""", """  simRoot / "kernel" / "kernel.map\""""]]
 cmd = "tools/run_tests.sh testKernelBuildsConcurrent"
 must_fail = ["FAIL: 8 builds, two at a time: every ROM and map equals the one built alone"]
+
+[[bug]]
+name = "simtest wrote its programs, maps and SD images beside the sources (tools/testdata, build/storage) - two runs at once overwrote each other's"
+fixed_in = "the commit adding testRunsSideBySide"
+revert = [["tools/simtest.nim", """let workDir = romDir() / "work\"""", """let workDir = testdata"""],
+          ["tools/simtest.nim", """let storeDir = workDir / "storage\"""", """let storeDir = rootDir / "build" / "storage\""""]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: run"]
