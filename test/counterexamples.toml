@@ -35,14 +35,12 @@ must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/ne
 name = "kernel: the BASIC program buffer overflowed"
 fixed_in = "e635dbd"
 # the full check taken out of today's term.s (f811788's term.s no longer
-# assembles with the 16-bit BASIC and its 8 KB buffer at $c000, 2026-09-26)
-revert = [["kernel/term.s", """.end_hi:
-	gt r0, #0x20
+# assembles with the 16-bit BASIC and its 8 KB buffer at $c000, 2026-09-26;
+# the check is on the new length since the lines are kept in order)
+revert = [["kernel/term.s", """	ld r0, $6f07
+	gt r0, #0x1f
 	bzf .full
-	eq r0, #0x20
-	bzf .at_top
-	b .fits""", """.end_hi:
-	b .fits"""]]
+""", ""]]
 cmd = "tools/run_tests.sh testProgramFull"
 must_fail = ["FAIL: a line that would end past $dfff is refused", "FAIL: a line past it is refused (PROGRAM FULL)",
              "FAIL: nothing written past $dfff"]
@@ -426,10 +424,11 @@ must_fail = ["FAIL race sweep: every READ framed"]
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
 fixed_in = "52423fa"
-revert = [["kernel/term.s", """	xor r0, r0
-	st [term_basic_prog_buf_idx], r0
-	st [term_basic_prog_buf_idx+1], r0
-	st $c000, r0
+# (term_do clears it through term_cmd_new since the lines are kept in order)
+revert = [["kernel/term.s", """	push pch
+	push pcl
+	b term_cmd_new
+	xor r0, r0
 	st API_RUN, r0""", """	xor r0, r0
 	st API_RUN, r0"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
@@ -843,3 +842,21 @@ revert = [["fw/sim/simcards.c", """	if (c->wifi)
 """, ""]]
 cmd = "tools/run_tests.sh testRunsSideBySide"
 must_fail = ["FAIL: run"]
+
+[[bug]]
+name = "kernel BASIC: every typed line was appended - lines out of order ran out of order, a line typed again was kept twice, a line number alone was kept as an empty line"
+fixed_in = "the line editing commit (KRN-027)"
+before = "44bbccb"
+files = ["kernel/term.s"]
+cmd = "tools/run_tests.sh testBasicEdit"
+must_fail = ["FAIL: typed out of order, kept in order", "FAIL: replace, the same length",
+             "FAIL: delete a line in the middle", "FAIL: GOSUB and GOTO to lines typed out of order"]
+
+[[bug]]
+name = "kernel BASIC: LOAD took line numbers past 32767 (typing refuses them) - kept in order, 40000 went first, as -25536"
+fixed_in = "the line editing commit (KRN-027)"
+revert = [["kernel/ubasic.s", """	gt r1, #0x7f			; a line number is 1-32767, as typed
+	bzf .done
+""", ""]]
+cmd = "tools/run_tests.sh testBasicEditStorage"
+must_fail = ["FAIL: ... in order, the later line 10 kept, 40000 skipped"]

@@ -1,8 +1,8 @@
 
 ; The BASIC program is text at $c000-$dfff, the top 8 KB of the user area
-; (memory-map.md): each line as typed, ending in a CR, then a 0.
-; term_basic_prog_buf_idx is its length. A program for $7000 bigger than
-; 20 KB goes over it.
+; (memory-map.md): the lines in line-number order, each as typed, ending in
+; a CR, then a 0 (term_cmd_basicline keeps them so). term_basic_prog_buf_idx
+; is its length. A program for $7000 bigger than 20 KB goes over it.
 %define TERM_PROG_HI #0xc0
 term_basic_prog_buf_idx: resb 2
 term_full: resb 1			; the last line was refused (PROGRAM FULL)
@@ -443,7 +443,8 @@ term_cmd_list:
 ; for from that one's place on (term_p), so a program typed or loaded in
 ; order is quick. The work is in API_ARGS ($6f00): +2 the old line's end
 ; while looking, then API_MEM_CPY's dst, src and len; +6 the new length.
-; This part uses the kernel through the API, str_atoi and n16_cmp only.
+; Of the kernel it uses API_MEM_CPY (through the jump table), str_atoi,
+; n16_cmp and str_printstr, so it can move out with BASIC.
 %define API_MEM_CPY $101e
 term_p: resb 2				; the last typed line's place ($c000 after new)
 term_ln: resb 2				; the typed line's number
@@ -539,17 +540,23 @@ term_cmd_basicline:
 	add r1, #1
 	st [term_new], r1
 	xor r1, r1
-.scan:
+.number:
 	ld r0, [term_line_buf]+r1
 	add r1, #1
-	eq r0, #32
-	bzf .scan
 	sub r0, #48
 	lt r0, #10
-	bzf .scan
-	eq r0, #221				; its CR, 13 - 48
+	bzf .number
+.spaces:					; then only spaces up to the CR?
+	eq r0, #221				; the CR, 13 - 48
 	bzf .delete
+	eq r0, #240				; a space, 32 - 48
+	bzf .space
 	b .text
+.space:
+	ld r0, [term_line_buf]+r1
+	add r1, #1
+	sub r0, #48
+	b .spaces
 .delete:
 	xor r0, r0
 	st [term_new], r0

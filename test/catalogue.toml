@@ -834,6 +834,15 @@ vrow = "2.1"
 cmd = "tools/run_tests.sh testBasicList"
 
 [[test]]
+id = "KRN-027"
+title = "BASIC line editing: the program in line-number order"
+checks = "the bytes at $c000 (each line, its CR, the 0, the length) after every edit: lines typed out of order kept in order (by number: 9 < 10 < 100; 1 and 32767); a line of an existing number replaces it (the same length, longer, shorter); insert at the start, in the middle, at the end; a line number alone (spaces after it too) deletes the line, a missing one changes nothing, `25 5` is a line (not a delete), every line deleted leaves an empty program; new, then a line above the last typed one; list and run see the order; GOTO and GOSUB reach lines typed backwards and lines inserted, replaced and deleted between runs; PROGRAM FULL exact at $dfff for a replacement (8180 bytes: a line 11 bytes longer taken, the program 8191 bytes with its 0 at $dfff; one byte more refused, the program and $e000 untouched; a new line refused; a shorter replacement taken, then a new line that fits exactly); 16 lines typed in order after 263 take as long as into an empty program (within 10 %: each is looked for from the last typed line's place); SAVE of a program typed out of order writes it in order (the file as a PC reads it) and LOADs back the same; LOAD of a PC's file with lines out of order, one given twice (the later kept) and 40000 (skipped: line numbers are 1-32767, as typed) gives the sorted program, which runs"
+method = "tools/simtest.nim testBasicEdit, testBasicEditStorage: the real kernel on the simulator's HDMI, IO and storage cards"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicEdit testBasicEditStorage"
+
+[[test]]
 id = "KRN-030"
 title = "USB console: the kernel's side of the rings"
 checks = "on junk RAM (HOST set, CON_OUT nearly full) the kernel's boot zeroes the four indices and CON_FLAGS before it prints, so the banner and prompt reach CON_OUT and the prompt the graphics card; help typed into CON_IN runs, its echo and output in CON_OUT, CON_IN's tail caught up; a BASIC program typed into CON_IN runs and its output (over 300 bytes) comes out of the 128-byte ring whole and in order as the card takes it; with HOST set and nobody taking, the kernel waits at the full ring and goes on when the card drains it; with HOST clear it runs to the prompt with the ring full and the rest dropped"

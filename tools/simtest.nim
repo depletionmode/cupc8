@@ -1576,8 +1576,10 @@ proc testBasic16() =
                          "50 if 32767 > -32768 then print 1 else print 0", "60 if 256 = 0 then print 1 else print 0"],
      @["1", "0", "1", "1", "1", "0"]),
     ("and, or", @["10 print 4096 | 15", "20 print -1 & 255", "30 print 300 & 256"], @["4111", "255", "256"]),
-    ("line numbers", @["10 goto 1000", "20 print 2", "30 end", "1000 print 1", "1010 gosub 32767",
-                       "1020 goto 20", "32767 print 32767", "32767 return"],
+    # two lines numbered 32767 were both kept while lines were only appended;
+    # the second now replaces the first (KRN-027)
+    ("line numbers", @["10 goto 1000", "20 print 2", "30 end", "1000 print 1", "1010 gosub 32766",
+                       "1020 goto 20", "32766 print 32767", "32767 return"],
      @["1", "32767", "2"]),
     ("for past 255", @["10 for i = 250 to 1000", "20 next i", "30 print i", "40 for j = -3 to -1",
                        "50 print j", "60 next j"], @["1001", "-3", "-2", "-1"]),
@@ -2717,9 +2719,10 @@ proc testBasicEdit() =
   ## lines added or changed after a run. PROGRAM FULL stays exact at $dfff
   ## for a replacement: one that grows the program to 8191 bytes is taken,
   ## one byte more refused with the program and $e000 untouched, a shorter
-  ## one taken on a full program. A line above the last typed one is found
-  ## from that one's place: typing in order after 250 lines is as quick as
-  ## at the start.
+  ## one taken on a full program. A line above the last typed one is looked
+  ## for from that one's place: typing in order after 263 lines is as quick
+  ## as into an empty program (looking from the first line takes 20 times
+  ## as long there).
   echo "== BASIC line editing =="
   let rom = buildKernelRom()
   bootBasic(rom)
@@ -2737,6 +2740,9 @@ proc testBasicEdit() =
   edit(["15"], "5 print 0|10 print 1|20 print 7|30 print 3|40 print 4|", "delete a line in the middle")
   edit(["5   "], "10 print 1|20 print 7|30 print 3|40 print 4|", "delete the first line (spaces after the number)")
   edit(["25"], "10 print 1|20 print 7|30 print 3|40 print 4|", "delete a missing line: nothing changes")
+  edit(["25 5"], "10 print 1|20 print 7|25 5|30 print 3|40 print 4|",
+       "a number and more digits after a space is a line, not a delete")
+  edit(["25 "], "10 print 1|20 print 7|30 print 3|40 print 4|", "... deleted")
   edit(["40"], "10 print 1|20 print 7|30 print 3|", "delete the last line")
   edit(["35 print 35"], "10 print 1|20 print 7|30 print 3|35 print 35|", "a line after a deleted last line")
   edit(["100 print 100", "9 print 9"], "9 print 9|10 print 1|20 print 7|30 print 3|35 print 35|100 print 100|",
@@ -2748,6 +2754,8 @@ proc testBasicEdit() =
              runOutput() == @["1", "9", "1", "7", "3", "35", "100", "32767"])
   edit(["10", "20", "30", "35", "100", "32767", "1", "9"], "", "every line deleted")
   expectTrue("an empty program lists nothing", cmdOutput("list").len == 0)
+  edit(["10 print 1", "20 print 2", "new", "30 print 3"], "30 print 3|",
+       "new, then a line above the last one typed")
 
   # GOTO and GOSUB: the line index (ubasic.s) is built as a run goes, so a
   # run after edits must reach the lines where they are now
@@ -2807,17 +2815,21 @@ proc testBasicEdit() =
   # typing in order: the next line is looked for from the last one's place
   typeLine("new")
   var t0 = simClocks
-  for i in 0..15: typeLine($(100 + i) & " rem x")
+  for i in 0..15: typeLine($(30000 + i) & " rem x")
   let short = simClocks - t0
   typeLine("new")
   discard prefillProgram(head[0..^2])
-  typeLine("29999 rem x")                       # from the first line: after 250 lines
+  t0 = simClocks
+  typeLine("29999 rem x")                       # looked for from the first line
+  let first = simClocks - t0
   t0 = simClocks
   for i in 0..15: typeLine($(30000 + i) & " rem x")
   let long = simClocks - t0
-  echo "  16 lines typed at the start: ", short, " clocks; after 250 lines: ", long
-  expectTrue("16 lines typed in order after 250 take as long as at the start (within 20 %)",
-             long * 5 < short * 6)
+  echo "  16 lines typed into an empty program: ", short, " clocks; after ", head.len - 1,
+       " lines: ", long, " (one line looked for from the first: ", first, ")"
+  expectTrue("16 lines typed in order after " & $(head.len - 1) &
+             " take as long as into an empty program (within 10 %)",
+             long * 10 < short * 11)
   ioModel = imLegacy
 
 run testBasicEdit
