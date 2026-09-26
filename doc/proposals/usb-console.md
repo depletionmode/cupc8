@@ -44,7 +44,14 @@ bytes, `sysctl.md`), so no lock is needed.
   and what calls it) is also put in CON_OUT. If the ring is full: with HOST
   set, the kernel waits (the PC is reading; it drains in milliseconds); with
   HOST clear it drops the character, so a machine with no system card, or
-  no terminal open, never stalls.
+  no terminal open, never stalls. A PC that keeps the port open but stops
+  reading (a terminal program suspended or hung) must not stall it either
+  (David, 2026-09-26): if the ring stays full for 500 ms (the chipset's
+  millisecond counter, MS_COUNT at $f206, read in 4 ms steps: 496-504 ms)
+  the kernel drops that character, and every one after it while
+  CON_OUT_TAIL stays where it was, without waiting; once the PC has read
+  again (the tail moved) a full ring is waited for again, so a reader that
+  keeps up loses nothing.
 - **Kernel, input:** the key wait and the key poll take bytes from CON_IN
   as well as from the IO card. The kernel's slow chipset tick (the key
   wait's ~20 Hz wake-up, `kernel-api.md`) bounds the latency.
@@ -74,8 +81,11 @@ bytes, `sysctl.md`), so no lock is needed.
   protocol against a RAM model (wrap, full rings, HOST on open/close, CR LF),
   the bridge traffic only while open.
 - Kernel on the simulator: output reaches the ring and wraps; full ring
-  with and without HOST (waits vs drops); input from the ring reaches the
-  prompt and BASIC; boot zeroes the rings.
+  with and without HOST (waits vs drops); HOST set and nobody reading: the
+  terminal goes on after 500 ms, the rest dropped, and waits again once the
+  ring is read, losing nothing (KRN-030, a counterexample with the timeout
+  taken out); input from the ring reaches the prompt and BASIC; boot zeroes
+  the rings.
 - Whole machine (native): the kernel's banner and a typed command's output
   read from the console port; a BASIC program pasted through it runs; no
   console open: nothing waits.

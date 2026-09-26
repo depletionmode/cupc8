@@ -45,6 +45,15 @@ vrow = "2.1"
 cmd = "python3 test/sim/test_cli.py"
 
 [[test]]
+id = "SIM-014"
+title = "The simulator's arrow, navigation and function keys"
+checks = "the keys with no character reach the kernel as the real IO card gives them (fw/io/core/iocard.h): tools/testdata/keys_prog.s prints the byte API_GETKEY returns for Up, Down, Left, Right, Home, End, PgUp, PgDn, Insert, Delete, F1-F12 ($80-$88, $7f, $91-$9c), pressed by HID usage (the window's path: SDL scancodes are the usages) and by byte (the --type path), both through the IO card core; tools/sim --type with {UP}..{F12} names and \\xHH escapes gives the same bytes headless, a lower-case name works and an unknown {name} is typed as text; examples/snake steered with the arrows (KRN-025)"
+method = "tools/simtest.nim testSimKeys; test/sim/test_keys.py (builds tools/sim, --run and --type headless)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testSimKeys && python3 test/sim/test_keys.py"
+
+[[test]]
 id = "SIM-011"
 title = "Simulator timers count in WAI as the CPU does"
 checks = "parked in WAI, cpu.vhd counts its timers once a turn of 3 clocks (tick, settle, check), 4 counts a microsecond: tmr0 #200 (counted down as TMR0 and WAI retire) wakes WAI after 198 turns, 594 clocks and the IRQ entry's 20; the code after WAI runs"
@@ -796,7 +805,7 @@ cmd = "tools/run_tests.sh testMemApi"
 [[test]]
 id = "KRN-025"
 title = "examples/snake on the HDMI and the e-ink card"
-checks = "examples/snake (mkprg.py) on the simulator. HDMI: GFX mode, walls in colour 9, the snake moving right, S turns it down, Q gives TEXT, the goodbye and the terminal. E-ink 648 x 480: mode 2, 40 x 30 cells of 16 pixels 4 in (white outside), walls grey 1, the snake black, a greyscale refresh shows the field (grey, black and white on the glass); a step every 450-600 ms, each shown by a partial refresh; S turns it down, on the glass after the next partial refresh; Q gives TEXT and the automatic refresh back (the goodbye refreshed by itself); no panel or frame errors. E-ink 800 x 480: 50 x 30 cells to the panel's edges"
+checks = "examples/snake (mkprg.py) on the simulator. HDMI: GFX mode, walls in colour 9, the snake moving right, S turns it down, then the arrow keys as the sim window gives them (HID usages through the IO card) turn it right, down and left, Q gives TEXT, the goodbye and the terminal. E-ink 648 x 480: mode 2, 40 x 30 cells of 16 pixels 4 in (white outside), walls grey 1, the snake black, a greyscale refresh shows the field (grey, black and white on the glass); a step every 450-600 ms, each shown by a partial refresh; S turns it down, on the glass after the next partial refresh; Q gives TEXT and the automatic refresh back (the goodbye refreshed by itself); no panel or frame errors. E-ink 800 x 480: 50 x 30 cells to the panel's edges"
 method = "tools/simtest.nim testSnakeExample"
 kind = "sim"
 vrow = "2.3"
@@ -845,7 +854,7 @@ cmd = "tools/run_tests.sh testBasicEdit testBasicEditStorage"
 [[test]]
 id = "KRN-030"
 title = "USB console: the kernel's side of the rings"
-checks = "on junk RAM (HOST set, CON_OUT nearly full) the kernel's boot zeroes the four indices and CON_FLAGS before it prints, so the banner and prompt reach CON_OUT and the prompt the graphics card; help typed into CON_IN runs, its echo and output in CON_OUT, CON_IN's tail caught up; a BASIC program typed into CON_IN runs and its output (over 300 bytes) comes out of the 128-byte ring whole and in order as the card takes it; with HOST set and nobody taking, the kernel waits at the full ring and goes on when the card drains it; with HOST clear it runs to the prompt with the ring full and the rest dropped"
+checks = "on junk RAM (HOST set, CON_OUT nearly full) the kernel's boot zeroes the four indices and CON_FLAGS before it prints, so the banner and prompt reach CON_OUT and the prompt the graphics card; help typed into CON_IN runs, its echo and output in CON_OUT, CON_IN's tail caught up; a BASIC program typed into CON_IN runs and its output (over 300 bytes) comes out of the 128-byte ring whole and in order as the card takes it; with HOST set and nobody taking, the kernel waits at the full ring (still waiting 400 ms on) and goes on, whole, when the card drains it; with HOST set and the card no longer taking, 490-600 ms after the ring filled the kernel is back at the prompt (the program ran to the end on the graphics card, the ring untouched), and further output goes straight past while the tail stays put; once the card has taken the ring the kernel waits again (still waiting 400 ms on) and the output then comes whole and in order; with HOST clear it runs to the prompt with the ring full and the rest dropped"
 method = "tools/simtest.nim testKernelConsole: the real kernel on the simulator; the test plays the system card on the rings (fw/sysctl/core/console.c's side)"
 kind = "sim"
 vrow = "2.1"

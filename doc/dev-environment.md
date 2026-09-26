@@ -46,12 +46,16 @@ does everything except KiCad.
   `net join` joins any SSID, and the machine reaches the real network and
   localhost directly (no QEMU, no 10.0.2.x addresses). The window shows
   the graphics card's picture (an e-ink card's glass, which changes only
-  when a refresh completes); keys go to the IO card. `--rom:FILE` boots a
+  when a refresh completes); keys go to the IO card, the arrows, Home, End,
+  PgUp, PgDn, Insert, Delete and F1-F12 by their USB HID usages, so the
+  kernel gets the IO card's own codes for them ($80-$88, $7f, $91-$9c). `--rom:FILE` boots a
   given ROM image, a `kernel.o` argument is put in one with the boot ROM,
   and `--legacy` keeps the old I/O model (ILI9340, SD on SPI 1). For
   scripts, `--headless --type:"10 print 1\nrun\n" --dump-text:-` types
   the text (a key each time the CPU parks in WAI), runs on for `--settle`
-  guest ms once idle, and prints the screen (SIM-010, `test/sim/test_cli.py`).
+  guest ms once idle, and prints the screen (SIM-010, `test/sim/test_cli.py`);
+  in the text `{UP}` `{DOWN}` `{LEFT}` `{RIGHT}` `{HOME}` `{END}` `{PGUP}`
+  `{PGDN}` `{INS}` `{DEL}` `{F1}`..`{F12}` or `\xHH` press those keys (SIM-014).
   `--run:PROG` runs a program for $7000 (a `.prg` from `tools/mkprg.py`, or
   the bare binary) once the kernel is at its prompt, as `cupc8.py run` does
   on the machine (SIM-012): `python3 tools/mkprg.py examples/hello/hello.s -o

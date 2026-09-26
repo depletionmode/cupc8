@@ -844,6 +844,15 @@ cmd = "tools/run_tests.sh testRunsSideBySide"
 must_fail = ["FAIL: run"]
 
 [[bug]]
+name = "the kernel waited for ever at a full CON_OUT while HOST was set - a PC that kept the console open but stopped reading stalled the terminal"
+fixed_in = "6fb42fb"
+revert = [["kernel/console.s", """	lt r0, #125
+	bzf .again				; under 500 ms, keep waiting
+""", """	b .again
+"""]]
+cmd = "tools/run_tests.sh testKernelConsole"
+must_fail = ["FAIL: HOST set, nobody reading: the terminal goes on"]
+
 name = "kernel BASIC: every typed line was appended - lines out of order ran out of order, a line typed again was kept twice, a line number alone was kept as an empty line"
 fixed_in = "37a6c41"
 before = "44bbccb"

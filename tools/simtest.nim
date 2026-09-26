@@ -3723,13 +3723,14 @@ proc testMemApi() =
 
 run testMemApi
 
-proc runExample(name: string; card: int): SimCard =
-  ## examples/NAME/NAME.s built with tools/mkprg.py, started on a machine
-  ## with `card` and the IO card as `cupc8.py run` does; the graphics card.
+proc runPrg(src: string; card: int): SimCard =
+  ## src built with tools/mkprg.py, started on a machine with `card` and the
+  ## IO card as `cupc8.py run` does; the graphics card.
+  let name = src.extractFilename.changeFileExt("")
   let rom = buildKernelRom()
   let prg = workDir / "examples" / name & ".prg"
   createDir(workDir / "examples")
-  mkprg(rootDir / "examples" / name / name & ".s", prg)
+  mkprg(src, prg)
   machineCards([card, CardIo])
   cpuReset()
   cpuLoadRom(rom)
@@ -3737,6 +3738,10 @@ proc runExample(name: string; card: int): SimCard =
   settle(6_000_000)
   result = gpuCard()
   expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
+
+proc runExample(name: string; card: int): SimCard =
+  ## examples/NAME/NAME.s, as runPrg
+  runPrg(rootDir / "examples" / name / name & ".s", card)
 
 proc glassOf(g: SimCard): (int, seq[uint32]) =
   ## the e-ink panel's glass as of its last refresh: its width, the pixels
@@ -3771,6 +3776,31 @@ proc testSnakeExample() =
         return true
   expectTrue("HDMI: S turns it down", runUntil(turnedH, 10_000_000))
   expectTrue("HDMI: ... and it no longer goes right (" & $turnedAt & ")", px((turnedAt + 1) * 8 + 3, 123) != 10)
+  # the arrow keys, as the sim's window gives them (SDL scancode = HID usage
+  # through the IO card): Right turns it right, Down down, Left left
+  let col = turnedAt
+  var rowR = -1
+  pushUsage(0x4f)                     # Right arrow
+  proc turnedR(): bool =
+    for y in 16..22:
+      if px((col + 1) * 8 + 3, y * 8 + 3) == 10:
+        rowR = y
+        return true
+  expectTrue("HDMI: the Right arrow turns it right", runUntil(turnedR, 10_000_000))
+  pushUsage(0x51)                     # Down arrow
+  var colD = -1
+  proc turnedD(): bool =
+    for x in col + 1 .. col + 5:
+      if px(x * 8 + 3, (rowR + 1) * 8 + 3) == 10:
+        colD = x
+        return true
+  expectTrue("HDMI: the Down arrow turns it down (row " & $rowR & ")", runUntil(turnedD, 10_000_000))
+  pushUsage(0x50)                     # Left arrow
+  proc turnedL(): bool =
+    for y in rowR + 1 .. rowR + 6:
+      if px((colD - 1) * 8 + 3, y * 8 + 3) == 10:
+        return true
+  expectTrue("HDMI: the Left arrow turns it left (column " & $colD & ")", runUntil(turnedL, 10_000_000))
   pushKey(ord('q'))
   expectTrue("HDMI: Q- TEXT and the goodbye, the terminal back", runUntil(proc (): bool =
     simcard_gpu_mode(g) == 0 and gpuFind(g, "Thanks for playing snake.") >= 0 and mem[ApiRun] == 0, 5_000_000))
@@ -3837,6 +3867,39 @@ proc testSnakeExample() =
   ioModel = imLegacy
 
 run testSnakeExample
+
+proc testSimKeys() =
+  ## SIM-014: the keys with no character reach the kernel as the real IO card
+  ## gives them (fw/io/core/iocard.h): tools/testdata/keys_prog.s prints the
+  ## byte API_GETKEY returns for each. By HID usage (the sim window's path,
+  ## pushUsage: SDL's scancodes are the usages) and by byte (--type's path,
+  ## pushKey: the shim's ASCII-to-HID table), both through the IO card core.
+  echo "== the simulator's arrow, navigation and function keys =="
+  let g = runPrg(testdata / "keys_prog.s", CardGpu)
+  settle(2_000_000)
+  # Up Down Left Right Home End PgUp PgDn Insert Delete F1..F12
+  let usages = @[0x52, 0x51, 0x50, 0x4f, 0x4a, 0x4d, 0x4b, 0x4e, 0x49, 0x4c] & toSeq(0x3a..0x45)
+  let bytes = @[0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x7f] & toSeq(0x91..0x9c)
+  proc shown(keys: seq[int]): string =
+    for b in keys: result.add("<" & toHex(b, 2) & ">")
+  proc screen(): string =
+    for row in 0..29: result.add(gpuLine(g, row).strip)
+  let want = shown(bytes)
+  for u in usages:
+    pushUsage(u)
+    settle(2_000_000)
+    runGuest(5)
+  expectTrue("by HID usage: " & want & " (" & screen() & ")", want in screen())
+  for b in bytes:
+    pushKey(b)
+    settle(2_000_000)
+    runGuest(5)
+  expectTrue("by byte (--type's path): " & want & " again (" & screen() & ")", screen().count(want) == 2)
+  pushKey(ord('q'))
+  expectTrue("q ends it", runUntil(proc (): bool = mem[ApiRun] == 0 and waiting, 5_000_000))
+  ioModel = imLegacy
+
+run testSimKeys
 
 proc testGfxdemoExample() =
   ## KRN-026: examples/gfxdemo on both graphics cards, a key between stages.
@@ -4006,7 +4069,10 @@ proc testKernelConsole() =
   ## banner would wait for ever); the terminal's output reaches CON_OUT and
   ## wraps; with HOST set a full ring holds the kernel until the card takes
   ## it, with HOST clear the kernel drops and goes on; typed input from
-  ## CON_IN reaches the prompt and BASIC.
+  ## CON_IN reaches the prompt and BASIC. A PC that keeps the port open but
+  ## stops reading: after 500 ms of a full ring the kernel drops what does not
+  ## fit (and goes straight past while the tail stays), and waits again once
+  ## the PC has read.
   echo "== the USB console, the kernel's side =="
   let rom = buildKernelRom()
   machineCards([CardGpu, CardIo])
@@ -4061,13 +4127,59 @@ proc testKernelConsole() =
   expectTrue("BASIC typed on the PC runs; its output wraps the ring whole: " & escape(got),
              got.startsWith(want) and "DONE." in got)
 
-  # HOST set and nobody taking: the kernel waits at the full ring
+  # HOST set and nobody taking: the kernel waits at the full ring, for a
+  # while (a PC that reads again within 500 ms loses nothing)
+  proc runToFull(): int =
+    ## guest ms until CON_OUT is full (-1: not within 3 s)
+    result = -1
+    for i in 0 ..< 3000:
+      if ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail]: return msCount()
+      runGuest(1)
+  proc runToPrompt(): int =
+    ## guest ms until the kernel is back at the prompt (-1: not within 3 s)
+    result = -1
+    for i in 0 ..< 3000:
+      if waiting: return msCount()
+      runGuest(1)
   conType("run\r")
-  discard conRun(1500, false)
-  expectTrue("HOST set, ring full: the kernel waits (not back at the prompt)",
+  var fullAt = runToFull()
+  discard conRun(400, false)
+  expectTrue("HOST set, ring full: the kernel waits (not back at the prompt 400 ms on)",
+             fullAt >= 0 and ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail] and not waiting)
+  got = conRun(1500, true)
+  expectTrue("the card takes it: the rest comes whole, and the prompt: " & escape(got),
+             got.startsWith(want) and "DONE." in got and got.endsWith(">> "))
+
+  # HOST set and the PC stops reading (the port open, the terminal program
+  # hung): after 500 ms of a full ring the kernel drops instead of waiting
+  conType("run\r")
+  fullAt = runToFull()
+  let stuckTail = mem[ConOutTail]
+  let promptAt = runToPrompt()
+  expectTrue("HOST set, nobody reading: the terminal goes on ~500 ms after the ring filled (" &
+             $(promptAt - fullAt) & " ms)", fullAt >= 0 and promptAt >= 0 and promptAt - fullAt in 490..600)
+  expectTrue("... the program ran to the end on the graphics card", gpuFind(g, "DONE.") >= 0)
+  expectTrue("... the rest dropped: the ring untouched, full", mem[ConOutTail] == stuckTail and
+             ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail])
+  # more output while still nobody reads: dropped at once, no new wait
+  conType("print 12345\r")
+  let typedAt = msCount()
+  while mem[ConInTail] != mem[ConInHead] and msCount() - typedAt < 500: runGuest(1)
+  runGuest(1)
+  let backAt = runToPrompt()
+  expectTrue("still stuck: new output goes straight past (back at the prompt in " &
+             $(backAt - typedAt) & " ms)", backAt >= 0 and backAt - typedAt < 100 and
+             gpuFind(g, "12345") >= 0 and mem[ConInTail] == mem[ConInHead])
+  # the PC reads again: the kernel waits once more and nothing is lost
+  discard conDrain()
+  conType("run\r")
+  fullAt = runToFull()
+  discard conRun(400, false)
+  expectTrue("the PC read: waiting resumes (full and not at the prompt 400 ms on)", fullAt >= 0 and
              ((mem[ConOutHead] + 1) and 127) == mem[ConOutTail] and not waiting)
   got = conRun(1500, true)
-  expectTrue("the card takes it: the rest comes, and the prompt", "line 12 of" in got and got.endsWith(">> "))
+  expectTrue("... then taken: the output whole and in order: " & escape(got),
+             got.startsWith(want) and "DONE." in got and got.endsWith(">> "))
 
   # HOST clear (the port closed): the kernel drops what does not fit
   mem[ConFlags] = 0

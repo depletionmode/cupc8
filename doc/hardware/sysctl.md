@@ -197,10 +197,12 @@ on every poll (nothing is cached across a kernel reboot); each side writes
 only its own index, after the data it covers, because the bridge's writes are
 atomic per byte and not across bytes.
 
-With `HOST` set the kernel waits for room in a full `CON_OUT`, so a PC that
-holds the port open but stops reading (a terminal program suspended, say)
-holds up the terminal, as a serial terminal with flow control would. Close
-the port and the kernel goes on, dropping what it would have sent.
+With `HOST` set the kernel waits for room in a full `CON_OUT`, as a serial
+terminal with flow control would, but for 500 ms at most: a PC that holds the
+port open but stops reading (a terminal program suspended, say) holds up the
+terminal for half a second, then the kernel goes on, dropping what does not
+fit until the PC reads again (then it waits for the PC again, so a reader
+that keeps up loses nothing). With the port closed the kernel drops at once.
 
 Open it with `cupc8.py console` (it finds interface 2; `Ctrl-]` quits), or
 any terminal program: `picocom /dev/ttyACM1`, `screen /dev/ttyACM1`, PuTTY.

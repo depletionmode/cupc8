@@ -281,6 +281,11 @@ static int ascii_to_hid(uint8_t ch, uint8_t *mods, uint8_t *usage)
 	if (ch == '\n')
 		ch = '\r';
 	if (ch == 0x7F) { *usage = 0x4C; return 1; }                  /* Delete */
+	/* the IO card's key codes (iocard.h) back to the keys that give them:
+	 * Up, Down, Left, Right, Home, End, PgUp, PgDn, Insert; F1-F12 */
+	static const uint8_t nav[] = {0x52, 0x51, 0x50, 0x4F, 0x4A, 0x4D, 0x4B, 0x4E, 0x49};
+	if (ch >= 0x80 && ch <= 0x88) { *usage = nav[ch - 0x80]; return 1; }
+	if (ch >= 0x91 && ch <= 0x9C) { *usage = (uint8_t)(0x3A + ch - 0x91); return 1; }
 	if (ch >= 1 && ch <= 26 && ch != '\r' && ch != '\b' && ch != '\t') {
 		*mods = 0x01;                                                /* Ctrl+letter */
 		*usage = (uint8_t)(0x04 + ch - 1);
