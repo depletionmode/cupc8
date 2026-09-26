@@ -1096,6 +1096,122 @@ def prepare(board):
     v.SetNet(net)
     v.SetLocked(True)
     board.Add(v)
+    _plane_pads(board)
+
+
+PLANE_NETS = ("/GND", "/+3V3")
+FINE_PITCH = ("U2", "U7", "U9")
+
+
+def _plane_pads(board):
+    """Every GND and +3V3 pad of the fine-pitch parts reaches its plane by a
+    via of its own (ground_fanout's, or one placed here further in under the
+    part when the pins around took the near spots), and the outer-layer GND
+    pour keeps clear of those pads: between 0.5 mm-pitch pins it could only
+    reach one through a sliver (DRC: connection width)."""
+    import math
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    tracks = board.Tracks()
+    items = [tracks[i] for i in range(len(tracks))]
+    starts = [(to(t.GetStart().x), to(t.GetStart().y)) for t in items if t.Type() == pcbnew.PCB_TRACE_T]
+    vias = [(to(t.GetStart().x), to(t.GetStart().y)) for t in items if t.Type() == pcbnew.PCB_VIA_T]
+    # other nets' copper already there: (net, segment or via, half width)
+    segs = [(t.GetNetname(), to(t.GetStart().x), to(t.GetStart().y), to(t.GetEnd().x), to(t.GetEnd().y),
+             to(t.GetWidth()) / 2 if t.Type() == pcbnew.PCB_TRACE_T else 0.3) for t in items]
+
+    def seg_dist(x, y, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        k = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+        return math.hypot(x - ax - k * dx, y - ay - k * dy)
+
+    def clear(net, x, y, r):
+        """(x, y) with radius r keeps 0.2 mm from other nets' tracks and vias"""
+        return all(n == net or seg_dist(x, y, ax, ay, bx, by) >= r + hw + 0.2 for n, ax, ay, bx, by, hw in segs)
+    pads = [(p, fp) for fp in board.GetFootprints() for p in fp.Pads()]
+    others = []
+    for p, _ in pads:
+        bb = p.GetBoundingBox()
+        others.append((p.GetNetname(), to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom())))
+    for ref in FINE_PITCH:
+        fp = board.FindFootprintByReference(ref)
+        cx, cy = to(fp.GetPosition().x), to(fp.GetPosition().y)
+        for pad in fp.Pads():
+            net = pad.GetNetname()
+            if net not in PLANE_NETS:
+                continue
+            if net == "/GND":
+                pad.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_NONE)
+            px, py = to(pad.GetPosition().x), to(pad.GetPosition().y)
+            if any(math.hypot(px - x, py - y) < 0.05 for x, y in starts):
+                continue                            # fanned out already
+            # in, under the part, square to the side the pad sits on (along
+            # the pad's long axis), so the path runs between its neighbours
+            bb = pad.GetBoundingBox()
+            if bb.GetHeight() > bb.GetWidth():
+                base = math.pi / 2 if cy > py else -math.pi / 2
+            elif bb.GetWidth() > bb.GetHeight():
+                base = 0.0 if cx > px else math.pi
+            else:
+                base = math.atan2(cy - py, cx - px)
+
+            def path_clear(pts):
+                for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+                    for k in range(1, 21):
+                        sx, sy = ax + (bx - ax) * k / 20, ay + (by - ay) * k / 20
+                        if any(n != net and x0 - 0.3 < sx < x1 + 0.3 and y0 - 0.3 < sy < y1 + 0.3
+                               for n, x0, y0, x1, y1 in others) or not clear(net, sx, sy, 0.075):
+                            return False
+                return True
+
+            # straight in past the pad row (d1), then out to the side at an
+            # angle (a dog-leg round the neighbours' vias) to the via
+            # in under the part first; failing that out, past the pad's outer end
+            found = None
+            ext = max(to(pad.GetSize().x), to(pad.GetSize().y)) / 2
+            for d1, heading in [(d, base) for d in (1.2, 1.6, 2.0, 2.4)] + \
+                               [(d, base + math.pi) for d in (ext + 0.7, ext + 1.1)]:
+                kx, ky = px + d1 * math.cos(heading), py + d1 * math.sin(heading)
+                for r in (0.0, 0.9, 1.3, 1.8, 2.4, 3.0, 3.8):
+                    for da in ((0,) if r == 0 else (0, 45, -45, 90, -90, 30, -30, 60, -60)):
+                        a = heading + math.radians(da)
+                        vx, vy = kx + r * math.cos(a), ky + r * math.sin(a)
+                        if any(math.hypot(vx - x, vy - y) < 0.6 + 0.3 for x, y in vias) or \
+                                not clear(net, vx, vy, 0.3):
+                            continue
+                        if any(n != net and x0 - 0.55 < vx < x1 + 0.55 and y0 - 0.55 < vy < y1 + 0.55
+                               for n, x0, y0, x1, y1 in others):
+                            continue
+                        pts = [(px, py), (kx, ky), (vx, vy)] if r else [(px, py), (kx, ky)]
+                        if path_clear(pts):
+                            found = pts
+                            break
+                    if found:
+                        break
+                if found:
+                    break
+            if not found:
+                raise SystemExit("%s pad %s (%s): no room for a via to its plane" % (ref, pad.GetNumber(), net))
+            for (ax, ay), (bx, by) in zip(found, found[1:]):
+                t = pcbnew.PCB_TRACK(board)
+                t.SetStart(pcbnew.VECTOR2I(mm(ax), mm(ay)))
+                t.SetEnd(pcbnew.VECTOR2I(mm(bx), mm(by)))
+                t.SetWidth(mm(0.15))
+                t.SetLayer(pcbnew.F_Cu)
+                t.SetNet(pad.GetNet())
+                t.SetLocked(True)
+                board.Add(t)
+                segs.append((net, ax, ay, bx, by, 0.075))
+            vx, vy = found[-1]
+            v = pcbnew.PCB_VIA(board)
+            v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(vy)))
+            v.SetWidth(mm(0.6))
+            v.SetDrill(mm(0.3))
+            v.SetNet(pad.GetNet())
+            v.SetLocked(True)
+            board.Add(v)
+            vias.append((vx, vy))
+            segs.append((net, vx, vy, vx, vy, 0.3))
 
 
 def main():
