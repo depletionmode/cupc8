@@ -242,7 +242,9 @@ def package_ok(pkg, fp_name):
     m = re.fullmatch(r"(.+)\((\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)\)", p)   # "TQFP-144(20x20)": and its body
     if m:
         body = ["%.1f" % float(v) for v in m.group(2, 3)]
-        return name.startswith(m.group(1)) and "L%s-W%s" % tuple(body) in name
+        # either way round: JLC writes "VSON-10(2x3)" where the name says L3.0-W2.0
+        return name.startswith(m.group(1)) and ("L%s-W%s" % tuple(body) in name
+                                                or "L%s-W%s" % tuple(body[::-1]) in name)
     m = re.fullmatch(r"(.+)-(150|208)MIL", p)        # "SOIC-8-208mil": the body width in mils
     if m:
         return name.startswith(m.group(1)) and "-W%s-" % {"150": "3.9", "208": "5.3"}[m.group(2)] in name

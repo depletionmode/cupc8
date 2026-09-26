@@ -222,10 +222,10 @@ W, H = 56, 48
 EDGE_AT = (W / 2 - 16.5, H + 4.95)
 OUTLINE = (0, 0, W, H)
 EDGE = [(EDGE_AT[0] - 0.65, H), (0, H), (0, 0), (W, 0), (W, H), (EDGE_AT[0] + 33.65, H)]
-LOGO_MM = 12
+LOGO_MM = 10
 REVISION = "A"            # doc/milestone-1.md, Board revision: bump for every board sent to be made
 LABELS = {"D1": "PWR", "D2": "TX", "D3": "RX"}   # silkscreen says what each LED shows
-LOGO_AT = (49, 22)
+LOGO_AT = (50, 22)
 
 PLACEMENT = {
     "J2": (EDGE_AT[0], EDGE_AT[1], 0),
@@ -302,7 +302,8 @@ def main():
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
-        title="CUPC/8 system", revision=REVISION, prepare=prepare,
+        title="CUPC/8 system", revision=REVISION, prepare=prepare, route_tries=6,
+        logo_keepout=True,
         # the presence link crosses on In2.Cu just above the tab (the key notch
         # reaches the body) and above the GND ties' vias: on B.Cu it would wall
         # off the A-side fingers' escapes

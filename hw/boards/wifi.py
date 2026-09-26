@@ -227,9 +227,9 @@ def main():
     logo.footprint(LOGO_MM)
     lcsc = kg.pipeline("wifi", schematic, PLACEMENT, BODY, out=sys.argv[1] if len(sys.argv) > 1 else None,
                        io_card=True, power_nets=("/+5V", "/3V3", "/GND"),
-                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 22, -27, 0)],
+                       graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7, -29, 0)],
                        labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
-                       title=TITLE, revision=REVISION)                       # bottom right
+                       title=TITLE, revision=REVISION, logo_keepout=True)    # bottom right
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

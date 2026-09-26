@@ -212,7 +212,7 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
               AGND, GND ── ground; PG ── unconnected (or to a GPIO)
               L1–L2: 0.47 µH FXL0420-R47-M (C167200, 14 mΩ, Isat 9.5 A)
               VOUT: 2 × 22 µF 25 V 0805 (C45783)
-              FB: 825 kΩ 1 % (C25823) to VOUT, 91 kΩ 1 % (C23265) to GND  → 5.03 V
+              FB: 300 kΩ 1 % (C23024) to VOUT, 33 kΩ 1 % (C4216) to GND  → 5.045 V
          ── HDMI pin 18 (and the 2.2 kΩ DDC pull-ups, the HPD divider)
 ```
 
@@ -226,7 +226,7 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
   in boost) pulls far more than that through it.
 - **No Schottky.** The B5819W's ~0.3 V would cost the margin, and the
   TPS63802 disconnects its output from its input when it is off.
-- **The output**: 5.03 V nominal; 4.869–5.201 V with VFB ±1 %, the 1 %
+- **The output**: 5.045 V nominal; 4.881–5.214 V with VFB ±1 %, the 1 %
   divider and a 50 mVpp power-save ripple band (datasheet figure 10-21).
   HDMI asks 4.8–5.3 V.
 - **Its input OVP** stops the TPS63802 above 5.5–5.9 V. At vSafe5V max its
@@ -247,7 +247,7 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
 | POW-005 CC | Realised CC ranges: default 0.317–0.571 V, 1.5 A 0.829–1.090 V, 3.0 A 1.524–1.936 V. PWR_HI trips between 1.203 V (+112 mV clear of 1.5 A) and 1.386 V (+138 mV clear of 3.0 A). The ADC classes clear by 60–102 mV. TI's TLV7011 model agrees at both edges. |
 | POW-006 budget | M1 worst case 1.737 A: +42 % under a 3.0 A source, +34 % under the eFuse's minimum limit, +45 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.383 A (+7.8 %, against 5 % under the waiver). Default USB at typical loads: 374 mA (+25 % under 500 mA). Slots 5–6 have 0.65 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.397 V highest (+103 mV under 5.5). Per card +5V: IO 0.750 A (+6.3 % under slot.md's 0.80 A, +19 % under the fuse's 0.92 A hold), GPU 0.095 A, Wi-Fi 0.34 A. OVLO 5.60–5.81 V. |
 | POW-007 keyboard boost | Model check: 0.8 % off the set point. Port minimum in a 0→500 mA step at the DC low corner: 4.697 V worst (+297 mV over 4.40), 4.724 V typical, 5.129 V at vSafe5V max (pass-through). Port maximum 5.431 V (+69 mV under 5.5). Up in 0.32–0.36 ms. Inductor current 0.75 A against the 2.7 A valley limit. |
-| POW-008 HDMI +5V (TPS63802, behavioural) | Model check: 147 mV dip against the datasheet figure's 130 mV. Pin in a 10→55 mA step, over every tolerance: 4.862 V minimum (+62 mV over 4.8) and 5.220–5.239 V maximum (+61 mV under 5.3), at the worst and typical corners and at vSafe5V max. Converter input at vSafe5V max 5.409 V (+91 mV under its 5.5 V OVP), at the worst corner 3.751 V (over 1.3 V). PTC current 0.095 A against its 0.17 A hold (+44 %). With the PTC after the converter the pin would be 4.670 V. |
+| POW-008 HDMI +5V (TPS63802, behavioural) | Model check: 147 mV dip against the datasheet figure's 130 mV. Pin in a 10→55 mA step, over every tolerance: 4.874 V minimum (+74 mV over 4.8) and 5.233–5.252 V maximum (+48 mV under 5.3; 300k/33k, both basic: the 825k (C25823) had 418 in stock), at the worst and typical corners and at vSafe5V max. Converter input at vSafe5V max 5.409 V (+91 mV under its 5.5 V OVP), at the worst corner 3.750 V (over 1.3 V). PTC current 0.096 A against its 0.17 A hold (+44 %). With the PTC after the converter the pin would be 4.670 V. |
 | THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.5 °C, GPU card buck-boost 45.8 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card SY6280 46.0 °C. The AMS1117 rows are gone: no M1 card has one. |
 
 ### Assumptions the boards must meet
@@ -275,7 +275,7 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
   ≤ 10 µF on +5V. Per card (slot.md): ≤ 0.80 A of +5V (raised from
   0.55 A for the keyboard boost, B10), ≤ 300 mA of +3V3.
 - **GPU card:** the HDMI +5V circuit above: PTC SMD0805P020TF ahead of
-  a TPS63802DLAR, 0.47 µH, 825k/91k 1 %, MODE to GND, no Schottky.
+  a TPS63802DLAR, 0.47 µH, 300k/33k 1 %, MODE to GND, no Schottky.
 - **IO card:** the keyboard boost above: TPS61023DRLR, 1 µH FXL0420-1R0-M,
   10 µF in, 2 × 22 µF out, 750k/100k 1 %, feeding the SY6280 port switch.
 - **Wi-Fi card:** L1 is CJiang's FNR3015S2R2MT, not a Sunlord part. LCSC's

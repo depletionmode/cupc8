@@ -1,0 +1,16 @@
+# TPS63802DLAR (TI), 2 A buck-boost converter, VSON-10 (DLA) 3 x 2 mm
+datasheet: https://www.ti.com/lit/ds/symlink/tps63802.pdf
+source: "TPS63802 datasheet SLVSEU9D, 7 Pin Configuration and Functions: DLA package (VSON-10) top view and Table 7-1 Pin Functions (1 EN, 2 MODE, 3 AGND, 4 FB, 5 PG, 6 VOUT, 7 L2, 8 GND, 9 L1, 10 VIN)"
+package: VSON-10(2x3)
+pins:
+  1: EN
+  2: MODE
+  3: AGND
+  4: FB
+  5: PG
+  6: VOUT
+  7: L2
+  8: GND
+  9: L1
+  10: VIN
+ccw: [1, 10]        # 1-5 down the left side, 6-10 back up the right (top view)
