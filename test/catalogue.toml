@@ -949,6 +949,15 @@ vrow = "2.4"
 cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native >/dev/null && build/emu-native/test_sdcard && tools/fw_rp2040.sh emu_sdspi && CUPC8_EMU=native node test/emu/test_sdspi.mjs"
 
 [[test]]
+id = "EMU-009"
+title = "Native whole-machine emulator: the Wi-Fi card in step with the board"
+checks = "the kernel ROM with the HDMI, IO and Wi-Fi cards (its real firmware in the lockstep QEMU, tools/qemu_build.sh): boot, net join, net get from an HTTP server in a child process, serially and threaded twice: identical board clock count, CPU state, every card's time (QEMU's clock at its last answer for the Wi-Fi card) and core cycle counts, every slot SPI frame (the Wi-Fi card's with QEMU's clock at its end), the guest's network traffic (every packet and its guest time) and the screen; the page is shown; every packet the guest receives (DHCP, ARP, the TCP connect's SYN-ACK, the server's answer) reaches it at the guest time of the packet it sent that asked for it (QEMU lets the host answer first)"
+method = "test/emu/test_wifi_lockstep.mjs (machinenative.mjs's pcap option, emu/machine EspCard, tools/patches/qemu-esp-lockstep.patch)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
@@ -1121,7 +1130,7 @@ checks = "Machine.create({ forward }) on the native emulator: QEMU accepts TCP o
 method = "test/emu/test_wifi_forward.mjs, test/emu/machinenative.mjs (hostfwd on the -nic user,model=open_eth line)"
 kind = "sim"
 vrow = "2.6"
-cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && node test/emu/test_wifi_forward.mjs"
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_forward.mjs"
 
 [[test]]
 id = "WIFI-004"
@@ -1279,7 +1288,7 @@ vrow = "3.2"
 [[test]]
 id = "E2E-003"
 title = "Network fetch"
-checks = "Wi-Fi join → TCP fetch from a local server → page shown"
+checks = "Wi-Fi join → TCP fetch from a local server (a child process) → page shown; on the native emulator two runs with the same port (CUPC8_E2E003_PORT) are the same run (CUPC8_ESP_TRACE traces and end state identical)"
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
@@ -1291,7 +1300,7 @@ checks = "the kernel's DNS client asks a DNS server on the PC (net config dns 10
 method = "test/emu/test_e2e.mjs E2E-013 (CUPC8_EMU=native): the native emulator, esp32c3 firmware in QEMU, a Node DNS server and HTTP server on 127.0.0.1"
 kind = "sim"
 vrow = "3.2"
-cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
+cmd = "tools/qemu_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
 
 [[test]]
 id = "E2E-020"
@@ -1309,7 +1318,7 @@ checks = "on the native emulator (HDMI, IO, the Wi-Fi card's real firmware in QE
 method = "test/emu/test_e2e.mjs E2E-014 (CUPC8_EMU=native): Node's net and dgram sockets on 127.0.0.1, free host ports forwarded to the card's port 7007"
 kind = "sim"
 vrow = "3.2"
-cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
 
 [[test]]
 id = "E2E-015"

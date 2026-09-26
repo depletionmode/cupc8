@@ -136,10 +136,10 @@ index 102bec7..2ef6a36 100644
  }
 diff --git i/system/cupc8-lockstep.c w/system/cupc8-lockstep.c
 new file mode 100644
-index 0000000..eedd808
+index 0000000..dc1c887
 --- /dev/null
 +++ w/system/cupc8-lockstep.c
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,385 @@
 +/*
 + * CUPC/8 lockstep: the Wi-Fi card's QEMU in step with the CUPC/8
 + * whole-machine emulator (emu/machine in the CUPC/8 repository).
@@ -332,6 +332,9 @@ index 0000000..eedd808
 +    uint64_t seen = qatomic_read(&ls.net_rx);
 +    int64_t start = g_get_monotonic_time(), last = start;
 +    bql_unlock();
++    /* the packet may have opened a host socket (a TCP connect): the main
++     * loop polls it only once it has gone round, so wake it now */
++    qemu_notify_event();
 +    for (;;) {
 +        g_usleep(500);
 +        int64_t t = g_get_monotonic_time();

@@ -193,7 +193,7 @@ export class Machine {
     this.console?.server?.close();
     this.console?.client?.destroy();
     if (this.esp) {
-      this.esp.proc.kill();
+      this.esp.proc.kill('SIGKILL');  // a lockstep QEMU waits on its FIFO and would not stop on SIGTERM
       fs.closeSync(this.esp.tx);
       fs.closeSync(this.esp.rx);
     }

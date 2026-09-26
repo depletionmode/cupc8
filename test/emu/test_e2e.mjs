@@ -109,18 +109,30 @@ async function e2e002() {
 // The kernel's `net` command on the real Wi-Fi firmware (QEMU, user-mode NAT:
 // the host is 10.0.2.2): join, then an HTTP GET from a server on this host,
 // its page shown on HDMI.
+//
+// The server is a child process, so that it answers while the machine runs
+// (this process's event loop turns only between slices): on the native
+// emulator, whose Wi-Fi card is in step with the board (emu/machine/README.md),
+// two runs are then the same run, cycle for cycle, if the port is the same
+// (CUPC8_E2E003_PORT; the default is a free one, and the port is typed).
 async function e2e003() {
   log('E2E-003: Wi-Fi join, then an HTTP GET from a local server, shown on HDMI');
   const page = 'HELLO FROM THE HOST';
   let requests = 0;
-  const server = http.createServer((req, res) => {
-    requests++;
-    res.sendDate = false;                         // the screen is compared with a recording
-    res.writeHead(200, { 'Content-Type': 'text/plain', Connection: 'close' });
-    res.end(page + '\n');
+  const server = spawn(process.execPath, ['-e', `
+    const s = require('node:http').createServer((req, res) => {
+      console.log('request');
+      res.sendDate = false;                       // the screen is compared with a recording
+      res.writeHead(200, { 'Content-Type': 'text/plain', Connection: 'close' });
+      res.end(${JSON.stringify(page)} + '\\n');
+    });
+    s.listen(${Number(process.env.CUPC8_E2E003_PORT ?? 0)}, '127.0.0.1', () => console.log(s.address().port));`],
+  { stdio: ['ignore', 'pipe', 'inherit'] });
+  const port = await new Promise((resolve, reject) => {
+    server.stdout.once('data', (d) => resolve(Number(String(d).split('\n')[0])));
+    server.once('exit', (c) => reject(new Error(`E2E-003: the HTTP server exited (${c})`)));
   });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const port = server.address().port;
+  server.stdout.on('data', (d) => (requests += String(d).split('request').length - 1));
   const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' } });
   m.powerOn();
   expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
@@ -132,8 +144,9 @@ async function e2e003() {
   expect(requests === 1, `the server saw one request (${requests})`);
   await m.runAsync(200e6);
   golden('E2E-003', screenText(m).replace(new RegExp(`10\\.0\\.2\\.2 ${port}`, 'g'), '10.0.2.2 PORT'));
+  log(`ended at ${m.ns} ns, CPU ${JSON.stringify(m.state())}`);
   m.stop();
-  server.close();
+  server.kill();
 }
 
 // ------------------------------------------------------------------ E2E-007

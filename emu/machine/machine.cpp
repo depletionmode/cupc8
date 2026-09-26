@@ -110,7 +110,7 @@ bool Rp2040Card::irq() {
 // (fw/wifi/port/esp32c3/main/transport_uart.c): $A6 asks for the MISO
 // preload before a frame, $A5 len16 bytes delivers the MOSI bytes after it.
 // QEMU runs in icount mode, its clock a function of the instructions run,
-// and only as far as this card lets it (tools/qemu/cupc8-lockstep.patch,
+// and only as far as this card lets it (tools/patches/qemu-esp-lockstep.patch,
 // system/cupc8-lockstep.c): advance(t) grants it the board's time t in
 // GRANT_NS steps, so it trails the board, and each UART exchange is sent at
 // the board's time of the select or deselect, reaches the guest at that
