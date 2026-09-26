@@ -404,78 +404,6 @@ str_cpy:
 	pop pcl
 	pop pch
 
-mem_cmp_set0:
-	st [mem_p_dst], r1
-	st [mem_p_dst+1], r0
-	pop pcl
-	pop pch
-
-mem_cmp_set1:
-	st [mem_p_src], r1
-	st [mem_p_src+1], r0
-	pop pcl
-	pop pch
-
-mem_cmp_pc: resb 2
-mem_cmp_val: resb 1
-mem_cmp:
-	; length in r0
-	; args on stack:
-	;  src >> 8
-    ;  src
-	;  dst >> 8
-	;  dst
-
-	; save pc
-	pop r1
-	st [mem_cmp_pc], r1
-	pop r1
-	st [mem_cmp_pc+1], r1
-
-	pop r1
-	st [mem_p_src+1], r1
-	pop r1
-	st [mem_p_src], r1
-
-	pop r1
-	st [mem_p_dst+1], r1
-	pop r1
-	st [mem_p_dst], r1
-
-  ; 0 when all r0 bytes are equal, else the first difference (dst - src),
-  ; like memcmp (it used to keep only the last byte's difference)
-  xor r1, r1
-  st [mem_cmp_val], r1
-.loop:
-  eq r1, r0
-  bzf .done
-  push r0
-  push r1
-  ldd r0, [mem_p_src]+r1
-  ldd r1, [mem_p_dst]+r1
-  sub r1, r0
-  st [mem_cmp_val], r1
-  eq r1, #0
-  pop r1
-  pop r0
-  bzf .next
-  b .done
-.next:
-  add r1, #1
-  b .loop
-
-.done:
-	; restore pc
-	ld r1, [mem_cmp_pc+1]
-	push r1
-	ld r1, [mem_cmp_pc]
-	push r1
-
-  ld r0, [mem_cmp_val]
-
-  pop pcl
-  pop pch
-
 mem_cpy_pc: resb 2
 mem_cpy:
 	; length in r0
@@ -523,52 +451,6 @@ mem_cpy:
 	ld r1, [mem_cpy_pc]
 	push r1
 
-	pop pcl
-	pop pch
-
-str_chr_ptr: resb 2
-str_chr_set:
-	st [str_chr_ptr], r1
-	st [str_chr_ptr+1], r0
-	pop pcl
-	pop pch
-
-str_chr_offset: resb 1
-str_chr:
-	xor r1, r1
-	st [str_chr_offset], r1
-.loop:
-	ldd r1, [str_chr_ptr]+r1
-	eq r1, #0
-	bzf .notfound
-	eq r1, r0
-	bzf .found
-	ld r1, [str_chr_offset]
-	add r1, #1
-	st [str_chr_offset], r1
-	b .loop
-
-.notfound:
-	xor r0, r0
-	xor r1, r1
-	b .end
-
-.found:
-	ld r1, [str_chr_ptr]
-	ld r0, [str_chr_offset]
-	add r0, r1
-	st [str_chr_ptr], r0
-	lt r0, r1
-	bzf .carry
-	b .end
-.carry:
-	ld r0, [str_chr_ptr+1]
-	add r0, #1
-	st [str_chr_ptr+1], r0
-
-	ld r1, [str_chr_ptr]
-	ld r0, [str_chr_ptr+1]
-.end:
 	pop pcl
 	pop pch
 

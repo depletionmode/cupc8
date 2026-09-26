@@ -29,26 +29,6 @@ math_div:
 	pop pcl
 	pop pch
 
-mul_n: resb 1
-math_mul:
-	st [mul_n], r0
-	xor r0, r0
-.loop:
-	push r0
-	ld r0, [mul_n]
-	eq r0, #0
-	bzf .done
-	sub r0, #1
-	st [mul_n], r0
-	pop r0
-	add r0, r1
-	b .loop
-.done:
-	pop r0
-	pop pcl
-	pop pch
-	
-
 ; ------------------------------------------------------------ 16-bit numbers
 ; BASIC's numbers (and the kernel's where 8 bits are not enough): two bytes,
 ; low first, two's complement. The routines work on n_a and n_b: n_a op n_b
