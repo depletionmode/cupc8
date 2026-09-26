@@ -1635,6 +1635,18 @@ def remove_dangling(board, pours=()):
     return len(gone)
 
 
+def freerouting_left(log, pours=()):
+    """The connections a Freerouting run left, from its log: the nets it
+    lists (less the `pours`), and a marker when its final count is more than
+    it listed (it does not always list them)."""
+    listed = re.findall(r"Net '([^']+)' \((\d+) unrouted", log)
+    left = sorted({n for n, _ in listed if n not in pours})
+    final = re.findall(r"Auto-routing stage completed:.*?final score: [\d.]+ \((\d+) unrouted", log)
+    if final and int(final[-1]) > sum(int(k) for _, k in listed):
+        left.append("%d more, not listed" % (int(final[-1]) - sum(int(k) for _, k in listed)))
+    return left
+
+
 def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
     """`parallel` Freerouting runs at once, each on its own ordering (salt) of
     the problem and its own copy of the DSN, for each of `tries` pass
@@ -1674,8 +1686,7 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
                 sk, proc, ses, log, logf, done = job
                 if done is None and proc.poll() is not None:
                     logf.close()
-                    out = open(log).read()
-                    left = [n for n in re.findall(r"Net '([^']+)' \(\d+ unrouted", out) if n not in pours]
+                    left = freerouting_left(open(log).read(), pours)
                     job[5] = "ok" if (proc.returncode == 0 and not left and os.path.exists(ses)) else "left"
                     left_all[sk] = left or ["exit %d" % proc.returncode]
             # the first job, in salt order, that is not a failure decides

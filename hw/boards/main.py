@@ -798,17 +798,30 @@ def wanted(parts):
     at["R56"] = (115.5, 92.0, 0)
     at["Q2"] = (115.5, 88.5, 0)
     at["R55"] = (111.0, 88.5, 0)
-    # CPU socket channel (between the CPU socket and the system slot)
-    cpu_r = ["R%d" % i for i in list(range(80, 88)) + list(range(90, 98))]
-    for i, r in enumerate(cpu_r):
+    # CPU socket: the parts on its north (A) row north of it, by their
+    # contacts (A5 CRESET_n, A6 CDONE, A8-A10 FL1, A38 FL1_MISO, A40-A49 RSVD);
+    # the south (B) row's pulls and keepers in the channel south of it
+    def cpu_x(contact):
+        n = int(contact[1:])
+        return PIN1_X + (n - 1 if n <= 11 else n + 2)      # 3 mm key after contact 11
+    north = [(tp("CPUCARD_nCRESET"), "A5"), (tp("CPU_CDONE"), "A6"), (tp("FL1_SCK"), "A8"),
+             (tp("FL1_MOSI"), "A9"), (tp("FL1_nCS"), "A10"), (tp("FL1_MISO"), "A38")]
+    north += [(tp("CPU_RSVD_A%d" % k), c) for k, c in zip(range(2, 9), ("A40", "A41", "A43", "A44", "A46", "A47",
+                                                                       "A49"))]
+    x_prev = -99.0
+    for r, c in north:
+        x = max(cpu_x(c), x_prev + 2.6)
+        at[r] = (x, ROW_CPU - 6.0, 0)
+        x_prev = x
+    for r, c in (("R85", "A5"), ("R86", "A6"), ("R87", "A10")):   # CRESET_n, CDONE, FL1_nCS pull-ups
+        at[r] = (cpu_x(c) + (0, 3.4, 6.8)[("A5", "A6", "A10").index(c)], ROW_CPU - 9.0, 0)
+    south = ["R80", "R81", "R82", "R83", "R84"] + ["R%d" % i for i in range(90, 98)]   # nSTB nRST PRSNT2 ID0 ID1, D
+    for i, r in enumerate(south):
         at[r] = (20.0 + 3.7 * i, ROW_CPU + 8.4, 0)
     for i, r in enumerate(("C42", "C43", "C44")):
         at[r] = (8.0 + 3.6 * i, ROW_CPU + 8.6, 0)
-    cpu_tp = [tp(n) for n in ("CPU_nRST", "CPU_CDONE", "CPUCARD_nCRESET", "FL1_SCK", "FL1_MOSI", "FL1_MISO",
-                              "FL1_nCS")]
-    cpu_tp += [tp("CPU_RSVD_A%d" % k) for k in range(2, 9)] + [tp("CPU_RSVD_B1")]
-    for i, r in enumerate(cpu_tp):
-        at[r] = (8.0 + 4.0 * i, ROW_CPU + 12.6, 0)
+    for i, net in enumerate(("CPU_nRST", "CPU_RSVD_B1")):
+        at[tp(net)] = (70.0 + 3.0 * i, ROW_CPU + 8.4, 0)
     # system slot channel
     sys_parts = ["R100", "R101", "R102", "R103", "R104", "R105", "R106", "C45", "C46"]
     for i, r in enumerate(sys_parts):
@@ -821,21 +834,33 @@ def wanted(parts):
                              "BR_SCK", "BR_MOSI", "BR_MISO", "BR_nCS", "MEM_nCE_RAM", "CLK12", "CPU_CLK", "nPOR",
                              "nMR", "SPI_SCK", "SPI_MOSI", "SPI_MISO")):
         at[tp(net)] = (68.5 + 3.5 * (i % 3), 37.8 + 3.2 * (i // 3), 0)
-    # each I/O slot: its feed, pulls and pads in the channel south of it
+    # each I/O slot: the parts on its south (B) row in the channel south of
+    # it, those on its north (A) row just north of it, each by its contact
+    def slot_x(contact):
+        n = int(contact[1:])
+        return PIN1_X + (n - 1 if n <= 11 else n + 2)
     for n in range(1, 7):
         y0 = row_slot(n)
         b = 100 * (n + 1)
-        rowa = ["F%d" % b, "R%d" % (b + 1), "R%d" % (b + 2), "C%d" % (b + 1), "C%d" % (b + 2), "C%d" % (b + 3),
-                "R%d" % (b + 7), "R%d" % (b + 8)]
-        xs = [7.5, 13.2, 18.8, 24.4, 28.6, 32.8, 37.0, 41.2]
-        for r, x in zip(rowa, xs):
-            at[r] = (x, y0 + 8.2, 0)
-        for i, r in enumerate(["R%d" % (b + k) for k in (3, 4, 5, 6)]):
-            at[r] = (6.5 + 4.2 * i, y0 + 12.4, 0)
-        pads = [tp("SLOT%d_5V_L" % n), tp("SLOT%d_5V" % n), tp("SLOT%d_CS_n" % n)] + \
-               [tp("SLOT%d_RSVD_A%d" % (n, k)) for k in range(1, 6)]
-        for i, r in enumerate(pads):
-            at[r] = (24.0 + 4.0 * i, y0 + 12.4, 0)
+        # +5V feed by B1/B2/A2, decoupling after it
+        for r, x in zip(["F%d" % b, "R%d" % (b + 1), "R%d" % (b + 2), "C%d" % (b + 1), "C%d" % (b + 2),
+                         "C%d" % (b + 3)], [7.0, 11.8, 16.6, 21.6, 25.0, 28.4]):
+            at[r] = (x, y0 + 7.6, 0)
+        # B6 SWCLK, B7 SWDIO, B9 CARD_RST_n, B10 IRQ_n, B18 PRSNT2_n
+        for r, c in (("R%d" % (b + 7), "B6"), ("R%d" % (b + 8), "B7"), ("R%d" % (b + 4), "B9"),
+                     ("R%d" % (b + 3), "B10"), ("R%d" % (b + 6), "B18")):
+            at[r] = (slot_x(c), y0 + 10.9, 0)
+        for i, net in enumerate(("SLOT%d_5V_L" % n, "SLOT%d_5V" % n)):
+            at[tp(net)] = (36.0 + 3.0 * i, y0 + 10.9, 0)
+        # north: A6/A7/A9/A10/A16 RSVD, A14 CS_n, A18 PROG_n
+        north = [(tp("SLOT%d_RSVD_A%d" % (n, k)), c) for k, c in zip(range(1, 5), ("A6", "A7", "A9", "A10"))]
+        north += [(tp("SLOT%d_CS_n" % n), "A14"), (tp("SLOT%d_RSVD_A5" % n), "A16")]
+        x_prev = -99.0
+        for r, c in north:
+            x = max(slot_x(c), x_prev + 2.6)
+            at[r] = (x, y0 - 6.0, 0)
+            x_prev = x
+        at["R%d" % (b + 5)] = (max(slot_x("A18"), x_prev + 2.8), y0 - 6.0, 0)
     # slot expanders, programming-port mux and their pulls: east of the slots
     at["U13"] = (74.0, row_slot(1) + 8, 90)
     at["U14"] = (74.0, row_slot(2) + 4, 90)
