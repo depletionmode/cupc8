@@ -85,8 +85,6 @@ net_w_ip db "ip"
 net_w_dhcp db "dhcp"
 net_w_save db "save"
 
-; 10000, 1000, 100, 10, little-endian, for net_print_u16
-net_pow db 16, 39, 232, 3, 100, 0, 10, 0
 
 net_spi: resb 1
 net_tmp: resb 2
@@ -124,7 +122,6 @@ net_pn: resb 1
 net_pv: resb 1
 net_pd: resb 1
 net_pc: resb 1
-net_pz: resb 1
 net_wi: resb 1                  ; net config ip- the word
 net_pkt: resb 256               ; a datagram- DNS answers, ICMP messages
 net_a0: resb 1                  ; the API caller's r0 and r1
@@ -164,21 +161,8 @@ net_init:
 	pop pch
 
 net_send:
-	st [net_tmp], r0
-	ld r0, [net_spi]
-	ld r1, [net_tmp]
-	st $f100+r0, r1
-	mov r1, #1
-	st $f102+r0, r1
-.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
-	ld r1, $f103+r0
-	eq r1, #0
-	bzf .spi_wait
-	ld r1, $f101+r0
-	st [net_tmp], r1
-	ld r0, [net_tmp]
-	pop pcl
-	pop pch
+	ld r1, [net_spi]
+	b spi_send
 
 net_cs_on:
 	ld r0, [net_spi]
@@ -707,7 +691,7 @@ net_print_quad:
 	ldd r0, [net_ptr]+r1
 	push pch
 	push pcl
-	b str_printuint8
+	b term_print_u8
 	ld r1, [net_pi]
 	add r1, #1
 	st [net_pi], r1
@@ -722,59 +706,11 @@ net_print_quad:
 	pop pcl
 	pop pch
 
-; print net_u16 in decimal (net_u16 is used up)
+; print net_u16 in decimal
 net_print_u16:
-	xor r0, r0
-	st [net_pi], r0
-	st [net_pz], r0
-.power:
-	ld r1, [net_pi]
-	eq r1, #8
-	bzf .last
-	ld r0, [net_pow]+r1
-	st [net_t16], r0
-	add r1, #1
-	ld r0, [net_pow]+r1
-	st [net_t16+1], r0
-	xor r0, r0
-	st [net_pc], r0
-.sub:
-	push pch
-	push pcl
-	b net_ge16
-	eq r0, #0
-	bzf .digit
-	push pch
-	push pcl
-	b net_sub16
-	ld r0, [net_pc]
-	add r0, #1
-	st [net_pc], r0
-	b .sub
-.digit:
-	ld r0, [net_pc]
-	ld r1, [net_pz]
-	or r1, r0			; a digit other than 0 printed yet
-	st [net_pz], r1
-	eq r1, #0
-	bzf .skip
-	add r0, #48
-	push pch
-	push pcl
-	b print_ascii_char
-.skip:
-	ld r1, [net_pi]
-	add r1, #2
-	st [net_pi], r1
-	b .power
-.last:
 	ld r0, [net_u16]
-	add r0, #48
-	push pch
-	push pcl
-	b print_ascii_char
-	pop pcl
-	pop pch
+	ld r1, [net_u16+1]
+	b term_print_u16
 
 ; ------------------------------------------------------------ the command line
 

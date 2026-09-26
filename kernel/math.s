@@ -1,39 +1,7 @@
-
-div_q: resb 1
-math_div:
-	; r0 = r0 / r1, r1 = remainder; dividing by 0 gives 0 remainder r0
-	eq r1, #0
-	bzf .by_zero
-	push r0
-	xor r0, r0
-	st [div_q], r0
-	pop r0
-.loop:
-	lt r0, r1
-	bzf .done
-	push r0
-	ld r0, [div_q]
-	add r0, #1
-	st [div_q], r0
-	pop r0
-	sub r0, r1
-	b .loop
-.done:
-	mov r1, r0	; remainder
-	ld r0, [div_q]
-	pop pcl
-	pop pch
-.by_zero:
-	mov r1, r0
-	xor r0, r0
-	pop pcl
-	pop pch
-
 ; ------------------------------------------------------------ 16-bit numbers
 ; Two bytes, low first, two's complement. The routines work on n_a and n_b:
-; n_a op n_b into n_a. They change r0, r1 and n_t. The kernel's (API_GFX2_BLIT1,
-; BLIT2); BASIC's build (basic/build.sh) takes this file too, with the rest of
-; BASIC's in basic/n16.s.
+; n_a op n_b into n_a. They change r0, r1 and n_t. The kernel's own (API_GFX2_BLIT1,
+; BLIT2); BASIC, a program, has its own copy of these in basic/n16.s.
 
 n_a: resb 2
 n_b: resb 2

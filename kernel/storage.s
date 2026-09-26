@@ -42,6 +42,9 @@ st_buf: resb 128
 st_pos: resb 4				; F_SEEK's position
 st_name2: resb 14			; F_RENAME's new name
 
+; st_print_err's messages, one after the other in st_err_codes' order, then
+; the one for any other code
+st_err_codes db 1, 12, 3, 5, 6, 2, 4, 8, 13
 st_s_nomedium db "\nno SD card\n"
 st_s_nocard db "\nno storage card\n"
 st_s_notfound db "\nfile not found\n"
@@ -50,8 +53,8 @@ st_s_wp db "\nwrite protected\n"
 st_s_unmounted db "\nno file system on the card\n"
 st_s_exists db "\nfile exists\n"
 st_s_badname db "\nbad file name\n"
-st_s_error db "\ncard error\n"
 st_s_power db "\nUSB power under 3A: SD writes off\n"
+st_s_error db "\ncard error\n"
 
 storage_init:
 	mov r0, #0xff
@@ -81,21 +84,8 @@ storage_init:
 
 ; one byte out (r0), the byte that came back in r0
 st_send:
-	st [st_tmp], r0
-	ld r0, [st_spi]
-	ld r1, [st_tmp]
-	st $f100+r0, r1
-	mov r1, #1
-	st $f102+r0, r1
-.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
-	ld r1, $f103+r0
-	eq r1, #0
-	bzf .spi_wait
-	ld r1, $f101+r0
-	st [st_tmp], r1
-	ld r0, [st_tmp]
-	pop pcl
-	pop pch
+	ld r1, [st_spi]
+	b spi_send
 
 st_cs_on:
 	ld r0, [st_spi]
@@ -544,67 +534,50 @@ st_dir:
 	pop pcl
 	pop pch
 
-; print the message for error r0
+; print the message for error r0: the k-th of the messages for the k-th of
+; st_err_codes (the last message for any other code)
+st_eo: resb 1
 st_print_err:
-	eq r0, #1
-	bzf .nomedium
-	eq r0, #12
-	bzf .nocard
-	eq r0, #3
-	bzf .notfound
-	eq r0, #5
-	bzf .full
-	eq r0, #6
-	bzf .wp
-	eq r0, #2
-	bzf .unmounted
-	eq r0, #4
-	bzf .exists
-	eq r0, #8
-	bzf .badname
-	eq r0, #13
-	bzf .power
-	mov r0, #>[st_s_error]
-	mov r1, #<[st_s_error]
-	b .print
-.nomedium:
-	mov r0, #>[st_s_nomedium]
-	mov r1, #<[st_s_nomedium]
-	b .print
-.nocard:
-	mov r0, #>[st_s_nocard]
-	mov r1, #<[st_s_nocard]
-	b .print
-.notfound:
-	mov r0, #>[st_s_notfound]
-	mov r1, #<[st_s_notfound]
-	b .print
-.full:
-	mov r0, #>[st_s_full]
-	mov r1, #<[st_s_full]
-	b .print
-.wp:
-	mov r0, #>[st_s_wp]
-	mov r1, #<[st_s_wp]
-	b .print
-.unmounted:
-	mov r0, #>[st_s_unmounted]
-	mov r1, #<[st_s_unmounted]
-	b .print
-.exists:
-	mov r0, #>[st_s_exists]
-	mov r1, #<[st_s_exists]
-	b .print
-.badname:
-	mov r0, #>[st_s_badname]
-	mov r1, #<[st_s_badname]
-	b .print
-.power:
-	mov r0, #>[st_s_power]
-	mov r1, #<[st_s_power]
+	st [st_tmp], r0
+	xor r1, r1
+.find:
+	ld r0, [st_err_codes]+r1
+	push r1
+	ld r1, [st_tmp]
+	eq r0, r1
+	pop r1
+	bzf .found
+	add r1, #1
+	eq r1, #9
+	bzf .found
+	b .find
+.found:
+	xor r0, r0				; past k messages
+	st [st_eo], r0
+.skip:
+	eq r1, #0
+	bzf .print
+	push r1
+	ld r1, [st_eo]
+.past:
+	ld r0, [st_s_nomedium]+r1
+	add r1, #1
+	eq r0, #0
+	bzf .next
+	b .past
+.next:
+	st [st_eo], r1
+	pop r1
+	sub r1, #1
+	b .skip
 .print:
-	push pch
-	push pcl
+	ld r1, [st_eo]			; st_s_nomedium + st_eo
+	mov r0, #<[st_s_nomedium]
+	add r1, r0
+	lt r1, r0				; carried
+	mov r0, #>[st_s_nomedium]
+	bzf .carry
 	b str_printstr
-	pop pcl
-	pop pch
+.carry:
+	add r0, #1
+	b str_printstr

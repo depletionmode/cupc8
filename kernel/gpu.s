@@ -255,21 +255,8 @@ gpu_wait_free:
 
 ; exchange r0 with the console; result in r0
 gpu_send:
-	st [gpu_tmp], r0
-	ld r0, [gpu_spi]
-	ld r1, [gpu_tmp]
-	st $f100+r0, r1
-	mov r1, #1
-	st $f102+r0, r1
-.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
-	ld r1, $f103+r0
-	eq r1, #0
-	bzf .spi_wait
-	ld r1, $f101+r0
-	st [gpu_tmp], r1
-	ld r0, [gpu_tmp]
-	pop pcl
-	pop pch
+	ld r1, [gpu_spi]
+	b spi_send
 
 gpu_cs_on:
 	ld r0, [gpu_spi]
@@ -286,6 +273,7 @@ gpu_cs_off:
 	pop pch
 
 ; print the character in r0 (and mirror it to the USB console, console.s)
+print_ascii_char:
 gpu_putc:
 	push pch
 	push pcl
@@ -338,13 +326,6 @@ gpu_attr:
 
 ; ---------------------------------------------------------------- compatibility
 ; the terminal and BASIC call these
-
-print_ascii_char:
-	push pch
-	push pcl
-	b gpu_putc
-	pop pcl
-	pop pch
 
 print_ascii_char_inverse:
 	st [gpu_char], r0

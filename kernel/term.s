@@ -55,12 +55,6 @@ term_do:
 	b .loop
 
 term_prompt:
-	; echo on
-	mov r0, #1
-	push pch
-	push pcl
-	b set_echo_char
-
 	term_s_prompt db "\n>> "
 	mov r0, #>[term_s_prompt]
 	mov r1, #<[term_s_prompt]
@@ -392,6 +386,16 @@ term_cmd_dir:
 .done:
 	pop pcl
 	pop pch
+
+; print r0 in decimal (0-255); term_print_u16: r0 (low), r1 (high)
+term_print_u8:
+	xor r1, r1
+term_print_u16:
+	st [term_num], r0
+	st [term_num+1], r1
+	xor r0, r0
+	st [term_num+2], r0
+	st [term_num+3], r0
 
 ; print term_num (4 bytes, low first) in decimal - each digit is the remainder
 ; of a 32-step shift-and-subtract division by 10

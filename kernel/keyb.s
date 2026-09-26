@@ -65,21 +65,8 @@ keyb_init:
 	pop pch
 
 keyb_send:
-	st [keyb_tmp], r0
-	ld r0, [keyb_spi]
-	ld r1, [keyb_tmp]
-	st $f100+r0, r1
-	mov r1, #1
-	st $f102+r0, r1
-.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
-	ld r1, $f103+r0
-	eq r1, #0
-	bzf .spi_wait
-	ld r1, $f101+r0
-	st [keyb_tmp], r1
-	ld r0, [keyb_tmp]
-	pop pcl
-	pop pch
+	ld r1, [keyb_spi]
+	b spi_send
 
 keyb_cs_on:
 	ld r0, [keyb_spi]
