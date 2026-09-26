@@ -246,19 +246,17 @@ print_string:
 ;
 ; clr_screen is now the graphics card's CLS (gpu.s)
 
-str_int_res: resb 1
 str_int_addr: resb 2
+; the decimal number at the pointer r0 (high), r1 (low): r0 = its low byte,
+; r1 = its high byte (16 bits, wrapping; 0 if it does not start with a digit)
 str_atoi:
 	st [str_int_addr], r1
 	st [str_int_addr+1], r0
-
 	xor r1, r1
-	st [str_int_res], r1
-
+	st [n_a], r1
+	st [n_a+1], r1
 .loop:
 	ldd r0, [str_int_addr]+r1
-	eq r0, #0
-	bzf .done
 	lt r0, #48
 	bzf .done
 	gt r0, #57
@@ -266,20 +264,35 @@ str_atoi:
 	push r1
 	sub r0, #48
 	push r0
-	mov r0, #10
-	ld r1, [str_int_res]
+	push pch				; n_a * 10 - (n_a * 2) + (n_a * 2) * 4
+	push pcl
+	b n16_shl1
+	ld r0, [n_a]
+	st [n_b], r0
+	ld r0, [n_a+1]
+	st [n_b+1], r0
 	push pch
 	push pcl
-	b math_mul
-	pop r1
-	add r0, r1
-	st [str_int_res], r0
+	b n16_shl1
+	push pch
+	push pcl
+	b n16_shl1
+	push pch
+	push pcl
+	b n16_add
+	pop r0					; + the digit
+	st [n_b], r0
+	xor r0, r0
+	st [n_b+1], r0
+	push pch
+	push pcl
+	b n16_add
 	pop r1
 	add r1, #1
 	b .loop
-
 .done:
-	ld r0, [str_int_res]
+	ld r0, [n_a]
+	ld r1, [n_a+1]
 	pop pcl
 	pop pch
 

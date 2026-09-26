@@ -34,10 +34,18 @@ must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/ne
 [[bug]]
 name = "kernel: the BASIC program buffer overflowed"
 fixed_in = "e635dbd"
-before = "f811788"
-files = ["kernel/term.s"]
+# the full check taken out of today's term.s (f811788's term.s no longer
+# assembles with the 16-bit BASIC and its 8 KB buffer at $c000, 2026-09-26)
+revert = [["kernel/term.s", """.end_hi:
+	gt r0, #0x20
+	bzf .full
+	eq r0, #0x20
+	bzf .at_top
+	b .fits""", """.end_hi:
+	b .fits"""]]
 cmd = "tools/run_tests.sh testProgramFull"
-must_fail = ["the 8th line was refused"]
+must_fail = ["FAIL: a line that would end past $dfff is refused", "FAIL: a line past it is refused (PROGRAM FULL)",
+             "FAIL: nothing written past $dfff"]
 
 [[bug]]
 name = "sim: a card holding IRQ_n hid another card's IRQ"
@@ -72,7 +80,8 @@ must_fail = ["programmed $F0 reads"]
 name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on them)"
 fixed_in = "45d051b"
 # the empty stubs put back into today's ubasic.s (80c23a6's whole file no
-# longer assembles with the rest of the kernel)
+# longer assembles with the rest of the kernel; since 2026-09-26 the 16-bit
+# BASIC's peek and poke, with the address in either form)
 revert = [
   ["kernel/ubasic.s", """ubasic_peek_statement:
 	mov r0, TOKENIZER_PEEK
@@ -81,7 +90,57 @@ revert = [
 	b ubasic_accept
 	push pch
 	push pcl
-	b ubasic_mem_address
+	b ubasic_expr
+	st [ub_mem_ptr], r0
+	st [ub_mem_ptr+1], r1
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
+	; a variable and the statement's end: peek addr, var
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_VARIABLE
+	bzf .var
+	b .lo
+.var:
+	ld r0, [ub_ptr]
+	st [ub_peek_pos], r0
+	ld r0, [ub_ptr+1]
+	st [ub_peek_pos+1], r0
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [ub_peek_var], r0
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .read
+	eq r0, TOKENIZER_ELSE
+	bzf .read
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .read
+	ld r0, [ub_peek_pos+1]	; no - back to the variable, lo's expression
+	ld r1, [ub_peek_pos]
+	push pch
+	push pcl
+	b ubasic_tokenizer_goto
+.lo:
+	push pch
+	push pcl
+	b ubasic_expr
+	push pch
+	push pcl
+	b ub_mem_hi_lo
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
 	push pch
 	push pcl
 	b ubasic_tokenizer_variable_num
@@ -90,17 +149,19 @@ revert = [
 	push pch
 	push pcl
 	b ubasic_accept
-	ldd r1, [ub_mem_ptr]
+.read:
+	ldd r0, [ub_mem_ptr]
+	st [ub_val], r0
+	xor r0, r0
+	st [ub_val+1], r0
 	ld r0, [ub_peek_var]
 	push pch
 	push pcl
 	b ubasic_set_variable
-	push pch
-	push pcl
 	b ubasic_end_of_statement
-	pop pcl
 """, """ubasic_peek_statement:
 	pop pcl
+	pop pch
 """],
   ["kernel/ubasic.s", """ubasic_poke_statement:
 	mov r0, TOKENIZER_POKE
@@ -109,17 +170,42 @@ revert = [
 	b ubasic_accept
 	push pch
 	push pcl
-	b ubasic_mem_address
+	b ubasic_expr
+	st [ub_mem_ptr], r0
+	st [ub_mem_ptr+1], r1
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
 	push pch
 	push pcl
 	b ubasic_expr
-	std [ub_mem_ptr], r0
+	push r0
+	push r1
 	push pch
 	push pcl
+	b ubasic_tokenizer_token
+	pop r1
+	eq r0, TOKENIZER_COMMA
+	pop r0
+	bzf .three
+	b .write
+.three:
+	push pch
+	push pcl
+	b ub_mem_hi_lo
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	push pch
+	push pcl
+	b ubasic_expr
+.write:
+	std [ub_mem_ptr], r0
 	b ubasic_end_of_statement
-	pop pcl
 """, """ubasic_poke_statement:
 	pop pcl
+	pop pch
 """],
 ]
 cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
@@ -342,7 +428,8 @@ name = "kernel: the BASIC program buffer index was never cleared (junk at power-
 fixed_in = "52423fa"
 revert = [["kernel/term.s", """	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
-	st [term_basic_prog_buf], r0
+	st [term_basic_prog_buf_idx+1], r0
+	st $c000, r0
 	st API_RUN, r0""", """	xor r0, r0
 	st API_RUN, r0"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
@@ -361,10 +448,10 @@ fixed_in = "f9150e6"
 revert = [["kernel/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
 	xor r1, r1
 .clear_variables:
-	gt r1, #39
-	bzf .done_clear_variables
 	st [ub_variables]+r1, r0
 	add r1, #1
+	eq r1, #52
+	bzf .done_clear_variables
 	b .clear_variables
 .done_clear_variables:
 

@@ -156,22 +156,12 @@ ubasic_set_nextptr_ptr_plus_val:
 	pop pcl
 	pop pch
 
-ub_s_let db "let"
-ub_s_print db "print"
-ub_s_if db "if"
-ub_s_then db "then"
-ub_s_else db "else"
-ub_s_for db "for"
-ub_s_to db "to"
-ub_s_next db "next"
-ub_s_goto db "goto"
-ub_s_gosub db "gosub"
-ub_s_return db "return"
-ub_s_call db "call"
-ub_s_rem db "rem"
-ub_s_peek db "peek"
-ub_s_poke db "poke"
-ub_s_end db "end"
+; the keywords in token order, each followed by a space: LET (5) to END
+; (20), then MODE (37) to REFRESH (44). None is the start of another.
+ub_keywords db "let print if then else for to next goto gosub return call rem peek poke end mode cls color plot line box palette refresh "
+ub_kw_i: resb 1
+ub_kw_j: resb 1
+ub_kw_tok: resb 1
 ubasic_get_next_token:
 	ldd r0, [ub_ptr]
 	gt r0, #0
@@ -190,7 +180,7 @@ ubasic_get_next_token:
 	push r1
 .loop:
 	pop r1
-	gt r1, #3
+	gt r1, #5				; a number is at most 5 digits (32767)
 	bzf .error
 .if1:
 	ldd r0, [ub_ptr]+r1
@@ -275,357 +265,60 @@ ubasic_get_next_token:
 	b .done
 
 .else0:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-
-	mov r0, #>[ub_s_let]
-	mov r1, #<[ub_s_let]
-	push r1
-	push r0
-
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n0
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
+	; a keyword: the text at ub_ptr starts with it
+	xor r0, r0
+	st [ub_kw_i], r0
 	mov r0, TOKENIZER_LET
-	b .done
-.n0:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_print]
-	mov r1, #<[ub_s_print]
-	push r1
-	push r0
-
-	mov r0, #5	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n1
-	mov r0, #5	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_PRINT
-	b .done
-.n1:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_if]
-	mov r1, #<[ub_s_if]
-	push r1
-	push r0
-
-	mov r0, #2	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n2
-	mov r0, #2	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_IF
-	b .done
-.n2:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_then]
-	mov r1, #<[ub_s_then]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n3
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_THEN
-	b .done
-.n3:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_else]
-	mov r1, #<[ub_s_else]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n4
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_ELSE
-	b .done
-.n4:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_for]
-	mov r1, #<[ub_s_for]
-	push r1
-	push r0
-
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n5
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_FOR
-	b .done
-.n5:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_to]
-	mov r1, #<[ub_s_to]
-	push r1
-	push r0
-
-	mov r0, #2	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n6
-	mov r0, #2	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_TO
-	b .done
-.n6:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_next]
-	mov r1, #<[ub_s_next]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n7
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_NEXT
-	b .done
-.n7:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_goto]
-	mov r1, #<[ub_s_goto]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n8
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_GOTO
-	b .done
-.n8:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_gosub]
-	mov r1, #<[ub_s_gosub]
-	push r1
-	push r0
-
-	mov r0, #5	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n9
-	mov r0, #5	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_GOSUB
-	b .done
-.n9:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_return]
-	mov r1, #<[ub_s_return]
-	push r1
-	push r0
-
-	mov r0, #6	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n10
-	mov r0, #6	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_RETURN
-	b .done
-.n10:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_call]
-	mov r1, #<[ub_s_call]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n11
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_CALL
-	b .done
-.n11:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_rem]
-	mov r1, #<[ub_s_rem]
-	push r1
-	push r0
-
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n12
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_REM
-	b .done
-.n12:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_peek]
-	mov r1, #<[ub_s_peek]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n13
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_PEEK
-	b .done
-.n13:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_poke]
-	mov r1, #<[ub_s_poke]
-	push r1
-	push r0
-
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
-	bzf .n14
-	mov r0, #4	; strlen
-	push pch
-	push pcl
-	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_POKE
-	b .done
-.n14:
-	ld r0, [ub_ptr+1]
-	ld r1, [ub_ptr]
-	push r1
-	push r0
-	mov r0, #>[ub_s_end]
-	mov r1, #<[ub_s_end]
-	push r1
-	push r0
-
-	mov r0, #3	; strlen
-	push pch
-	push pcl
-	b mem_cmp
-	gt r0, #0
+	st [ub_kw_tok], r0
+.word:
+	ld r1, [ub_kw_i]
+	ld r0, [ub_keywords]+r1
+	eq r0, #0
 	bzf .variable
-	mov r0, #3	; strlen
+	xor r0, r0
+	st [ub_kw_j], r0
+.char:
+	ld r1, [ub_kw_i]
+	ld r0, [ub_keywords]+r1
+	eq r0, #32
+	bzf .matched
+	ld r1, [ub_kw_j]
+	ldd r1, [ub_ptr]+r1
+	eq r0, r1
+	bzf .same
+.skip:
+	ld r1, [ub_kw_i]		; to the next word
+	ld r0, [ub_keywords]+r1
+	add r1, #1
+	st [ub_kw_i], r1
+	eq r0, #32
+	bzf .next_word
+	b .skip
+.same:
+	ld r0, [ub_kw_i]
+	add r0, #1
+	st [ub_kw_i], r0
+	ld r0, [ub_kw_j]
+	add r0, #1
+	st [ub_kw_j], r0
+	b .char
+.next_word:
+	ld r0, [ub_kw_tok]
+	add r0, #1
+	eq r0, #21				; after END - MODE
+	bzf .graphics
+	b .kw_tok
+.graphics:
+	mov r0, TOKENIZER_MODE
+.kw_tok:
+	st [ub_kw_tok], r0
+	b .word
+.matched:
+	ld r0, [ub_kw_j]
 	push pch
 	push pcl
 	b ubasic_set_nextptr_ptr_plus_val
-	mov r0, TOKENIZER_END
+	ld r0, [ub_kw_tok]
 	b .done
 
 .variable:

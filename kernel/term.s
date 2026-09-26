@@ -1,6 +1,11 @@
 
-term_basic_prog_buf_idx: resb 1
-term_basic_prog_buf: resb 256
+; The BASIC program is text at $c000-$dfff, the top 8 KB of the user area
+; (memory-map.md): each line as typed, ending in a CR, then a 0.
+; term_basic_prog_buf_idx is its length. A program for $7000 bigger than
+; 20 KB goes over it.
+%define TERM_PROG_HI #0xc0
+term_basic_prog_buf_idx: resb 2
+term_full: resb 1			; the last line was refused (PROGRAM FULL)
 
 term_line_buf: resb 80
 
@@ -9,7 +14,8 @@ term_do:
 	; powers up with junk
 	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
-	st [term_basic_prog_buf], r0
+	st [term_basic_prog_buf_idx+1], r0
+	st $c000, r0
 	st API_RUN, r0			; no program from the PC yet
 
 	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n"
@@ -337,6 +343,9 @@ term_parse:
 	push pch
 	push pcl
 	b str_atoi
+	gt r1, #0x7f			; a line number is 1-32767
+	bzf .invalid
+	or r0, r1
 	eq r0, #0
 	bzf .invalid
 	b term_cmd_basicline
@@ -364,30 +373,38 @@ term_cmd_clr:
 
 term_basic_prog_ptr: resb 2
 term_cmd_basicline:
-	; the line (rs_i characters, its CR and a 0) must fit the 256-byte buffer
+	; the line (rs_i characters, its CR and a 0) must fit the 8 KB buffer:
+	; the length + rs_i + 2 at most $2000
+	xor r0, r0
+	st [term_full], r0
 	ld r0, [rs_i]
 	add r0, #2
 	ld r1, [term_basic_prog_buf_idx]
 	add r0, r1
-	lt r0, r1			; wrapped past 255
-	bzf .full
-	eq r0, #255
-	bzf .full
-	mov r0, #>[term_basic_prog_buf]
-	st [term_basic_prog_ptr+1], r0
-	mov r1, #<[term_basic_prog_buf]
-	ld r0, [term_basic_prog_buf_idx]
-	add r1, r0
-	st [term_basic_prog_ptr], r1
-	lt r1, r0
+	st [term_basic_prog_ptr], r0
+	lt r0, r1				; carried
+	ld r0, [term_basic_prog_buf_idx+1]
 	bzf .carry
-	b .nocarry
+	b .end_hi
 .carry:
-	mov r0, #>[term_basic_prog_buf]
 	add r0, #1
+.end_hi:
+	gt r0, #0x20
+	bzf .full
+	eq r0, #0x20
+	bzf .at_top
+	b .fits
+.at_top:
+	ld r0, [term_basic_prog_ptr]
+	eq r0, #0
+	bzf .fits
+	b .full
+.fits:
+	ld r0, [term_basic_prog_buf_idx]		; to $c000 + the length
+	st [term_basic_prog_ptr], r0
+	ld r0, [term_basic_prog_buf_idx+1]
+	add r0, TERM_PROG_HI
 	st [term_basic_prog_ptr+1], r0
-.nocarry:
-	ld r0, [term_basic_prog_ptr+1]
 	ld r1, [term_basic_prog_ptr]
 	push r1
 	push r0
@@ -404,8 +421,17 @@ term_cmd_basicline:
 	ld r1, [term_basic_prog_buf_idx]
 	add r1, r0
 	st [term_basic_prog_buf_idx], r1
+	lt r1, r0
+	bzf .idx_carry
+	b .done
+.idx_carry:
+	ld r1, [term_basic_prog_buf_idx+1]
+	add r1, #1
+	st [term_basic_prog_buf_idx+1], r1
 	b .done
 .full:
+	mov r0, #1
+	st [term_full], r0
 	term_s_full db "\nPROGRAM FULL\n"
 	mov r0, #>[term_s_full]
 	mov r1, #<[term_s_full]
@@ -419,7 +445,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH EXEC\n"
+	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH EXEC\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch
@@ -433,8 +459,8 @@ term_cmd_help:
 term_cmd_run:
 	; run program in BASIC program buffer
 
-	mov r0, #>[term_basic_prog_buf]
-	mov r1, #<[term_basic_prog_buf]
+	mov r0, TERM_PROG_HI
+	xor r1, r1
 	push pch
 	push pcl
 	b ubasic_init
@@ -447,6 +473,9 @@ term_cmd_run:
 	b ubasic_finished
 	eq r0, #0
 	bzf .loop
+	push pch
+	push pcl
+	b ubasic_gfx_done
 
 	term_s_done db "\nDONE.\n"
 	mov r0, #>[term_s_done]
@@ -460,21 +489,11 @@ term_cmd_run:
 	pop pch
 
 term_cmd_new:
-	; reset basic program buffer
-
-	xor r1, r1
-.loop:
-	ld r0, [term_basic_prog_buf_idx]
-	gt r1, r0
-	bzf .zeroed
-	xor r0, r0
-	st [term_basic_prog_buf]+r1, r0
-	add r1, #1
-	b .loop
-
-.zeroed:
+	; an empty program
 	xor r0, r0
 	st [term_basic_prog_buf_idx], r0
+	st [term_basic_prog_buf_idx+1], r0
+	st $c000, r0
 
 .done:
 	pop pcl

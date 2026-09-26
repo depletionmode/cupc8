@@ -75,6 +75,17 @@ def ink_rows(ppm, y0, y1):
     return sum(1 for y in range(y0, y1) for x in range(w) if px[(y * w + x) * 3] < 0x80)
 
 
+def pixel(ppm, x, y):
+    """(r, g, b) of pixel x, y in a binary PPM."""
+    data = open(ppm, "rb").read() if os.path.exists(ppm) else b"P6\n1 1\n255\n\0\0\0"
+    header_end = 0
+    for _ in range(3):
+        header_end = data.index(b"\n", header_end) + 1
+    w = int(data.split(b"\n")[1].split()[0])
+    i = header_end + (y * w + x) * 3
+    return tuple(data[i:i + 3])
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     requests = []
 
@@ -163,6 +174,25 @@ def main():
         check(kind + ": the program ran", "\n42\n" in text and "DONE." in text, out + text)
         # rows 0-7 of text are 16 px each: the banner (row 1), the typed lines and 42
         check(kind + ": the text is on the glass", ink_rows(ppm, 16, 128) > 500, ppm)
+
+    # BASIC graphics (doc/proposals/basic-graphics.md) through the kernel on
+    # the sim's cards: GFX mode on hdmi (the ended program keeps its picture
+    # while it waits for a key), mode 2 on the e-ink panel after a
+    # greyscale refresh
+    ppm = os.path.join(work, "gfx.ppm")
+    text, out = sim("--cards:hdmi,io", "--dump-fb:" + ppm,
+                    "--type:10 mode 1\\n20 cls 1\\n30 box 20, 20, 60, 40, 196, 1\\nrun\\n")
+    red, blue = pixel(ppm, 100, 80), pixel(ppm, 20, 20)
+    check("hdmi: mode 1, cls 1, a filled box in 196: red in it %s, VGA blue around it %s" % (red, blue),
+          red[0] > 240 and red[1] < 16 and red[2] < 16 and blue[0] < 16 and blue[1] < 16 and 160 < blue[2] < 180,
+          out + text)
+    ppm = os.path.join(work, "grey.ppm")
+    text, out = sim("--cards:eink,io", "--dump-fb:" + ppm,
+                    "--type:10 mode 2\\n20 cls\\n30 box 20, 20, 100, 60, 0, 1\\n40 box 140, 20, 100, 60, 1, 1\\n"
+                    "50 box 260, 20, 100, 60, 2, 1\\n60 refresh\\nrun\\n")
+    greys = [pixel(ppm, x - 4, 50)[0] for x in (70, 190, 310, 500)]   # the glass's middle 640 of 648
+    check("eink: mode 2, boxes in greys 0, 1, 2 on white, refresh: the four greys on the glass %s" % greys,
+          greys == [0, 85, 170, 255], out + text)
 
     # SIM-012: --run
     def mkprg(src, dest):

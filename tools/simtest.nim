@@ -313,7 +313,10 @@ proc testSymbolsAndKernelDecode() =
              table.lineFor.hasKey(termAddress) and
              table.lineFor[termAddress].file == "term.s")
   let source = table.sourceLines("term.s")
-  expectTrue("source loader", source.len > 8 and source[6].strip == "term_do:")
+  # the label's line, and term_do's first instruction (the map's line) after it
+  let termLine = source.find("term_do:")
+  expectTrue("source loader", source.len > 8 and termLine >= 0 and
+             table.lineFor[termAddress].line > termLine + 1)
   # the instruction after term_do's first, whatever that one's length
   var nextIns = -1
   for a in table.insAddrs:
@@ -1155,12 +1158,16 @@ proc basicRun(rom: string; prog: openArray[string]): seq[string] =
 
 proc testBasicPrograms() =
   ## KRN-003: BASIC programs typed into the real kernel give the output
-  ## worked out by hand (uBASIC semantics, 8-bit values that wrap).
+  ## worked out by hand (uBASIC semantics). Worked out for 8-bit values
+  ## first; re-checked for 16-bit (basic-graphics.md): only "no wrap at
+  ## 256" changed (200+100 wrapped to 44 in 8 bits; in 16 bits it is 300).
+  ## The rest never passes 255 or goes below 0, and poke/peek use the old
+  ## hi, lo form, which saved programs keep.
   echo "== BASIC programs =="
   let rom = buildKernelRom()
   let cases: seq[(string, seq[string], seq[string])] = @[
     ("precedence", @["10 print 1+2*3"], @["7"]),
-    ("8-bit wrap", @["10 print 200+100"], @["44"]),
+    ("no wrap at 256", @["10 print 200+100"], @["300"]),
     ("division", @["10 print 17/5", "20 print 20-3*4"], @["3", "8"]),
     ("string", @["10 print \"hello\""], @["hello"]),
     ("variables", @["10 let a = 7", "20 let b = a * 3", "30 print b - a"], @["14"]),
@@ -1313,19 +1320,104 @@ proc testBackspace() =
 
 run testBackspace
 
+proc progIdxAt(): int =
+  ## term_basic_prog_buf_idx, the BASIC program's length, in the kernel just built
+  loadMap(kernelDir / "kernel.map").resolve("term_basic_prog_buf_idx")
+
+proc progIdx(): int =
+  let a = progIdxAt()
+  mem[a] or (mem[a + 1] shl 8)
+
+proc prefillProgram(lines: openArray[string]): int =
+  ## The program as if typed, straight into its buffer at $c000: each line,
+  ## a CR, then a 0; the kernel's length set. The bytes used.
+  var a = 0xc000
+  for line in lines:
+    for ch in line:
+      mem[a] = ord(ch)
+      inc a
+    mem[a] = 13
+    inc a
+  mem[a] = 0
+  let n = a - 0xc000
+  let at = progIdxAt()
+  mem[at] = n and 0xff
+  mem[at + 1] = n shr 8
+  n
+
+proc bigProgram(): tuple[head, tail: seq[string], fillers: int] =
+  ## KRN-017's program, near 8 KB: over 300 lines (past the line index), a
+  ## GOSUB to the far end, a FOR loop past the index. `head` goes into the
+  ## buffer (8177 bytes, a REM padding it to that), then `tail` is typed:
+  ## "32010 return " (13 characters) fills it to its last byte.
+  var body = @["1 let s = 0", "2 gosub 32000"]
+  let ending = @["31000 for i = 1 to 3", "31010 let s = s + 100", "31020 next i", "31030 print s",
+                 "31040 print t", "31050 end", "32000 let t = 7"]
+  var used = 0
+  for l in body & ending: used += l.len + 1
+  var n = 0
+  while true:
+    let l = $(100 + n) & " let s = s + 1"
+    if used + l.len + 1 + 30 > 8177: break
+    body.add(l)
+    used += l.len + 1
+    inc n
+  let pad = 8177 - used                        # a REM line: pad - 1 characters and its CR
+  body.add("30000 rem " & "x".repeat(pad - 1 - 10))
+  (body & ending, @["32010 return "], n)
+
+proc typeRun(limit: int) =
+  ## "run", Enter, and up to `limit` steps for the program
+  for ch in "run":
+    pushKey(ord(ch))
+    settle(400_000)
+    if waiting: discard cpuStep()
+  pushKey(13)
+  settle(400_000)
+  if waiting: discard cpuStep()
+  settle(limit)
+
 proc testProgramFull() =
-  ## KRN-003: the 256-byte program buffer refuses a line that does not fit
-  ## ("PROGRAM FULL") instead of overwriting memory, and keeps working. Each
-  ## line below is 31 characters plus CR: 7 fit, the 8th does not.
-  echo "== BASIC program buffer full =="
+  ## KRN-017: the 8 KB program buffer at $c000-$dfff: a program 8177 bytes
+  ## long takes a typed 13-character line (its CR and the 0 after it end at
+  ## $dfff), after refusing the same line one character longer, and then
+  ## refuses another ("PROGRAM FULL"), writing nothing past $dfff; the
+  ## program (over 400 lines, line numbers to 32010: past the 300-line
+  ## index, a GOSUB to its far end, a FOR loop beyond the index) runs.
+  echo "== BASIC program buffer: 8 KB, full =="
   let rom = buildKernelRom()
-  var prog: seq[string]
-  for i in 1..8:
-    prog.add($(i * 10) & " print \"" & "a".repeat(20) & "\"")
-  let got = basicRun(rom, prog)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  let (head, tail, fillers) = bigProgram()
+  let used = prefillProgram(head)
+  expect("the program before the last line", used, 8177, 4)
+  let bss0 = mem[0xe000]
   let g = gpuCard()
-  expectTrue("the 8th line was refused", gpuFind(g, "PROGRAM FULL") >= 0)
-  expectTrue("the 7 lines that fit ran", got == newSeqWith(7, "a".repeat(20)))
+  typeLine("32010 return  ")                   # one character too many
+  expectTrue("a line that would end past $dfff is refused", gpuFind(g, "PROGRAM FULL") >= 0)
+  expect("... and the program is as it was", progIdx(), 8177, 4)
+  typeLine("clr")
+  typeLine(tail[0])
+  expectTrue("the line that fits exactly is taken", gpuFind(g, "PROGRAM FULL") < 0)
+  expect("the program is 8191 bytes", progIdx(), 8191, 4)
+  expect("its CR at $dffe", mem[0xdffe], 13)
+  expect("the 0 after it at $dfff", mem[0xdfff], 0)
+  typeLine("32020 print 1")
+  expectTrue("a line past it is refused (PROGRAM FULL)", gpuFind(g, "PROGRAM FULL") >= 0)
+  expect("nothing written past $dfff", mem[0xe000], bss0)
+  expect("the program still 8191 bytes", progIdx(), 8191, 4)
+  typeLine("clr")
+  typeRun(300_000_000)
+  let want = @[$(fillers + 300), "7", "DONE."]
+  var got: seq[string]
+  for row in 0..29:
+    let l = gpuLine(g, row)
+    if l.len > 0 and not l.startsWith(">>"): got.add(l)
+  if got != want: echo "  screen: ", got
+  expectTrue("the near-8 KB program runs (" & $(head.len + 1) & " lines): " & $want, got == want)
   ioModel = imLegacy
 
 run testProgramFull
@@ -1376,6 +1468,169 @@ proc testBasicJunkRamVariables() =
   ioModel = imLegacy
 
 run testBasicJunkRamVariables
+
+proc testBasic16() =
+  ## KRN-016: 16-bit BASIC (basic-graphics.md): signed numbers
+  ## -32768..32767 that wrap, printed signed; unary minus; / and % truncate
+  ## toward 0 (the remainder takes the dividend's sign), / 0 gives 0 and % 0
+  ## the dividend; comparisons are signed; literals up to 5 digits (32768
+  ## and up wrap, so 61440 is $f000); line numbers above 255 up to 32767
+  ## for GOTO, GOSUB and FOR; poke/peek with a 16-bit address and the old
+  ## hi, lo form (variables in it too), the LEDs both ways; an old-style
+  ## primes program as David SAVEd them.
+  echo "== BASIC: 16-bit numbers =="
+  let rom = buildKernelRom()
+  let cases: seq[(string, seq[string], seq[string])] = @[
+    ("negatives", @["10 print 3 - 10", "20 print 0 - 5", "30 let a = 0 - 300", "40 print a * 2"],
+     @["-7", "-5", "-600"]),
+    ("unary minus", @["10 print -5", "20 print -2 * 3", "30 let b = 4", "40 print -b + 1", "50 print 2 - -3",
+                      "60 print -(1 + 2)"], @["-5", "-6", "-3", "5", "-3"]),
+    ("big numbers", @["10 print 32767", "20 print 1000 * 30", "30 print 12345 + 20000", "40 print 256 * 128 - 1"],
+     @["32767", "30000", "32345", "32767"]),
+    ("wrap at 32768", @["10 print 32767 + 1", "20 print -32768 - 1", "30 print 200 * 200", "40 print 32768",
+                        "50 print 65535", "60 print -32768 / -1"],
+     @["-32768", "32767", "-25536", "-32768", "-1", "-32768"]),
+    ("division signs", @["10 print -7 / 2", "20 print -7 % 2", "30 print 7 / -2", "40 print 7 % -2",
+                         "50 print -7 / -2", "60 print -7 % -2", "70 print 30000 / 7", "80 print 30000 % 7"],
+     @["-3", "-1", "-3", "1", "3", "-1", "4285", "5"]),
+    ("divide by 0", @["10 print -7 / 0", "20 print 7 % 0", "30 print 0 / 0"], @["0", "7", "0"]),
+    ("signed compare", @["10 if -1 < 1 then print 1 else print 0", "20 if 0 - 1 > 1 then print 1 else print 0",
+                         "30 if 300 > 255 then print 1 else print 0", "40 if -300 < -299 then print 1 else print 0",
+                         "50 if 32767 > -32768 then print 1 else print 0", "60 if 256 = 0 then print 1 else print 0"],
+     @["1", "0", "1", "1", "1", "0"]),
+    ("and, or", @["10 print 4096 | 15", "20 print -1 & 255", "30 print 300 & 256"], @["4111", "255", "256"]),
+    ("line numbers", @["10 goto 1000", "20 print 2", "30 end", "1000 print 1", "1010 gosub 32767",
+                       "1020 goto 20", "32767 print 32767", "32767 return"],
+     @["1", "32767", "2"]),
+    ("for past 255", @["10 for i = 250 to 1000", "20 next i", "30 print i", "40 for j = -3 to -1",
+                       "50 print j", "60 next j"], @["1001", "-3", "-2", "-1"]),
+    ("poke/peek 16-bit", @["10 poke 53253, 33", "20 peek 53253, a", "30 print a", "40 let x = 53253",
+                           "50 peek x, b", "60 print b + 1", "70 poke x + 1, 300", "80 peek 208, 6, c", "90 print c"],
+     @["33", "34", "44"]),
+    ("peek old form", @["10 let h = 208", "20 let l = 5", "30 poke h, l, 77", "40 peek h, l, v", "50 print v",
+                        "60 poke 208, 6, 9", "70 peek h, l + 1, w", "80 print w"],
+     @["77", "9"]),
+  ]
+  for (name, prog, want) in cases:
+    let got = basicRun(rom, prog)
+    if got == want:
+      ok("BASIC " & name)
+    else:
+      fail("BASIC " & name & ": got " & $got & ", want " & $want)
+  var got = basicRun(rom, @["10 poke 61440, 90", "20 peek 61440, a", "30 print a"])
+  expectTrue("poke 61440 (a literal past 32767 wraps to the same 16 bits: $f000) " & $got, got == @["90"])
+  expect("the LEDs after poke 61440, 90", mem[0xf000], 0x5a)
+  got = basicRun(rom, @["10 poke 240, 0, 165", "20 peek 240, 0, a", "30 print a"])
+  expectTrue("the old poke 240, 0, n still sets the LEDs " & $got, got == @["165"])
+  expect("the LEDs after poke 240, 0, 165", mem[0xf000], 0xa5)
+  # PRIMES as David SAVEd it (the 8-bit style: poke 240, 0, n)
+  got = basicRun(rom, @["10 for n = 2 to 50", "20 let p = 1", "30 for d = 2 to n - 1", "40 if n % d = 0 then let p = 0",
+                        "50 next d", "60 if p = 1 then print n,", "70 poke 240, 0, n", "80 next n"])
+  # (2 is missing: uBASIC's FOR runs its body once even when the limit is below the start, 8-bit or 16)
+  expectTrue("an old primes program " & $got,
+             got == @["3", "5", "7", "11", "13", "17", "19", "23", "29", "31", "37", "41", "43", "47"])
+  expect("... its last poke 240, 0, n on the LEDs", mem[0xf000], 50)
+  got = basicRun(rom, @["10 print 123456"])
+  expectTrue("a number of six figures: a tokenizer error " & $got, got.len > 0 and got[0].contains("TOKENIZER ERROR"))
+  ioModel = imLegacy
+
+run testBasic16
+
+proc gfxRun(rom: string; card: int; prog: openArray[string]): SimCard =
+  ## Boot on `card`, type the program and RUN it; the card, with the run
+  ## still going (a program that ends in a graphics mode waits for a key).
+  machineCards([card, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  for line in prog:
+    typeLine(line)
+  typeLine("run")
+  gpuCard()
+
+proc testBasicGraphics() =
+  ## KRN-018: BASIC's graphics statements (basic-graphics.md) on the
+  ## simulator's cards. HDMI: mode 1, cls, plot, line, box (outline and
+  ## filled), palette, refresh (nothing), y clamped to 0-255, off-screen
+  ## clipped; the picture stays while the ended program waits for a key,
+  ## then TEXT comes back with DONE.; color and cls in TEXT; mode 2 and
+  ## mode 7 are ignored on HDMI; palette with no arguments; wrong argument
+  ## counts are errors. E-ink: mode 2, cls (white), box filled and
+  ## outlined, plot, line in greys 0-3 in the card's mode-2 picture; refresh
+  ## (greyscale by default in mode 2) puts the four greys on the glass.
+  echo "== BASIC graphics statements =="
+  let rom = buildKernelRom()
+  var g = gfxRun(rom, CardGpu, @["10 mode 1", "20 cls 4", "30 plot 10, 20, 5", "40 line 0, 100, 50, 100, 7",
+                                 "50 box 100, 100, 20, 10, 9", "60 box 200, 50, 10, 10, 12, 1",
+                                 "70 palette 5, 255, 0, 0", "80 plot -5, 300, 1", "90 line 300, -20, 300, 500, 3",
+                                 "100 box 250, 200, 5, 5, 6, 0", "110 refresh"])
+  expect("mode 1: the card is in GFX", int(simcard_gpu_mode(g)), 1)
+  proc px(x, y: int): int = int(simcard_gpu_pixel(g, cint(x), cint(y)))
+  expect("cls 4", px(319, 239), 4)
+  expect("plot 10, 20, 5", px(10, 20), 5)
+  expectTrue("line 0,100 - 50,100 in 7", px(0, 100) == 7 and px(25, 100) == 7 and px(50, 100) == 7 and px(51, 100) == 4)
+  expectTrue("box: an outline", px(100, 100) == 9 and px(119, 109) == 9 and px(110, 105) == 4)
+  expectTrue("box ..., 1: filled", px(200, 50) == 12 and px(205, 55) == 12 and px(209, 59) == 12 and px(210, 60) == 4)
+  expectTrue("box ..., 0: an outline", px(250, 200) == 6 and px(252, 202) == 4)
+  expectTrue("line with y past 0-255 clamped: x = 300 top to bottom", px(300, 0) == 3 and px(300, 239) == 3)
+  expect("the card saw no bad command", int(simcard_gpu_errors(g)), 0)
+  var frame = newSeq[uint32](GpuOutW * GpuOutH)
+  simcard_render(g, addr frame[0])
+  let red = frame[40 * GpuOutW + 20]           # (10, 20), doubled
+  expectTrue("palette 5, 255, 0, 0: the pixel in colour 5 is red ($" & toHex(int(red), 6) & ")",
+             ((red shr 16) and 0xff) >= 0xf0 and ((red shr 8) and 0xff) < 0x10 and (red and 0xff) < 0x10)
+  expectTrue("the picture stays: DONE. not yet", gpuFind(g, "DONE.") < 0)
+  pushKey(ord(' '))
+  discard cpuStep()                            # WAI sees the key's IRQ
+  settle(4_000_000)
+  expect("a key: TEXT again", int(simcard_gpu_mode(g)), 0)
+  expectTrue("... and DONE.", gpuFind(g, "DONE.") >= 0)
+
+  g = gfxRun(rom, CardGpu, @["10 color 14, 1", "20 print \"c\"", "30 color 7", "40 print \"d\""])
+  var row = -1
+  for r in 0..29:
+    if gpuLine(g, r) == "c": row = r
+  expectTrue("color 14, 1: printed in $1e", row >= 0 and ((int(simcard_gpu_cell(g, 0, cint(row))) shr 8) and 0xff) == 0x1e)
+  expectTrue("color 7: printed in $07", row >= 0 and ((int(simcard_gpu_cell(g, 0, cint(row + 1))) shr 8) and 0xff) == 0x07)
+  g = gfxRun(rom, CardGpu, @["10 cls 23", "20 print 5"])
+  expect("cls 23 in TEXT: the attribute everywhere", (int(simcard_gpu_cell(g, 79, 20)) shr 8) and 0xff, 0x17)
+  var got = basicRun(rom, @["10 mode 2", "20 print 5", "30 palette", "40 mode 7", "50 print 6"])
+  expectTrue("mode 2 on HDMI, mode 7, palette: ignored / the default palette " & $got, got == @["5", "6"])
+  expect("... still TEXT", int(simcard_gpu_mode(gpuCard())), 0)
+  for bad in ["plot 1, 2", "line 1, 2, 3, 4", "box 1, 2, 3, 4", "box 1, 2, 3, 4, 5, 6, 7", "mode",
+              "palette 1, 2", "color", "cls 1, 2", "refresh 1, 2", "plot 1, 2, 3, 4"]:
+    got = basicRun(rom, @["10 " & bad, "20 print 1"])
+    expectTrue(bad & ": an error " & $got, got.len > 0 and got[0] == "BASIC: FATAL ERROR!" and "1" notin got)
+
+  # the e-ink card: mode 2
+  g = gfxRun(rom, CardEink, @["10 mode 2", "20 cls", "30 box 10, 10, 100, 50, 1, 1", "40 plot 5, 5, 0",
+                              "50 line 0, 470, 647, 470, 2", "60 box 200, 200, 40, 40, 0", "70 plot 700, 5, 0",
+                              "80 refresh"])
+  expect("e-ink: mode 2", int(simcard_gpu_mode(g)), 2)
+  proc g2(x, y: int): int = int(simcard_eink_pixel2(g, cint(x), cint(y)))
+  expect("cls in mode 2: white", g2(300, 300), 3)
+  expectTrue("box ..., 1, 1: filled in grey 1", g2(10, 10) == 1 and g2(60, 35) == 1 and g2(109, 59) == 1 and g2(110, 60) == 3)
+  expect("plot 5, 5, 0", g2(5, 5), 0)
+  expectTrue("line 0,470 - 647,470 in grey 2", g2(0, 470) == 2 and g2(647, 470) == 2 and g2(0, 471) == 3)
+  expectTrue("box 200, 200, 40, 40, 0: an outline", g2(200, 200) == 0 and g2(239, 239) == 0 and g2(220, 220) == 3)
+  expect("the card saw no bad command", int(simcard_gpu_errors(g)), 0)
+  runGuest(1500)
+  expectTrue("refresh in mode 2: a greyscale refresh (" & $simcard_eink_refreshes(g, 2) & ")",
+             simcard_eink_refreshes(g, 2) >= 1)
+  simcard_render(g, addr frame[0])
+  proc glass(x, y: int): int = int(frame[y * GpuOutW + x - 4] and 0xff)   # the middle 640 of the 648
+  let (k0, k1, k2, k3) = (glass(5, 5), glass(60, 35), glass(100, 470), glass(300, 300))
+  echo "  glass greys: ", k0, " ", k1, " ", k2, " ", k3
+  expectTrue("the four greys on the glass, darkest to white", k0 < k1 and k1 < k2 and k2 < k3)
+  expect("the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
+  pushKey(ord(' '))
+  discard cpuStep()                            # WAI sees the key's IRQ
+  settle(4_000_000)
+  expect("a key: TEXT again", int(simcard_gpu_mode(g)), 0)
+  ioModel = imLegacy
+
+run testBasicGraphics
 
 proc testSlotIrqShared() =
   ## KRN-005: a card holding IRQ_n low (slot 3 here) must not hide another
@@ -2179,9 +2434,13 @@ proc testStorage() =
   writeFile(storeDir / "big.dat", "x".repeat(70000))
   discard fatcheck("put " & quoteShell(img) & " PC.BAS " & quoteShell(storeDir / "pc.txt"))
   discard fatcheck("put " & quoteShell(img) & " BIG.DAT " & quoteShell(storeDir / "big.dat"))
-  var long = ""
-  for i in 1..9:
-    long.add($(i * 10) & " print \"" & "a".repeat(20) & "\"\r\n")    # 7 of these fit
+  # more than the 8 KB buffer: "1 print "long"", then 300 REM lines; a line
+  # goes in while it, its CR and a 0 end by $dfff
+  var long = "1 print \"long\"\r\n"
+  var longFit = 15
+  for i in 1..300:
+    long.add($(i * 10 + 10000) & " rem " & "a".repeat(20) & "\r\n")
+    if longFit + 32 <= 8192: longFit += 31     # 30 characters and the CR
   writeFile(storeDir / "long.txt", long)
   discard fatcheck("put " & quoteShell(img) & " LONG.BAS " & quoteShell(storeDir / "long.txt"))
 
@@ -2228,7 +2487,26 @@ proc testStorage() =
 
   # a file longer than the program buffer: the load stops at the first line that does not fit
   expectTrue("LOAD more than fits", cmdOutput("load \"long.bas\"") == @["PROGRAM FULL", "LOADED"])
-  expectTrue("what fitted runs", runOutput() == newSeqWith(7, "a".repeat(20)))
+  expect("what fitted is in", progIdx(), longFit, 4)
+  expectTrue("what fitted runs", runOutput() == @["long"])
+  # that near-8 KB program SAVEd (64 chunks), as a PC reads it, and LOADed back whole
+  expectTrue("SAVE a program of " & $longFit & " bytes", cmdOutput("save \"big.bas\"") == @["SAVED"])
+  var bigText = ""
+  for l in long.split("\r\n"):
+    if bigText.len - (bigText.count('\n')) + l.len + 1 > longFit: break
+    bigText.add(l & "\r\n")
+  let bigDir = storeDir / "expect-big"
+  removeDir(bigDir)
+  createDir(bigDir)
+  writeFile(bigDir / "BIG.BAS", bigText)
+  r = fatcheck("check " & quoteShell(img) & " " & quoteShell(bigDir))
+  if r.exitCode != 0: echo r.output
+  expectTrue("the long program as a PC reads it (" & $bigText.len & " bytes)", r.exitCode == 0)
+  typeLine("new")
+  expectTrue("LOAD it back: all of it fits", cmdOutput("load \"big.bas\"") == @["LOADED"])
+  expect("... the same length", progIdx(), longFit, 4)
+  expectTrue("... and it runs", runOutput() == @["long"])
+  expectTrue("DEL it", cmdOutput("del \"big.bas\"").len == 0)
 
   # DEL
   expectTrue("DEL", cmdOutput("del \"prog.bas\"").len == 0)
