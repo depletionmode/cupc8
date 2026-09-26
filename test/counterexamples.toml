@@ -853,6 +853,7 @@ revert = [["kernel/console.s", """	lt r0, #125
 cmd = "tools/run_tests.sh testKernelConsole"
 must_fail = ["FAIL: HOST set, nobody reading: the terminal goes on"]
 
+[[bug]]
 name = "kernel BASIC: every typed line was appended - lines out of order ran out of order, a line typed again was kept twice, a line number alone was kept as an empty line"
 fixed_in = "37a6c41"
 before = "44bbccb"
