@@ -1,6 +1,6 @@
 set(FW ${CMAKE_CURRENT_LIST_DIR}/../../../..)
 idf_component_register(
-	SRCS main.c frames.c netesp.c transport_spi.c transport_uart.c
+	SRCS main.c frames.c netesp.c transport_spi.c transport_uart.c transport_slotdev.c
 	     ${FW}/wifi/core/wifi.c ${FW}/common/cardproto.c
 	INCLUDE_DIRS . ${FW}/wifi ${FW}/wifi/core ${FW}/common
 	PRIV_REQUIRES esp_wifi esp_eth esp_netif esp-tls esp_driver_spi esp_driver_gpio

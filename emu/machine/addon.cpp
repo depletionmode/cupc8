@@ -376,7 +376,11 @@ ENTRY(js_cards, {
     napi_create_object(env, &o);
     set(env, o, "slot", num(env, slot));
     set(env, o, "kind", jsstr(env, kind));
-    if (esp) set(env, o, "ns", num(env, static_cast<double>(esp->guestNs)));  // QEMU's clock at its last answer
+    if (esp) {  // QEMU's clock at the last select, how far it was ever ahead, selects before a re-arm
+      set(env, o, "ns", num(env, static_cast<double>(esp->guestNs)));
+      set(env, o, "ahead", num(env, static_cast<double>(esp->ahead)));
+      set(env, o, "early", num(env, static_cast<double>(esp->early)));
+    }
     if (rc) {
       set(env, o, "csRises", num(env, static_cast<double>(rc->csRises)));
       set(env, o, "csEdges", num(env, static_cast<double>(rc->csEdges)));

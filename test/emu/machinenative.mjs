@@ -37,10 +37,10 @@ function hostfwd(forward) {
 }
 
 // The Wi-Fi card's QEMU (tools/qemu_build.sh: Espressif's, with the cupc8
-// chardev), in step with the machine: icount (one instruction 8 ns, and an
-// idle guest's clock jumps to its next timer), the guest's random numbers
-// from a fixed seed, and UART1 the cupc8 chardev, whose FIFOs the native
-// EspCard drives (emu/machine/README.md, "The Wi-Fi card").
+// chardev and slot SPI device), in step with the machine: icount (one
+// instruction 8 ns, and an idle guest's clock jumps to its next timer), the
+// guest's random numbers from a fixed seed, and the cupc8 chardev's FIFOs,
+// which the native EspCard drives (emu/machine/README.md, "The Wi-Fi card").
 // pcap: a file for the guest's network traffic (QEMU's filter-dump; guest
 // times, plus a whole-seconds offset of the wall clock at start).
 function startEsp(image, forward = [], pcap = null) {
@@ -55,8 +55,8 @@ function startEsp(image, forward = [], pcap = null) {
     '-icount', 'shift=3,sleep=off', '-seed', '1',
     '-drive', `file=${flash},if=mtd,format=raw`, '-nic', 'user,id=net0,model=open_eth' + hostfwd(forward),
     ...(pcap ? ['-object', `filter-dump,id=dump,netdev=net0,file=${pcap}`] : []),
-    '-serial', 'file:' + path.join(dir, 'uart0.log'), '-chardev', `cupc8,id=frames,path=${fifo}`,
-    '-serial', 'chardev:frames'], { stdio: 'ignore' });
+    '-serial', 'file:' + path.join(dir, 'uart0.log'), '-chardev', `cupc8,id=lockstep,path=${fifo}`],
+  { stdio: 'ignore' });
   const tx = fs.openSync(fifo + '.in', 'w');
   const rx = fs.openSync(fifo + '.out', 'r');
   return { proc, tx, rx };

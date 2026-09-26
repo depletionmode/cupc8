@@ -138,7 +138,10 @@ class EspCard : public Card {
   void drive(uint32_t sck, uint32_t mosi, bool selected) override;
   uint32_t miso() override;
   bool irq() override { return false; }
-  int64_t guestNs = 0;  // QEMU's clock when it last answered
+  static constexpr size_t PRELOAD = 512;     // the MISO bytes QEMU's slot device holds (the DMA buffer)
+  int64_t guestNs = 0;  // QEMU's clock at the last select
+  int64_t ahead = 0;    // the most QEMU's clock was ahead of the board's at a select (0: never)
+  uint64_t early = 0;   // selects before the firmware had re-armed after the last frame
 
  private:
   int tx, rx;
@@ -149,7 +152,8 @@ class EspCard : public Card {
   std::vector<uint8_t> bits, mosi_;
   size_t bit = 0;
   uint32_t lastSck = 0;
-  std::vector<uint8_t> exchange(uint32_t k, const std::vector<uint8_t> &send);
+  void select();
+  void frameEnd(const std::vector<uint8_t> &bytes);
   void readAll(uint8_t *b, size_t n);
   void writeAll(const std::vector<uint8_t> &b);
 };

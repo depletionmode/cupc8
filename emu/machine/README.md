@@ -132,39 +132,65 @@ mode can be slower than serial: the threads meet every 10 us of emulated time.
 
 ## The Wi-Fi card
 
-The Wi-Fi card's firmware (its QEMU build: slot frames over UART1,
-`fw/wifi/port/esp32c3/main/transport_uart.c`) runs in Espressif's QEMU,
-built by `tools/qemu_build.sh` from the tag the SDK's binary comes from with
-`tools/patches/qemu-esp-lockstep.patch` (the SDK's binary has no plugins and
-no outside clock control). It runs **in step with the board**:
+The Wi-Fi card's firmware (its QEMU build, `tools/fw_esp32c3.sh qemu`) runs
+in Espressif's QEMU, built by `tools/qemu_build.sh` from the tag the SDK's
+binary comes from with `tools/patches/qemu-esp-lockstep.patch` (the SDK's
+binary has no plugins and no outside clock control). It runs **in step with
+the board**:
 
 - `-icount shift=3,sleep=off`: the guest's clock is its instruction count
-  (8 ns each, 125 MIPS: icount steps are powers of two, the real chip is 160
-  MHz), and an idle guest's clock jumps straight to its next timer. `-seed 1`
-  and the patch's fix to the SYSCON random register (it was `rand()` seeded
-  from `time(NULL)`) make its random numbers repeat.
-- `-chardev cupc8` (the patch's `system/cupc8-lockstep.c`) is UART1. The
-  guest runs only as far as the emulator lets it: `EspCard::advance(t)`
-  grants it the board's time in 100 us steps (so it trails the board and
-  runs beside it, in its own process), and each `$A6`/`$A5` exchange is sent
-  with the board's time of the select or deselect; QEMU runs to that guest
-  time, the UART receives the bytes then, and the guest runs until it has
-  answered, while the board waits. No answer in 10 s of guest time is an
-  error, not a hang.
-- An answer takes about 1.3 ms of guest time (the firmware's UART driver
-  waits out an RX timeout before its frames task sees the bytes), so while
-  the kernel polls the card back to back (every ~35 us during `net join`)
-  the card's clock runs ahead of the board's, and grants below it do nothing
-  (EMU-009: 0.3 s ahead after 3.2 s). On the card the SPI slave answers at
-  once. Taking each byte as it comes (`uart_set_rx_full_threshold(1)`) was
-  tried: the frames task (priority 10) then answered in ~0.1 ms but ran all
-  the time under that polling, the main task never ran, and the join never
-  finished (task watchdog). It is deterministic either way.
+  (8 ns each), and an idle guest's clock jumps straight to its next timer.
+  `-seed 1` and the patch's fix to the SYSCON random register (it was
+  `rand()` seeded from `time(NULL)`) make its random numbers repeat.
+- `-chardev cupc8` (the patch's `system/cupc8-lockstep.c`) is the emulator's
+  line to QEMU. The guest runs only as far as the emulator lets it:
+  `EspCard::advance(t)` grants it the board's time in 100 us steps, so it
+  trails the board and runs beside it, in its own process.
+- **The slot SPI slave is a device in QEMU**, a stand-in for the ESP32-C3's
+  GPSPI2 slave at GPSPI2's address and interrupt source (registers in
+  `cupc8-lockstep.c`). Like the real slave's queued DMA descriptor it holds
+  the MISO preload the firmware armed, so the board never waits for the
+  guest: at CS_n falling QEMU runs to the board's time and hands the preload
+  over, and at CS_n rising the frame's MOSI bytes reach the device at the
+  board's time and raise its interrupt. The firmware's ISR
+  (`fw/wifi/port/esp32c3/main/transport_slotdev.c`) is `transport_spi.c`'s
+  `done()`/`arm()`: it queues the frame and arms the next preload, swapped
+  in whole by one register write. QEMU's clock is the board's at every
+  select (to within one instruction), through `net join`'s back-to-back
+  polling too (EMU-009 checks both). A stock QEMU has no such device (its ID
+  register reads 0): the firmware then serves frames over UART1 (`$A6`/`$A5`,
+  `transport_uart.c`), which `test_wifi_qemu.py` and the legacy machine.mjs
+  use.
+- **When a stale preload can be seen**, as on the card (`slot.md`: the card
+  preloads before CS_n falls; `wifi-card.md`, "Status byte"): a frame shifts
+  out the preload armed after the previous frame ended, so the status byte
+  and any offered response are as of the previous frame's end, never
+  updated mid-frame. The status byte is the task's last reading (the firmware
+  takes it with `frames_status()` in its main loop, at most a tick old): the
+  ISR may not ask the network stack for it. A response is offered only when
+  no command is queued or running (`frames_preload()`), so a READ gets it
+  only if it was ready when the frame before that READ ended, and RESP_LEN
+  `$00` otherwise. After a READ the next preload may offer the same response
+  again until the task has replayed that READ; the host reads a response
+  once and sends a new command, which discards it. If the host selects
+  before the ISR has re-armed (the host must leave 20 us), the device shifts
+  out the previous preload again and still takes the frame (INT bit 1 if the
+  ISR had not read the last one); the real slave has no descriptor queued
+  then and would miss the frame. EMU-009 counts such selects and requires
+  none.
 - So the same board run gives the same guest run, instruction for
   instruction: EMU-009 (`test/emu/test_wifi_lockstep.mjs`) runs a join and
   an HTTP GET serially and threaded twice and compares everything, the
-  Wi-Fi card's frames with QEMU's clock and the guest's network traffic
-  (pcap) included.
+  Wi-Fi card's frames, QEMU's clock and the guest's network traffic (pcap)
+  included.
+
+**The one known timing approximation: the guest runs at 125 MIPS.** icount
+steps are powers of two (`shift=3`: 8 ns an instruction), and the real
+ESP32-C3 runs at 160 MHz, at best one instruction a cycle (less out of
+flash: cache misses). So the firmware takes its instruction counts at 125
+MIPS, e.g. its frame-end ISR is up to 1.28x slower than on the card. Timers
+(FreeRTOS ticks, lwIP, the UART's) are in guest time and exact. Accepted by
+David, 2026-09-27.
 
 **The network outside the machine is not in step and never can be**: QEMU's
 user networking (slirp) talks to real sockets on the host's clock. The patch
@@ -180,10 +206,17 @@ so EMU-009's server runs in a child process. (Runs where cupc8.py talks to
 the system card are not deterministic either: its bytes arrive at slice
 boundaries that depend on wall time.)
 
-`CUPC8_ESP_TRACE=FILE` logs every exchange, with the board's time and QEMU's
-(`@`), and `Machine.create({ pcap })` records the guest's traffic. Two
+`CUPC8_ESP_TRACE=FILE` logs every select (`S`, with QEMU's clock after `@`
+and the preload) and frame (`F`, the MOSI bytes) at the board's time, and `Machine.create({ pcap })` records the guest's traffic. Two
 E2E-003 runs with `CUPC8_E2E003_PORT` set give identical traces (before the
 lockstep they differed from the first exchange after the join).
+
+Found by the SPI slave stand-in: the firmware's frame-end ISR built the
+preload with the card's `status()`, which asks lwIP (FIONREAD on each
+socket); from an interrupt that corrupted FreeRTOS's lists once a socket was
+open (the interrupt watchdog fired in `vListInsert`). The UART stand-in took
+the preload in a task and hid it; on the card it was waiting to happen. The
+ISR now takes the status byte the task last read.
 
 Speed (2026-09-26, 24-core host at load ~15, boot and type a program, 2.4 s
 emulated): a Wi-Fi card costs nothing measurable, before or after the
