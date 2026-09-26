@@ -714,7 +714,10 @@ def wanted(parts):
     for n in range(1, 7):
         at["J%d" % (10 + n)] = (PIN1_X + pin1_offset(sockets.SOCKETS["CUPC8_Slot"][0]), row_slot(n), 0)
     fx, fy = FPGA
-    at["U7"] = (fx, fy, 0)
+    # JLC's TQFP-144 has pin 1 bottom left, pins 1-36 along the bottom; turned
+    # a quarter clockwise it is the KiCad/JEDEC view pin_xy() below assumes:
+    # pin 1 top left, 1-36 down the left side (the CPU bus, facing the socket)
+    at["U7"] = (fx, fy, 270)
     at["U10"] = (88.5, 21.0, 0)                  # ROM, north of the chipset's memory pins
     at["U9"] = (104.5, 24.0, 90)                 # SRAM
     at["J1"] = (30.0, H - 4.58, 0)               # USB-C, opening south: the edge 5.79 mm off the pegs (y -1.21)
@@ -1062,6 +1065,39 @@ def fine_nets():
                    if n and n not in power} | {"unconnected-(U2-*", "/GND"})   # GND: the eFuse QFN GND pad sits 0.18 mm from DVDT
 
 
+def prepare(board):
+    """Before routing: a GND via for the eFuse's pin 8. ground_fanout puts an
+    IC's vias under it, which a 2 x 2 mm QFN has no room for, so this one
+    goes straight out from the pad, clear of the package."""
+    import math
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    fp = board.FindFootprintByReference("U2")
+    pad = [p for p in fp.Pads() if p.GetNumber() == "8"][0]
+    px, py = to(pad.GetPosition().x), to(pad.GetPosition().y)
+    cx, cy = to(fp.GetPosition().x), to(fp.GetPosition().y)
+    # out along the pad's own axis (the side it sits on), 1.2 mm past it
+    dx, dy = px - cx, py - cy
+    ax, ay = (math.copysign(1, dx), 0) if abs(dx) > abs(dy) else (0, math.copysign(1, dy))
+    vx, vy = px + 1.2 * ax, py + 1.2 * ay
+    net = pad.GetNet()
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(pad.GetPosition())
+    t.SetEnd(pcbnew.VECTOR2I(mm(vx), mm(vy)))
+    t.SetWidth(mm(0.2))
+    t.SetLayer(pcbnew.F_Cu)
+    t.SetNet(net)
+    t.SetLocked(True)
+    board.Add(t)
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(vy)))
+    v.SetWidth(mm(0.6))
+    v.SetDrill(mm(0.3))
+    v.SetNet(net)
+    v.SetLocked(True)
+    board.Add(v)
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     import logo
@@ -1077,7 +1113,7 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
                        fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
-                       route_parallel=ROUTE_PARALLEL,
+                       route_parallel=ROUTE_PARALLEL, prepare=prepare,
                        power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3,
                        title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
