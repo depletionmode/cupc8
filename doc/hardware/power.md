@@ -7,7 +7,9 @@ USB-C receptacle (main board)
   │  CC1/CC2: 5.1 kΩ Rd each (sink). Also to sysctl ADC pins to read the
   │           source's advertised current.
   ├─ TVS (SMF5.0A) + 3.5 A input PTC (SMD1812P350TF/16)
+  ├─ standby LDO (HT7533-2, 3V3_STBY) ── POWER button controller (MAX16054) ─┐
   └─ eFuse (TPS259470ARPWR): 2.63–3.21 A limit, OVLO 5.60–5.81 V, dVdt soft start
+       │  EN/UVLO ← the controller's OUT (the machine on) ──────────────────────┘
        │  ≤ 10 µF directly on VBUS; the rest charges behind the dVdt ramp
        └── 5V_SYS ──┬── 3V3 buck (TLV62569PDDCR, 2 A)
                     │     └── 3V3 ──┬── 1V2 LDO ── chipset iCE40 core (+ PLL filter)
@@ -23,6 +25,37 @@ USB-C receptacle (main board)
 - **Isolation:** each rail and each slot has a 0 Ω isolation link, so
   bring-up can power one section at a time.
 - **USB data:** USB-C D+/D− go to the sysctl RP2040 only.
+
+## On/off (the POWER button)
+
+*Added 2026-09-26 (David).* The main board has a **POWER** push button next
+to **RESET** on its front (south) edge, both labelled on the silkscreen and
+reachable with the cards fitted.
+
+- **Behaviour:** press to turn the machine on, press again to turn it off.
+  Plugging in USB leaves it **off**: nothing but the controller is powered
+  until POWER is pressed.
+- **Circuit:** a **MAX16054** (C79401) debounces the button and toggles its
+  push-pull OUT, which drives the eFuse's EN/UVLO (before this, EN/UVLO was
+  tied to IN). Its undervoltage lockout holds OUT low at power-up, and a
+  100 kΩ pull-down holds EN low until the controller is running. It runs
+  from **3V3_STBY**, an **HT7533-2** micropower LDO (C82217, 30 V in,
+  2.5 µA) on VBUS after the input PTC and TVS, so it is always powered, and
+  a VBUS over the eFuse's OVLO (or up to the TVS clamp) cannot hurt it: the
+  MAX16054 itself is a 5.5 V part. Only the MAX16054's 63 kΩ pull-up current
+  (53 µA) flows through the button.
+- **The eFuse's thresholds are as before:** with EN at 3.3 V the effective
+  undervoltage lockout is IN's own (2.7 V), as it was with EN tied to IN;
+  the OVLO divider and dVdt are unchanged. The soft start now begins at the
+  press, from a settled VBUS, which is no harder than the attach case
+  POW-004 models.
+- **Standby draw** (off, VBUS at 5.5 V; POW-006 B23): OVLO divider 116 µA,
+  TVS leakage ≤ 440 µA (assumed), eFuse off ≤ 20 µA, LDO ≤ 5 µA,
+  controller ≤ 15 µA: ≤ 0.6 mA, 0.65 mA with POWER held, against USB 2.0's
+  2.5 mA suspend limit. B24–B28 check the LDO's headroom and 30 V rating,
+  the MAX16054's supply range and EN's threshold.
+- **The system card is unpowered while the machine is off**, so the host
+  (`cupc8.py`) cannot reach it until POWER is pressed (`sysctl.md`).
 
 ## Current budget
 
@@ -256,9 +289,11 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
 
 - **Main board, input:** USB-C receptacle and VBUS/GND copper ≤ 20 mΩ loop.
   Input PTC **SMD1812P350TF/16** (C46970911), then the SMF5.0A TVS. Input
-  switch **TPS259470ARPWR** (C3662799) with EN/UVLO tied to IN, RILM
+  switch **TPS259470ARPWR** (C3662799) with EN/UVLO driven by the POWER
+  button's controller (MAX16054 from the HT7533-2 standby LDO), RILM
   **1.13 kΩ 1 %**, OVLO divider **37.4k / 10.0k at 0.1 %** from IN, and
-  **680 pF** on dVdt. ≤ 10 µF on VBUS ahead of it (1 µF assumed). 5V_SYS
+  **680 pF** on dVdt. ≤ 10 µF on VBUS ahead of it (2.1 µF: C1 and the
+  standby LDO's two capacitors). 5V_SYS
   copper ≤ 20 mΩ, 5V_SYS bulk 22 µF. Slot 0 Ω links ≤ 50 mΩ.
 - **Main board, 3V3 and 1V2:** buck **TLV62569PDDCR** (C398365; leave its PG
   pin unconnected or route it to sysctl). 2.2 µH (Isat ≥ 2.5 A, DCR

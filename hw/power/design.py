@@ -61,7 +61,8 @@ FUSE_IN = assume("main", "input PTC SMD1812P350TF/16 (C46970911): 3.5 A hold, 8-
 FUSE_IN_R_MIN, FUSE_IN_R_MAX = 0.008, 0.030
 FUSE_IN_IHOLD_40C = 3.5 * 0.90
 TVS_VRWM, TVS_VBR_MIN, TVS_VCLAMP = 5.0, 6.4, 9.2   # DS SMF5.0A (C193402)
-INSW_PART = assume("main", "input switch TPS259470ARPWR eFuse (C3662799), EN/UVLO tied to IN", "TPS259470ARPWR")
+INSW_PART = assume("main", "input switch TPS259470ARPWR eFuse (C3662799), EN/UVLO from the POWER "
+                   "button's controller (MAX16054 OUT, 3.3 V when on)", "TPS259470ARPWR")
 INSW_RON_TYP, INSW_RON_MAX = 0.0283, 0.045      # DS: 28.3 mOhm typ, 45 mOhm max over -40..125 C
 INSW_ILIM_K = 3340.0        # DS table: ILIM ~ 3340 / RILM (1.007 A at 3.32k, 2.028 at 1.65k, 4.452 at 750)
 INSW_ILIM_TOL = (0.112, 0.087)  # DS: 1.800..2.200 A at 1.65k and 3.96..4.84 at 750 ohm (-11.2 %, +8.7 %)
@@ -81,10 +82,32 @@ DOWNSTREAM_ABS_MAX = 6.0    # DS TLV62569, SY6280: VIN absolute maximum
 # (0.81..3.82 uA around 2.21 typ) scaling it
 INSW_CDVDT = assume("main", "eFuse dVdt capacitor 680 pF (5V_SYS rises at 1.1..5.1 V/ms)", 680e-12)
 INSW_IDVDT = (0.81e-6, 2.21e-6, 3.82e-6)
-INSW_UVLO = 2.7             # DS: input UVLO (EN/UVLO tied to IN)
+INSW_UVLO = 2.7             # DS: input UVLO (IN's own; EN is at 3.3 V only once VBUS is over ~3.4 V)
+INSW_EN_VTH_MAX = 1.25      # DS: EN/UVLO rising threshold, 1.2 V nominal (max taken as 1.25)
 R_5VSYS = assume("main", "5V_SYS copper, eFuse to the farthest slot / the buck: <= 20 mOhm", 0.020)
 # capacitance directly on VBUS, ahead of the switch (the USB 2.0 10 uF rule)
-C_VBUS_PRE = assume("main", "capacitance on VBUS ahead of the eFuse: 1 uF (<= 10 uF allowed)", 1.0e-6)
+C_VBUS_PRE = assume("main", "capacitance on VBUS ahead of the eFuse: 2.1 uF (C1 1 uF, the standby LDO's "
+                    "100 nF in and 1 uF out; <= 10 uF allowed)", 2.1e-6)
+
+# ---------------------------------------------------------------------------
+# The POWER button (David, 2026-09-26): a MAX16054 toggle (DS 19-4390,
+# 2.7..5.5 V, 7 uA typ; IN has a 63 kOhm pull-up to VCC and takes +-25 V;
+# UVLO holds OUT low at power-up) drives the eFuse's EN/UVLO. It runs from
+# 3V3_STBY, an HT7533-2 micropower LDO (DS: 30 V in, 2.5 uA, 3.3 V) on
+# VBUS_F, so it is always powered, whatever VBUS does (the TVS clamp, the
+# OVLO case). Standby: what VBUS feeds while the machine is off.
+# ---------------------------------------------------------------------------
+ONOFF_VCC = (2.7, 5.5)                          # DS MAX16054 operating range
+ONOFF_I_MAX = assume("main", "MAX16054 supply current <= 15 uA (DS: 7 uA typ)", 15e-6)
+ONOFF_PULLUP = 63e3                             # DS: IN's pull-up to VCC (the button current)
+STBY_LDO_VIN_MAX = 30.0                         # DS HT7533-2
+STBY_LDO_VOUT = (3.3 * 0.98, 3.3 * 1.02)        # DS: +-2 %
+STBY_LDO_DROPOUT = 0.1                          # DS: at 1 mA (the load here is ~10 uA)
+STBY_LDO_IQ_MAX = assume("main", "HT7533-2 quiescent current <= 5 uA (DS: 2.5 uA typ)", 5e-6)
+INSW_I_OFF = assume("main", "TPS25947 input current with EN low <= 20 uA", 20e-6)
+TVS_IR = assume("main", "SMF5.0A leakage at its 5.0 V standoff <= 400 uA (more above it)", 400e-6)
+USBLC6_IR = 1e-6                                # DS USBLC6-2: 1 uA max at 5 V (on VBUS_F)
+USB_SUSPEND_MAX = 2.5e-3                        # SPEC USB 2.0 7.2.3: a suspended device draws <= 2.5 mA
 
 # SY6280: now only the IO card's keyboard port switch (500 mA)
 SY6280_RON_TYP = 0.080                          # DS (typ only)

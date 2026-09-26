@@ -82,7 +82,7 @@ def find_port(env="CUPC8_PORT", interface=0):
             continue
         if (vid, pid) == ("1209", "c8c8") and num == interface:
             return "/dev/" + os.path.basename(dev)
-    sys.exit("cupc8.py: no system card found (plug it in, or use --port)")
+    sys.exit("cupc8.py: no system card found (is the machine on? press POWER; plug the card in, or use --port)")
 
 
 def open_port(port):

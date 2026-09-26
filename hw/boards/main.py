@@ -41,7 +41,11 @@ POWER = {
     "FUSE_IN": ("3.5A SMD1812P350TF/16", "C46970911"),   # F1
     "TVS": ("SMF5.0A", "C193402"),                    # D1
     "VBUS_C_AHEAD": ("1u", "C15849"),                 # C1: the only capacitance ahead of the eFuse
-    "EFUSE": ("TPS259470ARPWR", "C3662799"),          # U2: EN/UVLO tied to IN
+    "EFUSE": ("TPS259470ARPWR", "C3662799"),          # U2: EN/UVLO from the on/off controller
+    # --- the POWER button (David, 2026-09-26): a toggle, always powered from VBUS_F ---
+    "ONOFF": ("MAX16054AZT+T", "C79401"),             # U16: debounced toggle, OUT low at power-up
+    "STBY_LDO": ("HT7533-2 (30 V in, 2.5 uA)", "C82217"),   # U15: 3V3_STBY for U16, off VBUS_F
+    "STBY_LDO_COUT": ("1u", "C15849"),                # C17 (C16 100n at its input)
     "EFUSE_RILM": ("1.13k 1%", "C22833"),             # R3: 3340 / 1.13k -> 2.63 / 2.96 / 3.21 A
     "EFUSE_OVLO_R1": ("37.4k 0.1%", "C326727"),       # R58, IN -> OVLO
     "EFUSE_OVLO_R2": ("10k 0.1%", "C95204"),          # R59, OVLO -> GND
@@ -225,7 +229,7 @@ def build_parts():
          {"K": "VBUS_F", "A": "GND"})              # a unidirectional TVS
     C("C1", "1u", "VBUS_F")                        # the only capacitance ahead of the eFuse (POW-004)
     part("U2", "jlc:TPS259470ARPWR", "TPS259470ARPWR", "jlc:VQFN-10_L2.0-W2.0-P0.45-TL", POWER["EFUSE"][1],
-         {"IN": "VBUS_F", "EN/UVLO": "VBUS_F", "OVLO/OVCSEL": "EFUSE_OVLO", "GND": "GND", "OUT": "5V_SYS",
+         {"IN": "VBUS_F", "EN/UVLO": "PWR_EN", "OVLO/OVCSEL": "EFUSE_OVLO", "GND": "GND", "OUT": "5V_SYS",
           "ILM": "EFUSE_ILM", "DVDT": "EFUSE_DVDT", "ITIMER": None,          # open: fastest overcurrent response
           "PG/AUXOFF": None, "~{FLT}/PGTH": None})   # open-drain flags nobody reads
     R("R3", "1.13k", "EFUSE_ILM", "GND", lcsc=POWER["EFUSE_RILM"][1])
@@ -234,6 +238,24 @@ def build_parts():
     part("C15", "Device:C", "680p", FP_C, POWER["EFUSE_DVDT"][1], {1: "EFUSE_DVDT", 2: "GND"})
     C("C3", "22u", "5V_SYS")
     R("R4", "0", "5V_SYS", "+5V", "Resistor_SMD:R_1206_3216Metric", "C17888")     # 5V isolation link
+
+    # ---- the POWER button (David, 2026-09-26; power.md, "On/off"): press to
+    # turn on, press again to turn off; the machine starts off when USB is
+    # plugged in. A MAX16054 toggle (UVLO holds OUT low at power-up) drives the
+    # eFuse's EN/UVLO; it runs from its own 3.3 V micropower LDO off VBUS_F
+    # (30 V in: the TVS clamp and the OVLO case are both inside it), so it is
+    # always powered. Only the MAX16054's 63k pull-up current goes through
+    # the button. R44 holds EN low while the LDO comes up.
+    part("U15", "jlc:HT7533-2_C82217", "HT7533-2", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", POWER["STBY_LDO"][1],
+         {"VIN": "VBUS_F", "GND": "GND", "VOUT": "3V3_STBY", 4: None, 5: None})     # 4, 5: NC
+    C("C16", "100n", "VBUS_F")
+    C("C17", "1u", "3V3_STBY")
+    part("U16", "jlc:MAX16054AZT+T", "MAX16054AZT", "jlc:TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-TL", POWER["ONOFF"][1],
+         {"IN": "PWR_BTN", "GND": "GND", "CLEAR": "GND", "OUT": "PWR_EN", "#OUT": None, "VCC": "3V3_STBY"})
+    C("C18", "100n", "3V3_STBY")
+    R("R44", "100k", "PWR_EN", "GND")
+    part("SW2", "jlc:TS-1187A-B-A-B", "POWER", "jlc:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5", "C318884",
+         {1: "PWR_BTN", 4: "GND", 2: None, 3: None})
 
     # ---- 3V3 buck, 1V2 LDO
     # the DDC package (thermal: THM-001 T2 fails the DBV with slots 4-6 at their 300 mA)
@@ -476,6 +498,9 @@ def build_parts():
         C("C%d" % (b + 3), "100n", "+3V3")
         for net in [v + "_L", v, "SLOT%d_CS_n" % n] + ["SLOT%d_RSVD_A%d" % (n, k) for k in range(1, 6)]:
             TP(net)
+    group("power")
+    for net in ("3V3_STBY", "PWR_EN"):              # last, so the other pads keep their numbers
+        TP(net)
     return PARTS
 
 
@@ -648,8 +673,9 @@ def schematic(path, footprint_libs=("cupc8",)):
 # memory and clock sit east of the CPU socket, the slot expanders and mux
 # east of the I/O slots. The system slot (its own card, system-slot.md) is
 # off the row in the south-east, power in along the south-west edge. The
-# debug LEDs, reset button and AUX header are on the east edge, beyond the
-# cards.
+# LEDs are in one row along the top edge with the power LED (milestone-1.md,
+# Indicator LEDs), east of the CPU socket; the reset button and AUX header
+# are on the east edge, beyond the cards.
 
 W, H = 125.0, 184.0
 OUTLINE = (0, 0, W, H)
@@ -667,13 +693,20 @@ def row_slot(n):
 # the GPO LEDs are bits 0-7 of $f000, the POST code
 LABELS = {"D2": "5V", "D3": "3V3", "D4": "1V2", "D5": "CDONE", "D6": "PWR"}
 LABELS.update({"D%d" % (11 + i): str(i) for i in range(8)})
-LABEL_SIDE = {d: "E" for d in LABELS if d != "D6"}   # the east column's labels all east of their LEDs
-LED_X = 117.5                                     # "CDONE" fits between its LED and the edge
+LABELS.update({"SW2": "POWER", "SW1": "RESET"})        # the front-edge buttons
+LABEL_SIDE = {d: "S" for d in LABELS if d != "D6"}   # the LED row's labels south of them (no room north)
+LABEL_SIDE.update({"SW1": "N", "SW2": "N"})            # the buttons' north of them (the edge is south)
+# the LED row's resistors: designators south, in a row under the labels; the
+# two NPNs and their base resistors, west of the row above the CPU socket: north
+LABEL_SIDE.update({r: "S" for r in ["R9", "R10", "R12", "R56"] + ["R%d" % (60 + i) for i in range(8)]})
+LABEL_SIDE.update({r: "N" for r in ("Q1", "Q2", "R11", "R55")})
+LED_X0 = 67.5                                     # the row's first LED after PWR: east of the CPU socket (J2)
 
 FPGA = (97.0, 47.0)                               # centre of U7
 LOGO_MM = 12
 LOGO_AT = (113.0, 164.0)
 TITLE, REVISION = "CUPC/8 main board", "A"
+BUTTONS_X = 42.0                                  # POWER; RESET 14 mm east, their controller between
 REV_AT = (W - 10.0, H - 1.5)                       # bottom-right of "<title> rev <rev>", clear of H4
 
 
@@ -727,7 +760,10 @@ def wanted(parts):
     at["U9"] = (104.5, 24.0, 90)                 # SRAM
     at["J1"] = (30.0, H - 4.58, 0)               # USB-C, opening south: the edge 5.79 mm off the pegs (y -1.21)
     at["J4"] = (116.6, 107.0, 0)                 # AUX SPI header, east edge
-    at["SW1"] = (119.5, 140.0, 0)
+    # POWER and RESET side by side on the front (south) edge, between the
+    # USB-C inlet and the system slot's pads: in front of every card
+    at["SW2"] = (BUTTONS_X, H - 3.4, 0)
+    at["SW1"] = (BUTTONS_X + 14.0, H - 3.4, 0)
     at["D6"] = kg.power_led_at(OUTLINE) + (0,)   # the power LED, where every board has it
     at["R57"] = (at["D6"][0] + 4.0, at["D6"][1], 0)
     for i, (x, y) in enumerate(HOLES):
@@ -795,19 +831,23 @@ def wanted(parts):
     at["C40"] = (104.5, 16.5, 0)
     for i, r in enumerate(("R70", "R71", "R72")):
         at[r] = (112.0, 19.0 + 2.2 * i, 0)
-    # east edge: one column of LEDs, 2.6 mm apart, each with its resistor
-    # to the west and its label to the east (LABEL_SIDE; "CDONE", the
-    # longest, fits between the LED and the edge): GPO 0-7 (the POST code),
-    # CDONE, 5V, 3V3, 1V2. The two NPNs (CDONE, 1V2) and their base
-    # resistors further west on their LEDs' lines.
-    col = [("D%d" % (11 + i), "R%d" % (60 + i)) for i in range(8)] + \
-        [("D5", "R56"), ("D2", "R9"), ("D3", "R10"), ("D4", "R12")]
-    for i, (d, r) in enumerate(col):
-        at[d] = (LED_X, 75.4 + 2.6 * i, 0)
-        at[r] = (LED_X - 4.0, 75.4 + 2.6 * i, 0)
-    for q, rb, d in (("Q2", "R55", "D5"), ("Q1", "R11", "D4")):
-        at[q] = (LED_X - 12.0, at[d][1], 0)
-        at[rb] = (LED_X - 16.0, at[d][1], 0)
+    # top edge (milestone-1.md, Indicator LEDs): one row in line with the
+    # power LED, east of the CPU socket, where no card stands: 5V, 3V3, 1V2,
+    # CDONE, then GPO 7..0 (the POST code, read as a binary number). Each
+    # label just south of its LED (LABEL_SIDE), its resistor south of that.
+    # The two NPNs (1V2, CDONE) and their base resistors west of the row, in
+    # the strip above the CPU socket. Spaced by the labels' widths, so
+    # "CDONE" clears its neighbours'.
+    row = [("D2", "R9"), ("D3", "R10"), ("D4", "R12"), ("D5", "R56")] + \
+        [("D%d" % (11 + i), "R%d" % (60 + i)) for i in reversed(range(8))]
+    x, y = LED_X0, at["D6"][1]
+    for i, (d, r) in enumerate(row):
+        if i:
+            x += max(3.6, (_text_w(LABELS[row[i - 1][0]])[0] + _text_w(LABELS[d])[0]) / 2 + 0.8)
+        at[d] = (x, y, 0)
+        at[r] = (x, y + 4.9, 90)
+    for i, ref in enumerate(("R55", "Q2", "R11", "Q1")):
+        at[ref] = (LED_X0 - 17.5 + 4.5 * i, y + 1.3, 0)
     # CPU socket channel (between the CPU socket and the system slot)
     cpu_r = ["R%d" % i for i in list(range(80, 88)) + list(range(90, 98))]
     for i, r in enumerate(cpu_r):
@@ -864,10 +904,20 @@ def wanted(parts):
              "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),
              "C10": (101.0, y - 13, 0), "R8": (101.0, y - 25), "R13": (84.0, y - 5), "R14": (84.0, y - 2),
              "C11": (88.0, y - 5), "R15": (91.5, y - 5), "R16": (91.5, y - 2), "U5": (95.0, y - 5, 90),
-             "C12": (95.0, y - 1)}
+             "C12": (95.0, y - 8.6)}         # C12 north of U5: the RESET label under it
     for r, v in power.items():
         east = v[0] > 105                       # the LEDs on the east edge stay
         at[r] = (v[0] + (0 if east else dx), v[1], v[2] if len(v) > 2 else 0)
+    # the POWER button's controller between the buttons; its LDO, EN's
+    # pull-down and their pads in the free corner west of the eFuse
+    at["U16"] = (BUTTONS_X + 7.0, H - 3.4, 0)
+    at["C18"] = (BUTTONS_X + 7.0, H - 9.6, 0)
+    at["U15"] = (6.5, 162.0, 90)
+    at["C16"] = (6.5, 158.0, 0)
+    at["C17"] = (6.5, 166.0, 0)
+    at["R44"] = (6.5, 170.5, 0)
+    at[tp("3V3_STBY")] = (11.0, 163.0, 0)
+    at[tp("PWR_EN")] = (11.0, 168.0, 0)
     for i, net in enumerate(("VBUS_F", "5V_SYS", "+5V", "3V3_BUCK", "+3V3", "1V2_LDO", "+1V2", "CC1", "CC2",
                              "PWR_HI")):
         at[tp(net)] = (44.0 + 3.8 * (i % 5), y - 26.0 + 3.2 * (i // 5), 0)
@@ -896,7 +946,8 @@ def legalize(parts, at, margin=0.35, extra=None):
     import math
     import pcbnew
     mm = pcbnew.FromMM
-    fixed = ("J", "U7", "U9", "U10", "H", "D6")
+    # the LEDs (one row), the buttons and their controller (the front edge) stay put too
+    fixed = ("J", "U7", "U9", "U10", "H", "D", "SW", "U16")
     order = sorted(at, key=lambda r: (not r.startswith(fixed), r))
     fps = {}
     for s in parts:
@@ -997,7 +1048,8 @@ def _designators(parts, pl):
         cx0, cy0, cx1, cy1 = courts[ref]
         mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
         others = [c for r, c in courts.items() if r != ref]
-        spots = {"E": [(cx1 + gap + w / 2, my)]}.get(LABEL_SIDE.get(ref), [])
+        spots = {"E": [(cx1 + gap + w / 2, my)], "N": [(mx, cy0 - gap - h / 2)],
+                 "S": [(mx, cy1 + gap + h / 2)]}.get(LABEL_SIDE.get(ref), [])
         for shift in (0, 1, -1, 2, -2, 3, -3):
             spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
                       (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
@@ -1120,9 +1172,11 @@ def prepare(board):
 
 
 def _efuse_escapes(board, fp):
-    """The eFuse's IN and OUT bars (pads 5 and 6, 0.19 mm apart) and IN
-    pin 1 get locked tracks out past the package, IN's on pin 1's side,
-    OUT's the other way. Freerouting holds its own pins to 0.2 mm whatever
+    """The eFuse's IN and OUT bars (pads 5 and 6, 0.19 mm apart) and pin 1
+    (EN/UVLO) get locked tracks out past the package, IN's on pin 1's side,
+    OUT's the other way. Pin 1 was joined to IN's escape while EN was tied to
+    IN; it is PWR_EN now (the POWER button), so its stub stops beside IN's
+    and the router takes it from there. Freerouting holds its own pins to 0.2 mm whatever
     their class, so it counts these pins violations and never starts a route
     from them (every run left VBUS_F and 5V_SYS one connection short); it
     joins the tracks' ends instead. Returns the nets, which the pipeline
@@ -1160,14 +1214,17 @@ def _efuse_escapes(board, fp):
     e5, u = out(pads["5"], pads["1"])
     track(xy(pads["5"]), e5, 0.3, pads["5"].GetNet())
     p1 = xy(pads["1"])
-    # pin 1 straight out to the bar's escape line, then across to its end
+    # pin 1 straight out to the bar's escape line; joined across to its end
+    # only if it is on IN's net (EN tied to IN): never short EN to IN
     k = (e5[0] - p1[0]) * u[0] + (e5[1] - p1[1]) * u[1]
     c1 = (p1[0] + u[0] * k, p1[1] + u[1] * k)
     track(p1, c1, 0.25, pads["1"].GetNet())
-    track(c1, e5, 0.25, pads["1"].GetNet())
+    same = pads["1"].GetNetname() == pads["5"].GetNetname()
+    if same:
+        track(c1, e5, 0.25, pads["1"].GetNet())
     e6, _ = out(pads["6"], pads["7"])
     track(xy(pads["6"]), e6, 0.3, pads["6"].GetNet())
-    return [pads["5"].GetNetname(), pads["6"].GetNetname()]
+    return [pads["5"].GetNetname(), pads["6"].GetNetname()] + ([] if same else [pads["1"].GetNetname()])
 
 
 PLANE_NETS = ("/GND", "/+3V3")

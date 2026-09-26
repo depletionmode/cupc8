@@ -3,7 +3,10 @@
 The RP2040 on the removable **system card** ([system-slot.md](system-slot.md)),
 with its own USB port. The host side is `tools/cupc8.py`.
 
-The card runs from the slot's +3V3 and only listens on USB while the host's
+The card runs from the slot's +3V3, so it is **unpowered while the machine
+is off**: plugging in USB-C leaves the machine off, and `cupc8.py` cannot
+reach the card until the main board's POWER button is pressed (`power.md`,
+On/off). It only listens on USB while the host's
 VBUS is there (GPIO29, USB_nVBUS, low): until then the USB controller is off
 and D+ is not pulled up, and it lets go of D+ whenever VBUS goes. GPIO0/1
 light its TX and RX LEDs for ~30 ms after USB data out and in. It has no

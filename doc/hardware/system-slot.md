@@ -13,6 +13,10 @@ or debugged:
 
 Firmware and USB protocol: [sysctl.md](sysctl.md).
 
+The card is powered from the slot's rails, which are off until the main
+board's **POWER** button is pressed (`power.md`, On/off): while the machine
+is off the host sees no system card, and `cupc8.py` cannot reach it.
+
 ## The slot
 
 - **Connector:** one PCIe x4 card edge (64 contacts), LCSC C19188869, an SMD

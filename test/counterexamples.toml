@@ -692,3 +692,24 @@ revert = [["hw/tools/kicadgen.py", """        for r, other, o, o_up in boxes[i +
 """, ""]]
 cmd = "python3 test/hw/test_silk.py"
 must_fail = ["FAIL designators run together"]
+
+[[bug]]
+name = "main board: the status LEDs in a column down the east edge, not in the power LED's row along the top edge"
+fixed_in = "HEAD"
+revert = [["hw/boards/main.py", "    x, y = LED_X0, at[\"D6\"][1]", "    x, y = LED_X0, 75.4"]]
+cmd = "python3 test/hw/test_ledrow.py"
+must_fail = ["FAIL main (source)", "LEDs off the power LED's row"]
+
+[[bug]]
+name = "main board: the eFuse's EN/UVLO tied to IN, so the machine starts on when USB is plugged in (no POWER button)"
+fixed_in = "HEAD"
+revert = [["hw/boards/main.py", "{\"IN\": \"VBUS_F\", \"EN/UVLO\": \"PWR_EN\",", "{\"IN\": \"VBUS_F\", \"EN/UVLO\": \"VBUS_F\","]]
+cmd = "python3 test/hw/test_power_button.py"
+must_fail = ["FAIL eFuse EN/UVLO not tied to IN"]
+
+[[bug]]
+name = "main board: the eFuse escape joined pin 1 to IN's escape, a short once EN/UVLO left IN for the POWER button"
+fixed_in = "HEAD"
+revert = [["hw/boards/main.py", "    if same:\n        track(c1, e5,", "    if True:\n        track(c1, e5,"]]
+cmd = "python3 test/hw/test_efuse_escapes.py"
+must_fail = ["FAIL EN/UVLO on its own net (PWR_EN)", "/PWR_EN track within 0.1 mm of a /VBUS_F track"]

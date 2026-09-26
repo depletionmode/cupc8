@@ -522,7 +522,31 @@ def check_mainboard(pins, path=MAINBOARD_NET):
             if not same(by_func(chip_ref, f), chip_net(sig)):
                 err("main board: %s %s is not chipset %s" % (chip_ref, f, sig))
         checked += 1
-    return checked
+
+    # the POWER button (power.md, On/off): the eFuse's EN/UVLO from the toggle's
+    # OUT, the toggle powered from the standby LDO on VBUS ahead of the eFuse,
+    # its IN on the POWER switch, CLEAR held low
+    efuse, toggle, ldo = parts_of("TPS259470ARPWR"), parts_of("MAX16054AZT+T"), parts_of("HT7533-2_C82217")
+    switches = {c[2]: r for r, c in comps.items() if c[1] == "TS-1187A-B-A-B"}
+    if not (len(efuse) == len(toggle) == len(ldo) == 1 and "POWER" in switches and "RESET" in switches):
+        err("main board: expected one eFuse, one MAX16054, one HT7533-2 and the POWER and RESET switches "
+            "(found %s %s %s %s)" % (efuse, toggle, ldo, sorted(switches)))
+        return checked
+    efuse, toggle, ldo = efuse[0], toggle[0], ldo[0]
+    en, vin = by_func(efuse, "EN/UVLO"), by_func(efuse, "IN")
+    sw_nets = {pin_net.get((switches["POWER"], p)) for p in ("1", "2", "3", "4")}
+    for ok, what in ((en is not None and by_func(toggle, "OUT") == en, "eFuse EN/UVLO on the MAX16054's OUT"),
+                     (en != vin, "eFuse EN/UVLO not tied to IN (the machine would start on)"),
+                     (by_func(ldo, "VIN") == vin, "the standby LDO's VIN on the eFuse's IN (always powered)"),
+                     (by_func(toggle, "VCC") == by_func(ldo, "VOUT"), "the MAX16054's VCC on the standby LDO"),
+                     (by_func(toggle, "CLEAR") == "GND", "the MAX16054's CLEAR on GND"),
+                     (by_func(toggle, "IN") in sw_nets and "GND" in sw_nets, "the POWER switch from the MAX16054's "
+                      "IN to GND"),
+                     (pin_net.get((switches["RESET"], "1")) == by_func(supervisor, "~{MR}"),
+                      "the RESET switch on the supervisor's MR")):
+        if not ok:
+            err("main board: not %s" % what)
+    return checked + 1
 
 
 def same_via(a, b, comps, pin_net):

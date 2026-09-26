@@ -168,6 +168,29 @@ def main():
             fix="lower the OVLO divider, or 0.1 % resistors")
     c.check("B21", "TVS breakdown (min) vs vSafe5V max + 10%", d.TVS_VBR_MIN, d.VBUS_MAX * 1.1, ">=")
     c.check("B22", "TVS clamp vs the eFuse's 23 V rating", d.TVS_VCLAMP, 23.0, "<=")
+
+    # the POWER button: the machine off, VBUS still feeds the controller
+    r1, r2 = d.INSW_OVLO_R
+    ovlo = d.VBUS_MAX / (r1 + r2)
+    tvs = d.TVS_IR * (d.VBUS_MAX / d.TVS_VRWM)          # over its standoff: taken as rising in proportion
+    stby = ovlo + tvs + d.USBLC6_IR + d.INSW_I_OFF + d.STBY_LDO_IQ_MAX + d.ONOFF_I_MAX
+    c.info("standby (machine off)", "at VBUS %.1f V: OVLO divider %.0f uA, TVS %.0f uA, eFuse off %.0f uA, "
+           "LDO %.0f uA, controller %.0f uA, USBLC6 %.0f uA; %.0f uA more while POWER is held" % (
+               d.VBUS_MAX, 1e6 * ovlo, 1e6 * tvs, 1e6 * d.INSW_I_OFF, 1e6 * d.STBY_LDO_IQ_MAX,
+               1e6 * d.ONOFF_I_MAX, 1e6 * d.USBLC6_IR, 1e6 * d.STBY_LDO_VOUT[1] / d.ONOFF_PULLUP))
+    c.check("B23", "standby draw, machine off, POWER held (vs USB 2.0 suspend 2.5 mA)",
+            1e3 * (stby + d.STBY_LDO_VOUT[1] / d.ONOFF_PULLUP), 1e3 * d.USB_SUSPEND_MAX, "<=", "mA", need=MARGIN)
+    vbus_lo = d.VBUS_MIN - d.CABLE_R_VBUS * 0.01          # off: only the standby current in the cable
+    c.check("B24", "standby LDO in, lowest VBUS minus dropout, vs its 3.3 V out (+2 %)",
+            vbus_lo - d.STBY_LDO_DROPOUT, d.STBY_LDO_VOUT[1], ">=")
+    c.check("B25", "standby LDO's 30 V input vs the TVS clamp (the OVLO case: VBUS over 5.8 V)",
+            d.TVS_VCLAMP, d.STBY_LDO_VIN_MAX, "<=")
+    c.check("B26", "controller supply (3V3_STBY, max) inside the MAX16054's 5.5 V", d.STBY_LDO_VOUT[1],
+            d.ONOFF_VCC[1], "<=")
+    c.check("B27", "controller supply (3V3_STBY, min) over the MAX16054's 2.7 V", d.STBY_LDO_VOUT[0],
+            d.ONOFF_VCC[0], ">=")
+    c.check("B28", "EN/UVLO when on (3V3_STBY min) vs the eFuse's EN threshold (max)", d.STBY_LDO_VOUT[0],
+            d.INSW_EN_VTH_MAX, ">=", need=MARGIN)
     return c.done()
 
 

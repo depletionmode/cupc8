@@ -530,7 +530,7 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
   on MEM_A/MEM_D. /CE_RAM, /CE_ROM and /WE have 10 kΩ pull-ups, so nothing
   is selected or written while the chipset configures.
 - **Clock and reset:** Y1 12 MHz (C160457) into CLK12 and CPU_CLK through
-  33 Ω each. U6 MAX811T: nPOR to the chipset; MR from SW1 and SYS_nRST.
+  33 Ω each. U6 MAX811T: nPOR to the chipset; MR from SW1 (RESET) and SYS_nRST.
 - **Sockets:** one row (slot.md, "One row of cards"): the CPU socket
   (x8) first, then slots 1–6 (x1), 20.32 mm apart, all with contact 1 at
   x = 12 mm and the same way round, so the seven cards, which share one
@@ -563,7 +563,7 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
 - **Power** (`power.md`; every value `hw/power/design.py` assumes is in
   `main.py`'s `POWER`, in one place): USB-C (C165948, JLC's footprint)
   with 5.1 kΩ Rd, USBLC6 on CC, SMD1812P350TF/16 3.5 A PTC, SMF5.0A,
-  1 µF, then the TPS259470 eFuse (EN tied to IN, RILM 1.13 kΩ: 2.63–3.21 A,
+  1 µF, then the TPS259470 eFuse (EN from the POWER button's controller, RILM 1.13 kΩ: 2.63–3.21 A,
   OVLO 37.4k/10.0k 0.1 %, dVdt 680 pF), 22 µF on 5V_SYS, 0 Ω link to +5V.
   3V3: TLV62569PDDCR (DDC, for THM-001; PG open), 2.2 µH HPC5020NF (4.1 A,
   32 mΩ), 10 µF in, 22 µF out, 453k/100k 0.1 %, 0 Ω link; 3 × 22 µF more at
@@ -571,11 +571,20 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
   iCE40 VCC pin; each PLL supply pin its own 100 Ω + 10 µF/100 nF filter. PWR_HI (a 3.0 A source): TLV7011 with CC1/CC2 averaged
   through 1 MΩ each against 0.645 V (41.2k/10k from 3V3), because only
   the active CC line carries Rp.
-- **LEDs:** PWR (3V3, top-left corner as on every board), rails 5V, 3V3, 1V2
-  (the 1V2 one through an NPN), CDONE (through an NPN, 100 kΩ base so CDONE
-  still reads high), and GPO bits 0–7 (the POST code) down the east edge,
-  where the cards do not hide them: one column, 2.6 mm apart, each label
-  east of its LED (`LABEL_SIDE`). All red 0603 (C2286), labelled on silk.
+- **POWER and RESET** (David, 2026-09-26; `power.md`, On/off): two
+  C318884 tactile switches side by side on the front (south) edge, labelled
+  on silk, in front of every card. POWER (SW2) toggles the machine: U16
+  MAX16054 (C79401) drives the eFuse's EN/UVLO (R44 100 kΩ pull-down), from
+  3V3_STBY, U15 HT7533-2 (C82217, 30 V in) on VBUS_F, so it is always
+  powered; the machine starts off when USB is plugged in. RESET (SW1) is
+  the MAX811's MR, as before.
+- **LEDs:** PWR (3V3, top-left corner as on every board), then, in one row
+  with it along the top edge (milestone-1.md, Indicator LEDs), east of the
+  CPU socket: rails 5V, 3V3, 1V2 (the 1V2 one through an NPN), CDONE
+  (through an NPN, 100 kΩ base so CDONE still reads high), and GPO bits 7–0
+  (the POST code, read as a binary number). Each label just south of its
+  LED, its resistor south of that (`LABEL_SIDE`); the NPNs west of the row,
+  above the CPU socket. All red 0603 (C2286), labelled on silk.
 - **Headers and pads:** J4, 2 × 5 AUX SPI (SPI dev 6: 1 +3V3, 3 SCK,
   5 MOSI, 7 MISO, 8 AUX_CS_n, 9 +5V, even pins GND). Test pads on every rail,
   the clock, the resets, both flash buses, the bridge, the slot SPI, I2C, the

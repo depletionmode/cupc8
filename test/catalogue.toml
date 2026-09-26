@@ -1391,6 +1391,15 @@ vrow = "4.2"
 cmd = "python3 test/hw/test_silk.py"
 
 [[test]]
+id = "LED-001"
+title = "Every board's LEDs in one row with its power LED, along the top edge"
+checks = "milestone-1.md, Indicator LEDs: on every built board (build/hw/<board>) every LED is on the power LED's line (within 0.25 mm), and that line is within 6 mm of the top edge; the main board's placement is also checked at the source (main.py wanted())"
+method = "test/hw/test_ledrow.py: pcbnew on each built board, main.py's placement function"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_ledrow.py"
+
+[[test]]
 id = "MECH-009"
 title = "3D models: each STEP where its WRL is"
 checks = "every imported model in hw/lib/jlc.3dshapes: the STEP's surface centroid within 0.2 mm of the WRL's and the same surface area (KiCad renders and check_models the WRL; its STEP export, which MECH-001..008 measure, swaps in the STEP)"
@@ -1588,6 +1597,24 @@ checks = "main board netlist + chipset + sysctl + SRAM/ROM models pass BRG-001/0
 method = "co-sim subset generated from the main board netlist only"
 kind = "sim"
 vrow = "3.1"
+
+[[test]]
+id = "MB-053"
+title = "Main board POWER button: the machine starts off and toggles; POWER and RESET on the front edge"
+checks = "power.md, On/off (David, 2026-09-26): the eFuse's EN/UVLO is the MAX16054's OUT (not tied to IN), with a pull-down; the MAX16054 runs from the HT7533-2 standby LDO on VBUS_F (always powered), CLEAR low, IN on the POWER switch; POWER and RESET side by side on the south edge, labelled. The netlist side is also in pincheck (check_mainboard)"
+method = "test/hw/test_power_button.py: main.py's parts and placement"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 test/hw/test_power_button.py"
+
+[[test]]
+id = "MB-054"
+title = "Main board eFuse escapes never join two nets"
+checks = "main.py _efuse_escapes (locked pre-routing of the TPS259470's IN/OUT bars and pin 1), laid on a bare board with the eFuse on its real nets: no track touches a pad or comes within 0.1 mm of a track of another net, with EN/UVLO on PWR_EN (the POWER button) and tied to IN"
+method = "test/hw/test_efuse_escapes.py: pcbnew, the eFuse footprint alone"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_efuse_escapes.py"
 
 [[test]]
 id = "MB-101"
