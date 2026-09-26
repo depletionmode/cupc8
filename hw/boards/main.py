@@ -217,7 +217,10 @@ def build_parts():
     part("U1", "Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL", "C7519",
          {1: "CC1", 6: "CC1", 3: "CC2", 4: "CC2", 2: "GND", 5: "VBUS_F"})
     # the input path, all values from POWER (hw/power/design.py decides them)
-    part("F1", "Device:Polyfuse", "3.5A", "Fuse:Fuse_1812_4532Metric", POWER["FUSE_IN"][1], {1: "VBUS", 2: "VBUS_F"})
+    # KiCad's 1812 resistor footprint: pads identical to Fuse_1812_4532Metric,
+    # which KiCad ships no 3D model for (the render showed bare pads)
+    part("F1", "Device:Polyfuse", "3.5A", "Resistor_SMD:R_1812_4532Metric", POWER["FUSE_IN"][1],
+         {1: "VBUS", 2: "VBUS_F"})
     part("D1", "Device:D_Zener", "SMF5.0A", "cupc8:D_SOD-123FL", POWER["TVS"][1],
          {"K": "VBUS_F", "A": "GND"})              # a unidirectional TVS
     C("C1", "1u", "VBUS_F")                        # the only capacitance ahead of the eFuse (POW-004)
@@ -664,6 +667,8 @@ def row_slot(n):
 # the GPO LEDs are bits 0-7 of $f000, the POST code
 LABELS = {"D2": "5V", "D3": "3V3", "D4": "1V2", "D5": "CDONE", "D6": "PWR"}
 LABELS.update({"D%d" % (11 + i): str(i) for i in range(8)})
+LABEL_SIDE = {d: "E" for d in LABELS if d != "D6"}   # the east column's labels all east of their LEDs
+LED_X = 117.5                                     # "CDONE" fits between its LED and the edge
 
 FPGA = (97.0, 47.0)                               # centre of U7
 LOGO_MM = 12
@@ -790,14 +795,19 @@ def wanted(parts):
     at["C40"] = (104.5, 16.5, 0)
     for i, r in enumerate(("R70", "R71", "R72")):
         at[r] = (112.0, 19.0 + 2.2 * i, 0)
-    # east edge: GPO LEDs (the POST code), CDONE and rail LEDs
-    for i in range(8):
-        at["D%d" % (11 + i)] = (120.0, 70.0 + 2.6 * i, 0)
-        at["R%d" % (60 + i)] = (115.5, 70.0 + 2.6 * i, 0)
-    at["D5"] = (120.0, 92.0, 0)
-    at["R56"] = (115.5, 92.0, 0)
-    at["Q2"] = (115.5, 88.5, 0)
-    at["R55"] = (111.0, 88.5, 0)
+    # east edge: one column of LEDs, 2.6 mm apart, each with its resistor
+    # to the west and its label to the east (LABEL_SIDE; "CDONE", the
+    # longest, fits between the LED and the edge): GPO 0-7 (the POST code),
+    # CDONE, 5V, 3V3, 1V2. The two NPNs (CDONE, 1V2) and their base
+    # resistors further west on their LEDs' lines.
+    col = [("D%d" % (11 + i), "R%d" % (60 + i)) for i in range(8)] + \
+        [("D5", "R56"), ("D2", "R9"), ("D3", "R10"), ("D4", "R12")]
+    for i, (d, r) in enumerate(col):
+        at[d] = (LED_X, 75.4 + 2.6 * i, 0)
+        at[r] = (LED_X - 4.0, 75.4 + 2.6 * i, 0)
+    for q, rb, d in (("Q2", "R55", "D5"), ("Q1", "R11", "D4")):
+        at[q] = (LED_X - 12.0, at[d][1], 0)
+        at[rb] = (LED_X - 16.0, at[d][1], 0)
     # CPU socket channel (between the CPU socket and the system slot)
     cpu_r = ["R%d" % i for i in list(range(80, 88)) + list(range(90, 98))]
     for i, r in enumerate(cpu_r):
@@ -852,9 +862,7 @@ def wanted(parts):
              "R4": (51.0, y - 27, 0), "U3": (78.0, y - 19, 90), "L1": (84.0, y - 20), "R5": (86.5, y - 15),
              "R6": (86.5, y - 12), "C5": (74.0, y - 19, 90), "C6": (72.0, y - 23), "C7": (89.5, y - 19, 90),
              "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),
-             "C10": (101.0, y - 13, 0), "R8": (101.0, y - 25), "R9": (115.5, 95.2), "D2": (120.0, 95.2),
-             "R10": (115.5, 98.4), "D3": (120.0, 98.4), "R11": (107.0, 101.6), "Q1": (111.0, 101.6),
-             "R12": (115.5, 101.6), "D4": (120.0, 101.6), "R13": (84.0, y - 5), "R14": (84.0, y - 2),
+             "C10": (101.0, y - 13, 0), "R8": (101.0, y - 25), "R13": (84.0, y - 5), "R14": (84.0, y - 2),
              "C11": (88.0, y - 5), "R15": (91.5, y - 5), "R16": (91.5, y - 2), "U5": (95.0, y - 5, 90),
              "C12": (95.0, y - 1)}
     for r, v in power.items():
@@ -989,7 +997,7 @@ def _designators(parts, pl):
         cx0, cy0, cx1, cy1 = courts[ref]
         mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
         others = [c for r, c in courts.items() if r != ref]
-        spots = []
+        spots = {"E": [(cx1 + gap + w / 2, my)]}.get(LABEL_SIDE.get(ref), [])
         for shift in (0, 1, -1, 2, -2, 3, -3):
             spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
                       (cx0 - gap - 1.5, my + shift), (cx1 + gap + 1.5, my + shift)]
@@ -1027,7 +1035,7 @@ def _designators_kicad(parts, pl):
         fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
         fp.SetOrientationDegrees(rot)
     try:
-        kg.place_designators(board, OUTLINE, labels=LABELS)
+        kg.place_designators(board, OUTLINE, labels=LABELS, label_side=LABEL_SIDE)
     except ValueError as e:
         return [re.match(r"(\S+):", str(e)).group(1)]
     return []
@@ -1294,6 +1302,7 @@ def main():
                        fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
                        route_parallel=ROUTE_PARALLEL, fanout_margin=FANOUT_MARGIN, prepare=prepare,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
+                       label_side=LABEL_SIDE,
                        boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
     n = pincheck.check_mainboard(load_pins(), net)

@@ -35,6 +35,12 @@ MODEL_OVERRIDES = {
     # facing +y, hence the half turn and the 0.85 mm shift.
     "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
         ("HRO_TYPE-C-31-M-12.wrl", (0, -0.85, 0), (0, 0, 180)),
+    # the main board's ROM (C645939): JLC's model of its PLCC-32, whose
+    # footprint has KiCad's origin and orientation (pin 1 top centre). A
+    # 4th element: how much wider the model is than the fab outline by
+    # design (here the J-leads, 12.32 mm across, round an 11.53 mm body)
+    "Package_LCC:PLCC-32_11.4x14.0mm_P1.27mm":
+        ("../jlc.3dshapes/PLCC-32_L14.0-W11.5-P1.27-T.wrl", (0, 0, 0), (0, 0, 0), 0.8),
 }
 
 
@@ -739,7 +745,8 @@ def silk_keepout(board, fp, margin=0.3):
 
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
-                zone_outline=None, labels=None, plane=False, silk_text=None, logo_keepout=False):
+                zone_outline=None, labels=None, plane=False, silk_text=None, logo_keepout=False,
+                label_side=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -831,7 +838,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
 
     clip_silk_to_board(board, outline)
     clip_silk_to_pads(board)
-    place_designators(board, outline, labels or {}, silk_text=silk_text)
+    place_designators(board, outline, labels or {}, silk_text=silk_text, label_side=label_side)
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     if plane and layers == 4:
@@ -1116,7 +1123,7 @@ def run_together(a, a_up, b, b_up, gap=WORD_GAP):
     return a[1] < b[3] and b[1] < a[3] and max(b[0] - a[2], a[0] - b[2]) < gap
 
 
-def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, reseat=False):
+def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, reseat=False, label_side=None):
     """Put every reference designator horizontal, in the first spot around its
     part that clears all pads and vias, every other part's courtyard, every
     part's body, the other designators and board texts, board-only graphics
@@ -1126,10 +1133,13 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
 
     `reseat`: after routing, move only the designators that a via (the
     fan-out's, the router's) or anything else now sits under, and leave the
-    rest where they are. Returns the designators moved."""
+    rest where they are. `label_side` ({ref: "N"/"S"/"E"/"W"}) tries that
+    side of the part first, so a column of LEDs reads alike. Returns the
+    designators moved."""
     import pcbnew
     mm = pcbnew.FromMM
     labels = labels or {}
+    label_side = label_side or {}
     if not reseat:
         for fp in board.GetFootprints():
             if fp.GetReference() in labels and fp.Reference().IsVisible() and \
@@ -1193,6 +1203,10 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
         ref.SetTextAngleDegrees(0)
         box0 = _ink_box(ref)
         w0, h0 = [b - a for a, b in zip(box0[:2], box0[2:])]
+        side = label_side.get(fp.GetReference())
+        if side:
+            spots.insert(0, ({"E": cx1 + gap + w0 / 2, "W": cx0 - gap - w0 / 2}.get(side, mx),
+                             {"N": cy0 - gap - h0 / 2, "S": cy1 + gap + h0 / 2}.get(side, my), 0, size))
         for angle, tsize in ((0, size), (90, size), (0, 0.8), (90, 0.8)):
             if tsize > size:
                 continue
@@ -1481,7 +1495,8 @@ def check_models(tolerance=0.6):
     box centres agree within `tolerance` and so do the widths."""
     import pcbnew
     bad = []
-    for fpid, (model, offset, rotation) in MODEL_OVERRIDES.items():
+    for fpid, entry in MODEL_OVERRIDES.items():
+        model, offset, rotation = entry[:3]
         lib, name = fpid.split(":")
         fp = pcbnew.FootprintLoad(footprint_dir(lib), name)
         gi = fp.GraphicalItems()
@@ -1491,7 +1506,7 @@ def check_models(tolerance=0.6):
              max(pcbnew.ToMM(b.GetRight()) for b in fab), max(pcbnew.ToMM(b.GetBottom()) for b in fab))
         m = wrl_box(os.path.join(HW_LIB, "models", model), offset, rotation)
         dc = math.hypot((m[0] + m[2] - f[0] - f[2]) / 2, (m[1] + m[3] - f[1] - f[3]) / 2)
-        dw = abs((m[2] - m[0]) - (f[2] - f[0]))
+        dw = abs((m[2] - m[0]) - (f[2] - f[0]) - (entry[3] if len(entry) > 3 else 0))
         if dc > tolerance or dw > tolerance:
             bad.append("%s: model %s is %.2f mm off the fab outline (width differs %.2f mm)"
                        % (fpid, model, dc, dw))
@@ -2576,7 +2591,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
-             fine_power_nets=()):
+             fine_power_nets=(), label_side=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2644,6 +2659,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
+                        label_side=label_side,
                         plane=plane, silk_text=silk_text, logo_keepout=logo_keepout)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
@@ -2665,7 +2681,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # had to move (off a wide tab's ties) has its new spot kept free of
         # the router's vias; one that didn't is left to the router as before
         # (a keep-out changes the routing) and moves after it if it must
-        state["pre_moved"] = place_designators(b, outline, labels, silk_text=silk_text, reseat=True)
+        state["pre_moved"] = place_designators(b, outline, labels, silk_text=silk_text, reseat=True,
+                                               label_side=label_side)
         if any(" rev " in m for m in state["pre_moved"]):
             name_keepout(b)
         pcbnew.SaveBoard(pcb, b, True)
@@ -2719,7 +2736,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def fill():
         # designators the fan-out's or the router's vias landed under move
         # clear of them first; the stitching vias then keep off every one
-        moved = place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True)
+        moved = place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True,
+                                  label_side=label_side)
         # the name's via keep-out has done its work for the router (and is
         # stale if the name moved); the stitching keeps off the name by itself
         zs = state["b"].Zones()
@@ -2747,7 +2765,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
                 break
             n += k
             fill_zones(state["b"])
-        moved += place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True)
+        moved += place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True,
+                                   label_side=label_side)
         pcbnew.SaveBoard(pcb, state["b"])
         return "%d stitching vias" % n + ("; designators moved off vias: " + " ".join(moved) if moved else "") + \
             ("; NOT JOINED: " + "; ".join(UNJOINED) if UNJOINED else "")
