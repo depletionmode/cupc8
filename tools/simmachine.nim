@@ -24,6 +24,15 @@ proc romDir*(): string =
   ## all of them).
   if privDir.len == 0:
     createDir(simRoot / "build")
+    # a process killed (the interactive sim, stopped by a test) leaves its
+    # directory: those of processes no longer running go
+    if dirExists("/proc/self"):
+      for kind, path in walkDir(simRoot / "build"):
+        let name = path.extractFilename
+        if kind == pcDir and name.startsWith("rom-"):
+          let pid = name.split('-')[1]
+          if pid.len > 0 and pid.allCharsInSet(Digits) and not dirExists("/proc" / pid):
+            removeDir(path)
     privDir = createTempDir("rom-" & $getCurrentProcessId() & "-", "", simRoot / "build")
     let d = privDir
     addExitProc(proc () = removeDir(d))
