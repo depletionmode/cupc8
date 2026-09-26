@@ -3249,7 +3249,7 @@ proc testText8Free() =
 run testText8Free
 
 proc testMemApi() =
-  ## KRN-022: API_MEM_CMP and API_MEM_CPY (group 0, $101b and $101e) called
+  ## KRN-024: API_MEM_CMP and API_MEM_CPY (group 0, $101b and $101e) called
   ## by tools/testdata/mem_prog.s with the cases the test puts in memory:
   ## equal, less, greater (unsigned: $f0 above $10), length 0, a 300-byte
   ## compare across pages differing at byte 290 (16-bit length and pointers);
@@ -3368,7 +3368,7 @@ proc glassOf(g: SimCard): (int, seq[uint32]) =
   (w, frame)
 
 proc testSnakeExample() =
-  ## KRN-023: examples/snake on both graphics cards. HDMI: GFX mode, the
+  ## KRN-025: examples/snake on both graphics cards. HDMI: GFX mode, the
   ## walls, the snake moving right, S turns it down, Q ends it with the
   ## terminal back. E-ink (648 x 480): mode 2, 40 x 30 cells of 16 pixels 4
   ## in from the left (white outside), walls grey 1, the snake black, a
@@ -3461,7 +3461,7 @@ proc testSnakeExample() =
 run testSnakeExample
 
 proc testGfxdemoExample() =
-  ## KRN-024: examples/gfxdemo on both graphics cards, a key between stages.
+  ## KRN-026: examples/gfxdemo on both graphics cards, a key between stages.
   ## HDMI: TEXT's colours, the palette grid, the line art, then TEXT and a
   ## line saying stage 4 (mode 2) is e-ink only. E-ink: the same stages, the
   ## grid and the line art each shown by a greyscale refresh (four greys on

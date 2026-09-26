@@ -1,4 +1,4 @@
-; KRN-022: API_MEM_CMP and API_MEM_CPY. The test puts the cases in memory
+; KRN-024: API_MEM_CMP and API_MEM_CPY. The test puts the cases in memory
 ; before it runs: $7d00 = n, case i at $7d10 + 8i = op (0 compare, 1 copy),
 ; then API_ARGS[0..5] (dst, src, len16). For each case the program calls the
 ; entry and puts r0, r1 and API_ARGS[0..5] after the call at $7e00 + 8i;

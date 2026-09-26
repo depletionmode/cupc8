@@ -155,7 +155,7 @@ kernel keeps for itself, take 8-bit ones on the stack). `API_ARGS` = dst
 | `API_MEM_CPY` | $101e | **memmove**: overlapping areas copy right (backwards when dst is above src). r0 = 0 |
 
 r0 is also left in `API_ERR`; `API_ARGS` is used up as they work (the
-pointers step, len counts down). About 50 instructions a byte. KRN-022.
+pointers step, len counts down). About 50 instructions a byte. KRN-024.
 
 ### Mode 2 (2026-09-26, `basic-graphics.md`)
 

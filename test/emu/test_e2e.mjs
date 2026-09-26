@@ -2,7 +2,7 @@
 // CPU and chipset RTL, the SRAM and ROM chip, and every card on its real
 // firmware, with the host tool (tools/cupc8.py) talking to the system card.
 //
-//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013|E2E-014|E2E-015|E2E-016|E2E-020] [--record]
+//   node test/emu/test_e2e.mjs [E2E-002|E2E-003|E2E-004|E2E-007|E2E-008|E2E-009|E2E-010|E2E-011|E2E-012|E2E-013|E2E-014|E2E-015|E2E-016|E2E-017|E2E-020] [--record]
 //
 // E2E-007 (files on the storage card's microSD), E2E-008 (the e-ink card),
 // E2E-010..012 (programs at $7000), E2E-013..014 (networking) and
@@ -759,6 +759,44 @@ async function e2e016() {
   m.stop();
 }
 
+// ------------------------------------------------------------------ E2E-017
+// examples/snake on the e-ink card: mode 2, 16-pixel cells 4 in from the
+// panel's left; a greyscale refresh shows the field, then a partial refresh
+// after each step. S typed mid-game turns the snake down, and the glass shows
+// it; Q gives TEXT and the goodbye on the panel (the automatic refresh back).
+async function e2e017() {
+  log('E2E-017: examples/snake on the e-ink card; S steers it, on the glass');
+  if (!expect(backend === 'native', 'E2E-017 needs the native emulator (CUPC8_EMU=native)')) return;
+  const prg = mkprg('examples/snake/snake.s');
+  const m = await Machine.create({ slots: { 1: 'eink', 2: 'io' }, sysctl: true });
+  m.powerOn();
+  expect(await m.runUntil(() => panelText(m).includes('>>'), 10e9, 50e6), 'the BASIC prompt appears on the panel');
+  const r = await cupc8(m, 'run', prg);
+  expect(r.code === 0 && /bytes at \$7000, running/.test(r.out), `cupc8.py run snake.prg: ${r.out.trim()}`);
+  const glass = (x, y) => { const p = m.panel(); return p.grey[y * p.w + x]; };
+  const cell = (cx, cy) => glass(4 + cx * 16 + 8, cy * 16 + 8);
+  expect(await m.runUntil(() => m.panel().refreshes[2] >= 1 && m.panel().busy === 0, 20e9, 50e6),
+    'a greyscale refresh shows the field');
+  expect(Math.abs(cell(0, 15) - 85) <= 8 && cell(12, 15) === 0 && cell(5, 5) === 255 && glass(1, 240) === 255,
+    `the wall grey, the snake black, the ground and the margin white (${cell(0, 15)} ${cell(12, 15)} ${cell(5, 5)} ${glass(1, 240)})`);
+  const p0 = m.panel().refreshes[3];
+  expect(await m.runUntil(() => cell(14, 15) === 0, 10e9, 20e6), 'the snake moves right on the glass (partial refreshes)');
+  expect(m.panel().refreshes[3] > p0, 'by partial refreshes');
+  m.type('s');
+  let at = -1;
+  expect(await m.runUntil(() => {
+    for (let x = 14; x <= 19; x++) if (cell(x, 16) === 0) { at = x; return true; }
+    return false;
+  }, 10e9, 20e6), 'S typed mid-game: the glass shows the snake turned down');
+  expect(at >= 0 && cell(at + 1, 15) === 255, `... and not gone on right (cell ${at})`);
+  m.type('q');
+  if (!expect(await m.runUntil(() => panelText(m).includes('Thanks for playing snake.'), 20e9, 50e6),
+    'Q: TEXT and the goodbye on the panel')) console.log(panelText(m));
+  const p = m.panel();
+  expect(p.errors === 0, `the panel model saw nothing the chip would ignore (${p.errors}: ${p.error})`);
+  m.stop();
+}
+
 // ------------------------------------------------------------------ E2E-020
 // The USB console (doc/proposals/usb-console.md) on the real system card
 // firmware and the real kernel: the banner and a command's output read from
@@ -845,9 +883,9 @@ async function e2e020() {
 
 const tests = { 'E2E-002': e2e002, 'E2E-003': e2e003, 'E2E-007': e2e007, 'E2E-008': e2e008, 'E2E-009': e2e009,
   'E2E-010': e2e010, 'E2E-011': e2e011, 'E2E-012': e2e012, 'E2E-013': e2e013,
-  'E2E-014': e2e014, 'E2E-015': e2e015, 'E2E-016': e2e016, 'E2E-020': e2e020 };
+  'E2E-014': e2e014, 'E2E-015': e2e015, 'E2E-016': e2e016, 'E2E-017': e2e017, 'E2E-020': e2e020 };
 const nativeOnly = ['E2E-007', 'E2E-008', 'E2E-010', 'E2E-011', 'E2E-012', 'E2E-013', 'E2E-014', 'E2E-015', 'E2E-016',
-  'E2E-020'];
+  'E2E-017', 'E2E-020'];
 log(`backend: ${backend === 'native' ? 'native (emu/machine)' : 'machine.mjs'}`);
 for (const [id, fn] of Object.entries(tests)) if (only ? only === id : !nativeOnly.includes(id) || backend === 'native') await fn();
 console.log(`${only ?? 'E2E'}: the whole-machine emulator, ${checks} checks, ${bad} failures`);
