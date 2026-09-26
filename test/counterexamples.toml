@@ -929,6 +929,7 @@ revert = [["tools/patches/qemu-esp-lockstep.patch", "+    qemu_notify_event();",
 cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
 must_fail = ["not when it asked"]
 
+[[bug]]
 name = "kernel: a BASIC.PRG too big for $7000-$bfff was loaded (20 KB, over a second at boot) before it was refused"
 fixed_in = "1cc9bbd"
 # sys_load looks for a byte past the room (a seek and a 1-byte read) before
