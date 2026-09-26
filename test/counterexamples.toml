@@ -843,3 +843,35 @@ revert = [["fw/sim/simcards.c", """	if (c->wifi)
 """, ""]]
 cmd = "tools/run_tests.sh testRunsSideBySide"
 must_fail = ["FAIL: run"]
+
+[[bug]]
+name = "Wi-Fi card: its QEMU ran on the host's clock, so a machine with a Wi-Fi card was not cycle-deterministic (E2E-003's exchanges with the card differed run to run from the first after the join)"
+fixed_in = "79a27c1"
+before = "44bbccb"
+# the lockstep kept, the guest's clock from the host again (adaptive icount, idle in real time)
+revert = [["test/emu/machinenative.mjs", "'-icount', 'shift=3,sleep=off'", "'-icount', 'shift=auto,sleep=on'"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["DIFFERENT"]
+
+[[bug]]
+name = "Espressif QEMU: the ESP32-C3's random number register was rand() seeded from time(NULL), so the Wi-Fi card's DHCP transaction IDs and TCP sequence numbers changed run to run"
+fixed_in = "f1b7cda"
+revert = [["tools/patches/qemu-esp-lockstep.patch", "@@ -151,13 +152,10 @@", "@@ -151,13 +152,13 @@"], ["tools/patches/qemu-esp-lockstep.patch", """+        uint32_t r;
++        qemu_guest_getrandom_nofail(&r, sizeof(r));
++        return r;
+""", """+        static bool init = false;
++        if (!init) {
++            srand(time(NULL));
++            init = true;
++        }
++        return rand();
+"""]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["network:"]
+
+[[bug]]
+name = "lockstep QEMU: the settle after a guest packet did not wake the main loop, so a TCP connect's new host socket was not polled and the SYN-ACK reached the guest 0.44 ms of guest time late, whenever the main loop went round"
+fixed_in = "c069a31"
+revert = [["tools/patches/qemu-esp-lockstep.patch", "+    qemu_notify_event();", "+    (void)0;"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["not when it asked"]
