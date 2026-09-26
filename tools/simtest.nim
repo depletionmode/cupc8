@@ -3430,6 +3430,293 @@ proc testText8Free() =
 
 run testText8Free
 
+proc testMemApi() =
+  ## KRN-024: API_MEM_CMP and API_MEM_CPY (group 0, $101b and $101e) called
+  ## by tools/testdata/mem_prog.s with the cases the test puts in memory:
+  ## equal, less, greater (unsigned: $f0 above $10), length 0, a 300-byte
+  ## compare across pages differing at byte 290 (16-bit length and pointers);
+  ## copies of 300 bytes, of 0, overlapping with dst above src (backwards)
+  ## and below it (forwards), and onto itself (memmove). The bytes on either
+  ## side of a copy are untouched; API_ARGS after the call as the contracts say.
+  echo "== kernel API: mem_cmp, mem_cpy =="
+  let rom = buildKernelRom()
+  let prg = workDir / "mem_prog.prg"
+  mkprg(testdata / "mem_prog.s", prg)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  proc peek(a: int): int = cardsLoadTest(a)
+  proc poke(a, v: int) = cardsStoreTest(a, v)
+  proc pokes(a: int; s: seq[int]) =
+    for i, v in s: poke(a + i, v)
+  proc pattern(a, n, seed: int) =
+    for i in 0 ..< n: poke(a + i, (i * 7 + seed) and 0xff)
+  # the buffers
+  pokes(0x8000, "HELLO".mapIt(ord(it)))
+  pokes(0x8010, "HELLO".mapIt(ord(it)))
+  pokes(0x8020, "HELLA".mapIt(ord(it)))
+  pokes(0x8030, @[0xf0, 1])
+  pokes(0x8038, @[0x10, 1])
+  pattern(0x80f0, 300, 3)                  # 300 bytes across pages ...
+  pattern(0x85f8, 300, 3)                  # ... the same, but byte 290
+  poke(0x85f8 + 290, peek(0x80f0 + 290) - 1)
+  pattern(0x9000, 300, 5)                  # copy sources
+  for a in 0x87fe .. 0x8930: poke(a, 0xee) # the copy's target, guards round it
+  pattern(0xa0f0, 0x130, 11)               # overlap, dst above src
+  pattern(0xa400, 300, 13)                 # overlap, dst below src
+  pattern(0xa700, 16, 17)                  # onto itself
+  poke(0xa7ff, 0x55)                       # copy of 0 there
+  type Case = tuple[op, dst, src, len: int]
+  let cases: seq[Case] = @[
+    (0, 0x8000, 0x8010, 5),      # 0 equal
+    (0, 0x8020, 0x8010, 5),      # 1 less at byte 4
+    (0, 0x8030, 0x8038, 2),      # 2 greater at byte 0, unsigned
+    (0, 0x8020, 0x8038, 0),      # 3 length 0
+    (0, 0x80f0, 0x85f8, 300),    # 4 across pages, byte 290
+    (1, 0x8800, 0x9000, 300),    # 5 copy 300
+    (1, 0xa7ff, 0x9000, 0),      # 6 copy 0
+    (1, 0xa100, 0xa0f0, 0x120),  # 7 overlap, dst above src
+    (1, 0xa3f0, 0xa400, 300),    # 8 overlap, dst below src
+    (1, 0xa700, 0xa700, 16)]     # 9 onto itself
+  poke(0x7d00, cases.len)
+  for i, c in cases:
+    pokes(0x7d10 + 8 * i, @[c.op, c.dst and 0xff, c.dst shr 8, c.src and 0xff, c.src shr 8,
+                            c.len and 0xff, c.len shr 8])
+  poke(0x7cff, 0)
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("it ran every case", runUntil(proc (): bool = peek(0x7cff) == 0xa5 and mem[ApiRun] == 0,
+                                           30_000_000))
+  proc res(i: int): seq[int] =
+    for k in 0..7: result.add(peek(0x7e00 + 8 * i + k))
+  proc after(r0, r1, dst, src, len: int): seq[int] =
+    @[r0, r1, dst and 0xff, dst shr 8, src and 0xff, src shr 8, len and 0xff, len shr 8]
+  let r1s = res(0)[1]                      # r1 is not part of the equal answer
+  expectTrue("cmp equal: 0, the pointers past the 5 bytes, len 0 " & $res(0),
+             res(0) == after(0, r1s, 0x8005, 0x8015, 0))
+  expectTrue("cmp less: $ff, r1 'A' - 'O', at byte 4 " & $res(1),
+             res(1) == after(0xff, (ord('A') - ord('O')) and 0xff, 0x8024, 0x8014, 0))
+  expectTrue("cmp greater, unsigned ($f0 against $10): 1, r1 $e0, at byte 0, 1 left " & $res(2),
+             res(2) == after(1, 0xe0, 0x8030, 0x8038, 1))
+  expectTrue("cmp of 0 bytes: equal, nothing moved " & $res(3),
+             res(3)[0] == 0 and res(3)[2..7] == after(0, 0, 0x8020, 0x8038, 0)[2..7])
+  expectTrue("cmp of 300 across pages: 1 at byte 290, 9 left " & $res(4),
+             res(4) == after(1, 1, 0x80f0 + 290, 0x85f8 + 290, 9))
+  var copied = true
+  for i in 0 ..< 300:
+    if peek(0x8800 + i) != ((i * 7 + 5) and 0xff): copied = false
+  expectTrue("copy 300: every byte, r0 0", copied and res(5)[0] == 0)
+  expectTrue("copy 300: the bytes round it untouched",
+             peek(0x87ff) == 0xee and peek(0x8800 + 300) == 0xee)
+  expectTrue("copy 0: nothing written, r0 0", peek(0xa7ff) == 0x55 and res(6)[0] == 0)
+  var up = true
+  for i in 0 ..< 0x120:
+    if peek(0xa100 + i) != ((i * 7 + 11) and 0xff): up = false
+  expectTrue("overlap, dst 16 above src: the source's bytes, not a repeat", up and res(7)[0] == 0)
+  expectTrue("overlap up: the byte below dst is src's own", peek(0xa0ff) == ((15 * 7 + 11) and 0xff))
+  var down = true
+  for i in 0 ..< 300:
+    if peek(0xa3f0 + i) != ((i * 7 + 13) and 0xff): down = false
+  expectTrue("overlap, dst 16 below src: the source's bytes", down and res(8)[0] == 0)
+  var same = true
+  for i in 0 ..< 16:
+    if peek(0xa700 + i) != ((i * 7 + 17) and 0xff): same = false
+  expectTrue("copy onto itself: unchanged", same and res(9)[0] == 0)
+  ioModel = imLegacy
+
+run testMemApi
+
+proc runExample(name: string; card: int): SimCard =
+  ## examples/NAME/NAME.s built with tools/mkprg.py, started on a machine
+  ## with `card` and the IO card as `cupc8.py run` does; the graphics card.
+  let rom = buildKernelRom()
+  let prg = workDir / "examples" / name & ".prg"
+  createDir(workDir / "examples")
+  mkprg(rootDir / "examples" / name / name & ".s", prg)
+  machineCards([card, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  result = gpuCard()
+  expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
+
+proc glassOf(g: SimCard): (int, seq[uint32]) =
+  ## the e-ink panel's glass as of its last refresh: its width, the pixels
+  let w = int(simcard_out_w(g))
+  var frame = newSeq[uint32](w * int(simcard_out_h(g)))
+  simcard_render(g, addr frame[0])
+  (w, frame)
+
+proc testSnakeExample() =
+  ## KRN-025: examples/snake on both graphics cards. HDMI: GFX mode, the
+  ## walls, the snake moving right, S turns it down, Q ends it with the
+  ## terminal back. E-ink (648 x 480): mode 2, 40 x 30 cells of 16 pixels 4
+  ## in from the left (white outside), walls grey 1, the snake black, a
+  ## greyscale refresh shows the field; a step every 450-600 ms, each shown
+  ## by a partial refresh; S turns it down, on the glass too; Q gives TEXT
+  ## again and the automatic refresh back (the goodbye reaches the glass by
+  ## itself). E-ink 800 x 480: 50 x 30 cells across the whole panel.
+  echo "== examples/snake =="
+  # ---- HDMI
+  var g = runExample("snake", CardGpu)
+  proc px(x, y: int): int = int(simcard_gpu_pixel(g, cint(x), cint(y)))
+  expectTrue("HDMI: GFX mode, the walls and the snake",
+             runUntil(proc (): bool = simcard_gpu_mode(g) == 1 and px(80 + 3, 123) == 10, 5_000_000))
+  expectTrue("HDMI: walls in colour 9 round the field", px(0, 0) == 9 and px(319, 239) == 9 and px(3, 120) == 9)
+  expectTrue("HDMI: the head reaches cell 14", runUntil(proc (): bool = px(14 * 8 + 3, 123) == 10, 10_000_000))
+  pushKey(ord('s'))
+  var turnedAt = -1
+  proc turnedH(): bool =
+    for x in 14..17:
+      if px(x * 8 + 3, 16 * 8 + 3) == 10:
+        turnedAt = x
+        return true
+  expectTrue("HDMI: S turns it down", runUntil(turnedH, 10_000_000))
+  expectTrue("HDMI: ... and it no longer goes right (" & $turnedAt & ")", px((turnedAt + 1) * 8 + 3, 123) != 10)
+  pushKey(ord('q'))
+  expectTrue("HDMI: Q- TEXT and the goodbye, the terminal back", runUntil(proc (): bool =
+    simcard_gpu_mode(g) == 0 and gpuFind(g, "Thanks for playing snake.") >= 0 and mem[ApiRun] == 0, 5_000_000))
+  # ---- e-ink, 648 x 480
+  g = runExample("snake", CardEink)
+  proc g2(x, y: int): int = int(simcard_eink_pixel2(g, cint(x), cint(y)))
+  proc cellGrey(cx, cy: int): int = g2(4 + cx * 16 + 8, cy * 16 + 8)
+  expectTrue("e-ink: mode 2 and the snake drawn",
+             runUntil(proc (): bool = simcard_gpu_mode(g) == 2 and cellGrey(12, 15) == 0, 10_000_000))
+  expectTrue("e-ink: walls grey 1 round 40 x 30 cells of 16 pixels",
+             cellGrey(0, 0) == 1 and cellGrey(39, 29) == 1 and cellGrey(0, 15) == 1 and cellGrey(39, 15) == 1 and
+             g2(4, 240) == 1 and g2(643, 240) == 1)
+  expectTrue("e-ink: centred, white outside the field", g2(3, 240) == 3 and g2(644, 240) == 3 and g2(647, 479) == 3)
+  expectTrue("e-ink: the ground white, the snake black with a gap round it",
+             cellGrey(5, 5) == 3 and g2(4 + 10 * 16, 15 * 16) == 3 and g2(4 + 10 * 16 + 1, 15 * 16 + 1) == 0)
+  expectTrue("e-ink: a greyscale refresh shows the field",
+             runUntil(proc (): bool = simcard_eink_refreshes(g, 2) >= 1 and cellGrey(13, 15) != 0, 60_000_000))
+  var (w, frame) = glassOf(g)
+  proc glass(x, y: int): int = int(frame[y * w + x] and 0xff)
+  expectTrue("e-ink: on the glass the wall grey, the snake black, the ground white (" &
+             $glass(12, 240) & " " & $glass(4 + 11 * 16 + 8, 248) & " " & $glass(100, 100) & ")",
+             glass(12, 240) in 60..120 and glass(4 + 11 * 16 + 8, 248) < 30 and glass(100, 100) > 220)
+  let partials0 = simcard_eink_refreshes(g, 3)
+  var steps: seq[int]
+  for c in 13..15:
+    if not runUntil(proc (): bool = cellGrey(c, 15) == 0, 40_000_000): break
+    steps.add(msCount())
+  expectTrue("e-ink: the head moves right, cells 13, 14, 15", steps.len == 3)
+  if steps.len == 3:
+    let gaps = @[steps[1] - steps[0], steps[2] - steps[1]]
+    expectTrue("e-ink: a step every 450-600 ms " & $gaps, gaps.allIt(it >= 450 and it <= 600))
+  expectTrue("e-ink: each step shown by a partial refresh (" & $(simcard_eink_refreshes(g, 3) - partials0) & ")",
+             simcard_eink_refreshes(g, 3) - partials0 >= 2)
+  pushKey(ord('s'))
+  turnedAt = -1
+  proc turnedE(): bool =
+    for x in 15..18:
+      if cellGrey(x, 16) == 0:
+        turnedAt = x
+        return true
+  expectTrue("e-ink: S turns it down", runUntil(turnedE, 40_000_000))
+  expectTrue("e-ink: ... and it no longer goes right", cellGrey(turnedAt + 1, 15) != 0)
+  let p1 = simcard_eink_refreshes(g, 3)
+  expectTrue("e-ink: the next partial refresh", runUntil(proc (): bool = simcard_eink_refreshes(g, 3) > p1, 40_000_000))
+  (w, frame) = glassOf(g)
+  expectTrue("e-ink: the glass shows the snake turned down (" & $glass(4 + turnedAt * 16 + 8, 16 * 16 + 8) & ")",
+             glass(4 + turnedAt * 16 + 8, 16 * 16 + 8) < 30)
+  pushKey(ord('q'))
+  expectTrue("e-ink: Q- TEXT and the goodbye, the terminal back", runUntil(proc (): bool =
+    simcard_gpu_mode(g) == 0 and gpuFind(g, "Thanks for playing snake.") >= 0 and mem[ApiRun] == 0, 40_000_000))
+  let full0 = simcard_eink_refreshes(g, 1) + simcard_eink_refreshes(g, 0)
+  expectTrue("e-ink: the automatic refresh is back: the goodbye reaches the glass by itself",
+             runUntil(proc (): bool = simcard_eink_refreshes(g, 1) + simcard_eink_refreshes(g, 0) > full0, 40_000_000))
+  expect("e-ink: the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
+  expect("e-ink: the card saw no bad frame", int(simcard_gpu_errors(g)), 0)
+  # ---- e-ink, 800 x 480
+  g = runExample("snake", CardEink750)
+  expectTrue("e-ink 800: 50 x 30 cells, the walls at the panel's edges",
+             runUntil(proc (): bool = simcard_gpu_mode(g) == 2 and g2(10 * 16 + 8, 248) == 0, 10_000_000) and
+             g2(0, 0) == 1 and g2(799, 479) == 1 and g2(49 * 16 + 8, 240) == 1 and g2(48 * 16 + 8, 240) == 3)
+  pushKey(ord('q'))
+  expectTrue("e-ink 800: Q ends it", runUntil(proc (): bool =
+    simcard_gpu_mode(g) == 0 and mem[ApiRun] == 0, 40_000_000))
+  ioModel = imLegacy
+
+run testSnakeExample
+
+proc testGfxdemoExample() =
+  ## KRN-026: examples/gfxdemo on both graphics cards, a key between stages.
+  ## HDMI: TEXT's colours, the palette grid, the line art, then TEXT and a
+  ## line saying stage 4 (mode 2) is e-ink only. E-ink: the same stages, the
+  ## grid and the line art each shown by a greyscale refresh (four greys on
+  ## the glass), then stage 4 in mode 2: four grey bars 0-3, a fan of lines,
+  ## the title, a greyscale refresh; then TEXT. On the 800 x 480 panel stage
+  ## 4 is centred (80 in).
+  echo "== examples/gfxdemo =="
+  # ---- HDMI
+  var g = runExample("gfxdemo", CardGpu)
+  proc px(x, y: int): int = int(simcard_gpu_pixel(g, cint(x), cint(y)))
+  proc waitKey(): bool = runUntil(proc (): bool = waiting, 20_000_000)
+  expectTrue("HDMI: stage 1, TEXT's colours", runUntil(proc (): bool =
+    gpuFind(g, "Press a key for GFX mode") >= 0 and waiting, 10_000_000))
+  pushKey(ord(' '))
+  expectTrue("HDMI: stage 2, the palette grid", runUntil(proc (): bool =
+    simcard_gpu_mode(g) == 1 and px(305, 230) == 255, 10_000_000) and px(5, 5) == 0 and px(25, 5) == 1 and
+    px(5, 20) == 16)
+  discard waitKey()
+  pushKey(ord(' '))
+  expectTrue("HDMI: stage 3, the line art", runUntil(proc (): bool = px(0, 0) == 196 and waiting, 20_000_000))
+  pushKey(ord(' '))
+  expectTrue("HDMI: TEXT again, stage 4 skipped with a word", runUntil(proc (): bool =
+    simcard_gpu_mode(g) == 0 and gpuFind(g, "is e-ink only: skipped.") >= 0 and
+    gpuFind(g, "That was TEXT and GFX mode.") >= 0 and mem[ApiRun] == 0, 10_000_000))
+  expect("HDMI: the card saw no bad frame", int(simcard_gpu_errors(g)), 0)
+  # ---- e-ink, both panels
+  for (card, name, xo) in [(CardEink, "e-ink", 4), (CardEink750, "e-ink 800", 80)]:
+    g = runExample("gfxdemo", card)
+    proc g2(x, y: int): int = int(simcard_eink_pixel2(g, cint(x), cint(y)))
+    expectTrue(name & ": stage 1", runUntil(proc (): bool =
+      gpuFind(g, "Press a key for GFX mode") >= 0 and waiting, 10_000_000))
+    for stage in 2..3:
+      let grey0 = simcard_eink_refreshes(g, 2)
+      pushKey(ord(' '))
+      expectTrue(name & ": stage " & $stage & " drawn, then a greyscale refresh", runUntil(proc (): bool =
+        simcard_eink_refreshes(g, 2) > grey0 and waiting, 60_000_000))
+      let (w, frame) = glassOf(g)
+      var levels = initCountTable[int]()
+      for i in countup(0, frame.len - 1, 7): levels.inc(int(frame[i] and 0xff) div 64)
+      expectTrue(name & ": stage " & $stage & ": greys on the glass, not only black and white " & $levels,
+                 levels.len >= 3)
+      discard w
+    let grey0 = simcard_eink_refreshes(g, 2)
+    pushKey(ord(' '))
+    expectTrue(name & ": stage 4, mode 2, then a greyscale refresh", runUntil(proc (): bool =
+      simcard_gpu_mode(g) == 2 and simcard_eink_refreshes(g, 2) > grey0 and waiting, 60_000_000))
+    var bars: seq[int]
+    for i in 0..3: bars.add(g2(xo + 8 + 160 * i + 40, 150))
+    expectTrue(name & ": the four bars in greys 0-3 " & $bars, bars == @[0, 1, 2, 3])
+    expectTrue(name & ": the white bar's outline, the ground white",
+               g2(xo + 488, 150) == 0 and g2(xo + 488 + 143, 255) == 0 and g2(xo + 4, 150) == 3)
+    expectTrue(name & ": the fan's lines meet at (320, 470), the middle one in grey 2",
+               g2(xo + 320, 470) != 3 and g2(xo + 320, 400) == 2 and g2(xo + 320, 295) == 3)
+    var title = 0
+    for y in 16..31:
+      for x in xo + 240 .. xo + 399:
+        if g2(x, y) == 0: inc title
+    expectTrue(name & ": the title (" & $title & " pixels)", title > 200)
+    let (w, frame) = glassOf(g)
+    var glassBars: seq[int]
+    for i in 0..3: glassBars.add(int(frame[150 * w + xo + 8 + 160 * i + 40] and 0xff))
+    expectTrue(name & ": the four greys on the glass " & $glassBars,
+               glassBars[0] < glassBars[1] and glassBars[1] < glassBars[2] and glassBars[2] < glassBars[3])
+    pushKey(ord(' '))
+    expectTrue(name & ": TEXT again", runUntil(proc (): bool =
+      simcard_gpu_mode(g) == 0 and gpuFind(g, "and the e-ink card's mode 2.") >= 0 and mem[ApiRun] == 0,
+      20_000_000))
+    expect(name & ": the panel model saw no command the chip would ignore", int(simcard_eink_errors(g)), 0)
+    expect(name & ": the card saw no bad frame", int(simcard_gpu_errors(g)), 0)
+  ioModel = imLegacy
+
+run testGfxdemoExample
+
 proc testHello() =
   ## KRN-015: examples/hello (tools/mkprg.py: kernel/api.inc, then the
   ## program, for $7000) on the HDMI machine: its banner and API version,
@@ -3606,3 +3893,4 @@ if failures > 0:
   echo "FAILED ", failures, " check(s)"
   quit(1)
 echo "ALL TESTS PASSED"
+

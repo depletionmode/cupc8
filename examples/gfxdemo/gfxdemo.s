@@ -5,7 +5,13 @@
 ; 2. GFX mode (320 x 240, 256 colours)- the whole palette as a 16 x 16 grid
 ;    (the VGA colours, the colour cube, the grey ramp).
 ; 3. GFX mode- a starburst of lines, nested rectangles and 8x8 text.
-; A key moves on each time. On the e-ink card the colours show as greys.
+; 4. The e-ink card's native mode 2 (the panel's 648 x 480 or 800 x 480 in
+;    four greys)- four grey bars, a fan of lines, 8 x 16 text. On HDMI it
+;    says so and skips it.
+; A key moves on each time. On the e-ink card the colours show as greys:
+; after drawing stages 2, 3 and 4 it asks for a greyscale refresh (the TEXT
+; stage is left to the card's automatic refresh). API_EINK_STATUS tells the
+; cards apart (0 on e-ink, $ff on HDMI, which it sends nothing).
 ;
 ; Build- python3 tools/mkprg.py examples/gfxdemo/gfxdemo.s -o build/GFXDEMO.PRG
 ; Run- exec "GFXDEMO.PRG"
@@ -16,6 +22,14 @@ msg_key db "\nPress a key for GFX mode (320 x 240, 256 colours) ..."
 msg_pal db "THE 256-COLOUR PALETTE"
 msg_art db "CUPC/8 GFX 320x240 256 COLOURS"
 msg_bye db "\nThat was TEXT and GFX mode. Back to the terminal.\n"
+msg_skip db "\nStage 4, the e-ink card's native 4-grey mode, is e-ink only: skipped."
+msg_bye2 db "\nThat was TEXT, GFX and the e-ink card's mode 2. Back to the terminal.\n"
+msg_n2 db "E-INK NATIVE 4 GREYS"
+msg_g0 db "0 BLACK"
+msg_g1 db "1 DARK "
+msg_g2 db "2 LIGHT"
+msg_g3 db "3 WHITE"
+bar_x db 8, 0, 168, 0, 72, 1, 232, 1
 
 i: resb 1
 row: resb 1
@@ -27,8 +41,23 @@ y: resb 1
 wl: resb 1
 wh: resb 1
 h: resb 1
+eink: resb 1			; 1 on the e-ink card
+xo: resb 1				; mode 2: the 640-pixel picture's left edge on the panel
+tpl: resb 1
+tph: resb 1
 
 main:
+	; which card (EPD_STATUS: only the e-ink card answers)
+	push pch
+	push pcl
+	b API_EINK_STATUS
+	mov r1, #1
+	eq r0, #0
+	bzf .card
+	xor r1, r1
+.card:
+	st [eink], r1
+
 	; ---------------------------------------------------------- 1. TEXT colours
 	xor r0, r0
 	push pch
@@ -156,6 +185,9 @@ main:
 	b title_pal
 	push pch
 	push pcl
+	b grey_refresh
+	push pch
+	push pcl
 	b API_GETKEY
 
 	; ---------------------------------------------------------- 3. line art
@@ -272,9 +304,21 @@ main:
 	b title_art
 	push pch
 	push pcl
+	b grey_refresh
+	push pch
+	push pcl
 	b API_GETKEY
 
+	; ---------------------------------------------------------- 4. mode 2
+	ld r0, [eink]
+	eq r0, #0
+	bzf .back
+	push pch
+	push pcl
+	b native
+
 	; ---------------------------------------------------------- back to TEXT
+.back:
 	xor r0, r0
 	push pch
 	push pcl
@@ -287,11 +331,273 @@ main:
 	push pch
 	push pcl
 	b API_CLS
-	mov r0, #<[msg_bye]
-	mov r1, #>[msg_bye]
+	ld r0, [eink]
+	eq r0, #0
+	bzf .hdmi
+	mov r0, #<[msg_bye2]
+	mov r1, #>[msg_bye2]
+	b .bye
+.hdmi:
+	mov r0, #<[msg_skip]
+	mov r1, #>[msg_skip]
 	push pch
 	push pcl
 	b puts
+	mov r0, #<[msg_bye]
+	mov r1, #>[msg_bye]
+.bye:
+	push pch
+	push pcl
+	b puts
+	pop pcl
+	pop pch
+
+; e-ink: a greyscale refresh, to show the GFX greys as greys (HDMI: nothing)
+grey_refresh:
+	ld r0, [eink]
+	eq r0, #0
+	bzf .done
+	mov r0, #3
+	push pch
+	push pcl
+	b API_EINK_REFRESH
+.done:
+	pop pcl
+	pop pch
+
+; stage 4, on the e-ink card: mode 2, the panel's own pixels in greys 0-3;
+; the picture is 640 wide, centred (xo 4 on the 648 x 480 panel, 80 on the
+; 800 x 480). Then a greyscale refresh and a key.
+native:
+	mov r0, #2
+	push pch
+	push pcl
+	b API_GFX_MODE				; cleared to white
+	mov r0, #4
+	st [xo], r0
+	mov r0, #0xbc				; (700, 0) is on the 800 x 480 panel only
+	st $6f00, r0
+	mov r0, #2
+	st $6f01, r0
+	xor r0, r0
+	st $6f02, r0
+	st $6f03, r0
+.ask:
+	push pch
+	push pcl
+	b API_GFX2_GETPIXEL			; (it waits behind a refresh, so ask again)
+	eq r0, #0
+	bzf .asked
+	b .ask
+.asked:
+	eq r1, #3
+	bzf .wide
+	b .bars
+.wide:
+	mov r0, #80
+	st [xo], r0
+
+	; the four grey bars, 144 x 200 at y 56, and their names under them
+.bars:
+	xor r0, r0
+	st [i], r0
+.bar:
+	ld r0, [i]
+	shl r0, #1
+	ld r1, [bar_x]+r0
+	st [xl], r1
+	add r0, #1
+	ld r1, [bar_x]+r0
+	st [xh], r1
+	push pch
+	push pcl
+	b bar_at
+	mov r0, #144
+	st $6f04, r0
+	xor r0, r0
+	st $6f05, r0
+	st $6f07, r0
+	mov r0, #200
+	st $6f06, r0
+	ld r0, [i]
+	st $6f08, r0
+	push pch
+	push pcl
+	b API_GFX2_FILL_RECT
+	push pch
+	push pcl
+	b bar_at					; a black outline (the white bar has only that)
+	mov r0, #144
+	st $6f04, r0
+	xor r0, r0
+	st $6f05, r0
+	st $6f07, r0
+	st $6f08, r0
+	mov r0, #200
+	st $6f06, r0
+	push pch
+	push pcl
+	b API_GFX2_RECT
+	ld r0, [xl]					; the name, 16 in and under the bar
+	add r0, #16
+	st [xl], r0
+	push pch
+	push pcl
+	b bar_at
+	mov r0, #8
+	st $6f02, r0				; y 264
+	mov r0, #1
+	st $6f03, r0
+	xor r0, r0
+	st $6f04, r0				; black
+	mov r0, #0xff
+	st $6f05, r0				; on the white, transparent
+	ld r0, [i]
+	shl r0, #3					; msg_g0 .. msg_g3 are 8 bytes apart
+	mov r1, #<[msg_g0]
+	add r0, r1
+	st $6f07, r0
+	lt r0, r1					; carried
+	mov r0, #>[msg_g0]
+	bzf .carry
+	b .name
+.carry:
+	add r0, #1
+.name:
+	st $6f08, r0
+	push pch
+	push pcl
+	b API_GFX2_TEXT16
+	ld r0, [i]
+	add r0, #1
+	st [i], r0
+	eq r0, #4
+	bzf .fan
+	b .bar
+
+	; a fan of lines from (320, 470) to (0, 296), (40, 296) ... (640, 296),
+	; in greys 0, 1, 2 in turn
+.fan:
+	xor r0, r0
+	st [i], r0
+	st [col], r0
+	st [xl], r0
+	st [xh], r0
+.line:
+	mov r0, #0x40				; 320
+	mov r1, #1
+	push pch
+	push pcl
+	b add_xo
+	st $6f00, r0
+	st $6f01, r1
+	mov r0, #0xd6				; 470
+	st $6f02, r0
+	mov r0, #1
+	st $6f03, r0
+	ld r0, [xl]
+	ld r1, [xh]
+	push pch
+	push pcl
+	b add_xo
+	st $6f04, r0
+	st $6f05, r1
+	mov r0, #0x28				; 296
+	st $6f06, r0
+	mov r0, #1
+	st $6f07, r0
+	ld r0, [col]
+	st $6f08, r0
+	push pch
+	push pcl
+	b API_GFX2_LINE
+	ld r0, [col]				; the next grey, 0 1 2 0 ...
+	add r0, #1
+	eq r0, #3
+	bzf .grey0
+	b .grey
+.grey0:
+	xor r0, r0
+.grey:
+	st [col], r0
+	ld r0, [xl]					; x + 40
+	add r0, #40
+	st [xl], r0
+	lt r0, #40
+	bzf .l_carry
+	b .l_next
+.l_carry:
+	ld r0, [xh]
+	add r0, #1
+	st [xh], r0
+.l_next:
+	ld r0, [i]
+	add r0, #1
+	st [i], r0
+	eq r0, #17
+	bzf .title
+	b .line
+
+	; the title, 20 characters centred at the top
+.title:
+	mov r0, #240
+	xor r1, r1
+	push pch
+	push pcl
+	b add_xo
+	st $6f00, r0
+	st $6f01, r1
+	mov r0, #16
+	st $6f02, r0
+	xor r0, r0
+	st $6f03, r0
+	st $6f04, r0				; black
+	mov r0, #0xff
+	st $6f05, r0				; transparent
+	mov r0, #<[msg_n2]
+	st $6f07, r0
+	mov r0, #>[msg_n2]
+	st $6f08, r0
+	push pch
+	push pcl
+	b API_GFX2_TEXT16
+	push pch
+	push pcl
+	b grey_refresh
+	push pch
+	push pcl
+	b API_GETKEY
+	pop pcl
+	pop pch
+
+; API_ARGS[0..3] = (xh:xl + xo, 56)
+bar_at:
+	ld r0, [xl]
+	ld r1, [xh]
+	push pch
+	push pcl
+	b add_xo
+	st $6f00, r0
+	st $6f01, r1
+	mov r0, #56
+	st $6f02, r0
+	xor r0, r0
+	st $6f03, r0
+	pop pcl
+	pop pch
+
+; r1:r0 += xo
+add_xo:
+	push r1
+	ld r1, [xo]
+	add r0, r1
+	lt r0, r1					; carried
+	pop r1
+	bzf .carry
+	pop pcl
+	pop pch
+.carry:
+	add r1, #1
 	pop pcl
 	pop pch
 

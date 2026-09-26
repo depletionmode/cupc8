@@ -33,6 +33,164 @@ api_slots:
 	pop pcl
 	pop pch
 
+; The memory entries: API_ARGS = dst (lo, hi), src (lo, hi), len16 (lo, hi),
+; len 0-65535. They work in API_ARGS: the pointers step through the bytes
+; and len counts down.
+
+; API_MEM_CMP - compare len bytes at dst with those at src (memcmp). r0 = 0
+; if all are equal, else by the first pair that differs (unsigned): 1 if
+; dst's byte is the greater, $ff if it is the less; r1 = dst's byte - src's
+; there, and API_ARGS[0..3] point at that pair, API_ARGS[4..5] = the bytes
+; after it.
+mem_d: resb 2				; what mem_step adds to both pointers
+api_mem_cmp:
+	push pch
+	push pcl
+	b mem_one
+.loop:
+	push pch
+	push pcl
+	b mem_count
+	bzf .equal
+	ldd r0, $6f02
+	ldd r1, $6f00
+	eq r1, r0
+	bzf .next
+	lt r1, r0
+	sub r1, r0
+	bzf .less
+	mov r0, #1
+	b api_ret
+.less:
+	mov r0, #0xff
+	b api_ret
+.next:
+	push pch
+	push pcl
+	b mem_step
+	b .loop
+.equal:
+	xor r0, r0
+	b api_ret
+
+; API_MEM_CPY - copy len bytes from src to dst (memmove: overlapping areas
+; copy right, backwards when dst is above src). r0 = 0
+api_mem_cpy:
+	ld r0, $6f01
+	ld r1, $6f03
+	eq r0, r1
+	bzf .same_page
+	gt r0, r1
+	bzf .back
+	b .fwd
+.same_page:
+	ld r0, $6f00
+	ld r1, $6f02
+	gt r0, r1
+	bzf .back
+.fwd:
+	push pch
+	push pcl
+	b mem_one
+.floop:
+	push pch
+	push pcl
+	b mem_count
+	bzf .done
+	ldd r0, $6f02
+	std $6f00, r0
+	push pch
+	push pcl
+	b mem_step
+	b .floop
+.back:
+	; both pointers past their last byte, then down a byte before each copy
+	ld r0, $6f04
+	st [mem_d], r0
+	ld r0, $6f05
+	st [mem_d+1], r0
+	push pch
+	push pcl
+	b mem_step
+	mov r0, #0xff
+	st [mem_d], r0
+	st [mem_d+1], r0
+.bloop:
+	push pch
+	push pcl
+	b mem_count
+	bzf .done
+	push pch
+	push pcl
+	b mem_step
+	ldd r0, $6f02
+	std $6f00, r0
+	b .bloop
+.done:
+	xor r0, r0
+	b api_ret
+
+; mem_d = 1
+mem_one:
+	mov r0, #1
+	st [mem_d], r0
+	xor r0, r0
+	st [mem_d+1], r0
+	pop pcl
+	pop pch
+
+; ZF set if len (API_ARGS[4..5]) is 0; else ZF clear and len one less
+mem_count:
+	ld r0, $6f04
+	ld r1, $6f05
+	eq r0, #0
+	bzf .borrow
+.lo:
+	sub r0, #1
+	st $6f04, r0
+	gt r0, r0				; ZF clear
+	pop pcl
+	pop pch
+.borrow:
+	eq r1, #0
+	bzf .end
+	sub r1, #1
+	st $6f05, r1
+	b .lo
+.end:
+	pop pcl
+	pop pch
+
+; dst and src (API_ARGS[0..3]) += mem_d, 16 bits each
+mem_step:
+	xor r1, r1
+	push pch
+	push pcl
+	b .add
+	mov r1, #2
+.add:
+	ld r0, $6f00+r1
+	push r1
+	ld r1, [mem_d]
+	add r0, r1
+	lt r0, r1				; the low byte carried
+	pop r1
+	st $6f00+r1, r0
+	add r1, #1
+	ld r0, $6f00+r1
+	bzf .carry
+	b .hi
+.carry:
+	add r0, #1
+.hi:
+	push r1
+	ld r1, [mem_d+1]
+	add r0, r1
+	pop r1
+	st $6f00+r1, r0
+	pop pcl
+	pop pch
+
 ; ============================================================ group 1: console
 ; The graphics card's TEXT mode, 80 x 30 (gpu-protocol.md). With no graphics
 ; card these do nothing, and the ones that answer give r0 = $ff.

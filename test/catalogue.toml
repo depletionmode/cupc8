@@ -784,6 +784,33 @@ kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testKernelBuildsConcurrent testRunsSideBySide"
 
+[[test]]
+id = "KRN-024"
+title = "Kernel API: API_MEM_CMP and API_MEM_CPY"
+checks = "tools/testdata/mem_prog.s calls the group-0 entries ($101b, $101e) with 16-bit lengths: compare equal (0), less ($ff, r1 the difference, the pointers at byte 4), greater unsigned ($f0 against $10: 1), length 0 (equal, nothing moved), 300 bytes across pages differing at byte 290 (1, 9 left); copy 300 bytes (the bytes round the target untouched), 0 bytes (nothing written), overlapping with dst above src (backwards: the source's bytes, not a repeat) and below it, onto itself (memmove)"
+method = "tools/simtest.nim testMemApi"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testMemApi"
+
+[[test]]
+id = "KRN-025"
+title = "examples/snake on the HDMI and the e-ink card"
+checks = "examples/snake (mkprg.py) on the simulator. HDMI: GFX mode, walls in colour 9, the snake moving right, S turns it down, Q gives TEXT, the goodbye and the terminal. E-ink 648 x 480: mode 2, 40 x 30 cells of 16 pixels 4 in (white outside), walls grey 1, the snake black, a greyscale refresh shows the field (grey, black and white on the glass); a step every 450-600 ms, each shown by a partial refresh; S turns it down, on the glass after the next partial refresh; Q gives TEXT and the automatic refresh back (the goodbye refreshed by itself); no panel or frame errors. E-ink 800 x 480: 50 x 30 cells to the panel's edges"
+method = "tools/simtest.nim testSnakeExample"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testSnakeExample"
+
+[[test]]
+id = "KRN-026"
+title = "examples/gfxdemo on the HDMI and the e-ink card"
+checks = "examples/gfxdemo (mkprg.py) on the simulator, a key between stages. HDMI: TEXT's colours, the palette grid pixel by pixel, the line art, then TEXT with stage 4 (mode 2) skipped as e-ink only. E-ink 648 x 480 and 800 x 480: the grid and the line art each followed by a greyscale refresh (several greys on the glass); stage 4 in mode 2, centred: four bars in greys 0-3 (the white one outlined), a fan of lines, the title, a greyscale refresh (0, 85, 170, 255 on the glass); then TEXT; no panel or frame errors"
+method = "tools/simtest.nim testGfxdemoExample"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testGfxdemoExample"
+
 # ============================================================================
 # CARD: common card protocol (every card firmware)
 # ============================================================================
@@ -1301,6 +1328,15 @@ method = "test/emu/test_e2e.mjs E2E-016 (CUPC8_EMU=native): m.panel()"
 kind = "sim"
 vrow = "3.2"
 cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-016"
+
+[[test]]
+id = "E2E-017"
+title = "examples/snake on the e-ink card, steered on the glass"
+checks = "on the native emulator (the real eink.elf with the UC8179 panel model, the system card): cupc8.py run of examples/snake; a greyscale refresh shows the field (the wall grey 85, the snake black, the ground and the margin white); the snake moves right on the glass by partial refreshes; S typed on the keyboard mid-game turns it down, and the glass shows it; Q brings TEXT and the goodbye on the panel; the panel model saw nothing the chip would ignore"
+method = "test/emu/test_e2e.mjs E2E-017 (CUPC8_EMU=native): Machine.type, m.panel()"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-017"
 
 [[test]]
 id = "E2E-004"
