@@ -1084,7 +1084,7 @@ def prepare(board):
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     fp = board.FindFootprintByReference("U2")
-    pad =[p for p in fp.Pads() if p.GetNumber() == "8"][0]
+    pad = [p for p in fp.Pads() if p.GetNumber() == "8"][0]
     px, py = to(pad.GetPosition().x), to(pad.GetPosition().y)
     cx, cy = to(fp.GetPosition().x), to(fp.GetPosition().y)
     # out along the pad's own axis (the side it sits on), 1.2 mm past it
@@ -1108,6 +1108,58 @@ def prepare(board):
     v.SetLocked(True)
     board.Add(v)
     _plane_pads(board)
+    return _efuse_escapes(board, fp)
+
+
+def _efuse_escapes(board, fp):
+    """The eFuse's IN and OUT bars (pads 5 and 6, 0.19 mm apart) and IN
+    pin 1 get locked tracks out past the package, IN's on pin 1's side,
+    OUT's the other way. Freerouting holds its own pins to 0.2 mm whatever
+    their class, so it counts these pins violations and never starts a route
+    from them (every run left VBUS_F and 5V_SYS one connection short); it
+    joins the tracks' ends instead. Returns the nets, which the pipeline
+    then checks with KiCad's connectivity."""
+    import math
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    pads = {p.GetNumber(): p for p in fp.Pads()}
+
+    def xy(p):
+        return to(p.GetPosition().x), to(p.GetPosition().y)
+
+    def track(a, b, width, net):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
+        t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
+        t.SetWidth(mm(width))
+        t.SetLayer(pcbnew.F_Cu)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
+
+    def out(bar, toward):
+        """The point 0.8 mm past `bar`'s end on `toward`'s side, and the unit step."""
+        bb = bar.GetBoundingBox()
+        bx, by = xy(bar)
+        tx, ty = xy(toward)
+        if to(bb.GetWidth()) > to(bb.GetHeight()):
+            u = (math.copysign(1, tx - bx), 0.0)
+            half = to(bb.GetWidth()) / 2
+        else:
+            u = (0.0, math.copysign(1, ty - by))
+            half = to(bb.GetHeight()) / 2
+        return (bx + u[0] * (half + 0.8), by + u[1] * (half + 0.8)), u
+    e5, u = out(pads["5"], pads["1"])
+    track(xy(pads["5"]), e5, 0.3, pads["5"].GetNet())
+    p1 = xy(pads["1"])
+    # pin 1 straight out to the bar's escape line, then across to its end
+    k = (e5[0] - p1[0]) * u[0] + (e5[1] - p1[1]) * u[1]
+    c1 = (p1[0] + u[0] * k, p1[1] + u[1] * k)
+    track(p1, c1, 0.25, pads["1"].GetNet())
+    track(c1, e5, 0.25, pads["1"].GetNet())
+    e6, _ = out(pads["6"], pads["7"])
+    track(xy(pads["6"]), e6, 0.3, pads["6"].GetNet())
+    return [pads["5"].GetNetname(), pads["6"].GetNetname()]
 
 
 PLANE_NETS = ("/GND", "/+3V3")

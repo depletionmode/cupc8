@@ -1652,12 +1652,32 @@ def freerouting_left(log, pours=()):
     return left
 
 
+def freerouting_violations(log):
+    """The clearance violations Freerouting's run ended with, from its log."""
+    final = re.findall(r"Auto-routing stage completed:.*?final score: [\d.]+ \(\d+ unrouted and (\d+) violation", log)
+    return int(final[-1]) if final else None
+
+
+def fixed_violations(dsn, env):
+    """The violations a DSN starts with, before any routing (the fixed
+    items: pads, pre-routed tracks and vias), from Freerouting's own DRC."""
+    import json
+    report = dsn + ".drc.json"
+    subprocess.run(["freerouting", "-de", dsn, "-drc", report, "--gui.enabled=false"], capture_output=True, env=env)
+    try:
+        return sum(1 for v in json.load(open(report))["violations"] if "learance" in v["type"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
     """`parallel` Freerouting runs at once, each on its own ordering (salt) of
     the problem and its own copy of the DSN, for each of `tries` pass
-    budgets. The run kept is the lowest-salted one that routes completely:
-    once run k completes, the runs after it are stopped and the ones before
-    it waited for, so the result depends on the salts, never on timing.
+    budgets. The run kept is the lowest-salted one that routes completely
+    and adds no violation to those the fixed items start with (one that does
+    has copper too close, which KiCad's DRC then throws out with the whole
+    round): once run k qualifies, the runs after it are stopped and the ones
+    before it waited for, so the result depends on the salts, never on timing.
     Returns (session file, its salt), or raises with what was left."""
     import pcbnew
     import time
@@ -1666,6 +1686,7 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
     left_all = {}
     for attempt in range(tries):
         jobs = []
+        fixed = None
         for k in range(parallel):
             sk = salt + attempt * parallel + k
             stable_uuids(board, sk)
@@ -1680,6 +1701,8 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
                 f.write(text)
             if os.path.exists(ses):
                 os.remove(ses)
+            if fixed is None:                    # the same fixed items in every ordering
+                fixed = fixed_violations(dsn, env)
             logf = open(log, "w")
             proc = subprocess.Popen(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)),
                                      "-mt", "1", "--gui.enabled=false"], stdout=logf, stderr=subprocess.STDOUT,
@@ -1691,7 +1714,11 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
                 sk, proc, ses, log, logf, done = job
                 if done is None and proc.poll() is not None:
                     logf.close()
-                    left = freerouting_left(open(log).read(), pours)
+                    text = open(log).read()
+                    left = freerouting_left(text, pours)
+                    extra = (freerouting_violations(text) or 0) - fixed if fixed is not None else 0
+                    if not left and extra > 0:
+                        left = ["%d violations more than the fixed items' %d" % (extra, fixed)]
                     job[5] = "ok" if (proc.returncode == 0 and not left and os.path.exists(ses)) else "left"
                     left_all[sk] = left or ["exit %d" % proc.returncode]
             # the first job, in salt order, that is not a failure decides
