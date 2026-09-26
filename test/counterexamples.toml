@@ -782,7 +782,7 @@ must_fail = ["FAIL designators run together"]
 
 [[bug]]
 name = "kernel API: API_GFX_TEXT8 sent its frame (up to 262 bytes) without asking FREE - the card dropped it when its FIFO was full (an e-ink REFRESH holds it)"
-fixed_in = "the commit adding KRN-021"
+fixed_in = "0f99965"
 revert = [["kernel/sys.s", """	st $6f05, r0
 	shr r0, #6				; the frame, 7 + length bytes, in 64s (rounded up, and 1 over)
 	add r0, #2
@@ -796,7 +796,7 @@ must_fail = ["FAIL: TEXT8 waits while the FIFO has no room for it", "FAIL: the t
 
 [[bug]]
 name = "kernel: gpu_wait_free asked FREE with NOP frames, which queue - while the card's execution was held they filled its FIFO and were dropped"
-fixed_in = "the commit adding KRN-021"
+fixed_in = "0f99965"
 revert = [["kernel/gpu.s", """	mov r0, #0xff
 	push pch
 	push pcl
