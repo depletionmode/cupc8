@@ -129,6 +129,10 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emu
   canvas:focus { border-color: #6a6; }
   #status { margin-top: 8px; white-space: pre; }
   #help { margin-top: 4px; color: #777; }
+  #leds { margin-top: 10px; display: flex; gap: 14px; align-items: flex-end; }
+  .led { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: #888; }
+  .led i { width: 16px; height: 16px; border-radius: 50%; background: #2a1a0a; border: 1px solid #444; }
+  .led i.on { background: #ffb020; border-color: #ffd070; box-shadow: 0 0 10px #ffb020; }
   #con { display: none; width: 960px; max-width: 100%; margin-top: 12px; }
   #con pre { height: 240px; overflow-y: auto; margin: 0; padding: 6px; background: #000; color: #9c9;
              border: 1px solid #333; white-space: pre-wrap; }
@@ -136,6 +140,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emu
                   border: 1px solid #333; font: inherit; }
 </style></head><body>
 <canvas id="c" width="640" height="480" tabindex="0"></canvas>
+<div id="leds" title="the main board's GPO LEDs D1-D8 ($f000), bit 7 on the left"></div>
 <div id="status">connecting...</div>
 <div id="help">click the screen, then type: keys go to the IO card's USB keyboard</div>
 <div id="con"><div>the USB console (the system card's second serial port)</div><pre id="cout"></pre>
@@ -144,11 +149,15 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>CUPC/8 emu
 const c = document.getElementById('c'), g = c.getContext('2d');
 let img = g.createImageData(640, 480);
 const status = document.getElementById('status');
+// the GPO LEDs D8..D1 ($f000 bits 7..0), as on the main board
+const leds = document.getElementById('leds');
+for (let b = 7; b >= 0; b--) leds.insertAdjacentHTML('beforeend', '<span class="led"><i id="led' + b + '"></i>D' + (b + 1) + '</span>');
 c.focus();
 async function tick() {
   try {
     const s = await (await fetch('/state')).json();
     status.textContent = s.line;
+    for (let b = 0; b < 8; b++) document.getElementById('led' + b).className = (s.gpo >> b) & 1 ? 'on' : '';
     if (s.frames !== window.seen) {
       window.seen = s.frames;
       if (c.width !== s.w || c.height !== s.h) {
@@ -216,7 +225,7 @@ http.createServer((req, res) => {
       `   POST $${s.gpo.toString(16).padStart(2, '0')}   PC $${s.pc.toString(16).padStart(4, '0')}` +
       `${s.halted ? '   HALTED' : ''}   frames ${frames}   ${note}`;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ line, frames, w: fw, h: fh, eink }));
+    res.end(JSON.stringify({ line, frames, w: fw, h: fh, eink, gpo: s.gpo }));
   } else if (url.pathname === '/frame') {
     res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
     res.end(frame ?? Buffer.alloc(0));
