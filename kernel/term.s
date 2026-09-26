@@ -18,7 +18,7 @@ term_do:
 	st $c000, r0
 	st API_RUN, r0			; no program from the PC yet
 
-	term_s_info db "\n      CUPC/8 BASIC 2015.10      \n"
+	term_s_info db "\n      CUPC/8 BASIC 2026.09      \n"
 	mov r0, #>[term_s_info]
 	mov r1, #<[term_s_info]
 	push pch
