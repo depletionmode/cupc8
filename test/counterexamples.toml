@@ -811,7 +811,7 @@ must_fail = ["FAIL: ... and nothing was dropped"]
 
 [[bug]]
 name = "tests built the kernel in kernel/ itself - two builds at once (SIM-010 beside simtest) mixed their merged.ss, kernel.o and kernel.map"
-fixed_in = "the commit adding KRN-022"
+fixed_in = "e96aab2"
 revert = [["tools/simmachine.nim", """  let d = if dir.len > 0: dir else: romDir()
   run("bash " & quoteShell(simRoot / "kernel" / "assemble.sh") & " " & quoteShell(d), "kernel build")
   d / "kernel.o\"""", """  run("cd " & quoteShell(simRoot / "kernel") & " && bash assemble.sh", "kernel build")
