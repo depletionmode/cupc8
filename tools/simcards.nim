@@ -50,6 +50,8 @@ proc simcard_gpu_pixel*(c: SimCard, x, y: cint): cint {.importc, cdecl.}
 proc simcard_gpu_mode*(c: SimCard): cint {.importc, cdecl.}
 proc simcard_eink_refreshes*(c: SimCard, waveform: cint): cint {.importc, cdecl.}
 proc simcard_eink_errors*(c: SimCard): cint {.importc, cdecl.}
+proc simcard_eink_pixel2*(c: SimCard, x, y: cint): cint {.importc, cdecl.}
+proc simcard_gpu_errors*(c: SimCard): cint {.importc, cdecl.}
 proc simcard_type_ascii*(c: SimCard, ch: uint8, nowMs: uint32) {.importc, cdecl.}
 proc simcard_hid*(c: SimCard, report: ptr uint8, nowMs: uint32) {.importc, cdecl.}
 

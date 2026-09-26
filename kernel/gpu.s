@@ -222,6 +222,31 @@ gpu_query_from:
 	pop pcl
 	pop pch
 
+; wait until the console's FIFO has room for a frame of r0 x 64 bytes
+; (gpu-protocol.md: FREE, the status byte, in 64s): NOP frames until it says
+; so. A frame over 64 bytes checks first; the card drops one that does not fit.
+gpu_wait_free:
+	st [gpu_n], r0
+.poll:
+	push pch
+	push pcl
+	b gpu_cs_on
+	xor r0, r0				; NOP
+	push pch
+	push pcl
+	b gpu_send
+	and r0, #0x7f
+	push r0
+	push pch
+	push pcl
+	b gpu_cs_off
+	pop r0
+	ld r1, [gpu_n]
+	lt r0, r1
+	bzf .poll
+	pop pcl
+	pop pch
+
 ; exchange r0 with the console; result in r0
 gpu_send:
 	st [gpu_tmp], r0

@@ -128,10 +128,26 @@ api_query:
 ; protocol's, in API_ARGS: an x16 is two bytes, low first; y8 and colours one
 ; byte. Drawing is clipped to the screen.
 
-; API_GFX_MODE - r0 = 0 TEXT, 1 GFX; clears that mode's picture
+; API_GFX_MODE - r0 = 0 TEXT, 1 GFX, 2 the e-ink card's native mode
+; (eink-card.md: the panel's own resolution in 4 greys, the API_GFX2 entries
+; draw in it); clears that mode's picture. r0 = 0, or $ff for mode 2 on HDMI
+; (INFO says it is not e-paper: nothing is sent, the mode stays)
 api_gfx_mode:
+	eq r0, #2
+	bzf .native
+.send:
 	mov r1, #0x01
+	push pch
+	push pcl
 	b api_gpu1
+	xor r0, r0
+	b api_ret
+.native:
+	ld r1, [gpu_kind]
+	eq r1, #EINK_KIND
+	bzf .send
+	mov r0, #0xff
+	b api_ret
 
 ; API_GFX_PIXEL - API_ARGS = x16, y8, colour
 api_gfx_pixel:
@@ -231,6 +247,325 @@ api_gfx_getpixel:
 api_gfx_vsync:
 	mov r0, #0x07
 	b api_query0
+
+; ------------------------------------------------------------ mode 2
+; The e-ink card's native mode (API_GFX_MODE 2; eink-card.md, $40-$49): the
+; panel's own resolution, 648 x 480 or 800 x 480, 2 bits a pixel: grey 0
+; black, 1 dark grey, 2 light grey, 3 white. The arguments are the card's, in
+; API_ARGS: x16, y16, w16, h16 are two bytes, low first (positions signed);
+; g is a grey 0-3 (any other: the card draws nothing). Drawing is clipped to
+; the panel. They return r0 = 0, or $ff on HDMI (INFO says it is not
+; e-paper), which is sent nothing. In modes 0 and 1 the card ignores them.
+
+; API_GFX2_PIXEL - API_ARGS = x16, y16, g
+api_gfx2_pixel:
+	mov r0, #0x40
+	mov r1, #5
+	b api_eink_cmd
+
+; API_GFX2_FILL_RECT - API_ARGS = x16, y16, w16, h16, g
+api_gfx2_fill_rect:
+	mov r0, #0x41
+	b api_eink9
+
+; API_GFX2_RECT - a 1-pixel outline; API_ARGS as API_GFX2_FILL_RECT
+api_gfx2_rect:
+	mov r0, #0x42
+	b api_eink9
+
+; API_GFX2_LINE - both ends drawn; API_ARGS = x0_16, y0_16, x1_16, y1_16, g
+api_gfx2_line:
+	mov r0, #0x43
+api_eink9:
+	mov r1, #9
+; command r0 with the r1 bytes at API_ARGS, on e-paper only
+api_eink_cmd:
+	push r0
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	pop r0
+	bzf .eink
+	mov r0, #0xff
+	b api_ret
+.eink:
+	push pch
+	push pcl
+	b gpu_cmd
+	xor r0, r0
+	b api_ret
+
+; API_GFX2_VSCROLL - scroll the picture up API_ARGS[0..1] rows (a signed
+; 16-bit dy: down if negative), the rows uncovered in grey API_ARGS[2]
+api_gfx2_vscroll:
+	mov r0, #0x48
+	mov r1, #3
+	b api_eink_cmd
+
+; API_GFX2_GETPIXEL - API_ARGS = x16, y16; r0 = 0 and r1 = the pixel's grey
+; (0 off the panel or outside mode 2), or r0 = $ff
+api_gfx2_getpixel:
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	bzf .eink
+	mov r0, #0xff
+	b api_ret
+.eink:
+	mov r0, #0x49
+	mov r1, #4
+	b api_query
+
+; API_GFX2_TEXT16 - the 8 x 16 TEXT font anywhere: API_ARGS = x16, y16, fg,
+; bg (a grey, or $ff transparent); API_ARGS[7..8] = a pointer to the
+; NUL-terminated text (at most 255 characters). The kernel puts the length
+; in API_ARGS[6].
+api_gfx2_text16:
+	mov r0, #0x46
+	b api_eink_text
+
+; API_GFX2_TEXT8 - the 8 x 8 font; API_ARGS as API_GFX2_TEXT16
+api_gfx2_text8:
+	mov r0, #0x47
+api_eink_text:
+	push r0
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	bzf .eink
+	pop r0
+	mov r0, #0xff
+	b api_ret
+.eink:
+	ld r1, $6f07
+	ld r0, $6f08
+	push pch
+	push pcl
+	b str_len
+	st $6f06, r0
+	shr r0, #6				; the frame, 8 + length bytes, in 64s (rounded up, and 1 over)
+	add r0, #2
+	push pch
+	push pcl
+	b gpu_wait_free
+	mov r0, #0x6f
+	st [gpu_src+1], r0
+	xor r0, r0
+	st [gpu_src], r0
+	pop r0
+	mov r1, #7
+	push pch
+	push pcl
+	b gpu_cmd_open
+	xor r1, r1
+.loop:
+	ld r0, $6f06
+	eq r1, r0
+	bzf .end
+	push r1
+	ldd r0, $6f07+r1
+	push pch
+	push pcl
+	b gpu_send
+	pop r1
+	add r1, #1
+	b .loop
+.end:
+	push pch
+	push pcl
+	b gpu_cs_off
+	xor r0, r0
+	b api_ret
+
+blit_n: resb 2				; picture bytes still to send
+blit_op: resb 1
+blit_hdr: resb 1			; the arguments before the pointer
+
+; API_GFX2_BLIT1 - a 1-bit picture: API_ARGS = x16, y16, w16, h16, fg, bg
+; (a grey, or $ff transparent); API_ARGS[10..11] = a pointer to its
+; ceil(w/8) x h bytes, rows top first, the most significant bit the
+; leftmost pixel. w is at most 1020, and the frame (11 bytes and the
+; picture) at most 8128 bytes: otherwise nothing is sent and r0 = $fe (send
+; a big picture in several).
+api_gfx2_blit1:
+	mov r0, #0x44
+	mov r1, #10
+	st [blit_op], r0
+	st [blit_hdr], r1
+	mov r1, #7				; ceil(w / 8)
+	mov r0, #3
+	b api_eink_blit
+
+; API_GFX2_BLIT2 - a 2-bit picture: API_ARGS = x16, y16, w16, h16;
+; API_ARGS[8..9] = a pointer to its ceil(w/4) x h bytes, rows top first,
+; the leftmost pixel in bits 7-6. Limits as API_GFX2_BLIT1 (the frame is 9
+; bytes and the picture).
+api_gfx2_blit2:
+	mov r0, #0x45
+	mov r1, #8
+	st [blit_op], r0
+	st [blit_hdr], r1
+	mov r1, #3				; ceil(w / 4)
+	mov r0, #2
+; the picture's bytes a row: (w + r1) >> r0
+api_eink_blit:
+	push r0
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	bzf .eink
+	pop r0
+	mov r0, #0xff
+	b api_ret
+.eink:
+	ld r0, $6f05			; w at most 1020 ($3fc), so a row is at most 255 bytes
+	gt r0, #3
+	bzf .big_pop
+	eq r0, #3
+	bzf .w3
+	b .w_ok
+.w3:
+	ld r0, $6f04
+	gt r0, #0xfc
+	bzf .big_pop
+.w_ok:
+	ld r0, $6f04
+	add r0, r1
+	st [n_a], r0
+	lt r0, r1
+	ld r0, $6f05
+	bzf .carry
+	b .row
+.carry:
+	add r0, #1
+.row:
+	st [n_a+1], r0
+	mov r1, #8
+	pop r0					; the shift
+	sub r1, r0
+	push r0
+	ld r0, [n_a+1]
+	shl r0, r1				; the high byte's part
+	pop r1
+	st [n_a+1], r0
+	ld r0, [n_a]
+	shr r0, r1
+	ld r1, [n_a+1]
+	or r0, r1
+	st [blit_n], r0			; the row's bytes, 0-255
+	; h at most 8117 / row, so the picture fits one frame
+	st [n_b], r0
+	xor r0, r0
+	st [n_b+1], r0
+	mov r0, #0xb5			; 8117
+	st [n_a], r0
+	mov r0, #0x1f
+	st [n_a+1], r0
+	push pch
+	push pcl
+	b n16_udiv				; a row of 0 bytes - $ffff
+	ld r0, $6f07
+	ld r1, [n_a+1]
+	gt r0, r1
+	bzf .big
+	eq r0, r1
+	bzf .h_hi
+	b .fits
+.h_hi:
+	ld r0, $6f06
+	ld r1, [n_a]
+	gt r0, r1
+	bzf .big
+.fits:
+	ld r0, [blit_n]
+	st [n_a], r0
+	xor r0, r0
+	st [n_a+1], r0
+	ld r0, $6f06
+	st [n_b], r0
+	ld r0, $6f07
+	st [n_b+1], r0
+	push pch
+	push pcl
+	b n16_mul
+	ld r0, [n_a]
+	st [blit_n], r0
+	ld r0, [n_a+1]
+	st [blit_n+1], r0
+	; room for the frame (1 + header + picture bytes) in the card's FIFO
+	ld r0, [blit_n]
+	ld r1, [blit_hdr]
+	add r1, #64				; + 63, rounded up
+	add r0, r1
+	st [n_a], r0
+	lt r0, r1
+	ld r0, [blit_n+1]
+	bzf .c2
+	b .units
+.c2:
+	add r0, #1
+.units:
+	shl r0, #2				; (bytes + 64) >> 6
+	ld r1, [n_a]
+	shr r1, #6
+	or r0, r1
+	push pch
+	push pcl
+	b gpu_wait_free
+	mov r0, #0x6f
+	st [gpu_src+1], r0
+	xor r0, r0
+	st [gpu_src], r0
+	ld r0, [blit_op]
+	ld r1, [blit_hdr]
+	push pch
+	push pcl
+	b gpu_cmd_open
+	ld r1, [blit_hdr]		; the picture, from the pointer after the arguments
+	ld r0, API_ARGS+r1
+	st [gpu_src], r0
+	add r1, #1
+	ld r0, API_ARGS+r1
+	st [gpu_src+1], r0
+.byte:
+	ld r0, [blit_n]
+	ld r1, [blit_n+1]
+	or r0, r1
+	eq r0, #0
+	bzf .sent
+	ldd r0, [gpu_src]
+	push pch
+	push pcl
+	b gpu_send
+	ld r0, [gpu_src]
+	add r0, #1
+	st [gpu_src], r0
+	eq r0, #0
+	bzf .src_hi
+	b .count
+.src_hi:
+	ld r0, [gpu_src+1]
+	add r0, #1
+	st [gpu_src+1], r0
+.count:
+	ld r0, [blit_n]
+	eq r0, #0
+	sub r0, #1
+	st [blit_n], r0
+	bzf .n_hi
+	b .byte
+.n_hi:
+	ld r0, [blit_n+1]
+	sub r0, #1
+	st [blit_n+1], r0
+	b .byte
+.sent:
+	push pch
+	push pcl
+	b gpu_cs_off
+	xor r0, r0
+	b api_ret
+.big_pop:
+	pop r0
+.big:
+	mov r0, #0xfe
+	b api_ret
 
 ; ============================================================ group 3: e-ink
 ; The e-paper graphics card (eink-card.md; kernel/eink.s). On HDMI these do

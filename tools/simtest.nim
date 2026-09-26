@@ -2856,6 +2856,77 @@ proc testEinkApi() =
 
 run testEinkApi
 
+proc testGfx2Api() =
+  ## KRN-019: the kernel API's mode 2 (API_GFX_MODE 2, the API_GFX2 entries)
+  ## on the simulator's e-ink card: tools/testdata/gfx2_prog.s draws with
+  ## every entry; their return codes; the card's mode-2 picture pixel by
+  ## pixel (pixel, rectangles, a line, a 1-bit and a 2-bit BLIT, TEXT16 and
+  ## TEXT8, VSCROLL down); GETPIXEL; a BLIT too wide or too big refused
+  ## ($fe), the widest taken; no bad frame on the card. On HDMI every entry
+  ## gives $ff and nothing reaches the card: it stays in TEXT with no error.
+  echo "== kernel API: mode 2 =="
+  let rom = buildKernelRom()
+  let prg = testdata / "gfx2_prog.prg"
+  mkprg(testdata / "gfx2_prog.s", prg)
+  for (card, name) in [(CardEink, "e-ink"), (CardGpu, "HDMI")]:
+    machineCards([card, CardIo])
+    cpuReset()
+    cpuLoadRom(rom)
+    cpuBootRom()
+    settle(6_000_000)
+    for a in 0x7e00 .. 0x7e11: mem[a] = 0x55
+    expectTrue(name & ": the program goes in", runProgram(readFile(prg)))
+    expectTrue(name & ": it ran", runUntil(proc (): bool = mem[0x7e11] != 0x55 and mem[ApiRun] == 0, 40_000_000))
+    let g = gpuCard()
+    var r: seq[int]
+    for a in [0x7e00, 0x7e01, 0x7e02, 0x7e03, 0x7e04, 0x7e05, 0x7e06, 0x7e07, 0x7e08, 0x7e09, 0x7e0c, 0x7e0d,
+              0x7e0e, 0x7e0f]: r.add(mem[a])
+    if card == CardGpu:
+      expectTrue("HDMI: every entry $ff " & $r, r == newSeqWith(14, 0xff))
+      expect("HDMI: still TEXT", int(simcard_gpu_mode(g)), 0)
+      expect("HDMI: nothing bad reached the card", int(simcard_gpu_errors(g)), 0)
+      continue
+    expectTrue("e-ink: MODE 2 .. VSCROLL 0, the big BLITs $fe " & $r,
+               r == @[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xfe, 0xfe, 0, 0])
+    expect("e-ink: mode 2", int(simcard_gpu_mode(g)), 2)
+    expect("GETPIXEL (10, 20) before the scroll", mem[0x7e0a], 0)
+    expect("GETPIXEL (105, 55) before the scroll: the fill", mem[0x7e0b], 1)
+    expect("GETPIXEL (10, 28) after VSCROLL -8: the pixel moved down", mem[0x7e10], 0)
+    expect("GETPIXEL (0, 0) after VSCROLL -8: the new rows in grey 1", mem[0x7e11], 1)
+    proc g2(x, y: int): int = int(simcard_eink_pixel2(g, cint(x), cint(y)))
+    let d = 8                                   # everything moved down 8 rows
+    expectTrue("VSCROLL: rows 0-7 grey 1, row 8 white", g2(300, 0) == 1 and g2(300, 7) == 1 and g2(300, 8) == 3)
+    expectTrue("PIXEL", g2(10, 20 + d) == 0 and g2(10, 20) == 3)
+    expectTrue("FILL_RECT", g2(100, 50 + d) == 1 and g2(119, 59 + d) == 1 and g2(120, 59 + d) == 3 and g2(119, 60 + d) == 3)
+    expectTrue("RECT", g2(200, 50 + d) == 0 and g2(229, 69 + d) == 0 and g2(215, 60 + d) == 3)
+    expectTrue("LINE to x 640", g2(0, 400 + d) == 2 and g2(640, 400 + d) == 2 and g2(641, 400 + d) == 3)
+    var b1: seq[int]
+    for y in 0..1:
+      for x in 0..15: b1.add(g2(300 + x, 100 + d + y))
+    expectTrue("BLIT1 $f0 $0f / $aa $55, fg 0 bg 3 " & $b1,
+               b1 == @[0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0,
+                       0, 3, 0, 3, 0, 3, 0, 3, 3, 0, 3, 0, 3, 0, 3, 0])
+    var b2: seq[int]
+    for x in 0..7: b2.add(g2(300 + x, 110 + d))
+    expectTrue("BLIT2 $1b $e4 " & $b2, b2 == @[0, 1, 2, 3, 3, 2, 1, 0])
+    var ink16, other16, ink8, bg8 = 0
+    for y in 0..15:
+      for x in 0..15:
+        let v = g2(400 + x, 200 + d + y)
+        if v == 0: inc ink16
+        elif v != 3: inc other16
+    for y in 0..7:
+      for x in 0..7:
+        let v = g2(400 + x, 250 + d + y)
+        if v == 0: inc ink8
+        elif v == 2: inc bg8
+    expectTrue("TEXT16 \"Hi\": ink, a transparent background (" & $ink16 & ")", ink16 > 20 and other16 == 0)
+    expectTrue("TEXT8 \"A\" on grey 2 (" & $ink8 & ", " & $bg8 & ")", ink8 > 5 and ink8 + bg8 == 64)
+    expect("the card saw no bad frame", int(simcard_gpu_errors(g)), 0)
+  ioModel = imLegacy
+
+run testGfx2Api
+
 proc testHello() =
   ## KRN-015: examples/hello (tools/mkprg.py: kernel/api.inc, then the
   ## program, for $7000) on the HDMI machine: its banner and API version,

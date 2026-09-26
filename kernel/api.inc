@@ -55,6 +55,17 @@
 %define API_GFX_VSCROLL $10db
 %define API_GFX_GETPIXEL $10de
 %define API_GFX_VSYNC $10e1
+; the e-ink card's native mode 2 (API_GFX_MODE 2): x16, y16 coordinates
+%define API_GFX2_PIXEL $10e4
+%define API_GFX2_FILL_RECT $10e7
+%define API_GFX2_RECT $10ea
+%define API_GFX2_LINE $10ed
+%define API_GFX2_BLIT1 $10f0
+%define API_GFX2_BLIT2 $10f3
+%define API_GFX2_TEXT16 $10f6
+%define API_GFX2_TEXT8 $10f9
+%define API_GFX2_VSCROLL $10fc
+%define API_GFX2_GETPIXEL $10ff
 
 ; group 3: e-ink ($1123)
 %define API_EINK_AUTO $1123

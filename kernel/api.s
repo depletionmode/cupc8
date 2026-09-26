@@ -101,16 +101,16 @@
 	b api_gfx_vscroll
 	b api_gfx_getpixel
 	b api_gfx_vsync
-	b api_none
-	b api_none
-	b api_none
-	b api_none
-	b api_none
-	b api_none
-	b api_none
-	b api_none
-	b api_none
-	b api_none
+	b api_gfx2_pixel
+	b api_gfx2_fill_rect
+	b api_gfx2_rect
+	b api_gfx2_line
+	b api_gfx2_blit1
+	b api_gfx2_blit2
+	b api_gfx2_text16
+	b api_gfx2_text8
+	b api_gfx2_vscroll
+	b api_gfx2_getpixel
 	b api_none
 	b api_none
 	b api_none

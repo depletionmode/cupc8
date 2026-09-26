@@ -38,6 +38,8 @@ int simcard_gpu_mode(simcard_t *c);
  * 3 partial) and the UC8179 model's error count; -1 on other cards */
 int simcard_eink_refreshes(simcard_t *c, int waveform);
 int simcard_eink_errors(simcard_t *c);
+int simcard_eink_pixel2(simcard_t *c, int x, int y);  /* mode 2's grey 0-3, -1 off the panel or not e-ink */
+int simcard_gpu_errors(simcard_t *c);       /* the graphics card's command errors (bad frames, bad greys) */
 
 /* IO: type an ASCII character (press + release of the matching US key) */
 void simcard_type_ascii(simcard_t *c, uint8_t ch, uint32_t now_ms);

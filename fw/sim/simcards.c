@@ -243,6 +243,17 @@ int simcard_eink_refreshes(simcard_t *c, int waveform)
 
 int simcard_eink_errors(simcard_t *c) { return c->eink ? (int)c->panel->errors : -1; }
 
+int simcard_eink_pixel2(simcard_t *c, int x, int y)
+{
+	/* mode 2's picture (eink-card.md): 2 bits a pixel, the leftmost in bits 7-6 */
+	if (!c->eink || x < 0 || y < 0 || x >= c->eink->panel->w || y >= c->eink->panel->h)
+		return -1;
+	uint8_t b = c->eink->gpu.gfx_bytes[y * (c->eink->panel->w / 4) + x / 4];
+	return (b >> (6 - 2 * (x & 3))) & 3;
+}
+
+int simcard_gpu_errors(simcard_t *c) { return c->gpu ? (int)c->gpu->errors : -1; }
+
 void simcard_hid(simcard_t *c, const uint8_t report[8], uint32_t now_ms)
 {
 	if (c->io)
