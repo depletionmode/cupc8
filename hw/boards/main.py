@@ -156,7 +156,7 @@ def has_series(sig):
 # iCE40HX4K-TQ144 pins that are not user I/O (KiCad's FPGA_Lattice symbol)
 CHIPSET_FIXED = {
     65: "CHIPSET_CDONE", 66: "CHIPSET_nCRESET", 67: "FL0_MOSI", 68: "FL0_MISO", 70: "FL0_SCK",
-    71: "FL0_nCS", 72: "+3V3", 108: "+3V3", 109: None, 54: "VCCPLL", 126: "VCCPLL",
+    71: "FL0_nCS", 72: "+3V3", 108: "+3V3", 109: None, 54: "VCCPLL0", 126: "VCCPLL1",
     53: "GND", 127: "GND",
 }
 
@@ -274,7 +274,7 @@ def build_parts():
     C("C12", "100n", "+3V3")
     for net in ("VBUS_F", "5V_SYS", "+5V", "3V3_BUCK", "+3V3", "1V2_LDO", "+1V2", "CC1", "CC2", "PWR_HI"):
         TP(net)
-    for net in ("GND", "+3V3", "+1V2", "VCCPLL"):
+    for net in ("GND", "+3V3", "+1V2", "VCCPLL0", "VCCPLL1"):
         flag(net)
 
     # ---- reset supervisor and clock
@@ -330,10 +330,13 @@ def build_parts():
     for i, net in enumerate(["+1V2"] * 4 + ["+3V3"] * 10):
         C("C%d" % (20 + i), "100n", net)
     C("C35", "22u", "+3V3")
-    R("R50", "100", "+1V2", "VCCPLL")
-    C("C36", "10u", "VCCPLL")
-    C("C37", "100n", "VCCPLL")
-    C("C38", "100n", "VCCPLL")
+    # each PLL supply pin its own 100 ohm / 10 uF + 100 nF filter, beside it
+    R("R50", "100", "+1V2", "VCCPLL0")
+    C("C36", "10u", "VCCPLL0")
+    C("C37", "100n", "VCCPLL0")
+    R("R49", "100", "+1V2", "VCCPLL1")
+    C("C34", "10u", "VCCPLL1")
+    C("C38", "100n", "VCCPLL1")
     # configuration: CRESET, CDONE and the flash chip select pulled up, so the
     # chipset boots from its flash with no system card (system-slot.md)
     for i, net in enumerate(("CHIPSET_nCRESET", "CHIPSET_CDONE", "FL0_nCS", "BR_nCS")):
@@ -757,6 +760,8 @@ def wanted(parts):
     at["C38"] = (x, y, 0)
     at["R50"] = (fx - 1.0, fy + 17.0, 0)
     at["C36"] = (fx - 1.0, fy + 20.0, 0)
+    at["R49"] = (fx + 1.0, fy - 17.0, 0)
+    at["C34"] = (fx + 1.0, fy - 20.0, 0)
     at["C35"] = (fx + 16.5, fy - 8.0, 90)
     # series resistors next to their chipset pin, one step further out
     for spec in parts:
@@ -1051,7 +1056,7 @@ ROUTE_PASSES, ROUTE_TRIES = 30, 3
 
 
 def fine_nets():
-    power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL"}
+    power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL0", "VCCPLL1"}
     return sorted({"/" + n for s in build_parts() if s.ref in FINE_PARTS for n in s.conns.values()
                    if n and n not in power} | {"unconnected-(U2-*"})
 
