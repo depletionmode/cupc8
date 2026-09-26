@@ -243,7 +243,7 @@ term_parse:
 	push pcl
 	b str_cmp
 	gt r0, #0
-	bzf .save
+	bzf .list
 	mov r0, #<[term_line_buf]
 	st [net_line], r0
 	mov r0, #>[term_line_buf]
@@ -251,6 +251,20 @@ term_parse:
 	push pch
 	push pcl
 	b net_cmd
+	b .done
+
+.list:
+	term_s_list db "list"
+	mov r0, #>[term_s_list]
+	mov r1, #<[term_s_list]
+	push pch
+	push pcl
+	b str_cmp
+	gt r0, #0
+	bzf .save
+	push pch
+	push pcl
+	b term_cmd_list
 	b .done
 
 .save:
@@ -371,6 +385,55 @@ term_cmd_clr:
 	pop pcl
 	pop pch
 
+; list- print the program as it is kept, each line's CR as a new line
+term_list_i: resb 2
+term_list_p: resb 2
+term_cmd_list:
+	xor r0, r0
+	st [term_list_i], r0
+	st [term_list_i+1], r0
+.loop:
+	ld r1, [term_list_i]			; stop at the length
+	ld r0, [term_basic_prog_buf_idx]
+	eq r1, r0
+	bzf .lo_same
+	b .byte
+.lo_same:
+	ld r1, [term_list_i+1]
+	ld r0, [term_basic_prog_buf_idx+1]
+	eq r1, r0
+	bzf .done
+.byte:
+	ld r0, [term_list_i]
+	st [term_list_p], r0
+	ld r0, [term_list_i+1]
+	add r0, TERM_PROG_HI
+	st [term_list_p+1], r0
+	ldd r0, [term_list_p]
+	eq r0, #13
+	bzf .newline
+	b .put
+.newline:
+	mov r0, #10
+.put:
+	push pch
+	push pcl
+	b print_ascii_char
+	ld r0, [term_list_i]
+	add r0, #1
+	st [term_list_i], r0
+	eq r0, #0
+	bzf .carry
+	b .loop
+.carry:
+	ld r0, [term_list_i+1]
+	add r0, #1
+	st [term_list_i+1], r0
+	b .loop
+.done:
+	pop pcl
+	pop pch
+
 term_basic_prog_ptr: resb 2
 term_cmd_basicline:
 	; the line (rs_i characters, its CR and a 0) must fit the 8 KB buffer:
@@ -445,7 +508,7 @@ term_cmd_basicline:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN CLR NET SAVE LOAD DIR DEL REFRESH EXEC\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
+	term_s_help_buf db "\nNEW RUN LIST CLR NET SAVE LOAD DIR DEL REFRESH EXEC\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch

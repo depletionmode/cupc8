@@ -23,9 +23,12 @@ Runs the sim binary headless, typing with --type and reading the console with
     python3 test/sim/test_cli.py
 """
 
+import atexit
+import fcntl
 import http.server
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -47,10 +50,20 @@ def check(name, cond, detail=""):
 
 
 def build():
-    r = subprocess.run(["nim", "c", "-d:release", "--hints:off", "sim.nim"],
-                       cwd=os.path.join(ROOT, "tools"), capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit("building tools/sim failed:\n" + r.stdout + r.stderr)
+    """Build tools/sim (one build at a time: a lock) and run a copy of it of
+    this run's own, so a SIM-010 or simtest beside this one cannot replace it."""
+    global SIM
+    os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+    with open(os.path.join(ROOT, "build", ".sim.lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        r = subprocess.run(["nim", "c", "-d:release", "--hints:off", "sim.nim"],
+                           cwd=os.path.join(ROOT, "tools"), capture_output=True, text=True)
+        if r.returncode != 0:
+            sys.exit("building tools/sim failed:\n" + r.stdout + r.stderr)
+        own = tempfile.mkdtemp(prefix="sim-cli-bin-")
+        atexit.register(shutil.rmtree, own, True)
+        SIM = os.path.join(own, "sim")
+        shutil.copy2(os.path.join(ROOT, "tools", "sim"), SIM)
 
 
 def sim(*args, timeout=300):
@@ -153,6 +166,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def main():
     build()
     work = tempfile.mkdtemp(prefix="sim-cli-")
+    atexit.register(shutil.rmtree, work, True)
 
     # the default machine: hdmi,io, booted through the boot ROM
     text, out = sim("--type:10 print 6*7\\nrun\\n")

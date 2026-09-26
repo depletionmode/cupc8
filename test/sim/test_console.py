@@ -59,7 +59,7 @@ def main():
     check("the banner and the prompt on stdout", b"CUPC/8 BASIC" in out and b">> " in out, out)
     check("newlines as CR LF, and only so", b"\r\n" in out and b"\n" not in out.replace(b"\r\n", b""), out)
     check("typed lines echoed at the prompt", b">> 10 for i = 1 to 3\r\n" in out and b">> help\r\n" in out, out)
-    check("help typed on stdin runs", b"NEW RUN CLR" in out, out)
+    check("help typed on stdin runs", b"NEW RUN LIST CLR" in out, out)
     check("the BASIC program typed on stdin runs", b">> run\r\n7\r\n14\r\n21\r\n" in out and b"DONE." in out, out)
     screen = open(text).read() if os.path.exists(text) else ""
     check("the same on the graphics card", "14" in screen and "21" in screen and "DONE." in screen, screen)

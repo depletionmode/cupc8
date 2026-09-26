@@ -38,9 +38,11 @@ proc parseAddress(value: string): int =
   else:
     parseInt(value)
 
-proc loadMap*(path: string): SymTab =
+proc loadMap*(path: string; srcDir = ""): SymTab =
+  ## The assembler's map; sources are looked for beside it, or in srcDir
+  ## (a kernel built elsewhere than kernel/)
   result = emptySymTab()
-  result.srcDir = path.absolutePath.parentDir
+  result.srcDir = if srcDir.len > 0: srcDir else: path.absolutePath.parentDir
   if not fileExists(path):
     return
 
