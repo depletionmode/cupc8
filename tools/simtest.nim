@@ -2914,7 +2914,7 @@ proc defineOf(defs: seq[(string, int)]; name: string): int =
 
 proc testKernelLayout() =
   ## KRN-010: the kernel's code, data and bss stay in their areas
-  ## (memory-map.md): code $1000-$5fff, data $6000-$6eff, bss $e000-$efff;
+  ## (memory-map.md): code $1000-$67ff, data $6800-$6eff, bss $e000-$efff;
   ## $6f00 is the API block and $7000- the user program's.
   echo "== kernel memory layout =="
   let assembled = kernelBuild()
@@ -2932,9 +2932,9 @@ proc testKernelLayout() =
     of "data": dataEnd = max(dataEnd, parseHexInt(f[1]) + parseInt(f[2]))
     of "bss": bssEnd = max(bssEnd, parseHexInt(f[1]) + parseInt(f[2]))
     else: discard
-  expectTrue("assembled for code $1000, data $6000, bss $e000 (" & bases & ")",
-             bases == "base 0x1000 data 0x6000 bss 0xe000")
-  expectTrue("code ends by $5fff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x6000)
+  expectTrue("assembled for code $1000, data $6800, bss $e000 (" & bases & ")",
+             bases == "base 0x1000 data 0x6800 bss 0xe000")
+  expectTrue("code ends by $67ff (at $" & toHex(codeEnd - 1, 4) & ")", codeEnd <= 0x6800)
   expectTrue("data ends by $6eff (at $" & toHex(dataEnd - 1, 4) & ")", dataEnd <= 0x6f00)
   expectTrue("bss ends by $efff (at $" & toHex(bssEnd - 1, 4) & ")", bssEnd <= 0xf000)
 
