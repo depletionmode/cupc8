@@ -214,7 +214,7 @@ reserved command, a read (the header has no MISO). A partial refresh moves
 only the pixels whose NEW differs from their OLD, so a wrong OLD picture
 leaves wrong pixels on the glass.
 
-**Seeing it:** `node tools/machine_view.mjs --native --slots eink,io` (or
+**Seeing it:** `tools/sim --cards:eink,io` (or `eink750,io`) shows the whole glass, 648 or 800 x 480, as of its last refresh; `node tools/machine_view.mjs --native --slots eink,io` (or
 `eink750,io`) shows the panel's glass in the browser, which changes only when
 a refresh completes; `CUPC8_EINK_SCALE=0.2` shortens the panel's busy times,
 `CUPC8_EINK_LOG=FILE` logs every controller command.

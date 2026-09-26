@@ -206,14 +206,16 @@ int simcard_storage_status(simcard_t *c)
 	return c->st ? st_status(c->st) : -1;
 }
 
+int simcard_out_w(simcard_t *c) { return c->eink ? c->panel->cfg.w : GPU_OUT_W; }
+int simcard_out_h(simcard_t *c) { return c->eink ? c->panel->cfg.h : GPU_OUT_H; }
+
 void simcard_render(simcard_t *c, uint32_t *rgb)
 {
 	if (c->eink) {
-		/* the panel's glass, as of its last refresh: the 640x480 middle */
-		int w = c->panel->cfg.w, ox = (w - GPU_OUT_W) / 2;
-		for (int y = 0; y < GPU_OUT_H; y++)
-			for (int x = 0; x < GPU_OUT_W; x++)
-				rgb[y * GPU_OUT_W + x] = c->panel->glass[y * w + ox + x] * 0x010101u;
+		/* the panel's whole glass (648 or 800 x 480), as of its last refresh */
+		int w = c->panel->cfg.w, h = c->panel->cfg.h;
+		for (int i = 0; i < w * h; i++)
+			rgb[i] = c->panel->glass[i] * 0x010101u;
 		return;
 	}
 	if (c->gpu)

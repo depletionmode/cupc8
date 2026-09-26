@@ -1237,12 +1237,14 @@ proc testKernelOnEink() =
     runGuest(1500)                           # the power-on clean refresh (x0.1)
     expect(name & ": one clean refresh at power-on", int(simcard_eink_refreshes(g, 0)), 1)
     # the glass: the banner's row (row 1, text in the middle) has ink
-    var frame = newSeq[uint32](GpuOutW * GpuOutH)
+    let fw = int(simcard_out_w(g))
+    expect(name & ": the picture is the whole panel", fw, (if card == CardEink: 648 else: 800), 4)
+    var frame = newSeq[uint32](fw * int(simcard_out_h(g)))
     simcard_render(g, addr frame[0])
     var ink = 0
     for y in 16..31:
-      for x in 0..<GpuOutW:
-        if frame[y * GpuOutW + x] == 0: inc ink
+      for x in 0..<fw:
+        if frame[y * fw + x] == 0: inc ink
     expectTrue(name & ": the banner is on the glass", ink > 200)
     typeLine("10 print 6*7")
     typeLine("run")
@@ -1618,8 +1620,9 @@ proc testBasicGraphics() =
   runGuest(1500)
   expectTrue("refresh in mode 2: a greyscale refresh (" & $simcard_eink_refreshes(g, 2) & ")",
              simcard_eink_refreshes(g, 2) >= 1)
+  frame = newSeq[uint32](int(simcard_out_w(g)) * int(simcard_out_h(g)))
   simcard_render(g, addr frame[0])
-  proc glass(x, y: int): int = int(frame[y * GpuOutW + x - 4] and 0xff)   # the middle 640 of the 648
+  proc glass(x, y: int): int = int(frame[y * 648 + x] and 0xff)          # the whole 648 x 480
   let (k0, k1, k2, k3) = (glass(5, 5), glass(60, 35), glass(100, 470), glass(300, 300))
   echo "  glass greys: ", k0, " ", k1, " ", k2, " ", k3
   expectTrue("the four greys on the glass, darkest to white", k0 < k1 and k1 < k2 and k2 < k3)

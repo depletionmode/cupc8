@@ -249,9 +249,12 @@ proc gpuPresent*() =
   let c = gpuCard()
   if c.isNil:
     return
-  if gpuFrame.len == 0:
-    gpuFrame = newSeq[uint32](GpuOutW * GpuOutH)
-  display_setSize(GpuOutW, GpuOutH)
+  # the card's whole picture: 640 x 480 on HDMI, the e-ink panel's 648 or 800 x 480
+  let w = int(simcard_out_w(c))
+  let h = int(simcard_out_h(c))
+  if gpuFrame.len != w * h:
+    gpuFrame = newSeq[uint32](w * h)
+  display_setSize(w, h)
   simcard_render(c, addr gpuFrame[0])
   display_blit(addr gpuFrame[0])
 

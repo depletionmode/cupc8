@@ -44,6 +44,8 @@ proc simcard_miso*(c: SimCard): uint8 {.importc, cdecl.}
 proc simcard_mosi*(c: SimCard, b: uint8) {.importc, cdecl.}
 proc simcard_irq*(c: SimCard): cint {.importc, cdecl.}
 proc simcard_tick*(c: SimCard, nowMs: uint32) {.importc, cdecl.}
+proc simcard_out_w*(c: SimCard): cint {.importc, cdecl.}
+proc simcard_out_h*(c: SimCard): cint {.importc, cdecl.}
 proc simcard_render*(c: SimCard, rgb: ptr uint32) {.importc, cdecl.}
 proc simcard_gpu_cell*(c: SimCard, x, y: cint): cint {.importc, cdecl.}
 proc simcard_gpu_pixel*(c: SimCard, x, y: cint): cint {.importc, cdecl.}

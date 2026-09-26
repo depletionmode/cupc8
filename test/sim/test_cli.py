@@ -64,6 +64,15 @@ def sim(*args, timeout=300):
     return text, r.stdout + r.stderr + "\nexit %d" % r.returncode
 
 
+SETTLE_BOUND = 200_000_000     # guest instructions: 20 times what a headless run takes to settle
+
+
+def retired(out):
+    """The instructions a headless run retired (its last status line)."""
+    m = re.findall(r"retired=(\d+)", out)
+    return int(m[-1]) if m else SETTLE_BOUND
+
+
 def ink_rows(ppm, y0, y1):
     """Dark pixels in rows y0..y1 of a binary PPM."""
     data = open(ppm, "rb").read()
@@ -84,6 +93,46 @@ def pixel(ppm, x, y):
     w = int(data.split(b"\n")[1].split()[0])
     i = header_end + (y * w + x) * 3
     return tuple(data[i:i + 3])
+
+
+def hello_pace(hello, env):
+    """examples/hello in the interactive sim: the wall-clock gaps between its
+    light's steps (its "second" is ten 100-101 ms waits and its printing:
+    1.01 s of guest time), their mean, and the step times."""
+    p = subprocess.Popen([SIM, "--run:" + hello], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    os.set_blocking(p.stdout.fileno(), False)
+    t0 = time.monotonic()
+    buf, started, steps = b"", None, []
+    while time.monotonic() - t0 < 30 and len(steps) < 6:
+        chunk = p.stdout.read(65536)
+        if not chunk:
+            time.sleep(0.002)
+            continue
+        buf += chunk
+        *lines, buf = buf.replace(b"\r", b"\n").split(b"\n")
+        now = time.monotonic()
+        for line in lines:
+            s = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", line.decode(errors="replace"))
+            if "API_RUN = 1" in s:
+                started = now
+            elif started is not None and s.startswith("GPO:"):
+                steps.append(now)
+    p.kill()
+    p.wait()
+    gaps = [b - a for a, b in zip(steps, steps[1:])]
+    return gaps, (sum(gaps) / len(gaps) if gaps else 0), steps
+
+
+def wai_pace(img, env):
+    """test/sim/waitloop.s (WAI woken every 50 instructions) for 12 s of wall
+    time in the interactive sim: the MHz of guest clock on its speed lines."""
+    try:
+        r = subprocess.run([SIM, "--cards:hdmi,io,storage", "--sd:" + img, '--type:exec "WAIT.PRG"\\n'],
+                           capture_output=True, text=True, timeout=12, env=env)
+        out = r.stdout
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+    return [float(m) for m in re.findall(r"([0-9.]+) MHz of CUPC/8 clock", out)], out
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -110,10 +159,14 @@ def main():
     check("default machine: the BASIC banner", "CUPC/8 BASIC" in text, out + text)
     check("default machine: the typed program ran", "\n42\n" in text and "DONE." in text, text)
 
-    # typed keys with no IO card to take them: the run still ends
+    # typed keys with no IO card to take them: the run still ends. Judged in
+    # guest instructions, not wall time (a loaded host once took the 60 s
+    # this had): headless it settles in about 10 M; a sim that never settles
+    # runs into --max-ins, and the wall-clock timeout only guards a real hang
     try:
-        text, out = sim("--cards:hdmi", "--type:help\\n", timeout=60)
-        check("--type with no IO card: headless still exits", "CUPC/8 BASIC" in text, out + text)
+        text, out = sim("--cards:hdmi", "--type:help\\n", "--max-ins:%d" % SETTLE_BOUND, timeout=1800)
+        check("--type with no IO card: headless still exits (%s instructions)" % retired(out),
+              "CUPC/8 BASIC" in text and "exit 0" in out and retired(out) < SETTLE_BOUND, out + text)
     except subprocess.TimeoutExpired:
         check("--type with no IO card: headless still exits", False, "the sim hung")
     # ... and when nothing at all wakes the CPU (a program parked with only
@@ -122,9 +175,9 @@ def main():
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "mkprg.py"),
                     os.path.join(ROOT, "tools", "testdata", "park.s"), "-o", park], check=True, capture_output=True)
     try:
-        text, out = sim("--cards:hdmi", "--run:" + park, "--type:ab", timeout=60)
-        check("--type at a program parked with nothing to wake it: headless still exits",
-              "CUPC/8 BASIC" in text and "exit 0" in out, out + text)
+        text, out = sim("--cards:hdmi", "--run:" + park, "--type:ab", "--max-ins:%d" % SETTLE_BOUND, timeout=1800)
+        check("--type at a program parked with nothing to wake it: headless still exits (%s instructions)"
+              % retired(out), "CUPC/8 BASIC" in text and "exit 0" in out and retired(out) < SETTLE_BOUND, out + text)
     except subprocess.TimeoutExpired:
         check("--type at a program parked with nothing to wake it: headless still exits", False, "the sim hung")
 
@@ -190,9 +243,22 @@ def main():
     text, out = sim("--cards:eink,io", "--dump-fb:" + ppm,
                     "--type:10 mode 2\\n20 cls\\n30 box 20, 20, 100, 60, 0, 1\\n40 box 140, 20, 100, 60, 1, 1\\n"
                     "50 box 260, 20, 100, 60, 2, 1\\n60 refresh\\nrun\\n")
-    greys = [pixel(ppm, x - 4, 50)[0] for x in (70, 190, 310, 500)]   # the glass's middle 640 of 648
+    greys = [pixel(ppm, x, 50)[0] for x in (70, 190, 310, 500)]
     check("eink: mode 2, boxes in greys 0, 1, 2 on white, refresh: the four greys on the glass %s" % greys,
           greys == [0, 85, 170, 255], out + text)
+
+    # the whole panel in the picture: 648 or 800 wide, as the emulator shows it;
+    # a box in mode 2 at x 790 on the 7.5" panel
+    ppm = os.path.join(work, "wide.ppm")
+    text, out = sim("--cards:eink750,io", "--dump-fb:" + ppm,
+                    "--type:10 mode 2\\n20 cls\\n30 box 780, 460, 20, 20, 0, 1\\n40 plot 5, 5, 1\\n50 refresh\\nrun\\n")
+    size = open(ppm, "rb").read().split(b"\n")[1] if os.path.exists(ppm) else b""
+    check("eink750: the picture is the whole 800 x 480 panel (%s)" % size.decode(), size == b"800 480", out)
+    got = [pixel(ppm, x, y)[0] for x, y in ((790, 470), (799, 479), (779, 470), (5, 5))]
+    check("eink750: mode 2 drawn at x 790 (and to the corner) is in --dump-fb %s" % got, got == [0, 0, 255, 85], out + text)
+    text, out = sim("--cards:eink,io", "--dump-fb:" + ppm, "--type:10 print 1\\nrun\\n")
+    size = open(ppm, "rb").read().split(b"\n")[1] if os.path.exists(ppm) else b""
+    check("eink: the picture is the whole 648 x 480 panel (%s)" % size.decode(), size == b"648 480", out)
 
     # SIM-012: --run
     def mkprg(src, dest):
@@ -225,28 +291,11 @@ def main():
     # steps once a second of wall time (its "second" is ten 100-101 ms waits
     # and its printing: 1.01 s of guest time)
     env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
-    p = subprocess.Popen([SIM, "--run:" + hello], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    os.set_blocking(p.stdout.fileno(), False)
-    t0 = time.monotonic()
-    buf, started, steps = b"", None, []
-    while time.monotonic() - t0 < 30 and len(steps) < 6:
-        chunk = p.stdout.read(65536)
-        if not chunk:
-            time.sleep(0.002)
-            continue
-        buf += chunk
-        *lines, buf = buf.replace(b"\r", b"\n").split(b"\n")
-        now = time.monotonic()
-        for line in lines:
-            s = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", line.decode(errors="replace"))
-            if "API_RUN = 1" in s:
-                started = now
-            elif started is not None and s.startswith("GPO:"):
-                steps.append(now)
-    p.kill()
-    p.wait()
-    gaps = [b - a for a, b in zip(steps, steps[1:])]
-    mean = sum(gaps) / len(gaps) if gaps else 0
+    for attempt in (1, 2):
+        gaps, mean, steps = hello_pace(hello, env)
+        if len(gaps) >= 5 and 0.98 <= mean <= 1.04:
+            break
+        print("   (the interactive sim fell off the wall clock, attempt %d: a loaded host?)" % attempt)
     check("the interactive sim: hello steps once a wall-clock second (%s s)" % ", ".join("%.3f" % g for g in gaps),
           len(gaps) >= 5 and 0.98 <= mean <= 1.04, "%d steps" % len(steps))
     # interactive pacing: a machine woken from WAI every 50 instructions must
@@ -259,23 +308,20 @@ def main():
                    check=True, capture_output=True)
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "put", img2, "WAIT.PRG", prg],
                    check=True, capture_output=True)
-    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
-    try:
-        r = subprocess.run([SIM, "--cards:hdmi,io,storage", "--sd:" + img2, '--type:exec "WAIT.PRG"\\n'],
-                           capture_output=True, text=True, timeout=12, env=env)
-        out = r.stdout
-    except subprocess.TimeoutExpired as e:
-        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-    # the speed line: instructions (WAI turns included) and the clocks they came to
-    mhz = [float(m) for m in re.findall(r"([0-9.]+) MHz of CUPC/8 clock", out)]
+    for attempt in (1, 2):
+        mhz, out = wai_pace(img2, env)
+        if len(mhz) >= 3 and all(11 <= x <= 13 for x in mhz[-3:]):
+            break
+        print("   (the interactive sim fell off the wall clock, attempt %d: a loaded host?)" % attempt)
     check("interactive: a WAI-heavy guest keeps its 12 MHz clock (last %s)" % (mhz[-3:],),
           len(mhz) >= 3 and all(11 <= x <= 13 for x in mhz[-3:]), out[-400:])
+
 
     # the window's GPO LED strip: D8..D1 under the picture, lit from $f000
     win = os.path.join(work, "win.ppm")
     env = dict(os.environ, SDL_VIDEODRIVER="offscreen", SDL_AUDIODRIVER="dummy")
     subprocess.run([SIM, "--cards:hdmi,io", "--type:10 poke 240,0,165\\nrun\\n", "--max-ins:20000000",
-                    "--dump-window:" + win], capture_output=True, text=True, timeout=120, env=env)
+                    "--dump-window:" + win], capture_output=True, text=True, timeout=600, env=env)
     lights = ""
     if os.path.exists(win):
         d = open(win, "rb").read()
@@ -289,7 +335,7 @@ def main():
     obj = os.path.join(work, "gpo.o")
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "as.py"),
                     os.path.join(ROOT, "test", "gpo-test.s"), obj], check=True, capture_output=True)
-    r = subprocess.run([SIM, "--legacy", "--headless", obj], capture_output=True, text=True, timeout=60)
+    r = subprocess.run([SIM, "--legacy", "--headless", obj], capture_output=True, text=True, timeout=600)
     check("--legacy runs a program at $1000", "GPO: 10101010 AA" in r.stdout and "hf=true" in r.stdout, r.stdout)
 
     if failures:

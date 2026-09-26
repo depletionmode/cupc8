@@ -27,7 +27,10 @@ int simcard_irq(simcard_t *c);             /* IRQ_n asserted */
 /* background work: execute queued GPU commands, vsync, key repeat */
 void simcard_tick(simcard_t *c, uint32_t now_ms);
 
-/* GPU: render the current picture (640x480, 0x00RRGGBB) */
+/* GPU: the picture's size: 640 x 480 on HDMI, the e-ink panel's (648 or
+ * 800 x 480); render it (0x00RRGGBB, out_w x out_h) */
+int simcard_out_w(simcard_t *c);
+int simcard_out_h(simcard_t *c);
 void simcard_render(simcard_t *c, uint32_t *rgb);
 
 /* GPU state, for tests: the character/attribute of a text cell, and a pixel */
