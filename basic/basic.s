@@ -27,6 +27,7 @@ bas_src: resb 2				; the hook's pointer
 bas_i: resb 1				; bas_find: where in its table
 bas_k: resb 1				;   the word's number there
 bas_j: resb 1				;   and where in the line
+ub_vbank: resb 1			; the RAM_BANK BASIC's PEEK and POKE see (ubasic.s)
 bas_list_i: resb 2
 bas_list_p: resb 2
 bas_p: resb 2				; the last typed line's place ($c004 after new)
@@ -71,6 +72,8 @@ main:
 	push pcl
 	b bas_cmd_new
 .kept:
+	mov r0, #2				; the window as the kernel leaves it, bank 2
+	st [ub_vbank], r0
 	mov r0, #4				; lines are looked for from the first
 	st [bas_p], r0
 	mov r0, PROG_HI

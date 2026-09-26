@@ -879,6 +879,15 @@ vrow = "2.1"
 cmd = "tools/run_tests.sh testBasicFromCard testKernelNoBasic"
 
 [[test]]
+id = "KRN-034"
+title = "BASIC: PEEK and POKE through the RAM window"
+checks = "E2E-009's BASIC program in the simulator: POKE $f205 picks the bank BASIC's $8000-$bfff shows (5 bits: 255 reads back 31), PEEK reads banks 4 and 5 (bytes put in the SRAM), POKE writes SRAM $14020 and $7ffff, PEEK $f205 reads 2 again; the CPU's window stays on bank 2 (BASIC runs from $7000 into it) and BASIC runs on"
+method = "tools/simtest.nim testBasicBanks: sim.nim's SRAM (physRead, physWrite)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicBanks"
+
+[[test]]
 id = "KRN-033"
 title = "Kernel API: API_TERM_HOOK, API_READLINE, API_ST_PERROR"
 checks = "tools/testdata/api_line.s at $7000: API_ST_PERROR 3 prints file not found; API_READLINE reads h, i, Backspace, e, y, Enter into its buffer as hey, a CR and a 0 (r1 = 3, r0 = 0), echoed with the i taken back off the screen; API_TERM_HOOK 0, 0 gives r0 = 0; after the program the kernel loads BASIC, whose hook is set again, and a typed program runs"

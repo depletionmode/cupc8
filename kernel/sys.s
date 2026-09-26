@@ -1523,6 +1523,8 @@ sys_basic:
 	xor r0, r0
 	st [sys_hook], r0
 	st [sys_hook+1], r0
+	mov r0, #2				; BASIC reaches into the RAM window - bank 2 there
+	st $f205, r0
 	ld r0, [sys_basic_src]
 	eq r0, #0
 	bzf .rom

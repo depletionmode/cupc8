@@ -204,7 +204,9 @@ revert = [
 	push pcl
 	b ubasic_expr
 .write:
-	std [ub_mem_ptr], r0
+	push pch
+	push pcl
+	b ub_poke
 	b ubasic_end_of_statement
 """, """ubasic_poke_statement:
 	pop pcl
@@ -976,3 +978,18 @@ revert = [["kernel/sys.s", """	push pch
 .said:""", """.said:"""]]
 cmd = "tools/run_tests.sh testBasicReload"
 must_fail = ["FAIL: ... BASIC at $7000 again, the program kept"]
+
+[[bug]]
+name = "BASIC at $7000: a POKE to RAM_BANK switched BASIC's own code at $8000-$8fff out of the window (E2E-009's program crashed it)"
+fixed_in = "HEAD"
+# POKE writes straight to memory again, $f205 included
+revert = [["basic/ubasic.s", """.write:
+	push pch
+	push pcl
+	b ub_poke
+	b ubasic_end_of_statement""", """.write:
+	std [ub_mem_ptr], r0
+	b ubasic_end_of_statement"""]]
+cmd = "tools/run_tests.sh testBasicBanks"
+must_fail = ["FAIL: BASIC reads banks 4 and 5"]
+

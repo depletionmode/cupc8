@@ -1013,7 +1013,9 @@ ubasic_peek_statement:
 	push pcl
 	b ubasic_accept
 .read:
-	ldd r0, [ub_mem_ptr]
+	push pch
+	push pcl
+	b ub_peek
 	st [ub_val], r0
 	xor r0, r0
 	st [ub_val+1], r0
@@ -1033,6 +1035,138 @@ ub_mem_hi_lo:
 	st [ub_mem_ptr], r0
 	pop pcl
 	pop pch
+
+; PEEK and POKE see the RAM window as the hardware would (extended-ram.md),
+; but BASIC runs from $7000 into the window ($8000-$8fff), so the CPU's
+; window stays on bank 2: RAM_BANK ($f205) is ub_vbank, and $8000-$bfff of
+; another bank is reached with API_BANK_FAR_COPY, a byte at a time.
+ub_fb: resb 1				; the byte API_BANK_FAR_COPY moves
+
+; r0 = the byte at ub_mem_ptr
+ub_peek:
+	push pch
+	push pcl
+	b ub_where
+	eq r0, #0
+	bzf .mem
+	eq r0, #1
+	bzf .bank
+	xor r0, r0				; from the other bank
+	push pch
+	push pcl
+	b ub_far
+	ld r0, [ub_fb]
+	pop pcl
+	pop pch
+.bank:
+	ld r0, [ub_vbank]
+	pop pcl
+	pop pch
+.mem:
+	ldd r0, [ub_mem_ptr]
+	pop pcl
+	pop pch
+
+; r0 to the byte at ub_mem_ptr
+ub_poke:
+	st [ub_fb], r0
+	push pch
+	push pcl
+	b ub_where
+	eq r0, #0
+	bzf .mem
+	eq r0, #1
+	bzf .bank
+	mov r0, #1				; into the other bank
+	b ub_far
+.bank:
+	ld r0, [ub_fb]
+	and r0, #0x1f			; RAM_BANK keeps 5 bits
+	st [ub_vbank], r0
+	pop pcl
+	pop pch
+.mem:
+	ld r0, [ub_fb]
+	std [ub_mem_ptr], r0
+	pop pcl
+	pop pch
+
+; where ub_mem_ptr is: r0 = 1 RAM_BANK, 2 the window showing another bank
+; than 2, 0 anywhere else
+ub_where:
+	ld r0, [ub_mem_ptr+1]
+	eq r0, #0xf2
+	bzf .f2
+	lt r0, #0x80
+	bzf .other
+	gt r0, #0xbf
+	bzf .other
+	ld r0, [ub_vbank]
+	eq r0, #2
+	bzf .other
+	mov r0, #2
+	pop pcl
+	pop pch
+.f2:
+	ld r0, [ub_mem_ptr]
+	eq r0, #0x05
+	bzf .ram_bank
+.other:
+	xor r0, r0
+	pop pcl
+	pop pch
+.ram_bank:
+	mov r0, #1
+	pop pcl
+	pop pch
+
+; one byte between the window's ub_mem_ptr in bank ub_vbank and ub_fb
+; (r0 = 0 to ub_fb, 1 from it), API_BANK_FAR_COPY: (bank, offset) places
+ub_far:
+	push r0
+	ld r0, [ub_vbank]		; $6f10-$6f12 - the window's byte
+	st $6f10, r0
+	ld r0, [ub_mem_ptr]
+	st $6f11, r0
+	ld r0, [ub_mem_ptr+1]
+	sub r0, #0x80
+	st $6f12, r0
+	mov r0, #>[ub_fb]		; $6f13-$6f15 - ub_fb's
+	shr r0, #6
+	st $6f13, r0
+	mov r0, #<[ub_fb]
+	st $6f14, r0
+	mov r0, #>[ub_fb]
+	and r0, #0x3f
+	st $6f15, r0
+	pop r0
+	xor r1, r1
+	eq r0, #0
+	bzf .to_fb
+.from_fb:
+	ld r0, $6f13+r1
+	st $6f00+r1, r0
+	ld r0, $6f10+r1
+	st $6f03+r1, r0
+	add r1, #1
+	eq r1, #3
+	bzf .len
+	b .from_fb
+.to_fb:
+	ld r0, $6f10+r1
+	st $6f00+r1, r0
+	ld r0, $6f13+r1
+	st $6f03+r1, r0
+	add r1, #1
+	eq r1, #3
+	bzf .len
+	b .to_fb
+.len:
+	mov r0, #1
+	st $6f06, r0
+	xor r0, r0
+	st $6f07, r0
+	b API_BANK_FAR_COPY
 
 ubasic_poke_statement:
 	mov r0, TOKENIZER_POKE
@@ -1072,7 +1206,9 @@ ubasic_poke_statement:
 	push pcl
 	b ubasic_expr
 .write:
-	std [ub_mem_ptr], r0
+	push pch
+	push pcl
+	b ub_poke
 	b ubasic_end_of_statement
 
 ubasic_end_statement:

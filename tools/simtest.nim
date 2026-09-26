@@ -3705,6 +3705,39 @@ proc testBasicReload() =
 
 run testBasicReload
 
+proc testBasicBanks() =
+  ## KRN-034: BASIC's PEEK and POKE reach the RAM banks as the hardware's
+  ## window would (E2E-009's program), though BASIC runs from $7000 into the
+  ## window and the CPU's window stays on bank 2: POKE $f205 sets the bank
+  ## BASIC's $8000-$bfff shows (5 bits; PEEK $f205 reads it back), and those
+  ## bytes are the SRAM's in that bank (API_BANK_FAR_COPY); BASIC and a
+  ## program after it still run. (It crashed when BASIC moved to $7000: the
+  ## POKE switched its own code at $8000-$8fff out of the window.)
+  echo "== BASIC: PEEK and POKE through the RAM window =="
+  let rom = buildKernelRom()
+  bootBasic(rom)
+  physWrite(0x13f00, 0x42)                     # bank 4, $bf00
+  physWrite(0x14010, 0x24)                     # bank 5, $8010
+  let prog = @[
+    "10 poke 242, 5, 4", "20 peek 191, 0, a",
+    "30 poke 242, 5, 5", "40 peek 128, 16, b",
+    "50 poke 128, 32, 99",
+    "60 poke 242, 5, 255", "70 poke 191, 255, 123", "75 peek 242, 5, d",
+    "80 poke 242, 5, 2", "90 peek 242, 5, c",
+    "100 print a", "110 print b", "120 print c", "130 print d"]
+  for l in prog: typeLine(l)
+  let got = runOutput()
+  expectTrue("BASIC reads banks 4 and 5, RAM_BANK back as 2 and as 31 (" & $got & ")",
+             got == @["66", "36", "2", "31"])
+  expect("its POKE into bank 5 is SRAM $14020", physRead(0x14020), 99)
+  expect("its POKE into bank 31 is SRAM $7ffff", physRead(0x7ffff), 123)
+  expect("the CPU's window stayed on bank 2", cardsLoadTest(0xf205), 2)
+  expectTrue("BASIC runs on", cmdOutput("new").len == 0 and cmdOutput("10 print 6*7").len == 0 and
+             runOutput() == @["42"])
+  ioModel = imLegacy
+
+run testBasicBanks
+
 proc testBasicFromCard() =
   ## KRN-032: at boot the kernel loads BASIC.PRG from the SD card when a
   ## storage card is fitted, an SD card is in it and the file has a good

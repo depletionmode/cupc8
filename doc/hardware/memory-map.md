@@ -112,6 +112,10 @@ empty. **A program for $7000 that uses $c000–$dfff (a body over 20 KB, or
 data there) overwrites the BASIC program**, as on the home computers this is
 modelled on, and BASIC then starts with none. Programs up to $bfff leave it
 alone. BASIC's line index (300 lines) and its variables are in its own bss.
+BASIC reaches into the RAM window (to about $90ff), so the kernel puts bank
+2 there before loading it, and BASIC's PEEK and POKE keep their own
+RAM_BANK: $8000–$bfff of another bank through `API_BANK_FAR_COPY`, the
+CPU's window left on bank 2.
 The jump table and calling convention are in `../proposals/kernel-api.md`
 and `kernel/api.inc`.
 

@@ -88,6 +88,12 @@ saved per change.
   now takes several sources and `--map`). 6530 bytes (6.2 KB of code),
   $7000-$8ff7 with its bss. It uses only the API; SAVE and LOAD through the
   storage group, their messages through the new `API_ST_PERROR`.
+- **The RAM window.** BASIC runs from $7000 into the window ($8000-$90ff),
+  so a program's POKE to RAM_BANK must not switch it: BASIC's PEEK and POKE
+  keep their own RAM_BANK (5 bits, read back at $f205) and reach $8000-$bfff
+  of another bank with `API_BANK_FAR_COPY`, a byte at a time; the CPU's
+  window stays on bank 2 (the kernel sets it before loading BASIC). E2E-009
+  found it; KRN-034.
 - **The program text** at $c000: `"BA"`, the end (two bytes), then the lines
   from $c004 (`memory-map.md`). The 4 bytes cost the longest program 4
   bytes: 8187 instead of 8191 (KRN-017, KRN-027 changed to match).
