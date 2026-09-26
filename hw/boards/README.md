@@ -495,9 +495,16 @@ with two (a 4-layer board, both inner layers planes) Freerouting stalls at
 ~80 unrouted connections; with four on a 4-layer board (the pours cut round
 the routing) it completes, but the +3V3 pour splits into pieces and GND
 islands form round the chipset. Every SMD pad on GND or +3V3 has its own
-via to its plane. The TQ144, sTSOP-32 and eFuse nets route in kicadgen's
-Fine class (0.15 mm), as on the CPU card. Routing is capped at 30 passes,
-then 60, then 90 (`ROUTE_PASSES`, `ROUTE_TRIES`). 125 × 184 mm, 3 boards assembled.
+via to its plane, placed where Freerouting also finds it clear
+(`FANOUT_MARGIN`: its hole a clearance off its own pad, clear of the NPTH
+holes' keep-outs; at KiCad's margins those vias were ~117 violations
+Freerouting carried through every pass). The TQ144, sTSOP-32 and eFuse
+signal nets route in kicadgen's Fine class (0.15 mm), as on the CPU card;
+the eFuse's VBUS_F and 5V_SYS in FinePower (0.5 mm track, Fine's
+clearance between the QFN's pins). Each routing try runs 8 differently
+ordered Freerouting runs at once and keeps the lowest-ordered one that
+completes (kicadgen `route_parallel`); tries are capped at 30 passes, then
+60, then 90 (`ROUTE_PASSES`, `ROUTE_TRIES`). 125 × 184 mm, 3 boards assembled.
 
 ```
 python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pincheck netlist check
