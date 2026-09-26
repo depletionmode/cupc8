@@ -1364,6 +1364,39 @@ proc testBackspace() =
 
 run testBackspace
 
+proc testBasicList() =
+  ## KRN-023: list prints the program as it is kept, one line per line, and
+  ## nothing for an empty program
+  echo "== list =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+  settle(6_000_000)
+  typeLine("list")
+  expectTrue("an empty program lists nothing", gpuFind(g, "print") < 0)
+  typeLine("10 print \"hello\"")
+  typeLine("20 for i=1 to 3")
+  typeLine("30 next i")
+  typeLine("new")
+  typeLine("40 print 42")
+  typeLine("50 print 43")
+  typeLine("list")
+  let lines = screenLines(g)
+  var at = -1
+  for i, l in lines:
+    if l.startsWith(">> list"): at = i
+  expectTrue("list printed after the command", at >= 0)
+  if at >= 0 and at + 2 < lines.len:
+    expectTrue("list: the first line", lines[at + 1].strip() == "40 print 42")
+    expectTrue("list: the second line", lines[at + 2].strip() == "50 print 43")
+    expectTrue("list: new cleared the old program", gpuFind(g, "hello") < gpuFind(g, "new"))
+  ioModel = imLegacy
+
+run testBasicList
+
 proc progIdxAt(): int =
   ## term_basic_prog_buf_idx, the BASIC program's length, in the kernel just built
   loadMap(romDir() / "kernel.map").resolve("term_basic_prog_buf_idx")

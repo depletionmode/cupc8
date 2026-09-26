@@ -798,6 +798,15 @@ vrow = "2.1"
 cmd = "tools/run_tests.sh testBackspace"
 
 [[test]]
+id = "KRN-023"
+title = "list prints the BASIC program"
+checks = "list on an empty program prints nothing; after new and two typed lines it prints exactly those two lines, one per line, after the command; help lists LIST (E2E-008's golden)"
+method = "tools/simtest.nim testBasicList: the real kernel on the simulator's HDMI and IO cards"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicList"
+
+[[test]]
 id = "KRN-030"
 title = "USB console: the kernel's side of the rings"
 checks = "on junk RAM (HOST set, CON_OUT nearly full) the kernel's boot zeroes the four indices and CON_FLAGS before it prints, so the banner and prompt reach CON_OUT and the prompt the graphics card; help typed into CON_IN runs, its echo and output in CON_OUT, CON_IN's tail caught up; a BASIC program typed into CON_IN runs and its output (over 300 bytes) comes out of the 128-byte ring whole and in order as the card takes it; with HOST set and nobody taking, the kernel waits at the full ring and goes on when the card drains it; with HOST clear it runs to the prompt with the ring full and the rest dropped"
