@@ -1120,6 +1120,7 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # at most 30 + 60 + 90 passes. On 6 layers try 1 left 4 connections
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
+ROUTE_TIMEOUT = 90 * 60                    # each Freerouting run's wall-time cap, s (kicadgen route_timeout)
 ROUTE_PARALLEL = 8                          # orderings routed at once per try (kicadgen route_parallel)
 # the fan-out vias a clearance off their own pads, 0.05 mm further from other
 # nets' and clear of the NPTH holes' keep-outs, as Freerouting judges them:
@@ -1168,7 +1169,58 @@ def prepare(board):
     v.SetLocked(True)
     board.Add(v)
     _plane_pads(board)
-    return _efuse_escapes(board, fp)
+    nets = _efuse_escapes(board, fp)
+    return nets + _standby_preroute(board)
+
+
+def _standby_preroute(board):
+    """Locked copper for the connections the router left open in most runs
+    once the POWER button was added: VBUS_F from IN's escape end straight
+    across to R58 (the OVLO divider, on the same line); 5V_SYS from OUT's
+    escape end west and up to C3 (its bulk capacitor); and the standby
+    LDO's VIN (U15 pin 2, between GND and VOUT) up to C16, with a via to
+    the inner layers beside C16. Returns the nets (checked on KiCad's
+    connectivity after routing)."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def pad(ref, num):
+        p = [q for q in board.FindFootprintByReference(ref).Pads() if q.GetNumber() == num][0]
+        return p, (to(p.GetPosition().x), to(p.GetPosition().y))
+
+    def track(pts, width, net):
+        for a, b in zip(pts, pts[1:]):
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
+            t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
+            t.SetWidth(mm(width))
+            t.SetLayer(pcbnew.F_Cu)
+            t.SetNet(net)
+            t.SetLocked(True)
+            board.Add(t)
+    bar, (bx, by) = pad("U2", "5")
+    r58, (rx, ry) = pad("R58", "1")
+    top = to(bar.GetBoundingBox().GetTop()) - 0.8          # the escape's end (_efuse_escapes)
+    if abs(top - ry) < 0.05 and rx > bx:
+        track([(bx, top), (rx, ry)], 0.5, bar.GetNet())
+    out, (ox, oy) = pad("U2", "6")
+    c3, (qx, qy) = pad("C3", "1")
+    bottom = to(out.GetBoundingBox().GetBottom()) + 0.8     # OUT's escape end
+    if qx < ox and qy < bottom:
+        track([(ox, bottom), (qx, bottom), (qx, qy)], 0.5, out.GetNet())
+    vin, (vx, vy) = pad("U15", "2")
+    c16, (cx, cy) = pad("C16", "1")
+    track([(vx, vy), (vx, cy + 1.2), (cx, cy + 0.4), (cx, cy)], 0.3, vin.GetNet())
+    via = (cx - 1.3, cy)
+    track([(cx, cy), via], 0.3, vin.GetNet())
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(mm(via[0]), mm(via[1])))
+    v.SetWidth(mm(0.6))
+    v.SetDrill(mm(0.3))
+    v.SetNet(vin.GetNet())
+    v.SetLocked(True)
+    board.Add(v)
+    return [vin.GetNetname()]
 
 
 def _efuse_escapes(board, fp):
@@ -1214,14 +1266,21 @@ def _efuse_escapes(board, fp):
     e5, u = out(pads["5"], pads["1"])
     track(xy(pads["5"]), e5, 0.3, pads["5"].GetNet())
     p1 = xy(pads["1"])
-    # pin 1 straight out to the bar's escape line; joined across to its end
-    # only if it is on IN's net (EN tied to IN): never short EN to IN
-    k = (e5[0] - p1[0]) * u[0] + (e5[1] - p1[1]) * u[1]
-    c1 = (p1[0] + u[0] * k, p1[1] + u[1] * k)
-    track(p1, c1, 0.25, pads["1"].GetNet())
+    # pin 1 on IN's net (EN tied to IN): straight out to the bar's escape
+    # line, then across to its end. On its own net (PWR_EN, the POWER
+    # button): out the package's side, away from IN's escape, never joined
+    # to it (routed beside IN's escape, 0.4 mm off, it left VBUS_F unrouted
+    # in most runs)
     same = pads["1"].GetNetname() == pads["5"].GetNetname()
     if same:
+        k = (e5[0] - p1[0]) * u[0] + (e5[1] - p1[1]) * u[1]
+        c1 = (p1[0] + u[0] * k, p1[1] + u[1] * k)
+        track(p1, c1, 0.25, pads["1"].GetNet())
         track(c1, e5, 0.25, pads["1"].GetNet())
+    else:
+        cx, cy = xy(fp)
+        side = (math.copysign(1, p1[0] - cx), 0.0) if u[0] == 0 else (0.0, math.copysign(1, p1[1] - cy))
+        track(p1, (p1[0] + side[0] * 1.1, p1[1] + side[1] * 1.1), 0.2, pads["1"].GetNet())
     e6, _ = out(pads["6"], pads["7"])
     track(xy(pads["6"]), e6, 0.3, pads["6"].GetNet())
     return [pads["5"].GetNetname(), pads["6"].GetNetname()] + ([] if same else [pads["1"].GetNetname()])
@@ -1357,7 +1416,8 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
                        fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
-                       route_parallel=ROUTE_PARALLEL, fanout_margin=FANOUT_MARGIN, prepare=prepare,
+                       route_parallel=ROUTE_PARALLEL, route_timeout=ROUTE_TIMEOUT, fanout_margin=FANOUT_MARGIN,
+                       prepare=prepare,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
                        boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)

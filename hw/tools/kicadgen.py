@@ -1685,7 +1685,7 @@ def fixed_violations(dsn, env):
         return None
 
 
-def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
+def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout=None):
     """`parallel` Freerouting runs at once, each on its own ordering (salt) of
     the problem and its own copy of the DSN, for each of `tries` pass
     budgets. The run kept is the lowest-salted one that routes completely
@@ -1693,7 +1693,9 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
     has copper too close, which KiCad's DRC then throws out with the whole
     round): once run k qualifies, the runs after it are stopped and the ones
     before it waited for, so the result depends on the salts, never on timing.
-    Returns (session file, its salt), or raises with what was left."""
+    `timeout` (seconds) is each run's wall-time cap: a run still going then
+    is stopped and counts as left, with the unrouted count its log last
+    showed. Returns (session file, its salt), or raises with what was left."""
     import pcbnew
     import time
     pdir = os.path.join(workdir, "route-parallel")
@@ -1722,11 +1724,24 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
             proc = subprocess.Popen(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)),
                                      "-mt", "1", "--gui.enabled=false"], stdout=logf, stderr=subprocess.STDOUT,
                                     env=env, start_new_session=True)   # its own group: the java under the script
-            jobs.append([sk, proc, ses, log, logf, None])
+            jobs.append([sk, proc, ses, log, logf, None, time.time()])
         chosen = None
         while chosen is None:
             for job in jobs:
-                sk, proc, ses, log, logf, done = job
+                sk, proc, ses, log, logf, done, t0 = job
+                if done is None and timeout and proc.poll() is None and time.time() - t0 > timeout:
+                    import signal
+                    try:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    proc.wait()
+                    logf.close()
+                    last = re.findall(r"\((\d+) unrouted and (\d+) violation", open(log).read())
+                    job[5] = "left"
+                    left_all[sk] = ["timeout after %d s (last: %s unrouted, %s violations)"
+                                    % (timeout, *(last[-1] if last else ("?", "?")))]
+                    continue
                 if done is None and proc.poll() is not None:
                     logf.close()
                     text = open(log).read()
@@ -1764,14 +1779,14 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env):
                        % (sorted({n for v in left_all.values() for n in v})[:8], tries, parallel, pdir))
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0):
+def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, timeout=None):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
     and an error after `tries`. `salt` starts the tries' orderings further
     on, for a second round that must not repeat the first. With `parallel`
     > 0 each try runs that many differently ordered routes at once
-    (_route_parallel)."""
+    (_route_parallel), each capped at `timeout` seconds of wall time."""
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
@@ -1815,7 +1830,7 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0):
         if not parallel:
             raise RuntimeError("Freerouting left %s unrouted after %d tries (see freerouting.log)" % (left, tries))
     if parallel:
-        ses, chosen = _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env)
+        ses, chosen = _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout)
         stable_uuids(board, chosen)                 # the ordering that session was routed on
     if not os.path.exists(ses):
         raise RuntimeError("Freerouting wrote no session file")
@@ -2591,7 +2606,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
-             fine_power_nets=(), label_side=None):
+             fine_power_nets=(), label_side=None, route_timeout=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2707,7 +2722,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             try:
                 autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
                           salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
-                          parallel=route_parallel)
+                          parallel=route_parallel, timeout=route_timeout)
             except RuntimeError as e:        # nets left unrouted: the next round's orderings
                 open_nets, too_close = [str(e)], []
                 continue
