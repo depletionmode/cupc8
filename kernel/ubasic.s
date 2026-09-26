@@ -2087,6 +2087,8 @@ ub_load_line:
 	push pch
 	push pcl
 	b str_atoi
+	gt r1, #0x7f			; a line number is 1-32767, as typed
+	bzf .done
 	or r0, r1
 	eq r0, #0
 	bzf .done

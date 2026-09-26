@@ -2677,6 +2677,190 @@ proc testStorage() =
 
 run testStorage
 
+# ---------------------------------------------------------------------------
+# BASIC line editing (kernel/term.s term_cmd_basicline)
+# ---------------------------------------------------------------------------
+
+proc progText(): string =
+  ## The BASIC program as the kernel keeps it: its length's bytes from $c000,
+  ## each CR as "|", and "!" unless a 0 follows them
+  let n = progIdx()
+  for a in 0xc000 ..< 0xc000 + n:
+    result.add(if mem[a] == 13: '|' else: char(mem[a]))
+  if mem[0xc000 + n] != 0: result.add("!")
+
+proc expectText(name, got, want: string) =
+  if got == want: ok(name)
+  else: fail(name & ": got \"" & got & "\", want \"" & want & "\"")
+
+proc bootBasic(rom: string) =
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+
+proc edit(lines: openArray[string]; want, what: string) =
+  ## type the lines; the program must then be `want` (progText)
+  for l in lines: typeLine(l)
+  expectText(what, progText(), want)
+
+proc testBasicEdit() =
+  ## KRN-027: BASIC keeps its program in line-number order, as a BASIC
+  ## should: a typed line goes in its place (at the start, in the middle, at
+  ## the end; by number, not as text: 9 < 10 < 100), replaces the line of its
+  ## number (the same length, longer, shorter), and a line number alone (with
+  ## spaces after it too) deletes that line, a missing one leaving the
+  ## program as it was; numbers 1 and 32767. The bytes at $c000 checked after
+  ## every edit (the lines, each CR, the 0 and the length); list and run see
+  ## the sorted program, GOTO and GOSUB reach lines typed out of order and
+  ## lines added or changed after a run. PROGRAM FULL stays exact at $dfff
+  ## for a replacement: one that grows the program to 8191 bytes is taken,
+  ## one byte more refused with the program and $e000 untouched, a shorter
+  ## one taken on a full program. A line above the last typed one is found
+  ## from that one's place: typing in order after 250 lines is as quick as
+  ## at the start.
+  echo "== BASIC line editing =="
+  let rom = buildKernelRom()
+  bootBasic(rom)
+  edit(["30 print 3", "10 print 1", "20 print 2"], "10 print 1|20 print 2|30 print 3|",
+       "typed out of order, kept in order")
+  expectTrue("list prints it in order",
+             cmdOutput("list") == @["10 print 1", "20 print 2", "30 print 3"])
+  expectTrue("run runs it in order", runOutput() == @["1", "2", "3"])
+  edit(["20 print 5"], "10 print 1|20 print 5|30 print 3|", "replace, the same length")
+  edit(["20 print 12345"], "10 print 1|20 print 12345|30 print 3|", "replace with a longer line")
+  edit(["20 print 7"], "10 print 1|20 print 7|30 print 3|", "replace with a shorter line")
+  edit(["5 print 0"], "5 print 0|10 print 1|20 print 7|30 print 3|", "insert at the start")
+  edit(["15 print 15"], "5 print 0|10 print 1|15 print 15|20 print 7|30 print 3|", "insert in the middle")
+  edit(["40 print 4"], "5 print 0|10 print 1|15 print 15|20 print 7|30 print 3|40 print 4|", "insert at the end")
+  edit(["15"], "5 print 0|10 print 1|20 print 7|30 print 3|40 print 4|", "delete a line in the middle")
+  edit(["5   "], "10 print 1|20 print 7|30 print 3|40 print 4|", "delete the first line (spaces after the number)")
+  edit(["25"], "10 print 1|20 print 7|30 print 3|40 print 4|", "delete a missing line: nothing changes")
+  edit(["40"], "10 print 1|20 print 7|30 print 3|", "delete the last line")
+  edit(["35 print 35"], "10 print 1|20 print 7|30 print 3|35 print 35|", "a line after a deleted last line")
+  edit(["100 print 100", "9 print 9"], "9 print 9|10 print 1|20 print 7|30 print 3|35 print 35|100 print 100|",
+       "by number, not as text")
+  edit(["32767 print 32767", "1 print 1"],
+       "1 print 1|9 print 9|10 print 1|20 print 7|30 print 3|35 print 35|100 print 100|32767 print 32767|",
+       "line numbers 1 and 32767")
+  expectTrue("run after the edits",
+             runOutput() == @["1", "9", "1", "7", "3", "35", "100", "32767"])
+  edit(["10", "20", "30", "35", "100", "32767", "1", "9"], "", "every line deleted")
+  expectTrue("an empty program lists nothing", cmdOutput("list").len == 0)
+
+  # GOTO and GOSUB: the line index (ubasic.s) is built as a run goes, so a
+  # run after edits must reach the lines where they are now
+  typeLine("new")
+  edit(["110 return", "100 print 1", "60 end", "10 gosub 100", "30 goto 60", "20 print 2", "40 print 99"],
+       "10 gosub 100|20 print 2|30 goto 60|40 print 99|60 end|100 print 1|110 return|",
+       "a GOSUB program typed backwards")
+  expectTrue("GOSUB and GOTO to lines typed out of order", runOutput() == @["1", "2"])
+  edit(["25 goto 40", "40 print 4"],
+       "10 gosub 100|20 print 2|25 goto 40|30 goto 60|40 print 4|60 end|100 print 1|110 return|",
+       "a GOTO inserted, its target replaced")
+  expectTrue("GOTO to a replaced line after a run", runOutput() == @["1", "2", "4"])
+  edit(["25", "105 print 5", "30 goto 55", "55 print 55"],
+       "10 gosub 100|20 print 2|30 goto 55|40 print 4|55 print 55|60 end|100 print 1|105 print 5|110 return|",
+       "lines deleted, inserted and changed")
+  expectTrue("GOTO and GOSUB after more edits", runOutput() == @["1", "5", "2", "55"])
+
+  # PROGRAM FULL for replacements: 8180 bytes, then line 1 (7 characters)
+  # replaced by 18 (the program to 8191, its 0 at $dfff) and by 19
+  bootBasic(rom)
+  var head = @["1 rem a"]
+  var used = 8
+  var n = 0
+  while used + 31 + 20 <= 8180:
+    head.add($(1000 + n) & " rem " & "b".repeat(21))   # 30 characters and the CR
+    used += 31
+    inc n
+  head.add("30000 rem " & "c".repeat(8180 - used - 11))
+  expect("the program before the edits", prefillProgram(head), 8180, 4)
+  var rest = ""
+  for l in head[1..^1]: rest.add(l & "|")
+  let bss0 = mem[0xe000]
+  let g = gpuCard()
+  typeLine("1 rem " & "a".repeat(12))
+  expectTrue("a replacement that ends the program at $dfff is taken", gpuFind(g, "PROGRAM FULL") < 0)
+  expectText("... the line replaced, the rest moved up", progText(), "1 rem " & "a".repeat(12) & "|" & rest)
+  expect("... 8191 bytes", progIdx(), 8191, 4)
+  expect("... the last CR at $dffe", mem[0xdffe], 13)
+  expect("... and the 0 at $dfff", mem[0xdfff], 0)
+  typeLine("1 rem " & "a".repeat(13))
+  expectTrue("a replacement one byte longer is refused (PROGRAM FULL)", gpuFind(g, "PROGRAM FULL") >= 0)
+  expectText("... the program as it was", progText(), "1 rem " & "a".repeat(12) & "|" & rest)
+  expect("... nothing written past $dfff", mem[0xe000], bss0)
+  typeLine("clr")
+  typeLine("2 rem d")
+  expectTrue("a new line on a full program is refused", gpuFind(g, "PROGRAM FULL") >= 0)
+  typeLine("clr")
+  typeLine("1 rem a")
+  expectTrue("a shorter replacement on a full program is taken", gpuFind(g, "PROGRAM FULL") < 0)
+  expectText("... the rest moved down", progText(), "1 rem a|" & rest)
+  typeLine("2 rem " & "d".repeat(4))
+  expectTrue("then a new line of 10 characters fits exactly", gpuFind(g, "PROGRAM FULL") < 0)
+  expect("... 8191 bytes", progIdx(), 8191, 4)
+  expectText("... in its place", progText(), "1 rem a|2 rem dddd|" & rest)
+  expect("... nothing written past $dfff", mem[0xe000], bss0)
+
+  # typing in order: the next line is looked for from the last one's place
+  typeLine("new")
+  var t0 = simClocks
+  for i in 0..15: typeLine($(100 + i) & " rem x")
+  let short = simClocks - t0
+  typeLine("new")
+  discard prefillProgram(head[0..^2])
+  typeLine("29999 rem x")                       # from the first line: after 250 lines
+  t0 = simClocks
+  for i in 0..15: typeLine($(30000 + i) & " rem x")
+  let long = simClocks - t0
+  echo "  16 lines typed at the start: ", short, " clocks; after 250 lines: ", long
+  expectTrue("16 lines typed in order after 250 take as long as at the start (within 20 %)",
+             long * 5 < short * 6)
+  ioModel = imLegacy
+
+run testBasicEdit
+
+proc testBasicEditStorage() =
+  ## KRN-027: SAVE and LOAD with the ordered program: a program typed out of
+  ## order is saved in order (the file as a PC reads it) and LOADs back the
+  ## same; a PC's file with its lines out of order, a line given twice (the
+  ## later kept) and a line number past 32767 (skipped, as typing refuses
+  ## it) LOADs in order and runs.
+  echo "== BASIC line editing: SAVE and LOAD =="
+  let rom = buildKernelRom()
+  createDir(storeDir)
+  let img = storeDir / "edit.img"
+  var r = fatcheck("blank " & quoteShell(img) & " 4096")
+  if r.exitCode != 0:
+    fail("fatcheck blank: " & r.output)
+    return
+  writeFile(storeDir / "mixed.txt",
+            "30 print 3\r\n10 print 1\r\n40000 print 4\r\n20 print 2\r\n10 print 11\r\n5 print 5\r\n")
+  discard fatcheck("put " & quoteShell(img) & " MIXED.BAS " & quoteShell(storeDir / "mixed.txt"))
+  bootStorage(rom, img)
+  for l in ["30 print 3", "10 print 1", "20 print 2", "15 print 15", "15 print 5"]:
+    typeLine(l)
+  expectTrue("SAVE a program typed out of order", cmdOutput("save \"sorted.bas\"") == @["SAVED"])
+  let expectDir = storeDir / "expect-sorted"
+  removeDir(expectDir)
+  createDir(expectDir)
+  writeFile(expectDir / "SORTED.BAS", "10 print 1\r\n15 print 5\r\n20 print 2\r\n30 print 3\r\n")
+  r = fatcheck("check " & quoteShell(img) & " " & quoteShell(expectDir))
+  if r.exitCode != 0: echo r.output
+  expectTrue("... the file holds it in order", r.exitCode == 0)
+  typeLine("new")
+  expectTrue("LOAD it back", cmdOutput("load \"sorted.bas\"") == @["LOADED"])
+  expectText("... the same program", progText(), "10 print 1|15 print 5|20 print 2|30 print 3|")
+  expectTrue("LOAD a file with its lines out of order", cmdOutput("load \"mixed.bas\"") == @["LOADED"])
+  expectText("... in order, the later line 10 kept, 40000 skipped", progText(),
+             "5 print 5|10 print 11|20 print 2|30 print 3|")
+  expectTrue("... and it runs in order", runOutput() == @["5", "11", "2", "3"])
+  ioModel = imLegacy
+
+run testBasicEditStorage
+
 proc testRamBanks() =
   ## SIM-005: the simulator's RAM_BANK ($f205, extended-ram.md) matches the
   ## chipset's (MMU-005): reset 2 is the identity map, 5 bits read back,

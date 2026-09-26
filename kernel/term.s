@@ -12,10 +12,10 @@ term_line_buf: resb 80
 term_do:
 	; start with an empty program: .bss is not cleared, and the SRAM
 	; powers up with junk
+	push pch
+	push pcl
+	b term_cmd_new
 	xor r0, r0
-	st [term_basic_prog_buf_idx], r0
-	st [term_basic_prog_buf_idx+1], r0
-	st $c000, r0
 	st API_RUN, r0			; no program from the PC yet
 
 	term_s_info db "\n      CUPC/8 BASIC 2026.09      \n"
@@ -434,255 +434,185 @@ term_cmd_list:
 	pop pcl
 	pop pch
 
+; ------------------------------------------------------------ program editing
 ; A typed line into the program, which is kept in line-number order: it goes
 ; in its place, replaces the line of its number, and a line number alone
 ; (spaces after it are fine) deletes that line. The rest of the program moves
-; up or down by the change; PROGRAM FULL if the program would end past
-; $dfff. term_v holds 16-bit pointers, low first:
-;  0 a move's from, 2 its to, 4 the from it stops at (term_move)
-;  6 the typed line's place, 8 past the line there if that has the typed
-;    line's number (else the place), 10 the program's end, its 0
-term_v: resb 12
-term_step: resb 2			; what term_add adds - the move's step
+; by the difference (API_MEM_CPY, a memmove); PROGRAM FULL if the program
+; would end past $dfff. A line numbered above the last one typed is looked
+; for from that one's place on (term_p), so a program typed or loaded in
+; order is quick. The work is in API_ARGS ($6f00): +2 the old line's end
+; while looking, then API_MEM_CPY's dst, src and len; +6 the new length.
+; This part uses the kernel through the API, str_atoi and n16_cmp only.
+%define API_MEM_CPY $101e
+term_p: resb 2				; the last typed line's place ($c000 after new)
 term_ln: resb 2				; the typed line's number
 term_new: resb 1			; the typed line's length with its CR, 0 for just a number
+term_d: resb 2				; what term_add adds
 term_cmd_basicline:
 	xor r0, r0
 	st [term_full], r0
-	st [term_step+1], r0
 	mov r0, #>[term_line_buf]
 	mov r1, #<[term_line_buf]
 	push pch
 	push pcl
-	b str_atoi
+	b term_cmp				; 2 if above the last typed line
+	push r0
+	ld r0, [n_a]
 	st [term_ln], r0
-	st [term_ln+1], r1
-	ld r0, [term_basic_prog_buf_idx]	; the end - $c000 + the length
-	st [term_v+10], r0
-	st [term_v+8], r0
-	ld r0, [term_basic_prog_buf_idx+1]
-	add r0, TERM_PROG_HI
-	st [term_v+11], r0
-	st [term_v+9], r0
-	; typing a program in order adds each line at the end, so first the last
-	; line - the one after the CR before the end's CR, or the first
-	ld r0, [term_basic_prog_buf_idx]
-	ld r1, [term_basic_prog_buf_idx+1]
-	or r0, r1
-	eq r0, #0
-	bzf .at_end				; an empty program
-	mov r0, #0xff
-	st [term_step], r0
-	st [term_step+1], r0
-	mov r1, #8
-	push pch
-	push pcl
-	b term_add
-.back:
-	mov r1, #8
-	push pch
-	push pcl
-	b term_add
-	ld r0, [term_v+9]
-	eq r0, #0xbf
-	bzf .last
-	ldd r0, [term_v+8]
-	eq r0, #13
-	bzf .last
-	b .back
-.last:
-	mov r0, #1
-	st [term_step], r0
-	xor r0, r0
-	st [term_step+1], r0
-	mov r1, #8
-	push pch
-	push pcl
-	b term_add
-	ld r0, [term_v+9]
-	ld r1, [term_v+8]
-	push pch
-	push pcl
-	b term_cmp
-	eq r0, #1
-	bzf .at_end				; the last line's number is smaller
+	ld r0, [n_a+1]
+	st [term_ln+1], r0
+	pop r0
+	eq r0, #2
+	bzf .find
 	xor r0, r0				; else from the first line
-	st [term_v+6], r0
+	st [term_p], r0
 	mov r0, TERM_PROG_HI
-	st [term_v+7], r0
+	st [term_p+1], r0
 .find:
-	ld r0, [term_v+6]
-	st [term_v+8], r0
-	ld r0, [term_v+7]
-	st [term_v+9], r0
-	ldd r0, [term_v+6]
+	ld r0, [term_p]			; the old line's end - the place, for now
+	st $6f02, r0
+	ld r0, [term_p+1]
+	st $6f03, r0
+	ldd r0, [term_p]
 	eq r0, #0
 	bzf .placed				; the program's end
-	ld r0, [term_v+7]
-	ld r1, [term_v+6]
+	ld r0, [term_p+1]
+	ld r1, [term_p]
 	push pch
 	push pcl
 	b term_cmp
 	eq r0, #2
 	bzf .placed				; a bigger number - the typed line goes before it
 	push r0
-	xor r1, r1				; past the line's CR
+	xor r1, r1
 .eol:
-	ldd r0, [term_v+6]+r1
+	ldd r0, [term_p]+r1
 	add r1, #1
 	eq r0, #13
 	bzf .eol_found
 	b .eol
 .eol_found:
-	st [term_step], r1
-	mov r1, #8
+	st [term_d], r1			; past the line's CR
+	xor r0, r0
+	st [term_d+1], r0
+	mov r1, #2
 	push pch
 	push pcl
 	b term_add
 	pop r0
 	eq r0, #0
 	bzf .placed				; the same number - the typed line replaces it
-	ld r0, [term_v+8]		; a smaller number - on to the next line
-	st [term_v+6], r0
-	ld r0, [term_v+9]
-	st [term_v+7], r0
+	ld r0, $6f02			; a smaller number - on to the next line
+	st [term_p], r0
+	ld r0, $6f03
+	st [term_p+1], r0
 	b .find
-.at_end:
-	ld r0, [term_v+10]
-	st [term_v+6], r0
-	st [term_v+8], r0
-	ld r0, [term_v+11]
-	st [term_v+7], r0
-	st [term_v+9], r0
 .placed:
-	xor r1, r1
-.scan:						; a line number alone?
-	ld r0, [term_line_buf]+r1
-	add r1, #1
-	eq r0, #13
-	bzf .delete
-	eq r0, #32
-	bzf .scan
-	lt r0, #48
-	bzf .text
-	gt r0, #57
-	bzf .text
-	b .scan
-.text:
+	; the bytes from the old line's end to the program's 0, that included -
+	; the length + 1 less (the end - $c000)
+	ld r0, [term_basic_prog_buf_idx]
+	ld r1, $6f02
+	lt r0, r1				; a borrow
+	sub r0, r1
+	st $6f04, r0
+	ld r0, [term_basic_prog_buf_idx+1]
+	add r0, TERM_PROG_HI
+	ld r1, $6f03
+	sub r0, r1
+	bzf .borrow
+	b .count_hi
+.borrow:
+	sub r0, #1
+.count_hi:
+	st $6f05, r0
+	mov r0, #1
+	st [term_d], r0
+	xor r0, r0
+	st [term_d+1], r0
+	mov r1, #4
+	push pch
+	push pcl
+	b term_add
+	; the typed line's length, 0 for a line number alone
 	ld r1, [rs_i]
 	add r1, #1
-	b .length
-.delete:
-	xor r1, r1
-.length:
 	st [term_new], r1
-	; the program grows by k - the typed line's length less the old line's
-	; (under 80 each, so the low bytes do), the step k sign-extended
-	mov r0, r1
-	ld r1, [term_v+8]
-	sub r0, r1
-	ld r1, [term_v+6]
-	add r0, r1
-	st [term_step], r0
 	xor r1, r1
-	st [term_step+1], r1
-	eq r0, #0
-	bzf .shrink
+.scan:
+	ld r0, [term_line_buf]+r1
+	add r1, #1
+	eq r0, #32
+	bzf .scan
+	sub r0, #48
+	lt r0, #10
+	bzf .scan
+	eq r0, #221				; its CR, 13 - 48
+	bzf .delete
+	b .text
+.delete:
+	xor r0, r0
+	st [term_new], r0
+.text:
+	; the program grows by k - the typed line's length less the old line's
+	; (under 80 each, so the low bytes do) - sign-extended into term_d
+	ld r0, [term_new]
+	ld r1, $6f02
+	sub r0, r1
+	ld r1, [term_p]
+	add r0, r1
+	st [term_d], r0
+	xor r1, r1
 	gt r0, #0x7f
 	bzf .negative
-	; it grows - the end moves up by k, the rest from the end down to the
-	; old line's end, a byte at a time
-	ld r0, [term_v+10]
-	st [term_v], r0
-	ld r0, [term_v+11]
-	st [term_v+1], r0
-	mov r1, #10
-	push pch
-	push pcl
-	b term_add
-	ld r0, [term_v+11]
-	eq r0, #0xe0
-	bzf .full				; the new end is past $dfff
-	ld r0, [term_v+10]
-	st [term_v+2], r0
-	ld r0, [term_v+11]
-	st [term_v+3], r0
-	ld r0, [term_v+8]
-	st [term_v+4], r0
-	ld r0, [term_v+9]
-	st [term_v+5], r0
-	mov r0, #0xff
-	st [term_step], r0
-	st [term_step+1], r0
-	mov r1, #4
-	push pch
-	push pcl
-	b term_add
-	b .move
+	b .signed
 .negative:
 	mov r1, #0xff
-	st [term_step+1], r1
-.shrink:					; the rest from the old line's end up, down by k
-	ld r0, [term_v+10]
-	st [term_v+4], r0
-	ld r0, [term_v+11]
-	st [term_v+5], r0
-	mov r1, #10
+.signed:
+	st [term_d+1], r1
+	ld r0, [term_basic_prog_buf_idx]	; the new length, at most $1fff
+	st $6f06, r0
+	ld r0, [term_basic_prog_buf_idx+1]
+	st $6f07, r0
+	mov r1, #6
 	push pch
 	push pcl
 	b term_add
-	ld r0, [term_v+8]
-	st [term_v], r0
-	st [term_v+2], r0
-	ld r0, [term_v+9]
-	st [term_v+1], r0
-	st [term_v+3], r0
-	mov r1, #2
-	push pch
-	push pcl
-	b term_add
-	mov r0, #1
-	st [term_step], r0
-	xor r0, r0
-	st [term_step+1], r0
-	mov r1, #4
-	push pch
-	push pcl
-	b term_add
-.move:
-	push pch
-	push pcl
-	b term_move
-	; the typed line into its place
-	mov r0, #<[term_line_buf]
-	st [term_v], r0
-	st [term_v+4], r0
-	mov r0, #>[term_line_buf]
-	st [term_v+1], r0
-	st [term_v+5], r0
-	ld r0, [term_v+6]
-	st [term_v+2], r0
-	ld r0, [term_v+7]
-	st [term_v+3], r0
-	xor r0, r0
-	st [term_step+1], r0
-	ld r0, [term_new]
-	st [term_step], r0
-	mov r1, #4
-	push pch
-	push pcl
-	b term_add
-	mov r0, #1
-	st [term_step], r0
-	push pch
-	push pcl
-	b term_move
-	ld r0, [term_v+10]		; the length - the new end less $c000
+	ld r0, $6f07
+	gt r0, #0x1f
+	bzf .full
+	ld r0, $6f06
 	st [term_basic_prog_buf_idx], r0
-	ld r0, [term_v+11]
-	sub r0, TERM_PROG_HI
+	ld r0, $6f07
 	st [term_basic_prog_buf_idx+1], r0
-	b .done
+	ld r0, $6f02			; the rest to the old line's end + k
+	st $6f00, r0
+	ld r0, $6f03
+	st $6f01, r0
+	xor r1, r1
+	push pch
+	push pcl
+	b term_add
+	push pch
+	push pcl
+	b API_MEM_CPY
+	ld r0, [term_p]			; the typed line into its place
+	st $6f00, r0
+	ld r0, [term_p+1]
+	st $6f01, r0
+	mov r0, #<[term_line_buf]
+	st $6f02, r0
+	mov r0, #>[term_line_buf]
+	st $6f03, r0
+	ld r0, [term_new]
+	st $6f04, r0
+	xor r0, r0
+	st $6f05, r0
+	push pch
+	push pcl
+	b API_MEM_CPY
+	pop pcl
+	pop pch
 .full:
 	mov r0, #1
 	st [term_full], r0
@@ -696,8 +626,8 @@ term_cmd_basicline:
 	pop pcl
 	pop pch
 
-; compare the number the line at r0 (high), r1 (low) starts with to the typed
-; line's - r0 0 the same, 1 smaller, 2 bigger
+; the number the text at r0 (high), r1 (low) starts with, into n_a, against
+; the typed line's (term_ln) - r0 0 the same, 1 less, 2 greater
 term_cmp:
 	push pch
 	push pcl
@@ -708,62 +638,29 @@ term_cmp:
 	st [n_b], r0
 	ld r0, [term_ln+1]
 	st [n_b+1], r0
-	push pch
-	push pcl
 	b n16_cmp
-	pop pcl
-	pop pch
 
-; the 16 bits at term_v + r1 plus term_step
+; the 16 bits at API_ARGS + r1 plus term_d
 term_add:
-	ld r0, [term_v]+r1
+	ld r0, $6f00+r1
 	push r1
-	ld r1, [term_step]
+	ld r1, [term_d]
 	add r0, r1
 	lt r0, r1				; carried
 	pop r1
-	st [term_v]+r1, r0
-	ld r0, [term_v+1]+r1
+	st $6f00+r1, r0
+	add r1, #1
+	ld r0, $6f00+r1
 	bzf .carry
 	b .high
 .carry:
 	add r0, #1
 .high:
 	push r1
-	ld r1, [term_step+1]
+	ld r1, [term_d+1]
 	add r0, r1
 	pop r1
-	st [term_v+1]+r1, r0
-	pop pcl
-	pop pch
-
-; copy a byte at a time from term_v+0 to term_v+2, stepping both by
-; term_step, until the from is term_v+4
-term_move:
-.loop:
-	ld r0, [term_v]
-	ld r1, [term_v+4]
-	eq r0, r1
-	bzf .low_same
-	b .byte
-.low_same:
-	ld r0, [term_v+1]
-	ld r1, [term_v+5]
-	eq r0, r1
-	bzf .done
-.byte:
-	ldd r0, [term_v]
-	std [term_v+2], r0
-	xor r1, r1
-	push pch
-	push pcl
-	b term_add
-	mov r1, #2
-	push pch
-	push pcl
-	b term_add
-	b .loop
-.done:
+	st $6f00+r1, r0
 	pop pcl
 	pop pch
 
@@ -819,6 +716,9 @@ term_cmd_new:
 	st [term_basic_prog_buf_idx], r0
 	st [term_basic_prog_buf_idx+1], r0
 	st $c000, r0
+	st [term_p], r0			; lines are looked for from the first
+	mov r0, TERM_PROG_HI
+	st [term_p+1], r0
 
 .done:
 	pop pcl
