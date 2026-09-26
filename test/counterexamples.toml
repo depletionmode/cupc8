@@ -153,7 +153,9 @@ revert = [
 	push pcl
 	b ubasic_accept
 .read:
-	ldd r0, [ub_mem_ptr]
+	push pch
+	push pcl
+	b ub_peek
 	st [ub_val], r0
 	xor r0, r0
 	st [ub_val+1], r0
