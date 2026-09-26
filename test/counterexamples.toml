@@ -808,3 +808,13 @@ revert = [["kernel/gpu.s", """	mov r0, #0xff
 	and r0, #0x7f"""]]
 cmd = "tools/run_tests.sh testText8Free"
 must_fail = ["FAIL: ... and nothing was dropped"]
+
+[[bug]]
+name = "tests built the kernel in kernel/ itself - two builds at once (SIM-010 beside simtest) mixed their merged.ss, kernel.o and kernel.map"
+fixed_in = "the commit adding KRN-022"
+revert = [["tools/simmachine.nim", """  let d = if dir.len > 0: dir else: romDir()
+  run("bash " & quoteShell(simRoot / "kernel" / "assemble.sh") & " " & quoteShell(d), "kernel build")
+  d / "kernel.o\"""", """  run("cd " & quoteShell(simRoot / "kernel") & " && bash assemble.sh", "kernel build")
+  simRoot / "kernel" / "kernel.o\""""], ["tools/simmachine.nim", """  romDir() / "kernel.map\"""", """  simRoot / "kernel" / "kernel.map\""""]]
+cmd = "tools/run_tests.sh testKernelBuildsConcurrent"
+must_fail = ["FAIL: 8 builds, two at a time: every ROM and map equals the one built alone"]

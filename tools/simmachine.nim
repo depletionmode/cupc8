@@ -4,15 +4,30 @@
 # and a blank FAT image for the storage card.
 
 import os
+import std/tempfiles
+import std/exitprocs
 import osproc
 import strutils
 import simcards
 
 const
   simRoot = currentSourcePath().parentDir.parentDir
-  romDir = simRoot / "build" / "rom"
-
   CardKindNames* = "hdmi, eink, eink750, io, storage, wifi, empty"
+
+var privDir = ""
+
+proc romDir*(): string =
+  ## This process's own build directory (build/rom-PID-*, made on first use,
+  ## removed at exit): the kernel, its map, the boot ROM and the ROM images
+  ## built here. Tests and sims running side by side each have their own, so
+  ## none overwrites another's (kernel/assemble.sh once built in kernel/ for
+  ## all of them).
+  if privDir.len == 0:
+    createDir(simRoot / "build")
+    privDir = createTempDir("rom-" & $getCurrentProcessId() & "-", "", simRoot / "build")
+    let d = privDir
+    addExitProc(proc () = removeDir(d))
+  privDir
 
 proc cardKind*(name: string): int =
   ## Slot card kind by name (the native emulator's names), 0 = empty slot,
@@ -33,9 +48,8 @@ proc run(cmd, what: string) =
     raise newException(IOError, what & ": " & r.output)
 
 proc buildBootRom*(): string =
-  ## Assemble rom/boot.s into build/rom/boot.bin.
-  createDir(romDir)
-  result = romDir / "boot.bin"
+  ## Assemble rom/boot.s into romDir()/boot.bin.
+  result = romDir() / "boot.bin"
   run("python3 " & quoteShell(simRoot / "tools" / "as.py") & " " &
       quoteShell(simRoot / "rom" / "boot.s") & " " & quoteShell(result) &
       " 0xe000,0xe600,0x0f00", "boot ROM")
@@ -47,11 +61,21 @@ proc makeRom*(boot, kernel, dest: string): string =
       quoteShell(boot) & " " & quoteShell(kernel) & " -o " & quoteShell(dest), "mkrom")
   dest
 
+proc buildKernel*(dir = ""): string =
+  ## Assemble the real kernel (kernel/assemble.sh) into `dir` (default
+  ## romDir()): its kernel.o, the path returned, and kernel.map beside it.
+  let d = if dir.len > 0: dir else: romDir()
+  run("bash " & quoteShell(simRoot / "kernel" / "assemble.sh") & " " & quoteShell(d), "kernel build")
+  d / "kernel.o"
+
+proc kernelMapPath*(): string =
+  ## The map of the kernel buildKernel built last (in romDir())
+  romDir() / "kernel.map"
+
 proc buildKernelRom*(): string =
-  ## Assemble the real kernel (kernel/assemble.sh) and the boot ROM into
-  ## build/rom/kernel.rom.
-  run("cd " & quoteShell(simRoot / "kernel") & " && bash assemble.sh", "kernel build")
-  makeRom(buildBootRom(), simRoot / "kernel" / "kernel.o", romDir / "kernel.rom")
+  ## The real kernel and the boot ROM as the ROM chip holds them:
+  ## romDir()/kernel.rom.
+  makeRom(buildBootRom(), buildKernel(), romDir() / "kernel.rom")
 
 proc screenLines*(g: SimCard): seq[string] =
   ## The graphics card's text screen, one string per row, trailing blanks cut.

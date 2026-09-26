@@ -9,6 +9,7 @@ import nativesockets
 import strutils
 import sequtils
 import tables
+import streams
 import sim
 import simdisplay
 import simcards
@@ -36,6 +37,18 @@ proc ok(msg: string) =
 
 # `simtest [name ...]` runs only the named tests; no arguments runs them all.
 let onlyTests = commandLineParams()
+
+# `simtest --build-kernel OUT`: build the kernel ROM as every test here does
+# (simmachine.nim buildKernelRom) and copy it and its map to OUT.rom, OUT.map;
+# testKernelBuildsConcurrent runs several of these at once
+if onlyTests.len == 2 and onlyTests[0] == "--build-kernel":
+  try:
+    copyFile(buildKernelRom(), onlyTests[1] & ".rom")
+    copyFile(kernelMapPath(), onlyTests[1] & ".map")
+  except CatchableError as e:
+    echo "build failed: ", e.msg
+    quit(1)
+  quit(0)
 
 template run(test: untyped) =
   if onlyTests.len == 0 or astToStr(test) in onlyTests:
@@ -88,6 +101,12 @@ proc runFile(src: string): int =
 # original smoke tests
 # ---------------------------------------------------------------------------
 
+proc kernelBuild(): tuple[output: string, exitCode: int] =
+  ## Assemble the kernel (kernel/assemble.sh) into this run's own build
+  ## directory (simmachine.nim romDir()), never into kernel/: a test running
+  ## beside this one builds in its own.
+  execCmdEx("bash " & quoteShell(kernelDir / "assemble.sh") & " " & quoteShell(romDir()))
+
 proc testTinyProgram() =
   echo "== tiny assembled program =="
   let src = testdata / "movst.s"
@@ -131,10 +150,9 @@ proc testTinyProgram() =
 
 proc testKernelBoot() =
   echo "== kernel.o boot =="
-  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath},
-                            workingDir = kernelDir)
+  let assembled = kernelBuild()
   echo assembled.output.splitLines()[^1]
-  let kpath = kernelDir / "kernel.o"
+  let kpath = romDir() / "kernel.o"
   if not fileExists(kpath):
     fail("kernel.o missing after assemble.sh")
     return
@@ -294,12 +312,11 @@ proc testDisassembler() =
 
 proc testSymbolsAndKernelDecode() =
   echo "== symbols and kernel instruction boundaries =="
-  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath},
-                            workingDir = kernelDir)
+  let assembled = kernelBuild()
   if assembled.exitCode != 0:
     fail("kernel assembly for symbol test failed: " & assembled.output)
     return
-  var table = loadMap(kernelDir / "kernel.map")
+  var table = loadMap(romDir() / "kernel.map", kernelDir)
   expectTrue("kernel map loaded", table.loaded)
   let termAddress = table.resolve("term_do")
   expectTrue("resolve term_do", termAddress >= 0x1000)
@@ -327,7 +344,7 @@ proc testSymbolsAndKernelDecode() =
              nextIns > termAddress and table.prevInsAddr(nextIns, 1) == termAddress)
 
   cpuReset()
-  cpuLoadFile(kernelDir / "kernel.o")
+  cpuLoadFile(romDir() / "kernel.o")
   var mismatch = ""
   for i in 0..<(table.insAddrs.len - 1):
     let
@@ -854,13 +871,12 @@ run testIrqMaskMmio
 
 proc testKernelKeybWaits() =
   echo "== kernel keyb parks on wai =="
-  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath},
-                            workingDir = kernelDir)
+  let assembled = kernelBuild()
   if assembled.exitCode != 0:
     fail("kernel assemble failed: " & assembled.output)
     return
   cpuReset()
-  cpuLoadFile(kernelDir / "kernel.o")
+  cpuLoadFile(romDir() / "kernel.o")
   var n = 0
   while n < 2_000_000 and not waiting and not HF:
     if cpuStep() != sOk:
@@ -964,10 +980,10 @@ run testCardsMode
 
 proc buildRom(kernelSrc: string): string =
   ## Assemble the boot ROM and a kernel, then build a ROM image.
-  let kernel = rootDir / "build" / "rom" / "kernel.o"
+  let kernel = romDir() / "kernel.o"
   let boot = buildBootRom()
   assemble(kernelSrc, kernel)
-  makeRom(boot, kernel, rootDir / "build" / "rom" / "test.rom")
+  makeRom(boot, kernel, romDir() / "test.rom")
 
 proc testBootChain() =
   ## BOOT-001: reset into the boot ROM, POST, banner, kernel copy, and go.
@@ -1024,8 +1040,8 @@ proc corruptRom(src, dest: string; offset: int; value: uint8; fixHeaderSum = fal
 proc testBootFailures() =
   ## BOOT-002: each failure path halts with its specified LED code.
   echo "== boot ROM failure paths =="
-  let good = rootDir / "build" / "rom" / "test.rom"
-  let bad = rootDir / "build" / "rom" / "bad.rom"
+  let good = romDir() / "test.rom"
+  let bad = romDir() / "bad.rom"
 
   corruptRom(good, bad, 0x800, uint8(ord('X')))          # magic
   expect("bad magic halts with $90", runBootWithRom(bad), 0x90)
@@ -1222,7 +1238,7 @@ proc testKernelOnEink() =
   ## HDMI and `refresh` does nothing.
   echo "== kernel on the e-ink card =="
   let rom = buildKernelRom()
-  let table = loadMap(kernelDir / "kernel.map")
+  let table = loadMap(romDir() / "kernel.map")
   let kindAt = table.resolve("gpu_kind")
   expectTrue("gpu_kind in the kernel map", kindAt >= 0)
   for (card, name) in [(CardEink, "5.83in"), (CardEink750, "7.5in")]:
@@ -1324,7 +1340,7 @@ run testBackspace
 
 proc progIdxAt(): int =
   ## term_basic_prog_buf_idx, the BASIC program's length, in the kernel just built
-  loadMap(kernelDir / "kernel.map").resolve("term_basic_prog_buf_idx")
+  loadMap(romDir() / "kernel.map").resolve("term_basic_prog_buf_idx")
 
 proc progIdx(): int =
   let a = progIdxAt()
@@ -1875,7 +1891,7 @@ const
 
 proc kernelSyms(): Table[string, int] =
   ## Code labels, data and bss of the kernel just built (kernel/kernel.map).
-  for line in lines(kernelDir / "kernel.map"):
+  for line in lines(romDir() / "kernel.map"):
     let f = line.splitWhitespace
     if f.len >= 3 and f[0] == "sym": result[f[2]] = parseHexInt(f[1])
     elif f.len >= 4 and f[0] in ["bss", "data"]: result[f[3]] = parseHexInt(f[1])
@@ -1927,7 +1943,7 @@ proc testNetRoutines() =
   let sym = kernelSyms()
   ioModel = imLegacy
   cpuReset()
-  cpuLoadFile(kernelDir / "kernel.o")
+  cpuLoadFile(romDir() / "kernel.o")
   let pkt = sym["net_pkt"]
 
   # ---- the Internet checksum
@@ -2661,7 +2677,7 @@ proc testKernelBanks() =
   ## SRAM, bad arguments), each leaving the caller's bank selected.
   echo "== kernel banked RAM =="
   let rom = buildKernelRom()
-  let table = loadMap(kernelDir / "kernel.map")
+  let table = loadMap(romDir() / "kernel.map")
   # the kernel keeps nothing in the window
   var inWindow: seq[string]
   for (a, name) in table.sortedSyms:
@@ -2697,8 +2713,8 @@ proc testKernelBanks() =
   expect("stack balanced after the calls", SP, sp0)
 
   # a pattern in every bank, by a program at $7000
-  let src = rootDir / "build" / "rom" / "bank_pattern.s"
-  let bin = rootDir / "build" / "rom" / "bank_pattern.o"
+  let src = romDir() / "bank_pattern.s"
+  let bin = romDir() / "bank_pattern.o"
   writeFile(src, "%define BANK_SET $" & toHex(setAt, 4) & "\n" & readFile(testdata / "bank_pattern.s"))
   let r = execCmdEx("python3 " & quoteShell(asPy) & " " & quoteShell(src) & " " & quoteShell(bin) &
                     " 0x7000,0x7300,0x7400")
@@ -2799,7 +2815,7 @@ run testKernelBanks
 # ---------------------------------------------------------------------------
 
 proc kernelMap(): tuple[syms: Table[int, string], lines: seq[string]] =
-  for line in lines(kernelDir / "kernel.map"):
+  for line in lines(romDir() / "kernel.map"):
     result.lines.add(line)
     let f = line.splitWhitespace()
     if f.len >= 3 and f[0] == "sym":
@@ -2822,7 +2838,7 @@ proc testKernelLayout() =
   ## (memory-map.md): code $1000-$5fff, data $6000-$6eff, bss $e000-$efff;
   ## $6f00 is the API block and $7000- the user program's.
   echo "== kernel memory layout =="
-  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
+  let assembled = kernelBuild()
   if assembled.exitCode != 0:
     fail("kernel assembly failed: " & assembled.output)
     return
@@ -2845,6 +2861,47 @@ proc testKernelLayout() =
 
 run testKernelLayout
 
+proc testKernelBuildsConcurrent() =
+  ## KRN-022: kernel builds running side by side (two test runs, a test and
+  ## the sim) do not clobber each other: each builds in a directory of its
+  ## own (simmachine.nim romDir()). Four rounds of two `simtest
+  ## --build-kernel` at once; every ROM and map equals the one built alone,
+  ## and the map is whole. (They all built in kernel/: merged.ss, kernel.o
+  ## and kernel.map from two builds at once came out mixed, and SIM-010 run
+  ## beside simtest failed now and then.)
+  echo "== kernel builds side by side =="
+  let alone = buildKernelRom()
+  let rom0 = readFile(alone)
+  let map0 = readFile(kernelMapPath())
+  var syms = 0
+  for line in map0.splitLines():
+    if line.startsWith("sym "): inc syms
+  expectTrue("the map built alone is whole (" & $syms & " symbols, term_do and main in it)",
+             syms > 1000 and "term_do" in map0 and " main\n" in map0)
+  let dir = romDir() / "side"
+  createDir(dir)
+  var bad: seq[string]
+  for round in 1..4:
+    var ps: seq[Process]
+    for k in 0..1:
+      ps.add(startProcess(getAppFilename(), args = ["--build-kernel", dir / ("b" & $k)],
+                          options = {poStdErrToStdOut}))
+    for k, p in ps:
+      let output = p.outputStream.readAll()
+      let code = p.waitForExit()
+      p.close()
+      let base = dir / ("b" & $k)
+      if code != 0:
+        bad.add("round " & $round & " build " & $k & ": " & output.strip)
+      elif readFile(base & ".rom") != rom0:
+        bad.add("round " & $round & " build " & $k & ": the ROM differs")
+      elif readFile(base & ".map") != map0:
+        bad.add("round " & $round & " build " & $k & ": the map differs")
+  for b in bad: echo "  ", b
+  expectTrue("8 builds, two at a time: every ROM and map equals the one built alone", bad.len == 0)
+
+run testKernelBuildsConcurrent
+
 proc testKernelApi() =
   ## KRN-010: the jump table (kernel/api.s, from $1003: 8 groups x 32 entries
   ## x 3 bytes) against kernel/api.inc: every entry is a B; a named entry
@@ -2854,11 +2911,11 @@ proc testKernelApi() =
   ## widened the groups from 16 on 2026-09-25, before any release; the
   ## 16-entry drafts, API_PUTC $1033, are not held to it).
   echo "== kernel API table =="
-  let assembled = execCmdEx("bash assemble.sh", options = {poUsePath}, workingDir = kernelDir)
+  let assembled = kernelBuild()
   if assembled.exitCode != 0:
     fail("kernel assembly failed: " & assembled.output)
     return
-  let image = readFile(kernelDir / "kernel.o")
+  let image = readFile(romDir() / "kernel.o")
   let syms = kernelMap().syms
   let defs = incDefines(readFile(kernelDir / "api.inc"))
   var named = initTable[int, string]()
