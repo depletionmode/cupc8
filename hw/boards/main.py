@@ -1053,6 +1053,7 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # at most 30 + 60 + 90 passes. On 6 layers try 1 left 4 connections
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
+ROUTE_PARALLEL = 6                          # orderings routed at once per try (kicadgen route_parallel)
 
 
 def fine_nets():
@@ -1076,6 +1077,7 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
                        fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
+                       route_parallel=ROUTE_PARALLEL,
                        power_nets=POWER_NETS, graphics=_graphics(), labels=LABELS, boards=3,
                        title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
