@@ -10,6 +10,7 @@ import strutils
 import sequtils
 import tables
 import streams
+from posix import O_CREAT, O_RDWR, F_LOCK, F_ULOCK, lockf
 import sim
 import simdisplay
 import simcards
@@ -60,6 +61,24 @@ if onlyTests.len == 2 and onlyTests[0] == "--build-kernel":
 template run(test: untyped) =
   if onlyTests.len == 0 or astToStr(test) in onlyTests:
     test()
+
+template runOnHostPorts(test: untyped) =
+  ## A test whose guest serves or fetches on a fixed port of this host
+  ## (8088, 7007: the Wi-Fi card's sockets are the host's): one run at a time
+  ## on the host, under build/.simtest-ports.lock, so two runs side by side
+  ## do not take each other's port
+  if onlyTests.len == 0 or astToStr(test) in onlyTests:
+    createDir(rootDir / "build")
+    let lockFd = posix.open(cstring(rootDir / "build" / ".simtest-ports.lock"), O_CREAT or O_RDWR, 0o644)
+    discard lockf(lockFd, F_LOCK, 0)
+    try:
+      test()
+    finally:
+      let model = ioModel
+      machineCards([])                # the cards freed: the Wi-Fi card's host sockets closed
+      ioModel = model
+      discard lockf(lockFd, F_ULOCK, 0)
+      discard posix.close(lockFd)
 
 proc expect(name: string, got, want: int, width = 2) =
   if got != want:
@@ -1844,7 +1863,7 @@ proc testKernelNetwork() =
   dns.sock.close()
   ioModel = imLegacy
 
-run testKernelNetwork
+runOnHostPorts testKernelNetwork
 
 proc testKernelNetWeakPower() =
   ## KRN-004: on a USB source under 3 A (SYSCTL.PWR_HI = 0) the "net"
@@ -2384,7 +2403,7 @@ proc testNetExamples() =
   expectTrue("udpecho: still running (not halted)", not HF)
   ioModel = imLegacy
 
-run testNetExamples
+runOnHostPorts testNetExamples
 
 # ---------------------------------------------------------------------------
 # the storage card: BASIC SAVE, LOAD, DIR, DEL (kernel/storage.s, ubasic.s)
@@ -2394,6 +2413,26 @@ let storeDir = workDir / "storage"
 
 proc fatcheck(args: string): tuple[output: string, exitCode: int] =
   execCmdEx("python3 " & quoteShell(toolsDir / "fatcheck.py") & " " & args)
+
+# `simtest --own-files a|b GOFILE` (testRunsSideBySide): write what tests
+# write, where they write it (an SD image in storeDir, an assembled program in
+# workDir), each run its own content; say "ready", wait for GOFILE, then say
+# whether both are still its own. Two of these at once share nothing.
+if onlyTests.len == 3 and onlyTests[0] == "--own-files":
+  let mine = onlyTests[1] == "a"
+  createDir(storeDir)
+  let img = storeDir / "card.img"
+  discard fatcheck("blank " & quoteShell(img) & (if mine: " 2048" else: " 4096"))
+  let imgSize = getFileSize(img)
+  let obj = workDir / "probe.o"
+  assemble(testdata / (if mine: "alu.s" else: "cmp.s"), obj)
+  let objText = readFile(obj)
+  echo "ready"
+  flushFile(stdout)
+  while not fileExists(onlyTests[2]): sleep(10)
+  let same = fileExists(img) and getFileSize(img) == imgSize and fileExists(obj) and readFile(obj) == objText
+  echo(if same: "own files kept" else: "own files overwritten")
+  quit(if same: 0 else: 1)
 
 proc storageCard(): SimCard =
   for c in slots:
@@ -2912,12 +2951,33 @@ run testKernelBuildsConcurrent
 proc testRunsSideBySide() =
   ## KRN-022: two simtest runs at once both pass. Two copies of this binary
   ## run the same tests together: ones that write assembled programs and
-  ## maps (testdata's .o, .map, .prg), build ROM images and the kernel, and
-  ## make, fill and check SD images; each writes only to its own directory
-  ## (workDir, romDir()), so neither sees the other's files.
+  ## maps (testdata's .o, .map, .prg), build ROM images and the kernel,
+  ## make, fill and check SD images, and serve on a fixed port of the host
+  ## (examples/net on 7007); each writes only to its own directory (workDir,
+  ## romDir()), so neither sees the other's files, and the port is taken one
+  ## run at a time (runOnHostPorts). First, deterministically: two
+  ## `simtest --own-files` write an SD image and a program where the tests
+  ## do, the second while the first waits, and the first's must be its own.
   echo "== two simtest runs side by side =="
+  # first, for certain: each run writes an SD image and a program where the
+  # tests do, the second while the first waits; the first's must be its own
+  let go = workDir / "go"
+  var pa = startProcess(getAppFilename(), args = ["--own-files", "a", go], options = {poStdErrToStdOut})
+  let ra = pa.outputStream.readLine()
+  var pb = startProcess(getAppFilename(), args = ["--own-files", "b", go], options = {poStdErrToStdOut})
+  let rb = pb.outputStream.readLine()
+  writeFile(go, "")
+  let outA = pa.outputStream.readAll()
+  let codeA = pa.waitForExit()
+  let outB = pb.outputStream.readAll()
+  let codeB = pb.waitForExit()
+  pa.close()
+  pb.close()
+  expectTrue("two runs at once: each keeps its own SD image and program (" & ra & ", " & rb & "; " &
+             outA.strip & "; " & outB.strip & ")",
+             ra == "ready" and rb == "ready" and codeA == 0 and codeB == 0)
   let subset = ["testAssemblerMap", "testAssemblerRejects", "testAluImm", "testBootChain",
-                "testApiProgram", "testExec"]
+                "testApiProgram", "testExec", "testNetExamples"]
   var ps: seq[Process]
   for k in 0..1:
     ps.add(startProcess(getAppFilename(), args = subset, options = {poStdErrToStdOut}))

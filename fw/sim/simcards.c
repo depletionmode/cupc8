@@ -118,6 +118,8 @@ void simcard_free(simcard_t *c)
 		free(c->gpu);
 	}
 	free(c->io);
+	if (c->wifi)
+		netposix_free(c->wifi->ctx);    /* its host sockets closed: their ports free again */
 	free(c->wifi);
 	if (c->st) {
 		st_detect(c->st, false);        /* FatFs lets go of the volume before it is freed */
