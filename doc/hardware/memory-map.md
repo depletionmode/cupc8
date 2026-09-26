@@ -63,8 +63,8 @@ bridge's 24-bit RAM commands.
 
 | Range | Use |
 |---|---|
-| $1000–$5fff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
-| $6000–$6eff | kernel data |
+| $1000–$67ff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
+| $6800–$6eff | kernel data (2026-09-26: moved up from $6000, as the code needed more room and the data used 1.4 KB of 3.75) |
 | $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
 | $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
 | $c000–$dfff | … whose top 8 KB holds the **BASIC program** (`kernel/term.s`): its text, each line ending in a CR, then a 0 |
