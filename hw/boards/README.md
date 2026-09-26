@@ -501,10 +501,14 @@ holes' keep-outs; at KiCad's margins those vias were ~117 violations
 Freerouting carried through every pass). The TQ144, sTSOP-32 and eFuse
 signal nets route in kicadgen's Fine class (0.15 mm), as on the CPU card;
 the eFuse's VBUS_F and 5V_SYS in FinePower (0.5 mm track, Fine's
-clearance between the QFN's pins). Each routing try runs 8 differently
+clearance between the QFN's pins). Each routing try runs 16 differently
 ordered Freerouting runs at once and keeps the lowest-ordered one that
 completes (kicadgen `route_parallel`); tries are capped at 30 passes, then
-60, then 90 (`ROUTE_PASSES`, `ROUTE_TRIES`). 125 × 184 mm, 3 boards assembled.
+60, then 90 (`ROUTE_PASSES`, `ROUTE_TRIES`), each run at 90 minutes of wall
+time (`ROUTE_TIMEOUT`) and a 1 GB Java heap (`ROUTE_HEAP`; uncapped, each
+JVM reserved a quarter of the RAM). The eFuse's IN/OUT escapes, EN's stub,
+and the VBUS_F/5V_SYS connections the router kept leaving open are locked
+copper laid before routing (`prepare()`). 125 × 184 mm, 3 boards assembled.
 
 ```
 python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pincheck netlist check

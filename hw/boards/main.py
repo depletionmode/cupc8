@@ -1121,7 +1121,9 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
 ROUTE_TIMEOUT = 90 * 60                    # each Freerouting run's wall-time cap, s (kicadgen route_timeout)
-ROUTE_PARALLEL = 8                          # orderings routed at once per try (kicadgen route_parallel)
+ROUTE_PARALLEL = 16                         # orderings routed at once per try (kicadgen route_parallel; David,
+                                            # 2026-09-26: 16 of the 24 cores, the rest for other work)
+ROUTE_HEAP = "1g"                           # each run's JVM heap cap (kicadgen route_heap): uncapped, Java takes 15.5 GB
 # the fan-out vias a clearance off their own pads, 0.05 mm further from other
 # nets' and clear of the NPTH holes' keep-outs, as Freerouting judges them:
 # at KiCad's own margins they were ~117 violations it carried through every
@@ -1416,7 +1418,8 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
                        fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
-                       route_parallel=ROUTE_PARALLEL, route_timeout=ROUTE_TIMEOUT, fanout_margin=FANOUT_MARGIN,
+                       route_parallel=ROUTE_PARALLEL, route_timeout=ROUTE_TIMEOUT, route_heap=ROUTE_HEAP,
+                       fanout_margin=FANOUT_MARGIN,
                        prepare=prepare,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,

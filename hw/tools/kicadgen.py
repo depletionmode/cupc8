@@ -1779,18 +1779,21 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, t
                        % (sorted({n for v in left_all.values() for n in v})[:8], tries, parallel, pdir))
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, timeout=None):
+def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, timeout=None, heap=None):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
     and an error after `tries`. `salt` starts the tries' orderings further
     on, for a second round that must not repeat the first. With `parallel`
     > 0 each try runs that many differently ordered routes at once
-    (_route_parallel), each capped at `timeout` seconds of wall time."""
+    (_route_parallel), each capped at `timeout` seconds of wall time. `heap`
+    (e.g. "1g") caps each Freerouting JVM's heap: by default Java takes a
+    quarter of the RAM, which is what limited how many ran at once (a run's
+    live data is ~110 MB)."""
     import pcbnew
     dsn = os.path.join(workdir, "route.dsn")
     ses = os.path.join(workdir, "route.ses")
-    env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
+    env = dict(os.environ, JAVA_TOOL_OPTIONS="-Djava.awt.headless=true" + (" -Xmx" + heap if heap else ""))
     # a net pre-routed partly on an inner plane layer (presence_link's run on
     # a wide card): the DSN has no inner track, so Freerouting sees the rest
     # dangling and trims it, and the import drops the inner track. Such a net
@@ -2606,7 +2609,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
-             fine_power_nets=(), label_side=None, route_timeout=None):
+             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2722,7 +2725,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             try:
                 autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
                           salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
-                          parallel=route_parallel, timeout=route_timeout)
+                          parallel=route_parallel, timeout=route_timeout, heap=route_heap)
             except RuntimeError as e:        # nets left unrouted: the next round's orderings
                 open_nets, too_close = [str(e)], []
                 continue
