@@ -1190,26 +1190,54 @@ def _standby_preroute(board):
         p = [q for q in board.FindFootprintByReference(ref).Pads() if q.GetNumber() == num][0]
         return p, (to(p.GetPosition().x), to(p.GetPosition().y))
 
-    def track(pts, width, net):
+    def track(pts, width, net, layer=pcbnew.F_Cu):
         for a, b in zip(pts, pts[1:]):
             t = pcbnew.PCB_TRACK(board)
             t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
             t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
             t.SetWidth(mm(width))
-            t.SetLayer(pcbnew.F_Cu)
+            t.SetLayer(layer)
             t.SetNet(net)
             t.SetLocked(True)
             board.Add(t)
+
+    def via(at, net):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(pcbnew.VECTOR2I(mm(at[0]), mm(at[1])))
+        v.SetWidth(mm(0.6))
+        v.SetDrill(mm(0.3))
+        v.SetNet(net)
+        v.SetLocked(True)
+        board.Add(v)
     bar, (bx, by) = pad("U2", "5")
     r58, (rx, ry) = pad("R58", "1")
     top = to(bar.GetBoundingBox().GetTop()) - 0.8          # the escape's end (_efuse_escapes)
-    if abs(top - ry) < 0.05 and rx > bx:
-        track([(bx, top), (rx, ry)], 0.5, bar.GetNet())
     out, (ox, oy) = pad("U2", "6")
     c3, (qx, qy) = pad("C3", "1")
+    c5, (kx, ky) = pad("C5", "1")
+    f1, (fx, fy) = pad("F1", "2")
     bottom = to(out.GetBoundingBox().GetBottom()) + 0.8     # OUT's escape end
-    if qx < ox and qy < bottom:
-        track([(ox, bottom), (qx, bottom), (qx, qy)], 0.5, out.GetNet())
+    if not (abs(top - ry) < 0.05 and rx > bx + 3.0 and qx < ox and qy < bottom and kx > ox and ky < bottom
+            and fy > bottom + 4.0 and abs(fx - bx) < 1.0):
+        raise SystemExit("_standby_preroute: the eFuse's neighbours have moved; lay its power copper again")
+    vbus, v5 = bar.GetNet(), out.GetNet()
+    # VBUS_F: IN's escape across to R58; 5V_SYS: OUT's escape west to C3 and
+    # east to C5 (the buck's input), both along the line below the package
+    track([(bx, top), (rx, ry)], 0.5, vbus)
+    track([(qx, qy), (qx, bottom), (kx, bottom), (kx, ky)], 0.5, v5)
+    # VBUS_F from the input PTC (south of that line) to IN's escape (north of
+    # it): three vias at each end and a 1 mm track on In3, x 1.1 mm east of
+    # IN's bar (clear of the GND via beside pin 8), for the 3.5 A input
+    xs = bx + 1.1
+    north = [(xs + 0.8 * i, top) for i in range(3)]
+    south = [(fx - 0.8 + 0.8 * i, fy - 1.3) for i in range(3)]
+    for at in north + south:
+        via(at, vbus)
+    track([north[0], north[-1]], 1.0, vbus, pcbnew.In3_Cu)
+    track([north[0], (xs, south[0][1]), south[0], south[-1]], 1.0, vbus, pcbnew.In3_Cu)
+    track([south[0], south[-1]], 0.6, vbus)
+    for at in south:
+        track([at, (at[0], fy)], 0.6, vbus)
     vin, (vx, vy) = pad("U15", "2")
     c16, (cx, cy) = pad("C16", "1")
     track([(vx, vy), (vx, cy + 1.2), (cx, cy + 0.4), (cx, cy)], 0.3, vin.GetNet())
