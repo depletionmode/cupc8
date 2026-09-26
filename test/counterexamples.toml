@@ -843,3 +843,13 @@ revert = [["fw/sim/simcards.c", """	if (c->wifi)
 """, ""]]
 cmd = "tools/run_tests.sh testRunsSideBySide"
 must_fail = ["FAIL: run"]
+
+[[bug]]
+name = "the kernel waited for ever at a full CON_OUT while HOST was set - a PC that kept the console open but stopped reading stalled the terminal"
+fixed_in = "this commit (usb-console.md's 500 ms timeout)"
+revert = [["kernel/console.s", """	lt r0, #125
+	bzf .again				; under 500 ms, keep waiting
+""", """	b .again
+"""]]
+cmd = "tools/run_tests.sh testKernelConsole"
+must_fail = ["FAIL: HOST set, nobody reading: the terminal goes on"]

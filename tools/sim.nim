@@ -271,6 +271,19 @@ proc pushKey*(k: int) =
 
 proc keyPending*(): bool = has_key
 
+proc pushUsage*(usage: int) =
+  ## A key without a character (arrows, Home, End, PgUp, PgDn, Insert,
+  ## Delete, F1-F12) by its USB HID usage: pressed and released on the IO
+  ## card's USB path, whose core (io_translate) gives the byte.
+  if ioModel == imCards:
+    let c = ioCard()
+    if not c.isNil:
+      var down = [0'u8, 0, uint8(usage), 0, 0, 0, 0, 0]
+      var up: array[8, uint8]
+      simcard_hid(c, addr down[0], simMillis())
+      simcard_hid(c, addr up[0], simMillis())
+      cardsTick()
+
 proc romWindow(a: int): int =
   ## ROM chip offset for CPU address a, or -1 if a is not in a ROM window.
   if ioModel != imCards or romOff or a < 0xe000 or a > 0xefff:
@@ -1076,7 +1089,10 @@ the kernel from the ROM chip; the slot cards run the real card firmware cores.
   --rom:FILE        boot this ROM image (default: built from rom/boot.s and
                     kernel.o, or from kernel/ when no kernel.o is given)
   --type:TEXT       type TEXT on the keyboard (\n = Enter), one key each time
-                    the CPU parks in WAI (the kernel's keyboard wait); repeatable
+                    the CPU parks in WAI (the kernel's keyboard wait); repeatable.
+                    \t Tab, \e Escape, \xHH the key giving byte HH (e.g. \x80);
+                    named keys {UP} {DOWN} {LEFT} {RIGHT} {HOME} {END} {PGUP}
+                    {PGDN} {INS} {DEL} {F1}..{F12}
   --dump-text:PATH  at exit, write the console's text (- = stdout)
   --settle:MS       headless: guest ms to run on once the typed text is used up
                     and the machine is idle again (default 2000); then exit
@@ -1099,15 +1115,40 @@ Both:
   --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --dump-window:PATH (the window, LEDs included; not headless)  --trace  --log-mask:N"""
 
   proc unescapeTyped(t: string): string =
-    ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash.
+    ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash,
+    ## \xHH byte HH; {NAME} a named key, as the byte the IO card gives for it
+    ## (iocard.h; pushKey sends each byte as its key). Other braces are text.
+    const named = {"UP": 0x80, "DOWN": 0x81, "LEFT": 0x82, "RIGHT": 0x83,
+                   "HOME": 0x84, "END": 0x85, "PGUP": 0x86, "PGDN": 0x87,
+                   "INS": 0x88, "INSERT": 0x88, "DEL": 0x7f, "DELETE": 0x7f}
     var i = 0
     while i < t.len:
-      if t[i] == '\\' and i + 1 < t.len:
+      if t[i] == '{' and t.find('}', i) > i:
+        let close = t.find('}', i)
+        let name = t[i + 1 ..< close].toUpperAscii
+        var key = -1
+        for (n, b) in named:
+          if n == name: key = b
+        if name.len in 2..3 and name[0] == 'F' and name[1 .. ^1].allCharsInSet(Digits) and
+           parseInt(name[1 .. ^1]) in 1..12:
+          key = 0x90 + parseInt(name[1 .. ^1])
+        if key >= 0:
+          result.add(chr(key))
+          i = close + 1
+          continue
+        result.add('{')
+      elif t[i] == '\\' and i + 1 < t.len:
         inc i
         case t[i]
         of 'n', 'r': result.add('\r')
         of 't': result.add('\t')
         of 'e': result.add('\x1b')
+        of 'x':
+          if i + 2 < t.len and t[i + 1] in HexDigits and t[i + 2] in HexDigits:
+            result.add(chr(parseHexInt(t[i + 1 .. i + 2])))
+            i += 2
+          else:
+            result.add('x')
         else: result.add(t[i])
       else:
         result.add(if t[i] == '\n': '\r' else: t[i])
@@ -1346,6 +1387,12 @@ Both:
             of K_TAB:
               pushKey(9)
             else:
+              # SDL's scancodes are the USB HID usages: F1-F12 ($3a-$45),
+              # Insert, Home, PgUp, Delete, End, PgDn and the arrows ($49-$52)
+              let sc = int(e.keysym.scancode)
+              if sc in 0x3a..0x45 or sc in 0x49..0x52:
+                pushUsage(sc)
+                continue
               # Ctrl+letter (no TextInput comes for it)
               let sym = int(e.keysym.sym)
               if (e.keysym.modstate and KMOD_CTRL) != 0 and sym >= ord('a') and sym <= ord('z'):
