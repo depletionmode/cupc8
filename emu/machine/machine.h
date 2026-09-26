@@ -3,7 +3,7 @@
 // their RTL (Verilated, soc/emu/board.h), the SRAM and the SST39 ROM chip,
 // and the cards on their real firmware: the RP2040 cards (GPU, IO, system
 // card) on the native RP2040 (emu/rp2040), the Wi-Fi card in Espressif's
-// QEMU over pipes, exactly as machine.mjs's EspCard.
+// QEMU (machine.mjs's EspCard protocol), in step with the board.
 //
 // The loop is machine.mjs's runFor, iteration for iteration: one 12 MHz
 // clock at a time while any slot or the bridge is selected ("busy"), up to
