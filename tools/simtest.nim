@@ -1146,7 +1146,7 @@ proc testKernelOnCards() =
     if cpuStep() != sOk: break
     inc n
   expectTrue("typed command echoed", gpuFind(g, "help") >= 0)
-  expectTrue("help output", gpuFind(g, "NEW RUN CLR") >= 0)
+  expectTrue("help output", gpuFind(g, "NEW RUN LIST CLR") >= 0)
   ioModel = imLegacy
 
 run testKernelOnCards
@@ -1725,7 +1725,7 @@ proc testSlotIrqShared() =
   typeLine("help")
   let g = gpuCard()
   expectTrue("typed while slot 3 held its IRQ", gpuFind(g, ">> help") >= 0)
-  expectTrue("the command ran", gpuFind(g, "NEW RUN CLR") >= 0)
+  expectTrue("the command ran", gpuFind(g, "NEW RUN LIST CLR") >= 0)
   heldSlotIrq = 0
   ioModel = imLegacy
 
@@ -3548,8 +3548,8 @@ proc testKernelConsole() =
   # a PC opens the port: HOST. A command typed there reaches the terminal
   mem[ConFlags] = 1
   var got = conLine("help")
-  expectTrue("help from CON_IN runs (graphics card)", gpuFind(g, "NEW RUN CLR") >= 0)
-  expectTrue("its echo and output in CON_OUT: " & escape(got), got.startsWith("help\n") and "NEW RUN CLR" in got)
+  expectTrue("help from CON_IN runs (graphics card)", gpuFind(g, "NEW RUN LIST CLR") >= 0)
+  expectTrue("its echo and output in CON_OUT: " & escape(got), got.startsWith("help\n") and "NEW RUN LIST CLR" in got)
   expect("CON_IN taken: its tail caught up", mem[ConInTail], mem[ConInHead])
 
   # idle at the prompt, a key from the PC is taken by the key wait's next

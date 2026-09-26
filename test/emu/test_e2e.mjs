@@ -785,9 +785,9 @@ async function e2e020() {
   // a command typed on the PC: echoed, run, its output back (and on HDMI)
   text = '';
   m.console.write('help\r');
-  expect(await until('NEW RUN CLR', 3e9), 'help typed on the console: its output comes back');
+  expect(await until('NEW RUN LIST CLR', 3e9), 'help typed on the console: its output comes back');
   expect(text.startsWith('help'), `the typed line is echoed: ${JSON.stringify(text.slice(0, 20))}`);
-  expect(await waitFor(m, 'NEW RUN CLR', 1e9), 'the output is on HDMI too');
+  expect(await waitFor(m, 'NEW RUN LIST CLR', 1e9), 'the output is on HDMI too');
 
   // a program pasted in one go (more than CON_IN's 64 bytes, LF line ends
   // as a PC's clipboard has them), then run
