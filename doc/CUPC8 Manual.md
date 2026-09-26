@@ -34,7 +34,22 @@ The software stack consists of a monolithic kernel which provides drivers for th
 
 In addition to drivers and system functions, the kernel provides a 'terminal' interface which accepts a number of commands. A limited subset of BASIC is provided which allows BASIC programs to be executed directly from the terminal (in a non-interactive fashion).
 
-The BASIC is uBASIC with 8-bit numbers (arithmetic wraps at 256), line numbers 1-255, one-letter variables `a`-`z`, and a 256-byte program buffer (a line that does not fit is refused with `PROGRAM FULL`; a typed line is at most 78 characters). Statements: `let`, `print` (`,` prints a space, `;` nothing), `if ... then ... else`, `for ... to ... next`, `goto`, `gosub`/`return`, `rem`, `end`, and, because an 8-bit number cannot hold an address, `poke hi, lo, value` and `peek hi, lo, var` (the address is hi*256+lo; `poke 240, 0, n` sets the LEDs at $f000). Operators: `+ - * / % & |`, `< > =`, parentheses. Dividing by 0 gives 0.
+The BASIC is uBASIC with 16-bit signed numbers (-32768 to 32767; arithmetic wraps, so 32767+1 is -32768), line numbers 1-32767, one-letter variables `a`-`z`, and an 8 KB program buffer at $c000-$dfff (a line that does not fit is refused with `PROGRAM FULL`; a typed line is at most 78 characters). Statements: `let`, `print` (`,` prints a space, `;` nothing; numbers print signed), `if ... then ... else`, `for ... to ... next`, `goto`, `gosub`/`return`, `rem`, `end`, `poke addr, value` and `peek addr, var` (a 16-bit address: `poke 61440, 5` sets the LEDs at $f000, since 61440 wraps to the same 16 bits; the old form `poke hi, lo, value` / `peek hi, lo, var`, the address hi*256+lo, still works, so `poke 240, 0, n` in a saved program does what it did), and the graphics statements below. Operators: `+ - * / % & |` and a leading `-`, `< > =` (signed), parentheses. `/` and `%` truncate toward zero (`-7/2` is -3, `-7%2` is -1); dividing by 0 gives 0 (and `%` by 0 the number itself). A number is at most 5 digits; 32768 to 99999 wrap. uBASIC's `for` runs its body once even when the limit is below the start.
+
+Graphics, through the kernel API, so a program runs on either graphics card:
+
+| Statement | Does |
+|---|---|
+| `mode n` | 0 TEXT, 1 GFX (320 x 240, 256 colours; on the e-ink card shown in grey), 2 the e-ink card's native mode (the panel's 648 x 480 or 800 x 480 in 4 greys). Mode 2 on HDMI, or any other n, is ignored, as the card ignores it. |
+| `cls [c]` | clear: TEXT with attribute c ($07 if not given), GFX with colour c (0), mode 2 with grey c (3, white) |
+| `color fg [, bg]` | the TEXT attribute for what is printed next: 16 colours each (bg 0 if not given) |
+| `plot x, y, c` | a pixel: colour 0-255 in GFX, grey 0 black ... 3 white in mode 2 |
+| `line x0, y0, x1, y1, c` | a line, both ends drawn |
+| `box x, y, w, h, c [, f]` | a rectangle's outline, or filled with a last argument f that is not 0 (`box 10, 10, 50, 20, 4, 1`) |
+| `palette i, r, g, b` / `palette` | set palette entry i (r, g, b 0-255) / the default palette back |
+| `refresh [m]` | on the e-ink card, refresh the panel now: m 0 partial, 1 fast, 2 clean, 3 greyscale (3 in mode 2, 0 otherwise, if not given); nothing on HDMI |
+
+Drawing is clipped to the screen. In GFX mode y (and a box's h) is 8-bit on the card, so values outside 0-255 are taken as 0 or 255. A wrong number of arguments is an error. A program that ends in mode 1 or 2 leaves its picture up until a key is pressed; then TEXT mode comes back (cleared) with `DONE.`.
 
 Terminal commands besides BASIC lines: `help`, `new` (clear the program), `run`, `clr` (clear the screen), `refresh` (on the e-ink card, a clean full refresh of the panel, which clears the faint ghosts partial refreshes leave; on HDMI it does nothing) and `net`, for the Wi-Fi card:
 
@@ -52,14 +67,14 @@ The times come from the chipset's millisecond counter (`doc/hardware/memory-map.
 Files, on the storage card's microSD card (`doc/hardware/storage-card.md`). A card formatted on a PC works as it is (FAT12, FAT16 or FAT32). Names are 8.3 (`PROG.BAS`), in any case, with or without the quotes:
 
 - `save "NAME"` writes the program as text, one line per program line, each ending in CR LF, so a PC can read and edit it. It replaces a file of that name.
-- `load "NAME"` clears the program (`new`), then takes the file's lines as if they were typed: a line that does not start with a line number (a blank line, say) is skipped, and a line longer than 78 characters is cut. A line that does not fit stops the load with `PROGRAM FULL`.
+- `load "NAME"` clears the program (`new`), then takes the file's lines as if they were typed (up to the 8 KB buffer): a line that does not start with a line number (a blank line, say) is skipped, and a line longer than 78 characters is cut. A line that does not fit stops the load with `PROGRAM FULL`.
 - `dir` lists every file with its size in bytes.
 - `del "NAME"` deletes a file.
-- `exec "NAME"` runs a file: a program for $7000 (it starts with the header `C8P` and version 1; `tools/mkprg.py` makes one, and it calls the kernel through `kernel/api.inc`), which comes back to the prompt when it returns or calls `API_EXIT`, or else a BASIC program, which it loads and runs. `cupc8.py run PROG` does the same from the PC through the system card.
+- `exec "NAME"` runs a file: a program for $7000 (it starts with the header `C8P` and version 1; `tools/mkprg.py` makes one, and it calls the kernel through `kernel/api.inc`), which comes back to the prompt when it returns or calls `API_EXIT`, or else a BASIC program, which it loads and runs. A program for $7000 longer than 20 KB (past $bfff) goes over the BASIC program at $c000-$dfff, as on the home computers of old: nothing warns about it. `cupc8.py run PROG` does the same from the PC through the system card.
 
 They print `SAVED` or `LOADED` when done, or what went wrong: `no SD card`, `no storage card` (none fitted), `file not found`, `card full`, `write protected`, `bad file name` (not 8.3), `no file system on the card` (not formatted) or `card error`. On a USB source under 3 A, `save` and `del` print `USB power under 3A: SD writes off` and leave the card as it was; `load` and `dir` still work.
 
-A program calls the kernel through its jump table at *$1003*: 8 groups of 32 entries, 3 bytes each, entry *n* of group *g* at *$1003* + 96*g* + 3*n* (*$1003*-*$1302*). The groups are system (with the RAM bank routines), console, graphics, e-ink, storage, net (16 routines: sockets, the DNS client, the card's settings), timers (milliseconds since power-on, and a wait) and one reserved; the unused entries answer *$ff*. `kernel/api.inc` names every entry (`API_PUTC`, `API_NET_OPEN`, ...); an entry's address never changes once it is there. Arguments go in **r0**/**r1** and the API block at *$6f00*, and **r0** comes back 0 or an error code (`doc/proposals/kernel-api.md`). The CPU's two timers are left to programs: the kernel's clock is the chipset's millisecond counter.
+A program calls the kernel through its jump table at *$1003*: 8 groups of 32 entries, 3 bytes each, entry *n* of group *g* at *$1003* + 96*g* + 3*n* (*$1003*-*$1302*). The groups are system (with the RAM bank routines), console, graphics (GFX mode, and the e-ink card's native mode 2: `API_GFX_MODE` 2 and the `API_GFX2_` entries, which give $ff on HDMI), e-ink, storage, net (16 routines: sockets, the DNS client, the card's settings), timers (milliseconds since power-on, and a wait) and one reserved; the unused entries answer *$ff*. `kernel/api.inc` names every entry (`API_PUTC`, `API_NET_OPEN`, ...); an entry's address never changes once it is there. Arguments go in **r0**/**r1** and the API block at *$6f00*, and **r0** comes back 0 or an error code (`doc/proposals/kernel-api.md`). The CPU's two timers are left to programs: the kernel's clock is the chipset's millisecond counter.
 
 There is no compiler available for the CUPC/8 ISA. Development tools are cross-platform and consist of an assembler and a simulator which provides 1-to-1 simulation of the full computer (including display and input). The simulator can be executed natively or compiled to JavaScript (using emscripten) and run through a web browser.
 

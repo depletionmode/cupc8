@@ -1,7 +1,7 @@
 # 16-bit BASIC, BASIC graphics, and the e-ink native mode in the API
 
 Status: **decided 2026-09-26 by David** ("add 1 and 2"; 16-bit BASIC; an
-8 KB program buffer), being implemented.
+8 KB program buffer), **built 2026-09-26** (see "As built" at the end).
 
 ## Why
 
@@ -84,3 +84,47 @@ the card does; a wrong number of arguments is a syntax error.
 - The existing BASIC tests pass (with the changed expectations explained),
   and the counterexamples that use BASIC still fail as they should.
 - Every bug found: a test and a counterexample.
+
+## As built (2026-09-26)
+
+- **API** (`kernel/sys.s`, `kernel/api.inc`): `API_GFX_MODE` returns r0 = 0,
+  or $ff for mode 2 when INFO did not say e-paper (nothing sent). The ten
+  entries are group 2's entries 11-20: `API_GFX2_PIXEL` $10e4,
+  `API_GFX2_FILL_RECT` $10e7, `API_GFX2_RECT` $10ea, `API_GFX2_LINE` $10ed,
+  `API_GFX2_BLIT1` $10f0, `API_GFX2_BLIT2` $10f3, `API_GFX2_TEXT16` $10f6,
+  `API_GFX2_TEXT8` $10f9, `API_GFX2_VSCROLL` $10fc, `API_GFX2_GETPIXEL`
+  $10ff (their `API_ARGS` in `kernel-api.md`). The texts take a pointer as
+  `API_GFX_TEXT8` does; the BLITs a pointer to the picture, w at most 1020
+  and one frame of at most 8128 bytes (else r0 = $fe, nothing sent). Frames
+  over 64 bytes wait for the card's FREE first (`gpu_wait_free`).
+- **Numbers** (`kernel/math.s`): 16-bit routines on `n_a`, `n_b` (add, sub,
+  and, or, neg, shift-and-add multiply, shift-and-subtract division, signed
+  compare, signed print). `%` by 0 gives the number itself, as the 8-bit
+  BASIC did. A leading `-` (unary minus) was added, so negative numbers can
+  be written; literals are at most 5 digits, and 32768-99999 wrap (so
+  `poke 61440, n` reaches $f000). `str_atoi` is 16-bit.
+- **The interpreter** (`kernel/ubasic.s`): one precedence routine for
+  relations, `+ - & |` and `* / %` (it replaced three copies); the
+  tokenizer's keywords are a table (`ub_keywords`) instead of a compare per
+  keyword, which paid for the new code: the kernel's code ends at about
+  $5d85 of $5fff, so the layout did not change. The line index is 300
+  entries of 4 bytes in bss; past it (and for a line not run yet) GOTO,
+  GOSUB, RETURN and NEXT find the line from the start of the program.
+  `peek a, b` is the 2-argument form when `b` is a variable that ends the
+  statement, else the tokenizer goes back and reads the old 3-argument form.
+- **Program buffer** (`kernel/term.s`): $c000-$dfff, its length 16-bit;
+  NEW writes a 0 at $c000; LOAD stops at the first line that does not fit.
+- **Graphics statements**: as the table above. `mode 2` on HDMI and a mode
+  above 2 are ignored (the card ignores them). In GFX mode y and h are
+  clamped to 0-255 (the card's y8, h8). `box`'s sixth argument fills when it
+  is not 0. A program that ends in mode 1 or 2 keeps its picture until a
+  key, then MODE 0 (the text is cleared) and `DONE.`; a fatal error's
+  message is printed again then. `help` lists the statements. The banner is
+  `CUPC/8 BASIC 2026.09` (David).
+- **Tests**: KRN-016 (16-bit numbers), KRN-017 (the 8 KB buffer, PROGRAM
+  FULL at its last byte, a near-8 KB program past the line index; SAVE and
+  LOAD of long programs in KRN-006), KRN-018 (every statement on the
+  simulator's HDMI and e-ink cards), KRN-019 (the API entries), E2E-015 (the
+  HDMI picture), E2E-016 (the e-ink glass), SIM-010 (the simulator CLI). The
+  KRN-003 programs were re-checked by hand for 16 bits: only `200+100`
+  changed (44 in 8 bits, 300 now).

@@ -182,6 +182,14 @@ answers). `kernel/eink.s` has `eink_refresh` (REFRESH m, on e-paper only)
 and the terminal's **`refresh`** command: a clean full refresh, to clear
 ghosting by hand. On HDMI it does nothing.
 
+Mode 2 is in the kernel API (2026-09-26, `../proposals/basic-graphics.md`,
+`../proposals/kernel-api.md`): `API_GFX_MODE` 2 (an error on HDMI, by
+INFO) and one entry per mode-2 command, `API_GFX2_PIXEL` ... `API_GFX2_GETPIXEL`
+($10e4-$10ff). BASIC reaches it with `mode 2` and its graphics statements
+(`plot`, `line`, `box`, `cls` in greys 0-3), and `refresh [m]` asks for a
+refresh (greyscale by default in mode 2); the policy's settings stay out of
+BASIC.
+
 ## Tests
 
 | Test | What |
@@ -190,6 +198,8 @@ ghosting by hand. On HDMI it does nothing.
 | GPU-009 | the real `eink.elf` and `eink750.elf` on the native emulator with the panel model (`build/emu-machine/einkcard`) |
 | KRN-007 | the kernel on the simulator's e-ink card (`tools/run_tests.sh testKernelOnEink`) |
 | E2E-008 | the whole machine with the e-ink card: boot to BASIC on the panel, a program, `refresh` |
+| KRN-018, KRN-019 | BASIC's graphics statements in mode 2, and every mode-2 API entry, on the simulator's e-ink card (the card's mode-2 picture pixel by pixel, the greys on the glass after a greyscale refresh) |
+| E2E-016 | the whole machine: a BASIC program draws in mode 2, `refresh`; the four greys on the panel model's glass |
 
 **The UC8179 model** (`fw/test/epdmodel.c`) is one model for the host
 tests, the simulator and the emulator. It takes SPI bytes with DC, RST_n and

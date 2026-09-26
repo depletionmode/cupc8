@@ -67,6 +67,7 @@ bridge's 24-bit RAM commands.
 | $6000–$6eff | kernel data |
 | $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
 | $7000–$dfff | **user program** (28 KB), loaded and entered at $7000 |
+| $c000–$dfff | … whose top 8 KB holds the **BASIC program** (`kernel/term.s`): its text, each line ending in a CR, then a 0 |
 | $e000–$efff | kernel bss: RAM once the kernel has turned the ROM off (its first instruction), and bss needs no loading |
 
 The USB console's part of the API block (the kernel zeroes $6f22–$6f26 at boot):
@@ -88,9 +89,15 @@ it covers (`sysctl.md`, "The console port").
 `kernel/assemble.sh` assembles for code $1000, data $6000, bss $e000
 (2026-09-25: the kernel's code outgrew $4fff once the API, the network
 commands and the bank routines were in); `testKernelLayout` (KRN-010) fails
-if any outgrows its area. The kernel keeps nothing in the user area
-$7000–$dfff (so nothing in the banked RAM window $8000–$bfff,
-`../proposals/extended-ram.md`). The jump table and calling convention are in
+if any outgrows its area. The kernel keeps nothing of its own in the user
+area $7000–$dfff (so nothing in the banked RAM window $8000–$bfff,
+`../proposals/extended-ram.md`), but the BASIC program lives in its top 8 KB,
+$c000–$dfff (2026-09-26, `../proposals/basic-graphics.md`; its line index,
+300 lines, is in the kernel's bss). **A program for $7000 that uses
+$c000–$dfff (a body over 20 KB, or data there) overwrites the BASIC
+program**, as on the home computers this is modelled on: `exec` and
+`cupc8.py run` say nothing about it, and `run` afterwards finds what the
+program left. Programs up to $bfff leave it alone. The jump table and calling convention are in
 `../proposals/kernel-api.md` and `kernel/api.inc`.
 
 **Program file** (`exec "NAME"` on the storage card, `cupc8.py run`): a 4-byte

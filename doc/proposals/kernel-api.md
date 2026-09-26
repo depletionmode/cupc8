@@ -55,7 +55,7 @@ $5fff, data moved to $6000 and bss to $e000.)
 |---|---|---|
 | 0 system | $1003 | version, exit (back to the terminal), api_block address, slot table, bank_set, bank_get, bank_count, bank_far_copy (`kernel/bank.s`, as they are: they leave `API_ERR` alone) |
 | 1 console | $1063 | putc, puts, getkey (wait), pollkey, cls, cursor set/get, attr |
-| 2 graphics | $10c3 | mode, pixel, rect, line, palette, text-plane helpers (what `gfx.s`/the GPU protocol offer) |
+| 2 graphics | $10c3 | mode, pixel, rect, line, palette, text-plane helpers (what `gfx.s`/the GPU protocol offer); from $10e4 the e-ink card's native mode 2 (`basic-graphics.md`) |
 | 3 e-ink | $1123 | eink_auto, eink_get, eink_status, eink_refresh (`eink-card.md`) |
 | 4 storage | $1183 | info, open, read, write, close, seek, dir first/next, delete, rename |
 | 5 net | $11e3 | 16 routines (`kernel/net.s`): status, join, open, connect, connect_host, listen, send, recv, sock_status, close, udp_bind, sendto, recvfrom, events, resolve (the kernel's DNS client), config (r0 0 get, 1 set); then 16 blank |
@@ -138,9 +138,39 @@ ring is dropped.
   return (its frame went over the popped byte, its handler's `POP pcl`
   replaced pcl). `cpu.vhd` and `sim.nim` now take no IRQ at that boundary
   (CPU-005).
-- Graphics has no BLIT8/BLIT1/DEFCHAR entries yet (a frame over 64 bytes
-  needs the card's FREE check); they can be added in group 2's spare
-  entries.
+- Graphics has no BLIT8/BLIT1/DEFCHAR entries for GFX mode yet; they can
+  be added in group 2's spare entries (the mode-2 BLITs below show how: a
+  frame over 64 bytes waits for the card's FREE first).
+
+### Mode 2 (2026-09-26, `basic-graphics.md`)
+
+`API_GFX_MODE` takes 2, the e-ink card's native mode (`eink-card.md`: the
+panel's 648 x 480 or 800 x 480, 2 bits a pixel, grey 0 black ... 3 white),
+and returns r0 = 0, or $ff on HDMI (INFO says it is not e-paper; nothing is
+sent). The mode-2 commands ($40-$49) have entries after `API_GFX_VSYNC`,
+with the card's arguments in `API_ARGS` (16-bit coordinates, low byte
+first, positions signed); each returns r0 = 0, or $ff on HDMI, where nothing
+is sent:
+
+| Entry | Address | `API_ARGS` |
+|---|---|---|
+| `API_GFX2_PIXEL` | $10e4 | x16, y16, g |
+| `API_GFX2_FILL_RECT` | $10e7 | x16, y16, w16, h16, g |
+| `API_GFX2_RECT` | $10ea | the same: a 1-pixel outline |
+| `API_GFX2_LINE` | $10ed | x0_16, y0_16, x1_16, y1_16, g |
+| `API_GFX2_BLIT1` | $10f0 | x16, y16, w16, h16, fg, bg ($ff transparent), then a pointer to ceil(w/8) x h bytes |
+| `API_GFX2_BLIT2` | $10f3 | x16, y16, w16, h16, then a pointer to ceil(w/4) x h bytes |
+| `API_GFX2_TEXT16` | $10f6 | x16, y16, fg, bg; `API_ARGS[7..8]` a pointer to the text (the kernel puts its length in `API_ARGS[6]`) |
+| `API_GFX2_TEXT8` | $10f9 | the same, the 8 x 8 font |
+| `API_GFX2_VSCROLL` | $10fc | dy16 (signed, down if negative), g |
+| `API_GFX2_GETPIXEL` | $10ff | x16, y16; r1 = the grey |
+
+A BLIT is one frame of at most 8128 bytes and w at most 1020; a bigger one
+is not sent (r0 = $fe). The BLITs and texts wait for the card's FIFO to
+have room for the whole frame (NOP frames until FREE says so,
+`gpu-protocol.md`), since the card drops a frame that does not fit (it can
+fill while a REFRESH holds it). BASIC's graphics statements use these and
+the GFX entries.
 
 ## Networking
 

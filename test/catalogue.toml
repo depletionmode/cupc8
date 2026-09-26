@@ -38,7 +38,7 @@ cmd = "tools/run_tests.sh"
 [[test]]
 id = "SIM-010"
 title = "The simulator CLI runs the M1 machine with its slot cards"
-checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000; interactively (SDL's dummy video driver) a guest woken from WAI by timer 0 every 50 instructions keeps its 12 MHz clock on the speed line (11-13 MHz: no sleep per WAI while the guest is behind the host clock)"
+checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; BASIC graphics (basic-graphics.md): on hdmi mode 1, cls 1 and a filled box in 196 put red and VGA blue in the dumped picture, on eink mode 2 boxes in greys 0-2 and refresh put 0, 85, 170 and 255 on the glass; --legacy still runs a program at $1000; interactively (SDL's dummy video driver) a guest woken from WAI by timer 0 every 50 instructions keeps its 12 MHz clock on the speed line (11-13 MHz: no sleep per WAI while the guest is behind the host clock)"
 method = "test/sim/test_cli.py builds tools/sim and runs it as a user would; the HTTP server runs in the test"
 kind = "sim"
 vrow = "2.1"
@@ -626,7 +626,7 @@ cmd = "tools/run_tests.sh"
 id = "KRN-003"
 title = "BASIC programs"
 checks = "a suite of BASIC programs gives golden output"
-method = "tools/simtest.nim testBasicPrograms: 23 programs typed into the real kernel on the M1 machine model, output worked out by hand (8-bit uBASIC); several pin a fixed kernel bug each"
+method = "tools/simtest.nim testBasicPrograms: 24 programs typed into the real kernel on the M1 machine model, output worked out by hand (uBASIC; re-checked for 16-bit numbers 2026-09-26: only 200+100 changed, 44 to 300); several pin a fixed kernel bug each"
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testBasicPrograms"
@@ -661,7 +661,7 @@ cmd = "tools/run_tests.sh testKernelOnEink"
 [[test]]
 id = "KRN-006"
 title = "Files on the storage card: SAVE, LOAD, DIR, DEL"
-checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file too long for the program buffer stops at PROGRAM FULL and what fitted runs; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); a USB source under 3 A (PWR_HI low: SAVE and DEL refused with \"USB power under 3A: SD writes off\", the card unchanged, LOAD, RUN and DIR fine); no SD card, no storage card, a full card"
+checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file longer than the 8 KB program buffer stops at PROGRAM FULL with the lines that fit in (their length exact) and they run; that near-8 KB program SAVEd (as a PC reads it), LOADed back whole and run; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); a USB source under 3 A (PWR_HI low: SAVE and DEL refused with \"USB power under 3A: SD writes off\", the card unchanged, LOAD, RUN and DIR fine); no SD card, no storage card, a full card"
 method = "tools/simtest.nim testStorage: the real kernel on sim.nim with the storage card model (the real fw/storage/core over an image file, fw/sim/simcards.c); images made and checked with tools/fatcheck.py"
 kind = "sim"
 vrow = "2.3"
@@ -729,6 +729,42 @@ method = "tools/simtest.nim testEinkApi (fw/eink/core with AUTO_EXT/AUTO_GET in 
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testEinkApi"
+
+[[test]]
+id = "KRN-016"
+title = "BASIC: 16-bit numbers"
+checks = "typed programs on the real kernel: negatives and unary minus; 32767, 30000, sums and products up to 32767; wrap at 32768 (32767+1, -32768-1, 200*200, the literals 32768 and 65535, -32768/-1); / and % truncating toward 0 with each sign combination; / 0 gives 0, % 0 the number; signed comparisons; & and | on 16 bits; line numbers to 32767 for GOTO and GOSUB; FOR past 255 and below 0; poke/peek with a 16-bit address (a literal, a variable, an expression; 61440 reaching the LEDs at $f000) and the old hi, lo form with variables and expressions (poke 240, 0, n on the LEDs); an old-style primes program as saved on David's card; a number of six figures is a tokenizer error"
+method = "tools/simtest.nim testBasic16: the real kernel on the simulator's HDMI and IO cards, output worked out by hand"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testBasic16"
+
+[[test]]
+id = "KRN-017"
+title = "BASIC: the 8 KB program buffer"
+checks = "a program 8177 bytes long at $c000: a typed line one character too long for it is refused (PROGRAM FULL, the program unchanged), the 13-character one that fills it exactly is taken (its CR at $dffe, the 0 at $dfff, 8191 bytes), the next is refused and nothing is written past $dfff; the program (456 lines, line numbers to 32010, over the 300-line index: a GOSUB to its far end, a FOR loop past the index) runs to the right sum"
+method = "tools/simtest.nim testProgramFull: the program written into the buffer as typing leaves it, the last lines typed"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testProgramFull"
+
+[[test]]
+id = "KRN-018"
+title = "BASIC graphics statements"
+checks = "on the simulator's HDMI card: mode 1, cls, plot, line, box outlined and filled (a sixth argument 0 or 1), palette (the colour rendered red), refresh (nothing), y outside 0-255 clamped, off-screen clipped, no bad command on the card; the ended program keeps GFX until a key, then TEXT and DONE.; color fg, bg and cls c in TEXT (the attributes in the cells); mode 2 and mode 7 on HDMI ignored, palette with no arguments; ten wrong argument counts each one fatal error. On the e-ink card: mode 2, cls (white), boxes, plot, line in greys 0-3 in the card's mode-2 picture pixel by pixel; refresh (greyscale by default in mode 2): the four greys darkest to white on the glass; no command the panel would ignore; a key brings TEXT back"
+method = "tools/simtest.nim testBasicGraphics (the cards' state through fw/sim/simcards.c: simcard_gpu_pixel, simcard_eink_pixel2, simcard_gpu_errors, simcard_render)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testBasicGraphics"
+
+[[test]]
+id = "KRN-019"
+title = "Kernel API: the e-ink card's mode 2"
+checks = "tools/testdata/gfx2_prog.s (API_GFX_MODE 2, API_CLS, every API_GFX2 entry) on the simulator's e-ink card: each returns 0; the mode-2 picture pixel by pixel: PIXEL, FILL_RECT, RECT, LINE to x 640, BLIT1 ($f0 $0f / $aa $55 in fg 0, bg 3), BLIT2 ($1b $e4: greys 0-3 and back), TEXT16 on a transparent background, TEXT8 on grey 2, VSCROLL down 8 with the new rows in grey 1; GETPIXEL before and after the scroll; a BLIT 1021 wide and one 800 x 100 (over 8128 bytes) refused with $fe, one 1020 wide taken; no bad frame on the card. On HDMI every entry gives $ff, the card stays in TEXT and sees nothing bad"
+method = "tools/simtest.nim testGfx2Api"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testGfx2Api"
 
 # ============================================================================
 # CARD: common card protocol (every card firmware)
@@ -1220,6 +1256,24 @@ method = "test/emu/test_e2e.mjs E2E-014 (CUPC8_EMU=native): Node's net and dgram
 kind = "sim"
 vrow = "3.2"
 cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
+
+[[test]]
+id = "E2E-015"
+title = "BASIC graphics on the HDMI picture"
+checks = "on the native emulator (HDMI and IO cards, their real firmware): a typed BASIC program (mode 1, cls 1, a filled box in 196, a line in 15, plot in 226, an outline in 46, palette 100 set to blue and a box in it) gives, in the picture decoded from the card's TMDS output, VGA blue, red, white, yellow, green and blue at the places drawn (each GFX pixel 2 x 2, both of its corners); the ended program keeps the picture until a key, then TEXT and DONE.; the terminal works on"
+method = "test/emu/test_e2e.mjs E2E-015 (CUPC8_EMU=native): m.frame()"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-015"
+
+[[test]]
+id = "E2E-016"
+title = "BASIC in the e-ink card's mode 2 on the glass"
+checks = "on the native emulator (the real eink.elf with the UC8179 panel model): a typed BASIC program (mode 2, cls, filled boxes in greys 0, 1 and 2, a line across the panel, an outline in grey 1, refresh) makes a greyscale refresh; the glass then has 0, 85, 170 and 255 at the places drawn, the line from x 0 to 647; the panel model saw nothing the chip would ignore; a key brings TEXT and DONE. back on the panel"
+method = "test/emu/test_e2e.mjs E2E-016 (CUPC8_EMU=native): m.panel()"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-016"
 
 [[test]]
 id = "E2E-004"
