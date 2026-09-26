@@ -81,13 +81,13 @@ saved per change.
 
 - **BASIC** is `basic/`: `basic.s` (main, the terminal's hook, the
   commands, the program editor, from `term.s`), `ubasic.s` and
-  `ubasic_tokenizer.s` (from `kernel/`), `n16.s` (the 16-bit arithmetic the
-  kernel does not need, and `str_atoi`); `basic/build.sh` assembles them
-  with `kernel/math.s` (the kernel's `n16_shl1`, `n16_mul`, `n16_udiv`) as a
-  program for $7000 (`tools/mkprg.py`, which now takes several sources and
-  `--map`). About 6.3 KB of code, $7000 to about $9000 with its bss. It uses
-  only the API; SAVE and LOAD through the storage group, their messages
-  through the new `API_ST_PERROR`.
+  `ubasic_tokenizer.s` (from `kernel/`), `n16.s` (the 16-bit arithmetic,
+  from `kernel/math.s`, which keeps the three routines the kernel itself
+  needs, and `str_atoi`); `basic/build.sh` assembles them with
+  `kernel/api.inc` only, as a program for $7000 (`tools/mkprg.py`, which
+  now takes several sources and `--map`). 6530 bytes (6.2 KB of code),
+  $7000-$8ff7 with its bss. It uses only the API; SAVE and LOAD through the
+  storage group, their messages through the new `API_ST_PERROR`.
 - **The program text** at $c000: `"BA"`, the end (two bytes), then the lines
   from $c004 (`memory-map.md`). The 4 bytes cost the longest program 4
   bytes: 8187 instead of 8191 (KRN-017, KRN-027 changed to match).
@@ -112,6 +112,9 @@ saved per change.
   runs. `exec` of a file with no header goes to the hook (r0 = 1), and
   BASIC loads and runs it; a failed `exec` that had already loaded part of
   a program loads BASIC again.
+- **Sizes:** the kernel's code 20612 bytes before, 14697 with BASIC out
+  (option 4, after 575 bytes of unreferenced code went), 14246 after option
+  5's merges (the commits give each change and its bytes). BASIC 6530 bytes.
 - **Tests:** KRN-031 (reloaded after `cupc8.py run` and exec, the program
   kept or started empty), KRN-032 (BASIC.PRG on the card; the fallbacks with
   no delay; no BASIC in the ROM), KRN-033 (the new entries), KRN-010 (the

@@ -23,9 +23,11 @@ before = "f811788"
 # The fix touched ubasic.s, ubasic_tokenizer.s, printf.s, math.s and term.s;
 # those old files no longer assemble with today's kernel (sys.s, the API,
 # calls routines they lack), so the whole kernel as it was goes back, and
-# the files added since go.
+# the .s files added since go. (Since 2026-09-26 BASIC is basic/, a program
+# the ROM carries: that old kernel has its own BASIC and never loads it;
+# kernel/api.inc stays, for basic/build.sh.)
 files = ["kernel"]
-cmd = "rm -f kernel/api.inc kernel/api.s kernel/bank.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
+cmd = "rm -f kernel/api.s kernel/bank.s kernel/console.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
 must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/next", "FAIL: BASIC if/then/else",
              "FAIL: BASIC goto loop", "FAIL: BASIC gosub", "FAIL: BASIC nested for", "FAIL: BASIC parentheses",
              "FAIL: BASIC equals", "FAIL: BASIC zero", "FAIL: BASIC rem", "FAIL: BASIC mod, divide by 0",
@@ -34,10 +36,11 @@ must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/ne
 [[bug]]
 name = "kernel: the BASIC program buffer overflowed"
 fixed_in = "e635dbd"
-# the full check taken out of today's term.s (f811788's term.s no longer
-# assembles with the 16-bit BASIC and its 8 KB buffer at $c000, 2026-09-26;
-# the check is on the new length since the lines are kept in order)
-revert = [["kernel/term.s", """	ld r0, $6f07
+# the full check taken out of today's program editor (f811788's term.s no
+# longer assembles with the 16-bit BASIC and its 8 KB buffer at $c000,
+# 2026-09-26; the check is on the new end since the lines are kept in order;
+# the editor is basic/basic.s's since BASIC became a program)
+revert = [["basic/basic.s", """	ld r0, $6f07
 	gt r0, #0x1f
 	bzf .full
 """, ""]]
@@ -79,9 +82,10 @@ name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on 
 fixed_in = "45d051b"
 # the empty stubs put back into today's ubasic.s (80c23a6's whole file no
 # longer assembles with the rest of the kernel; since 2026-09-26 the 16-bit
-# BASIC's peek and poke, with the address in either form)
+# BASIC's peek and poke, with the address in either form; basic/ since BASIC
+# became a program)
 revert = [
-  ["kernel/ubasic.s", """ubasic_peek_statement:
+  ["basic/ubasic.s", """ubasic_peek_statement:
 	mov r0, TOKENIZER_PEEK
 	push pch
 	push pcl
@@ -161,7 +165,7 @@ revert = [
 	pop pcl
 	pop pch
 """],
-  ["kernel/ubasic.s", """ubasic_poke_statement:
+  ["basic/ubasic.s", """ubasic_poke_statement:
 	mov r0, TOKENIZER_POKE
 	push pch
 	push pcl
@@ -424,13 +428,16 @@ must_fail = ["FAIL race sweep: every READ framed"]
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
 fixed_in = "52423fa"
-# (term_do clears it through term_cmd_new since the lines are kept in order)
-revert = [["kernel/term.s", """	push pch
+# (term_do cleared it through term_cmd_new once the lines were kept in
+# order; since BASIC became a program, 2026-09-26, its main keeps the
+# program at $c000 only if "BA" and the end are right, else clears it: the
+# revert keeps whatever is there)
+revert = [["basic/basic.s", """.new:
+	push pch
 	push pcl
-	b term_cmd_new
-	xor r0, r0
-	st API_RUN, r0""", """	xor r0, r0
-	st API_RUN, r0"""]]
+	b bas_cmd_new
+.kept:""", """.new:
+.kept:"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
 must_fail = ["FAIL: BASIC on junk RAM"]
 
@@ -444,7 +451,7 @@ must_fail = ["FAIL rom id after a killed run's late reply"]
 [[bug]]
 name = "kernel BASIC: variables were never cleared, so on power-up junk RAM an unset one printed junk"
 fixed_in = "f9150e6"
-revert = [["kernel/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
+revert = [["basic/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
 	xor r1, r1
 .clear_variables:
 	st [ub_variables]+r1, r0
@@ -470,8 +477,10 @@ must_fail = ["FAIL (long)(size_on_medium(name)) == (long)(sizes[i])", "STO-001/0
 [[bug]]
 name = "kernel SAVE: the last chunk (under 128 bytes) was never written - the saved program lost its tail"
 fixed_in = "e4eeda1"
-revert = [["kernel/ubasic.s", """.last:
-	ld r0, [st_n]
+# (basic/ubasic.s since BASIC became a program, 2026-09-26: its chunk is ub_n
+# bytes of ub_buf)
+revert = [["basic/ubasic.s", """.last:
+	ld r0, [ub_n]
 	eq r0, #0
 	bzf .close
 """, """.last:
@@ -483,10 +492,12 @@ must_fail = ["FAIL: the saved program as a PC reads it (text, CR LF)", "FAIL: th
 [[bug]]
 name = "kernel SAVE: no F_CLOSE, so nothing flushed the file - a PC, or the machine after a power cycle, found it empty"
 fixed_in = "e4eeda1"
-revert = [["kernel/ubasic.s", """.close:
+# (basic/ubasic.s since BASIC became a program, 2026-09-26: ub_close is
+# API_ST_CLOSE)
+revert = [["basic/ubasic.s", """.close:
 	push pch
 	push pcl
-	b st_close
+	b ub_close
 	eq r0, #0
 	bzf .saved
 	b .error
@@ -856,8 +867,18 @@ must_fail = ["FAIL: HOST set, nobody reading: the terminal goes on"]
 [[bug]]
 name = "kernel BASIC: every typed line was appended - lines out of order ran out of order, a line typed again was kept twice, a line number alone was kept as an empty line"
 fixed_in = "37a6c41"
-before = "44bbccb"
-files = ["kernel/term.s"]
+# 44bbccb's term.s went back until BASIC became a program (2026-09-26: the
+# editor is basic/basic.s's, and the old term.s no longer assembles with the
+# kernel): now the editor's compare says "less" for every line, so a typed
+# line goes past them all to the end - appended, as before the fix
+revert = [["basic/basic.s", """	b bas_cmp
+	eq r0, #2
+	bzf .placed				; a bigger number - the typed line goes before it
+""", """	b bas_cmp
+	mov r0, #1
+	eq r0, #2
+	bzf .placed				; a bigger number - the typed line goes before it
+"""]]
 cmd = "tools/run_tests.sh testBasicEdit"
 must_fail = ["FAIL: typed out of order, kept in order", "FAIL: replace, the same length",
              "FAIL: delete a line in the middle", "FAIL: GOSUB and GOTO to lines typed out of order"]
@@ -865,8 +886,92 @@ must_fail = ["FAIL: typed out of order, kept in order", "FAIL: replace, the same
 [[bug]]
 name = "kernel BASIC: LOAD took line numbers past 32767 (typing refuses them) - kept in order, 40000 went first, as -25536"
 fixed_in = "be81d03"
-revert = [["kernel/ubasic.s", """	gt r1, #0x7f			; a line number is 1-32767, as typed
+revert = [["basic/ubasic.s", """	gt r1, #0x7f			; a line number is 1-32767, as typed
 	bzf .done
 """, ""]]
 cmd = "tools/run_tests.sh testBasicEditStorage"
 must_fail = ["FAIL: ... in order, the later line 10 kept, 40000 skipped"]
+
+[[bug]]
+name = "kernel: a BASIC.PRG too big for $7000-$bfff was loaded (20 KB, over a second at boot) before it was refused"
+fixed_in = "1cc9bbd"
+# sys_load looks for a byte past the room (a seek and a 1-byte read) before
+# it loads anything; without that, too big was only found at the limit
+revert = [["kernel/sys.s", """.accepted:
+	; too big is known before anything is loaded: is there a byte at
+	; sys_top - $7000 + 4 (past the header and the room)?
+	mov r0, #4
+	st [st_pos], r0
+	ld r0, [sys_top]
+	sub r0, #0x70
+	st [st_pos+1], r0
+	xor r0, r0
+	st [st_pos+2], r0
+	st [st_pos+3], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .probe
+	b .close
+.probe:
+	mov r0, #1
+	st [st_n], r0
+	push pch
+	push pcl
+	b st_read
+	eq r0, #0
+	bzf .probed
+	b .close
+.probed:
+	ld r1, [st_n]
+	eq r1, #0
+	bzf .room
+	mov r0, #0xfc
+	b .close
+.room:
+	xor r0, r0				; back to the start, the first chunk again
+	st [st_pos], r0
+	st [st_pos+1], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .again
+	b .close
+.again:
+	push pch
+	push pcl
+	b sys_chunk
+	eq r0, #0
+	bzf .load
+	b .close
+.load:
+""", """.accepted:
+.load:
+"""]]
+cmd = "tools/run_tests.sh testBasicFromCard"
+must_fail = ["FAIL: too big for $7000-$bfff: no delay"]
+
+[[bug]]
+name = "kernel: the terminal's hook ran BASIC with API_RUN 0, so cupc8.py run could write a program over the running interpreter"
+fixed_in = "1cc9bbd"
+revert = [["kernel/term.s", """term_hook:
+	push r0
+	mov r0, #2
+	st API_RUN, r0
+""", """term_hook:
+	push r0
+"""]]
+cmd = "tools/run_tests.sh testBasicReload"
+must_fail = ["FAIL: API_RUN 2 while BASIC runs a program"]
+
+[[bug]]
+name = "kernel: an exec that failed after part of its program was in left BASIC at $7000 overwritten (the next line crashed it)"
+fixed_in = "1cc9bbd"
+revert = [["kernel/sys.s", """	push pch
+	push pcl
+	b sys_basic
+.said:""", """.said:"""]]
+cmd = "tools/run_tests.sh testBasicReload"
+must_fail = ["FAIL: ... BASIC at $7000 again, the program kept"]

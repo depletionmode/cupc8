@@ -66,7 +66,7 @@ proc buildBootRom*(): string =
 proc buildBasic*(dir = ""): string =
   ## BASIC as a program for $7000 (basic/build.sh) into `dir` (default
   ## romDir()): its BASIC.PRG, the path returned, and basic.map beside it.
-  let d = if dir.len > 0: dir else: romDir()
+  let d = if dir.len == 0: romDir() else: dir
   run("bash " & quoteShell(simRoot / "basic" / "build.sh") & " " & quoteShell(d), "BASIC build")
   d / "BASIC.PRG"
 

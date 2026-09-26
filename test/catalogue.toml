@@ -863,7 +863,7 @@ cmd = "tools/run_tests.sh testKernelConsole"
 [[test]]
 id = "KRN-031"
 title = "BASIC as a program: loaded again after a native program"
-checks = "the kernel copies BASIC from the ROM to $7000 at boot and after every native program (cupc8.py run's API_RUN and exec from the card alike): each time $7000 holds BASIC.PRG's body and the terminal's hook is BASIC's (bas_hook), the terminal's stack as before; a program typed before a native program that stayed below $c000 is still there (list, run); after one that wrote over $c000 BASIC starts with no program (\"BA\" and the end written again, list empty) and a new one runs"
+checks = "the kernel copies BASIC from the ROM to $7000 at boot and after every native program (cupc8.py run's API_RUN and exec from the card alike): each time $7000 holds BASIC.PRG's body and the terminal's hook is BASIC's (bas_hook), the terminal's stack as before; a program typed before a native program that stayed below $c000 is still there (list, run); after one that wrote over $c000 BASIC starts with no program (\"BA\" and the end written again, list empty) and a new one runs; API_RUN is 2 while BASIC runs a program and 0 at the prompt after; exec of a file with a broken FAT chain says card error and loads nothing; exec with the SD card taken out once its first chunk is in says no SD card and loads BASIC again, the program kept"
 method = "tools/simtest.nim testBasicReload: the real kernel and ROM image on sim.nim's M1 machine, tools/testdata/exec_prog.s and big_prog.s on the storage card model"
 kind = "sim"
 vrow = "2.1"

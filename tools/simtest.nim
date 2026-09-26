@@ -3610,7 +3610,11 @@ proc testBasicReload() =
   ## holds BASIC.PRG's body again and the terminal's hook is BASIC's. A
   ## program typed before a native program that stayed below $c000 is still
   ## there after it (list, run); after one that wrote over $c000 (as one over
-  ## 20 KB would) BASIC starts with no program, and a new one runs.
+  ## 20 KB would) BASIC starts with no program, and a new one runs. API_RUN
+  ## is 2 while BASIC runs a program (cupc8.py run must not write over it).
+  ## An exec whose file has a broken FAT chain fails before loading anything
+  ## (the size probe's seek); one that fails after part of its program is
+  ## in (the SD card taken out) says so and loads BASIC again.
   echo "== BASIC loaded again after a native program =="
   let rom = buildKernelRom()
   let body = basicBody(readFile(romDir() / "BASIC.PRG"))
@@ -3627,6 +3631,12 @@ proc testBasicReload() =
   mkprg(testdata / "big_prog.s", big)
   discard fatcheck("put " & quoteShell(img) & " PROG.PRG " & quoteShell(prog))
   discard fatcheck("put " & quoteShell(img) & " BIG.PRG " & quoteShell(big))
+  var long = readFile(prog)
+  while long.len < 5000: long.add('\xa5')
+  writeFile(storeDir / "long.bin", long)
+  discard fatcheck("put " & quoteShell(img) & " LONG.PRG " & quoteShell(storeDir / "long.bin"))
+  discard fatcheck("put " & quoteShell(img) & " BROKEN.PRG " & quoteShell(storeDir / "long.bin"))
+  breakFatChain(img, "BROKEN.PRG")
   bootStorage(rom, img)
   let g = gpuCard()
   expectTrue("after boot: the ROM's BASIC at $7000 (" & $body.len & " bytes)", bodyAt7000(body))
@@ -3640,6 +3650,43 @@ proc testBasicReload() =
   expect("... the terminal's stack as before", SP, sp0, 4)
   expectTrue("... the program kept: list", cmdOutput("list") == @["10 print 6*7", "20 print \"KEPT\""])
   expectTrue("... and run", runOutput() == @["42", "KEPT"])
+  # API_RUN while BASIC runs a program
+  typeLine("30 for i = 1 to 300")
+  typeLine("40 next i")
+  typeLine("clr")
+  for ch in "run\r": pushKey(ord(ch))
+  var seen2 = false
+  discard runUntil(proc (): bool =
+    if mem[ApiRun] == 2 and not waiting: seen2 = true
+    gpuFind(g, "DONE.") >= 0, 40_000_000)
+  settle(5_000_000)
+  expectTrue("API_RUN 2 while BASIC runs a program, 0 at the prompt after", seen2 and mem[ApiRun] == 0)
+  typeLine("30")
+  typeLine("40")
+  expectTrue("exec a program with a broken FAT chain: the card's message",
+             cmdOutput("exec \"broken.prg\"") == @["card error"])
+  expectTrue("... nothing loaded: BASIC and the program as they were",
+             bodyAt7000(body) and hookAt() == bhook and runOutput() == @["42", "KEPT"])
+  # the SD card out while exec loads a program: its first chunk is in
+  let dirty = loadMap(kernelMapPath()).resolve("sys_dirty")
+  for ch in "exec \"long.prg\"\r": pushKey(ord(ch))
+  expectTrue("exec a program, the SD card out once it has started loading",
+             runUntil(proc (): bool = mem[dirty] == 1, 20_000_000))
+  discard simcard_storage_image(storageCard(), nil, 0)
+  settle(20_000_000)
+  let rows = screenLines(g)
+  var said: seq[string]
+  var at = -1
+  for i, l in rows:
+    if l.startsWith(">> exec \"long.prg\""): at = i
+  if at >= 0:
+    for l in rows[at + 1 .. ^1]:
+      if l.startsWith(">>"): break
+      if l.len > 0: said.add(l)
+  expectTrue("... no SD card (" & $said & ")", said == @["no SD card"])
+  expectTrue("... BASIC at $7000 again, the program kept",
+             bodyAt7000(body) and hookAt() == bhook and runOutput() == @["42", "KEPT"])
+  discard simcard_storage_image(storageCard(), img, 0)
   expectTrue("exec from the card", cmdOutput("exec \"prog.prg\"") == @["NATIVE OK"])
   expectTrue("... BASIC at $7000 again, the program kept",
              bodyAt7000(body) and hookAt() == bhook and runOutput() == @["42", "KEPT"])
