@@ -8,6 +8,10 @@
   when it finishes; don't sit waiting on it in the foreground.
 - Run single tests by name rather than whole suites, unless the whole suite
   is what's needed.
+- **Software changes: the simulator first** (David, 2026-09-27). Test kernel,
+  BASIC, ROM and program changes on the simulator (`tools/run_tests.sh`,
+  `test/sim/*.py`) until they pass there; it is much faster. Only then run
+  the emulator (native E2E) tests, as the final check.
 
 ## Emulator and simulator (David, 2026-09-25)
 
