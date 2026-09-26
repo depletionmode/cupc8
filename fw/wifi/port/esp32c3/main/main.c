@@ -53,7 +53,8 @@ void app_main(void)
 	wifi_init(&card, &netesp_ops, netesp_init());
 	frames_init(&card.card);
 #if CONFIG_CUPC8_QEMU
-	transport_uart_start();
+	if (!transport_slotdev_start())
+		transport_uart_start();
 #else
 	transport_spi_start();
 #endif
@@ -63,6 +64,7 @@ void app_main(void)
 		frames_busy(true);          /* polling may complete a deferred response */
 		wifi_poll(&card);
 		frames_busy(false);
+		frames_status();
 		gpio_set_direction(PIN_SLOT_NIRQ, card_irq(&card.card) ? GPIO_MODE_OUTPUT : GPIO_MODE_INPUT);
 		gpio_set_level(PIN_LED_LINK, card.link == WIFI_LINK_UP);
 		activity(PIN_LED_TX, card.tx_bytes, &tx_seen, &tx_until);

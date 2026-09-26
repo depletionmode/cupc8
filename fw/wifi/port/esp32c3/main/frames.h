@@ -3,7 +3,8 @@
  * build) and the card engine (fw/common/cardproto.h), for the ESP32-C3.
  *
  * A transport can't change a frame's MISO once it is queued, so it asks for
- * the whole preload when it queues the next frame: the status byte, then
+ * the whole preload when it queues the next frame, in its frame-end ISR on the
+ * card: the status byte (as the task last took it: frames_status()), then
  * RESP_LEN and the response if one is ready and nothing that could change it
  * is queued or running (doc/hardware/slot.md allows this). Received frames
  * are queued from the ISR and replayed into the engine by the task.
@@ -25,6 +26,10 @@ bool frames_received(const uint8_t *mosi, int len);
 int frames_preload(uint8_t *miso, int max);
 /* task: replay queued frames into the engine; returns how many */
 int frames_poll(void);
+/* task: take the status byte the next preloads carry. status() asks the
+ * network stack (FIONREAD on each socket), which an ISR must not call, and
+ * transports take the preload in their frame-end ISR */
+void frames_status(void);
 /* task: bracket changes to the response made outside frames_poll() */
 void frames_busy(bool busy);
 
