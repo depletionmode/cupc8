@@ -276,6 +276,15 @@ def preroute(board):
     buck_boost(board)
     import pcbnew
 
+    # B13 (SCK) is between two top-side GND fingers, while A13 is GND on
+    # the reverse. A via in the tab would cut into A13's ground tie. Carry
+    # SCK straight up between the GND ties and change layers beyond their
+    # ends, where the reverse-side copper has stopped.
+    sck = rc.pad_at(board, "J1", "B13")
+    escape = (sck[0], -10.3)
+    rc.track(board, "/SCK", sck, escape)
+    rc.via(board, "/SCK", escape)
+
     def gnd_via_near(x, y, dx, dy):
         tracks = board.Tracks()
         return any(tracks[i].Type() == pcbnew.PCB_VIA_T and tracks[i].GetNetname() == "/GND" and
