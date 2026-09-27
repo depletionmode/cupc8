@@ -199,6 +199,10 @@ fail until their contract coverage exists:
   currently marks RT9013 EOL; JLC stock needs a separate live check.
   CC-005 remains red until the physical bounds and 40 mA FPGA core-load
   assumption are supported.
+  The [current receipt-bound CPU power audit](cpu-power-proof-gaps-20260928.md)
+  also traces the socket +3V3 feed through the In4 plane, identifies the
+  input-capacitor recommendation mismatch, and states the finished-copper,
+  contact, FPGA-current and thermal evidence still needed.
 - Thermal: main/CPU regulator models need netlist binding, and RP2040 cards
   need internal-regulator dissipation at their maximum operating loads.
 - Wi-Fi strapping: WC-006 checks the actual KiCad netlist's ESP32-C3 GPIO2/8/9,

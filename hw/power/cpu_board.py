@@ -1,10 +1,12 @@
-"""CC-005: bind the CPU card's RT9013 output to its routed 1V2 copper.
+"""CC-005: bind CPU RT9013 output and input to their routed copper.
 
-The route result is a centerline scenario using nominal finished copper:
-pad spreading, minimum copper thickness and capacitor ESR remain outside
-this extractor. The catalogue gate retains those coverage failures.
+Both route results are centerline scenarios using nominal finished copper.
+The input scenario assigns zero resistance to its In4 plane and vias.
+Pad spreading, minimum copper thickness, contacts, and capacitor ESR remain
+outside this extractor. The catalogue gate retains those coverage failures.
 """
 import heapq
+import itertools
 import json
 import math
 from pathlib import Path
@@ -15,7 +17,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cosim.netlist import read
 
 NET = '/1V2'
+INPUT_NET = '/3V3'
+INPUT_PINS = [('J1', 'B5'), ('J1', 'B6'), ('J1', 'B7')]
 EXPECTED = {
+    **{pin: INPUT_NET for pin in INPUT_PINS},
     ('U3', '1'): '/3V3', ('U3', '3'): '/3V3', ('U3', '2'): '/GND',
     ('U3', '5'): NET, ('C21', '1'): '/3V3', ('C21', '2'): '/GND',
     ('C22', '1'): NET, ('C22', '2'): '/GND',
@@ -97,6 +102,90 @@ def route_resistance(board, order):
     return segments, {sink: distance(sink) for sink in SINKS}
 
 
+def input_feed_scenario(board, order):
+    """Optimistic 3V3 centerline route with an ideal In4 plane and vias.
+
+    This is neither an effective plane resistance nor a guaranteed bound on
+    finished copper. It deliberately omits socket/finger contacts, via
+    barrels, pad spreading and input current from other CPU-card loads.
+    """
+    spec = json.loads(Path(order).read_text())
+    if (spec.get('layers'), spec.get('finished_outer_copper_oz'),
+            spec.get('finished_inner_copper_oz')) != (6, 1, 0.5):
+        raise ValueError('CPU 3V3 feed scenario requires six layers, 1 oz outer / 0.5 oz inner')
+    tree = parse(Path(board).read_text())
+    pads = pad_nodes(tree)
+    targets = [('U3', '1'), ('U3', '3'), ('C21', '1')]
+    for pin in [*INPUT_PINS, *targets]:
+        if pads.get(pin, (None,))[0] != INPUT_NET:
+            raise ValueError('%s is not a 3V3 pad in routed PCB' % (pin,))
+    zones = [z for z in find(tree, 'zone') if (find1(z, 'net') or [None, None])[1] == INPUT_NET]
+    if len(zones) != 1 or child(zones[0], 'layer')[1] != 'In4.Cu' or not find1(zones[0], 'filled_polygon'):
+        raise ValueError('CPU 3V3 In4 plane has no saved fill')
+
+    graph = {}
+    endpoints = set()
+    plane = ('ideal In4 plane',)
+    def edge(a, b, ohms):
+        graph.setdefault(a, []).append((b, ohms))
+        graph.setdefault(b, []).append((a, ohms))
+    segments = 0
+    for segment in find(tree, 'segment'):
+        if child(segment, 'net')[1] != INPUT_NET:
+            continue
+        if child(segment, 'layer')[1] != 'F.Cu':
+            raise ValueError('3V3 feed has an unmodeled non-top track')
+        a, b = point(segment, 'start'), point(segment, 'end')
+        width = float(child(segment, 'width')[1])
+        if width <= 0 or a == b:
+            raise ValueError('invalid 3V3 feed track geometry')
+        edge(a, b, COPPER_OHM_MM * math.dist(a, b) / width / 1000)
+        endpoints.update((a, b))
+        segments += 1
+    vias = 0
+    for via in find(tree, 'via'):
+        if child(via, 'net')[1] != INPUT_NET:
+            continue
+        if set(child(via, 'layers')[1:]) != {'F.Cu', 'B.Cu'}:
+            raise ValueError('3V3 feed has an unmodeled via span')
+        p = point(via, 'at')
+        edge(p, plane, 0)
+        endpoints.add(p)
+        vias += 1
+    if not vias:
+        raise ValueError('3V3 feed has no plane via')
+    for pin in [*INPUT_PINS, *targets]:
+        _, center, radius, layers = pads[pin]
+        hits = [p for p in endpoints if 'F.Cu' in layers and math.dist(p, center) <= radius]
+        if not hits:
+            raise ValueError('%s has no 3V3 track/via at its pad' % (pin,))
+        for p in hits:
+            edge(pin, p, 0)
+    source = ('3V3 edge fingers',)
+    for pin in INPUT_PINS:
+        edge(source, pin, 0)
+
+    distances = {}
+    for target in targets:
+        sequence = itertools.count()
+        queue = [(0.0, next(sequence), source)]
+        seen = set()
+        while queue:
+            cost, _, node = heapq.heappop(queue)
+            if node in seen:
+                continue
+            seen.add(node)
+            if node == target:
+                distances[target] = cost
+                break
+            for nxt, ohms in graph.get(node, ()):
+                if nxt not in seen:
+                    heapq.heappush(queue, (cost + ohms, next(sequence), nxt))
+        else:
+            raise ValueError('3V3 feed cannot reach %s' % (target,))
+    return segments, vias, distances
+
+
 def check(out):
     out = Path(out)
     topology(out / 'cpu.net')
@@ -105,4 +194,10 @@ def check(out):
     print('CPU 1V2: %d top-layer tracks; longest centerline scenario U3.5 to %s: %.1f mOhm'
           % (segments, farthest, 1e3 * sinks[farthest]))
     print('CPU output parts: C22 4.7 uF + C1-C4 100 nF nominal; LDO deck uses 1.4 uF')
+    feed_segments, feed_vias, feed = input_feed_scenario(out / 'cpu.kicad_pcb',
+                                                          out / 'fab/order.json')
+    print('CPU 3V3 feed: %d top-layer tracks, %d In4 plane vias; ideal-plane/zero-via '
+          'shortest-path scenario to U3.1/U3.3: %.2f/%.2f mOhm'
+          % (feed_segments, feed_vias, 1e3 * feed[('U3', '1')],
+             1e3 * feed[('U3', '3')]))
     return sinks
