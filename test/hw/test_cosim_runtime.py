@@ -132,6 +132,16 @@ def main():
                 rom_bad != {'code': 1, 'verified': False, 'failed': True}:
             raise AssertionError(f'open ROM /WE did not break programming verification: {rom_good} / {rom_bad}')
         print('open ROM /WE makes sysctl flash-program verify fail')
+        if not manifest['runtime']['rom_read_d0_connected']:
+            raise AssertionError('ROM DQ0 requires an executed, routed read-data path')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['rom_read_d0_connected'] = False
+        mutant = Path(directory) / 'open-rom-dq0.json'
+        mutant.write_text(json.dumps(changed))
+        rom_read_bad = run(mutant)
+        if (rom_read_bad['pc'], rom_read_bad['gpo']) == (good['pc'], good['gpo']):
+            raise AssertionError(f'open ROM DQ0 did not change CPU execution: {good} / {rom_read_bad}')
+        print(f"open ROM DQ0 moves CPU from ${good['pc']:04x} to ${rom_read_bad['pc']:04x}")
         for name, key in (('ROM', 'rom_address'), ('CPU', 'cpu_address')):
             changed = copy.deepcopy(manifest)
             bits = changed['runtime'][key]

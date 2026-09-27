@@ -42,6 +42,13 @@ launch disables both. In a 20 ms CPU probe, an open SRAM /WE changes PC from
 `$E2B9` to `$E1FF`; an open ROM /WE makes a 4 KiB sysctl flash write fail
 read-back verification. This models the write-enable path only; other memory
 controls and analog timing remain separate work.
+ROM DQ0 has an additional route-bound read dependency from U10.13 to chipset
+U7.119. The measured planar route is 23.517 mm. Opening its ROM launch track
+keeps the other memory data traces in place but changes the native CPU's 20 ms
+state from PC `$E2B9`/GPO `$02` to PC `$E35B`/GPO `$00`. The open net has no
+pull resistor, so its voltage is physically undefined; the digital model
+uses a deterministic high DQ0 value solely to expose the missing connection.
+This counterexample does not establish analog open-pin behavior.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
@@ -77,9 +84,9 @@ The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
 supervisor's routed nPOR launch. The third proves that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
-nPOR path and open memory-write branches change the running machine. The
-manifest currently covers the CPU,
-main memory, slot data paths, system bridge, Type-C source class and
+nPOR path, memory-write branches and ROM DQ0 read route change the running
+machine. The manifest currently covers the CPU, main memory, slot data paths,
+system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the current routed-board snapshot, all required top-level
 routes are present, but 502 named nets remain without executed models or

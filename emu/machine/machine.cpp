@@ -399,6 +399,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     board->romAccessNs = o.romAccessNs;
     board->ramWriteConnected = o.ramWriteConnected;
     board->romWriteConnected = o.romWriteConnected;
+    board->romD0Connected = o.romD0Connected;
   }
   pwrHi = o.pwrHi;
   porConnected = o.porConnected;

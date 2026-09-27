@@ -217,6 +217,7 @@ class Machine {
     std::array<uint8_t, 8> cpuData{};
     double ramAccessNs = 45.0, romAccessNs = 70.0;
     bool ramWriteConnected = true, romWriteConnected = true;
+    bool romD0Connected = true;
     bool slotWiringOn = false;
     std::array<SlotWiring, 6> slotWiring{};
     uint8_t misoIdle = 1;

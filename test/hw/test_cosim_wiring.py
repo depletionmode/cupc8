@@ -74,6 +74,12 @@ def main_cli():
                     'main:MEM_nWE' not in bad_write['runtime_nets']:
                 raise AssertionError('removed /WE copper did not disable both chip-write paths')
             print('open chipset MEM_nWE launch disables RAM and ROM writes')
+            bad_rom_data = open_launch('U10', '13', '/MEM_D0')
+            if bad_rom_data['runtime']['rom_read_d0_connected'] or \
+                    bad_rom_data['runtime']['routed_top'] or \
+                    'main:MEM_D0' not in bad_rom_data['runtime_nets']:
+                raise AssertionError('removed ROM DQ0 copper did not disable read-data path')
+            print('open ROM MEM_D0 launch disables the executable read-data path')
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')
@@ -109,6 +115,10 @@ def main_cli():
         broken_write = copy.deepcopy(main)
         del broken_write.pins[('U7', '114')]
         rejected(cards, broken_write, 'missing chipset memory-write output')
+
+        broken_rom_data = copy.deepcopy(main)
+        del broken_rom_data.pins[('U10', '13')]
+        rejected(cards, broken_rom_data, 'missing ROM read-data DQ0')
 
         broken_io = copy.deepcopy(cards)
         broken_io['io'].resistors = tuple(r for r in broken_io['io'].resistors if r.ref != 'R14')

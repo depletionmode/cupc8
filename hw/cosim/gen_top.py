@@ -276,14 +276,31 @@ def check(cards, main, pcb=None):
                                   'to': f'main.{target[0]}.{target[1]}',
                                   'route_mm': length, 'runtime': f'{kind}_write_connected'})
     manifest['runtime']['memory_write_links'] = write_links
+    # A ROM DQ0 open is visible during CPU instruction fetch. The digital
+    # model uses a deterministic high value for this otherwise floating bit;
+    # it is a wiring counterexample, not an analog estimate of an open pad.
+    rom_d0, chipset_d0 = ('U10', '13'), ('U7', '119')
+    if node(main, *rom_d0) != '/MEM_D0':
+        raise ValueError('ROM DQ0 pad is not MEM_D0')
+    path(main, rom_d0, chipset_d0)
+    rom_d0_mm = None
+    if pcb is not None and Path(pcb).is_file():
+        from ibis_bus import routed_distances
+        rom_d0_mm = routed_distances(Path(pcb), '/MEM_D0', rom_d0, [chipset_d0])[
+            f'{chipset_d0[0]}.{chipset_d0[1]}']
+    manifest['paths'].append({'from': 'main.U10.13', 'to': 'main.U7.119',
+                              'route_mm': rom_d0_mm, 'runtime': 'rom_read_d0_connected'})
+    manifest['runtime']['rom_read_d0_connected'] = rom_d0_mm is not None
     for name, connected in (('nPOR:U6.2->U7.61', manifest['runtime']['por_connected']),
                             ('MEM_nWE:U7.114->U9.5', write_links['ram']),
-                            ('MEM_nWE:U7.114->U10.31', write_links['rom'])):
+                            ('MEM_nWE:U7.114->U10.31', write_links['rom']),
+                            ('MEM_D0:U10.13->U7.119', manifest['runtime']['rom_read_d0_connected'])):
         if not connected:
             manifest['runtime']['missing_routes'].append(name)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
-    manifest['runtime']['routed_timing'] &= all(write_links.values())
+    manifest['runtime']['routed_timing'] &= all(write_links.values()) and \
+        manifest['runtime']['rom_read_d0_connected']
     # CPU driver pack channels must remain explicit; the native board model
     # may use these channel values as edge delays after E2E-001 integration.
     import cpu

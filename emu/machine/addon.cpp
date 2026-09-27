@@ -203,6 +203,10 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       };
       opt.ramWriteConnected = writeLink("ram");
       opt.romWriteConnected = writeLink("rom");
+      napi_value romD0 = prop(env, wiring, "rom_read_d0_connected");
+      if (!isType(env, romD0, napi_boolean) ||
+          napi_get_value_bool(env, romD0, &opt.romD0Connected) != napi_ok)
+        throw std::runtime_error("netlist wiring: invalid ROM DQ0 read link");
       opt.memoryWiringOn = true;
       napi_value slots = prop(env, wiring, "slots");
       bool array = false;

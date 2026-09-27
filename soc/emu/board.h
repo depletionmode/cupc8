@@ -39,6 +39,7 @@ struct MainBoard {
 	bool timedMemory = false;
 	double ramAccessNs = 45.0, romAccessNs = 70.0;
 	bool ramWriteConnected = true, romWriteConnected = true;
+	bool romD0Connected = true;
 
 	Vmachine_core *top = nullptr;
 	sst39_t rom;
@@ -125,8 +126,10 @@ struct MainBoard {
 			read_data = pending_data;
 		reading = now_reading;
 		read_addr = chipAddress;
+		uint8_t romPhysical = read_data;
+		if (!romD0Connected) romPhysical |= 1u;  // opened DQ0 is unknown; deterministic high mutation policy
 		uint8_t din = now_reading == 1 ? fromPhysical(read_data, wiring.ramData) :
-		              now_reading == 2 ? fromPhysical(read_data, wiring.romData) : 0xFF;
+		              now_reading == 2 ? fromPhysical(romPhysical, wiring.romData) : 0xFF;
 		if (last_we == 0 && top->mem_n_we == 1) {         // /WE rose: the write happens
 			if (!top->mem_n_ce_ram) {
 				if (ramWriteConnected)
