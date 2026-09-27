@@ -2402,9 +2402,12 @@ def order_spec(layers, card_edge):
     Cards (card_edge) are 1.6 mm with hard-gold fingers and a 30 degree
     chamfer (milestone-1.md, Board thickness); check_order enforces it."""
     spec = {"layers": layers, "thickness_mm": 1.6, "surface_finish": "ENIG", "min_hole_mm": 0.3,
+            "finished_outer_copper_oz": 1,
             "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
             "gold_fingers": card_edge, "finger_finish": "hard gold" if card_edge else None,
             "finger_chamfer_deg": 30 if card_edge else None}
+    if layers > 2:
+        spec["finished_inner_copper_oz"] = 0.5
     # JLC's standard 1.6 mm stack-ups (jlcpcb.com/impedance); gold fingers
     # are offered at any layer count, with ENIG and a board >= 50 mm
     stackup = {4: "JLC04161H-7628", 6: "JLC06161H-3313"}.get(layers)
@@ -2417,6 +2420,10 @@ def check_order(spec, card_edge):
     bad = []
     if spec["thickness_mm"] != 1.6:
         bad.append("thickness %s mm, cards must be 1.6" % spec["thickness_mm"])
+    if spec.get("finished_outer_copper_oz") != 1:
+        bad.append("finished outer copper must be 1 oz")
+    if spec["layers"] > 2 and spec.get("finished_inner_copper_oz") != 0.5:
+        bad.append("finished inner copper must be 0.5 oz")
     if card_edge and (not spec["gold_fingers"] or spec["finger_finish"] != "hard gold"
                       or spec["finger_chamfer_deg"] != 30):
         bad.append("card edge needs hard-gold fingers with a 30 degree chamfer")

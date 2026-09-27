@@ -38,7 +38,8 @@ class WifiPowerBoard(unittest.TestCase):
 
     def fixture(self, directory, broken=False):
         out = Path(directory)
-        (out / 'order.json').write_text(json.dumps({'layers': 2, 'thickness_mm': 1.6}))
+        (out / 'order.json').write_text(json.dumps({'layers': 2, 'thickness_mm': 1.6,
+                                                    'finished_outer_copper_oz': 1}))
         parts = ['(kicad_pcb (layers (0 "F.Cu" signal) (31 "B.Cu" signal))']
         by_net = {'/+5V': [], '/3V3': []}
         for index, ((ref, pin), net) in enumerate(PINS.items()):
@@ -71,6 +72,10 @@ class WifiPowerBoard(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, '2-layer'):
                 routes(board, order, self.circuit())
             order.write_text(json.dumps({'layers': 2, 'thickness_mm': 1.6}))
+            with self.assertRaisesRegex(ValueError, '1 oz'):
+                routes(board, order, self.circuit())
+            order.write_text(json.dumps({'layers': 2, 'thickness_mm': 1.6,
+                                         'finished_outer_copper_oz': 1}))
             board.write_text(board.read_text().replace('(width 0.5)', '(width 0.1)', 1))
             self.assertGreater(routes(board, order, self.circuit())[0], r5)
             board.write_text(board.read_text().replace('(net "/3V3")', '(net "/+5V")', 1))
