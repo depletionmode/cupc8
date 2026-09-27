@@ -185,12 +185,17 @@ system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the archived routed-board snapshot used for this audit,
 all required top-level routes are present; the current main-board route receipt
-must be checked separately. Of 502 previously uncovered named nets, 45
+must be checked separately. The bridge MISO runtime input is gated by copper
+continuity on both sides of R20 on main and from the system socket to the
+RP2040 input; an open leg forces the native machine input high. Copper length
+is recorded as provenance only, not an analog MISO timing model. Of 502
+previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
 nets, three CPU reset nets, two chipset oscillator-branch nets and three
-system bridge source nets now affect execution; 355 remain unmodeled. The remaining groups
-are boot/programming (68), slot/control bus (33), CPU/memory (47),
+system bridge source nets and the bridge MISO source now affect execution;
+354 remain unmodeled. The remaining groups are boot/programming (68),
+slot/control bus (32), CPU/memory (47),
 power/return (65), clock/reset (46), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

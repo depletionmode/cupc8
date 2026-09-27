@@ -738,6 +738,7 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     bridge = {}
+    bridge_miso_main = True
     bridge_source = {'BR_SCK': 0, 'BR_MOSI': 1, 'BR_nCS': 2}
     for destination in ('BR_SCK', 'BR_MOSI', 'BR_nCS', 'BR_MISO'):
         pads = [pin for (ref, pin), net in main.pins.items()
@@ -750,7 +751,6 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         if destination == 'BR_MISO':
             if card_net != 'BR_MISO':
                 raise ValueError('system bridge MISO contact swapped')
-            bridge['miso'] = True
             fpga = [pin for (ref, pin), net in main.pins.items()
                     if ref == 'U7' and net == '/BR_MISO_SRC']
             if len(fpga) != 1:
@@ -758,6 +758,23 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             resistor = path(main, ('U7', fpga[0]), ('J3', pads[0]), '33')
             manifest['paths'].append({'from': f'main.U7.{fpga[0]}', 'to': f'main.J3.{pads[0]}',
                                       'series': resistor, 'ohms': 33})
+            if (node(main, resistor, '1') != '/BR_MISO_SRC' or
+                    node(main, resistor, '2') != '/BR_MISO'):
+                raise ValueError('system bridge MISO series pad mapping changed')
+            for net, first, last in (('BR_MISO_SRC', ('U7', fpga[0]), (resistor, '1')),
+                                     ('BR_MISO', (resistor, '2'), ('J3', pads[0]))):
+                path(main, first, last)
+                length = None
+                if pcb is not None and Path(pcb).is_file():
+                    from ibis_bus import routed_distances
+                    length = routed_distances(Path(pcb), f'/{net}', first, [last])[
+                        f'{last[0]}.{last[1]}']
+                manifest['paths'].append({'from': f'main.{first[0]}.{first[1]}',
+                                          'to': f'main.{last[0]}.{last[1]}',
+                                          'route_mm': length, 'runtime': 'bridge_miso_connected'})
+                if length is None:
+                    bridge_miso_main = False
+                    manifest['runtime']['missing_routes'].append(f'main:{net}_bridge_miso_copper')
         else:
             if card_net not in bridge_source:
                 raise ValueError(f'system bridge {destination}: wired to {card_net}')
@@ -780,6 +797,22 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['bridge_source_links'] = bridge_links
     manifest['paths'].extend(bridge_paths)
     manifest['runtime']['missing_routes'].extend(bridge_missing)
+    # The return bit also crosses the system card from the socket to RP2040.
+    system_miso_contact, system_miso_input = ('J2', 'B15'), ('U1', '6')
+    if (node(cards['system'], *system_miso_contact) != '/BR_MISO' or
+            node(cards['system'], *system_miso_input) != '/BR_MISO'):
+        raise ValueError('system bridge MISO return pad mapping changed')
+    path(cards['system'], system_miso_contact, system_miso_input)
+    system_miso_mm = None
+    if system_board is not None and Path(system_board).is_file():
+        from ibis_bus import routed_distances
+        system_miso_mm = routed_distances(Path(system_board), '/BR_MISO',
+                                          system_miso_contact, [system_miso_input])['U1.6']
+    manifest['paths'].append({'from': 'system.J2.B15', 'to': 'system.U1.6',
+                              'route_mm': system_miso_mm, 'runtime': 'bridge_miso_connected'})
+    if system_miso_mm is None:
+        manifest['runtime']['missing_routes'].append('system:BR_MISO_bridge_copper')
+    bridge['miso'] = bridge_miso_main and system_miso_mm is not None
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # Reset, oscillator and Type-C source policy reach actual chipset pads.
@@ -911,7 +944,7 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('cpu', f'CPU_A{i}')
     for name in ('MEM_nOE', 'MEM_nWE', 'MEM_nCE_RAM', 'MEM_nCE_ROM',
                  'SPI_SCK', 'SPI_MOSI', 'SPI_MISO', 'BR_SCK', 'BR_MOSI',
-                 'BR_MISO', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF',
+                 'BR_MISO', 'BR_MISO_SRC', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF',
                  'nPOR'):
         runtime_net('main', name)
     for name in ('SPI_SCK_SRC', 'SPI_MOSI_SRC'):
