@@ -102,6 +102,12 @@ SOCKETS = {
 def key_mating_margin(sock, notch_width, notch_minus):
     """Signed worst-case clearance on each side of a centered socket key."""
     return (notch_width - notch_minus - sock["rib_w"] - sock.get("rib_plus", 0)) / 2
+
+
+# JLCPCB's published routed-edge dimensional tolerance is +/-0.20 mm
+# regular, +/-0.10 mm high precision. This is a best-case edge-location
+# uncertainty, not a proven rib-to-notch registration tolerance.
+JLC_HIGH_PRECISION_EDGE_TOLERANCE = 0.10
 HOUSING_BEFORE_B1 = 14.50 - 11.50      # housing end to finger B1's contact
 SLOT_BEFORE_B1 = 1.00                  # slot end to B1 (EasyEDA model of C404113: slot x -10.50, B1 -9.50)
 SLOT_AFTER_TAB = 0.40                  # tab's far edge to the slot end (model: 10.55 vs tab 10.15)
@@ -418,6 +424,11 @@ def check_fingers(b, res):
             "%s in %s: key notch min %.2f mm vs rib max %.2f mm; per-side worst-case gap %.3f mm%s"
             % (name, sock["part"], key_w - CEM["key_w"][1], rib_max, mating_margin,
                " (UMAX drawing 318307001, page 1: key 1.78 +/-0.05)" if "rib_plus" in sock else ""))
+    if "rib_plus" in sock:
+        res.add(cid, mating_margin > JLC_HIGH_PRECISION_EDGE_TOLERANCE,
+                "%s in %s: %.3f mm centered key/notch gap per side vs JLC best listed +/-%.2f mm "
+                "routed-edge tolerance; positional fit needs qualified routing and mating evidence"
+                % (name, sock["part"], mating_margin, JLC_HIGH_PRECISION_EDGE_TOLERANCE))
     res.add(cid, b["thickness"] < sock["slot_w"] - 0.05,
             "%s in %s: card %.2f mm in slot min %.2f mm (nominal %.2f%s)" %
             (name, sock["part"], b["thickness"], sock["slot_w"] - .05,

@@ -16,6 +16,7 @@ class KeyMatingTests(unittest.TestCase):
         margin = fit.key_mating_margin(socket, *fit.CEM['key_w'])
         self.assertAlmostEqual(margin, .005)
         self.assertGreater(margin, 0)
+        self.assertLess(margin, fit.JLC_HIGH_PRECISION_EDGE_TOLERANCE)
 
     def test_mutated_key_or_notch_requires_positive_worst_case_margin(self):
         socket = dict(fit.SOCKETS['C404113'])

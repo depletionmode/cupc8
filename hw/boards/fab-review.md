@@ -28,9 +28,9 @@ The UMAX manufacturer's drawing 318307001, page 1
 *along the card edge* as 1.78 +/-0.05 mm. Its separate 1.77 +0.20/-0.05 mm
 dimension is the slot opening *across the card thickness*. With both key and
 notch at their specified worst widths and perfectly centered, the remaining
-side gap is just 0.005 mm. `MECH-001` reports this width comparison, but it
-does not establish worst-case alignment of the molded rib against the routed
-notch or qualify the board-route process. [JLCPCB's routed-edge table](https://jlcpcb.com/capabilities/Capab)
+side gap is just 0.005 mm. `MECH-001` reports this width comparison and fails
+the production-fit check because the molded rib against the routed notch is
+not qualified. [JLCPCB's routed-edge table](https://jlcpcb.com/capabilities/Capab)
 lists +/-0.20 mm regular and +/-0.10 mm high-precision outline tolerance;
 either exceeds the 0.06 mm CEM notch-width tolerance unless a tighter process
 and inspection are agreed. Obtain manufacturer routing capability and mating
