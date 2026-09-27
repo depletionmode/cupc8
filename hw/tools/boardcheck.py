@@ -119,7 +119,9 @@ def check(board, mode, out):
         count = connectorcheck.check(board, out / (board + '.net'))
         print('%s: %d connector contacts match the specified netlist pinout' % (board, count))
     elif mode == 'strapping':
-        raise ValueError('Wi-Fi reset strapping RC transient and download-mode model is missing')
+        if board != 'wifi':
+            raise ValueError('strapping check applies only to Wi-Fi card')
+        run([sys.executable, 'hw/tools/strapcheck.py', out / 'wifi.net'])
     elif mode == 'fab':
         check_report(json.loads((out / 'drc.json').read_text()), 'drc')
         if not list((out / 'fab').glob('*.gbr')) or not list((out / 'fab').glob('*.drl')):
