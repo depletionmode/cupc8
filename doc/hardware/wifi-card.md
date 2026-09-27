@@ -145,7 +145,7 @@ Event codes: `$01 SCAN_DONE`, `$02 JOINED`, `$03 JOIN_FAILED`, `$04 LINK_LOST`,
     response is always preloaded), Wi-Fi and lwIP glue.
 - **Testing:** the core also builds for the host against **the host's own
   sockets** (`fw/wifi/host/netposix.c`). So the co-simulation, the host
-  tests and the simulator (`tools/sim --cards:...,wifi`: any SSID joins,
+  tests and the simulator (`tools/sim --slots hdmi,io,wifi`: any SSID joins,
   the address is 127.0.0.1, localhost is the host's) make real TCP and UDP
   connections, driven entirely by CUPC/8 code.
   NVS is a variable there that outlives a simulated power cycle. ICMP uses

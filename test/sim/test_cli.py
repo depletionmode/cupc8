@@ -141,7 +141,7 @@ def wai_pace(img, env):
     """test/sim/waitloop.s (WAI woken every 50 instructions) for 12 s of wall
     time in the interactive sim: the MHz of guest clock on its speed lines."""
     try:
-        r = subprocess.run([SIM, "--cards:hdmi,io,storage", "--sd:" + img, '--type:exec "WAIT.PRG"\\n'],
+        r = subprocess.run([SIM, "--slots", "hdmi,io,storage", "--sd", img, '--type:exec "WAIT.PRG"\\n'],
                            capture_output=True, text=True, timeout=12, env=env)
         out = r.stdout
     except subprocess.TimeoutExpired as e:
@@ -179,7 +179,7 @@ def main():
     # this had): headless it settles in about 10 M; a sim that never settles
     # runs into --max-ins, and the wall-clock timeout only guards a real hang
     try:
-        text, out = sim("--cards:hdmi", "--type:help\\n", "--max-ins:%d" % SETTLE_BOUND, timeout=1800)
+        text, out = sim("--slots", "hdmi", "--type:help\\n", "--max-ins:%d" % SETTLE_BOUND, timeout=1800)
         check("--type with no IO card: headless still exits (%s instructions)" % retired(out),
               "CUPC/8 BASIC" in text and "exit 0" in out and retired(out) < SETTLE_BOUND, out + text)
     except subprocess.TimeoutExpired:
@@ -190,7 +190,7 @@ def main():
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "mkprg.py"),
                     os.path.join(ROOT, "tools", "testdata", "park.s"), "-o", park], check=True, capture_output=True)
     try:
-        text, out = sim("--cards:hdmi", "--run:" + park, "--type:ab", "--max-ins:%d" % SETTLE_BOUND, timeout=1800)
+        text, out = sim("--slots", "hdmi", "--run:" + park, "--type:ab", "--max-ins:%d" % SETTLE_BOUND, timeout=1800)
         check("--type at a program parked with nothing to wake it: headless still exits (%s instructions)"
               % retired(out), "CUPC/8 BASIC" in text and "exit 0" in out and retired(out) < SETTLE_BOUND, out + text)
     except subprocess.TimeoutExpired:
@@ -198,8 +198,8 @@ def main():
 
     # storage: a new image, SAVE / NEW / DIR / LOAD / RUN
     img = os.path.join(work, "card.img")
-    cards = "--cards:hdmi,io,storage,wifi"
-    text, out = sim(cards, "--sd:" + img,
+    slots = ("--slots", "hdmi,io,storage,wifi")
+    text, out = sim(*slots, "--sd", img,
                     '--type:10 print "from the card"\\n20 print 3*5\\nsave "t.bas"\\nnew\\ndir\\n'
                     'load "t.bas"\\nrun\\n')
     lines = text.split("\n")
@@ -227,7 +227,7 @@ def main():
     shutil.copy(img, img2)
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "fatcheck.py"), "put", img2, "BASIC.PRG",
                         os.path.join(work, "basic.bin")], capture_output=True, text=True)
-    text, out = sim("--cards:hdmi,io,storage", "--sd:" + img2, '--type:load "t.bas"\nrun\n')
+    text, out = sim("--slots", "hdmi,io,storage", "--sd", img2, '--type:load "t.bas"\nrun\n')
     lines = text.split("\n")
     check("BASIC.PRG on the SD card: the line under the banner", "BASIC from the SD card" in lines, text)
     check("... the card's BASIC runs the program", "LOADED" in lines and "15" in lines and "D0NE." in lines, text)
@@ -236,7 +236,7 @@ def main():
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    text, out = sim(cards, "--sd:" + img,
+    text, out = sim(*slots, "--sd", img,
                     '--type:load "t.bas"\\nrun\\nnet join anynet anypass\\nnet get 127.0.0.1 %d\\n' % port)
     server.shutdown()
     lines = text.split("\n")
@@ -244,7 +244,7 @@ def main():
     check("net join: any SSID joins, the host's address", "joined, address 127.0.0.1" in lines, text)
     check("net get: the local server got the request", Handler.requests == ["/"], str(Handler.requests))
     check("net get: the reply is on the screen", "HTTP/1.0 200 OK" in lines and "SIM-CLI-OK" in lines, text)
-    text, out = sim("--cards:hdmi,io,wifi", "--type:net join anynet anypass\\nnet config\\nnet ping 127.0.0.1 2\\n")
+    text, out = sim("--slots", "hdmi,io,wifi", "--type:net join anynet anypass\\nnet config\\nnet ping 127.0.0.1 2\\n")
     check("net config: the card's settings", "mode dhcp" in text, text)
     check("net ping 127.0.0.1 2: two replies, times from the ms counter",
           re.search(r"seq 1 time \d+ ms", text) and re.search(r"seq 2 time \d+ ms", text)
@@ -253,7 +253,7 @@ def main():
     # the e-ink cards: text model and the glass
     for kind in ("eink", "eink750"):
         ppm = os.path.join(work, kind + ".ppm")
-        text, out = sim("--cards:%s,io" % kind, "--dump-fb:" + ppm, "--type:10 print 6*7\\nrun\\n")
+        text, out = sim("--slots", "%s,io" % kind, "--dump-fb:" + ppm, "--type:10 print 6*7\\nrun\\n")
         check(kind + ": the program ran", "\n42\n" in text and "DONE." in text, out + text)
         # rows 0-7 of text are 16 px each: the banner (row 1), the typed lines and 42
         check(kind + ": the text is on the glass", ink_rows(ppm, 16, 128) > 500, ppm)
@@ -263,14 +263,14 @@ def main():
     # while it waits for a key), mode 2 on the e-ink panel after a
     # greyscale refresh
     ppm = os.path.join(work, "gfx.ppm")
-    text, out = sim("--cards:hdmi,io", "--dump-fb:" + ppm,
+    text, out = sim("--slots", "hdmi,io", "--dump-fb:" + ppm,
                     "--type:10 mode 1\\n20 cls 1\\n30 box 20, 20, 60, 40, 196, 1\\nrun\\n")
     red, blue = pixel(ppm, 100, 80), pixel(ppm, 20, 20)
     check("hdmi: mode 1, cls 1, a filled box in 196: red in it %s, VGA blue around it %s" % (red, blue),
           red[0] > 240 and red[1] < 16 and red[2] < 16 and blue[0] < 16 and blue[1] < 16 and 160 < blue[2] < 180,
           out + text)
     ppm = os.path.join(work, "grey.ppm")
-    text, out = sim("--cards:eink,io", "--dump-fb:" + ppm,
+    text, out = sim("--slots", "eink,io", "--dump-fb:" + ppm,
                     "--type:10 mode 2\\n20 cls\\n30 box 20, 20, 100, 60, 0, 1\\n40 box 140, 20, 100, 60, 1, 1\\n"
                     "50 box 260, 20, 100, 60, 2, 1\\n60 refresh\\nrun\\n")
     greys = [pixel(ppm, x, 50)[0] for x in (70, 190, 310, 500)]
@@ -280,13 +280,13 @@ def main():
     # the whole panel in the picture: 648 or 800 wide, as the emulator shows it;
     # a box in mode 2 at x 790 on the 7.5" panel
     ppm = os.path.join(work, "wide.ppm")
-    text, out = sim("--cards:eink750,io", "--dump-fb:" + ppm,
+    text, out = sim("--slots", "eink750,io", "--dump-fb:" + ppm,
                     "--type:10 mode 2\\n20 cls\\n30 box 780, 460, 20, 20, 0, 1\\n40 plot 5, 5, 1\\n50 refresh\\nrun\\n")
     size = open(ppm, "rb").read().split(b"\n")[1] if os.path.exists(ppm) else b""
     check("eink750: the picture is the whole 800 x 480 panel (%s)" % size.decode(), size == b"800 480", out)
     got = [pixel(ppm, x, y)[0] for x, y in ((790, 470), (799, 479), (779, 470), (5, 5))]
     check("eink750: mode 2 drawn at x 790 (and to the corner) is in --dump-fb %s" % got, got == [0, 0, 255, 85], out + text)
-    text, out = sim("--cards:eink,io", "--dump-fb:" + ppm, "--type:10 print 1\\nrun\\n")
+    text, out = sim("--slots", "eink,io", "--dump-fb:" + ppm, "--type:10 print 1\\nrun\\n")
     size = open(ppm, "rb").read().split(b"\n")[1] if os.path.exists(ppm) else b""
     check("eink: the picture is the whole 648 x 480 panel (%s)" % size.decode(), size == b"648 480", out)
 
@@ -350,7 +350,7 @@ def main():
     # the window's GPO LED strip: D8..D1 under the picture, lit from $f000
     win = os.path.join(work, "win.ppm")
     env = dict(os.environ, SDL_VIDEODRIVER="offscreen", SDL_AUDIODRIVER="dummy")
-    subprocess.run([SIM, "--cards:hdmi,io", "--type:10 poke 240,0,165\\nrun\\n", "--max-ins:20000000",
+    subprocess.run([SIM, "--slots", "hdmi,io", "--type:10 poke 240,0,165\\nrun\\n", "--max-ins:20000000",
                     "--dump-window:" + win], capture_output=True, text=True, timeout=600, env=env)
     lights = ""
     if os.path.exists(win):
