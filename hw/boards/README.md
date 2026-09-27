@@ -579,7 +579,7 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
   C318884 tactile switches side by side on the front (south) edge, labelled
   on silk, in front of every card. POWER (SW2) toggles the machine: U16
   MAX16054 (C79401) drives the eFuse's EN/UVLO (R44 100 kΩ pull-down), from
-  3V3_STBY, U15 HT7533-2 (C82217, 30 V in) on VBUS_F, so it is always
+  3V3_STBY, U15 HT7533-2 (C82217, 24 V in) on VBUS_F, so it is always
   powered; the machine starts off when USB is plugged in. RESET (SW1) is
   the MAX811's MR, as before.
 - **LEDs:** PWR (3V3, top-left corner as on every board), then, in one row

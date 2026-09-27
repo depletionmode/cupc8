@@ -183,7 +183,7 @@ def main():
     vbus_lo = d.VBUS_MIN - d.CABLE_R_VBUS * 0.01          # off: only the standby current in the cable
     c.check("B24", "standby LDO in, lowest VBUS minus dropout, vs its 3.3 V out (+2 %)",
             vbus_lo - d.STBY_LDO_DROPOUT, d.STBY_LDO_VOUT[1], ">=")
-    c.check("B25", "standby LDO's 30 V input vs the TVS clamp (the OVLO case: VBUS over 5.8 V)",
+    c.check("B25", "standby LDO's 24 V input vs the TVS clamp (the OVLO case: VBUS over 5.8 V)",
             d.TVS_VCLAMP, d.STBY_LDO_VIN_MAX, "<=")
     c.check("B26", "controller supply (3V3_STBY, max) inside the MAX16054's 5.5 V", d.STBY_LDO_VOUT[1],
             d.ONOFF_VCC[1], "<=")

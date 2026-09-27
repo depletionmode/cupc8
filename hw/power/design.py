@@ -93,14 +93,14 @@ C_VBUS_PRE = assume("main", "capacitance on VBUS ahead of the eFuse: 2.1 uF (C1 
 # The POWER button (David, 2026-09-26): a MAX16054 toggle (DS 19-4390,
 # 2.7..5.5 V, 7 uA typ; IN has a 63 kOhm pull-up to VCC and takes +-25 V;
 # UVLO holds OUT low at power-up) drives the eFuse's EN/UVLO. It runs from
-# 3V3_STBY, an HT7533-2 micropower LDO (DS: 30 V in, 2.5 uA, 3.3 V) on
+# 3V3_STBY, an HT7533-2 micropower LDO (DS Holtek HT75xx-2: 24 V in, 2.5 uA, 3.3 V) on
 # VBUS_F, so it is always powered, whatever VBUS does (the TVS clamp, the
 # OVLO case). Standby: what VBUS feeds while the machine is off.
 # ---------------------------------------------------------------------------
 ONOFF_VCC = (2.7, 5.5)                          # DS MAX16054 operating range
 ONOFF_I_MAX = assume("main", "MAX16054 supply current <= 15 uA (DS: 7 uA typ)", 15e-6)
 ONOFF_PULLUP = 63e3                             # DS: IN's pull-up to VCC (the button current)
-STBY_LDO_VIN_MAX = 30.0                         # DS HT7533-2
+STBY_LDO_VIN_MAX = 24.0                         # DS HT75xx-2 (JLC lists 30 V; the datasheet says 24)
 STBY_LDO_VOUT = (3.3 * 0.98, 3.3 * 1.02)        # DS: +-2 %
 STBY_LDO_DROPOUT = 0.1                          # DS: at 1 mA (the load here is ~10 uA)
 STBY_LDO_IQ_MAX = assume("main", "HT7533-2 quiescent current <= 5 uA (DS: 2.5 uA typ)", 5e-6)

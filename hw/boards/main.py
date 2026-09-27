@@ -44,7 +44,7 @@ POWER = {
     "EFUSE": ("TPS259470ARPWR", "C3662799"),          # U2: EN/UVLO from the on/off controller
     # --- the POWER button (David, 2026-09-26): a toggle, always powered from VBUS_F ---
     "ONOFF": ("MAX16054AZT+T", "C79401"),             # U16: debounced toggle, OUT low at power-up
-    "STBY_LDO": ("HT7533-2 (30 V in, 2.5 uA)", "C82217"),   # U15: 3V3_STBY for U16, off VBUS_F
+    "STBY_LDO": ("HT7533-2 (24 V in, 2.5 uA)", "C82217"),   # U15: 3V3_STBY for U16, off VBUS_F
     "STBY_LDO_COUT": ("1u", "C15849"),                # C17 (C16 100n at its input)
     "EFUSE_RILM": ("1.13k 1%", "C22833"),             # R3: 3340 / 1.13k -> 2.63 / 2.96 / 3.21 A
     "EFUSE_OVLO_R1": ("37.4k 0.1%", "C326727"),       # R58, IN -> OVLO
@@ -243,7 +243,7 @@ def build_parts():
     # turn on, press again to turn off; the machine starts off when USB is
     # plugged in. A MAX16054 toggle (UVLO holds OUT low at power-up) drives the
     # eFuse's EN/UVLO; it runs from its own 3.3 V micropower LDO off VBUS_F
-    # (30 V in: the TVS clamp and the OVLO case are both inside it), so it is
+    # (24 V in: the TVS clamp and the OVLO case are both inside it), so it is
     # always powered. Only the MAX16054's 63k pull-up current goes through
     # the button. R44 holds EN low while the LDO comes up.
     part("U15", "jlc:HT7533-2_C82217", "HT7533-2", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", POWER["STBY_LDO"][1],
@@ -1175,7 +1175,41 @@ def prepare(board):
     board.Add(v)
     _plane_pads(board)
     nets = _efuse_escapes(board, fp)
+    _label_keepouts(board)
     return nets + _standby_preroute(board)
+
+
+def _label_keepouts(board):
+    """No router vias under the LED row's labels, its resistors' and
+    NPNs' designators and the CPU socket channel's resistors' designators (a rule area on every copper layer, as kicadgen's
+    name_keepout for the board's name): a via there moves the designator
+    after routing, and the row's designators came out scattered (R12 beside
+    R56's part, R65/R66 turned)."""
+    import pcbnew
+    mm = pcbnew.FromMM
+    refs = set(LABELS) - {"D6", "SW1", "SW2"}
+    refs |= set(r for r, side in LABEL_SIDE.items() if r.startswith(("R", "Q")))
+    # and the CPU socket channel's row of resistors (R85, R91 came out small, R86 turned)
+    refs |= {"R%d" % i for i in list(range(80, 88)) + list(range(90, 98))}
+    for ref in sorted(refs):
+        fp = board.FindFootprintByReference(ref)
+        if fp is None:
+            continue
+        x0, y0, x1, y1 = kg._ink_box(fp.Reference(), 0.2)
+        z = pcbnew.ZONE(board)
+        z.SetIsRuleArea(True)
+        z.SetZoneName("label " + ref)
+        z.SetDoNotAllowVias(True)
+        z.SetDoNotAllowTracks(False)
+        z.SetDoNotAllowPads(False)
+        z.SetDoNotAllowZoneFills(False)
+        z.SetDoNotAllowFootprints(False)
+        z.SetLayerSet(pcbnew.LSET.AllCuMask())
+        ol = z.Outline()
+        ol.NewOutline()
+        for px, py in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+            ol.Append(mm(px), mm(py))
+        board.Add(z)
 
 
 def _standby_preroute(board):

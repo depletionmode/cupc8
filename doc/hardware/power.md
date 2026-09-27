@@ -39,7 +39,7 @@ reachable with the cards fitted.
   push-pull OUT, which drives the eFuse's EN/UVLO (before this, EN/UVLO was
   tied to IN). Its undervoltage lockout holds OUT low at power-up, and a
   100 kΩ pull-down holds EN low until the controller is running. It runs
-  from **3V3_STBY**, an **HT7533-2** micropower LDO (C82217, 30 V in,
+  from **3V3_STBY**, an **HT7533-2** micropower LDO (C82217, 24 V in,
   2.5 µA) on VBUS after the input PTC and TVS, so it is always powered, and
   a VBUS over the eFuse's OVLO (or up to the TVS clamp) cannot hurt it: the
   MAX16054 itself is a 5.5 V part. Only the MAX16054's 63 kΩ pull-up current
@@ -52,7 +52,7 @@ reachable with the cards fitted.
 - **Standby draw** (off, VBUS at 5.5 V; POW-006 B23): OVLO divider 116 µA,
   TVS leakage ≤ 440 µA (assumed), eFuse off ≤ 20 µA, LDO ≤ 5 µA,
   controller ≤ 15 µA: ≤ 0.6 mA, 0.65 mA with POWER held, against USB 2.0's
-  2.5 mA suspend limit. B24–B28 check the LDO's headroom and 30 V rating,
+  2.5 mA suspend limit. B24–B28 check the LDO's headroom and 24 V rating,
   the MAX16054's supply range and EN's threshold.
 - **The system card is unpowered while the machine is off**, so the host
   (`cupc8.py`) cannot reach it until POWER is pressed (`sysctl.md`).
