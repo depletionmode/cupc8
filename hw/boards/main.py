@@ -1562,7 +1562,8 @@ def _finish_route(board):
             t.SetWidth(mm(0.1))
             widened += 1
         if t.GetNetname() == "/+5V" and t.GetWidth() == mm(7.5) and ends in (
-                ((4.5, 152.0), (3.4, 149.0)), ((4.5, 149.0), (3.4, 149.0))):
+                ((4.5, 152.0), (3.4, 149.0)), ((4.5, 149.0), (3.4, 149.0)),
+                ((4.5, 40.52), (3.4, 40.52))):
             t.SetWidth(mm(1.0))
             narrowed += 1
         if t.GetNetname() == "/VBUS_F" and t.GetLayer() == pcbnew.In2_Cu and ends in (
@@ -1570,11 +1571,10 @@ def _finish_route(board):
                 ((38.0643, 160.3033), (37.4225, 160.3033))):
             board.Remove(t)
             removed += 1
-    # Freerouting sometimes rejoins the southern bus via at x=5.0 (inside
-    # the outline) and sometimes at x=3.4 (the three overwide taps). Both
-    # variants have the same electrical trunk; only the latter needs trim.
-    if widened != 2 or narrowed not in (0, 3) or removed != 2:
-        raise RuntimeError("_finish_route: expected CPU_RW/bus/VBUS_F geometry (2,0-or-3,2); found %s" %
+    # Freerouting can rejoin either end of the bus at x=3.4. The wide trunk
+    # remains intact while these short edge-adjacent taps are narrowed.
+    if widened != 2 or narrowed not in (0, 3, 6) or removed != 2:
+        raise RuntimeError("_finish_route: expected CPU_RW/bus/VBUS_F geometry (2,0/3/6,2); found %s" %
                            ((widened, narrowed, removed),))
     # U3:2 has a small F.Cu GND island. The standard through via's drill is
     # completely outside its solder pad, and the lead reaches the In1 plane.
