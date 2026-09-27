@@ -1957,10 +1957,18 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, 
                                  for f in board.GetFootprints()))
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
-    if placement is not None and placement != tuple(sorted(
-            (f.GetReference(), f.GetPosition().x, f.GetPosition().y,
-             f.GetOrientationDegrees(), f.IsFlipped()) for f in board.GetFootprints())):
-        raise RuntimeError('SES replay moved a pre-routed footprint')
+    if placement is not None:
+        after = tuple(sorted((f.GetReference(), f.GetPosition().x, f.GetPosition().y,
+                              f.GetOrientationDegrees(), f.IsFlipped())
+                             for f in board.GetFootprints()))
+        # Specctra coordinates round a few 1 nm KiCad placement artifacts to
+        # the nearest grid unit during import. Preserve the guard against a
+        # real move, rotation, flip or missing footprint.
+        if (len(placement) != len(after) or any(
+                before[0] != current[0] or abs(before[1] - current[1]) > 1 or
+                abs(before[2] - current[2]) > 1 or before[3:] != current[3:]
+                for before, current in zip(placement, after))):
+            raise RuntimeError('SES replay moved a pre-routed footprint')
     # the router's own copper on those nets stays (removing it opened every
     # connection it made: the main board's VBUS_F, pre-routed on In3); what
     # the import dropped of the pre-routing goes back

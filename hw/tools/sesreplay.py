@@ -11,11 +11,13 @@ import json
 from pathlib import Path
 import re
 import shutil
+import tempfile
 
 
 FIELDS = ('preroute_board', 'dsn', 'ses')
 SHA256 = re.compile(r'^[0-9a-f]{64}$')
 UUID_FIELD = re.compile(r'\(uuid "[0-9a-fA-F-]{36}"\)')
+MODEL_FIELD = re.compile(r'\(model "([^"\n]+)"')
 
 
 def digest(path):
@@ -23,23 +25,87 @@ def digest(path):
 
 
 def preroute_digest(path):
-    """Hash KiCad's saved pre-route board except pcbnew's random item UUIDs."""
-    text = Path(path).read_text()
-    normalized, count = UUID_FIELD.subn('(uuid "<item>")', text)
-    if not text.startswith('(kicad_pcb\n') or count < 1:
+    """Fingerprint routed geometry across worktree paths and KiCad item order.
+
+    pcbnew saves footprints in a nondeterministic order, gives every item a
+    fresh UUID, and embeds the current worktree's absolute 3D model paths.
+    None of those values affect the DSN. Every other top-level board item,
+    including net identities, footprints, pads, tracks, zones and rules,
+    remains byte-exact after canonicalization.
+    """
+    source = Path(path).read_text()
+    normalized, count = UUID_FIELD.subn('(uuid "<item>")', source)
+    if not normalized.startswith('(kicad_pcb\n') or count < 1:
         raise ValueError('unsupported pre-route PCB for replay fingerprint')
-    return hashlib.sha256(normalized.encode()).hexdigest()
+
+    def model(match):
+        value = match.group(1)
+        if '/hw/lib/' in value:
+            return '(model "<hw/lib>/' + value.split('/hw/lib/', 1)[1] + '"'
+        return match.group(0)
+
+    normalized = MODEL_FIELD.sub(model, normalized)
+    items = []
+    depth = 0
+    start = None
+    quoted = escaped = False
+    for index, char in enumerate(normalized):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == '\\':
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char == '(':
+            if depth == 1:
+                start = index
+            depth += 1
+        elif char == ')':
+            depth -= 1
+            if depth < 0:
+                raise ValueError('unbalanced pre-route PCB')
+            if depth == 1:
+                items.append(normalized[start:index + 1])
+                start = None
+    if quoted or depth or not items:
+        raise ValueError('incomplete pre-route PCB')
+    return hashlib.sha256('\n'.join(sorted(items)).encode()).hexdigest()
 
 
 def canonical_dsn_digest(path):
-    """Hash a canonical DSN with only its export-directory prefix removed."""
+    """Hash KiCad's DSN line multiset after removing its export path.
+
+    pcbnew emits geometry declarations in board item order. The source DSN
+    is also checked exactly against its saved source board, so this digest
+    only bridges that harmless ordering difference in a fresh build.
+    """
     path = Path(path).resolve()
     text = path.read_text()
     match = re.match(r'^\(pcb "([^"\n]+)"', text)
     if not match or Path(match[1]).resolve() != path:
         raise ValueError('DSN embedded source path differs from its file')
     normalized = text[:match.start(1)] + path.name + text[match.end(1):]
-    return hashlib.sha256(normalized.encode()).hexdigest()
+    return hashlib.sha256('\n'.join(sorted(normalized.splitlines())).encode()).hexdigest()
+
+
+def verify_source_dsn(board_path, dsn_path, salt):
+    """Prove the captured DSN is exactly the source board's salted export."""
+    import pcbnew
+    import kicadgen as kg
+
+    board = pcbnew.LoadBoard(str(board_path))
+    kg.stable_uuids(board, salt)
+    with tempfile.TemporaryDirectory(prefix='cupc8-ses-source-') as tmp:
+        check = Path(tmp) / 'check.dsn'
+        if not pcbnew.ExportSpecctraDSN(board, str(check)):
+            raise ValueError('source pre-route board DSN export failed')
+        generated = kg.canonical_dsn(check.read_text(), salt)
+    source = Path(dsn_path).read_text()
+    if generated.split('\n', 1)[1] != source.split('\n', 1)[1]:
+        raise ValueError('source salted DSN differs from source pre-route board')
 
 
 def _source_paths(package, salt):
@@ -55,8 +121,11 @@ def _check_session(path, salt):
     # by its SHA-256 and by regenerating it from this source revision.
     text = Path(path).read_text()
     name = 'route-%d' % salt
-    if not re.match(r'^\s*\(session\s+' + re.escape(name) +
-                    r'\s+\(base_design\s+' + re.escape(name) + r'\s*\)', text):
+    # Freerouting quotes both names in a real Specctra session. Accept the
+    # unquoted form as well, but still require the exact selected salt.
+    atom = r'"?' + re.escape(name) + r'"?'
+    if not re.match(r'^\s*\(session\s+' + atom +
+                    r'\s+\(base_design\s+' + atom + r'\s*\)', text):
         raise ValueError('SES session/base_design does not match route salt')
     depth = 0
     quoted = escaped = False
@@ -96,6 +165,7 @@ def snapshot(package, salt, manifest_path):
         if not path.is_file() or not path.stat().st_size:
             raise ValueError('missing or empty replay %s: %s' % (name, path))
     _check_session(paths['ses'], salt)
+    verify_source_dsn(paths['preroute_board'], paths['dsn'], salt)
     payload = {'version': 1, 'board': 'main', 'salt': salt,
                'sources': {name: str(paths[name]) for name in FIELDS},
                'sha256': {name: digest(paths[name]) for name in FIELDS},
@@ -135,6 +205,7 @@ def load(manifest_path, output, maximum_salt):
         if digest(source) != expected_hash:
             raise ValueError('changed replay %s' % name)
     _check_session(paths['ses'], payload['salt'])
+    verify_source_dsn(paths['preroute_board'], paths['dsn'], payload['salt'])
     for name, actual in (('preroute_board', preroute_digest(paths['preroute_board'])),
                          ('dsn', canonical_dsn_digest(paths['dsn']))):
         wanted = payload['canonical'][name]
