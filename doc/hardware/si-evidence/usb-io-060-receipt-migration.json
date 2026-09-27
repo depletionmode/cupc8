@@ -1,0 +1,43 @@
+{
+  "scope": "0.060 mm USB routed-copper field input migration to rebuilt IO receipt",
+  "saved_receipt": {
+    "receipt_sha256": "e27f89a630b740acc52a672c1560051415122af83591d043c3d1fb24865adfc1",
+    "board_sha256": "2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41",
+    "netlist_sha256": "a01595539420eee40bc1f9449e92e77f934d5117097609b6ebb9a9fa1f5e3c66"
+  },
+  "rebuilt_receipt": {
+    "receipt_sha256": "4a7b7b85faac2c27f7b46ca5196823294f622702e241cad0cf6f01370721c072",
+    "board_sha256": "2708b66ce7f6e42445c0c2f54186150f3622347ac51e7849c8501969e3052a20",
+    "netlist_sha256": "91d4314697bf74c616b8ffe62162ab59038509af770b2b1877bfa49c197616a6"
+  },
+  "saved_report_sha256": "24852e46dd6d22ebefb771aa31376bb1a43da4df8a84263e2730ac27dee0e4b6",
+  "saved_xml_sha256": "b0b3ecc3409e9369b21d21ef4dfcda0786ef00ec72f40e2c428c10a24da42ac9",
+  "saved_run_log_sha256": "020bab6ce6b593bf80d420d51741d8ee3318e2b115130edff0f944c6a5bfad40",
+  "saved_port_file_sha256": {
+    "ut_1": "7d5b214602c21e3a3843a2397f9fb7db753d369adf8b4f5877cba17e13e29c09",
+    "it_1": "4db1b7b71c835be87783917ea0f905832929172a933d2d5240ad822b25e06035",
+    "ut_2": "446f75ffd64617f77bbe5a0e3d6275280e8b64399c5ffefaa70c2e24c1b137e8",
+    "it_2": "b57ee360f1f93af94a08ef0f3435ebb04a06f5d0214cfab0e7471de92b4af35a"
+  },
+  "model_source_sha256": "b44a958e1975da53694e5e6d810ebb9de7fc1a685f574c34f1006ddb36b518a1",
+  "route_fingerprints": {
+    "saved": "ea0603bb61f023db037bd189f224df5a3939b7f2fd0b3cf9fdb84fa375af96eb",
+    "rebuilt": "ea0603bb61f023db037bd189f224df5a3939b7f2fd0b3cf9fdb84fa375af96eb"
+  },
+  "physical_fingerprints": {
+    "saved": "8cd43bfaa5142544dfdeb1172712d2c1609dd2a3ed0e689cab56e281d88774eb",
+    "rebuilt": "8cd43bfaa5142544dfdeb1172712d2c1609dd2a3ed0e689cab56e281d88774eb"
+  },
+  "solver_xml_fingerprints": {
+    "field_run": "904495cf10e3ebb014715694e1c09da9fe911d278253b3eeac7aff56eb26cea5",
+    "saved": "904495cf10e3ebb014715694e1c09da9fe911d278253b3eeac7aff56eb26cea5",
+    "rebuilt": "904495cf10e3ebb014715694e1c09da9fe911d278253b3eeac7aff56eb26cea5"
+  },
+  "modeled_input_equivalent": true,
+  "full_row_4_6_closed": false,
+  "limits": [
+    "field run used saved PCB bytes; regenerated rebuilt inputs are equivalent",
+    "model omits pads, mask, connector, ESD, source/sink and finite losses",
+    "three mesh samples alone do not prove asymptotic convergence"
+  ]
+}

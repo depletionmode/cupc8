@@ -1,0 +1,198 @@
+{
+  "scope": "modeled GPU HDMI D0/D1/D2/CK and IO USB routed-copper field-input migration",
+  "method": "validated receipts; identical full-board track/via/zone/footprint/layer/outline geometry after UUID removal, collinear filled-zone vertex normalization and omission of F/B.SilkS footprint graphics only; identical routed segments/endpoints; regenerated saved XML; strict solver-relevant XML tree equality except random display colors and same-priority copper Polygon ordering",
+  "receipts": {
+    "gpu": {
+      "archived": {
+        "receipt_sha256": "fe2f7eb122ae290c5d42a4bb053195da498f7183542f1aa6a9cbd39794bed1cb",
+        "input_fingerprint": "89d3da36bbb069c32756e883a1fc9dd528aa7e547a6e14d283a3adb2be640990",
+        "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+        "netlist_sha256": "c8ee1de8349d52ae958b5ebfc9c5114329626b47fe69d0e431c1b2f500f62d24"
+      },
+      "current": {
+        "receipt_sha256": "5c7808f1f5294b09e289feb08b5f138583fd5bf411bca826e8ef9410fde42575",
+        "input_fingerprint": "3f44d957a47806347a0a89d1e259ed0d69f53732b35737e315d25f9904133bf8",
+        "board_sha256": "0b4ccc5861ee22a050c72747555633ff95e548da51758083b5db74868112f5b4",
+        "netlist_sha256": "a5d759a8edf3655366abd3faf92954ec8f15517621a477c8bb8014058305ce78"
+      }
+    },
+    "io": {
+      "archived": {
+        "receipt_sha256": "d9e52ccfa73c9dc4a68600d20820663e37211aef897e1934d2e9fcc4d7ddc18a",
+        "input_fingerprint": "4afb6e91500c8b6d6a97011bfb5bcee149e7051aced914f22356f83fd901f461",
+        "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c",
+        "netlist_sha256": "074f967c05707d2794262cf9cff36a98e247ebfaffd8a9040e1c5c6b7c86e7ff"
+      },
+      "current": {
+        "receipt_sha256": "4a7b7b85faac2c27f7b46ca5196823294f622702e241cad0cf6f01370721c072",
+        "input_fingerprint": "cb4c611c0853c3fda4f2c9686f037ae7a317de6bb8aad705152936936fdeba57",
+        "board_sha256": "2708b66ce7f6e42445c0c2f54186150f3622347ac51e7849c8501969e3052a20",
+        "netlist_sha256": "91d4314697bf74c616b8ffe62162ab59038509af770b2b1877bfa49c197616a6"
+      }
+    }
+  },
+  "route_fingerprints": {
+    "gpu": {
+      "archived": "dfd1a96ad95ebe101e905b2cb509ef3b4d45ca80206b48fad618a60a3cefb94b",
+      "current": "dfd1a96ad95ebe101e905b2cb509ef3b4d45ca80206b48fad618a60a3cefb94b"
+    },
+    "io": {
+      "archived": "ea0603bb61f023db037bd189f224df5a3939b7f2fd0b3cf9fdb84fa375af96eb",
+      "current": "ea0603bb61f023db037bd189f224df5a3939b7f2fd0b3cf9fdb84fa375af96eb"
+    }
+  },
+  "board_physical_fingerprints": {
+    "gpu": {
+      "archived": "3be1936c79b46cdb0bb1bc7e106c914c8ba47771798f9d8acb399fb7bf12555a",
+      "current": "3be1936c79b46cdb0bb1bc7e106c914c8ba47771798f9d8acb399fb7bf12555a"
+    },
+    "io": {
+      "archived": "8cd43bfaa5142544dfdeb1172712d2c1609dd2a3ed0e689cab56e281d88774eb",
+      "current": "8cd43bfaa5142544dfdeb1172712d2c1609dd2a3ed0e689cab56e281d88774eb"
+    }
+  },
+  "models": {
+    "gpu-d0": {
+      "report_sha256": "95e3bdbacbedbbfada6203baa6539cbdd3be2cafc9ed188654816c08b7e5262c",
+      "saved_xml_sha256": "6c60b4d3ed307a0034b710f4e3ac8a72e74d6f77877f79fdc695b093bb5c084c",
+      "saved_run_log_sha256": "d79642368cf28b42ac4f1931e5ebc6c7150e1f5e6f9043a1008988d6997ce26c",
+      "solver_xml_fingerprint": "469c8283b11558cea63e0a593bfa35860d59661f5cb64f4b060d7d06c49c3ea2",
+      "model_source_sha256": "1f6d9c422fb628db4d179dfd4cadfeed7d08099a4f962285be7ceb13eeaa610b",
+      "solver_config": {
+        "fixed_window": true,
+        "max_steps": 126000,
+        "solver_threads": 4,
+        "pml_clearance_mm": 1.0,
+        "solver_version": "v0.37.0-rc3-1-g65f8771",
+        "mesh_mm": 0.05,
+        "declared_port_ohms": 100,
+        "reference_ohms": 100,
+        "gaussian_center_hz": 3000000000,
+        "gaussian_width_hz": 3000000000,
+        "end_criteria_db": -150,
+        "boundary": "PML_8 on six sides"
+      },
+      "saved_subset_gate": true
+    },
+    "gpu-d1": {
+      "report_sha256": "8f808848524a249f82678a6380ecd28bb21aa4ed194ed159a988944421132202",
+      "saved_xml_sha256": "d2a3695dbe9de5b44dd6deb1bc70d4851bfccc5ef7b175b81cc64369eddcda18",
+      "saved_run_log_sha256": "57062694071fcd1a1dc7d531cc99af55ab4a50e0f869abd0873758a488481ea6",
+      "solver_xml_fingerprint": "91eaad1bc082a473cce709723a312e1215a616f7198f782c277f7c438a1ad814",
+      "model_source_sha256": "1f6d9c422fb628db4d179dfd4cadfeed7d08099a4f962285be7ceb13eeaa610b",
+      "solver_config": {
+        "fixed_window": true,
+        "max_steps": 126000,
+        "solver_threads": 1,
+        "pml_clearance_mm": 1.0,
+        "solver_version": "v0.37.0-rc3-1-g65f8771",
+        "mesh_mm": 0.05,
+        "declared_port_ohms": 100,
+        "reference_ohms": 100,
+        "gaussian_center_hz": 3000000000,
+        "gaussian_width_hz": 3000000000,
+        "end_criteria_db": -150,
+        "boundary": "PML_8 on six sides"
+      },
+      "saved_subset_gate": true
+    },
+    "gpu-d2": {
+      "report_sha256": "06cf470a5544d8728d17be68285b9d3bc172a1687143db63fdfcce9a93c7bc0c",
+      "saved_xml_sha256": "bd39b7d2e6f34d99494109551554a34193d09ec87025480480297adcf256a59a",
+      "saved_run_log_sha256": "abfddcf110932c8b25248e72f6a301dd1400a3a0f3f114050b7ba48fa8d7edba",
+      "solver_xml_fingerprint": "02e4bd8a12f20f8700674927d92369e5ff8dab0e3566727f307e75bddbfa2ac7",
+      "model_source_sha256": "1f6d9c422fb628db4d179dfd4cadfeed7d08099a4f962285be7ceb13eeaa610b",
+      "solver_config": {
+        "fixed_window": true,
+        "max_steps": 126000,
+        "solver_threads": 1,
+        "pml_clearance_mm": 1.0,
+        "solver_version": "v0.37.0-rc3-1-g65f8771",
+        "mesh_mm": 0.05,
+        "declared_port_ohms": 100,
+        "reference_ohms": 100,
+        "gaussian_center_hz": 3000000000,
+        "gaussian_width_hz": 3000000000,
+        "end_criteria_db": -150,
+        "boundary": "PML_8 on six sides"
+      },
+      "saved_subset_gate": true
+    },
+    "gpu-ck": {
+      "report_sha256": "27d845fb797ef69f72af401a4f35ddbd6577a87ad9fe4d861bc9c7272164318c",
+      "saved_xml_sha256": "f00fbb0f3f5afe2c55b1069778d2f6126bea4febad5b7ad3491cbead75d43d79",
+      "saved_run_log_sha256": "b854fd919f4efb237379b69e7b8f39a6250f512757c4e0b9c8c830fd1273a9e7",
+      "solver_xml_fingerprint": "75a14066f0ba0f2029b652266229f4f14a5974764babd8bf5203279385a9915f",
+      "model_source_sha256": "1f6d9c422fb628db4d179dfd4cadfeed7d08099a4f962285be7ceb13eeaa610b",
+      "solver_config": {
+        "fixed_window": true,
+        "max_steps": 126000,
+        "solver_threads": 1,
+        "pml_clearance_mm": 1.0,
+        "solver_version": "v0.37.0-rc3-1-g65f8771",
+        "mesh_mm": 0.05,
+        "declared_port_ohms": 100,
+        "reference_ohms": 100,
+        "gaussian_center_hz": 3000000000,
+        "gaussian_width_hz": 3000000000,
+        "end_criteria_db": -150,
+        "boundary": "PML_8 on six sides"
+      },
+      "saved_subset_gate": true
+    },
+    "usb-075": {
+      "report_sha256": "ca10ba1a953f866c48823fd09e116ead858768502db33a99abbe5a5e70079e86",
+      "saved_xml_sha256": "fc0ad04f788f3601a272ee50e38f6f45c5156165ece1f7a82202ebd100a65765",
+      "saved_run_log_sha256": "b092604d3d9ba7d74580b47a363b0d6418ee0fb14c1695173f13c19565087dc6",
+      "solver_xml_fingerprint": "f32e75de298694cf15a983b9eada2cc4407cb91edcb950efd47ef38c9a0842ae",
+      "model_source_sha256": "b44a958e1975da53694e5e6d810ebb9de7fc1a685f574c34f1006ddb36b518a1",
+      "solver_config": {
+        "fixed_window": true,
+        "max_steps": 220000,
+        "solver_threads": 4,
+        "pml_clearance_mm": 1.0,
+        "solver_version": "v0.37.0-rc3-1-g65f8771",
+        "mesh_mm": 0.075,
+        "declared_port_ohms": 100,
+        "reference_ohms": 90,
+        "gaussian_center_hz": 3000000000,
+        "gaussian_width_hz": 3000000000,
+        "end_criteria_db": -150,
+        "boundary": "PML_8 on six sides"
+      },
+      "saved_subset_gate": true
+    },
+    "usb-090": {
+      "report_sha256": "7d2654aaacee6a71e95737fb4ad384ceac22c65b6ee374787a359ff34a9308a7",
+      "saved_xml_sha256": "f8395dd9232cc7e20aa767466f9a900f3683a246a9ad7ce7dfb6d8fccc869283",
+      "saved_run_log_sha256": "e14204cf3b541cb05c838a906488961801c8c60b067abdaa4f87f2d620a5963d",
+      "solver_xml_fingerprint": "4bae879fd9e40cd35178f3c8572a8e7afbd969616b4576a5bb96d4456ad31cb6",
+      "model_source_sha256": "b44a958e1975da53694e5e6d810ebb9de7fc1a685f574c34f1006ddb36b518a1",
+      "solver_config": {
+        "fixed_window": true,
+        "max_steps": 169000,
+        "solver_threads": 2,
+        "pml_clearance_mm": 1.0,
+        "solver_version": "v0.37.0-rc3-1-g65f8771",
+        "mesh_mm": 0.09,
+        "declared_port_ohms": 100,
+        "reference_ohms": 90,
+        "gaussian_center_hz": 3000000000,
+        "gaussian_width_hz": 3000000000,
+        "end_criteria_db": -150,
+        "boundary": "PML_8 on six sides"
+      },
+      "saved_subset_gate": true
+    }
+  },
+  "current_board_modeled_subset_equivalent": true,
+  "full_row_4_6_closed": false,
+  "limits": [
+    "saved field runs were made on archived PCB bytes; this report proves equality of modeled inputs",
+    "board solder-mask setup changed and is intentionally outside the copper-geometry fingerprint",
+    "footprint F/B.SilkS graphics changed and are outside the copper-geometry fingerprint",
+    "USB copper polygon order differs in raw XML; the same-priority primitive set is identical",
+    "field models omit pads, finite copper/dielectric losses, solder mask, connectors and source/sink",
+    "USB impedance mesh convergence and full HDMI physical coupling remain open"
+  ]
+}
