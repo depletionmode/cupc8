@@ -34,8 +34,11 @@ fail until their contract coverage exists:
   outline, and Excellon data for its implemented checks. Passing those checks
   still leaves the fab row red. The remaining plotted-geometry rules are
   minimum neck width in filled copper and silk regions and silkscreen text
-  height. The card boards also configure no positive
-  solder-mask web minimum. Gerber regions use `G36` polygons and a zero-width
+  height. The board generator now configures a 0.10 mm solder-mask web
+  minimum, plus 0.01 mm opening expansion so KiCad's mask-region plot covers
+  the pad copper. Saved board packages need regeneration before their receipts
+  contain these rules and the new plotted masks. Gerber regions use `G36`
+  polygons and a zero-width
   aperture; checking only draw aperture widths cannot establish their minimum
   neck width. Gerber strokes have no text-object or character grouping, so
   the saved PCB's text-size property alone would not be an independent
