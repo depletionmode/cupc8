@@ -242,6 +242,30 @@ measurement at 40 °C ambient and sustained 350 mA TX, including neighboring
 cards and the final airflow. TI's [TLV62569 datasheet](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
 provides DBV θJA 188.2 °C/W and ψJT 31.4 °C/W; these package parameters
 alone do not bound heat transfer from the ESP32 on this board.
+
+The 2026-09-27 source-only re-audit cannot turn these scenarios into limits.
+`hw/parts/easyeda/C45783.yaml` records C1/C2's footprint and pin positions,
+not ESR versus frequency, bias, temperature and age. The order records nominal
+1 oz finished copper, not a minimum local thickness; the saved fill does not
+specify thermal-spoke/contact resistance or minimum via plating. The raster's
+shortest 0.25 mm corridor is one assumed path, not an upper bound on all
+unrepresented series resistance. Likewise, the module and buck positions do
+not bound the enclosure's airflow or the board's ESP32-to-buck thermal
+transfer. WC-005 needs a guaranteed ESR maximum for each fitted capacitor at
+the transient frequencies and operating corners, and an upper bound on the
+assembled pad/spoke/via return resistance from qualified extraction or a
+four-terminal measurement. WC-010 needs a calibrated board-and-enclosure
+thermal model or a sustained-TX temperature measurement that establishes
+ESP32-to-buck transfer below an allowance recomputed with bounded electrical
+losses (34.429 °C/W in the present route scenario).
+
+One layout candidate is to shorten the local GND returns at U2 pin 2 and C2
+pin 2 and control their thermal-relief spokes. In the committed routed-board
+fixture those pad centres are (5.3, -15.0) and (11.0, -13.45) mm; each nearest
+GND stitching-via centre is 1.0 mm away, versus 0.326 mm at U1 pin 1. A
+closer, DRC-clean return via or wider verified spokes could reduce the
+uncertain contact path. This is a candidate for a regenerated board and new
+extraction or measurement, not a computed resistance or thermal pass.
 - SI and board co-simulation remain separate workstreams; newly added rows
   remain pending until their checks are implemented.
 
