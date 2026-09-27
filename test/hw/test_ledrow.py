@@ -8,7 +8,6 @@ edge (milestone-1.md, Indicator LEDs).
   in seconds): every LED on the power LED's line, near the top edge
 - every board built under build/hw/<board>/: the same on the laid-out board
 """
-import glob
 import os
 import sys
 
@@ -43,9 +42,11 @@ leds = {p.ref: at[p.ref][:2] for p in parts if p.lib == "Device:LED"}
 check("main (source)", leds, "D6", main.OUTLINE[1])
 
 # every board built
-for pcb in sorted(glob.glob(os.path.join(ROOT, "build", "hw", "*", "*.kicad_pcb"))):
-    name = os.path.basename(os.path.dirname(pcb))
-    if os.path.basename(pcb) != name + ".kicad_pcb":
+for name in ("main", "cpu", "gpu", "io", "storage", "wifi", "eink", "system"):
+    pcb = os.path.join(ROOT, "build", "hw", name, name + ".kicad_pcb")
+    if not os.path.isfile(pcb):
+        print("FAIL %s: missing built board" % name)
+        fails += 1
         continue
     b = pcbnew.LoadBoard(pcb)
     leds = {fp.GetReference(): (pcbnew.ToMM(fp.GetPosition().x), pcbnew.ToMM(fp.GetPosition().y))
