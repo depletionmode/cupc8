@@ -66,6 +66,16 @@ def main():
             if good == bad or not bad['halted']:
                 raise AssertionError(f'{name} A0/A1 mutation did not break execution: {good} / {bad}')
             print(f"{name} A0/A1 swap halts the native machine at ${bad['pc']:04x}")
+        for name, key in (('ROM', 'rom_data'), ('CPU', 'cpu_data')):
+            changed = copy.deepcopy(manifest)
+            bits = changed['runtime'][key]
+            bits[0], bits[1] = bits[1], bits[0]
+            mutant = Path(directory) / f'swapped-{name.lower()}-data.json'
+            mutant.write_text(json.dumps(changed))
+            bad = run(mutant)
+            if good == bad:
+                raise AssertionError(f'{name} D0/D1 mutation did not change execution')
+            print(f"{name} D0/D1 swap changes PC/GPO to ${bad['pc']:04x}/${bad['gpo']:02x}")
         changed = copy.deepcopy(manifest)
         slot = changed['runtime']['slots'][0]
         slot['sck'], slot['mosi'] = slot['mosi'], slot['sck']

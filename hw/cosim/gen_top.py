@@ -56,6 +56,14 @@ def path(circuit, first, last, resistance=None):
     return resistor.ref
 
 
+def named_pin(circuit, ref, name):
+    pins = [pin for (component, pin), label in circuit.pin_names.items()
+            if component == ref and label == name and (ref, pin) in circuit.pins]
+    if len(pins) != 1:
+        raise ValueError(f'{ref} pin {name}: expected one connected package pad')
+    return (ref, pins[0])
+
+
 def check(cards, main, pcb=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
@@ -189,6 +197,15 @@ def check(cards, main, pcb=None):
     required_routes = {f'MEM_A{i}' for i in range(19)} | {f'MEM_D{i}' for i in range(8)} | \
                       {'MEM_nOE', 'MEM_nCE_RAM', 'MEM_nCE_ROM'}
     manifest['runtime']['routed_timing'] = all(route.get(net, 0) > 0 for net in required_routes)
+    required_top = required_routes | {f'CPU_A{i}' for i in range(16)} | \
+                   {f'CPU_D{i}' for i in range(8)} | \
+                   {f'SLOT{i}_CS_n' for i in range(1, 7)} | \
+                   {f'SLOT_nIRQ{i}' for i in range(6)} | \
+                   {'CPU_CLK', 'CPU_nRST', 'CPU_nRDY', 'CPU_nSTB', 'CPU_RW',
+                    'CPU_SYNC', 'SPI_SCK', 'SPI_MOSI', 'SPI_MISO',
+                    'BR_SCK', 'BR_MOSI', 'BR_MISO', 'BR_nCS', 'nPOR', 'PWR_HI'}
+    manifest['runtime']['routed_top'] = all(route.get(net, 0) > 0 for net in required_top)
+    manifest['runtime']['missing_routes'] = sorted(net for net in required_top if route.get(net, 0) <= 0)
     # CPU driver pack channels must remain explicit; the native board model
     # may use these channel values as edge delays after E2E-001 integration.
     import cpu
@@ -256,6 +273,32 @@ def check(cards, main, pcb=None):
             manifest['paths'].append({'from': f'system.U1.{mcu[0]}', 'to': f'system.J2.{contact}',
                                       'series': resistor, 'ohms': 33})
     manifest['runtime']['bridge'] = bridge
+    # Reset, oscillator and Type-C source policy reach actual chipset pads.
+    for source_ref, source_pin, destination_net in (
+            ('U5', 'OUT', '/PWR_HI'), ('U6', '~{RESET}', '/nPOR')):
+        fpga = [(ref, pin) for (ref, pin), net in main.pins.items()
+                if ref == 'U7' and net == destination_net]
+        if len(fpga) != 1:
+            raise ValueError(f'{destination_net}: chipset pad missing')
+        path(main, named_pin(main, source_ref, source_pin), fpga[0])
+        manifest['paths'].append({'from': f'main.{source_ref}.{source_pin}',
+                                  'to': f'main.U7.{fpga[0][1]}', 'net': destination_net.lstrip('/')})
+    clock = named_pin(main, 'Y1', 'OUT')
+    fpga_clk = [(ref, pin) for (ref, pin), net in main.pins.items()
+                if ref == 'U7' and net == '/CLK12']
+    if len(fpga_clk) != 1:
+        raise ValueError('chipset CLK12 package pad missing')
+    for target in (fpga_clk[0], ('J2', next(pin for (ref, pin), net in main.pins.items()
+                                       if ref == 'J2' and net == '/CPU_CLK'))):
+        resistor = path(main, clock, target, '33')
+        manifest['paths'].append({'from': f'main.Y1.{clock[1]}',
+                                  'to': f'main.{target[0]}.{target[1]}', 'series': resistor, 'ohms': 33})
+    for i in range(8):
+        net = node(main, 'J2', next(pin for (ref, pin), attached in main.pins.items()
+                                    if ref == 'J2' and attached == f'/CPU_D{i}'))
+        if not any(value == '47k' for _, value in
+                   ((r.ref, r.value) for r, other in main.pulls('/+3V3') if other == net)):
+            raise ValueError(f'CPU_D{i}: missing weak keeper')
     return manifest
 
 
@@ -268,8 +311,9 @@ def main_cli():
     with tempfile.TemporaryDirectory(prefix='cupc8-cosim-') as temporary:
         manifest = check(exported_cards(Path(temporary)), read(args.main_netlist),
                          args.main_netlist.with_suffix('.kicad_pcb'))
-    if args.require_route and not manifest['runtime']['routed_timing']:
-        raise ValueError('main-board memory bus lacks complete routed copper')
+    if args.require_route and not manifest['runtime']['routed_top']:
+        missing = manifest['runtime']['missing_routes']
+        raise ValueError(f'main-board co-sim paths lack routed copper: {", ".join(missing)}')
     output = json.dumps(manifest, indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

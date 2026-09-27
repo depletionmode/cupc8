@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/cosim'))
-from gen_top import check, exported_cards
+from gen_top import check, exported_cards, named_pin
 from netlist import read
 
 
@@ -45,6 +45,14 @@ def main_cli():
         absent_pull.resistors = tuple(r for r in absent_pull.resistors
                                       if not (r.value == '47k' and miso in r.ends))
         rejected(cards, absent_pull, 'missing MISO idle pull')
+
+        broken_policy = copy.deepcopy(main)
+        del broken_policy.pins[named_pin(broken_policy, 'U5', 'OUT')]
+        rejected(cards, broken_policy, 'missing Type-C power policy output')
+
+        broken_clock = copy.deepcopy(main)
+        broken_clock.resistors = tuple(r for r in broken_clock.resistors if r.ref != 'R17')
+        rejected(cards, broken_clock, 'missing chipset oscillator series resistor')
 
 
 if __name__ == '__main__':
