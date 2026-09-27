@@ -400,6 +400,35 @@ class FabCheckTests(unittest.TestCase):
                             'X3200000Y1000000I100000J0D01*\nG01*\nM02*\n')
             self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15), 1)
 
+    def test_isolated_filled_silk_width_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            mask = fab / 'sample-F_Mask.gts'
+            silk = fab / 'sample-F_Silkscreen.gto'
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n'
+                            '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                            'D10*\nX9000000Y9000000D03*\nM02*\n')
+            prefix = ('%TF.FileFunction,Legend,Top*%\n'
+                      '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                      '%MOMM*%\n%LPD*%\n%ADD10C,0.150000*%\nD10*\n')
+            def region(width):
+                return ('G36*\nX1000000Y1000000D02*\n'
+                        'X2000000Y1000000D01*\n'
+                        f'X2000000Y{1000000+width}D01*\n'
+                        f'X1000000Y{1000000+width}D01*\n'
+                        'X1000000Y1000000D01*\nG37*\n')
+            silk.write_text(prefix + region(150000) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 1)
+            silk.write_text(prefix + region(149999) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated filled region width 0.149999 mm'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+            # A touching stroke may make the union wide; this partial check
+            # must leave that case to the full filled-neck rule.
+            silk.write_text(prefix + region(149999) +
+                            'X1500000Y900000D02*\nX1500000Y1200000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 2)
+
     def test_excellon_hole_to_copper_and_edge_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)

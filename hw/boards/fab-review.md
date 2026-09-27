@@ -9,8 +9,10 @@ width. It compares verified Excellon cuts with plotted copper (the project
 hole-clearance rule) and non-plated cuts with plotted edges (JLC's 1.0 mm
 non-plated hole-to-edge rule). It checks exposed pads against the plotted mask,
 paste deposits against copper and mask openings, and silkscreen strokes against
-mask openings and JLC's 0.15 mm minimum line width. It checks mask webs if the
-KiCad project has a positive solder-mask minimum width. The board needs a
+mask openings and JLC's 0.15 mm minimum line width. Isolated filled silk
+regions whose entire bounding width is below 0.15 mm fail independently; the
+remaining filled-neck rule still needs connected ink analysis. It checks mask
+webs if the KiCad project has a positive solder-mask minimum width. The board needs a
 recorded visual CPL review. The fab gate remains red because text height,
 filled ink necks, and other plotted-layer rules still lack independent
 validation. Export parity and a review receipt do not complete Gerber re-import

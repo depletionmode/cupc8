@@ -178,7 +178,7 @@ def arc_points(start, target, offsets, mode):
 
 
 def plotted_copper(path, geometry, minimum_track=None, require_net=True, features=None,
-                   extra_function=None, allow_empty=False):
+                   extra_function=None, allow_empty=False, filled_regions=None):
     """Return (net, GEOS shape, bounds) for every supported dark operation."""
     lines = path.read_text().splitlines()
     apertures = {}
@@ -294,7 +294,11 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
             if region is None:
                 raise ValueError('%s:%d: region end without start' % (path.name, number))
             xs, ys = zip(*region)
-            add(geometry.wkt(polygon(region), repair=True), (min(xs), min(ys), max(xs), max(ys)))
+            bounds = (min(xs), min(ys), max(xs), max(ys))
+            shape = geometry.wkt(polygon(region), repair=True)
+            add(shape, bounds)
+            if filled_regions is not None:
+                filled_regions.append((net, shape, bounds, number))
             region = None
         elif line in ('G01*', 'G02*', 'G03*'):
             mode = line[:-1]
@@ -735,6 +739,32 @@ def check_paste_registration(copper_path, mask_path, paste_path):
         engine.close()
 
 
+def check_isolated_filled_width(path, geometry, objects, filled_regions, minimum):
+    """Reject a filled island whose entire plotted width is below the rule.
+
+    A narrow region touching other ink can form a wider combined shape. Such
+    regions need a full union/neck analysis and are deliberately left to the
+    final incomplete-coverage gate.
+    """
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('no positive filled-ink width requirement')
+    rule_um = Decimal(str(minimum)) * 1000000
+    for net, shape, (x0, y0, x1, y1), line in filled_regions:
+        width_um = round(min(x1-x0, y1-y0) * 1000000)
+        if width_um >= rule_um:
+            continue
+        for other_net, other, (a0, b0, a1, b1) in objects:
+            if other == shape or other_net != net:
+                continue
+            if x1 < a0 or a1 < x0 or y1 < b0 or b1 < y0:
+                continue
+            if geometry.distance(shape, other) == 0:
+                break
+        else:
+            raise ValueError('%s:%d: isolated filled region width %.6f mm < %.6f mm' %
+                             (Path(path).name, line, width_um/1000000, minimum))
+
+
 def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
     """Check plotted legend against negative-polarity mask openings."""
     if not math.isfinite(minimum) or minimum <= 0:
@@ -742,9 +772,14 @@ def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
     engine = Geometry()
     try:
         openings = plotted_copper(Path(mask_path), engine, require_net=False)
+        filled_regions = []
         legend = plotted_copper(Path(silk_path), engine, require_net=False,
                                 extra_function='Legend', allow_empty=True,
-                                minimum_track=minimum_ink_width)
+                                minimum_track=minimum_ink_width,
+                                filled_regions=filled_regions)
+        if minimum_ink_width is not None:
+            check_isolated_filled_width(silk_path, engine, legend, filled_regions,
+                                        minimum_ink_width)
         for _, ink, (x0,y0,x1,y1) in legend:
             for _, opening, (a0,b0,a1,b1) in openings:
                 if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
