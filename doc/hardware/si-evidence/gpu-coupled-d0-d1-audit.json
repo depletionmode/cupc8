@@ -1,0 +1,257 @@
+{
+  "scope": "GPU HDMI D0/D1 four-port copper-subset field audit",
+  "gpu_receipt_sha256": "5c7808f1f5294b09e289feb08b5f138583fd5bf411bca826e8ef9410fde42575",
+  "board_sha256": "0b4ccc5861ee22a050c72747555633ff95e548da51758083b5db74868112f5b4",
+  "model_source_sha256": "1b69ececd9e3e0566fd455f90fae5b9c4631ed42183c7368cc9b4d477958fca8",
+  "excitation_runs": {
+    "d0": {
+      "report_sha256": "f1322213dcf748bf9a047c87920d90e1d2ed7861e413be9f384e168b948156d8",
+      "xml_sha256": "6d047fb161c6ca19ec43ca0ebd75aa87acf756defe34df6adfeba3363a517d70",
+      "run_log_sha256": "f8f9362852c38176b7390263eddb2256011983b9377f85fb03632e1d2f428bbb",
+      "raw_port_sha256": {
+        "port_ut_1": "91149e4a26ff119e1b23bccea9323f8cb4fad3d158292a90c56be61a2a9a0cc2",
+        "port_it_1": "c61f762a91b883af15a70f4ce8a9f4ed44b17de9c40cf81600b906dbd3eb339e",
+        "port_ut_2": "08d8a665e947d08aa52f1557d84d2dc8656808516a4e41c08384e9c49d832c7b",
+        "port_it_2": "2b46c2fde2e60a3a5d1f86669eec707b96a598ac719b794da0314076f3edd745",
+        "port_ut_3": "108e207cb30afa67fbaa0fa3bbce40ec1155e1e2a496a82a1e56d37668d5f05a",
+        "port_it_3": "647b503365d17f547a3bc32fb8d8f9643a3dc2a0eb6cd7e11e25a32b79aa376a",
+        "port_ut_4": "2307df7e0168a42f736a9a3900a22ddbacbe51f0dffd93a31fe5d68596ec0580",
+        "port_it_4": "477ca25862c12bd53d365a5e33594db83893b2e8d8ed6a6c06c992b9b8a335db"
+      },
+      "passive_geometry_fingerprint": "4d1ebaa6390f0e464be6f8cb8bdc37ad790f9677e16ab0fa42d3b373eb611d4d",
+      "converged": true,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true,
+      "valid_for_coupled_subset": true
+    },
+    "d1": {
+      "report_sha256": "0ebc0864057434d15062131824c1dca8b970778397a1693e4d3cc95af227cba8",
+      "xml_sha256": "555889aecbf0f0dd7bc5095e703b00cd6392056f661b9a2bad9ace2090b8a06b",
+      "run_log_sha256": "f99cfa59d1579c29ab458ee229920877f5345a30c33e7eadba5137af6c0def0a",
+      "raw_port_sha256": {
+        "port_ut_1": "4276f49e8d0742ec7993909929d31d3ba5169f9428563b7febb03b498f7df1ff",
+        "port_it_1": "daed70759ff70853cebf2fd766a91e5dc721099f9472a2be6f9cca1ccd71688c",
+        "port_ut_2": "79cfeb403190657f644d5423e6ac6329cc6c93e50bf3b305cf9485f88feacc3c",
+        "port_it_2": "4dba4a1f338efe6b383eca376e7b71d1572392126fcd7497e4cdaf41e9a4e834",
+        "port_ut_3": "5b06190067d8b3246b2a68d52f019af80c60a4c3515ba5119054fdcbd63c9865",
+        "port_it_3": "084c4b8c764c9a8c4d455ff49a0b545870672d8c7c177b0b8bc6854123610487",
+        "port_ut_4": "843051d1da8608fc2cbf423be844553aad9a3e59055554b5a181f239fc185789",
+        "port_it_4": "81d28936c5dd09ab52ea65b7c0410fcb4b599c405a5d9df5267272fd6d92c948"
+      },
+      "passive_geometry_fingerprint": "4d1ebaa6390f0e464be6f8cb8bdc37ad790f9677e16ab0fa42d3b373eb611d4d",
+      "converged": true,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true,
+      "valid_for_coupled_subset": true
+    }
+  },
+  "s_parameters_12ns": {
+    "d0": [
+      {
+        "frequency_hz": 100000000,
+        "s_complex": {
+          "d0_source": [
+            0.00025804569254035047,
+            0.007620457710188763
+          ],
+          "d0_load": [
+            0.9994223921292593,
+            -0.03057609209546791
+          ],
+          "d1_source": [
+            -2.071018556942309e-05,
+            -0.0004041364497708548
+          ],
+          "d1_load": [
+            6.297517666562495e-06,
+            0.00017108132658267376
+          ]
+        }
+      },
+      {
+        "frequency_hz": 480000000,
+        "s_complex": {
+          "d0_source": [
+            0.00550025778266734,
+            0.035968675425478644
+          ],
+          "d0_load": [
+            0.9885821295618721,
+            -0.14609117960767143
+          ],
+          "d1_source": [
+            -0.0004602247392128849,
+            -0.0018660130783202703
+          ],
+          "d1_load": [
+            0.00018994763450120132,
+            0.0007831142965819833
+          ]
+        }
+      },
+      {
+        "frequency_hz": 800000000,
+        "s_complex": {
+          "d0_source": [
+            0.015012493014154995,
+            0.05825053590739982
+          ],
+          "d0_load": [
+            0.9685542380637631,
+            -0.24149869616188208
+          ],
+          "d1_source": [
+            -0.0012439971842789117,
+            -0.0029393088897422134
+          ],
+          "d1_load": [
+            0.0005081271258127281,
+            0.001227106855373069
+          ]
+        }
+      },
+      {
+        "frequency_hz": 1260000000,
+        "s_complex": {
+          "d0_source": [
+            0.03589533749035281,
+            0.08576911421888218
+          ],
+          "d0_load": [
+            0.9230905011729609,
+            -0.37317027166161965
+          ],
+          "d1_source": [
+            -0.0029279501829758436,
+            -0.004019086171658598
+          ],
+          "d1_load": [
+            0.0011752425266745904,
+            0.0016639775420450088
+          ]
+        }
+      }
+    ],
+    "d1": [
+      {
+        "frequency_hz": 100000000,
+        "s_complex": {
+          "d0_source": [
+            -2.1152755623193746e-05,
+            -0.00040409480997881815
+          ],
+          "d0_load": [
+            9.034200432378043e-06,
+            0.00017088155334036293
+          ],
+          "d1_source": [
+            0.00027364444123579494,
+            0.007654880820888784
+          ],
+          "d1_load": [
+            0.9993622134360666,
+            -0.03204953736857556
+          ]
+        }
+      },
+      {
+        "frequency_hz": 480000000,
+        "s_complex": {
+          "d0_source": [
+            -0.00046037467377185205,
+            -0.0018660097829935037
+          ],
+          "d0_load": [
+            0.00019205137011059757,
+            0.0007816896170485058
+          ],
+          "d1_source": [
+            0.005807866458566996,
+            0.03607381472733458
+          ],
+          "d1_load": [
+            0.9875168345651621,
+            -0.15306583297626208
+          ]
+        }
+      },
+      {
+        "frequency_hz": 800000000,
+        "s_complex": {
+          "d0_source": [
+            -0.0012438070397066358,
+            -0.0029391964167407945
+          ],
+          "d0_load": [
+            0.0005114427054045957,
+            0.001223307868671423
+          ],
+          "d1_source": [
+            0.015838517381772277,
+            0.05824848729939608
+          ],
+          "d1_load": [
+            0.9656447742325658,
+            -0.2528470272636644
+          ]
+        }
+      },
+      {
+        "frequency_hz": 1260000000,
+        "s_complex": {
+          "d0_source": [
+            -0.002927702793153263,
+            -0.0040188584086828264
+          ],
+          "d0_load": [
+            0.0011836996741030137,
+            0.001653475120622907
+          ],
+          "d1_source": [
+            0.03773468862172583,
+            0.08511050050970483
+          ],
+          "d1_load": [
+            0.9160585212147494,
+            -0.3901040376842233
+          ]
+        }
+      }
+    ]
+  },
+  "reciprocity_s31_vs_s13": [
+    {
+      "frequency_hz": 100000000,
+      "s31_abs": 0.00040466675403313105,
+      "s13_abs": 0.00040464806254604963,
+      "s31_minus_s13_abs": 4.4452460536557454e-07
+    },
+    {
+      "frequency_hz": 480000000,
+      "s31_abs": 0.0019219291399648062,
+      "s13_abs": 0.001921961849381512,
+      "s31_minus_s13_abs": 1.4997076765550198e-07
+    },
+    {
+      "frequency_hz": 800000000,
+      "s31_abs": 0.0031917183058364443,
+      "s13_abs": 0.0031915406198583327,
+      "s31_minus_s13_abs": 2.2091884123855696e-07
+    },
+    {
+      "frequency_hz": 1260000000,
+      "s31_abs": 0.004972519072784501,
+      "s13_abs": 0.004972189311970943,
+      "s31_minus_s13_abs": 3.362702744053458e-07
+    }
+  ],
+  "both_subset_gates_pass": true,
+  "full_row_4_6_closed": false,
+  "limits": [
+    "only adjacent D0/D1 routed copper with four ideal differential ports",
+    "D2/CK coupling, pads, connector, mask, finite losses and source/sink remain open",
+    "two-source excitation does not determine the full four-port S matrix"
+  ]
+}
