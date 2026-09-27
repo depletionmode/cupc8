@@ -25,6 +25,7 @@ import path from 'node:path';
 const backend = process.env.CUPC8_EMU === 'native' ? 'native' : 'js';
 const { Machine } = await import(backend === 'native' ? './machinenative.mjs' : './machine.mjs');
 import { kernelRom, ROOT } from './romimage.mjs';
+import { compareGoldenHdmiFrame } from './hdmi_golden.mjs';
 
 const only = process.argv.slice(2).find((a) => a.startsWith('E2E-'));
 const record = process.argv.includes('--record');
@@ -86,7 +87,8 @@ async function e2e002() {
   while (end > 0 && rom[end - 1] === 0xff) end--;
   const image = path.join(ROOT, 'build/emu/e2e-rom.bin');
   fs.writeFileSync(image, rom.subarray(0, end));
-  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff), sysctl: true });
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff),
+    sysctl: true, spiLog: backend === 'native' && Boolean(process.env.CUPC8_COSIM_TOP) });
   m.powerOn();
   await m.runAsync(20e6);
   const ping = await cupc8(m, 'ping');
@@ -102,6 +104,11 @@ async function e2e002() {
   if (!expect(await waitFor(m, '42', 3e9), 'the typed program runs and prints 42')) console.log('---- screen\n' + screenText(m));
   await m.runAsync(200e6);
   golden('E2E-002', screenText(m));
+  if (backend === 'native' && process.env.CUPC8_COSIM_TOP) {
+    const pixel = compareGoldenHdmiFrame(m);
+    expect(pixel.differences === 0,
+      `captured HDMI pixels equal GPU golden (${pixel.differences} differences, first ${pixel.first}, cursor phase ${pixel.phase})`);
+  }
   m.stop();
 }
 
