@@ -2572,6 +2572,15 @@ vrow = "4.6"
 cmd = "python3 hw/si/openems_gpu_d0.py --board build/hw/gpu/gpu.kicad_pcb --out build/hw/si/gpu-d0.json --require-evidence"
 
 [[test]]
+id = "SI-004"
+title = "Lattice iCE40HX4K IBIS source integrity"
+checks = "Lattice FPGA-MD-02034 rev 2.5 is downloaded from the vendor, SHA-256 checked, contains the 3.3 V normal/bank-3 output models and rising/falling waveforms, and a changed byte fails validation"
+method = "hw/si/fetch_ice40_ibis.py plus test/hw/test_ibis_model.py; model sourcing only, not ngspice bus simulation"
+kind = "static"
+vrow = "4.6"
+cmd = "python3 hw/si/fetch_ice40_ibis.py && python3 test/hw/test_ibis_model.py"
+
+[[test]]
 id = "COSIM-001"
 title = "KiCad netlist connectivity extraction regression"
 checks = "direct nets, two-pin series resistors and supply pulls are represented separately; missing or swapped wires change the graph"
