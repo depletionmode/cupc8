@@ -127,17 +127,17 @@ def trace_lines(text):
 
 
 def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0, inject=0):
-    name = os.path.splitext(os.path.basename(src))[0]
     with open(src) as f:
         if SPI_RE.search(f.read()):
             return "skip", "uses SPI (needs the chipset model)"
-    # each (engine, waits, seed) combination gets its own directory, so
-    # concurrent runs (test/run.py -j) never share files
+    # Each source also needs its own path: test/isa/alu.s and
+    # tools/testdata/alu.s run concurrently in the same invocation.
     progs = os.path.join(PROGS, "%s-w%d-s%d%s%s%s" % (engine, waits, seed, "-noise" if noise else "",
                                                      "-st%d" % stall if stall else "",
                                                      "-r%d" % reset_at if reset_at else ""))
-    os.makedirs(progs, exist_ok=True)
-    obj = os.path.join(progs, name + ".o")
+    rel = os.path.relpath(src, ROOT)
+    obj = os.path.join(progs, os.path.splitext(rel)[0] + ".o")
+    os.makedirs(os.path.dirname(obj), exist_ok=True)
     r = run(["python3", os.path.join(ROOT, "tools", "as.py"), src, obj])
     if r.returncode or not os.path.exists(obj):
         return "skip", "does not assemble"
