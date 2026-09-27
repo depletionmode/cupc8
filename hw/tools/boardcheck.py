@@ -104,7 +104,10 @@ def check(board, mode, out):
         run([sys.executable, 'hw/mech/fit.py'])
     elif mode == 'power':
         for command in POWER[board]:
-            run([sys.executable, 'hw/power/' + command[0], *command[1:]])
+            args = [sys.executable, 'hw/power/' + command[0], *command[1:]]
+            if board == 'wifi':
+                args.append(out)
+            run(args)
         if board in GAPS['power']:
             raise ValueError('missing power coverage: ' + GAPS['power'][board])
     elif mode == 'thermal':
