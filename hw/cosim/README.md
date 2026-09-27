@@ -76,17 +76,23 @@ execution. An open bit is held high only as a deterministic digital
 counterexample because its real voltage is undefined. This does not establish
 CPU-card propagation delay or analog margin, and the remaining control lines
 still need executed models.
-The CPU clock also follows the routed 33 Ω output on the main board to socket
-J2.B13, then the CPU card's J1.B13 to FPGA U1.21. The planar paths measure
-60.564 mm and 31.218 mm. Opening the FPGA clock launch holds the native CPU
+The CPU clock follows Y1.3 to R18.1 (5.937 mm), the routed 33 Ω output
+to socket J2.B13 (60.564 mm), then the CPU card's J1.B13 to FPGA U1.21
+(31.218 mm). Opening the FPGA clock launch holds the native CPU
 at its reset vector PC `$E000` instead of `$E2B9` after 20 ms, while the
-chipset continues to run. The shared oscillator source and chipset clock
-branch are still outside this executed model.
+chipset continues to run. The chipset branch has its own R17 route check below.
 The active-low CPU reset follows main R34.2 to socket J2.B16 (103.930 mm)
 and card J1.B16 to FPGA U1.22 (27.014 mm). Opening the FPGA reset launch
 holds the native CPU at PC `$E000` with `/RST` low instead of booting to
 `$E2B9`. The digital open-pad value is forced low for this counterexample;
 the physical voltage and the chipset's reset-source leg are still unmodeled.
+The 12 MHz oscillator's chipset branch runs from Y1.3 to R17.1 (14.622 mm)
+and from R17.2 to chipset U7.21 (20.377 mm). The 33 Ω resistor and both
+copper legs gate the chipset clock input in the native RTL. Opening either
+leg removes chipset clock edges in the digital model. An open clock pad has
+an undefined physical voltage, so a forced low input is used only to expose
+the missing route; oscillator startup, jitter, amplitude and timing margin
+remain outside this model.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
@@ -171,8 +177,8 @@ machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
-nets and two CPU reset nets now affect execution; 361 remain unmodeled. The remaining groups
+nets, two CPU reset nets and two chipset oscillator-branch nets now affect execution; 359 remain unmodeled. The remaining groups
 are boot/programming (68), slot/control bus (36), CPU/memory (47),
-power/return (65), clock/reset (49), indicators (52), external IO (26),
+power/return (65), clock/reset (47), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

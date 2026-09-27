@@ -219,6 +219,17 @@ def main():
         if reset_bad['pc'] == good['pc'] or reset_bad['nrst'] != 0:
             raise AssertionError(f'open CPU reset did not hold the CPU in reset: {good} / {reset_bad}')
         print(f"open CPU reset holds PC ${reset_bad['pc']:04x} and /RST low")
+        if not manifest['runtime']['chipset_clock_connected'] or \
+                not {'main:OSC_OUT', 'main:CLK12'} <= set(manifest['runtime_nets']):
+            raise AssertionError('chipset clock requires both routed oscillator branch nets')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['chipset_clock_connected'] = False
+        mutant = Path(directory) / 'open-chipset-clock.json'
+        mutant.write_text(json.dumps(changed))
+        chipset_bad = run(mutant)
+        if (chipset_bad['pc'], chipset_bad['gpo']) == (good['pc'], good['gpo']):
+            raise AssertionError(f'open chipset clock did not change native execution: {good} / {chipset_bad}')
+        print(f"open chipset clock changes PC ${good['pc']:04x} -> ${chipset_bad['pc']:04x}")
         changed = copy.deepcopy(manifest)
         slot = changed['runtime']['slots'][0]
         slot['sck'], slot['mosi'] = slot['mosi'], slot['sck']

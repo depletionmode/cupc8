@@ -150,6 +150,8 @@ export class Machine {
       throw new Error('machinenative: invalid CPU clock path');
     if (netlistTop && typeof netlistTop.runtime.cpu_reset_connected !== 'boolean')
       throw new Error('machinenative: invalid CPU reset path');
+    if (netlistTop && typeof netlistTop.runtime.chipset_clock_connected !== 'boolean')
+      throw new Error('machinenative: invalid chipset clock path');
     const boardKind = { hdmi: 'gpu', io: 'io', storage: 'storage', wifi: 'wifi',
       eink: 'eink', eink750: 'eink' };
     const boot = netlistTop?.runtime.qspi_boot_connected;
@@ -188,6 +190,7 @@ export class Machine {
       porConnected: netlistTop?.runtime.por_connected ?? true,
       cpuClockConnected: netlistTop?.runtime.cpu_clock_connected ?? true,
       cpuResetConnected: netlistTop?.runtime.cpu_reset_connected ?? true,
+      chipsetClockConnected: netlistTop?.runtime.chipset_clock_connected ?? true,
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...activeSlots };

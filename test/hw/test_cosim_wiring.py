@@ -48,14 +48,13 @@ def main_cli():
         assert 'main:MEM_A0' in manifest['runtime_nets']
         assert 'main:CPU_CLK' in manifest['runtime_nets']
         assert 'cpu:CPU_CLK' in manifest['runtime_nets']
-        assert 'main:CLK12' in manifest['structural_only_nets']
-        assert 'main:CLK12' in manifest['unmodeled_nets']
+        assert {'main:CLK12', 'main:OSC_OUT'} <= set(manifest['runtime_nets'])
         assert not manifest['coverage_complete']
         assert 'main:CPU_RSVD_A2' in manifest['reviewed_waivers']
         assert 'main:SLOT1_RSVD_A1' in manifest['reviewed_waivers']
         assert 'system:RSVD_B1' in manifest['reviewed_waivers']
         assert 'main:CPU_RSVD_A2' not in manifest['unmodeled_nets']
-        assert 'main:CLK12' in manifest['coverage_families']['clock_and_reset']
+        assert 'main:CLK12' not in manifest['unmodeled_nets']
         assert sorted(net for family in manifest['coverage_families'].values()
                       for net in family) == manifest['unmodeled_nets']
         assert not set(manifest['reviewed_waivers']) & set(manifest['unmodeled_nets'])
@@ -89,6 +88,7 @@ def main_cli():
             assert good_route['runtime']['por_connected']
             assert good_route['runtime']['cpu_clock_connected']
             assert good_route['runtime']['cpu_reset_connected']
+            assert good_route['runtime']['chipset_clock_connected']
             assert good_route['runtime']['memory_write_links'] == {'ram': True, 'rom': True}
             physical = pcbnew.LoadBoard(str(args.main_board))
             def open_launch(ref, pin, net):
@@ -114,6 +114,36 @@ def main_cli():
                     'main:nPOR' not in bad_route['runtime_nets']:
                 raise AssertionError('removed nPOR copper did not change the executed reset path')
             print('open supervisor nPOR copper disables the native reset-release path')
+            bad_chipset_clock = open_launch('U7', '21', '/CLK12')
+            if bad_chipset_clock['runtime']['chipset_clock_connected'] or \
+                    bad_chipset_clock['runtime']['routed_top'] or \
+                    'main:CLK12' not in bad_chipset_clock['runtime_nets']:
+                raise AssertionError('opened chipset CLK12 pad did not disable its executed clock')
+            bad_oscillator = open_launch('Y1', '3', '/OSC_OUT')
+            if bad_oscillator['runtime']['chipset_clock_connected'] or \
+                    bad_oscillator['runtime']['cpu_clock_connected'] or \
+                    bad_oscillator['runtime']['routed_top'] or \
+                    'main:OSC_OUT' not in bad_oscillator['runtime_nets']:
+                raise AssertionError('opened oscillator source did not disable the chipset clock')
+            if card_boards:
+                import json
+                from test_cosim_runtime import run, PROBE
+                good_clock_top = Path(temporary) / 'good-chipset-clock.json'
+                bad_clock_top = Path(temporary) / 'open-chipset-clock.json'
+                bad_source_top = Path(temporary) / 'open-oscillator-source.json'
+                good_clock_top.write_text(json.dumps(good_route))
+                bad_clock_top.write_text(json.dumps(bad_chipset_clock))
+                bad_source_top.write_text(json.dumps(bad_oscillator))
+                clock_good, clock_bad = run(good_clock_top, PROBE), run(bad_clock_top, PROBE)
+                source_bad = run(bad_source_top, PROBE)
+                if (clock_good['pc'], clock_good['gpo']) == (clock_bad['pc'], clock_bad['gpo']):
+                    raise AssertionError('open routed chipset CLK12 did not change native execution')
+                if (clock_good['pc'], clock_good['gpo']) == (source_bad['pc'], source_bad['gpo']):
+                    raise AssertionError('open routed OSC_OUT did not change native execution')
+                print(f"open routed chipset CLK12 changes PC ${clock_good['pc']:04x} -> "
+                      f"${clock_bad['pc']:04x}")
+                print(f"open routed OSC_OUT changes PC ${clock_good['pc']:04x} -> "
+                      f"${source_bad['pc']:04x}")
             bad_write = open_launch('U7', '114', '/MEM_nWE')
             if bad_write['runtime']['memory_write_links'] != {'ram': False, 'rom': False} or \
                     bad_write['runtime']['routed_top'] or \

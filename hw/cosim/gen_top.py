@@ -221,7 +221,7 @@ def cpu_bus_routes(card, board, address_map, data_map):
 
 
 def cpu_clock_route(main, card, main_board, cpu_board):
-    """The resistor output and CPU-card copper carrying the CPU clock."""
+    """The oscillator branch, resistor output and CPU-card clock copper."""
     oscillator = named_pin(main, 'Y1', 'OUT')
     socket = ('J2', 'B13')
     fpga = ('U1', '21')
@@ -230,10 +230,12 @@ def cpu_clock_route(main, card, main_board, cpu_board):
     if node(main, resistor, '2') != '/CPU_CLK' or node(card, *finger) != '/CPU_CLK':
         raise ValueError('CPU clock resistor output or card contact is missing')
     path(card, finger, fpga)
-    legs = (('main', main_board, '/CPU_CLK', (resistor, '2'), socket),
+    legs = (('main', main_board, '/OSC_OUT', oscillator, (resistor, '1')),
+            ('main', main_board, '/CPU_CLK', (resistor, '2'), socket),
             ('cpu', cpu_board, '/CPU_CLK', finger, fpga))
     rows, missing = [], []
     for board_name, board_file, net, source, target in legs:
+        path(main if board_name == 'main' else card, source, target)
         length = None
         if board_file is not None and Path(board_file).is_file():
             sys.path.insert(0, str(ROOT / 'hw/si'))
@@ -244,7 +246,7 @@ def cpu_clock_route(main, card, main_board, cpu_board):
                      'to': f'{board_name}.{target[0]}.{target[1]}',
                      'route_mm': length, 'runtime': 'cpu_clock_connected'})
         if length is None:
-            missing.append(f'{board_name}:CPU_CLK_clock_copper')
+            missing.append(f'{board_name}:{net.lstrip("/")}_cpu_clock_copper')
     return not missing, rows, missing
 
 
@@ -271,6 +273,33 @@ def cpu_reset_route(main, card, main_board, cpu_board):
                      'route_mm': length, 'runtime': 'cpu_reset_connected'})
         if length is None:
             missing.append(f'{board_name}:CPU_nRST_reset_copper')
+    return not missing, rows, missing
+
+
+def chipset_clock_route(main, main_board):
+    """Trace both copper legs of the 12 MHz oscillator's chipset branch."""
+    source = named_pin(main, 'Y1', 'OUT')
+    chipset = ('U7', '21')
+    if node(main, *source) != '/OSC_OUT' or node(main, *chipset) != '/CLK12':
+        raise ValueError('oscillator or chipset clock pad has the wrong net')
+    if path(main, source, chipset, '33') != 'R17':
+        raise ValueError('chipset clock requires the R17 33-ohm branch')
+    legs = (('/OSC_OUT', source, ('R17', '1')),
+            ('/CLK12', ('R17', '2'), chipset))
+    rows, missing = [], []
+    for net, first, last in legs:
+        path(main, first, last)
+        length = None
+        if main_board is not None and Path(main_board).is_file():
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            length = routed_distances(Path(main_board), net, first, [last])[
+                f'{last[0]}.{last[1]}']
+        rows.append({'from': f'main.{first[0]}.{first[1]}',
+                     'to': f'main.{last[0]}.{last[1]}',
+                     'route_mm': length, 'runtime': 'chipset_clock_connected'})
+        if length is None:
+            missing.append(f'main:{net.lstrip("/")}_chipset_clock_copper')
     return not missing, rows, missing
 
 
@@ -666,6 +695,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_reset_connected'] = reset_connected
     manifest['paths'].extend(reset_paths)
     manifest['runtime']['missing_routes'].extend(reset_missing)
+    chipset_clock_connected, chipset_clock_paths, chipset_clock_missing = chipset_clock_route(main, pcb)
+    manifest['runtime']['chipset_clock_connected'] = chipset_clock_connected
+    manifest['paths'].extend(chipset_clock_paths)
+    manifest['runtime']['missing_routes'].extend(chipset_clock_missing)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     bridge = {}
@@ -871,6 +904,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     runtime_net('cpu', 'CPU_CLK')
     runtime_net('main', 'CPU_nRST')
     runtime_net('cpu', 'CPU_nRST')
+    runtime_net('main', 'OSC_OUT')
+    runtime_net('main', 'CLK12')
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest

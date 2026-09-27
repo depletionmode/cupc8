@@ -22,6 +22,7 @@ entity machine_core is
 		cpu_d_connected:	in std_logic_vector(7 downto 0);
 		cpu_clk_connected:	in std_logic;
 		cpu_rst_connected:	in std_logic;
+		chipset_clk_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
 		mem_d_in:		in std_logic_vector(7 downto 0);
@@ -60,11 +61,15 @@ architecture rtl of machine_core is
 	signal cpu_doe, cs_doe, rw, n_stb, n_rdy, sync, halted, waiting, n_rst: std_logic;
 	signal irq: std_logic_vector(3 downto 0);
 	signal cpu_clk: std_logic;
+	signal chipset_clk: std_logic;
 	signal cpu_rst_at_pad: std_logic;
 	signal tmr_exp: std_logic_vector(1 downto 0);
 	signal fl: std_logic_vector(1 downto 0);
 begin
 	cpu_clk <= clk when cpu_clk_connected = '1' else '0';
+	-- An open clock branch leaves the chipset input undefined in hardware.
+	-- Hold it low here to expose the missing digital route.
+	chipset_clk <= clk when chipset_clk_connected = '1' else '0';
 	-- An open FPGA reset pad has undefined voltage. Holding it low is a
 	-- deterministic digital counterexample, not a prediction of that voltage.
 	cpu_rst_at_pad <= n_rst when cpu_rst_connected = '1' else '0';
@@ -92,7 +97,7 @@ begin
 		dbg_pc => dbg_pc, dbg_sp => dbg_sp, dbg_r0 => dbg_r0, dbg_r1 => dbg_r1, dbg_f => fl);
 
 	cs0: entity work.chipset port map(
-		clk => clk, n_por => n_por,
+		clk => chipset_clk, n_por => n_por,
 		cpu_a => a_chip, cpu_d_in => cs_din, cpu_d_out => cs_dout, cpu_d_oe => cs_doe, cpu_rw => rw,
 		cpu_n_stb => n_stb, cpu_n_rdy => n_rdy, cpu_sync => sync, cpu_irq => irq,
 		cpu_tmr_exp => tmr_exp, cpu_halted => halted, cpu_waiting => waiting, cpu_n_rst => n_rst,
