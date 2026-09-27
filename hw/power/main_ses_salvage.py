@@ -144,13 +144,16 @@ def drc(board_path, report):
 def main_cli():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--build', type=Path, required=True, help='active root build/hw/main, read-only')
+    p.add_argument('--preroute-dir', type=Path, help='saved matching preroute files; defaults to --build')
     p.add_argument('--salt', type=int, required=True, choices=range(10))
     p.add_argument('--out', type=Path, required=True, help='fresh sandbox output directory')
     a = p.parse_args()
     build = a.build.resolve()
+    preroute_dir = (a.preroute_dir or a.build).resolve()
     out = a.out.resolve()
-    if out == build or build in out.parents or out in build.parents:
-        raise RuntimeError('output must be separate from the active build')
+    for source in (build, preroute_dir):
+        if out == source or source in out.parents or out in source.parents:
+            raise RuntimeError('output must be separate from every input directory')
     if out.exists() and any(out.iterdir()):
         raise RuntimeError('output directory must be empty')
     route = build / 'route-parallel' / f'route-{a.salt}'
@@ -160,13 +163,13 @@ def main_cli():
     log_text = log.read_text()
     if 'Auto-routing stage completed:' not in log_text:
         raise RuntimeError('router log has no completed auto-routing stage; wait for finished SES')
-    preroute = build / 'main.kicad_pcb'
+    preroute = preroute_dir / 'main.kicad_pcb'
     if digest(preroute) != EXPECTED_PREROUTE_SHA256:
         raise RuntimeError('preroute PCB SHA-256 differs from the audited root build')
     out.mkdir(parents=True, exist_ok=True)
     hashes = {}
     for name in ('main.kicad_pcb', 'main.kicad_pro', 'main.kicad_sch', 'main.net'):
-        hashes[name] = copy_verified(build / name, out / name)
+        hashes[name] = copy_verified(preroute_dir / name, out / name)
     hashes[dsn.name] = copy_verified(dsn, out / dsn.name)
     hashes[ses.name] = copy_verified(ses, out / ses.name)
     hashes[log.name] = copy_verified(log, out / log.name)
