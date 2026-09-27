@@ -47,7 +47,7 @@ architecture sim of tb_cpu_trace is
 	signal r0, r1:	std_logic_vector(7 downto 0);
 	signal fl:		std_logic_vector(1 downto 0);
 	signal done:	boolean := false;
-	signal pending, mask: std_logic_vector(3 downto 0) := "0000";
+	signal pending, mask: std_logic_vector(4 downto 0) := "00000";
 
 	function hx(v: std_logic_vector) return string is
 		constant digits: string(1 to 16) := "0123456789abcdef";
@@ -81,7 +81,8 @@ begin
 		dbg_pc => pc, dbg_sp => sp, dbg_r0 => r0, dbg_r1 => r1, dbg_f => fl);
 
 	clk <= not clk after 5 ns when not done;
-	irq <= pending and mask;
+	irq <= ((pending(3) and mask(3)) or (pending(4) and mask(4))) &
+	       (pending(2 downto 0) and mask(2 downto 0));
 
 
 	chipset: process(clk)
@@ -95,7 +96,7 @@ begin
 		variable count: integer;
 		variable lfsr: unsigned(15 downto 0) := to_unsigned(SEED mod 65535 + 1, 16);
 		variable cycles: natural := 0;
-		variable p: std_logic_vector(3 downto 0);
+		variable p: std_logic_vector(4 downto 0);
 		file f: text;
 		variable l: line;
 		variable b: std_logic_vector(7 downto 0);
@@ -140,9 +141,9 @@ begin
 				if cyc_rw = '0' then
 					if started then emit("W " & hx(std_logic_vector(to_unsigned(cyc_a, 16))) & " " & hx(cyc_d)); end if;
 					if cyc_a = 16#f200# then
-						p := p and not cyc_d(3 downto 0);		-- write 1 to clear
+						p := p and not cyc_d(4 downto 0);		-- write 1 to clear
 					elsif cyc_a = 16#f201# then
-						mask <= cyc_d(3 downto 0);
+						mask <= cyc_d(4 downto 0);
 					end if;
 					mem(cyc_a) := cyc_d;
 				end if;
@@ -180,8 +181,8 @@ begin
 					busy := false;
 					started := false;
 					mem := mem_at_power_on;
-					p := "0000";
-					mask <= "0000";
+					p := "00000";
+					mask <= "00000";
 				end if;
 				if sync = '1' and busy then
 					if pc = x"1000" and reset_done then started := true; end if;
@@ -208,8 +209,8 @@ begin
 				if count <= 0 then
 					n_rdy <= '0';
 					if cyc_rw = '1' then
-						if cyc_a = 16#f200# then d_in <= "0000" & p;
-						elsif cyc_a = 16#f201# then d_in <= "0000" & mask;
+						if cyc_a = 16#f200# then d_in <= "000" & p;
+						elsif cyc_a = 16#f201# then d_in <= "000" & mask;
 						else d_in <= mem(cyc_a);
 						end if;
 					end if;
