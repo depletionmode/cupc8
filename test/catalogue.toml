@@ -2554,6 +2554,24 @@ vrow = "4.6"
 cmd = "python3 test/hw/test_crosstalk.py"
 
 [[test]]
+id = "SI-002"
+title = "HDMI D0 field-model route input regressions"
+checks = "the extracted P/N copper connects its pad-side anchors and refuses a swapped endpoint, a missing section, a layer change or an unsupported via"
+method = "test/hw/test_openems_gpu_d0.py with KiCad PCB fixtures; the analog run is SI-003"
+kind = "static"
+vrow = "4.6"
+cmd = "python3 test/hw/test_openems_gpu_d0.py"
+
+[[test]]
+id = "SI-003"
+title = "Routed HDMI D0 differential openEMS subset"
+checks = "on a provenance-checked completed GPU board, openEMS produces finite S11/S21 through 1.26 GHz and reaches -40 dB field-energy decay for the RN2-to-HDMI D0 pair"
+method = "hw/si/openems_gpu_d0.py; partial TMDS route model, with full 4.6 analog coverage remaining in GC-007"
+kind = "sim"
+vrow = "4.6"
+cmd = "python3 hw/si/openems_gpu_d0.py --board build/hw/gpu/gpu.kicad_pcb --out build/hw/si/gpu-d0.json --require-evidence"
+
+[[test]]
 id = "COSIM-001"
 title = "KiCad netlist connectivity extraction regression"
 checks = "direct nets, two-pin series resistors and supply pulls are represented separately; missing or swapped wires change the graph"
