@@ -126,6 +126,14 @@ launch changes 15 SPI frames to 0; opening IO-card IRQ_n prevents five
 keyboard-service SPI frames within the first 25 ms after a key is queued.
 This models digital connectivity and IRQ delivery, not analog edge quality
 or open-pin voltage.
+The system card's three RP2040 bridge outputs now require copper on both
+sides of their 33 Ω series resistors: SCK through R11, MOSI through R12,
+and chip select through R13. Their MCU-side paths measure 22.999, 18.676,
+and 19.684 mm; their socket-side paths measure 25.853, 24.440, and
+23.668 mm. Each route flag gates the corresponding native bridge input.
+An open SCK route holds that digital input low as a deterministic
+counterexample. The actual voltage on an open pad is undefined, and the
+main-board bridge copper remains outside this system-card route check.
 Five RP2040 boards (system, GPU, IO, storage, e-ink) also require all six
 QSPI MCU-to-flash nets to have pad-to-pad copper before their native firmware
 starts. An open clock launch on the GPU card changes 15 SPI frames to none;
@@ -175,12 +183,14 @@ nPOR and CPU-reset paths, memory-write branches and ROM DQ0 read route change th
 machine. The manifest currently covers the CPU, main memory, slot data paths,
 system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
-machine wiring. On the routed-board snapshot used for this audit, all required
-top-level routes are present. Of 502 previously uncovered named nets, 45
+machine wiring. On the archived routed-board snapshot used for this audit,
+all required top-level routes are present; the current main-board route receipt
+must be checked separately. Of 502 previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
-nets, three CPU reset nets and two chipset oscillator-branch nets now affect execution; 358 remain unmodeled. The remaining groups
-are boot/programming (68), slot/control bus (36), CPU/memory (47),
+nets, three CPU reset nets, two chipset oscillator-branch nets and three
+system bridge source nets now affect execution; 355 remain unmodeled. The remaining groups
+are boot/programming (68), slot/control bus (33), CPU/memory (47),
 power/return (65), clock/reset (46), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

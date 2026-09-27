@@ -82,6 +82,51 @@ def main_cli():
         assert 'main:SLOT1_RSVD_A1' in exposed['unmodeled_nets']
         print('reserved-contact waivers fail closed for active-pin and mating-card mutations')
 
+        wrong_bridge = copy.deepcopy(cards)
+        wrong_bridge['system'].pins[('U1', '4')], wrong_bridge['system'].pins[('U1', '5')] = \
+            wrong_bridge['system'].pins[('U1', '5')], wrong_bridge['system'].pins[('U1', '4')]
+        rejected(wrong_bridge, main, 'swapped system bridge MCU SCK/MOSI pads')
+
+        if args.system_board:
+            routed_system = check(cards, main, args.main_board, card_boards,
+                                  args.system_board, args.cpu_board)
+            if routed_system['runtime']['bridge_source_links'] != \
+                    {'sck': True, 'mosi': True, 'ncs': True}:
+                raise AssertionError('routed system bridge source paths are incomplete')
+            system_pcb = pcbnew.LoadBoard(str(args.system_board))
+            mcu_pad = next(pad for pad in system_pcb.FindFootprintByReference('U1').Pads()
+                           if pad.GetNumber() == '4')
+            point = mcu_pad.GetPosition()
+            launch = (round(pcbnew.ToMM(point.x), 4), round(pcbnew.ToMM(point.y), 4))
+            system_tree = parse(args.system_board.read_text())
+            segments = [item for item in system_tree[1:]
+                        if isinstance(item, list) and item and item[0] == 'segment' and
+                        find1(item, 'net') and find1(item, 'net')[1] == '/BR_SCK_MCU' and
+                        launch in (tuple(round(float(x), 4) for x in find1(item, end)[1:])
+                                   for end in ('start', 'end'))]
+            if len(segments) != 1:
+                raise AssertionError(f'system bridge SCK MCU launch has {len(segments)} tracks')
+            system_tree.remove(segments[0])
+            opened_system = Path(temporary) / 'open-system-bridge-sck.kicad_pcb'
+            opened_system.write_text(dump(system_tree) + '\n')
+            bad_system = check(cards, main, args.main_board, card_boards,
+                               opened_system, args.cpu_board)
+            if bad_system['runtime']['bridge_source_links'] != \
+                    {'sck': False, 'mosi': True, 'ncs': True} or \
+                    'system:BR_SCK_MCU' not in bad_system['runtime_nets']:
+                raise AssertionError('physical bridge SCK launch did not isolate its native input')
+            if args.main_board and args.cpu_board and card_boards:
+                import json
+                from test_cosim_runtime import run, BRIDGE_PROBE
+                good_top = Path(temporary) / 'good-system-bridge.json'
+                bad_top = Path(temporary) / 'open-system-bridge.json'
+                good_top.write_text(json.dumps(routed_system))
+                bad_top.write_text(json.dumps(bad_system))
+                good_status, bad_status = run(good_top, BRIDGE_PROBE), run(bad_top, BRIDGE_PROBE)
+                if good_status == bad_status:
+                    raise AssertionError('open routed system bridge SCK did not change native sysctl status')
+                print(f'open system bridge SCK changes sysctl status {good_status} -> {bad_status}')
+
         if args.main_board:
             good_route = check(cards, main, args.main_board, card_boards,
                                args.system_board, args.cpu_board)

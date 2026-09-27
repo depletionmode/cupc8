@@ -329,6 +329,19 @@ def main():
                 bad_status['gpo'] != '00':
             raise AssertionError(f'bridge SCK/MOSI swap did not change GPO readback: {normal_status} / {bad_status}')
         print(f"bridge SCK/MOSI swap: GPO ${normal_status['gpo']} became ${bad_status['gpo']}")
+        links = manifest['runtime']['bridge_source_links']
+        if links != {'sck': True, 'mosi': True, 'ncs': True} or \
+                not {'system:BR_SCK_MCU', 'system:BR_MOSI_MCU', 'system:BR_nCS_MCU'} <= \
+                set(manifest['runtime_nets']):
+            raise AssertionError('system bridge needs three routed MCU source legs')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['bridge_source_links']['sck'] = False
+        mutant = Path(directory) / 'open-system-bridge-sck.json'
+        mutant.write_text(json.dumps(changed))
+        open_status = run(mutant, BRIDGE_PROBE)
+        if open_status == normal_status:
+            raise AssertionError(f'open bridge SCK did not change sysctl readback: {normal_status}')
+        print(f"open system bridge SCK changes status {normal_status} -> {open_status}")
         changed = copy.deepcopy(manifest)
         changed['runtime']['io_usb_host'] = False
         mutant = Path(directory) / 'open-io-usb.json'

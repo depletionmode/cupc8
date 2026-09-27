@@ -233,6 +233,7 @@ class Machine {
     uint8_t misoIdle = 1;
     double seriesDelayNs = 0;
     std::array<uint8_t, 3> bridgeInputs{{0, 1, 2}};
+    std::array<bool, 3> bridgeSourceConnected{{true, true, true}};
     bool bridgeMiso = true;
   };
   struct Stats {
@@ -285,6 +286,7 @@ class Machine {
   uint8_t misoIdle = 1;
   double seriesDelayNs = 0;
   std::array<uint8_t, 3> bridgeInputs{{0, 1, 2}};
+  std::array<bool, 3> bridgeSourceConnected{{true, true, true}};
   bool bridgeMiso = true;
   BridgePins br;
   std::vector<std::array<uint8_t, 16>> font;

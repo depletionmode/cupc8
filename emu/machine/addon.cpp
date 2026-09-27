@@ -278,6 +278,16 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       opt.bridgeInputs[0] = integerPin(bridge, "sck", 0, 2);
       opt.bridgeInputs[1] = integerPin(bridge, "mosi", 0, 2);
       opt.bridgeInputs[2] = integerPin(bridge, "ncs", 0, 2);
+      napi_value bridgeLinks = prop(env, wiring, "bridge_source_links");
+      if (!isType(env, bridgeLinks, napi_object))
+        throw std::runtime_error("netlist wiring: missing routed bridge source links");
+      for (int i = 0; i < 3; ++i) {
+        const char *name = i == 0 ? "sck" : i == 1 ? "mosi" : "ncs";
+        napi_value value = prop(env, bridgeLinks, name);
+        if (!isType(env, value, napi_boolean) ||
+            napi_get_value_bool(env, value, &opt.bridgeSourceConnected[i]) != napi_ok)
+          throw std::runtime_error(std::string("netlist wiring: invalid bridge source ") + name);
+      }
       napi_value bridgeMiso = prop(env, bridge, "miso");
       if (!isType(env, bridgeMiso, napi_boolean) ||
           napi_get_value_bool(env, bridgeMiso, &opt.bridgeMiso) != napi_ok)
