@@ -115,7 +115,9 @@ def check(board, mode, out):
             raise ValueError('thermal model still needs regulator/netlist binding')
     elif mode == 'connectors':
         run([sys.executable, 'hw/tools/pincheck.py'])
-        raise ValueError('pincheck covers source pin tables; board connector netlist comparison is missing')
+        import connectorcheck
+        count = connectorcheck.check(board, out / (board + '.net'))
+        print('%s: %d connector contacts match the specified netlist pinout' % (board, count))
     elif mode == 'strapping':
         raise ValueError('Wi-Fi reset strapping RC transient and download-mode model is missing')
     elif mode == 'fab':

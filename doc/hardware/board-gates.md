@@ -29,8 +29,9 @@ fail until their contract coverage exists:
 - Fab: Gerber re-import with DRC, drills compared to footprint holes and
   recorded CPL review. Existing clean PCB DRC and exported files do not
   prove these requirements.
-- Connectors: pincheck validates the source tables, but does not compare
-  connector contacts in each board netlist to the specified connections.
+- Connectors: pincheck validates the source tables; connectorcheck compares
+  every contact, including intended no-connects, of the board's external
+  connectors with its KiCad netlist and the published pinout.
 - Power: main and CPU models need binding to the actual board netlists;
   GPU needs the RP2040 internal regulator at its overclocked operating point;
   IO needs SY6280 current-limit, short and fault-flag transients; storage,
