@@ -2621,7 +2621,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
-             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None):
+             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2640,7 +2640,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     connectivity after routing, as the key-notch escapes are.
 
     `logo_keepout`: no tracks or vias on the copper under the logo (silk_keepout),
-    and the silkscreen step fails on any there."""
+    and the silkscreen step fails on any there.
+
+    `zone_min_width` (mm): the pours' minimum width, if not build_board's
+    0.25 (KiCad's fill at 0.25 left the main board's planes a 0.063 mm neck
+    that its own connection-width check then flagged; at 0.3 it does not)."""
     import pcbnew
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
@@ -2783,6 +2787,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         zs = list(state["b"].Zones())
         for z in zs:
             z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_NEVER)
+            if zone_min_width and not z.GetIsRuleArea():
+                z.SetMinThickness(pcbnew.FromMM(zone_min_width))
         fill_zones(state["b"])
         n = sum(stitch(state["b"], z, poly, pitch=3.0) for z in zones[:1])   # the first pour net (GND)
         for z in zs:
