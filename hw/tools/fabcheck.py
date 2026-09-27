@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Check fabrication files against a DRC-clean KiCad board.
-
-The Gerber comparison is byte-for-byte after removing creation timestamps:
-it checks every actual plotted geometry command and aperture against a fresh
-export of the board. This is export parity, not a Gerber re-import DRC.
-"""
+"""Check fabrication files against a DRC-clean KiCad board and plotted copper."""
 from collections import Counter
 import json
 from pathlib import Path
@@ -13,6 +8,7 @@ import subprocess
 import tempfile
 
 import pcbnew
+import gerberdrc
 
 
 GERBER_EXTENSIONS = {'.gtl', '.gbl', '.gts', '.gbs', '.gtp', '.gbp',
@@ -164,6 +160,13 @@ def check_review(out):
 def check(out):
     board, layers = export_parity(out, out / 'fab')
     holes = check_drills(board, out / 'fab')
+    copper = sorted(path for path in (out / 'fab').iterdir()
+                    if path.suffix.lower() in ('.gtl', '.gbl', '.g1', '.g2', '.g3', '.g4'))
+    if len(copper) != board.GetCopperLayerCount():
+        raise ValueError('Gerber copper layer count differs from board stackup')
+    clearance = pcbnew.ToMM(board.GetDesignSettings().m_MinClearance)
+    shapes = gerberdrc.check_clearance(copper, clearance)
     check_review(out)
-    raise ValueError('Gerber re-import DRC is still missing; export parity on %d layers and %d drill hits is not enough' %
-                     (layers, holes))
+    return ('%d Gerber layers match fresh export; %d drill hits match pads/vias; '
+            '%d plotted copper objects meet %.3f mm net clearance; CPL review approved' %
+            (layers, holes, shapes, clearance))

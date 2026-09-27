@@ -6,11 +6,12 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hw' / 'tools'))
 import fabcheck
 import boardevidence
+import gerberdrc
 
 
 class FabCheckTests(unittest.TestCase):
@@ -69,12 +70,54 @@ class FabCheckTests(unittest.TestCase):
             self.assertIn('fab/board-F_Cu.gtl', artifacts)
             self.assertNotIn('fab/cpl-review.json', artifacts)
 
-    def test_export_parity_and_review_do_not_replace_reimport_drc(self):
-        with patch.object(fabcheck, 'export_parity', return_value=(object(), 9)), \
-             patch.object(fabcheck, 'check_drills', return_value=218), \
-             patch.object(fabcheck, 'check_review'):
-            with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC is still missing'):
-                fabcheck.check(Path('/tmp/wifi'))
+    def test_fab_gate_requires_copper_geometry_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'wifi'
+            (out / 'fab').mkdir(parents=True)
+            for name in ('wifi-F_Cu.gtl', 'wifi-B_Cu.gbl'):
+                (out / 'fab' / name).write_text('stub')
+            board = MagicMock()
+            board.GetCopperLayerCount.return_value = 2
+            board.GetDesignSettings.return_value.m_MinClearance = 150000
+            with patch.object(fabcheck, 'export_parity', return_value=(board, 9)), \
+                 patch.object(fabcheck, 'check_drills', return_value=218), \
+                 patch.object(fabcheck, 'check_review'), \
+                 patch.object(fabcheck.gerberdrc, 'check_clearance', return_value=123) as clearance:
+                self.assertIn('123 plotted copper objects', fabcheck.check(out))
+                clearance.assert_called_once()
+
+    def test_exported_copper_short_and_clearance_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sample-F_Cu.gtl'
+            prefix = '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n'
+            def gerber(second_x, second_net='/B'):
+                return (prefix + '%TO.N,/A*%\nX1000000Y1000000D03*\n'
+                        + '%TO.N,' + second_net + f'*%\nX{second_x}Y1000000D03*\nM02*\n')
+            path.write_text(gerber(1350000))
+            self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
+            path.write_text(gerber(1200000))
+            with self.assertRaisesRegex(ValueError, 'copper clearance'):
+                gerberdrc.check_clearance([path], .15)
+            path.write_text(gerber(1000000))
+            with self.assertRaisesRegex(ValueError, 'copper clearance'):
+                gerberdrc.check_clearance([path], .15)
+            path.write_text(gerber(1350000, '/A'))
+            self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
+
+    def test_unsupported_gerber_geometry_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sample-F_Cu.gtl'
+            base = ('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                    'D10*\n%TO.N,/A*%\nX1000000Y1000000D03*\nM02*\n')
+            for mutant in (base.replace('%LPD*%', '%LPC*%'),
+                           base.replace('%LPD*%', '%TF.FilePolarity,Negative*%\n%LPD*%'),
+                           base.replace('%TO.N,/A*%', '%TD*%'),
+                           base.replace('%ADD10C,0.200000*%',
+                                        '%ADD10RoundRect,0.100000X0.200000X0.200000X-0.200000X0.200000X-0.200000X-0.200000X0.200000X-0.200000X0*%'),
+                           base.replace('%ADD10C,0.200000*%', '%ADD10P,0.200000X6*%')):
+                path.write_text(mutant)
+                with self.assertRaises(ValueError):
+                    gerberdrc.check_clearance([path], .15)
 
 
 if __name__ == '__main__':
