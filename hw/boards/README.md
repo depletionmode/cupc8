@@ -587,8 +587,8 @@ python3 hw/boards/main.py        # also runs hw/boards/sockets.py and the pinche
   CPU socket: rails 5V, 3V3, 1V2 (the 1V2 one through an NPN), CDONE
   (through an NPN, 100 kΩ base so CDONE still reads high), and GPO bits 7–0
   (the POST code, read as a binary number). Each label just south of its
-  LED, its resistor south of that (`LABEL_SIDE`); the NPNs west of the row,
-  above the CPU socket. All red 0603 (C2286), labelled on silk.
+  LED, its resistor south of that (`LABEL_SIDE`); the NPNs in a column
+  east of the row. All red 0603 (C2286), labelled on silk.
 - **Headers and pads:** J4, 2 × 5 AUX SPI (SPI dev 6: 1 +3V3, 3 SCK,
   5 MOSI, 7 MISO, 8 AUX_CS_n, 9 +5V, even pins GND). Test pads on every rail,
   the clock, the resets, both flash buses, the bridge, the slot SPI, I2C, the

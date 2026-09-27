@@ -697,9 +697,9 @@ LABELS.update({"SW2": "POWER", "SW1": "RESET"})        # the front-edge buttons
 LABEL_SIDE = {d: "S" for d in LABELS if d != "D6"}   # the LED row's labels south of them (no room north)
 LABEL_SIDE.update({"SW1": "N", "SW2": "N"})            # the buttons' north of them (the edge is south)
 # the LED row's resistors: designators south, in a row under the labels; the
-# two NPNs and their base resistors, west of the row above the CPU socket: north
+# two NPNs and their base resistors, a column east of the row: west
 LABEL_SIDE.update({r: "S" for r in ["R9", "R10", "R12", "R56"] + ["R%d" % (60 + i) for i in range(8)]})
-LABEL_SIDE.update({r: "N" for r in ("Q1", "Q2", "R11", "R55")})
+LABEL_SIDE.update({r: "W" for r in ("Q1", "Q2", "R11", "R55")})
 LED_X0 = 67.5                                     # the row's first LED after PWR: east of the CPU socket (J2)
 
 FPGA = (97.0, 47.0)                               # centre of U7
@@ -835,9 +835,11 @@ def wanted(parts):
     # power LED, east of the CPU socket, where no card stands: 5V, 3V3, 1V2,
     # CDONE, then GPO 7..0 (the POST code, read as a binary number). Each
     # label just south of its LED (LABEL_SIDE), its resistor south of that.
-    # The two NPNs (1V2, CDONE) and their base resistors west of the row, in
-    # the strip above the CPU socket. Spaced by the labels' widths, so
-    # "CDONE" clears its neighbours'.
+    # The two NPNs (1V2, CDONE) and their base resistors in a column east of
+    # the row: the strip above the CPU socket stays free for its north-row
+    # contacts' tracks (with the NPNs there, the router shorted and left
+    # CPU_RSVD_A6/A7, CPU_CDONE and FL1_* there). Spaced by the labels'
+    # widths, so "CDONE" clears its neighbours'.
     row = [("D2", "R9"), ("D3", "R10"), ("D4", "R12"), ("D5", "R56")] + \
         [("D%d" % (11 + i), "R%d" % (60 + i)) for i in reversed(range(8))]
     x, y = LED_X0, at["D6"][1]
@@ -846,8 +848,8 @@ def wanted(parts):
             x += max(3.6, (_text_w(LABELS[row[i - 1][0]])[0] + _text_w(LABELS[d])[0]) / 2 + 0.8)
         at[d] = (x, y, 0)
         at[r] = (x, y + 4.9, 90)
-    for i, ref in enumerate(("R55", "Q2", "R11", "Q1")):
-        at[ref] = (LED_X0 - 17.5 + 4.5 * i, y + 1.3, 0)
+    for ref, dy in (("Q1", 1.2), ("R11", 5.0), ("Q2", 10.0), ("R55", 13.8)):
+        at[ref] = (114.0, y + dy, 0)
     # CPU socket channel (between the CPU socket and the system slot)
     cpu_r = ["R%d" % i for i in list(range(80, 88)) + list(range(90, 98))]
     for i, r in enumerate(cpu_r):
@@ -1048,7 +1050,7 @@ def _designators(parts, pl):
         cx0, cy0, cx1, cy1 = courts[ref]
         mx, my = (cx0 + cx1) / 2, (cy0 + cy1) / 2
         others = [c for r, c in courts.items() if r != ref]
-        spots = {"E": [(cx1 + gap + w / 2, my)], "N": [(mx, cy0 - gap - h / 2)],
+        spots = {"E": [(cx1 + gap + w / 2, my)], "W": [(cx0 - gap - w / 2, my)], "N": [(mx, cy0 - gap - h / 2)],
                  "S": [(mx, cy1 + gap + h / 2)]}.get(LABEL_SIDE.get(ref), [])
         for shift in (0, 1, -1, 2, -2, 3, -3):
             spots += [(mx + shift, cy0 - gap - 0.6), (mx + shift, cy1 + gap + 0.6),
@@ -1239,6 +1241,19 @@ def _standby_preroute(board):
     track([south[0], south[-1]], 0.6, vbus)
     for at in south:
         track([at, (at[0], fy)], 0.6, vbus)
+    # 5V_SYS on to R4 (the +5V link, north behind the eFuse's small parts):
+    # three vias on the line below the package, a 1 mm In3 track, three vias
+    # under R4's pad 1
+    r4, (ux, uy) = pad("R4", "1")
+    uy1 = to(r4.GetBoundingBox().GetBottom()) + 1.0
+    south5 = [(qx + 1.5 + 0.8 * i, bottom) for i in range(3)]
+    north5 = [(ux - 0.8 + 0.8 * i, uy1) for i in range(3)]
+    for at in south5 + north5:
+        via(at, v5)
+    track([south5[-1], south5[0], (south5[0][0], uy1 + 2.6), north5[-1], north5[0]], 1.0, v5, pcbnew.In3_Cu)
+    track([north5[0], north5[-1]], 0.6, v5)
+    for at in north5:
+        track([at, (at[0], uy)], 0.6, v5)
     vin, (vx, vy) = pad("U15", "2")
     c16, (cx, cy) = pad("C16", "1")
     track([(vx, vy), (vx, cy + 1.2), (cx, cy + 0.4), (cx, cy)], 0.3, vin.GetNet())
