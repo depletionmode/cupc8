@@ -71,6 +71,12 @@ def copper_lengths(path):
 
 
 def extract(main, cpu):
+    import boardevidence
+    import boardcheck
+    for name, path in (('main', main), ('cpu', cpu)):
+        out = path.parent
+        boardevidence.validate(name, out)
+        boardcheck.check_report(json.loads((out / 'drc.json').read_text()), 'drc')
     a, b = copper_lengths(main), copper_lengths(cpu)
     missing = [name for name in bus_nets() if a.get(name, 0) <= 0 or b.get(name, 0) <= 0]
     if missing:
