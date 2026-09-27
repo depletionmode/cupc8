@@ -41,6 +41,20 @@ fail until their contract coverage exists:
   defers it. Separate contours for a hole fail as unsupported; an accepted
   polygon with a hole or a wide bounding box can still have an interior neck.
   A union and minimum-neck analysis remains necessary for both layers.
+  A bounded plotted check now catches one proven neck case: for an orthogonal,
+  hole-free filled polygon that touches no other ink of its net, exact
+  micrometre-grid scanlines measure interior spans. A span below the rule
+  proves that the region is locally too thin; synthetic copper and silk
+  dumbbells test both sides of the limit. Touching strokes, holes,
+  nonorthogonal boundaries, and the overall connected union still need analysis,
+  so the final incomplete-coverage gate remains in force.
+  To close it, the verifier needs a per-net, per-layer union of every dark
+  Gerber operation (one union for all legend ink), with region holes and
+  touching strokes represented exactly or with certified outward error
+  bounds. An inward-offset/connected-component test can then prove bridge
+  failures, but a second coverage test must find narrow terminal tongues and
+  rings that do not split the offset. Every reported pass needs a bound on
+  arc polygonization, buffer approximation, and numeric tolerance.
   The board generator now configures a 0.10 mm solder-mask web
   minimum, plus 0.01 mm opening expansion so KiCad's mask-region plot covers
   the pad copper. Saved board packages need regeneration before their receipts

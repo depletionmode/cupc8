@@ -309,6 +309,46 @@ class FabCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'multiple region contours unsupported'):
                 gerberdrc.check_clearance([copper], .15, .1)
 
+    def test_isolated_filled_neck_mutations(self):
+        def dumbbell(bridge):
+            low = 1500000 - bridge // 2
+            high = low + bridge
+            points = [(1000000,1000000), (1500000,1000000),
+                      (1500000,low), (2000000,low), (2000000,1000000),
+                      (2500000,1000000), (2500000,2000000),
+                      (2000000,2000000), (2000000,high),
+                      (1500000,high), (1500000,2000000),
+                      (1000000,2000000), (1000000,1000000)]
+            return 'G36*\n' + ''.join(f'X{x}Y{y}D{"02" if i == 0 else "01"}*\n'
+                                     for i, (x,y) in enumerate(points)) + 'G37*\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper = fab / 'sample-F_Cu.gtl'
+            silk = fab / 'sample-F_Silkscreen.gto'
+            mask = fab / 'sample-F_Mask.gts'
+            prefix = '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n'
+            copper_prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                             '%TF.FilePolarity,Positive*%\n' + prefix + '%TO.N,/GND*%\n')
+            silk_prefix = ('%TF.FileFunction,Legend,Top*%\n'
+                           '%TF.FilePolarity,Positive*%\n' + prefix)
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n' + prefix +
+                            'X9000000Y9000000D03*\nM02*\n')
+            copper.write_text(copper_prefix + dumbbell(100000) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 1)
+            copper.write_text(copper_prefix + dumbbell(80000) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated filled region has a 0.080000 mm span below 0.100000 mm'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # A touching stroke can widen the union; the bounded proof defers it.
+            copper.write_text(copper_prefix + dumbbell(80000) +
+                              'X1750000Y1300000D02*\nX1750000Y1700000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            silk.write_text(silk_prefix + dumbbell(150000) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 1)
+            silk.write_text(silk_prefix + dumbbell(100000) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated filled region has a 0.100000 mm span below 0.150000 mm'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)

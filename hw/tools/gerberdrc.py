@@ -50,6 +50,7 @@ class Geometry:
         self.circles = {}
         self.obrounds = {}
         self.flashes = {}
+        self.repaired = set()
         self.outward = True
 
     def call(self, name, result, args):
@@ -72,6 +73,7 @@ class Geometry:
                               [ctypes.c_void_p, ctypes.c_void_p])(self.ctx, shape)
             if shape:
                 self.shapes.append(shape)
+                self.repaired.add(shape)
                 valid = self.call('GEOSisValid_r', ctypes.c_byte,
                                   [ctypes.c_void_p, ctypes.c_void_p])(self.ctx, shape)
         empty = self.call('GEOSisEmpty_r', ctypes.c_byte, [ctypes.c_void_p, ctypes.c_void_p])(
@@ -140,6 +142,20 @@ class Geometry:
             raise ValueError('GEOS failed to union plotted openings')
         self.shapes.append(result)
         return result
+
+    def simple_hole_free_polygon(self, shape):
+        """Whether a filled region retained one valid polygon without holes."""
+        if shape in self.repaired:
+            return False
+        kind = self.call('GEOSGeomTypeId_r', ctypes.c_int,
+                         [ctypes.c_void_p, ctypes.c_void_p])(self.ctx, shape)
+        if kind != 3:
+            return False
+        holes = self.call('GEOSGetNumInteriorRings_r', ctypes.c_int,
+                          [ctypes.c_void_p, ctypes.c_void_p])(self.ctx, shape)
+        if holes < 0:
+            raise ValueError('GEOS failed to inspect filled-region holes')
+        return holes == 0
 
     def close(self):
         destroy = self.call('GEOSGeom_destroy_r', None, [ctypes.c_void_p, ctypes.c_void_p])
@@ -298,7 +314,7 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
             shape = geometry.wkt(polygon(region), repair=True)
             add(shape, bounds)
             if filled_regions is not None:
-                filled_regions.append((net, shape, bounds, number))
+                filled_regions.append((net, shape, bounds, number, tuple(region)))
             region = None
         elif line in ('G01*', 'G02*', 'G03*'):
             mode = line[:-1]
@@ -743,13 +759,14 @@ def check_isolated_filled_width(path, geometry, objects, filled_regions, minimum
     """Reject a filled island whose entire plotted width is below the rule.
 
     A narrow region touching another shape of the same net (or any silk ink)
-    can form a wider combined shape. Holes and connected necks need a full
-    union/neck analysis and remain at the final incomplete-coverage gate.
+    can form a wider combined shape. The orthogonal scanline check below
+    catches a subset of interior necks; the general union and holes remain
+    at the final incomplete-coverage gate.
     """
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('no positive filled-ink width requirement')
     rule_um = Decimal(str(minimum)) * 1000000
-    for net, shape, (x0, y0, x1, y1), line in filled_regions:
+    for net, shape, (x0, y0, x1, y1), line, _ in filled_regions:
         width_um = round(min(x1-x0, y1-y0) * 1000000)
         if width_um >= rule_um:
             continue
@@ -763,6 +780,71 @@ def check_isolated_filled_width(path, geometry, objects, filled_regions, minimum
         else:
             raise ValueError('%s:%d: isolated filled region width %.6f mm < %.6f mm' %
                              (Path(path).name, line, width_um/1000000, minimum))
+
+
+def orthogonal_region_min_span(points):
+    """Exact minimum axis-aligned interior span on the Gerber 1 um grid.
+
+    Between consecutive vertex coordinates an orthogonal polygon's scanline
+    intersections are constant. Alternating pairs of crossed edges bound
+    filled intervals, so examining one midpoint per slab is exhaustive for
+    horizontal and vertical spans. Nonorthogonal contours are deferred.
+    """
+    if len(points) > 2000:
+        return None  # bound the quadratic scan; the final gate retains this case
+    vertices = [(round(x * 1000000), round(y * 1000000)) for x, y in points]
+    if vertices[0] != vertices[-1]:
+        vertices.append(vertices[0])
+    edges = list(zip(vertices, vertices[1:]))
+    if any(a == b or a[0] != b[0] and a[1] != b[1] for a, b in edges):
+        return None
+    best = None
+    for axis in (0, 1):
+        coordinates = sorted({point[axis] for point in vertices})
+        for low, high in zip(coordinates, coordinates[1:]):
+            midpoint2 = low + high  # twice the half-grid scanline coordinate
+            crossings = []
+            for a, b in edges:
+                if (a[1-axis] == b[1-axis] and
+                        min(2*a[axis], 2*b[axis]) < midpoint2 < max(2*a[axis], 2*b[axis])):
+                    crossings.append(a[1-axis])
+            crossings.sort()
+            if len(crossings) % 2:
+                return None  # unsupported topology, never claim a pass
+            for start, end in zip(crossings[::2], crossings[1::2]):
+                width = end - start
+                if width <= 0:
+                    return None
+                best = width if best is None else min(best, width)
+    return best
+
+
+def check_isolated_filled_necks(path, geometry, objects, filled_regions, minimum):
+    """Reject a proven thin span inside an isolated orthogonal filled polygon.
+
+    The test uses only integer plotted coordinates. Touching ink might widen
+    the region, and holes or nonorthogonal boundaries need separate proofs.
+    """
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('no positive filled-ink neck requirement')
+    rule_um = Decimal(str(minimum)) * 1000000
+    for net, shape, (x0, y0, x1, y1), line, points in filled_regions:
+        if min(x1-x0, y1-y0) < minimum:
+            continue  # the existing whole-region width check handles this
+        if not geometry.simple_hole_free_polygon(shape):
+            continue
+        for other_net, other, (a0, b0, a1, b1) in objects:
+            if other == shape or other_net != net:
+                continue
+            if x1 < a0 or a1 < x0 or y1 < b0 or b1 < y0:
+                continue
+            if geometry.distance(shape, other) == 0:
+                break
+        else:
+            width_um = orthogonal_region_min_span(points)
+            if width_um is not None and width_um < rule_um:
+                raise ValueError('%s:%d: isolated filled region has a %.6f mm span below %.6f mm' %
+                                 (Path(path).name, line, width_um/1000000, minimum))
 
 
 def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
@@ -779,6 +861,8 @@ def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
                                 filled_regions=filled_regions)
         if minimum_ink_width is not None:
             check_isolated_filled_width(silk_path, engine, legend, filled_regions,
+                                        minimum_ink_width)
+            check_isolated_filled_necks(silk_path, engine, legend, filled_regions,
                                         minimum_ink_width)
         for _, ink, (x0,y0,x1,y1) in legend:
             for _, opening, (a0,b0,a1,b1) in openings:
@@ -1018,6 +1102,8 @@ def check_clearance(paths, minimum, minimum_track=None):
                                      filled_regions=filled_regions)
             if minimum_track is not None:
                 check_isolated_filled_width(path, engine, objects, filled_regions,
+                                            minimum_track)
+                check_isolated_filled_necks(path, engine, objects, filled_regions,
                                             minimum_track)
             cells = defaultdict(list)
             for index, (net, shape, (x0,y0,x1,y1)) in enumerate(objects):
