@@ -127,6 +127,7 @@ class FabCheckTests(unittest.TestCase):
             settings.m_ViasMinAnnularWidth = 130000
             settings.m_CopperEdgeClearance = 300000
             settings.m_HoleClearance = 250000
+            settings.m_HoleToHoleMin = 500000
             settings.m_SolderMaskMinWidth = 100000
             with patch.object(fabcheck, 'export_parity', return_value=(board, 9)), \
                  patch.object(fabcheck, 'check_drills', return_value=(218, Counter({(1., 1., .3): 1}), Counter())), \
@@ -160,9 +161,20 @@ class FabCheckTests(unittest.TestCase):
                 message = str(caught.exception)
                 self.assertIn('filled silkscreen regions', message)
                 self.assertIn('silkscreen text height', message)
-                self.assertIn('drill-to-drill clearance', message)
                 self.assertEqual('positive solder-mask web rule is not configured' in message,
                                  width == 0)
+
+    def test_excellon_drill_spacing_exact_boundary_and_slot(self):
+        circle = (1.0, 1.0, .3)
+        at_limit = (1.8, 1.0, .3)  # 0.5 mm clearance between 0.3 mm cuts
+        self.assertEqual(fabcheck.check_drill_spacing(Counter({circle: 1, at_limit: 1}), .5), 2)
+        with self.assertRaisesRegex(ValueError, 'drill-to-drill clearance'):
+            fabcheck.check_drill_spacing(Counter({circle: 1, (1.799, 1.0, .3): 1}), .5)
+        slot = fabcheck.slot_key((1.8, 1.0), (1.8, 2.0), .3)
+        self.assertEqual(fabcheck.check_drill_spacing(Counter({circle: 1, slot: 1}), .5), 2)
+        crossing = fabcheck.slot_key((1.0, 1.0), (2.0, 1.0), .3)
+        with self.assertRaisesRegex(ValueError, 'drill-to-drill clearance'):
+            fabcheck.check_drill_spacing(Counter({slot: 1, crossing: 1}), .5)
 
     def test_exported_copper_short_and_clearance_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
