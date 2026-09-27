@@ -32,15 +32,25 @@ fail until their contract coverage exists:
 
   `fabcheck.py` independently parses plotted copper, mask, paste, silk,
   outline, and Excellon data for its implemented checks. Passing those checks
-  still leaves the fab row red. The remaining plotted-geometry rules are
-  minimum neck width in filled copper and silk regions and silkscreen text
-  height. The parser rejects isolated filled copper and silk regions whose
-  entire plotted bounding width is below their respective 0.10/0.15 mm rules.
-  It evaluates copper per net and layer. A filled region touching a same-net
-  stroke or another region can form a wider union, so the local bounding rule
-  defers it. Separate contours for a hole fail as unsupported; an accepted
-  polygon with a hole or a wide bounding box can still have an interior neck.
-  A union and minimum-neck analysis remains necessary for both layers.
+  still leaves the fab row red. Plotted copper and silk require complete
+  minimum-neck coverage, and the legend requires independent text-height
+  coverage. The parser rejects isolated filled regions whose entire plotted
+  bounding width is below their respective 0.10/0.15 mm rules. It evaluates
+  copper per net and layer; touching ink can widen a region, and holes or a
+  wide bounding box can hide an interior neck.
+
+  The bounded scanline check catches additional proven failures. For
+  orthogonal, hole-free filled polygons, exact half-micrometre-grid scanlines
+  measure the union of touching regions and rectangular flashes. A thin span
+  from filled ink proves a violation; flash-only pad tongues are exempt. A
+  single touching stroke or nonrectangular flash is bounded by its
+  outward-rounded box, so a thin span that survives its possible widening is
+  also a proven failure. Exact rational scanlines detect an interior neck in
+  an isolated nonorthogonal, hole-free polygon when wider spans overlap it on
+  both sides; this excludes a rounded terminal tip. Holes, multiple touching
+  unsupported operations, connected nonorthogonal polygons, and large unions
+  remain outside these witnesses. The final incomplete-coverage gate stays
+  red until all such ink and text-height rules are independently checked.
   The board generator now configures a 0.10 mm solder-mask web
   minimum, plus 0.01 mm opening expansion so KiCad's mask-region plot covers
   the pad copper. Saved board packages need regeneration before their receipts
