@@ -75,6 +75,7 @@ def audit(directory):
     return {'scope': 'USB numerical-convergence diagnosis, not accepted SI evidence',
             'port_file_sha256': hashes, 'reference_ohms': REFERENCE_OHMS,
             'field_energy_best_db': -max(levels), 'field_energy_final_db': -levels[-1],
+            'field_below_40db_at_final_sample': levels[-1] >= 40,
             'field_end_criterion_met': 'Max. number of timesteps was reached' not in log and
                                        levels[-1] >= 40,
             'port_tail_last_1ns_max_relative_db': tails,
