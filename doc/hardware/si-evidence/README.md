@@ -77,3 +77,7 @@ sweeps and `ibis-current-route-source-audit.json` bind the pinned vendor model
 and source-pin copper paths to the final main/CPU receipts. The waveform line
 models still use assumed lengths and loads, so the audit does not certify
 physical bus SI.
+
+`usb-io-three-mesh-complex-port.json` checks the three runs against their
+raw port traces at 16 ns and quantifies complex reflection and loaded input
+impedance sensitivity. Loaded input impedance is not characteristic impedance.
