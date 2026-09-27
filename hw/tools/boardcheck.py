@@ -19,7 +19,7 @@ ROOT = boardevidence.ROOT
 BOARDS = ('main', 'cpu', 'gpu', 'io', 'wifi', 'storage', 'eink', 'system')
 POWER = {
     'main': [('buck.py',), ('ldo.py', '1v2'), ('inrush.py',), ('cc.py',), ('budget.py',)],
-    'cpu': [('ldo.py', '1v2')], 'wifi': [('buck.py', 'wifi-card')],
+    'cpu': [('ldo.py', 'cpu-card')], 'wifi': [('buck.py', 'wifi-card')],
     'gpu': [('hdmi.py',)], 'io': [('boost.py',)],
     'storage': [('budget.py',)], 'eink': [('budget.py',)], 'system': [('budget.py',)],
 }
@@ -28,7 +28,7 @@ POWER = {
 GAPS = {
     'power': {
         'main': 'bind regulator/input path models to the actual main-board netlist',
-        'cpu': 'bind the RT9013 model to the CPU netlist and capacitor values',
+        'cpu': 'bound socket 3V3 feed, minimum finished copper/contact resistance, effective C22/C1-C4 capacitance and ESR, and FPGA maximum core current',
         'gpu': 'RP2040 VREG 1.20 V transient/droop model at 252 MHz',
         'io': 'SY6280 short/fault flag and current-limit transient model',
         'storage': 'SD-card load-step and RP2040 internal regulator model',
@@ -105,7 +105,7 @@ def check(board, mode, out):
     elif mode == 'power':
         for command in POWER[board]:
             args = [sys.executable, 'hw/power/' + command[0], *command[1:]]
-            if board == 'wifi':
+            if board in ('wifi', 'cpu'):
                 args.append(out)
             run(args)
         if board in GAPS['power']:

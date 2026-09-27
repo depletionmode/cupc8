@@ -1186,6 +1186,13 @@ fixed_in = "5729b36"
 revert = [["hw/tools/boardcheck.py", "findings = [v for key in keys for v in report[key]]", "findings = report['violations']"]]
 cmd = "python3 test/hw/test_boardcheck.py ReportTests.test_each_drc_failure_class"
 must_fail = ["FAIL: test_each_drc_failure_class"]
+
+[[bug]]
+name = "CPU 1V2 power check accepted a regulator output pinned to GND"
+fixed_in = "CPU route-bound power gate"
+revert = [["hw/power/cpu_board.py", "if circuit.net(*pin) != net:", "if False:"]]
+cmd = "python3 test/hw/test_cpu_power_board.py CpuPowerBoard.test_netlist_pin_swap_fails"
+must_fail = ["FAIL: test_netlist_pin_swap_fails"]
 [[bug]]
 name = "crosstalk screen: split collinear tracks hid a long parallel run"
 fixed_in = "crosstalk initial implementation"

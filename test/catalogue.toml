@@ -2589,6 +2589,15 @@ method = "test/hw/test_boardcheck.py"
 kind = "static"
 vrow = "4.2"
 cmd = "python3 test/hw/test_boardcheck.py"
+
+[[test]]
+id = "CC-005A"
+title = "CPU 1V2 netlist and routed rail mutation checks"
+checks = "RT9013/capacitor/FPGA pin swaps, narrower copper and a broken 1V2 route change or fail the extracted result"
+method = "test/hw/test_cpu_power_board.py with synthetic KiCad netlist and PCB fixtures"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 test/hw/test_cpu_power_board.py"
 [[test]]
 id = "SI-001"
 title = "Routed parallel-run screen regression"

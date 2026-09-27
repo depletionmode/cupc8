@@ -32,12 +32,34 @@ fail until their contract coverage exists:
 - Connectors: pincheck validates the source tables; connectorcheck compares
   every contact, including intended no-connects, of the board's external
   connectors with its KiCad netlist and the published pinout.
-- Power: main and CPU models need binding to the actual board netlists;
+- Power: the main board models need binding to the actual board netlist;
+  the CPU output rail has partial routed binding described below;
   GPU needs the RP2040 internal regulator at its overclocked operating point;
   IO needs SY6280 current-limit, short and fault-flag transients; storage,
   e-ink and system need load-step/internal-regulator coverage. Existing
   buck, LDO, HDMI, USB boost and budget models still execute before these
   missing portions fail.
+
+  CC-005 now binds the CPU card's RT9013 U3, input C21, output C22,
+  C1-C4 decouplers and the four FPGA VCC pins to the exported netlist and
+  PCB. The 2026-09-27 routed CPU PCB (SHA-256 prefix `cd72e96e79e9`,
+  netlist `8f77c6df0154`) has 47 top-layer 1V2 segments, no 1V2 vias or
+  pours, and a longest centerline resistance scenario of 196.8 mΩ from
+  U3.5 to U1.40. At the modeled 40 mA this adds 7.9 mV; the behavioral
+  model's low-corner minimum then becomes 1.164 V, 24 mV above the FPGA's
+  1.14 V limit. The scenario uses 1 oz nominal finished copper with hot
+  resistivity and ideal pad contacts, so it is not a guaranteed maximum
+  resistance. The 3V3 socket feed is not extracted. The board fits a nominal
+  4.7 µF Samsung C22 plus four 100 nF capacitors, while the existing deck
+  uses 1.4 µF; effective capacitance and ESR at bias and temperature are
+  unbounded. [Richtek's RT9013 datasheet](https://www.richtek.com/assets/product_file/RT9013/DS9013-10.pdf)
+  requires at least 1 µF and ESR above 5 mΩ for stability. Samsung's
+  [C22 product page](https://product.samsungsem.com/mlcc/CL05A475MP5NRN.do)
+  lists nominal properties and typical characteristics, not a guaranteed
+  biased capacitance/ESR bound. Richtek's [product page](https://richtek.com/Products/Linear%20Regulator/Single%20Output%20Linear%20Regulator/RT9013?sc_lang=en&specid=RT9013)
+  currently marks RT9013 EOL; JLC stock needs a separate live check.
+  CC-005 remains red until the physical bounds and 40 mA FPGA core-load
+  assumption are supported.
 - Thermal: main/CPU regulator models need netlist binding, and RP2040 cards
   need internal-regulator dissipation at their maximum operating loads.
 - Wi-Fi strapping: WC-006 checks the actual KiCad netlist's ESP32-C3 GPIO2/8/9,

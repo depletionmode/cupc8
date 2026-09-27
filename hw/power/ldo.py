@@ -3,6 +3,7 @@
 models/behavioural.lib.
 
     python3 hw/power/ldo.py 1v2
+    python3 hw/power/ldo.py cpu-card BOARD_BUILD
 
 Each run first re-simulates the datasheet load-step figure its model was
 fitted to, so a change to the model or its parameters can't pass silently.
@@ -17,6 +18,7 @@ a TLV62569 buck, checked by hw/power/buck.py wifi-card.
 """
 
 import sys
+from pathlib import Path
 
 import design as d
 import spice
@@ -44,7 +46,7 @@ meas tran vmin min v(out) from=100u to=130u
         1e3 * dip, 1e3 * fig_dip), abs(dip - fig_dip) / fig_dip, 0.25, "<=", "", fmt="%.2f")
 
 
-def run_1v2(c):
+def run_1v2(c, rail_ohms=0.0):
     p = dict(d.RT9013)
     model_check(c, "L0", "pow002_fit", dict(p, VSET=1.5, VIN_NOM=2.5), 2.5, 1e-6, 0.005, 0.010, 0.300, 0.025)
     v3_lo, v3_hi = d.buck_vout_range()
@@ -66,11 +68,15 @@ meas tran t95 when v(out)={v95} rise=1
 """.format(v3=v3_lo, p=spice.params(dict(p, VIN_NOM=3.3)), cout=d.RT9013_COUT, imax=d.I_1V2_MAX,
            v95=0.95 * 1.2)
     m = spice.run("pow002_step", deck)
+    rail_drop = d.I_1V2_MAX * rail_ohms
+    if rail_ohms:
+        c.info('CPU 1V2 copper scenario', '%.1f mOhm at 40 mA: %.1f mV additional drop; '
+               'nominal finished copper and ideal pad contacts' % (1e3 * rail_ohms, 1e3 * rail_drop))
     c.check("L1", "1V2 up to 95% within the 3V3 soft start + 1 ms", 1e3 * m["t95"], 1.8, "<=", "ms", fmt="%.2f")
     c.check("L2", "start-up peak at the DC high corner (iCE40 VCC max)", m["vpeak"] - 1.2 + vset_hi,
             d.V1V2_MAX, "<=")
     c.check("L3", "0->40 mA core step, minimum at the DC low corner (droop %.1f mV)" % (
-        1e3 * (m["vss"] - m["vmin"])), m["vmin"] - 1.2 + vset_lo, d.V1V2_MIN, ">=")
+        1e3 * (m["vss"] - m["vmin"])), m["vmin"] - 1.2 + vset_lo - rail_drop, d.V1V2_MIN, ">=")
     drop = d.RT9013["RDROP"] * d.I_1V2_MAX
     c.check("L4", "dropout: lowest 3V3 (DC low - 50 mV step and ripple) - 1V2 max vs dropout at 40 mA",
             v3_lo - 0.050 - vset_hi, drop, ">=")
@@ -94,8 +100,10 @@ meas ac g find vm(out) at={f}
             20 * __import__("math").log10(g), 1e3 * vpp, 1e3 * vpp * g))
         worst = max(worst, vpp * g)
     c.check("L6", "1V2 total at the DC low corner: 1.2 V - 2 % - step droop - ripple/2",
-            m["vmin"] - 1.2 + vset_lo - worst / 2, d.V1V2_MIN, ">=")
-    c.info("CPU card", "its RT9013 sees the same 3V3 through the socket (< 20 mV at 40 mA), so L1-L6 cover it")
+            m["vmin"] - 1.2 + vset_lo - worst / 2 - rail_drop, d.V1V2_MIN, ">=")
+    if not rail_ohms:
+        c.info("CPU card", "its RT9013 sees the same 3V3 through the socket (< 20 mV at 40 mA); "
+               "the routed card is checked separately by CC-005")
 
 
 def main():
@@ -103,6 +111,11 @@ def main():
     if which == "1v2":
         c = Checks("POW-002 1V2 LDO, RT9013 behavioural model (hw/power/ldo.py 1v2)")
         run_1v2(c)
+    elif which == 'cpu-card' and len(sys.argv) == 3:
+        import cpu_board
+        c = Checks('CC-005 CPU card RT9013 and routed 1V2 copper')
+        paths = cpu_board.check(Path(sys.argv[2]))
+        run_1v2(c, max(paths.values()))
     else:
         sys.exit(__doc__)
     return c.done()
