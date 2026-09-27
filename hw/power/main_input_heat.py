@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / 'hw/tools'))
 sys.path.insert(0, str(ROOT / 'hw'))
 
 import boardevidence
+from boardcheck import check_report
 from cosim.netlist import read
 import design as d
 from main_trial_corner import row
@@ -45,6 +46,7 @@ def losses(resistance_mohm, current_a):
 
 def inspect(out):
     boardevidence.validate('main', out)
+    check_report(json.loads((out / 'drc.json').read_text()), 'drc')
     order = json.loads((out / 'fab/order.json').read_text())
     required = {'layers': 6, 'thickness_mm': 1.6, 'finished_outer_copper_oz': 1,
                 'finished_inner_copper_oz': 0.5, 'stackup': 'JLC06161H-3313'}

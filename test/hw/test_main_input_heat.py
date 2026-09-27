@@ -4,7 +4,9 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
+import json
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,6 +53,18 @@ class MainInputHeat(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('FAIL I0', output.getvalue())
         self.assertNotIn('fault corner', output.getvalue())
+
+    def test_receipted_board_with_drc_finding_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)
+            (path / 'drc.json').write_text(json.dumps({
+                'included_severities': ['error', 'warning', 'exclusion'],
+                'violations': [{'description': 'shorted rail'}],
+                'unconnected_items': [], 'schematic_parity': [],
+            }))
+            with patch.object(gate.boardevidence, 'validate'):
+                with self.assertRaisesRegex(ValueError, 'drc has 1 findings'):
+                    gate.inspect(path)
 
 
 if __name__ == '__main__':
