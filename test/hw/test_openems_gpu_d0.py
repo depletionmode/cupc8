@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'hw/si'))
-from openems_gpu_d0 import completion_decay, routed_pair
+from openems_gpu_d0 import PAIR_GEOMETRY, completion_decay, routed_pair
 
 
 def segment(name, a, b, width=.2, layer='F.Cu'):
@@ -33,6 +33,29 @@ class RouteInputTests(unittest.TestCase):
         routes = self.load(fixture())
         self.assertEqual({name: len(parts) for name, parts in routes.items()},
                          {'/HD_D0P': 2, '/HD_D0N': 2})
+
+    def test_each_tmds_pair_has_independent_connected_launches(self):
+        for pair, (nets, _, ends) in PAIR_GEOMETRY.items():
+            text = '(kicad_pcb ' + ' '.join(segment(net, *ends[net]) for net in nets) + ')'
+            with self.subTest(pair=pair), tempfile.TemporaryDirectory() as directory:
+                board = Path(directory) / 'gpu.kicad_pcb'
+                board.write_text(text)
+                self.assertEqual(set(routed_pair(board, pair)), set(nets))
+                board.write_text(text.replace(f'(net "{nets[0]}")', '(net "/BROKEN")', 1))
+                with self.assertRaises(ValueError):
+                    routed_pair(board, pair)
+                board.write_text(text.replace('(layer "F.Cu")', '(layer "B.Cu")', 1))
+                with self.assertRaises(ValueError):
+                    routed_pair(board, pair)
+                board.write_text(text.replace('(kicad_pcb ',
+                                             f'(kicad_pcb (via (at {ends[nets[0]][0][0]} -30) (net "{nets[0]}")) ', 1))
+                with self.assertRaises(ValueError):
+                    routed_pair(board, pair)
+                first_end = ends[nets[0]][1]
+                board.write_text(text.replace(f'(end {first_end[0]} {first_end[1]})',
+                                              f'(end {first_end[0] + .1} {first_end[1]})', 1))
+                with self.assertRaises(ValueError):
+                    routed_pair(board, pair)
 
     def test_swapped_wire_and_via_are_rejected(self):
         source = fixture()

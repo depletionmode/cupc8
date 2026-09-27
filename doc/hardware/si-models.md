@@ -1,22 +1,33 @@
 # Signal-integrity models in progress
 
-`hw/si/openems_gpu_d0.py` reads the GPU card's routed KiCad board. It models the six top-layer track segments on each side of the HDMI D0 pair, from the output side of RN2 to J1, in openEMS. The input must be a completed GPU pipeline build when run by `SI-003`; its board receipt and file hashes are checked before simulation. The JSON result records the board SHA-256 and the field-energy decay.
+`hw/si/openems_gpu_d0.py` reads the GPU card's routed KiCad board and models each of the four HDMI TMDS pairs independently, from a source resistor pack to J1, in openEMS (`--pair d0|d1|d2|ck`). The input must be a completed GPU pipeline build when run by `SI-003`; its board receipt and file hashes are checked before simulation. Each JSON result records the board SHA-256 and the field-energy decay.
 
 The selected [JLC04161H-7628 stackup](https://jlcpcb.com/impedance) puts 0.2104 mm of 7628 prepreg (Dk 4.4) between top copper and the L2 ground plane. The model uses those values, a rectangular L2 ground plane, lossless dielectric, and ideal copper. It excites and terminates the pair with two 100 Ω lumped differential ports on the z=0 copper plane, then derives S11 and S21. [openEMS warns](https://docs.openems.de/en/latest/concepts/ports.html) that lumped ports can perform poorly on differential pairs; these results remain diagnostic pending mesh and port sensitivity checks. The script rejects results where |S11|² + |S21|² exceeds 1.001 or the nominally matched passive port has an incident wave exceeding 1% of the driven port's incident wave at any sampled frequency. These small numerical margins are basic consistency checks, not complete port calibration. It also fails if either route disconnects, changes layers, or adds a via (those changes need new geometry, not a silent approximation).
 
-This is a subset, not `GC-007`. The other seven TMDS pairs, their vias, exact pad and HDMI connector metal, solder mask, finite copper and dielectric loss, and the source/sink behavior are still absent. The reported S21 therefore cannot certify the real insertion-loss budget, and S11 includes the model's launch discontinuities. The script's `--straight-control` option keeps the same ports and endpoints while replacing bends and width changes with straight 0.2 mm tracks; a mesh/port sensitivity run is still needed before using this model to judge the pair's impedance. `GC-007` and the row 4.6 system gate remain pending.
+This is a subset, not `GC-007`. The pairs are solved separately, so inter-pair coupling is absent. Exact pad and HDMI connector metal, solder mask, finite copper and dielectric loss, and source/sink behavior are also absent. The reported S21 therefore cannot certify the real insertion-loss budget, and S11 includes the model's launch discontinuities. The script's `--straight-control` option keeps the same ports and endpoints while replacing bends and width changes with straight 0.2 mm tracks; a mesh/port sensitivity run is still needed before using the model to judge impedance. `GC-007` and the row 4.6 system gate remain pending.
 
 To repeat the subset after building the GPU board:
 
 ```sh
-python3 hw/si/openems_gpu_d0.py --board build/hw/gpu/gpu.kicad_pcb --out build/hw/si/gpu-d0.json --require-evidence
+for pair in d0 d1 d2 ck; do
+  python3 hw/si/openems_gpu_d0.py --pair "$pair" --board build/hw/gpu/gpu.kicad_pcb --out "build/hw/si/gpu-$pair.json" --require-evidence
+done
 ```
 
 On a fresh, provenance-checked GPU board (SHA-256 `95fa5811164a2fb367d8bf085ae1cfb91ced5320b8bb77a9227961c85535c9fa`), the original lumped-port boxes extending from z=-0.05 to +0.05 mm reached -40.06 dB in 87,200 steps on openEMS v0.37.0-rc3-1-g65f8771. At 1.26 GHz they gave S11 -10.66 dB and S21 -0.26 dB, but their squared magnitudes summed to 1.027414, violating passive two-port power balance by 2.74%. The unexcited port had |uf_inc,2/uf_inc,1| about 0.18 and measured -U2/I2 about 145.4 Ω across 0.1–1.26 GHz, despite a declared 100 Ω load. Those data fail the new validity gates.
 
 Changing only the lumped-port boxes to two-dimensional surfaces at z=0 kept the same board, traces, substrate, 0.05 mm x/y mesh, and 100 Ω port resistors. That comparison run reached -40.14 dB in 96,792 steps. Its passive port measured 99.94 - j0.15 Ω at 1.26 GHz, with |uf_inc,2/uf_inc,1| = 0.000775. At that frequency S11 was -12.45 dB and S21 was -0.54 dB, with squared magnitudes summing to 0.939621. The comparison isolates the port thickness as the cause of the 145 Ω mismatch on this mesh.
 
-The current rebuilt GPU board is SHA-256 `86185894b9863e53bdbc19ff3b0940147180a36fb3725be38f39f54d2479b66f`. Its provenance-checked D0 run reached -40.17 dB in 102,678 steps; at 1.26 GHz S11 was -12.44 dB, S21 was -0.54 dB, and the squared power sum was 0.939592. All four sampled frequencies pass the port consistency and passive power checks, and saved-field postprocessing reproduces the generated geometry. This does not establish the full row 4.6 impedance or loss target: other TMDS pairs, USB routes, connector and pad geometry, physical losses, and a mesh sensitivity study are still missing.
+The routed GPU board used for the four exploratory runs is SHA-256 `86185894b9863e53bdbc19ff3b0940147180a36fb3725be38f39f54d2479b66f`. Each reached at least -40 dB field-energy decay, and all four sampled frequencies passed the port consistency and passive power checks. At 1.26 GHz:
+
+| Pair | Steps | S11 | S21 | Power sum |
+| --- | ---: | ---: | ---: | ---: |
+| D0 | 102,678 | -12.44 dB | -0.54 dB | 0.939592 |
+| D1 | 107,692 | -12.06 dB | -0.57 dB | 0.939937 |
+| D2 | 104,640 | -12.34 dB | -0.54 dB | 0.941130 |
+| CK | 102,678 | -12.56 dB | -0.52 dB | 0.943002 |
+
+D0 saved-field postprocessing reproduces the generated geometry after the four-pair refactor. A fresh GPU pipeline receipt is required before `SI-003` can accept these runs against current sources. This does not establish the full row 4.6 impedance or loss target: USB routes, connector and pad geometry, physical losses, pair coupling, and a mesh sensitivity study remain open.
 
 ## IBIS specification and pinned FPGA model
 
