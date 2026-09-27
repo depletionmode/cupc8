@@ -9,6 +9,7 @@ TQ144 package assignment the result is deliberately diagnostic only.
 """
 import argparse
 import hashlib
+import heapq
 import json
 import math
 import re
@@ -18,10 +19,13 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pcbnew
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_ice40_ibis import verify
+sys.path.insert(0, str(ROOT / 'hw/tools'))
+from kicadgen import find1, parse
 
 IBIS = ROOT / 'build/hw/si/FPGA-MD-02034-2-5-iCE40-IO.ibs'
 MODELS = ('lvc330io', 'lvc330_b3io')
@@ -30,6 +34,75 @@ VDD = {'typ': 3.30, 'min': 3.14, 'max': 3.47}
 VIH, VIL = 2.0, 0.8  # vendor [Model] VinH/VinL
 FIXTURE_R, FIXTURE_C = 50.0, 25e-12
 TRACE_Z0, TRACE_PS_PER_MM = 50.0, 7.0
+COPPER = ('F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'B.Cu')
+
+
+def routed_distances(board_path, net, source, receivers):
+    """Measure layer-aware shortest copper paths; report disconnected pads.
+
+    This measures length only. It does not turn branches, vias, pad stubs or
+    changing reference planes into an electrical transmission-line model.
+    """
+    board = pcbnew.LoadBoard(str(board_path))
+    tree = parse(board_path.read_text())
+    graph = {}
+
+    def add_edge(a, b, length):
+        graph.setdefault(a, []).append((b, length))
+        graph.setdefault(b, []).append((a, length))
+
+    for item in tree[1:]:
+        if not isinstance(item, list) or not item or item[0] not in ('segment', 'via'):
+            continue
+        attached = find1(item, 'net')
+        if attached is None or attached[1] != net:
+            continue
+        if item[0] == 'segment':
+            a, b = (tuple(round(float(x), 4) for x in find1(item, tag)[1:])
+                    for tag in ('start', 'end'))
+            layer = find1(item, 'layer')[1]
+            add_edge((a, layer), (b, layer), math.dist(a, b))
+        else:
+            pos = tuple(round(float(x), 4) for x in find1(item, 'at')[1:])
+            via_layers = find1(item, 'layers')[1:]
+            if via_layers == ['F.Cu', 'B.Cu']:
+                via_layers = COPPER
+            for a, b in zip(via_layers, via_layers[1:]):
+                add_edge((pos, a), (pos, b), .02)
+
+    def pad_nodes(contact):
+        ref, number = contact
+        footprint = board.FindFootprintByReference(ref)
+        if footprint is None:
+            raise ValueError(f'{ref}: missing from routed board')
+        pads = [p for p in footprint.Pads() if p.GetNumber() == number]
+        if len(pads) != 1 or pads[0].GetNetname() != net:
+            raise ValueError(f'{ref}.{number}: missing or wrong {net} pad')
+        pad = pads[0]
+        pos = pad.GetPosition()
+        xy = (round(pcbnew.ToMM(pos.x), 4), round(pcbnew.ToMM(pos.y), 4))
+        return [(xy, layer) for layer in COPPER
+                if pad.IsOnLayer(getattr(pcbnew, layer.replace('.', '_')))]
+
+    distances, pending = {}, []
+    for node in pad_nodes(source):
+        distances[node] = 0.0
+        heapq.heappush(pending, (0.0, node))
+    while pending:
+        distance, node = heapq.heappop(pending)
+        if distance > distances[node]:
+            continue
+        for neighbor, length in graph.get(node, []):
+            new = distance + length
+            if new < distances.get(neighbor, math.inf):
+                distances[neighbor] = new
+                heapq.heappush(pending, (new, neighbor))
+    result = {}
+    for ref, number in receivers:
+        length = min((distances.get(node, math.inf)
+                      for node in pad_nodes((ref, number))), default=math.inf)
+        result[f'{ref}.{number}'] = round(length, 3) if math.isfinite(length) else None
+    return result
 
 
 def number(token):
@@ -164,12 +237,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ibis', type=Path, default=IBIS)
     parser.add_argument('--top', type=Path, help='schematic-derived co-simulation manifest to validate 33-ohm sources')
+    parser.add_argument('--main-board', type=Path,
+                        help='optional routed main PCB for layer-aware copper path audit')
     parser.add_argument('--out', type=Path, default=ROOT / 'build/hw/si/ibis-bus-diagnostic.json')
     args = parser.parse_args()
     data = args.ibis.read_bytes()
     digest = verify(data)
     report = {'source_sha256': digest, 'models': MODELS, 'scope': 'diagnostic IBIS-derived linear source, assumed copper',
               'routed_evidence': False, 'package_assignment_confirmed': False, 'cases': []}
+    if args.main_board:
+        board = args.main_board.resolve()
+        slot = routed_distances(board, '/SPI_SCK', ('R36', '2'),
+                                [(f'J{number}', 'B13') for number in range(11, 17)])
+        cpu = routed_distances(board, '/CPU_CLK', ('R18', '2'), [('J2', 'B13')])
+        report['main_board_sha256'] = hashlib.sha256(board.read_bytes()).hexdigest()
+        report['measured_copper_paths_mm'] = {'slot_sck': slot, 'cpu_clk': cpu}
+        report['measured_copper_paths_complete'] = all(
+            length is not None for group in (slot, cpu) for length in group.values())
     if args.top:
         top_bytes = args.top.read_bytes()
         top = json.loads(top_bytes)
@@ -217,6 +301,8 @@ def main():
     print(f'{len(report["cases"])} ngspice bus transients, {len(failures)} threshold-instability cases; '
           f'IBIS fixture error <= {max(c["fixture_max_error_v"] for c in report["cases"]):.4f} V')
     print('DIAGNOSTIC ONLY: assumed line lengths/loads; TQ144 package assignment unresolved; MB-007/CC-007 remain pending')
+    if args.main_board:
+        print('Main-board copper paths:', report['measured_copper_paths_mm'])
 
 
 if __name__ == '__main__':

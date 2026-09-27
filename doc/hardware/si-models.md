@@ -88,7 +88,14 @@ not yet extract branch geometry from routed copper. The provisional run has
 six-slot line; the smallest excursions are on the order of the fixture-fit
 error. These are risk indicators, not proof of a physical failure. The
 missing receiver IBIS, package assignment, nonlinear clamp behavior and
-finished main-board route keep `MB-007`, `CC-007` and row 4.6 pending.
+finished main-board route keep `MB-007`, `CC-007` and row 4.6 pending. With
+`--main-board`, the diagnostic separately audits shortest F.Cu/In1.Cu/In2.Cu/
+In3.Cu/B.Cu copper paths from R36 to all six slot SCK pins and R18 to the CPU
+clock socket. It records disconnected pads as `null` and hashes the board.
+Those measured paths are not substituted into the waveform model: branch
+topology, return planes and via parasitics need an electrical extraction first.
+On the provisional `main-routed.kicad_pcb`, J11/J12 SCK paths measure
+88.482/83.828 mm while J13–J16 are disconnected; R18-to-J2 clock is 73.618 mm.
 
 ```sh
 python3 hw/si/fetch_ice40_ibis.py
