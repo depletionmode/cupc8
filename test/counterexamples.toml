@@ -1196,7 +1196,7 @@ must_fail = ["FAIL: test_netlist_pin_swap_fails"]
 
 [[bug]]
 name = "Wi-Fi ESR sensitivity accepted an overvoltage waveform because its burst minimum passed"
-fixed_in = "Wi-Fi sensitivity extrema"
+fixed_in = "a1c1eff"
 revert = [["hw/power/wifi_limits.py", "return minimum >= d.ESP32_VDD_MIN and maximum <= d.ESP32_VDD_MAX", "return minimum >= d.ESP32_VDD_MIN"]]
 cmd = "python3 test/hw/test_wifi_limits.py WifiLimits.test_overvoltage_fails_even_when_burst_minimum_passes"
 must_fail = ["FAIL: test_overvoltage_fails_even_when_burst_minimum_passes"]
