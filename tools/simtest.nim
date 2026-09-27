@@ -3837,6 +3837,7 @@ proc testKernelNoBasic() =
   data[hdr + 512] = char(ord(data[hdr + 512]) xor 1)   # a body byte
   writeFile(romDir() / "sumbasic.rom", data)
   let withBasic = bootStorageTimed(good, "", fitted = false)
+  expectTrue("good ROM installs BASIC's hook", hookAt() != 0)
   let without = bootStorageTimed(none, "", fitted = false)
   echo "  at the prompt ", withBasic, " ms after reset with the ROM's BASIC, ", without, " with none"
   expectTrue("copying the ROM's BASIC (and summing it) takes under 150 ms (" & $(withBasic - without) & ")",
