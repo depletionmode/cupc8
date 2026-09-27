@@ -27,7 +27,7 @@ The routed GPU board used for the four exploratory runs is SHA-256 `86185894b986
 | D2 | 104,640 | -12.34 dB | -0.54 dB | 0.941130 |
 | CK | 102,678 | -12.56 dB | -0.52 dB | 0.943002 |
 
-D0 saved-field postprocessing reproduces the generated geometry after the four-pair refactor. A fresh GPU pipeline receipt is required before `SI-003` can accept these runs against current sources. This does not establish the full row 4.6 impedance or loss target: USB routes, connector and pad geometry, physical losses, pair coupling, and a mesh sensitivity study remain open.
+Saved-field postprocessing reproduces the generated geometry for all four pairs after the refactor. A fresh GPU pipeline receipt is required before `SI-003` can accept these runs against current sources. This does not establish the full row 4.6 impedance or loss target: USB routes, connector and pad geometry, physical losses, pair coupling, and a mesh sensitivity study remain open.
 
 ## IBIS specification and pinned FPGA model
 
