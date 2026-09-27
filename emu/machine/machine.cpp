@@ -452,7 +452,8 @@ uint32_t Machine::inputs(bool por) {
   const uint32_t out = board->outputs();
   uint32_t miso = misoIdle, nirq = 0x3f;
   for (auto &[slot, card] : cards) {
-    if (slot <= 6 && selected(slot, out) && slotWiring[slot - 1].miso) miso &= card->miso();
+    if (slot <= 6 && selected(slot, out) && slotWiring[slot - 1].miso &&
+        slotWiring[slot - 1].misoConnected) miso &= card->miso();
     if (slot <= 6 && card->irq()) nirq &= ~(1u << slotWiring[slot - 1].irq);
   }
   const bool reset = sysctl && sysctl->sysReset();
@@ -468,8 +469,12 @@ bool Machine::selected(int slot, uint32_t out) const {
          !((out >> slotWiring[slot - 1].cs) & 1u);
 }
 
-uint32_t Machine::sckFor(int slot, uint32_t out) const { return (out >> slotWiring[slot - 1].sck) & 1u; }
-uint32_t Machine::mosiFor(int slot, uint32_t out) const { return (out >> slotWiring[slot - 1].mosi) & 1u; }
+uint32_t Machine::sckFor(int slot, uint32_t out) const {
+  return slotWiring[slot - 1].sckConnected ? (out >> slotWiring[slot - 1].sck) & 1u : 0;
+}
+uint32_t Machine::mosiFor(int slot, uint32_t out) const {
+  return slotWiring[slot - 1].mosiConnected ? (out >> slotWiring[slot - 1].mosi) & 1u : 0;
+}
 
 double Machine::ns() const { return board->ns(); }
 

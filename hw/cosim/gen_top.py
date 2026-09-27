@@ -344,6 +344,59 @@ def check(cards, main, pcb=None):
                         f'slot{slot}_select_{leg}:{source_net if leg == "source" else output_net}')
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
+    # The clock and outbound data each have one shared source resistor and
+    # six routed branches. The return data line has six branches to U7.48.
+    # Keep these as per-slot booleans: a damaged connector branch must not
+    # silence otherwise connected slots, while a source open affects all six.
+    for signal, source_net, output_net, resistor_ref, contact, field in (
+            ('sck', '/SPI_SCK_SRC', '/SPI_SCK', 'R36', 'B13', 'sck_connected'),
+            ('mosi', '/SPI_MOSI_SRC', '/SPI_MOSI', 'R35', 'B15', 'mosi_connected')):
+        source = next(((ref, pin) for (ref, pin), net in main.pins.items()
+                       if ref == 'U7' and net == source_net), None)
+        source_pad = next(((resistor_ref, pin) for (ref, pin), net in main.pins.items()
+                           if ref == resistor_ref and net == source_net), None)
+        output_pad = next(((resistor_ref, pin) for (ref, pin), net in main.pins.items()
+                           if ref == resistor_ref and net == output_net), None)
+        if source is None or source_pad is None or output_pad is None or \
+                main.series(source, ('J11', contact)) is None:
+            raise ValueError(f'{signal}: source and series resistor mapping missing')
+        receivers = [(f'J{10+slot}', contact) for slot in range(1, 7)]
+        source_mm, branch_mm = None, {}
+        if pcb is not None and Path(pcb).is_file():
+            from ibis_bus import routed_distances
+            source_mm = routed_distances(Path(pcb), source_net, source, [source_pad])[
+                f'{source_pad[0]}.{source_pad[1]}']
+            branch_mm = routed_distances(Path(pcb), output_net, output_pad, receivers)
+        manifest['paths'].append({'from': f'main.{source[0]}.{source[1]}',
+                                  'to': f'main.{source_pad[0]}.{source_pad[1]}',
+                                  'route_mm': source_mm, 'runtime': f'slot_{signal}_source_connected'})
+        for slot, target in enumerate(receivers, 1):
+            mm = branch_mm.get(f'{target[0]}.{target[1]}')
+            manifest['runtime']['slots'][slot-1][field] = source_mm is not None and mm is not None
+            manifest['paths'].append({'from': f'main.{output_pad[0]}.{output_pad[1]}',
+                                      'to': f'main.{target[0]}.{target[1]}',
+                                      'route_mm': mm, 'runtime': f'slot{slot}_{signal}_connected'})
+            if not manifest['runtime']['slots'][slot-1][field]:
+                manifest['runtime']['missing_routes'].append(
+                    f'slot{slot}_{signal}:{source_net if source_mm is None else output_net}')
+    miso_source = ('U7', '48')
+    if node(main, *miso_source) != '/SPI_MISO':
+        raise ValueError('shared SPI MISO chipset input is not U7.48')
+    miso_receivers = [(f'J{10+slot}', 'B16') for slot in range(1, 7)]
+    miso_mm = {}
+    if pcb is not None and Path(pcb).is_file():
+        from ibis_bus import routed_distances
+        miso_mm = routed_distances(Path(pcb), '/SPI_MISO', miso_source, miso_receivers)
+    for slot, target in enumerate(miso_receivers, 1):
+        mm = miso_mm.get(f'{target[0]}.{target[1]}')
+        manifest['runtime']['slots'][slot-1]['miso_connected'] = mm is not None
+        manifest['paths'].append({'from': 'main.U7.48',
+                                  'to': f'main.{target[0]}.{target[1]}',
+                                  'route_mm': mm, 'runtime': f'slot{slot}_miso_connected'})
+        if mm is None:
+            manifest['runtime']['missing_routes'].append(f'slot{slot}_miso:/SPI_MISO')
+    manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # CPU driver pack channels must remain explicit; the native board model
     # may use these channel values as edge delays after E2E-001 integration.
     import cpu
@@ -542,6 +595,8 @@ def check(cards, main, pcb=None):
                  'SPI_SCK', 'SPI_MOSI', 'SPI_MISO', 'BR_SCK', 'BR_MOSI',
                  'BR_MISO', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF',
                  'nPOR'):
+        runtime_net('main', name)
+    for name in ('SPI_SCK_SRC', 'SPI_MOSI_SRC'):
         runtime_net('main', name)
     for slot in range(1, 7):
         runtime_net('main', f'SLOT{slot}_CS_n')

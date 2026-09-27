@@ -236,6 +236,14 @@ napi_value js_create(napi_env env, napi_callback_info info) {
         if (!isType(env, csConnected, napi_boolean) ||
             napi_get_value_bool(env, csConnected, &slot.csConnected) != napi_ok)
           throw std::runtime_error("netlist wiring: invalid routed slot select");
+        auto routedSignal = [&](const char *key, bool &out) {
+          napi_value signal = prop(env, value, key);
+          if (!isType(env, signal, napi_boolean) || napi_get_value_bool(env, signal, &out) != napi_ok)
+            throw std::runtime_error(std::string("netlist wiring: invalid routed slot ") + key);
+        };
+        routedSignal("sck_connected", slot.sckConnected);
+        routedSignal("mosi_connected", slot.mosiConnected);
+        routedSignal("miso_connected", slot.misoConnected);
       }
       opt.misoIdle = integerPin(wiring, "miso_idle", 0, 1);
       napi_value series = prop(env, wiring, "series_delay_ns");

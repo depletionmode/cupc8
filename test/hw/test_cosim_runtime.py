@@ -25,6 +25,15 @@ m.powerOn(); m.runFor(1e9);
 console.log(JSON.stringify({frames: m.spiLog(1).filter(x => x.bytes.length).length}));
 m.stop();
 """
+SLOT_DATA_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+const m = await Machine.create({slots: {1: 'hdmi'}, spiLog: true, threaded: false});
+m.powerOn(); m.runFor(1e9);
+const frames = m.spiLog(1).filter(x => x.bytes.length);
+console.log(JSON.stringify({frames: frames.length, firstTx: frames[0]?.bytes,
+                            pc: m.state().pc}));
+m.stop();
+"""
 BRIDGE_PROBE = """
 import { Machine } from './test/emu/machinenative.mjs';
 import { spawn } from 'node:child_process';
@@ -171,6 +180,27 @@ def main():
         if normal_frames < 1 or bad_frames >= normal_frames:
             raise AssertionError(f'slot SCK/MOSI swap did not break SPI: {normal_frames} / {bad_frames}')
         print(f'slot SCK/MOSI swap: {normal_frames} valid frames became {bad_frames}')
+        good_spi = run(args.top, SLOT_DATA_PROBE)
+        if not all(manifest['runtime']['slots'][0][name]
+                   for name in ('sck_connected', 'mosi_connected', 'miso_connected')):
+            raise AssertionError('slot 1 SPI requires three routed signal links')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['slots'][0]['mosi_connected'] = False
+        mutant = Path(directory) / 'open-slot-mosi.json'
+        mutant.write_text(json.dumps(changed))
+        bad_mosi = run(mutant, SLOT_DATA_PROBE)
+        if not good_spi['firstTx'] or bad_mosi['firstTx'] != [0] or \
+                bad_mosi['pc'] == good_spi['pc']:
+            raise AssertionError(f'open MOSI did not change card command and CPU state: {good_spi} / {bad_mosi}')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['slots'][0]['miso_connected'] = False
+        mutant = Path(directory) / 'open-slot-miso.json'
+        mutant.write_text(json.dumps(changed))
+        bad_miso = run(mutant, SLOT_DATA_PROBE)
+        if bad_miso['frames'] >= good_spi['frames'] or bad_miso['pc'] == good_spi['pc']:
+            raise AssertionError(f'open MISO did not change CPU/card execution: {good_spi} / {bad_miso}')
+        print(f"open MOSI changes first GPU command to {bad_mosi['firstTx']}; "
+              f"open MISO reduces GPU frames {good_spi['frames']} -> {bad_miso['frames']}")
 
         changed = copy.deepcopy(manifest)
         bridge = changed['runtime']['bridge']

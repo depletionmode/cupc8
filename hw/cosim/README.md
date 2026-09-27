@@ -73,8 +73,17 @@ from the resistor output to the slot contact. A missing leg deasserts the
 corresponding card's select in the native machine and fails `--require-route`.
 The slot 1 source launch mutation leaves the other five selects intact and
 reduces recorded SPI frames from 15 to 0. This accounts for the six
-`SPI_nCS*_SRC` nets; clock and MOSI source legs and card-local slot signals
-remain separate coverage gaps.
+`SPI_nCS*_SRC` nets. Shared SPI SCK and MOSI use the same two-leg check from
+the chipset through their 33 Ω source resistors to each of six slot pads;
+MISO is traced from each slot pad back to the chipset input. The corresponding
+per-slot link flags control the native card clock, outbound data, and return
+bit. Opening the routed SCK source launch stops all slot 1 frames (15 to 0).
+With the MOSI link disabled, the first GPU command changes from `$F0` to `$00`;
+with MISO disabled, the native GPU workload records only 2 frames instead of
+15. For digital counterexamples, open SCK/MOSI are held low and open MISO
+reads the modeled idle high value; these choices do not predict analog
+floating-pin voltage. The two source-side SCK/MOSI nets now count as executed.
+Card-local slot signals remain separate coverage gaps.
 The storage card's seven SD signal contacts similarly control whether the
 microSD socket is attached to its RP2040 model.
 All four HDMI differential pairs, including the clock pair, must pass through
@@ -105,8 +114,9 @@ python3 hw/cosim/run.py E2E-004
 
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
-supervisor's routed nPOR launch and slot 1 chip-select launch, then executes
-the native SPI counterexample. The third proves that ROM and CPU
+supervisor's routed nPOR launch, slot 1 chip-select launch, and shared SCK
+source launch, then executes the native SPI counterexamples. The third proves
+that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
 nPOR path, memory-write branches and ROM DQ0 read route change the running
 machine. The manifest currently covers the CPU, main memory, slot data paths,
@@ -114,9 +124,9 @@ system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
-reserved contacts have pin-bound waivers and six slot-select sources now
-affect execution; 451 remain unmodeled. The remaining groups are
-boot/programming (98), slot/control bus (68), CPU/memory
+reserved contacts have pin-bound waivers and eight slot-bus source nets now
+affect execution; 449 remain unmodeled. The remaining groups are
+boot/programming (98), slot/control bus (66), CPU/memory
 (71), power/return (65), clock/reset (53), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

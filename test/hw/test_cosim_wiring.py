@@ -129,6 +129,19 @@ def main_cli():
             if good_frames < 1 or bad_frames != 0:
                 raise AssertionError(f'open routed slot select did not stop native SPI: {good_frames} / {bad_frames}')
             print(f'open routed slot 1 select stops native SPI frames: {good_frames} -> {bad_frames}')
+            bad_sck = open_launch('U7', '43', '/SPI_SCK_SRC')
+            if any(slot['sck_connected'] for slot in bad_sck['runtime']['slots']) or \
+                    not all(slot['mosi_connected'] and slot['miso_connected']
+                            for slot in bad_sck['runtime']['slots']) or \
+                    bad_sck['runtime']['routed_top'] or \
+                    'main:SPI_SCK_SRC' not in bad_sck['runtime_nets']:
+                raise AssertionError('opened shared SPI clock source did not isolate all slot clocks')
+            bad_sck_top = Path(temporary) / 'open-shared-sck.json'
+            bad_sck_top.write_text(json.dumps(bad_sck))
+            sck_bad_frames = run(bad_sck_top, SLOT_PROBE)['frames']
+            if sck_bad_frames != 0:
+                raise AssertionError(f'open shared SCK did not stop native SPI: {good_frames} / {sck_bad_frames}')
+            print(f'open routed shared SCK source stops native SPI frames: {good_frames} -> {sck_bad_frames}')
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')
