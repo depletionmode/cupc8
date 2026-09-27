@@ -72,9 +72,14 @@ class Geometry:
         return shape
 
     def buffer(self, shape, radius):
+        # GEOS emits 64 chords per quadrant. Its ordinary buffer polygon is
+        # inscribed in the requested circular arc and can overstate clearance.
+        # At each chord midpoint the inradius is R*cos(pi/256); expanding R
+        # by its reciprocal makes this approximation a superset of the plot.
+        conservative_radius = radius / math.cos(math.pi / 256)
         result = self.call('GEOSBuffer_r', ctypes.c_void_p,
                            [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_double, ctypes.c_int])(
-                               self.ctx, shape, radius, 64)
+                               self.ctx, shape, conservative_radius, 64)
         if not result:
             raise ValueError('GEOS failed to buffer plotted geometry')
         self.shapes.append(result)
@@ -285,8 +290,8 @@ def check_clearance(paths, minimum):
                     if net == other_net or x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
                         continue
                     distance = engine.distance(shape, other)
-                    if distance + .002 < minimum:
-                        raise ValueError('%s: %s to %s copper clearance %.4f mm < %.4f mm' %
+                    if distance < minimum:
+                        raise ValueError('%s: %s to %s copper clearance %.6f mm < %.6f mm' %
                                          (Path(path).name, net, other_net, distance, minimum))
                 for cx in range(xmin, xmax+1):
                     for cy in range(ymin, ymax+1):

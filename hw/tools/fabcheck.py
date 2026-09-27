@@ -167,6 +167,8 @@ def check(out):
     clearance = pcbnew.ToMM(board.GetDesignSettings().m_MinClearance)
     shapes = gerberdrc.check_clearance(copper, clearance)
     check_review(out)
-    return ('%d Gerber layers match fresh export; %d drill hits match pads/vias; '
-            '%d plotted copper objects meet %.3f mm net clearance; CPL review approved' %
-            (layers, holes, shapes, clearance))
+    raise ValueError('Gerber re-import DRC incomplete: %d layers match fresh export, '
+                     '%d drill hits match pads/vias, and %d plotted copper objects '
+                     'passed %.3f mm net clearance; copper-to-edge, trace width, '
+                     'mask, and annular-ring rules remain unchecked' %
+                     (layers, holes, shapes, clearance))

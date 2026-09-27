@@ -83,7 +83,8 @@ class FabCheckTests(unittest.TestCase):
                  patch.object(fabcheck, 'check_drills', return_value=218), \
                  patch.object(fabcheck, 'check_review'), \
                  patch.object(fabcheck.gerberdrc, 'check_clearance', return_value=123) as clearance:
-                self.assertIn('123 plotted copper objects', fabcheck.check(out))
+                with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC incomplete.*123 plotted copper objects'):
+                    fabcheck.check(out)
                 clearance.assert_called_once()
 
     def test_exported_copper_short_and_clearance_mutations(self):
@@ -93,15 +94,25 @@ class FabCheckTests(unittest.TestCase):
             def gerber(second_x, second_net='/B'):
                 return (prefix + '%TO.N,/A*%\nX1000000Y1000000D03*\n'
                         + '%TO.N,' + second_net + f'*%\nX{second_x}Y1000000D03*\nM02*\n')
-            path.write_text(gerber(1350000))
+            path.write_text(gerber(1351000))
             self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
             path.write_text(gerber(1200000))
+            with self.assertRaisesRegex(ValueError, 'copper clearance'):
+                gerberdrc.check_clearance([path], .15)
+            path.write_text(gerber(1349999))  # 0.149999 mm edge clearance
+            with self.assertRaisesRegex(ValueError, 'copper clearance'):
+                gerberdrc.check_clearance([path], .15)
+            # A 2 mm circle at this angle falls halfway between buffer chords.
+            # An inscribed polygon alone would overstate the 0.14999 mm gap.
+            path.write_text(prefix.replace('0.200000', '2.000000')
+                            + '%TO.N,/A*%\nX1000000Y1000000D03*\n'
+                            + '%TO.N,/B*%\nX3149828Y1026384D03*\nM02*\n')
             with self.assertRaisesRegex(ValueError, 'copper clearance'):
                 gerberdrc.check_clearance([path], .15)
             path.write_text(gerber(1000000))
             with self.assertRaisesRegex(ValueError, 'copper clearance'):
                 gerberdrc.check_clearance([path], .15)
-            path.write_text(gerber(1350000, '/A'))
+            path.write_text(gerber(1351000, '/A'))
             self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
 
     def test_unsupported_gerber_geometry_fails_closed(self):
