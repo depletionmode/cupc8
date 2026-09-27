@@ -42,18 +42,21 @@ fail until their contract coverage exists:
   polygon with a hole or a wide bounding box can still have an interior neck.
   A union and minimum-neck analysis remains necessary for both layers.
   A bounded plotted check now catches a proven neck case: for orthogonal,
-  hole-free filled polygons that touch no stroke or flash of the same net,
-  exact micrometre-grid scanlines measure the union of their interior spans.
+  hole-free filled polygons that touch no unsupported same-net operation,
+  exact half-micrometre-grid scanlines measure the union of their interior
+  spans. Axis-aligned rectangular aperture flashes can join and widen that
+  union; flash-only narrow spans are exempt from the filled-region rule.
   A span below the rule proves that the connected filled ink is locally too
   thin; synthetic copper and silk cases test narrow bridges, adjoining
   regions that stay narrow, and adjoining regions that widen each other.
-  Touching strokes or flashes, holes, nonorthogonal boundaries, and larger
-  unions still need analysis,
-  so the final incomplete-coverage gate remains in force.
+  Touching strokes, circular/obround/rounded/polygonal flashes, holes,
+  nonorthogonal boundaries, and components over the explicit complexity
+  limits (500 filled regions, 5000 eligible objects, 2000 contour vertices)
+  still need analysis, so the final incomplete-coverage gate remains in force.
   To close it, the verifier needs a per-net, per-layer union of every dark
   Gerber operation (one union for all legend ink), including strokes and
-  flashes, with region holes and
-  touching strokes represented exactly or with certified outward error
+  nonrectangular flashes, with region holes and curved boundaries represented
+  exactly or with certified outward error
   bounds. An inward-offset/connected-component test can then prove bridge
   failures, but a second coverage test must find narrow terminal tongues and
   rings that do not split the offset. Every reported pass needs a bound on

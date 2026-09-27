@@ -390,6 +390,49 @@ class FabCheckTests(unittest.TestCase):
             silk.write_text(silk_prefix + silk_widened + 'M02*\n')
             self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 2)
 
+    def test_rectangular_flash_widens_filled_region_on_half_micron_grid(self):
+        def region(y1):
+            return ('G36*\nX1000000Y1000000D02*\nX2000000Y1000000D01*\n'
+                    f'X2000000Y{y1}D01*\nX1000000Y{y1}D01*\n'
+                    'X1000000Y1000000D01*\nG37*\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper = fab / 'sample-F_Cu.gtl'
+            silk = fab / 'sample-F_Silkscreen.gto'
+            mask = fab / 'sample-F_Mask.gts'
+            prefix = '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+            copper_prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                             '%TF.FilePolarity,Positive*%\n' + prefix + '%TO.N,/GND*%\n')
+            silk_prefix = ('%TF.FileFunction,Legend,Top*%\n'
+                           '%TF.FilePolarity,Positive*%\n' + prefix)
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n' + prefix +
+                            'D10*\nX9000000Y9000000D03*\nM02*\n')
+            def plotted(base, flash_height):
+                return (base + f'%ADD11R,1.000000X{flash_height:.6f}*%\nD10*\n' +
+                        region(1080000) + 'D11*\nX1500000Y1040000D03*\nM02*\n')
+            copper.write_text(plotted(copper_prefix, .101))
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            copper.write_text(plotted(copper_prefix, .099))
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.099000 mm span below 0.100000 mm'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # Two touching flashes cover opposite halves; both must enter
+            # the transitive connected union before a width is measured.
+            copper.write_text(copper_prefix + '%ADD11R,0.500000X0.121000*%\nD10*\n' +
+                              region(1080000) + 'D11*\nX1250000Y1040000D03*\n'
+                              'X1750000Y1040000D03*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
+            # The narrow flash tongue beyond a wide region is a pad, not a
+            # narrow filled-region span.
+            copper.write_text(copper_prefix + '%ADD11R,0.500000X0.050000*%\nD10*\n' +
+                              region(1200000) + 'D11*\nX2250000Y1100000D03*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            silk.write_text(plotted(silk_prefix, .151))
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 2)
+            silk.write_text(plotted(silk_prefix, .149))
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.149000 mm span below 0.150000 mm'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)
