@@ -146,6 +146,18 @@ export class Machine {
       throw new Error('machinenative: invalid display output path');
     if (netlistTop && typeof netlistTop.runtime.por_connected !== 'boolean')
       throw new Error('machinenative: invalid supervisor reset path');
+    const boardKind = { hdmi: 'gpu', io: 'io', storage: 'storage', wifi: 'wifi',
+      eink: 'eink', eink750: 'eink' };
+    const boot = netlistTop?.runtime.qspi_boot_connected;
+    if (netlistTop && !['system', 'gpu', 'io', 'storage', 'eink'].every((kind) =>
+      typeof boot?.[kind] === 'boolean'))
+      throw new Error('machinenative: missing routed QSPI boot prerequisites');
+    // A disconnected MCU-to-flash path prevents that card firmware from
+    // starting. The digital model leaves the physically fitted card inert;
+    // it does not predict RP2040 boot-ROM fallback or analog open-pin levels.
+    const activeSlots = netlistTop ? Object.fromEntries(Object.entries(slots).filter(([, kind]) =>
+      boot[boardKind[kind]] !== false)) : slots;
+    const activeSysctl = sysctl && (!netlistTop || boot.system);
     let memoryWiring = netlistTop?.runtime;
     if (netlistTop) {
       const links = netlistTop.runtime.card_slot_links;
@@ -153,12 +165,10 @@ export class Machine {
       if (!links || !['gpu', 'io', 'storage', 'wifi', 'eink'].every((kind) =>
         signals.every((signal) => typeof links[kind]?.[signal] === 'boolean')))
         throw new Error('machinenative: missing routed card slot links');
-      const kinds = { hdmi: 'gpu', io: 'io', storage: 'storage', wifi: 'wifi',
-        eink: 'eink', eink750: 'eink' };
       const slotWiring = netlistTop.runtime.slots.map((mainLink, index) => {
         const installed = slots[index + 1];
         if (!installed) return mainLink;
-        const kind = kinds[installed];
+        const kind = boardKind[installed];
         if (!kind) throw new Error(`machinenative: unknown installed card ${installed}`);
         const cardLink = links[kind];
         return { ...mainLink, ...Object.fromEntries(signals.map((signal) =>
@@ -166,7 +176,7 @@ export class Machine {
       });
       memoryWiring = { ...netlistTop.runtime, slots: slotWiring };
     }
-    m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
+    m.h = native.create({ slots: activeSlots, rom: m.rom, sysctl: activeSysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
       ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
       storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
@@ -174,19 +184,19 @@ export class Machine {
       porConnected: netlistTop?.runtime.por_connected ?? true,
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
-    m.kinds = { ...slots };
-    if (sysctl) {
+    m.kinds = { ...activeSlots };
+    if (activeSysctl) {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
     }
-    if (Object.values(slots).includes('io') && (netlistTop?.runtime.io_usb_host ?? true)) {
+    if (Object.values(activeSlots).includes('io') && (netlistTop?.runtime.io_usb_host ?? true)) {
       const h = m.h;
       m.keyboard = {
         press: (mods, ...keys) => native.press(h, mods, keys),
         get state() { return native.keyboard(h); },
       };
     }
-    if (Object.values(slots).includes('storage') && (netlistTop?.runtime.storage_sd_socket ?? true)) {
+    if (Object.values(activeSlots).includes('storage') && (netlistTop?.runtime.storage_sd_socket ?? true)) {
       // the storage card's microSD socket (emu/rp2040/harness/sdcard.h): an
       // image file goes in (written through as blocks are programmed), comes out
       const h = m.h;

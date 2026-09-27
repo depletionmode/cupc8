@@ -25,7 +25,9 @@ def main():
     # Each make-verify row owns its manifest. The strict generator refuses an
     # incomplete route, even though development probes may use it provisionally.
     generation = [sys.executable, ROOT / 'hw/cosim/gen_top.py', '--main-netlist',
-                  args.main_netlist, '--require-route', '--require-coverage', '--output', output]
+                  args.main_netlist, '--system-board',
+                  ROOT / 'build/hw/system/system-routed.kicad_pcb',
+                  '--require-route', '--require-coverage', '--output', output]
     run(generation)
     # Firmware and the native addon are shared build products. Parallel E2E
     # rows wait here so their build steps cannot overwrite each other.
@@ -40,7 +42,8 @@ def main():
         run([sys.executable, ROOT / 'test/hw/test_cosim_wiring.py',
              '--main-netlist', args.main_netlist,
              '--main-board', args.main_netlist.with_suffix('.kicad_pcb'),
-             '--card-board-dir', ROOT / 'build/hw'])
+             '--card-board-dir', ROOT / 'build/hw',
+             '--system-board', ROOT / 'build/hw/system/system-routed.kicad_pcb'])
         run([sys.executable, ROOT / 'test/hw/test_cosim_runtime.py', '--top', output])
         run(['node', ROOT / 'test/hw/test_cosim_pixels.mjs'],
             env=dict(os.environ, CUPC8_COSIM_TOP=str(output)))

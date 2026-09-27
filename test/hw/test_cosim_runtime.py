@@ -43,6 +43,13 @@ m.type('x'); m.runFor(25e6);
 console.log(JSON.stringify({keyboardFrames: m.spiLog(1).length - before}));
 m.stop();
 """
+SYSTEM_BOOT_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+const m = await Machine.create({slots: {}, sysctl: true, threaded: false});
+console.log(JSON.stringify({port: Number.isInteger(m.sysctlPort),
+                            systemCard: m.cards().some(x => x.kind === 'sysctl')}));
+m.stop();
+"""
 BRIDGE_PROBE = """
 import { Machine } from './test/emu/machinenative.mjs';
 import { spawn } from 'node:child_process';
@@ -237,6 +244,33 @@ def main():
             raise AssertionError(f'IO IRQ link did not control prompt keyboard service: {irq_good} / {irq_bad}')
         print(f"installed IO IRQ services {irq_good['keyboardFrames']} keyboard SPI frames within 25 ms; "
               'open IRQ services none')
+        boot_links = manifest['runtime']['qspi_boot_connected']
+        if not all(boot_links.values()):
+            raise AssertionError('RP2040 QSPI boot prerequisite requires five routed flash links')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['qspi_boot_connected']['gpu'] = False
+        mutant = Path(directory) / 'open-gpu-qspi.json'
+        mutant.write_text(json.dumps(changed))
+        gpu_boot_bad = run(mutant, DISPLAY_PROBE)
+        if gpu_boot_bad != {'panel': True, 'videoError': 'no graphics card'}:
+            raise AssertionError(f'GPU QSPI path did not prevent GPU firmware boot: {gpu_boot_bad}')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['qspi_boot_connected']['io'] = False
+        mutant = Path(directory) / 'open-io-qspi.json'
+        mutant.write_text(json.dumps(changed))
+        io_boot_bad = run(mutant, USB_PROBE)
+        if io_boot_bad != {'keyboard': False, 'sd': True}:
+            raise AssertionError(f'IO QSPI path did not prevent IO firmware boot: {io_boot_bad}')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['qspi_boot_connected']['system'] = False
+        mutant = Path(directory) / 'open-system-qspi.json'
+        mutant.write_text(json.dumps(changed))
+        system_good = run(args.top, SYSTEM_BOOT_PROBE)
+        system_bad = run(mutant, SYSTEM_BOOT_PROBE)
+        if system_good != {'port': True, 'systemCard': True} or \
+                system_bad != {'port': False, 'systemCard': False}:
+            raise AssertionError(f'system QSPI path did not control bridge firmware: {system_good} / {system_bad}')
+        print('open GPU/IO/system QSPI path suppresses only that board firmware endpoint')
 
         changed = copy.deepcopy(manifest)
         bridge = changed['runtime']['bridge']

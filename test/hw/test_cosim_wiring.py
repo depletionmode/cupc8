@@ -31,6 +31,8 @@ def main_cli():
     parser.add_argument('--main-board', type=Path, help='routed PCB for reset and memory-write copper-open counterexamples')
     parser.add_argument('--card-board-dir', type=Path,
                         help='generated card PCBs for card-local routed SPI/IRQ counterexamples')
+    parser.add_argument('--system-board', type=Path,
+                        help='explicit routed system card PCB for QSPI boot counterexamples')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='cupc8-cosim-cx-') as temporary:
         cards = exported_cards(Path(temporary))
@@ -38,7 +40,7 @@ def main_cli():
         card_boards = ({card: args.card_board_dir / card / f'{card}.kicad_pcb'
                         for card in ('gpu', 'io', 'storage', 'wifi', 'eink')}
                        if args.card_board_dir else None)
-        manifest = check(cards, main, card_boards=card_boards)
+        manifest = check(cards, main, card_boards=card_boards, system_board=args.system_board)
         print(f"valid top: {len(manifest['contacts'])} contacts, {len(manifest['paths'])} paths")
         assert 'main:MEM_A0' in manifest['runtime_nets']
         assert 'main:CPU_CLK' in manifest['structural_only_nets']
@@ -77,7 +79,7 @@ def main_cli():
         print('reserved-contact waivers fail closed for active-pin and mating-card mutations')
 
         if args.main_board:
-            good_route = check(cards, main, args.main_board, card_boards)
+            good_route = check(cards, main, args.main_board, card_boards, args.system_board)
             assert good_route['runtime']['por_connected']
             assert good_route['runtime']['memory_write_links'] == {'ram': True, 'rom': True}
             physical = pcbnew.LoadBoard(str(args.main_board))
@@ -97,7 +99,7 @@ def main_cli():
                 board.remove(matches[0])
                 opened = Path(temporary) / f'open-{net.lstrip("/")}.kicad_pcb'
                 opened.write_text(dump(board) + '\n')
-                return check(cards, main, opened, card_boards)
+                return check(cards, main, opened, card_boards, args.system_board)
 
             bad_route = open_launch('U6', '2', '/nPOR')
             if bad_route['runtime']['por_connected'] or bad_route['runtime']['routed_top'] or \
@@ -150,24 +152,28 @@ def main_cli():
                     raise AssertionError(f'open shared SCK did not stop native SPI: {good_frames} / {sck_bad_frames}')
                 print(f'open routed shared SCK source stops native SPI frames: {good_frames} -> {sck_bad_frames}')
 
-                gpu_board = card_boards['gpu']
-                gpu_physical = pcbnew.LoadBoard(str(gpu_board))
-                gpu_pad = next(pad for pad in gpu_physical.FindFootprintByReference('U1').Pads()
-                               if pad.GetNumber() == '4')
-                point = gpu_pad.GetPosition()
-                launch = (round(pcbnew.ToMM(point.x), 4), round(pcbnew.ToMM(point.y), 4))
-                gpu_tree = parse(gpu_board.read_text())
-                gpu_tracks = [item for item in gpu_tree[1:]
+                def open_card_launch(board_path, ref, pin, net, label):
+                    physical = pcbnew.LoadBoard(str(board_path))
+                    pad = next(item for item in physical.FindFootprintByReference(ref).Pads()
+                               if item.GetNumber() == pin)
+                    point = pad.GetPosition()
+                    launch = (round(pcbnew.ToMM(point.x), 4), round(pcbnew.ToMM(point.y), 4))
+                    tree = parse(board_path.read_text())
+                    tracks = [item for item in tree[1:]
                               if isinstance(item, list) and item and item[0] == 'segment' and
-                              find1(item, 'net') and find1(item, 'net')[1] == '/SCK' and
+                              find1(item, 'net') and find1(item, 'net')[1] == net and
                               launch in (tuple(round(float(x), 4) for x in find1(item, end)[1:])
                                          for end in ('start', 'end'))]
-                if len(gpu_tracks) != 1:
-                    raise AssertionError(f'GPU SCK U1.4 launch has {len(gpu_tracks)} tracks, expected one')
-                gpu_tree.remove(gpu_tracks[0])
-                opened_gpu = Path(temporary) / 'open-gpu-sck.kicad_pcb'
-                opened_gpu.write_text(dump(gpu_tree) + '\n')
-                bad_gpu = check(cards, main, args.main_board, {**card_boards, 'gpu': opened_gpu})
+                    if len(tracks) != 1:
+                        raise AssertionError(f'{label} {ref}.{pin} launch has {len(tracks)} tracks, expected one')
+                    tree.remove(tracks[0])
+                    opened = Path(temporary) / f'open-{label}.kicad_pcb'
+                    opened.write_text(dump(tree) + '\n')
+                    return opened
+
+                opened_gpu = open_card_launch(card_boards['gpu'], 'U1', '4', '/SCK', 'gpu-sck')
+                bad_gpu = check(cards, main, args.main_board,
+                                {**card_boards, 'gpu': opened_gpu}, args.system_board)
                 if bad_gpu['runtime']['card_slot_links']['gpu']['sck'] or \
                         not bad_gpu['runtime']['card_slot_links']['io']['sck'] or \
                         bad_gpu['runtime']['routed_top'] or 'gpu:SCK' not in bad_gpu['runtime_nets']:
@@ -178,6 +184,22 @@ def main_cli():
                 if gpu_bad_frames != 0:
                     raise AssertionError(f'open GPU SCK copper did not stop native SPI: {good_frames} / {gpu_bad_frames}')
                 print(f'open routed GPU-card SCK launch stops native SPI frames: {good_frames} -> {gpu_bad_frames}')
+
+                if args.system_board:
+                    opened_qspi = open_card_launch(card_boards['gpu'], 'U1', '52',
+                                                   '/QSPI_SCLK', 'gpu-qspi-clock')
+                    boot_bad = check(cards, main, args.main_board,
+                                     {**card_boards, 'gpu': opened_qspi}, args.system_board)
+                    boot = boot_bad['runtime']['qspi_boot_connected']
+                    if boot['gpu'] or not all(value for kind, value in boot.items() if kind != 'gpu') or \
+                            boot_bad['runtime']['routed_top'] or 'gpu:QSPI_SCLK' not in boot_bad['runtime_nets']:
+                        raise AssertionError('GPU QSPI clock launch did not isolate its firmware boot prerequisite')
+                    boot_bad_top = Path(temporary) / 'open-gpu-qspi.json'
+                    boot_bad_top.write_text(json.dumps(boot_bad))
+                    boot_bad_frames = run(boot_bad_top, SLOT_PROBE)['frames']
+                    if boot_bad_frames != 0:
+                        raise AssertionError(f'open GPU QSPI copper did not stop firmware SPI: {boot_bad_frames}')
+                    print(f'open routed GPU QSPI clock launch prevents firmware SPI: {good_frames} -> 0 frames')
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')
@@ -229,6 +251,10 @@ def main_cli():
         broken_miso = copy.deepcopy(cards)
         del broken_miso['gpu'].pins[('U4', '2')]
         rejected(broken_miso, main, 'missing GPU MISO buffer input')
+
+        broken_qspi = copy.deepcopy(cards)
+        del broken_qspi['gpu'].pins[('U1', '52')]
+        rejected(broken_qspi, main, 'missing GPU QSPI flash clock pad')
 
         broken_sd = copy.deepcopy(cards)
         del broken_sd['storage'].pins[('J2', '5')]

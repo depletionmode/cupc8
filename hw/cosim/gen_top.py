@@ -126,7 +126,44 @@ def card_slot_routes(cards, board_paths):
     return rows, paths, missing
 
 
-def check(cards, main, pcb=None, card_boards=None):
+def qspi_boot_routes(cards, card_boards, system_board):
+    """Digital boot prerequisite: six MCU-to-external-flash copper paths."""
+    rows, paths, missing = {}, [], []
+    for board in ('system', 'gpu', 'io', 'storage', 'eink'):
+        circuit = cards[board]
+        pcb = system_board if board == 'system' else (card_boards or {}).get(board)
+        routed = pcb is not None and Path(pcb).is_file()
+        if routed:
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+        flash = 'U2' if board == 'system' else 'U3'
+        nets = ('QSPI_SCLK', 'QSPI_SD0', 'QSPI_SD1', 'QSPI_SD2', 'QSPI_SD3',
+                'QSPI_nSS' if board == 'system' else 'QSPI_SS')
+        connected = True
+        for name in nets:
+            net = f'/{name}'
+            source = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
+                      if ref == 'U1' and attached == net]
+            target = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
+                      if ref == flash and attached == net]
+            if len(source) != 1 or len(target) != 1:
+                raise ValueError(f'{board}:{name}: MCU/flash pad mapping missing')
+            path(circuit, source[0], target[0])
+            mm = None
+            if routed:
+                mm = routed_distances(Path(pcb), net, source[0], target)[
+                    f'{target[0][0]}.{target[0][1]}']
+            paths.append({'from': f'{board}.{source[0][0]}.{source[0][1]}',
+                          'to': f'{board}.{target[0][0]}.{target[0][1]}',
+                          'route_mm': mm, 'runtime': f'{board}_qspi_boot_connected'})
+            if mm is None:
+                connected = False
+                missing.append(f'{board}:{name}_qspi_copper')
+        rows[board] = connected
+    return rows, paths, missing
+
+
+def check(cards, main, pcb=None, card_boards=None, system_board=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
     fittings = [('cpu', 'J2', 'J1'), ('system', 'J3', 'J2')]
@@ -467,6 +504,10 @@ def check(cards, main, pcb=None, card_boards=None):
     manifest['runtime']['card_slot_links'] = card_links
     manifest['paths'].extend(card_paths)
     manifest['runtime']['missing_routes'].extend(card_missing)
+    boot_links, boot_paths, boot_missing = qspi_boot_routes(cards, card_boards, system_board)
+    manifest['runtime']['qspi_boot_connected'] = boot_links
+    manifest['paths'].extend(boot_paths)
+    manifest['runtime']['missing_routes'].extend(boot_missing)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # CPU driver pack channels must remain explicit; the native board model
@@ -690,6 +731,10 @@ def check(cards, main, pcb=None, card_boards=None):
         for name in ('SCK', 'MOSI', 'CS_n', 'IRQ_n', 'MISO',
                      'MISO_INT' if card == 'wifi' else 'MISO_OUT'):
             runtime_net(card, name)
+    for card in ('system', 'gpu', 'io', 'storage', 'eink'):
+        for name in ('QSPI_SCLK', 'QSPI_SD0', 'QSPI_SD1', 'QSPI_SD2', 'QSPI_SD3',
+                     'QSPI_nSS' if card == 'system' else 'QSPI_SS'):
+            runtime_net(card, name)
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest
@@ -700,6 +745,9 @@ def main_cli():
     parser.add_argument('--main-netlist', type=Path, default=ROOT / 'build/hw/main/main.net')
     parser.add_argument('--card-board-dir', type=Path, default=ROOT / 'build/hw',
                         help='directory containing each generated card PCB under CARD/CARD.kicad_pcb')
+    parser.add_argument('--system-board', type=Path,
+                        default=ROOT / 'build/hw/system/system-routed.kicad_pcb',
+                        help='explicit routed system-card PCB for the QSPI boot prerequisite')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--require-route', action='store_true', help='fail unless required board/card paths have routed copper')
     parser.add_argument('--require-coverage', action='store_true', help='fail on any modeled/waiver coverage gap')
@@ -708,7 +756,8 @@ def main_cli():
         manifest = check(exported_cards(Path(temporary)), read(args.main_netlist),
                          args.main_netlist.with_suffix('.kicad_pcb'),
                          {card: args.card_board_dir / card / f'{card}.kicad_pcb'
-                          for card in ('gpu', 'io', 'storage', 'wifi', 'eink')})
+                          for card in ('gpu', 'io', 'storage', 'wifi', 'eink')},
+                         args.system_board)
     if args.require_route and not manifest['runtime']['routed_top']:
         missing = manifest['runtime']['missing_routes']
         raise ValueError(f'co-sim paths lack routed copper: {", ".join(missing)}')

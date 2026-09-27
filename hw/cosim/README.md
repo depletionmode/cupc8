@@ -3,7 +3,8 @@
 `gen_top.py` exports fresh KiCad netlists for the seven cards and reads the
 main-board netlist. For routed slot execution it also reads the generated
 GPU, IO, storage, Wi-Fi and e-ink card PCBs from `build/hw` (or
-`--card-board-dir`). It joins contacts by physical pad number, including the
+`--card-board-dir`), and the explicitly selected routed system PCB
+(`--system-board`, default `build/hw/system/system-routed.kicad_pcb`). It joins contacts by physical pad number, including the
 system socket's x4 pad translation. It checks the shared slot buses, their
 chipset series resistors, the weak MISO pull, CPU socket and resistor packs,
 and SRAM/ROM attachment. Its JSON manifest lists contact joins and the
@@ -96,6 +97,15 @@ launch changes 15 SPI frames to 0; opening IO-card IRQ_n prevents five
 keyboard-service SPI frames within the first 25 ms after a key is queued.
 This models digital connectivity and IRQ delivery, not analog edge quality
 or open-pin voltage.
+Five RP2040 boards (system, GPU, IO, storage, e-ink) also require all six
+QSPI MCU-to-flash nets to have pad-to-pad copper before their native firmware
+starts. An open clock launch on the GPU card changes 15 SPI frames to none;
+the same board-level prerequisite removes only that card's firmware endpoint.
+Mutating the IO prerequisite removes its keyboard, and mutating the system
+prerequisite removes its bridge USB endpoint. The native firmware still comes
+from an ELF image, so this checks a digital boot wiring prerequisite only;
+flash contents, protocol timing, signal integrity, power rails, crystals,
+reset and RP2040 boot-ROM fallback remain outside this model.
 The storage card's seven SD signal contacts similarly control whether the
 microSD socket is attached to its RP2040 model.
 All four HDMI differential pairs, including the clock pair, must pass through
@@ -112,7 +122,7 @@ From the repo root, after building the main board and five slot cards:
 
 ```
 python3 hw/cosim/gen_top.py --output build/hw/cosim/top.json
-python3 test/hw/test_cosim_wiring.py --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw
+python3 test/hw/test_cosim_wiring.py --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb
 python3 test/hw/test_cosim_runtime.py --top build/hw/cosim/top.json
 # after the main route is complete:
 python3 hw/cosim/gen_top.py --require-route --output build/hw/cosim/top.json
@@ -127,7 +137,7 @@ python3 hw/cosim/run.py E2E-004
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
 supervisor's routed nPOR launch, slot 1 chip-select launch, shared SCK
-source launch and GPU card SCK launch, then executes the native SPI
+source launch, GPU card SCK launch and GPU QSPI clock launch, then executes the native SPI
 counterexamples. The third proves
 that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
@@ -137,9 +147,9 @@ system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
-reserved contacts have pin-bound waivers, eight slot-bus source nets and 30
-card-local slot nets now affect execution; 419 remain unmodeled. The remaining
-groups are boot/programming (98), slot/control bus (36), CPU/memory
+reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
+card-local slot nets and 30 QSPI boot nets now affect execution; 389 remain
+unmodeled. The remaining groups are boot/programming (68), slot/control bus (36), CPU/memory
 (71), power/return (65), clock/reset (53), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
