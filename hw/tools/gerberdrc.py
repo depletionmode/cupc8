@@ -262,6 +262,9 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
             kind, params, _ = apertures[current]
             if kind != 'C' or params[0] <= 0:
                 raise ValueError('%s:%d: unsupported arc aperture' % (path.name, number))
+            if minimum_track is not None and params[0] < minimum_track:
+                raise ValueError('%s:%d: plotted trace width %.6f mm < %.6f mm' %
+                                 (path.name, number, params[0], minimum_track))
             target = (int(match[1])/1e6, int(match[2])/1e6)
             points, sagitta = arc_points(position, target,
                                          (int(match[3])/1e6, int(match[4])/1e6), mode)
@@ -357,7 +360,9 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                          extra_function is None else '%TF.FilePolarity,Positive*%')
     if (macro is not None or region is not None or not seen_end or not seen_format or
             not seen_units or not result and not allow_empty or not require_net and
-            (file_polarity != expected_polarity or file_function != expected_function)):
+            (file_polarity != expected_polarity or file_function != expected_function) or
+            require_net and (file_polarity not in (None, expected_polarity) or
+                             file_function not in (None, 'Copper'))):
         raise ValueError('%s: incomplete or empty copper Gerber' % path.name)
     return result
 

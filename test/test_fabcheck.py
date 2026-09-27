@@ -165,6 +165,7 @@ class FabCheckTests(unittest.TestCase):
             for mutant in (base.replace('%LPD*%', '%LPC*%'),
                            base.replace('%LPD*%', '%TF.FilePolarity,Negative*%\n%LPD*%'),
                            base.replace('%TO.N,/A*%', '%TD*%'),
+                           base.replace('%LPD*%', '%TF.FileFunction,Paste,Top*%\n%LPD*%'),
                            base.replace('%ADD10C,0.200000*%',
                                         '%ADD10RoundRect,0.100000X0.200000X0.200000X-0.200000X0.200000X-0.200000X-0.200000X0.200000X-0.200000X0*%'),
                            base.replace('%ADD10C,0.200000*%', '%ADD10P,0.200000X6*%')):
@@ -191,6 +192,12 @@ class FabCheckTests(unittest.TestCase):
             copper.write_text('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.090000*%\n'
                               'D10*\n%TO.N,/A*%\nX1000000Y1000000D02*\n'
                               'X1500000Y1000000D01*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'trace width'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            copper.write_text('%TF.FileFunction,Copper,L1,Top*%\n%TF.FilePolarity,Positive*%\n'
+                              '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.090000*%\n'
+                              'D10*\n%TO.N,/A*%\nX1000000Y1000000D02*\nG02*\n'
+                              'X2000000Y1000000I500000J0D01*\nM02*\n')
             with self.assertRaisesRegex(ValueError, 'trace width'):
                 gerberdrc.check_clearance([copper], .15, .1)
 
