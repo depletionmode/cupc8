@@ -1868,7 +1868,28 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, t
                        % (sorted({n for v in left_all.values() for n in v})[:8], tries, parallel, pdir))
 
 
-def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, timeout=None, heap=None):
+def _replay_session(board, workdir, manifest, preroute_board):
+    """Recreate one salted DSN, capture the matching SES, and import neither yet."""
+    import pcbnew
+    import sesreplay
+    if not preroute_board:
+        raise ValueError('SES replay requires the generated pre-route board path')
+    chosen = manifest['salt']
+    stable_uuids(board, chosen)
+    directory = os.path.join(workdir, 'route-parallel')
+    os.makedirs(directory, exist_ok=True)
+    dsn = os.path.join(directory, 'route-%d.dsn' % chosen)
+    if not pcbnew.ExportSpecctraDSN(board, dsn):
+        raise RuntimeError('replay DSN export failed')
+    with open(dsn) as source:
+        canonical = canonical_dsn(source.read(), chosen)
+    with open(dsn, 'w') as target:
+        target.write(canonical)
+    return sesreplay.capture(manifest, workdir, preroute_board, dsn)
+
+
+def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, timeout=None, heap=None,
+              replay=None, preroute_board=None):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
@@ -1896,38 +1917,50 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, 
               pcbnew.VECTOR2I(t.GetEnd().x, t.GetEnd().y), t.GetWidth(), t.GetLayer(), t.GetNet(),
               t.GetDrillValue() if t.Type() == pcbnew.PCB_VIA_T else 0)
              for t in items if t.GetNetname() in held]
-    for attempt in range(0 if parallel else tries):
-        # each try orders the problem differently (a UUID salt): Freerouting
-        # can stall on one order and complete on another, and the salt keeps
-        # every run of the pipeline the same
-        stable_uuids(board, salt + attempt)
-        if not pcbnew.ExportSpecctraDSN(board, dsn):
-            raise RuntimeError("DSN export failed")
-        with open(dsn) as f:
-            text = canonical_dsn(f.read(), salt + attempt)
-        with open(dsn, "w") as f:
-            f.write(text)
-        if os.path.exists(ses):
-            os.remove(ses)
-        # one optimiser thread: with a pool, the route (and whether it
-        # completes) changes from run to run
-        r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)), "-mt", "1",
-                 "--gui.enabled=false"], env=env)
-        with open(os.path.join(workdir, "freerouting.log"), "w") as f:
-            f.write(r.stdout + r.stderr)
-        left = [n for n in re.findall(r"Net '([^']+)' \(\d+ unrouted", r.stdout + r.stderr) if n not in pours]
-        if not left and os.path.exists(ses):
-            break
+    if replay is not None:
+        ses = _replay_session(board, workdir, replay, preroute_board)
     else:
-        if not parallel:
-            raise RuntimeError("Freerouting left %s unrouted after %d tries (see freerouting.log)" % (left, tries))
-    if parallel:
-        ses, chosen = _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout)
-        stable_uuids(board, chosen)                 # the ordering that session was routed on
+        for attempt in range(0 if parallel else tries):
+            # each try orders the problem differently (a UUID salt): Freerouting
+            # can stall on one order and complete on another, and the salt keeps
+            # every run of the pipeline the same
+            stable_uuids(board, salt + attempt)
+            if not pcbnew.ExportSpecctraDSN(board, dsn):
+                raise RuntimeError("DSN export failed")
+            with open(dsn) as f:
+                text = canonical_dsn(f.read(), salt + attempt)
+            with open(dsn, "w") as f:
+                f.write(text)
+            if os.path.exists(ses):
+                os.remove(ses)
+            # one optimiser thread: with a pool, the route (and whether it
+            # completes) changes from run to run
+            r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)), "-mt", "1",
+                     "--gui.enabled=false"], env=env)
+            with open(os.path.join(workdir, "freerouting.log"), "w") as f:
+                f.write(r.stdout + r.stderr)
+            left = [n for n in re.findall(r"Net '([^']+)' \(\d+ unrouted", r.stdout + r.stderr) if n not in pours]
+            if not left and os.path.exists(ses):
+                break
+        else:
+            if not parallel:
+                raise RuntimeError("Freerouting left %s unrouted after %d tries (see freerouting.log)" % (left, tries))
+        if parallel:
+            ses, chosen = _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout)
+            stable_uuids(board, chosen)                 # the ordering that session was routed on
     if not os.path.exists(ses):
         raise RuntimeError("Freerouting wrote no session file")
+    placement = None
+    if replay is not None:
+        placement = tuple(sorted((f.GetReference(), f.GetPosition().x, f.GetPosition().y,
+                                  f.GetOrientationDegrees(), f.IsFlipped())
+                                 for f in board.GetFootprints()))
     if not pcbnew.ImportSpecctraSES(board, ses):
         raise RuntimeError("SES import failed")
+    if placement is not None and placement != tuple(sorted(
+            (f.GetReference(), f.GetPosition().x, f.GetPosition().y,
+             f.GetOrientationDegrees(), f.IsFlipped()) for f in board.GetFootprints())):
+        raise RuntimeError('SES replay moved a pre-routed footprint')
     # the router's own copper on those nets stays (removing it opened every
     # connection it made: the main board's VBUS_F, pre-routed on In3); what
     # the import dropped of the pre-routing goes back
@@ -2718,7 +2751,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
              fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=(),
-             post_route=None):
+             post_route=None, replay=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2739,6 +2772,10 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     `post_route(board)`, if given, makes deterministic board-specific copper
     corrections after SES import and before connectivity/DRC checks and pours.
 
+    `replay`, for the main board only, is a validated sesreplay snapshot. It
+    imports that one content-bound SES without invoking Freerouting, then
+    continues through the same post-route and fabrication steps.
+
     `logo_keepout`: no tracks or vias on the copper under the logo (silk_keepout),
     and the silkscreen step fails on any there.
 
@@ -2746,6 +2783,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     0.25 (KiCad's fill at 0.25 left the main board's planes a 0.063 mm neck
     that its own connection-width check then flagged; at 0.3 it does not)."""
     import pcbnew
+    if replay is not None and name != 'main':
+        raise ValueError('SES replay is supported only for the main board')
     if io_card:
         # every I/O card is the same shape (slot.md, Mechanical): the outline,
         # finger edge and pour come from here, and the parts every card has in
@@ -2842,14 +2881,17 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # KiCad's DRC on the routed copper throws such a try away too
         escaped = tuple(state.get("escaped", ()))
         routed = os.path.join(out, name + "-routed.kicad_pcb")
-        for round_ in range(3):
+        for round_ in range(1 if replay is not None else 3):
             if round_:
                 state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
             try:
                 autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
                           salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
-                          parallel=route_parallel, timeout=route_timeout, heap=route_heap)
+                          parallel=route_parallel, timeout=route_timeout, heap=route_heap,
+                          replay=replay, preroute_board=pcb)
             except RuntimeError as e:        # nets left unrouted: the next round's orderings
+                if replay is not None:
+                    raise
                 open_nets, too_close = [str(e)], []
                 continue
             if post_route:
@@ -2867,6 +2909,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
                 if not too_close:
                     break
         else:
+            if replay is not None:
+                raise RuntimeError('SES replay left %s open or copper too close (%s)' %
+                                   (open_nets, '; '.join(too_close[:3])))
             raise RuntimeError("Freerouting left %s unrouted, or copper too close (%s), over 3 rounds of %d tries"
                                % (open_nets, "; ".join(too_close[:3]), route_tries))
         n = clear_fingers(state["b"], pour_nets) if card_edge else 0
