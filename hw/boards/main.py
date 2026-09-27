@@ -1587,6 +1587,8 @@ def _finish_route(board):
         track(a, z, 0.5, pcbnew.In2_Cu, "/VBUS_F")
     from main_power_reinforce import reinforce_5v_sys
     reinforce_5v_sys(board)
+    from main_power_trial5 import reinforce_slot_5v
+    reinforce_slot_5v(board)
 
 
 def _efuse_escapes(board, fp):
