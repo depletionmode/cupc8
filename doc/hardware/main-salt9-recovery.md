@@ -31,3 +31,33 @@ layout closure only. The input positive copper sensitivity at 115 °C,
 35.931 mΩ for F1→U2, or **73.060 mΩ before ground, contacts, zones or fault
 thermal limits**. MB-005's 20 mΩ loop target is therefore not met by this
 route and remains red.
+
+## Receipt-bound input heating check (2026-09-28)
+
+The completed DRC-clean main-board receipt copied from `milestone-1` has
+PCB SHA-256 `ada8c6fe16af74c4a75cca67dab2989fda286a35da70fa92e9d700a1b25fc30e`,
+netlist SHA-256 `995ba33de0e5dfe3c83a928318f3b039767c58ad91d3d27219696379437f422f`,
+and order SHA-256 `230fc5562b8c8697009adc22b33044df4c3e416f0ede71235340f9e8b5d42e66`.
+`python3 hw/power/main_input_heat.py build/hw/main` validates the complete
+content receipt and J1→F1→U2 pin nets before extracting resistance. At the
+modeled 115 °C corner, the two positive segments are 37.129 and 35.931 mΩ.
+At the 3.213 A eFuse maximum current-limit corner, they imply **234.7 mV**
+positive-path drop and **754 mW instantaneous** copper heat. For an ambient
+of 40 °C, holding an assumed uniform copper maximum of 115 °C would require
+at most **99.4 °C/W effective rise per watt** for that aggregate heat alone.
+This is a screening requirement, not a measured board thermal resistance or
+a local neck temperature; other board heat and the fault time history are
+excluded. The current limit is derived from the fitted RILM and the
+[TPS25947 datasheet](https://www.ti.com/lit/ds/symlink/tps25947.pdf).
+
+The 115 °C resistance calculation assumes 80% of drawn trace width, 24.9/11.4
+µm outer/inner copper, 15 µm via wall and 1.76 mm board thickness. JLCPCB
+publishes [±20% trace-width tolerance and nominal multilayer copper
+options](https://jlcpcb.com/capabilities/Capab), but the selected local
+finished-copper and via-wall minima have not been accepted as fabrication
+limits. The graph also omits positive-net fills and idealizes pad copper, so
+73.060 mΩ is a modeled scenario rather than a guaranteed lower bound on the
+fabricated board. The check explicitly fails both its 20 mΩ positive-copper
+screen and the absent fabrication, return/contact and coupled thermal
+evidence. A lower extracted resistance cannot clear those three evidence
+failures. MB-005 remains red.
