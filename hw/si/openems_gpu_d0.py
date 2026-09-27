@@ -27,6 +27,11 @@ from kicadgen import find1, parse
 PREPREG_MM = .2104
 DIELECTRIC_ER = 4.4
 NETS = ('/HD_D0P', '/HD_D0N')
+# A passive, lossless two-port cannot return more power than is incident.
+# Allow 0.1% for floating-point and finite-time postprocessing noise. A
+# larger excess makes the extracted S parameters unusable as SI evidence.
+PASSIVITY_TOLERANCE = .001
+PASSIVE_PORT_INCIDENT_TOLERANCE = .01
 ROI = (24.5, 28.5, -35.5, -26.2)
 # Pad-side trace endpoints on this board revision (x, y, millimetres).
 # The FDTD ports extend the line away from the routed copper at these points.
@@ -134,9 +139,12 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
         metal.AddBox([top[0] - .1, top[1], 0], [top[0] + .1, -26.9, 0], priority=10)
         metal.AddBox([bottom[0] - .1, -34.3, 0],
                      [bottom[0] + .1, bottom[1], 0], priority=10)
-    ports = [fdtd.AddLumpedPort(1, 100, [26.4, -27.10, -.05], [27.0, -27.00, .05],
+    # Keep the port on the same z=0 mesh plane as the PEC traces. A volume
+    # extending +/-0.05 mm in z gave a measured 145-ohm passive load for a
+    # declared 100-ohm resistor on this mesh, invalidating S21 extraction.
+    ports = [fdtd.AddLumpedPort(1, 100, [26.4, -27.10, 0], [27.0, -27.00, 0],
                                'x', excite=1, priority=20),
-             fdtd.AddLumpedPort(2, 100, [26.1, -34.20, -.05], [26.9, -34.10, .05],
+             fdtd.AddLumpedPort(2, 100, [26.1, -34.20, 0], [26.9, -34.10, 0],
                                'x', priority=20)]
     directory.mkdir(parents=True, exist_ok=True)
     if postprocess_only:
@@ -191,15 +199,37 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
     s21 = ports[1].uf_ref / incident
     if not np.all(np.isfinite(s11)) or not np.all(np.isfinite(s21)):
         raise ValueError('openEMS returned non-finite S parameters')
+    power_sum = np.abs(s11)**2 + np.abs(s21)**2
+    excess = np.maximum(power_sum - 1, 0)
+    passivity_ok = bool(np.all(excess <= PASSIVITY_TOLERANCE))
+    # The passive port is terminated in its own 100-ohm reference impedance,
+    # so its incident wave should vanish. A substantial incident component
+    # makes uf_ref/uf_inc a loaded response, not a valid S21 measurement.
+    port2_incident_ratio = np.abs(ports[1].uf_inc / incident)
+    if not np.all(np.isfinite(port2_incident_ratio)):
+        raise ValueError('openEMS returned non-finite passive-port incident wave')
+    port_consistency_ok = bool(np.all(port2_incident_ratio <= PASSIVE_PORT_INCIDENT_TOLERANCE))
+    if np.any(np.abs(ports[1].if_tot) == 0):
+        raise ValueError('openEMS passive-port current is zero')
+    passive_load_z = -ports[1].uf_tot / ports[1].if_tot
+    if not np.all(np.isfinite(passive_load_z)):
+        raise ValueError('openEMS returned non-finite passive-port load impedance')
     report = {
         'scope': ('straight-line port control for GPU HDMI D0 P/N' if straight_control else
                   'GPU HDMI D0 P/N, RN2 output to connector; partial 4.6 evidence'),
         'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
         'stackup': 'JLC04161H-7628', 'prepreg_mm': PREPREG_MM, 'dielectric_er': DIELECTRIC_ER,
         'model': 'lossless dielectric, PEC copper, rectangular L2 GND, no pads/mask/connector',
+        'port_geometry': '100-ohm differential lumped ports in the z=0 copper plane',
         'straight_control': straight_control,
         'energy_decay_db': final_decay if converged else round(10 * math.log10(energy_ratio), 2),
         'converged': converged,
+        'passivity_ok': passivity_ok,
+        'passivity_tolerance': PASSIVITY_TOLERANCE,
+        'maximum_passivity_excess': float(max(excess)),
+        'port_consistency_ok': port_consistency_ok,
+        'valid_for_si_evidence': converged and passivity_ok and port_consistency_ok,
+        'passive_port_incident_tolerance': PASSIVE_PORT_INCIDENT_TOLERANCE,
         'solver_version': version[1] if version else None,
         'timesteps': int(steps[1]) if steps else None,
         'routes': {name: {'segments': len(parts),
@@ -209,8 +239,12 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
         'results': [{'frequency_hz': int(f),
                      's11_db': float(20 * np.log10(abs(a))),
                      's21_db': float(20 * np.log10(abs(b))),
-                     's11_s21_power_sum': float(abs(a)**2 + abs(b)**2)}
-                    for f, a, b in zip(frequencies, s11, s21)],
+                     's11_s21_power_sum': float(power),
+                     'passive_port_incident_ratio': float(port2_inc),
+                     'passive_port_load_ohm': [float(z.real), float(z.imag)]}
+                    for f, a, b, power, port2_inc, z in
+                    zip(frequencies, s11, s21, power_sum, port2_incident_ratio,
+                        passive_load_z)],
     }
     return report
 
@@ -239,6 +273,12 @@ def main():
     print(json.dumps(report, indent=2))
     if not report['converged']:
         raise SystemExit('openEMS did not reach -40 dB energy convergence')
+    if not report['passivity_ok']:
+        raise SystemExit('openEMS S parameters violate passive two-port power balance; '
+                         'port or mesh calibration is required')
+    if not report['port_consistency_ok']:
+        raise SystemExit('openEMS passive port does not match its reference impedance; '
+                         'S21 is not a valid two-port measurement')
 
 
 if __name__ == '__main__':

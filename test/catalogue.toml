@@ -2574,7 +2574,7 @@ cmd = "python3 test/hw/test_openems_gpu_d0.py"
 [[test]]
 id = "SI-003"
 title = "Routed HDMI D0 differential openEMS subset"
-checks = "on a provenance-checked completed GPU board, openEMS produces finite S11/S21 through 1.26 GHz and reaches -40 dB field-energy decay for the RN2-to-HDMI D0 pair"
+checks = "on a provenance-checked completed GPU board, openEMS produces finite S11/S21 through 1.26 GHz, reaches -40 dB field-energy decay, has |S11|^2 + |S21|^2 <= 1.001, and has a passive-port incident wave <= 1% of the driven incident wave at every sampled frequency for the RN2-to-HDMI D0 pair"
 method = "hw/si/openems_gpu_d0.py; partial TMDS route model, with full 4.6 analog coverage remaining in GC-007"
 kind = "sim"
 vrow = "4.6"
