@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Audit pinned IBIS assumptions and archived FPGA source-pin copper paths.
+"""Audit pinned IBIS assumptions and FPGA source-pin copper paths.
 
-This validates source data and the saved routed main/CPU board subset. It does
+This validates source data and a routed main/CPU board subset. It does
 not substitute measured planar paths into the diagnostic transmission lines.
 """
 import argparse
 import csv
 import hashlib
+import importlib.util
 import inspect
 import json
 import math
@@ -213,7 +214,8 @@ def case_unstable(case):
 
 
 def audit(ibis, main_build, cpu_build, top_path, pinout, source_root,
-          diagnostic_path=None, vendor_diagnostic_path=None):
+          diagnostic_path=None, vendor_diagnostic_path=None,
+          current_route=False):
     data = ibis.read_bytes()
     vendor_sha = verify(data)
     if b'Bank3(left bank) IOs have strong drive and use model lvc330_b3io' not in data:
@@ -221,8 +223,14 @@ def audit(ibis, main_build, cpu_build, top_path, pinout, source_root,
     if sha(pinout) != PINOUT_SHA256:
         raise ValueError('TQ144 pinout CSV differs from reviewed source')
     receipts = {}
+    validator = boardevidence
+    if current_route and source_root != ROOT:
+        spec = importlib.util.spec_from_file_location('current_boardevidence',
+                        source_root / 'hw/tools/boardevidence.py')
+        validator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(validator)
     for board, build in (('main', main_build), ('cpu', cpu_build)):
-        receipt = boardevidence.validate(board, build, root=source_root)
+        receipt = validator.validate(board, build, root=source_root)
         receipts[board] = {'receipt_sha256': sha(build / 'evidence.json'),
                            'board_sha256': receipt['artifacts'][f'{board}.kicad_pcb'],
                            'netlist_sha256': receipt['artifacts'][f'{board}.net']}
@@ -241,7 +249,9 @@ def audit(ibis, main_build, cpu_build, top_path, pinout, source_root,
     modeled_package_c = inspect.signature(run_spice).parameters['package_pf'].default * 1e-12
     modeled_package_r = inspect.signature(run_spice).parameters['package_ohm'].default
     result = {
-        'scope': 'pinned vendor IBIS source and archived main/CPU FPGA source-path audit',
+        'scope': 'pinned vendor IBIS source and ' +
+                 ('current' if current_route else 'archived') +
+                 ' main/CPU FPGA source-path audit',
         'ibis_sha256': vendor_sha, 'pinout_sha256': sha(pinout),
         'top_sha256': sha(top_path), 'receipts': receipts,
         'vendor_model_contract': vendor_contract(data),
@@ -263,6 +273,7 @@ def audit(ibis, main_build, cpu_build, top_path, pinout, source_root,
                    'the diagnostic still uses assumed 120/180 mm line lengths and loads',
                    'the two commented TQ144 package rows are not assigned to HX4K by this file',
                    'the present linear driver omits nonlinear I/V and receiver IBIS behavior',
+                   'the loaded physical bus remains unverified' if current_route else
                    'the main-board current route and loaded physical bus remain unverified'],
     }
     if diagnostic_path is not None:
@@ -341,6 +352,8 @@ def main():
                         help='optional saved 96-case ngspice report to bind to this audit')
     parser.add_argument('--vendor-diagnostic', type=Path,
                         help='same 96 cases with both vendor TQ144 typical R/L/C candidates')
+    parser.add_argument('--current-route', action='store_true',
+                        help='label validated main/CPU inputs as the current routed builds')
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     if args.vendor_diagnostic and not args.diagnostic:
@@ -349,7 +362,8 @@ def main():
                    args.cpu_build.resolve(), args.top.resolve(),
                    args.pinout.resolve(), args.source_root.resolve(),
                    args.diagnostic.resolve() if args.diagnostic else None,
-                   args.vendor_diagnostic.resolve() if args.vendor_diagnostic else None)
+                   args.vendor_diagnostic.resolve() if args.vendor_diagnostic else None,
+                   args.current_route)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + '\n')
     print(f"vendor/fixture checked; SCK bank {result['slot_sck']['bank']}; "
