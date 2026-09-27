@@ -1,0 +1,38 @@
+{
+  "scope": "interrupted 0.060 mm IO USB-A routed-copper field mesh; no S-parameter or mesh-convergence result",
+  "current_io_receipt_sha256": "80da7696052d2e7da752b4b2f52382e5b79d0592f631f2e728fb1e2c6f72d663",
+  "board_sha256": "8ce463cc553aedbe0e620bc6d834d521dbd86012cd31278f1036cf102da304fc",
+  "netlist_sha256": "6699aaeb9b88023f73eb53f2af0e64c768068367d3ca6d991a9b5632ed171f51",
+  "mesh_mm": 0.06,
+  "grid_lines": {
+    "x": 186,
+    "y": 302,
+    "z": 34
+  },
+  "pml_clearance_mm": 1.0,
+  "pml_geometry_ok": true,
+  "fixed_window": true,
+  "solver_threads": 2,
+  "configured_max_steps": 250000,
+  "termination": "SIGTERM after main-route CPU contention made completion within the 90-minute wall cap infeasible",
+  "process_exit_code": 143,
+  "last_logged_wall_seconds": 965.824,
+  "last_logged_step": 22190,
+  "last_logged_energy_db": -21.85,
+  "fdtd_timestep_seconds": 6.55555e-14,
+  "simulated_ns": 1.454676545,
+  "step_fraction": 0.08876,
+  "xml_sha256": "7e2aea214439a243b3225824cc411838c18ef92207defefbe7f8f41662441f6e",
+  "run_log_sha256": "a4d87db9d19c8278c7dd58aa727be12af47dbafdadc550103972146e8f635c17",
+  "run_stats_sha256": "8cbee1e233f54d7a0329b7d8778b0e76590ef8fef4ac729d0cc12d9bf950360e",
+  "port_file_sha256": {
+    "port_it_1": "132f937360bff88ce332cd5c9f8270b70280097c841098c109821ae46761cfbb",
+    "port_it_2": "c6672a5258893dd2cbcd1bf601fd0e7d60e525cca6ba99cd8cf4eb000575869f",
+    "port_ut_1": "c7f9d14792b53d1efc988d4cb5d061b2673e7791f44a16f92d54e502cc988ddf",
+    "port_ut_2": "4b8744c33dd5132cce1213c1bb057b1e9f297589dcdd1d82226d542b8cc3535c"
+  },
+  "spectral_stability_evaluated": false,
+  "mesh_comparison_evaluated": false,
+  "valid_for_diagnostic_sparams": false,
+  "full_row_4_6_closed": false
+}

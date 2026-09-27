@@ -1,0 +1,167 @@
+{
+  "scope": "16 ns complex-port and loaded-input diagnostic for 0.075/0.090 mm USB subset",
+  "migration_report_sha256": "713373ec73f867f4b75c0030a6519ca227a7f9800c76be859d4138ed19c59bc2",
+  "reference_ohms": 90,
+  "fourier_cutoff_ns": 16,
+  "sources": {
+    "0.075": {
+      "report_sha256": "ca10ba1a953f866c48823fd09e116ead858768502db33a99abbe5a5e70079e86",
+      "xml_sha256": "fc0ad04f788f3601a272ee50e38f6f45c5156165ece1f7a82202ebd100a65765",
+      "run_log_sha256": "b092604d3d9ba7d74580b47a363b0d6418ee0fb14c1695173f13c19565087dc6",
+      "port_file_sha256": {
+        "ut_1": "5d6b2ed902a7773a488c1716f16e97198412934a1b61e73d72e68599a8796617",
+        "it_1": "665a9f4d0ddd3737db3fa16ee876354c44d5c8e5416de19a3d4add6e724ae50f",
+        "ut_2": "2d1511d50a0f34035de756d825eef9765585c791e79e5c8adbe5b0c5b2f2f854",
+        "it_2": "c30d200fbfc09e14a284acf49b5ba712a6354da9246689bbaea6694b7fdfca93"
+      },
+      "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c"
+    },
+    "0.090": {
+      "report_sha256": "7d2654aaacee6a71e95737fb4ad384ceac22c65b6ee374787a359ff34a9308a7",
+      "xml_sha256": "f8395dd9232cc7e20aa767466f9a900f3683a246a9ad7ce7dfb6d8fccc869283",
+      "run_log_sha256": "e14204cf3b541cb05c838a906488961801c8c60b067abdaa4f87f2d620a5963d",
+      "port_file_sha256": {
+        "ut_1": "a12eef005d5f03b1fce5997680d7c4b47f1e6387faa915118f0d7778b282b333",
+        "it_1": "2b75079c5882b60a446b311a5d5e85f78c3435451bb1d7296888186078448bfc",
+        "ut_2": "1757a6c42cc80eed7cd2add8e7e161aa99624d8a5ccd82a14ff1d101f5a1da6b",
+        "it_2": "57c90b1a1aa890f29fca1fe7655956342a8c3e98b290aa35c55d2fe0b33c879e"
+      },
+      "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c"
+    }
+  },
+  "results": {
+    "0.075": [
+      {
+        "frequency_hz": 100000000,
+        "s11_complex": [
+          0.0020463268741684835,
+          0.029723931344897984
+        ],
+        "s21_complex": [
+          0.9964302919318705,
+          -0.07667403658522251
+        ],
+        "s11_phase_degrees": 86.06171922857921,
+        "loaded_input_ohms": [
+          90.20922347030124,
+          5.367510266654645
+        ]
+      },
+      {
+        "frequency_hz": 240000000,
+        "s11_complex": [
+          0.010687801387123557,
+          0.07008609918834435
+        ],
+        "s21_complex": [
+          0.9805017752475634,
+          -0.18246581764532738
+        ],
+        "s11_phase_degrees": 81.32946118467451,
+        "loaded_input_ohms": [
+          91.03601002965483,
+          12.8251807401047
+        ]
+      },
+      {
+        "frequency_hz": 480000000,
+        "s11_complex": [
+          0.04074499170730072,
+          0.1334668647297712
+        ],
+        "s21_complex": [
+          0.9242222410965097,
+          -0.3556359431117958
+        ],
+        "s11_phase_degrees": 73.02352857573754,
+        "loaded_input_ohms": [
+          94.08200965379935,
+          25.6124267991847
+        ]
+      }
+    ],
+    "0.090": [
+      {
+        "frequency_hz": 100000000,
+        "s11_complex": [
+          0.0021460167772390146,
+          0.03149027495465189
+        ],
+        "s21_complex": [
+          0.996255943858198,
+          -0.07915005460781831
+        ],
+        "s11_phase_degrees": 86.10140320601585,
+        "loaded_input_ohms": [
+          90.2076436651228,
+          5.686992629539673
+        ]
+      },
+      {
+        "frequency_hz": 240000000,
+        "s11_complex": [
+          0.01151242249850041,
+          0.07425559877574088
+        ],
+        "s21_complex": [
+          0.9791664539970432,
+          -0.1882711542861626
+        ],
+        "s11_phase_degrees": 81.18715369538236,
+        "loaded_input_ohms": [
+          91.07455270492541,
+          13.602395862312484
+        ]
+      },
+      {
+        "frequency_hz": 480000000,
+        "s11_complex": [
+          0.04416416076904983,
+          0.14140815948410074
+        ],
+        "s21_complex": [
+          0.9187957604594199,
+          -0.36634373712613993
+        ],
+        "s11_phase_degrees": 72.65553234834529,
+        "loaded_input_ohms": [
+          94.28347977800998,
+          27.26324608177559
+        ]
+      }
+    ]
+  },
+  "mesh_differences_090_minus_075": [
+    {
+      "frequency_hz": 100000000,
+      "complex_s11_delta_abs": 0.0017691545507650468,
+      "loaded_input_delta_ohms": [
+        -0.0015798051784372547,
+        0.3194823628850276
+      ]
+    },
+    {
+      "frequency_hz": 240000000,
+      "complex_s11_delta_abs": 0.0042502619668237165,
+      "loaded_input_delta_ohms": [
+        0.038542675270576865,
+        0.7772151222077834
+      ]
+    },
+    {
+      "frequency_hz": 480000000,
+      "complex_s11_delta_abs": 0.008646090414052125,
+      "loaded_input_delta_ohms": [
+        0.20147012421062982,
+        1.6508192825908914
+      ]
+    }
+  ],
+  "characteristic_impedance_convergence_evaluated": false,
+  "full_row_4_6_closed": false,
+  "limits": [
+    "loaded input impedance includes finite line length and 90-ohm termination; it is not trace characteristic impedance",
+    "the 100-ohm lumped launch and omitted pads/connector/ESD/mask/losses remain",
+    "two meshes do not establish port or mesh convergence"
+  ]
+}
