@@ -140,7 +140,8 @@ async function e2e003() {
     server.once('exit', (c) => reject(new Error(`E2E-003: the HTTP server exited (${c})`)));
   });
   server.stdout.on('data', (d) => (requests += String(d).split('request').length - 1));
-  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' } });
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' },
+    spiLog: backend === 'native' && Boolean(process.env.CUPC8_COSIM_TOP) });
   m.powerOn();
   expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
   m.type('net join cupc8 password\n');
@@ -151,6 +152,11 @@ async function e2e003() {
   expect(requests === 1, `the server saw one request (${requests})`);
   await m.runAsync(200e6);
   golden('E2E-003', screenText(m).replace(new RegExp(`10\\.0\\.2\\.2 ${port}`, 'g'), '10.0.2.2 PORT'));
+  if (backend === 'native' && process.env.CUPC8_COSIM_TOP) {
+    const pixel = compareGoldenHdmiFrame(m);
+    expect(pixel.differences === 0,
+      `network page HDMI pixels equal GPU golden (${pixel.differences} differences, first ${pixel.first}, cursor phase ${pixel.phase})`);
+  }
   log(`ended at ${m.ns} ns, CPU ${JSON.stringify(m.state())}`);
   m.stop();
   server.kill();

@@ -37,7 +37,8 @@ All four HDMI differential pairs, including the clock pair, must pass through
 their 270 Ω series pack channels to the receptacle before the TMDS capture
 endpoint attaches. Seven e-paper data/control lines through 33 Ω resistors
 likewise control whether the panel attaches.
-E2E-002 captures the native HDMI frame after the BASIC program, replays the
+E2E-002 and E2E-003 capture the native HDMI frame after the BASIC program or
+network page, replay the
 observed GPU-slot SPI traffic through the independent host GPU core, and
 compares all 640×480 decoded TMDS pixels at RGB222 precision. A fast mutation
 test changes one SPI PUTC byte and requires the pixel comparison to fail.
