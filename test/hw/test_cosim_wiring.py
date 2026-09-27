@@ -30,6 +30,10 @@ def main_cli():
         main = read(args.main_netlist)
         manifest = check(cards, main)
         print(f"valid top: {len(manifest['contacts'])} contacts, {len(manifest['paths'])} paths")
+        assert 'main:MEM_A0' in manifest['runtime_nets']
+        assert 'main:CPU_CLK' in manifest['structural_only_nets']
+        assert 'main:CPU_CLK' in manifest['unmodeled_nets']
+        assert not manifest['coverage_complete']
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')

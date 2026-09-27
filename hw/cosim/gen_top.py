@@ -349,25 +349,58 @@ def check(cards, main, pcb=None):
                    ((r.ref, r.value) for r, other in main.pulls('/+3V3') if other == net)):
             raise ValueError(f'CPU_D{i}: missing weak keeper')
     circuits = {'main': main, **cards}
-    modeled = set()
+    structural = set()
     for connection in manifest['contacts']:
         for endpoint in connection:
             board, ref, pin = endpoint.split('.', 2)
-            modeled.add((board, circuits[board].net(ref, pin)))
+            structural.add((board, circuits[board].net(ref, pin)))
     for connection in manifest['paths']:
         for key in ('from', 'to'):
             if key in connection:
                 board, ref, pin = connection[key].split('.', 2)
                 if (ref, pin) in circuits[board].pins:
-                    modeled.add((board, circuits[board].net(ref, pin)))
-    unmodeled = []
+                    structural.add((board, circuits[board].net(ref, pin)))
+    # Runtime coverage is deliberately narrower than validated topology.
+    # These signals are used to build pin permutations, SPI/bridge mapping,
+    # memory timing, or the Type-C policy calculation consumed by the native
+    # machine. A checked resistor or connector alone is not an executed model.
+    executed = set()
+    available_nets = {board: set(circuit.nets) for board, circuit in circuits.items()}
+    def runtime_net(board, name):
+        key = (board, f'/{name}')
+        if key[1] not in available_nets[board]:
+            raise ValueError(f'{board}:{name}: runtime signal missing from netlist')
+        executed.add(key)
+    for i in range(19):
+        runtime_net('main', f'MEM_A{i}')
+    for i in range(8):
+        runtime_net('main', f'MEM_D{i}')
+        runtime_net('main', f'CPU_D{i}')
+        runtime_net('cpu', f'CPU_D{i}')
+    for i in range(16):
+        runtime_net('main', f'CPU_A{i}')
+        runtime_net('cpu', f'CPU_A{i}')
+    for name in ('MEM_nOE', 'MEM_nCE_RAM', 'MEM_nCE_ROM',
+                 'SPI_SCK', 'SPI_MOSI', 'SPI_MISO', 'BR_SCK', 'BR_MOSI',
+                 'BR_MISO', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF'):
+        runtime_net('main', name)
+    for slot in range(1, 7):
+        runtime_net('main', f'SLOT{slot}_CS_n')
+        runtime_net('main', f'SLOT_nIRQ{slot-1}')
+    for name in ('BR_SCK', 'BR_MOSI', 'BR_MISO', 'BR_nCS'):
+        runtime_net('system', name)
+    unmodeled, structural_only = [], []
     for board, circuit in circuits.items():
         for net in circuit.nets:
             if net.startswith('unconnected-'):
                 continue  # KiCad's explicit no-connect marker, no electrical node
-            if (board, net) not in modeled:
+            if (board, net) not in executed:
                 unmodeled.append(f'{board}:{net.lstrip("/")}')
+                if (board, net) in structural:
+                    structural_only.append(f'{board}:{net.lstrip("/")}')
     manifest['unmodeled_nets'] = sorted(unmodeled)
+    manifest['structural_only_nets'] = sorted(structural_only)
+    manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     manifest['coverage_complete'] = not unmodeled
     return manifest
 

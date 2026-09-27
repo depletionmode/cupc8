@@ -17,11 +17,12 @@ times plus routed copper delay (7 ps/mm). A memory bus with no routed copper
 gets provisional access times and `routed_timing: false`. The manifest lists
 unrouted CPU, memory, slot, bridge, clock, reset and power-policy signal nets
 under `missing_routes`; `--require-route` rejects them.
-The generator also lists every named net that is not attached to an executed
-model path under `unmodeled_nets`. E2E-001 through E2E-004 use
-`--require-coverage` and fail
-until each remaining net has a model or an explicit reviewed waiver. This
-keeps local card and power circuits from being silently counted as covered.
+The generator separates `runtime_nets`, whose netlist values affect the
+machine, from `structural_only_nets`, which have only a connectivity check.
+All named nets without an executed model appear in `unmodeled_nets`, including
+the structural-only subset. E2E-001 through E2E-004 use `--require-coverage`
+and fail until each remaining net has a model or an explicit reviewed waiver.
+This keeps local card and power circuits from being silently counted as covered.
 
 The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
 reference network before it reaches the chipset's `PWR_HI` pin. The nominal
