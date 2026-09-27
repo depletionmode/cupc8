@@ -62,14 +62,14 @@ survives a lost session. Newest first within each section. Specs live in
   (`milestone-1.md`, Indicator LEDs).
 - **Board revision** on every board's silkscreen and title block.
 
-## In flight (2026-09-27)
+## In flight (2026-09-28)
 
 | Work | State |
 |---|---|
-| Main board | The source now includes deterministic power, ground and VBUS bypasses. A full ten-worker route rebuild is in progress; the prior routed receipt is stale against this source. A source-replayed bypass was DRC-clean with zero opens, but the hot/min-copper J1→F1→U2 positive path alone measured 66.858 mΩ, above the entire 20 mΩ loop limit. MB-005 and board thermal remain red. A quantified redesign target is in `hardware/main-power-closure-proposal.md`; the isolated F1/U2 relocation study has no completed route. |
-| Board verification | CPU, GPU, IO, storage, Wi-Fi, e-ink and system have fresh valid receipts and fresh KiCad DRC with zero violations, opens or parity errors. Their plotted drill spacing passes. Card-local silk corrections on CPU/GPU/IO/storage now pass independent front/back plotted silk-to-mask checks. All seven cards still show a 0.20 mm copper-to-notch gap against the 0.30 mm rule; the mating envelope requires supplier routing/fit qualification. The main CPL still requires human overlay review. Wi-Fi WC-005/WC-010 and CPU CC-005 remain red at unbounded physical parameters; the Wi-Fi return/ESR gap is quantified in `hardware/wifi-proof-gaps-20260927.md`. Thermal regulator/netlist/PCB binding passes on six card pairs, but does not close junction, contact or board heat paths. |
-| SI and schematic co-simulation | Four HDMI pair routed-copper openEMS subsets pass numerical and port checks. An exact solver-input comparison binds their archived runs, and the two USB diagnostic runs, to the final GPU/IO receipts; full row 4.6 remains red. USB mesh sensitivity is unresolved; a finer run awaits CPU capacity after main routing. A pinned IBIS fixture/source audit identifies chipset SCK's FPGA bank and source routes, but receiver and current-route coverage remain open. The main clock branch has routed execution checks. Strict E2E-001..004 still reject about 359 unmodeled nets, and a fresh main-route receipt is needed before regenerating the final top manifest. |
-| Final gate | The last full `make verify` produced 217 pass, 42 fail and 17 pending. Subsequent source repairs cleared several test harness, mechanical, LED and mutation failures in focused checks; CPU-002 now passes 1,190,846 instructions with zero divergence. The full suite has not yet been rerun on these commits and cannot be green while power, SI, coverage, notch, CPL and physical thermal gates remain open. No manufacturing upload or order. |
+| Main board | Salt-9 from the completed ten-worker route is source-replayed into `build/hw/main`: valid receipt, KiCad DRC zero, zero opens and zero schematic parity errors. The silk repair passes the independent plotted clearance check; all ten implemented Gerber subchecks pass. The receipt-bound hot/min-copper J1→F1→U2 positive path is 73.060 mΩ by itself against the 20 mΩ whole-loop limit; modeled instantaneous positive copper heat at the 3.213 A eFuse limit is 754 mW. MB-005 and board thermal remain red. An isolated F1/U2 relocation trial is in progress; its unrouted positive path does not yet leave enough budget for return and contacts. |
+| Board verification | All eight boards have fresh valid receipts and fresh KiCad DRC with zero violations, opens or parity errors. All seven cards pass nine of ten independent plotted subchecks; each still has the 0.20 mm copper-to-notch gap against the 0.30 mm rule. The selected socket/footprint geometry cannot close that gap under the current pitch check; see `hardware/card-notch-qualification.md` and `hardware/card-notch-socket-source-review.md`. CPL overlays are regenerated for all eight boards; the main CPL needs human review. Wi-Fi WC-005/WC-010 and CPU CC-005 remain red at unbounded physical parameters. See `hardware/independent-gerber-audit-20260928.md`. |
+| SI and schematic co-simulation | Four HDMI pair routed-copper openEMS subsets pass numerical and port checks. USB 0.060 mm openEMS completed 250,000 steps with PML/passivity/port checks passing for diagnostic S-parameters; three-mesh sensitivity reverses S11 direction, so convergence is unproven and row 4.6 remains red. Solver inputs for the old and rebuilt GPU/IO receipts compare exactly. The final main route has all six SCK branches connected; current-route IBIS source audit and 96-case fixtures remain diagnostic because receiver/package assignment and physical routed/coupled waveform coverage are open. A four-port coupled HDMI subset is running. Strict co-simulation route coverage has zero missing paths, but E2E-001..004 still reject 354 unmodeled nets. |
+| Final gate | The last completed full `make verify` produced 217 pass, 42 fail and 17 pending. A new full run is in progress after focused repairs and all eight board rebuilds. The suite cannot be green while power, SI, co-simulation coverage, notch, CPL and physical thermal gates remain open. No manufacturing upload or order. |
 
 ## Done (recent)
 
@@ -88,8 +88,8 @@ survives a lost session. Newest first within each section. Specs live in
   checks, KRN-006.
 - Power for four cards and a 3 A source: TPS259470 eFuse, 3.5 A PTC,
   TLV62569PDDCR, PWR_HI = 3.0 A; below it no radio and no SD writes.
-- Main board: source-driven salt-1 route, post-fill KiCad DRC/parity/connectivity
-  all zero, and current Gerber/BOM/CPL/render receipt. The hot-copper power
+- Main board: source-driven salt-9 route, post-fill KiCad DRC/parity/connectivity
+  all zero, with a current Gerber/BOM/CPL/render receipt. The hot-copper power
   and signal-integrity gates remain open.
 
 - Wi-Fi card board through the whole pipeline (WIFI-004), TLV62569 buck
