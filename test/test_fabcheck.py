@@ -349,6 +349,47 @@ class FabCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'isolated filled region has a 0.100000 mm span below 0.150000 mm'):
                 gerberdrc.check_silk_clearance(silk, mask, .15, .15)
 
+    def test_connected_filled_region_union_mutations(self):
+        def rectangle(x0, y0, x1, y1):
+            return (f'G36*\nX{x0}Y{y0}D02*\nX{x1}Y{y0}D01*\n'
+                    f'X{x1}Y{y1}D01*\nX{x0}Y{y1}D01*\n'
+                    f'X{x0}Y{y0}D01*\nG37*\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper = fab / 'sample-F_Cu.gtl'
+            silk = fab / 'sample-F_Silkscreen.gto'
+            mask = fab / 'sample-F_Mask.gts'
+            prefix = '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n'
+            copper_prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                             '%TF.FilePolarity,Positive*%\n' + prefix + '%TO.N,/GND*%\n')
+            silk_prefix = ('%TF.FileFunction,Legend,Top*%\n'
+                           '%TF.FilePolarity,Positive*%\n' + prefix)
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n' + prefix +
+                            'X9000000Y9000000D03*\nM02*\n')
+            narrow = (rectangle(1000000,1000000,1500000,1080000) +
+                      rectangle(1500000,1000000,2000000,1080000))
+            copper.write_text(copper_prefix + narrow + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.080000 mm span below 0.100000 mm'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            widened = (rectangle(1000000,1000000,2000000,1090000) +
+                       rectangle(1000000,1090000,2000000,1180000))
+            copper.write_text(copper_prefix + widened + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            # A stroke touching either region may widen the overall ink union.
+            copper.write_text(copper_prefix + narrow +
+                              'X1250000Y900000D02*\nX1250000Y1200000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
+            silk_narrow = (rectangle(1000000,1000000,1500000,1100000) +
+                           rectangle(1500000,1000000,2000000,1100000))
+            silk.write_text(silk_prefix + silk_narrow + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.100000 mm span below 0.150000 mm'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+            silk_widened = (rectangle(1000000,1000000,2000000,1100000) +
+                            rectangle(1000000,1100000,2000000,1200000))
+            silk.write_text(silk_prefix + silk_widened + 'M02*\n')
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 2)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)

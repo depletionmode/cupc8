@@ -11,9 +11,9 @@ non-plated hole-to-edge rule). It checks exposed pads against the plotted mask,
 paste deposits against copper and mask openings, and silkscreen strokes against
 mask openings and JLC's 0.15 mm minimum line width. Isolated filled copper
 and silk regions whose entire bounding width is below the respective minimum
-fail independently. An isolated orthogonal, hole-free filled polygon with an
-interior span below the rule also fails by an exact plotted-grid scanline check;
-touching shapes and other neck forms still need connected-layer
+fail independently. A touching union of orthogonal, hole-free filled polygons
+with an interior span below the rule also fails by an exact plotted-grid
+scanline check; strokes, flashes, and other neck forms still need connected-layer
 width analysis. It checks mask
 webs if the KiCad project has a positive solder-mask minimum width. The board needs a
 recorded visual CPL review. The fab gate remains red because text height,
