@@ -34,6 +34,15 @@ console.log(JSON.stringify({frames: frames.length, firstTx: frames[0]?.bytes,
                             pc: m.state().pc}));
 m.stop();
 """
+SLOT_IRQ_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+const m = await Machine.create({slots: {1: 'io'}, spiLog: true, threaded: false});
+m.powerOn(); m.runFor(2e9);
+const before = m.spiLog(1).length;
+m.type('x'); m.runFor(25e6);
+console.log(JSON.stringify({keyboardFrames: m.spiLog(1).length - before}));
+m.stop();
+"""
 BRIDGE_PROBE = """
 import { Machine } from './test/emu/machinenative.mjs';
 import { spawn } from 'node:child_process';
@@ -201,6 +210,33 @@ def main():
             raise AssertionError(f'open MISO did not change CPU/card execution: {good_spi} / {bad_miso}')
         print(f"open MOSI changes first GPU command to {bad_mosi['firstTx']}; "
               f"open MISO reduces GPU frames {good_spi['frames']} -> {bad_miso['frames']}")
+        card_links = manifest['runtime']['card_slot_links']
+        if not all(card_links[kind][signal]
+                   for kind in ('gpu', 'io', 'storage', 'wifi', 'eink')
+                   for signal in ('sck', 'mosi', 'cs', 'miso', 'irq')):
+            raise AssertionError('card-local slot family requires five routed cards')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['card_slot_links']['gpu']['sck'] = False
+        mutant = Path(directory) / 'open-gpu-local-sck.json'
+        mutant.write_text(json.dumps(changed))
+        if run(mutant, SLOT_PROBE)['frames'] != 0:
+            raise AssertionError('installed GPU card did not consume its local SCK link')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['card_slot_links']['io']['sck'] = False
+        mutant = Path(directory) / 'open-uninstalled-io-sck.json'
+        mutant.write_text(json.dumps(changed))
+        if run(mutant, SLOT_PROBE)['frames'] != normal_frames:
+            raise AssertionError('uninstalled IO card link changed GPU-slot traffic')
+        irq_good = run(args.top, SLOT_IRQ_PROBE)
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['card_slot_links']['io']['irq'] = False
+        mutant = Path(directory) / 'open-io-local-irq.json'
+        mutant.write_text(json.dumps(changed))
+        irq_bad = run(mutant, SLOT_IRQ_PROBE)
+        if irq_good['keyboardFrames'] < 1 or irq_bad['keyboardFrames'] != 0:
+            raise AssertionError(f'IO IRQ link did not control prompt keyboard service: {irq_good} / {irq_bad}')
+        print(f"installed IO IRQ services {irq_good['keyboardFrames']} keyboard SPI frames within 25 ms; "
+              'open IRQ services none')
 
         changed = copy.deepcopy(manifest)
         bridge = changed['runtime']['bridge']

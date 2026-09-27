@@ -200,6 +200,7 @@ class Machine {
       bool sckConnected = true;
       bool mosiConnected = true;
       bool misoConnected = true;
+      bool irqConnected = true;
     };
     std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;

@@ -1,7 +1,9 @@
 # Schematic-derived wiring prerequisite
 
 `gen_top.py` exports fresh KiCad netlists for the seven cards and reads the
-main-board netlist. It joins contacts by physical pad number, including the
+main-board netlist. For routed slot execution it also reads the generated
+GPU, IO, storage, Wi-Fi and e-ink card PCBs from `build/hw` (or
+`--card-board-dir`). It joins contacts by physical pad number, including the
 system socket's x4 pad translation. It checks the shared slot buses, their
 chipset series resistors, the weak MISO pull, CPU socket and resistor packs,
 and SRAM/ROM attachment. Its JSON manifest lists contact joins and the
@@ -83,7 +85,17 @@ with MISO disabled, the native GPU workload records only 2 frames instead of
 15. For digital counterexamples, open SCK/MOSI are held low and open MISO
 reads the modeled idle high value; these choices do not predict analog
 floating-pin voltage. The two source-side SCK/MOSI nets now count as executed.
-Card-local slot signals remain separate coverage gaps.
+The five slot cards now supply card-local route flags as well. SCK, MOSI,
+CS_n and IRQ_n run from J1 to the MCU pad. MISO crosses the 74LVC1G125
+buffer: MCU output to buffer input, buffer output to J1, and CS_n to its
+output-enable pad. The generated top includes all five card kinds, while the
+native machine combines only the installed kind's links with the physical
+slot's main-board links. A missing generated card PCB leaves those links
+disconnected and fails `--require-route`. Opening the GPU card's U1 SCK
+launch changes 15 SPI frames to 0; opening IO-card IRQ_n prevents five
+keyboard-service SPI frames within the first 25 ms after a key is queued.
+This models digital connectivity and IRQ delivery, not analog edge quality
+or open-pin voltage.
 The storage card's seven SD signal contacts similarly control whether the
 microSD socket is attached to its RP2040 model.
 All four HDMI differential pairs, including the clock pair, must pass through
@@ -96,11 +108,11 @@ observed GPU-slot SPI traffic through the independent host GPU core, and
 compares all 640×480 decoded TMDS pixels at RGB222 precision. A fast mutation
 test changes one SPI PUTC byte and requires the pixel comparison to fail.
 
-From the repo root, after building the main board:
+From the repo root, after building the main board and five slot cards:
 
 ```
 python3 hw/cosim/gen_top.py --output build/hw/cosim/top.json
-python3 test/hw/test_cosim_wiring.py
+python3 test/hw/test_cosim_wiring.py --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw
 python3 test/hw/test_cosim_runtime.py --top build/hw/cosim/top.json
 # after the main route is complete:
 python3 hw/cosim/gen_top.py --require-route --output build/hw/cosim/top.json
@@ -114,8 +126,9 @@ python3 hw/cosim/run.py E2E-004
 
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
-supervisor's routed nPOR launch, slot 1 chip-select launch, and shared SCK
-source launch, then executes the native SPI counterexamples. The third proves
+supervisor's routed nPOR launch, slot 1 chip-select launch, shared SCK
+source launch and GPU card SCK launch, then executes the native SPI
+counterexamples. The third proves
 that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
 nPOR path, memory-write branches and ROM DQ0 read route change the running
@@ -124,9 +137,9 @@ system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
-reserved contacts have pin-bound waivers and eight slot-bus source nets now
-affect execution; 449 remain unmodeled. The remaining groups are
-boot/programming (98), slot/control bus (66), CPU/memory
+reserved contacts have pin-bound waivers, eight slot-bus source nets and 30
+card-local slot nets now affect execution; 419 remain unmodeled. The remaining
+groups are boot/programming (98), slot/control bus (36), CPU/memory
 (71), power/return (65), clock/reset (53), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

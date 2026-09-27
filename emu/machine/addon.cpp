@@ -244,6 +244,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
         routedSignal("sck_connected", slot.sckConnected);
         routedSignal("mosi_connected", slot.mosiConnected);
         routedSignal("miso_connected", slot.misoConnected);
+        routedSignal("irq_connected", slot.irqConnected);
       }
       opt.misoIdle = integerPin(wiring, "miso_idle", 0, 1);
       napi_value series = prop(env, wiring, "series_delay_ns");

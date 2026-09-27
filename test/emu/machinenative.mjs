@@ -146,13 +146,33 @@ export class Machine {
       throw new Error('machinenative: invalid display output path');
     if (netlistTop && typeof netlistTop.runtime.por_connected !== 'boolean')
       throw new Error('machinenative: invalid supervisor reset path');
+    let memoryWiring = netlistTop?.runtime;
+    if (netlistTop) {
+      const links = netlistTop.runtime.card_slot_links;
+      const signals = ['sck', 'mosi', 'cs', 'miso', 'irq'];
+      if (!links || !['gpu', 'io', 'storage', 'wifi', 'eink'].every((kind) =>
+        signals.every((signal) => typeof links[kind]?.[signal] === 'boolean')))
+        throw new Error('machinenative: missing routed card slot links');
+      const kinds = { hdmi: 'gpu', io: 'io', storage: 'storage', wifi: 'wifi',
+        eink: 'eink', eink750: 'eink' };
+      const slotWiring = netlistTop.runtime.slots.map((mainLink, index) => {
+        const installed = slots[index + 1];
+        if (!installed) return mainLink;
+        const kind = kinds[installed];
+        if (!kind) throw new Error(`machinenative: unknown installed card ${installed}`);
+        const cardLink = links[kind];
+        return { ...mainLink, ...Object.fromEntries(signals.map((signal) =>
+          [`${signal}_connected`, mainLink[`${signal}_connected`] && cardLink[signal]])) };
+      });
+      memoryWiring = { ...netlistTop.runtime, slots: slotWiring };
+    }
     m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
       ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
       storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
       einkPanelLink: netlistTop?.runtime.eink_panel_link ?? true,
       porConnected: netlistTop?.runtime.por_connected ?? true,
-      memoryWiring: netlistTop?.runtime,
+      memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
     if (sysctl) {

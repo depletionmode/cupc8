@@ -77,7 +77,56 @@ def resistor_between(circuit, a, b):
     return resistor
 
 
-def check(cards, main, pcb=None):
+def card_slot_routes(cards, board_paths):
+    """Bind each slot card's GPIO and buffered MISO legs to its PCB copper."""
+    rows, paths, missing = {}, [], []
+    contacts = {'sck': ('SCK', 'B13'), 'mosi': ('MOSI', 'B15'),
+                'cs': ('CS_n', 'A14'), 'irq': ('IRQ_n', 'B10')}
+    for card in ('gpu', 'io', 'storage', 'wifi', 'eink'):
+        circuit = cards[card]
+        board = board_paths.get(card) if board_paths else None
+        routed = board is not None and Path(board).is_file()
+        if routed:
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+        links = {}
+
+        def leg(name, net, first, last):
+            path(circuit, first, last)
+            length = None
+            if routed:
+                length = routed_distances(Path(board), f'/{net}', first, [last])[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'{card}.{first[0]}.{first[1]}',
+                          'to': f'{card}.{last[0]}.{last[1]}',
+                          'route_mm': length, 'runtime': f'{card}_{name}_connected'})
+            return length is not None
+
+        for signal, (net, contact) in contacts.items():
+            targets = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
+                       if ref == 'U1' and attached == f'/{net}']
+            if len(targets) != 1:
+                raise ValueError(f'{card}:{net}: expected one MCU GPIO')
+            links[signal] = leg(signal, net, ('J1', contact), targets[0])
+        buffer_ref = 'U3' if card == 'wifi' else 'U4'
+        internal = 'MISO_INT' if card == 'wifi' else 'MISO_OUT'
+        source = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
+                  if ref == 'U1' and attached == f'/{internal}']
+        if len(source) != 1:
+            raise ValueError(f'{card}:{internal}: expected one MCU MISO output')
+        miso_input = leg('miso', internal, source[0], (buffer_ref, '2'))
+        miso_output = leg('miso', 'MISO', (buffer_ref, '4'), ('J1', 'B16'))
+        miso_enable = leg('miso', 'CS_n', ('J1', 'A14'), (buffer_ref, '1'))
+        links['cs'] &= miso_enable
+        links['miso'] = miso_input and miso_output and miso_enable
+        rows[card] = links
+        for signal, connected in links.items():
+            if not connected:
+                missing.append(f'{card}:{signal}_slot_copper')
+    return rows, paths, missing
+
+
+def check(cards, main, pcb=None, card_boards=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
     fittings = [('cpu', 'J2', 'J1'), ('system', 'J3', 'J2')]
@@ -395,6 +444,29 @@ def check(cards, main, pcb=None):
                                   'route_mm': mm, 'runtime': f'slot{slot}_miso_connected'})
         if mm is None:
             manifest['runtime']['missing_routes'].append(f'slot{slot}_miso:/SPI_MISO')
+    for slot, wiring in enumerate(manifest['runtime']['slots'], 1):
+        net = f'/SLOT_nIRQ{slot-1}'
+        source = next(((ref, pin) for (ref, pin), attached in main.pins.items()
+                       if ref == 'U7' and attached == net), None)
+        target = (f'J{10+slot}', 'B10')
+        if source is None:
+            raise ValueError(f'{net}: chipset IRQ input missing')
+        path(main, source, target)
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            from ibis_bus import routed_distances
+            mm = routed_distances(Path(pcb), net, source, [target])[
+                f'{target[0]}.{target[1]}']
+        wiring['irq_connected'] = mm is not None
+        manifest['paths'].append({'from': f'main.{source[0]}.{source[1]}',
+                                  'to': f'main.{target[0]}.{target[1]}',
+                                  'route_mm': mm, 'runtime': f'slot{slot}_irq_connected'})
+        if mm is None:
+            manifest['runtime']['missing_routes'].append(f'slot{slot}_irq:{net}')
+    card_links, card_paths, card_missing = card_slot_routes(cards, card_boards)
+    manifest['runtime']['card_slot_links'] = card_links
+    manifest['paths'].extend(card_paths)
+    manifest['runtime']['missing_routes'].extend(card_missing)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # CPU driver pack channels must remain explicit; the native board model
@@ -614,6 +686,10 @@ def check(cards, main, pcb=None):
     for name in epd_contacts:
         runtime_net('eink', name)
         runtime_net('eink', f'{name}_J')
+    for card in ('gpu', 'io', 'storage', 'wifi', 'eink'):
+        for name in ('SCK', 'MOSI', 'CS_n', 'IRQ_n', 'MISO',
+                     'MISO_INT' if card == 'wifi' else 'MISO_OUT'):
+            runtime_net(card, name)
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest
@@ -622,16 +698,20 @@ def check(cards, main, pcb=None):
 def main_cli():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--main-netlist', type=Path, default=ROOT / 'build/hw/main/main.net')
+    parser.add_argument('--card-board-dir', type=Path, default=ROOT / 'build/hw',
+                        help='directory containing each generated card PCB under CARD/CARD.kicad_pcb')
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--require-route', action='store_true', help='fail unless memory nets have routed copper')
+    parser.add_argument('--require-route', action='store_true', help='fail unless required board/card paths have routed copper')
     parser.add_argument('--require-coverage', action='store_true', help='fail on any modeled/waiver coverage gap')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='cupc8-cosim-') as temporary:
         manifest = check(exported_cards(Path(temporary)), read(args.main_netlist),
-                         args.main_netlist.with_suffix('.kicad_pcb'))
+                         args.main_netlist.with_suffix('.kicad_pcb'),
+                         {card: args.card_board_dir / card / f'{card}.kicad_pcb'
+                          for card in ('gpu', 'io', 'storage', 'wifi', 'eink')})
     if args.require_route and not manifest['runtime']['routed_top']:
         missing = manifest['runtime']['missing_routes']
-        raise ValueError(f'main-board co-sim paths lack routed copper: {", ".join(missing)}')
+        raise ValueError(f'co-sim paths lack routed copper: {", ".join(missing)}')
     if args.require_coverage and not manifest['coverage_complete']:
         missing = manifest['unmodeled_nets']
         raise ValueError(f'{len(missing)} netlist nets lack a model or explicit waiver: {", ".join(missing[:25])}')

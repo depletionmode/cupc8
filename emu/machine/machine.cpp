@@ -454,7 +454,8 @@ uint32_t Machine::inputs(bool por) {
   for (auto &[slot, card] : cards) {
     if (slot <= 6 && selected(slot, out) && slotWiring[slot - 1].miso &&
         slotWiring[slot - 1].misoConnected) miso &= card->miso();
-    if (slot <= 6 && card->irq()) nirq &= ~(1u << slotWiring[slot - 1].irq);
+    if (slot <= 6 && slotWiring[slot - 1].irqConnected && card->irq())
+      nirq &= ~(1u << slotWiring[slot - 1].irq);
   }
   const bool reset = sysctl && sysctl->sysReset();
   const uint32_t bridge = br.sck | (br.mosi << 1) | (br.ncs << 2);

@@ -37,7 +37,10 @@ def main():
             run([ROOT / 'tools/fw_esp32c3.sh', 'qemu'])
             run([ROOT / 'tools/qemu_build.sh'])
     if args.case == 'E2E-001':
-        run([sys.executable, ROOT / 'test/hw/test_cosim_wiring.py', '--main-netlist', args.main_netlist])
+        run([sys.executable, ROOT / 'test/hw/test_cosim_wiring.py',
+             '--main-netlist', args.main_netlist,
+             '--main-board', args.main_netlist.with_suffix('.kicad_pcb'),
+             '--card-board-dir', ROOT / 'build/hw'])
         run([sys.executable, ROOT / 'test/hw/test_cosim_runtime.py', '--top', output])
         run(['node', ROOT / 'test/hw/test_cosim_pixels.mjs'],
             env=dict(os.environ, CUPC8_COSIM_TOP=str(output)))
