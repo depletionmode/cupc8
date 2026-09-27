@@ -40,11 +40,25 @@ escape by 0.3 mm and widening the adjacent feed produced a measured
 The [fitted connector's manufacturer page](https://en.krhro.com/Product-Details/726.html)
 states a maximum contact resistance of 50 mΩ. If two contacts per rail each
 reach that ceiling and share perfectly, their VBUS plus GND contribution can
-reach 50 mΩ before PCB copper. Actual contact sharing and the mating plug
-are not bounded. The assembled loop therefore cannot be certified to 20 mΩ
-from the public part limit; it needs a qualified lower contact bound or a
-different connector/loop requirement. Finished local copper/via minima and
-fault-temperature coupling also remain unqualified.
+reach 50 mΩ before PCB copper. Even counting all four USB-C VBUS contacts
+and all four GND contacts as separate, equally loaded 50 mΩ paths yields a
+25 mΩ loop ceiling. Actual contact sharing, the mating plug and whether the
+published number applies to each finger or tied contact group are not
+bounded. At the eFuse's 3.21 A maximum current-limit value, these 25/50 mΩ
+contact cases alone dissipate 258/515 mW. The connector's 80 °C maximum
+operating temperature has no qualified fault-heating margin.
+
+**Requirement decision:** retain the whole-loop ≤20 mΩ limit and keep MB-005
+red. The fitted HRO public guarantee cannot establish it, regardless of
+PCB route quality. For a 5 mΩ design margin, allocate no more than 4 mΩ
+to the combined mated VBUS and GND contact groups, 7 mΩ to positive copper,
+3 mΩ to GND copper and 1 mΩ to transitions/solder. That needs either a
+connector and specified mating plug guaranteed at the assembled 4 mΩ
+contact limit over temperature and life, or a controlled four-terminal
+qualification of this exact connector pair. A connector replacement must
+still fit the fixed J1 envelope and undergo a fresh full-board route.
+Finished local copper/via minima and fault-temperature coupling also remain
+unqualified.
 
 A complete routed candidate must pass source replay, KiCad DRC, zero opens,
 schematic parity, corner-aware filled-copper extraction and assembled loop
