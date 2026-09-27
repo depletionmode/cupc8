@@ -125,11 +125,14 @@ class FabCheckTests(unittest.TestCase):
                         + '%TO.N,' + second_net + f'*%\nX{second_x}Y1000000D03*\nM02*\n')
             path.write_text(gerber(1351000))
             self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
+            path.write_text(gerber(1350000))  # exact rule, uncertain after tessellation
+            with self.assertRaisesRegex(ValueError, 'copper clearance indeterminate'):
+                gerberdrc.check_clearance([path], .15)
             path.write_text(gerber(1200000))
-            with self.assertRaisesRegex(ValueError, 'copper clearance'):
+            with self.assertRaisesRegex(ValueError, 'copper clearance below rule'):
                 gerberdrc.check_clearance([path], .15)
             path.write_text(gerber(1349999))  # 0.149999 mm edge clearance
-            with self.assertRaisesRegex(ValueError, 'copper clearance'):
+            with self.assertRaisesRegex(ValueError, 'copper clearance below rule'):
                 gerberdrc.check_clearance([path], .15)
             # A 2 mm circle at this angle falls halfway between buffer chords.
             # An inscribed polygon alone would overstate the 0.14999 mm gap.

@@ -44,6 +44,7 @@ class Geometry:
             raise ValueError('cannot initialize GEOS')
         self.reader = self.call('GEOSWKTReader_create_r', ctypes.c_void_p, [ctypes.c_void_p])(self.ctx)
         self.shapes = []
+        self.overfill = {}
 
     def call(self, name, result, args):
         function = getattr(self.lib, name)
@@ -85,6 +86,7 @@ class Geometry:
         if not result:
             raise ValueError('GEOS failed to buffer plotted geometry')
         self.shapes.append(result)
+        self.overfill[result] = conservative_radius - radius
         return result
 
     def distance(self, first, second):
@@ -508,8 +510,20 @@ def check_clearance(paths, minimum, minimum_track=None):
                         continue
                     distance = engine.distance(shape, other)
                     if distance < minimum:
-                        raise ValueError('%s: %s to %s copper clearance lower bound %.6f mm < %.6f mm' %
-                                         (Path(path).name, net, other_net, distance, minimum))
+                        # The expanded 64-chord arcs guarantee a lower bound.
+                        # The largest possible excess over the true plotted arc
+                        # is the buffer radius inflation at each object, plus
+                        # two nanometres for WKT coordinate rounding.
+                        uncertainty = (engine.overfill.get(shape, 0) +
+                                       engine.overfill.get(other, 0) + .000000002)
+                        upper = distance + uncertainty
+                        if upper >= minimum:
+                            raise ValueError('%s: %s to %s copper clearance indeterminate: '
+                                             'lower bound %.9f mm, upper bound %.9f mm, rule %.9f mm' %
+                                             (Path(path).name, net, other_net, distance, upper, minimum))
+                        raise ValueError('%s: %s to %s copper clearance below rule: '
+                                         'upper bound %.9f mm < %.9f mm' %
+                                         (Path(path).name, net, other_net, upper, minimum))
                 for cx in range(xmin, xmax+1):
                     for cy in range(ymin, ymax+1):
                         cells[(cx, cy)].append(index)
