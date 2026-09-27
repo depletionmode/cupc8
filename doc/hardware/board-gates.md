@@ -71,6 +71,31 @@ fail until their contract coverage exists:
   buck, LDO, HDMI, USB boost and budget models still execute before these
   missing portions fail.
 
+  **MB-051 is red on reset ownership and rail qualification (2026-09-27).**
+  Its catalogue and `power.md` require sysctl to hold `/CPU_RST` and all six
+  `CARD_RST_n` lines until the rails are within 5%. The main schematic instead
+  connects U6 MAX811's `nPOR` to the chipset, while the chipset alone drives
+  `CPU_nRST` from `nPOR`, CPU-card `CDONE`, and bridge hold control
+  (`main.py`, `chipset.vhd`). U13's six slot reset pins have 10 kΩ pull-ups
+  to 3V3 and its outputs power up as inputs. Sysctl has no direct CPU-reset
+  output: its `SYS_nRST` reaches U6's manual-reset input. Its only rail ADC
+  is the main 1V2 divider; firmware reads that channel for `STATUS` and
+  initializes all machine-facing pins as inputs. `sysctl_init` does no
+  power-on hold or rail check. Thus CPU and cards can be released before
+  sysctl boots, and the machine is designed to boot without that card. The
+  existing supervisor/CDONE path does not establish a 5% window for 5V,
+  3V3, 1V2, or card-local rails. KiCad DRC and a nominal power simulation
+  cannot establish the MB-051 claim.
+
+  The smallest robust correction is an autonomous rails-good reset path on
+  the main board: qualify the specified main/slot supply rails to the stated
+  window, assert reset during ramp or brown-out, and release U6/chipset and
+  each slot reset only after a defined settling interval. Keep sysctl's
+  command-driven reset overrides and the unplugged-system-card boot path.
+  Card-local rails need separate qualification or an explicit narrower
+  contract. This needs a schematic/netlist change, timing model and routed
+  board recheck; no firmware-only change can guarantee cold-start holds.
+
   CC-005 now binds the CPU card's RT9013 U3, input C21, output C22,
   C1-C4 decouplers and the four FPGA VCC pins to the exported netlist and
   PCB. The 2026-09-27 routed CPU PCB (SHA-256 prefix `cd72e96e79e9`,
