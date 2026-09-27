@@ -33,8 +33,8 @@ fail until their contract coverage exists:
   `fabcheck.py` independently parses plotted copper, mask, paste, silk,
   outline, and Excellon data for its implemented checks. Passing those checks
   still leaves the fab row red. The remaining plotted-geometry rules are
-  minimum neck width in filled copper and silk regions, silkscreen text height,
-  and drill-to-drill clearance. The card boards also configure no positive
+  minimum neck width in filled copper and silk regions and silkscreen text
+  height. The card boards also configure no positive
   solder-mask web minimum. Gerber regions use `G36` polygons and a zero-width
   aperture; checking only draw aperture widths cannot establish their minimum
   neck width. Gerber strokes have no text-object or character grouping, so
@@ -44,6 +44,15 @@ fail until their contract coverage exists:
   establish the missing rules from the plotted outputs, or explicitly narrow
   the fab contract with documented approval; removing the final failure does
   not certify a package.
+
+  Excellon drill-to-drill clearance is checked against the saved board's
+  positive hole-to-hole rule using exact rational distances between circular
+  hits and G85 slot centerlines. Exact-boundary cuts pass; one micrometre of
+  encroachment fails. The saved system card has a 0.3 mm GND via drill at
+  (38.189, -6.258) and J1 pad 1's 0.8 mm plated slot at x = 37.670 mm;
+  their cuts overlap by about 0.031 mm. The other six card drill sets pass
+  this 0.5 mm spacing rule. This check does not resolve the plotted copper,
+  silk, or mask gaps above.
 
   The 2026-09-27 seven-card diagnostic skipped only copper-to-edge and CPL
   review to reach that final coverage gate. Its success on implemented checks

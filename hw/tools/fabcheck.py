@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check fabrication files against a DRC-clean KiCad board and plotted copper."""
 from collections import Counter
+from fractions import Fraction
 import json
 import math
 from pathlib import Path
@@ -22,7 +23,6 @@ PLOTTED_DRC_GAPS = (
     'minimum neck width in filled copper regions',
     'minimum neck width in filled silkscreen regions',
     'silkscreen text height (Gerber has no text objects or character grouping)',
-    'drill-to-drill clearance from the Excellon cuts',
 )
 
 
@@ -251,6 +251,82 @@ def check_drills(board, fab, return_hits=False):
     return (sum(actual.values()), actual, npth_actual) if return_hits else sum(actual.values())
 
 
+def check_drill_spacing(cuts, minimum):
+    """Check edge clearance of every pair of verified Excellon cuts exactly.
+
+    Drill coordinates and tools are limited to 0.001 mm by `drill_hits`.
+    Integer micrometres and rational squared distances preserve exact rule
+    boundaries, including rounded slots; no tessellated hole can overstate a
+    clearance.
+    """
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('drill spacing requires a positive hole-to-hole rule')
+    rule = Fraction(str(minimum)) * 1000
+
+    def point_segment_distance2(point, segment):
+        a, b = segment
+        vx, vy = b[0] - a[0], b[1] - a[1]
+        wx, wy = point[0] - a[0], point[1] - a[1]
+        length2 = vx * vx + vy * vy
+        if not length2:
+            return wx * wx + wy * wy
+        projection = wx * vx + wy * vy
+        if projection <= 0:
+            return wx * wx + wy * wy
+        if projection >= length2:
+            return (point[0] - b[0]) ** 2 + (point[1] - b[1]) ** 2
+        cross = wx * vy - wy * vx
+        return Fraction(cross * cross, length2)
+
+    def orientation(a, b, c):
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    def intersects(first, second):
+        a, b = first
+        c, d = second
+        ab_c, ab_d = orientation(a, b, c), orientation(a, b, d)
+        cd_a, cd_b = orientation(c, d, a), orientation(c, d, b)
+        if not (min(ab_c, ab_d) <= 0 <= max(ab_c, ab_d) and
+                min(cd_a, cd_b) <= 0 <= max(cd_a, cd_b)):
+            return False
+        return (max(min(a[0], b[0]), min(c[0], d[0])) <=
+                min(max(a[0], b[0]), max(c[0], d[0])) and
+                max(min(a[1], b[1]), min(c[1], d[1])) <=
+                min(max(a[1], b[1]), max(c[1], d[1])))
+
+    def segment_distance2(first, second):
+        if intersects(first, second):
+            return 0
+        return min(*(point_segment_distance2(point, other)
+                     for segment, other in ((first, second), (second, first))
+                     for point in segment))
+
+    def cut(item):
+        if len(item) == 3:
+            x, y, diameter = item
+            start = end = (round(x * 1000), round(y * 1000))
+        elif len(item) == 6 and item[0] == 'slot':
+            _, x0, y0, x1, y1, diameter = item
+            start = (round(x0 * 1000), round(y0 * 1000))
+            end = (round(x1 * 1000), round(y1 * 1000))
+        else:
+            raise ValueError('unsupported Excellon cut key: %r' % (item,))
+        if not math.isfinite(diameter) or diameter <= 0:
+            raise ValueError('invalid Excellon drill diameter')
+        return (start, end), round(diameter * 1000)
+
+    if not cuts:
+        raise ValueError('no verified Excellon cuts for drill spacing')
+    items = [(key, *cut(key)) for key in cuts.elements()]
+    for index, (first_key, first, first_diameter) in enumerate(items):
+        for second_key, second, second_diameter in items[index + 1:]:
+            minimum_centerline = rule + Fraction(first_diameter + second_diameter, 2)
+            if segment_distance2(first, second) < minimum_centerline ** 2:
+                raise ValueError('Excellon drill-to-drill clearance below %.3f mm: %s and %s' %
+                                 (minimum, first_key, second_key))
+    return len(items)
+
+
 def check_review(out):
     """Require a recorded visual CPL overlay review tied to exact artifacts."""
     path = out / 'fab' / 'cpl-review.json'
@@ -273,6 +349,7 @@ def check_review(out):
 def check(out):
     board, layers = export_parity(out, out / 'fab')
     holes, cuts, npth_cuts = check_drills(board, out / 'fab', return_hits=True)
+    check_drill_spacing(cuts, pcbnew.ToMM(board.GetDesignSettings().m_HoleToHoleMin))
     copper = sorted(path for path in (out / 'fab').iterdir()
                     if path.suffix.lower() in ('.gtl', '.gbl', '.g1', '.g2', '.g3', '.g4'))
     if len(copper) != board.GetCopperLayerCount():
