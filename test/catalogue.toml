@@ -137,7 +137,7 @@ checks = "≥ 10⁶ constrained-random instructions (all opcodes, IRQs, WAI, tim
 method = "generator → assembler → lockstep, fixed seeds in CI plus one random seed per run (seed logged)"
 kind = "sim"
 vrow = "1.2"
-cmd = "python3 tools/cpufuzz.py --engine verilator --programs 300 --seed 100 --min-instructions 1000000"
+cmd = "python3 tools/cpufuzz.py --engine verilator --programs 550 --seed 100 --min-instructions 1000000"
 
 
 [[test]]
