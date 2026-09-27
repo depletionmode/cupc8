@@ -29,6 +29,36 @@ The routed GPU board used for the four exploratory runs is SHA-256 `86185894b986
 
 Saved-field postprocessing reproduces the generated geometry for all four pairs after the refactor. A fresh GPU pipeline receipt is required before `SI-003` can accept these runs against current sources. This does not establish the full row 4.6 impedance or loss target: USB routes, connector and pad geometry, physical losses, pair coupling, and a mesh sensitivity study remain open.
 
+## IO card USB field model
+
+`hw/si/openems_usb_io.py` reads the completed IO card's actual F.Cu routes
+from the outputs of 27 Ω resistors R14/R15 to USB-A J2 pins 2/3. It verifies
+the four pad nets, direct copper connectivity, 0.2 mm track width, and absence
+of vias or layer changes. An open D+ segment is rejected by
+`test/hw/test_usb_io_field.py`. On the current routed-card snapshot, D+ is
+12.821 mm and D− is 27.045 mm. The model includes their ESD stubs and a
+rectangular In1.Cu ground plane with the [JLC04161H-7628 stackup](https://jlcpcb.com/impedance).
+It omits exact pad and connector metal, ESD-device capacitance, copper and
+dielectric loss, solder mask, and the ground plane's local antipads.
+
+Two 2D differential lumped ports are normalized to 90 Ω. A declared 90 Ω
+port measured about 81 Ω at the passive end on the 0.075 mm mesh, so its
+S-parameters were invalid. A 100 Ω declared resistor measures about 90.0 Ω
+and leaves less than 0.05% passive-port incident voltage at 100–480 MHz. The
+longer run reached only −34.4 dB energy decay after 120,000 timesteps, short
+of the required −40 dB. Its S11/S21 values are therefore **not accepted** as
+signal-integrity evidence even though passive power and port checks pass.
+The script exits nonzero and writes `converged: false` and
+`valid_for_row_4_6: false`. A converged rerun, mesh/straight-route sensitivity,
+source and receiver USB PHY behavior, the system card's USB-C path and final
+main-board route remain required for `MB-007` and row 4.6.
+
+```sh
+python3 test/hw/test_usb_io_field.py --board build/hw/io/io.kicad_pcb
+python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
+  --out build/hw/si/usb-io.json --require-evidence
+```
+
 ## IBIS specification and pinned FPGA model
 
 [IBIS](https://ibis.org/about/) means *I/O Buffer Information Specification*. It describes a chip pin's analog input/output behavior with current-versus-voltage tables, switching waveforms, clamps, and package parasitics. It does not describe the FPGA's logic or the PCB trace. The applicable format reference for our file is the [official IBIS 4.0 specification](https://www.ibis.org/ver4.0/ver4_0.pdf): the vendor file says `[IBIS ver] 4.0`. The [IBIS Open Forum's specification index](https://www.ibis.org/specs/) lists later revisions, including 8.0, but those do not change which format this pinned file declares.
