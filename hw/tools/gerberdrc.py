@@ -991,8 +991,8 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
     """Measure touching filled regions with exact rectangular flash widening.
 
     Every touching same-net region or R-aperture flash joins its component.
-    Its flash-only spans are exempt from the filled-region width test. One
-    other touching operation can be included through an outward bounding box:
+    Its flash-only spans are exempt from the filled-region width test. Up to
+    four other touching operations can be included through outward boxes:
     if even that guaranteed superset has a thin region span, the real ink
     does too. More complex components remain at the final red gate.
     """
@@ -1045,22 +1045,23 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
         unknown = [(other_net, other, bounds) for other_net, other, bounds in objects
                    if other_net == net and other not in member_shapes and
                    any(touching(member, (other_net, other, bounds)) for member in members)]
-        if len(unknown) > 1:
+        if len(unknown) > 4:
             continue
         if unknown:
-            # A real connection through the unknown operation implies its
-            # bounding boxes overlap. Reject this bounded proof if any other
-            # dark object could join through it, including a second stroke.
-            _, extra, (x0, y0, x1, y1) = unknown[0]
-            if any(other_net == net and other not in member_shapes and other != extra and
-                   not (x1 < a0 or a1 < x0 or y1 < b0 or b1 < y0)
+            # An omitted object's ink could widen this component through any
+            # boxed operation. Its bounds must overlap that box, so defer if
+            # such an object exists. All boxes in unknown are included below.
+            unknown_shapes = {extra for _, extra, _ in unknown}
+            if any(other_net == net and other not in member_shapes and
+                   other not in unknown_shapes and
+                   any(not (x1 < a0 or a1 < x0 or y1 < b0 or b1 < y0)
+                       for _, _, (x0, y0, x1, y1) in unknown)
                    for other_net, other, (a0, b0, a1, b1) in objects):
                 continue
         elif len(group) < 2:
             continue  # the isolated-region check already covered it
         contours = [member[4] for member in regions + flashes]
-        if unknown:
-            x0, y0, x1, y1 = unknown[0][2]
+        for _, _, (x0, y0, x1, y1) in unknown:
             scale = 2000000
             # One full micrometre outward beyond the parser's already
             # conservative bounds covers float and half-grid rounding.
@@ -1072,7 +1073,7 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
         if width_grid is not None and width_grid < rule_grid:
             raise ValueError('%s:%d: connected filled region union has a %.6f mm span below %.6f mm' %
                              (Path(path).name, regions[0][3], width_grid/2000000, minimum))
-        if width_grid is None:
+        if width_grid is None and len(unknown) <= 1:
             witness = connected_polygon_scanline_witness(contours, len(regions), minimum)
             if witness is not None:
                 raise ValueError('%s:%d: connected nonorthogonal filled region union has a %.6f mm '

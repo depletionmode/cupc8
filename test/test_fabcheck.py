@@ -458,10 +458,29 @@ class FabCheckTests(unittest.TestCase):
             copper.write_text(prefix + region +
                               'X1000000Y1040000D02*\nX2000000Y1040000D01*\nM02*\n')
             self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
-            # Two unsupported dark operations remain outside the one-object
-            # witness; the final incomplete-coverage gate retains that case.
+            # Two unknown flashes widen only local pieces of the region.
+            # Their outward boxes cannot cover its thin center span.
             copper.write_text(prefix + region +
-                              'X1400000Y1040000D03*\nX1600000Y1040000D03*\nM02*\n')
+                              'X1100000Y1040000D03*\nX1900000Y1040000D03*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.080000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # A third flash touches the first flash but not the region. The
+            # bounded proof must defer because its ink might widen the union.
+            copper.write_text(prefix + region +
+                              'X1100000Y1040000D03*\nX1900000Y1040000D03*\n'
+                              'X1100000Y1230000D03*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 4)
+            # Five direct operations exceed the bounded proof, even though
+            # the central span still appears thin in this particular plot.
+            copper.write_text(prefix + region + ''.join(
+                'X%dY1040000D03*\n' % x for x in
+                (1050000, 1080000, 1110000, 1140000, 1170000)) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 6)
+            # Two strokes fully widen the region; their boxes must not
+            # invent a failure where no sub-rule span remains.
+            copper.write_text(prefix + region +
+                              'X1000000Y1040000D02*\nX1500000Y1040000D01*\n'
+                              'X1500000Y1040000D02*\nX2000000Y1040000D01*\nM02*\n')
             self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
 
     def test_nonorthogonal_filled_scanline_witness(self):
