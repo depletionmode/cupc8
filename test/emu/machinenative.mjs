@@ -131,7 +131,13 @@ export class Machine {
     const netlistTop = process.env.CUPC8_COSIM_TOP && JSON.parse(fs.readFileSync(process.env.CUPC8_COSIM_TOP, 'utf8'));
     if (netlistTop && (!netlistTop.runtime || !netlistTop.boards?.includes('main')))
       throw new Error('machinenative: invalid schematic-derived top');
-    m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi, root: ROOT, threaded, spiLog,
+    const trips = netlistTop?.runtime.cc_trip_volts;
+    if (netlistTop && (!Array.isArray(trips) || trips.length !== 2 || trips.some(v => !Number.isFinite(v))))
+      throw new Error('machinenative: invalid Type-C comparator model');
+    // pwrHi names the host source class. For the netlist top, drive the
+    // comparator with the worst 3 A minimum or 1.5 A maximum CC voltage.
+    const pwrHiAtFpga = netlistTop ? (pwrHi ? 1.524 : 1.090) >= Math.max(...trips) : pwrHi;
+    m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
       memoryWiring: netlistTop?.runtime,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };

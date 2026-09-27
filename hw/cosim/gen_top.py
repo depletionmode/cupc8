@@ -64,6 +64,18 @@ def named_pin(circuit, ref, name):
     return (ref, pins[0])
 
 
+def ohms(value):
+    scale = {'k': 1e3, 'M': 1e6}
+    return float(value[:-1]) * scale[value[-1]] if value[-1] in scale else float(value)
+
+
+def resistor_between(circuit, a, b):
+    resistor = circuit.series(a, b)
+    if resistor is None:
+        raise ValueError(f'{a} to {b}: required resistor missing')
+    return resistor
+
+
 def check(cards, main, pcb=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
@@ -145,6 +157,26 @@ def check(cards, main, pcb=None):
         net = f'/MEM_D{i}'
         if sum(n == net for (ref, _), n in main.pins.items() if ref in ('U7', 'U9', 'U10')) != 3:
             raise ValueError(f'{net}: FPGA/SRAM/ROM data pin missing')
+        endpoints = [(ref, pin) for (ref, pin), attached in main.pins.items()
+                     if ref in ('U7', 'U9', 'U10') and attached == net]
+        for target in endpoints[1:]:
+            path(main, endpoints[0], target)
+            manifest['paths'].append({'from': f'main.{endpoints[0][0]}.{endpoints[0][1]}',
+                                      'to': f'main.{target[0]}.{target[1]}', 'net': net.lstrip('/')})
+    for net, chips in (('MEM_nOE', ('U9', 'U10')), ('MEM_nWE', ('U9', 'U10')),
+                       ('MEM_nCE_RAM', ('U9',)), ('MEM_nCE_ROM', ('U10',))):
+        source = [(ref, pin) for (ref, pin), attached in main.pins.items()
+                  if ref == 'U7' and attached == f'/{net}']
+        if len(source) != 1:
+            raise ValueError(f'{net}: chipset driver missing')
+        for chip in chips:
+            sinks = [(ref, pin) for (ref, pin), attached in main.pins.items()
+                     if ref == chip and attached == f'/{net}']
+            if len(sinks) != 1:
+                raise ValueError(f'{net}: {chip} pin missing')
+            path(main, source[0], sinks[0])
+            manifest['paths'].append({'from': f'main.U7.{source[0][1]}',
+                                      'to': f'main.{chip}.{sinks[0][1]}', 'net': net})
     def chip_map(ref, prefix, count):
         mapping = []
         for i in range(count):
@@ -283,6 +315,23 @@ def check(cards, main, pcb=None):
         path(main, named_pin(main, source_ref, source_pin), fpga[0])
         manifest['paths'].append({'from': f'main.{source_ref}.{source_pin}',
                                   'to': f'main.U7.{fpga[0][1]}', 'net': destination_net.lstrip('/')})
+    # The USB-C symbol names these pads A5/B5, whereas the comparator names
+    # its actual package pins. Preserve resistor values in the policy model.
+    cc1, cc2 = ('J1', 'A5'), ('J1', 'B5')
+    plus, minus = named_pin(main, 'U5', 'IN+'), named_pin(main, 'U5', 'IN')
+    vcc, vee = named_pin(main, 'U5', 'VCC'), named_pin(main, 'U5', 'VEE')
+    r_cc1 = resistor_between(main, cc1, plus)
+    r_cc2 = resistor_between(main, cc2, plus)
+    r_top = resistor_between(main, vcc, minus)
+    r_bottom = resistor_between(main, minus, vee)
+    for contact in (cc1, cc2):
+        rd = resistor_between(main, contact, vee)
+        if not 4500 <= ohms(rd.value) <= 5600:
+            raise ValueError(f'{contact}: invalid Type-C Rd {rd.value}')
+    reference = 3.3 * ohms(r_bottom.value) / (ohms(r_top.value) + ohms(r_bottom.value))
+    fractions = (ohms(r_cc2.value) / (ohms(r_cc1.value) + ohms(r_cc2.value)),
+                 ohms(r_cc1.value) / (ohms(r_cc1.value) + ohms(r_cc2.value)))
+    manifest['runtime']['cc_trip_volts'] = [round(reference / f, 6) for f in fractions]
     clock = named_pin(main, 'Y1', 'OUT')
     fpga_clk = [(ref, pin) for (ref, pin), net in main.pins.items()
                 if ref == 'U7' and net == '/CLK12']
@@ -299,6 +348,27 @@ def check(cards, main, pcb=None):
         if not any(value == '47k' for _, value in
                    ((r.ref, r.value) for r, other in main.pulls('/+3V3') if other == net)):
             raise ValueError(f'CPU_D{i}: missing weak keeper')
+    circuits = {'main': main, **cards}
+    modeled = set()
+    for connection in manifest['contacts']:
+        for endpoint in connection:
+            board, ref, pin = endpoint.split('.', 2)
+            modeled.add((board, circuits[board].net(ref, pin)))
+    for connection in manifest['paths']:
+        for key in ('from', 'to'):
+            if key in connection:
+                board, ref, pin = connection[key].split('.', 2)
+                if (ref, pin) in circuits[board].pins:
+                    modeled.add((board, circuits[board].net(ref, pin)))
+    unmodeled = []
+    for board, circuit in circuits.items():
+        for net in circuit.nets:
+            if net.startswith('unconnected-'):
+                continue  # KiCad's explicit no-connect marker, no electrical node
+            if (board, net) not in modeled:
+                unmodeled.append(f'{board}:{net.lstrip("/")}')
+    manifest['unmodeled_nets'] = sorted(unmodeled)
+    manifest['coverage_complete'] = not unmodeled
     return manifest
 
 
@@ -307,6 +377,7 @@ def main_cli():
     parser.add_argument('--main-netlist', type=Path, default=ROOT / 'build/hw/main/main.net')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--require-route', action='store_true', help='fail unless memory nets have routed copper')
+    parser.add_argument('--require-coverage', action='store_true', help='fail on any modeled/waiver coverage gap')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='cupc8-cosim-') as temporary:
         manifest = check(exported_cards(Path(temporary)), read(args.main_netlist),
@@ -314,6 +385,9 @@ def main_cli():
     if args.require_route and not manifest['runtime']['routed_top']:
         missing = manifest['runtime']['missing_routes']
         raise ValueError(f'main-board co-sim paths lack routed copper: {", ".join(missing)}')
+    if args.require_coverage and not manifest['coverage_complete']:
+        missing = manifest['unmodeled_nets']
+        raise ValueError(f'{len(missing)} netlist nets lack a model or explicit waiver: {", ".join(missing[:25])}')
     output = json.dumps(manifest, indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

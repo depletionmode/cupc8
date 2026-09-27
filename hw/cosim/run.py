@@ -24,8 +24,11 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     # Each make-verify row owns its manifest. The strict generator refuses an
     # incomplete route, even though development probes may use it provisionally.
-    run([sys.executable, ROOT / 'hw/cosim/gen_top.py', '--main-netlist',
-         args.main_netlist, '--require-route', '--output', output])
+    generation = [sys.executable, ROOT / 'hw/cosim/gen_top.py', '--main-netlist',
+                  args.main_netlist, '--require-route', '--output', output]
+    if args.case == 'E2E-001':
+        generation.insert(-2, '--require-coverage')
+    run(generation)
     # Firmware and the native addon are shared build products. Parallel E2E
     # rows wait here so their build steps cannot overwrite each other.
     with (output.parent / 'build.lock').open('w') as lock:

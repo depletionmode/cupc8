@@ -152,8 +152,10 @@ async function e2e003() {
 // ------------------------------------------------------------------ E2E-004
 // Negative boot cases on the native board and real card firmware. A new
 // Machine is a power cycle: the slot population changes only while off.
-// The model exposes the source class through the chipset's PWR_HI input;
-// analogue CC voltage and supply-current behavior are outside this test.
+// Without a netlist top the model drives PWR_HI from the source class. With
+// CUPC8_COSIM_TOP it uses the schematic's CC averaging/reference resistor
+// network and the source-class voltage corners. Supply-current behavior is
+// covered separately in POW-005/006.
 // An upload interrupted between verified protocol chunks goes through sysctl.
 async function e2e004() {
   log('E2E-004: empty slots, removal between power cycles, corrupt kernel');

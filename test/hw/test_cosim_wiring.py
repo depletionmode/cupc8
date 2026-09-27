@@ -50,6 +50,10 @@ def main_cli():
         del broken_policy.pins[named_pin(broken_policy, 'U5', 'OUT')]
         rejected(cards, broken_policy, 'missing Type-C power policy output')
 
+        broken_threshold = copy.deepcopy(main)
+        broken_threshold.resistors = tuple(r for r in broken_threshold.resistors if r.ref != 'R15')
+        rejected(cards, broken_threshold, 'missing Type-C comparator reference resistor')
+
         broken_clock = copy.deepcopy(main)
         broken_clock.resistors = tuple(r for r in broken_clock.resistors if r.ref != 'R17')
         rejected(cards, broken_clock, 'missing chipset oscillator series resistor')

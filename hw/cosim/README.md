@@ -17,6 +17,15 @@ times plus routed copper delay (7 ps/mm). A memory bus with no routed copper
 gets provisional access times and `routed_timing: false`. The manifest lists
 unrouted CPU, memory, slot, bridge, clock, reset and power-policy signal nets
 under `missing_routes`; `--require-route` rejects them.
+The generator also lists every named net that is not attached to an executed
+model path under `unmodeled_nets`. E2E-001 uses `--require-coverage` and fails
+until each remaining net has a model or an explicit reviewed waiver. This
+keeps local card and power circuits from being silently counted as covered.
+
+The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
+reference network before it reaches the chipset's `PWR_HI` pin. The nominal
+trip is 1.289 V on the active CC line; the test drives the 3 A minimum or
+1.5 A maximum CC voltage, so a bad resistor network changes the class.
 
 From the repo root, after building the main board:
 
@@ -39,6 +48,7 @@ and a missing MISO pull are rejected. The third proves that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps and bridge SCK/MOSI swaps change the
 running machine's result. The manifest currently
 covers the CPU, main memory, slot data paths and system bridge. Power and
-reset circuits still use native machine wiring, and the current main-board
+reset circuits still use native machine wiring except the Type-C class input,
+and the current main-board
 route lacks memory copper. E2E-001 through E2E-004 remain pending until those
 paths and the full programs are exercised with a final routed board.
