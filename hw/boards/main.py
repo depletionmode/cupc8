@@ -1191,11 +1191,18 @@ def _label_keepouts(board):
     refs |= set(r for r, side in LABEL_SIDE.items() if r.startswith(("R", "Q")))
     # and the CPU socket channel's row of resistors (R85, R91 came out small, R86 turned)
     refs |= {"R%d" % i for i in list(range(80, 88)) + list(range(90, 98))}
+    tracks = board.Tracks()                      # indexed: iterating it breaks on Python 3.14
+    vias = [(pcbnew.ToMM(t.GetPosition().x), pcbnew.ToMM(t.GetPosition().y)) for t in
+            [tracks[i] for i in range(len(tracks))] if t.Type() == pcbnew.PCB_VIA_T]
     for ref in sorted(refs):
         fp = board.FindFootprintByReference(ref)
         if fp is None:
             continue
         x0, y0, x1, y1 = kg._ink_box(fp.Reference(), 0.2)
+        # a fan-out via there already: the designator moves off it anyway,
+        # and a via in a no-via area is a DRC error
+        if any(x0 - 0.5 < vx < x1 + 0.5 and y0 - 0.5 < vy < y1 + 0.5 for vx, vy in vias):
+            continue
         z = pcbnew.ZONE(board)
         z.SetIsRuleArea(True)
         z.SetZoneName("label " + ref)
