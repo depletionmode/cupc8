@@ -913,6 +913,11 @@ def wanted(parts):
     for r, v in power.items():
         east = v[0] > 105                       # the LEDs on the east edge stay
         at[r] = (v[0] + (0 if east else dx), v[1], v[2] if len(v) > 2 else 0)
+    # Input proximity study only: J1 stays fixed, F1 moves behind it and
+    # U2 faces F1. A new power preroute and full signal route are required.
+    at["F1"] = (25.0, 175.0, 90)
+    at["U2"] = (22.0, 170.0, 180)
+    at["R1"] = (19.0, 177.0, 0)
     # the POWER button's controller between the buttons; its LDO, EN's
     # pull-down and their pads in the free corner west of the eFuse
     at["U16"] = (BUTTONS_X + 7.0, H - 3.4, 0)
@@ -1187,8 +1192,8 @@ def prepare(board):
     board.Add(v)
     _plane_pads(board)
     nets = _efuse_escapes(board, fp)
-    standby = _standby_preroute(board)
-    _five_volt_bus(board)
+    standby = _standby_preroute_relocated(board)
+    _five_volt_bus(board, relocated=True)
     signal = _spi_ncs6_escape(board)
     _label_keepouts(board)
     # Freerouting reports the wide locked inner-layer +5V trunk as several
@@ -1328,7 +1333,103 @@ def _standby_preroute(board):
     return [vin.GetNetname()]
 
 
-def _five_volt_bus(board):
+def _standby_preroute_relocated(board):
+    """Preserve the fixed buck feed and standby spur with U2/F1 moved.
+
+    The new F1 to U2 and U2 to bulk-capacitor paths are left to the router;
+    the old QFN escape and via coordinates are not valid in this placement.
+    """
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def pad(ref, num):
+        return next(p for p in board.FindFootprintByReference(ref).Pads()
+                    if p.GetNumber() == num)
+
+    def xy(p):
+        return to(p.GetPosition().x), to(p.GetPosition().y)
+
+    def track(a, b, width, net, layer=pcbnew.F_Cu):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
+        t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
+        t.SetWidth(mm(width))
+        t.SetLayer(layer)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
+
+    def via(at, net):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(pcbnew.VECTOR2I(mm(at[0]), mm(at[1])))
+        v.SetWidth(mm(0.6))
+        v.SetDrill(mm(0.3))
+        v.SetNet(net)
+        v.SetLocked(True)
+        board.Add(v)
+
+    f1, u2, c3, c5 = (pad(ref, num) for ref, num in
+                      (("F1", "2"), ("U2", "5"), ("C3", "1"), ("C5", "1")))
+    if any(abs(xy(p)[i] - target) > 0.05 for p, expected in
+           ((f1, (25.0, 172.8625)), (u2, (22.23, 170.0)),
+            (c3, (11.0, 160.95)), (c5, (34.0, 160.775)))
+           for i, target in enumerate(expected)):
+        raise SystemExit("_standby_preroute_relocated: power neighbours moved")
+    j1 = pad("J1", "A4B9")
+    j1_b = pad("J1", "B4A9")
+    f1_input = pad("F1", "1")
+    if (abs(xy(j1)[0] - 27.6) > 0.05 or abs(xy(j1)[1] - 180.95) > 0.05 or
+            abs(xy(f1_input)[0] - 25.0) > 0.05 or
+            abs(xy(f1_input)[1] - 177.1375) > 0.05 or
+            abs(xy(j1_b)[0] - 32.4) > 0.05 or
+            abs(xy(j1_b)[1] - 180.95) > 0.05 or
+            j1_b.GetNetname() != j1.GetNetname()):
+        raise SystemExit("_standby_preroute_relocated: J1/F1 input pads moved")
+    vbus = j1.GetNet()
+    track(xy(j1), (27.6, 179.6), 0.3, vbus)
+    track((27.6, 179.6), (27.6, 178.5), 0.7, vbus)
+    track((27.6, 178.5), xy(f1_input), 1.0, vbus)
+    # A second feed leaves the USB pad before the SBU2 channel narrows,
+    # skirts the fixed J1 GND via, and meets F1 outside its solder pad.
+    via((27.6, 179.68), vbus)
+    via((25.0, 178.6), vbus)
+    track(xy(j1), (27.6, 179.68), 0.3, vbus)
+    track((25.0, 177.7), (25.0, 178.6), 0.7, vbus)
+    track((27.6, 179.68), (27.6, 178.2), 0.7, vbus, pcbnew.B_Cu)
+    track((27.6, 178.2), (25.0, 178.6), 1.0, vbus, pcbnew.B_Cu)
+    via((32.4, 179.68), vbus)
+    track(xy(j1_b), (32.4, 179.68), 0.3, vbus)
+    track((32.4, 179.68), (32.4, 178.2), 0.7, vbus, pcbnew.B_Cu)
+    track((32.4, 178.2), (27.6, 178.2), 1.0, vbus, pcbnew.B_Cu)
+    # The eFuse's 0.3 mm escape ends at y=172.0. A wider segment can
+    # start there while keeping the PWR_EN clearance at its fine pad.
+    track((22.23, 172.0), xy(f1), 1.0, f1.GetNet())
+    via((25.0, 171.4), f1.GetNet())
+    via((22.23, 172.0), f1.GetNet())
+    track(xy(f1), (25.0, 171.4), 0.7, f1.GetNet())
+    track((25.0, 171.4), (22.23, 172.0), 1.2, f1.GetNet(), pcbnew.B_Cu)
+    v5 = c3.GetNet()
+    track(xy(c3), (11.0, 162.0), 0.5, v5)
+    track((11.0, 162.0), (34.0, 162.0), 0.5, v5)
+    track((34.0, 162.0), xy(c5), 0.5, v5)
+    vin, c16 = pad("U15", "2"), pad("C16", "1")
+    vx, vy = xy(vin)
+    cx, cy = xy(c16)
+    track((vx, vy), (vx, cy + 1.2), 0.3, vin.GetNet())
+    track((vx, cy + 1.2), (cx, cy + 0.4), 0.3, vin.GetNet())
+    track((cx, cy + 0.4), (cx, cy), 0.3, vin.GetNet())
+    track((cx, cy), (cx - 1.3, cy), 0.3, vin.GetNet())
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(mm(cx - 1.3), mm(cy)))
+    v.SetWidth(mm(0.6))
+    v.SetDrill(mm(0.3))
+    v.SetNet(vin.GetNet())
+    v.SetLocked(True)
+    board.Add(v)
+    return [vin.GetNetname()]
+
+
+def _five_volt_bus(board, relocated=False):
     """Locked 5 V copper from the eFuse link to the six slot fuses.
 
     The 7.5 mm B.Cu/In2/In3 bus and three vias at each branch carry the 3 A
@@ -1399,7 +1500,7 @@ def _five_volt_bus(board):
                 abs(to(b.y) - 162) < 0.01 and abs(to(a.x - b.x)) > 20:
             item.SetWidth(mm(1.2))
             widened_f += 1
-    if (widened_f, widened_inner, len(parallel_inner)) != (1, 4, 3):
+    if (widened_f, widened_inner, len(parallel_inner)) != ((1, 0, 0) if relocated else (1, 4, 3)):
         raise SystemExit("_five_volt_bus: eFuse power pre-route changed; check widths")
     for a, b, net in parallel_inner:
         track(a, b, 2.0, net, pcbnew.In2_Cu)
@@ -1724,7 +1825,7 @@ def _efuse_escapes(board, fp):
         board.Add(t)
 
     def out(bar, toward):
-        """The point 0.8 mm past `bar`'s end on `toward`'s side, and the unit step."""
+        """The point 0.8 mm past `bar`'s end and the unit step."""
         bb = bar.GetBoundingBox()
         bx, by = xy(bar)
         tx, ty = xy(toward)
@@ -1900,7 +2001,7 @@ def main():
                        zone_min_width=0.3,          # at 0.25 KiCad's fill left a 0.063 mm plane neck
                        fanout_margin=FANOUT_MARGIN,
                        prepare=prepare,
-                       post_route=(lambda board: _finish_route(board, replay['salt'] if replay else None)),
+                       post_route=None,  # relocation trial: old salt-9 geometry is invalid
                        replay=replay,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
