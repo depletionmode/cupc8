@@ -788,6 +788,18 @@ def normalize_silk_strokes(board, minimum_mm=0.15):
                 return True
         return False
 
+    def round_mark_would_touch_pad(mark, front):
+        # A pin-one dot is a circle, not a segment. Its old bounding box
+        # includes the old stroke; grow it by the width increase and the
+        # required mask clearance before deciding whether it can be widened.
+        box = mark.GetBoundingBox()
+        box.Inflate(pcbnew.FromMM(0.15 + (minimum_mm - to(mark.GetWidth())) / 2 + 0.01))
+        x0, y0, x1, y1 = (to(box.GetLeft()), to(box.GetTop()),
+                          to(box.GetRight()), to(box.GetBottom()))
+        return any((on_f if front else on_b) and x0 < px1 and px0 < x1 and
+                   y0 < py1 and py0 < y1
+                   for px0, py0, px1, py1, on_f, on_b in pads)
+
     changed = 0
     for fp in board.GetFootprints():
         graphics = fp.GraphicalItems()
@@ -799,8 +811,10 @@ def normalize_silk_strokes(board, minimum_mm=0.15):
             width = item.GetWidth()
             if 0 < width < minimum:
                 if (isinstance(item, pcbnew.PCB_SHAPE) and
-                        item.GetShape() == pcbnew.SHAPE_T_SEGMENT and
-                        would_touch_pad(item, item.GetLayer() == pcbnew.F_SilkS)):
+                        ((item.GetShape() == pcbnew.SHAPE_T_SEGMENT and
+                          would_touch_pad(item, item.GetLayer() == pcbnew.F_SilkS)) or
+                         (item.GetShape() == pcbnew.SHAPE_T_CIRCLE and
+                          round_mark_would_touch_pad(item, item.GetLayer() == pcbnew.F_SilkS)))):
                     item.SetLayer(pcbnew.F_Fab if item.GetLayer() == pcbnew.F_SilkS
                                   else pcbnew.B_Fab)
                 else:
