@@ -47,8 +47,13 @@ fail until their contract coverage exists:
   outward-rounded box, so a thin span that survives its possible widening is
   also a proven failure. Exact rational scanlines detect an interior neck in
   an isolated nonorthogonal, hole-free polygon when wider spans overlap it on
-  both sides; this excludes a rounded terminal tip. Holes, multiple touching
-  unsupported operations, connected nonorthogonal polygons, and large unions
+  both sides; this excludes a rounded terminal tip. The same rational witness
+  now also measures connected nonorthogonal, hole-free region unions with
+  rectangular flash widening and at most one conservatively boxed unknown
+  operation. It is a **failure witness**: an 80 µm neck in two touching
+  regions is rejected for both copper and silk, while a flash that widens
+  the entire span and an exact-rule-width span are accepted. Holes, multiple
+  touching unsupported operations, large unions, and non-midpoint minima
   remain outside these witnesses. The final incomplete-coverage gate stays
   red until all such ink and text-height rules are independently checked.
   The board generator now configures a 0.10 mm solder-mask web

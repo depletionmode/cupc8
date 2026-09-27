@@ -508,6 +508,57 @@ class FabCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'isolated nonorthogonal filled region has a 0.080000 mm span'):
                 gerberdrc.check_silk_clearance(silk, mask, .15, .15)
 
+    def test_connected_nonorthogonal_neck_witness_on_copper_and_silk(self):
+        # A second filled region touches a wide lobe. The isolated witness
+        # must defer, while the connected union still has an 80 um neck.
+        narrow = [(1, 1), (2, 1), (2, 1.2), (1.54, 1.3),
+                  (1.54, 1.4), (2, 1.5), (2, 1.7), (1, 1.7),
+                  (1, 1.5), (1.46, 1.4), (1.46, 1.3), (1, 1.2)]
+        attached = [(.8, 1), (1.2, 1), (1.2, 1.2), (.8, 1.2)]
+
+        def region(points):
+            commands = ['G36*']
+            for index, (x, y) in enumerate([*points, points[0]]):
+                commands.append('X%dY%dD0%d*' %
+                                (round(x * 1000000), round(y * 1000000),
+                                 2 if index == 0 else 1))
+            return '\n'.join([*commands, 'G37*']) + '\n'
+
+        header = ('%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                  '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n')
+        wide_flash = ('%ADD11R,0.200000X0.300000*%\nD11*\n'
+                      'X1500000Y1350000D03*\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper = fab / 'sample-F_Cu.gtl'
+            silk = fab / 'sample-F_Silkscreen.gto'
+            mask = fab / 'sample-F_Mask.gts'
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n'
+                            '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n'
+                            'X9000000Y9000000D03*\nM02*\n')
+            copper_header = '%TF.FileFunction,Copper,L1,Top*%\n' + header + '%TO.N,/GND*%\n'
+            silk_header = '%TF.FileFunction,Legend,Top*%\n' + header.replace(
+                '0.200000', '0.150000')
+            for path, prefix, check, limit in (
+                    (copper, copper_header,
+                     lambda: gerberdrc.check_clearance([copper], .15, .1), .1),
+                    (silk, silk_header,
+                     lambda: gerberdrc.check_silk_clearance(silk, mask, .15, .15), .15)):
+                path.write_text(prefix + region(narrow) + region(attached) + 'M02*\n')
+                with self.assertRaisesRegex(ValueError,
+                                            'connected nonorthogonal filled region union has a 0.080000 mm'):
+                    check()
+                # A rectangular flash broadens the entire interior neck.
+                path.write_text(prefix + region(narrow) + region(attached) + wide_flash + 'M02*\n')
+                self.assertEqual(check(), 3)
+                # Exact-width necks pass; the proof is strictly below rule.
+                half = limit / 2
+                at_limit = [(1.5 + half if x == 1.54 else
+                             1.5 - half if x == 1.46 else x, y) for x, y in narrow]
+                path.write_text(prefix + region(at_limit) + region(attached) + 'M02*\n')
+                self.assertEqual(check(), 2)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)
