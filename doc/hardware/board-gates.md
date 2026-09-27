@@ -295,14 +295,57 @@ No guaranteed transient ESR maximum was found for the fitted part. The
 remaining electrical evidence is a manufacturer ESR limit or a controlled
 qualification of the assembled parts, plus a bound for the pad and return
 contacts from calibrated extraction or measurement. Until then WC-005 and
-WC-010 remain red. For WC-010, the bound is at most 34.429 °C/W of
-ESP32-to-buck transfer, with 88.3 mW assigned to the buck and adjacent
+WC-010 remain red. For WC-010, a **conditional scenario** permits at most
+34.429 °C/W of ESP32-to-buck transfer when the external copper heat is
+assigned the buck's JEDEC θJA. It assigns 88.3 mW to the buck and adjacent
 copper and 1.26 W upper-bounded ESP32 TX heat. The missing input is a
 calibrated board-and-enclosure thermal solution or a powered-board
 measurement at 40 °C ambient and sustained 350 mA TX, including neighboring
 cards and the final airflow. TI's [TLV62569 datasheet](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
 provides DBV θJA 188.2 °C/W and ψJT 31.4 °C/W; these package parameters
 alone do not bound heat transfer from the ESP32 on this board.
+
+The 2026-09-28 rebuilt receipt (PCB SHA-256 `c580049e7c1e`, netlist
+`92302b79bc58`, order `5f535efc038f`) validates against the current source
+and has a clean DRC report. Its routed +5 V/3V3/GND resistance scenarios are
+still 38.008/134.665/123.440 mΩ. `python3 hw/power/thermal.py wifi-card
+build/hw/wifi` now validates that receipt and exposes the physical heat
+balance for the 40 °C, 350 mA TX scenario:
+
+```text
+0.05157 W × θ_buck + 0.03674 W × θ_copper
+ + (0.12838 W/Ω × R_return_extra) × θ_contact
+ + 1.260 W × θ_ESP  ≤ 60 °C
+```
+
+The coefficients are modeled powers from the routed geometry and a constant
+358.3 mA TX load. Switching and RF return-current RMS ripple, capacitor ESR
+heat and the buck-loss estimate still need bounds. Each θ is the actual
+temperature rise of the buck junction per watt dissipated at that source in
+the final board and enclosure. `R_return_extra` is the return pad, spoke,
+barrel and contact resistance beyond the 123.440 mΩ corridor scenario; its
+physical upper bound is absent. Treating θ_buck, θ_copper and θ_contact all
+as TI's 188.2 °C/W JEDEC buck self-heating number gives the following
+**sensitivity only** ESP transfer allowances. No entry is a thermal pass.
+
+| Assumed extra return resistance | DC-load return heat at 358.3 mA | Conditional maximum θ_ESP |
+| ---: | ---: | ---: |
+| 0 Ω | 0 mW | 34.43 °C/W |
+| 0.20 Ω | 25.7 mW | 30.59 °C/W |
+| 0.33 Ω | 42.4 mW | 28.10 °C/W |
+| 0.40 Ω | 51.4 mW | 26.76 °C/W |
+
+The 0.33 Ω electrical scenario already falls below the ESP32's 3.0 V supply
+minimum. The table shows how that same unresolved return path also spends
+thermal headroom. WC-010 now fails separately for the missing return
+resistance and buck/copper/contact transfer bounds (`T4r`) and for the
+missing ESP transfer bound (`T4c`). A qualified four-terminal return
+measurement or calibrated pad/spoke/via extraction, plus board-and-enclosure
+thermal measurement or calibration at sustained TX, must supply these bounds.
+The [TI TLV62569 thermal metrics](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
+and [Espressif module TX-current table](https://documentation.espressif.com/esp32-c3-mini-1_datasheet_en.html)
+set the present diagnostic parameters; neither supplies a bound on the
+assembled card's four thermal transfer paths.
 
 The 2026-09-27 source-only re-audit cannot turn these scenarios into limits.
 `hw/parts/easyeda/C45783.yaml` records C1/C2's footprint and pin positions,

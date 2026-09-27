@@ -27,50 +27,102 @@ at the corner that heats it most:
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+
 import budget
 import design as d
 from spice import Checks
 
 
-def wifi_coupling_budget(r5, r3, rgnd):
-    """Maximum permissible ESP-to-buck thermal transfer, not an assumed value.
+def wifi_thermal_terms(r5, r3, rgnd):
+    """Modeled watts and total junction-rise budget for routed TX heat.
 
-    The ESP's full TX electrical input is counted as local heat. All estimated
-    copper I²R loss is pessimistically assigned to the buck junction. A board
-    thermal simulation or measurement must show a lower cross-coupling value.
+    External copper and contact heat need their own board-to-junction transfer
+    coefficients; a JEDEC buck self-heating theta_JA is not one of those.
+    I²R uses constant TX current, not a bound on switching or RF ripple RMS.
     """
+    if min(r5, r3, rgnd) < 0:
+        raise ValueError('routed resistances must be nonnegative')
     vin = budget.chain('worst')['wifi_in']
     iout = d.WIFI_I_3V3
     ibuck = iout * d.wifi_vout_range()[1] / vin
     copper_w = iout ** 2 * (r3 + rgnd) + ibuck ** 2 * r5
-    buck_w = buck_loss(vin, iout) + copper_w
+    internal_w = buck_loss(vin, iout)
     esp_w = d.ESP32_VDD_MAX * d.ESP32_I_TX
+    rise_budget_c = d.TJ_LIMIT_C - d.AMBIENT_C
+    return internal_w, copper_w, esp_w, iout ** 2, rise_budget_c
+
+
+def wifi_external_allowance(terms, r_contact, theta_buck, theta_copper, theta_contact):
+    """Conditional maximum ESP-to-buck C/W, for all stated thermal paths."""
+    if min(r_contact, theta_buck, theta_copper, theta_contact) < 0:
+        raise ValueError('resistance and thermal transfers must be nonnegative')
+    internal_w, copper_w, esp_w, contact_w_per_ohm, rise_budget_c = terms
+    return (rise_budget_c - internal_w * theta_buck - copper_w * theta_copper -
+            r_contact * contact_w_per_ohm * theta_contact) / esp_w
+
+
+def wifi_coupling_budget(r5, r3, rgnd):
+    """Legacy conditional scenario: external copper transfers as buck theta_JA.
+
+    The ESP's full TX electrical input is counted as local heat. All estimated
+    copper I²R loss is assigned the buck's JEDEC self-heating coefficient.
+    This is a sensitivity point, not a board thermal upper bound.
+    """
+    terms = wifi_thermal_terms(r5, r3, rgnd)
+    internal_w, copper_w, esp_w, _, _ = terms
     theta = d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]
-    allowance = (d.TJ_LIMIT_C - d.AMBIENT_C - buck_w * theta) / esp_w
-    return buck_w, copper_w, esp_w, allowance
+    allowance = wifi_external_allowance(terms, 0, theta, theta, theta)
+    return internal_w + copper_w, copper_w, esp_w, allowance
 
 
 def wifi_card(out):
     import wifi_board
     import wifi_ground
+    import json
+    import boardevidence
+    from boardcheck import check_report
     out = Path(out)
+    boardevidence.validate('wifi', out)
+    check_report(json.loads((out / 'drc.json').read_text()), 'drc')
     circuit = wifi_board.topology(out / 'wifi.net')
     r5, r3 = wifi_board.routes(out / 'wifi.kicad_pcb', out / 'fab/order.json', circuit)
     rgnd, coarse, fine, discrepancy = wifi_ground.compare(out / 'wifi.kicad_pcb')
     buck_w, copper_w, esp_w, allowance = wifi_coupling_budget(r5, r3, rgnd)
+    terms = wifi_thermal_terms(r5, r3, rgnd)
+    internal_w, _, _, contact_w_per_ohm, rise_budget_c = terms
     c = Checks('WC-010 Wi-Fi board local thermal coupling at %.0f C ambient' % d.AMBIENT_C)
     c.info('routed copper', '%.1f mOhm +5V, %.1f mOhm 3V3, %.1f mOhm GND; %d GND vias' %
            (1e3 * r5, 1e3 * r3, 1e3 * rgnd, coarse[1]))
     c.info('GND mesh', '0.25/0.125 mm %.1f/%.1f mOhm; discrepancy %.0f%%' %
            (1e3 * coarse[0], 1e3 * fine[0], 100 * discrepancy))
     c.info('coupling budget', 'buck + allocated copper %.0f mW (of which copper %.0f mW); '
-           'ESP TX heat <= %.0f mW; allowable ESP-to-buck transfer <= %.1f C/W' %
+           'ESP TX heat <= %.0f mW; conditional ESP-to-buck transfer <= %.1f C/W '
+           'if external copper uses buck theta_JA' %
            (1e3 * buck_w, 1e3 * copper_w, 1e3 * esp_w, allowance))
-    c.check('T4b', 'buck junction without ESP thermal coupling', tj(buck_w, d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]),
+    c.info('thermal balance', '%.1f mW x theta_buck + %.1f mW x theta_copper '
+           '+ (%.1f mW/ohm x R_contact) x theta_contact '
+           '+ %.0f mW x theta_ESP <= %.1f C' %
+           (1e3 * internal_w, 1e3 * copper_w,
+            1e3 * contact_w_per_ohm, 1e3 * esp_w, rise_budget_c))
+    c.info('heat scope', 'route I²R uses constant %.1f mA TX load; return-current RMS ripple, '
+           'capacitor ESR heat and board thermal transfers are not bounded' %
+           (1e3 * d.WIFI_I_3V3))
+    theta = d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]
+    for r_contact in (0.0, 0.2, 0.33, 0.4):
+        c.info('contact %.2f ohm scenario' % r_contact,
+               'extra return heat %.1f mW; conditional theta_ESP <= %.2f C/W '
+               'if theta_buck = theta_copper = theta_contact = %.1f C/W' %
+               (1e3 * contact_w_per_ohm * r_contact,
+                wifi_external_allowance(terms, r_contact, theta, theta, theta), theta))
+    c.check('T4b', 'conditional buck junction if copper uses JEDEC theta_JA, no ESP transfer',
+            tj(buck_w, d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]),
             d.TJ_LIMIT_C, '<=', 'C', fmt='%.1f')
     c.check('T4m', 'GND thermal copper path mesh discrepancy <= 10%', discrepancy, 0.10, '<=', '', fmt='%.3f')
     # The layout's board and air path cannot be inferred from JEDEC theta_JA.
     # A validated thermal solver or measurement must bound cross-coupling.
+    c.check('T4r', 'extra return resistance and buck/copper/contact thermal transfers bounded',
+            0, 1, '>=', '', fmt='%d')
     c.check('T4c', 'measured or calibrated ESP-to-buck thermal transfer bound supplied', 0, 1, '>=', '', fmt='%d')
     return c.done()
 

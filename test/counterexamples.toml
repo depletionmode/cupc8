@@ -1216,6 +1216,13 @@ cmd = "python3 test/hw/test_wifi_limits.py WifiLimits.test_overvoltage_fails_eve
 must_fail = ["FAIL: test_overvoltage_fails_even_when_burst_minimum_passes"]
 
 [[bug]]
+name = "Wi-Fi thermal balance omitted extra return-contact heating"
+fixed_in = "Wi-Fi return heat balance"
+revert = [["hw/power/thermal.py", "r_contact * contact_w_per_ohm * theta_contact", "0 * contact_w_per_ohm * theta_contact"]]
+cmd = "python3 test/hw/test_wifi_thermal_board.py WifiThermalBoard.test_contact_heat_and_external_transfer_reduce_esp_headroom"
+must_fail = ["FAIL: test_contact_heat_and_external_transfer_reduce_esp_headroom"]
+
+[[bug]]
 name = "crosstalk screen: split collinear tracks hid a long parallel run"
 fixed_in = "crosstalk initial implementation"
 revert = [["hw/tools/crosstalk.py", "if merged and lo <= merged[-1][1] + 1e-6:", "if False:"]]
