@@ -9,6 +9,77 @@
 # (Bugs in the RTL are also covered by mutants: tools/formal.py --mutants.)
 
 [[bug]]
+name = "BASIC follow-up: removed unused kernel and tokenizer routines stay out of the maps"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["basic/ubasic_tokenizer.s", "kernel/gfx.s", "kernel/gpu.s", "kernel/printf.s"]
+cmd = "tools/run_tests.sh testKernelLayout"
+must_fail = ["FAIL: approved dead routine removed: gfx_clrscreen", "FAIL: approved dead routine removed: gpu_fill_rect",
+             "FAIL: approved dead routine removed: print_ascii_char_inverse", "FAIL: approved dead routine removed: str_printuint16",
+             "FAIL: approved tokenizer routine removed"]
+
+[[bug]]
+name = "BASIC follow-up: ROM packing kept BASIC at the old fixed offset"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/mkrom.py"]
+cmd = "tools/run_tests.sh testKernelLayout"
+must_fail = ["FAIL: BASIC's packed header"]
+
+[[bug]]
+name = "BASIC follow-up: kernel ROM loader used the old BASIC bank"
+fixed_in = "1fa0806"
+revert = [["kernel/sys.s", "\tmov r0, #1                      ; the kernel header at ROM $00800", "\tmov r0, #16                     ; stale fixed BASIC bank"]]
+cmd = "tools/run_tests.sh testKernelNoBasic"
+must_fail = ["FAIL: good ROM installs BASIC's hook"]
+
+[[bug]]
+name = "BASIC follow-up: host wrote program bytes before upload acknowledgment"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/cupc8.py"]
+cmd = "python3 test/host/test_run_handshake.py"
+must_fail = ["FAIL run: body written only after acknowledgment"]
+
+[[bug]]
+name = "BASIC follow-up: terminal hook entered BASIC with an upload pending"
+fixed_in = "1fa0806"
+revert = [["kernel/term.s", "\tpush pch\n\tpush pcl\n\tb sys_upload_wait\n", ""]]
+cmd = "tools/run_tests.sh testRunUploadHandshake"
+must_fail = ["FAIL: pending Enter never enters BASIC before acknowledgment"]
+
+[[bug]]
+name = "BASIC follow-up: cancelled request remained stuck at idle prompt"
+fixed_in = "72b7cbe"
+revert = [["kernel/sys.s", "\teq r0, #5\n\tbzf .cancel\n\teq r0, #3", "\teq r0, #3"]]
+cmd = "tools/run_tests.sh testRunUploadHandshake"
+must_fail = ["FAIL: prompt clears a cancelled upload before acknowledgment"]
+
+[[bug]]
+name = "BASIC follow-up: idle terminal did not acknowledge upload requests"
+fixed_in = "1fa0806"
+revert = [["kernel/keyb.s", "keyb_read_char:\n\tpush pch\n\tpush pcl\n\tb sys_upload_poll\n", "keyb_read_char:\n"],
+          ["kernel/keyb.s", "\tpush pch\n\tpush pcl\n\tb sys_upload_poll\n\tld r0, API_RUN", "\tld r0, API_RUN"]]
+cmd = "tools/run_tests.sh testRunUploadHandshake"
+must_fail = ["FAIL: idle prompt acknowledges an upload"]
+
+[[bug]]
+name = "BASIC follow-up: Nim test builds shared the default compiler cache"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/run_tests.sh"]
+cmd = "python3 test/host/test_simtest_cache.py"
+must_fail = ["FAIL simtest builds share Nim cache"]
+
+[[bug]]
+name = "BASIC follow-up: assembler parsed labels inside comments"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/as.py"]
+cmd = "python3 test/asm/test_asm.py"
+must_fail = ["FAIL 'mov r0, #1 ; comment: [missing]'"]
+
+[[bug]]
 name = "assembler: TMR0/TMR1 register in the Ra bit"
 fixed_in = "e635dbd"
 before = "f811788"
