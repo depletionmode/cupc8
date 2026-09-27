@@ -40,7 +40,7 @@ COPPER = ('F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'B.Cu')
 def routed_distances(board_path, net, source, receivers):
     """Measure layer-aware shortest copper paths; report disconnected pads.
 
-    This measures length only. It does not turn branches, vias, pad stubs or
+    This measures planar track length only. It does not turn branches, vias, pad stubs or
     changing reference planes into an electrical transmission-line model.
     """
     board = pcbnew.LoadBoard(str(board_path))
@@ -52,11 +52,13 @@ def routed_distances(board_path, net, source, receivers):
         graph.setdefault(b, []).append((a, length))
 
     for item in tree[1:]:
-        if not isinstance(item, list) or not item or item[0] not in ('segment', 'via'):
+        if not isinstance(item, list) or not item or item[0] not in ('segment', 'via', 'arc'):
             continue
         attached = find1(item, 'net')
         if attached is None or attached[1] != net:
             continue
+        if item[0] == 'arc':
+            raise ValueError(f'{net}: arc needs an explicit centerline-length parser')
         if item[0] == 'segment':
             a, b = (tuple(round(float(x), 4) for x in find1(item, tag)[1:])
                     for tag in ('start', 'end'))
@@ -68,7 +70,7 @@ def routed_distances(board_path, net, source, receivers):
             if via_layers == ['F.Cu', 'B.Cu']:
                 via_layers = COPPER
             for a, b in zip(via_layers, via_layers[1:]):
-                add_edge((pos, a), (pos, b), .02)
+                add_edge((pos, a), (pos, b), 0.0)
 
     def pad_nodes(contact):
         ref, number = contact
