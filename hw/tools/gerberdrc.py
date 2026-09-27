@@ -633,7 +633,7 @@ def check_paste_registration(copper_path, mask_path, paste_path):
         engine.close()
 
 
-def check_silk_clearance(silk_path, mask_path, minimum):
+def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
     """Check plotted legend against negative-polarity mask openings."""
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('no positive silkscreen-to-mask requirement')
@@ -641,7 +641,8 @@ def check_silk_clearance(silk_path, mask_path, minimum):
     try:
         openings = plotted_copper(Path(mask_path), engine, require_net=False)
         legend = plotted_copper(Path(silk_path), engine, require_net=False,
-                                extra_function='Legend', allow_empty=True)
+                                extra_function='Legend', allow_empty=True,
+                                minimum_track=minimum_ink_width)
         for _, ink, (x0,y0,x1,y1) in legend:
             for _, opening, (a0,b0,a1,b1) in openings:
                 if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
@@ -769,6 +770,99 @@ def check_edge(paths, outline, minimum):
                         raise ValueError('%s: %s copper-to-edge lower bound %.6f mm < %.6f mm' %
                                          (Path(path).name, net, distance, minimum))
                 count += 1
+        return count
+    finally:
+        engine.close()
+
+
+def check_holes(holes, non_plated, copper_paths, outline, copper_minimum, npth_edge_minimum):
+    """Check verified Excellon cuts against plotted copper and NPTH edges.
+
+    `holes` is the multiset returned by fabcheck.drill_hits, after its parity
+    check against the board. `non_plated` is the subset matched to board NPTH
+    pads. A coincident ComponentPad or ViaPad flash supplies a plated hole's net.
+    Drill
+    coordinates and diameters were rounded to 0.001 mm by the parity parser,
+    so this check enlarges each cut by 0.001 mm and classifies any boundary
+    case within that uncertainty as indeterminate.
+    """
+    if (not math.isfinite(copper_minimum) or copper_minimum <= 0 or
+            not math.isfinite(npth_edge_minimum) or npth_edge_minimum <= 0):
+        raise ValueError('hole checks require positive clearance rules')
+    if not holes:
+        raise ValueError('no verified Excellon cuts for plotted hole checks')
+    if any(non_plated[item] > holes[item] for item in non_plated):
+        raise ValueError('non-plated cut classification exceeds verified Excellon hits')
+    engine = Geometry()
+    try:
+        objects = []
+        features = []
+        for path in copper_paths:
+            objects.extend((Path(path).name, net, shape, bounds) for net, shape, bounds in
+                           plotted_copper(Path(path), engine, features=features))
+        edges = profile_segments(Path(outline), engine)
+        count = 0
+        for item, repeats in holes.items():
+            if len(item) == 3:
+                x, y, diameter = item
+                center = (x, y)
+                primitive = engine.wkt('POINT (%.9f %.9f)' % center)
+                bounds = (x, y, x, y)
+            elif len(item) == 6 and item[0] == 'slot':
+                _, x0, y0, x1, y1, diameter = item
+                center = ((x0+x1)/2, (y0+y1)/2)
+                primitive = engine.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' % (x0,y0,x1,y1))
+                bounds = (min(x0,x1), min(y0,y1), max(x0,x1), max(y0,y1))
+            else:
+                raise ValueError('unsupported Excellon cut key: %r' % (item,))
+            if not all(math.isfinite(v) for v in item[1:] if isinstance(v, (float, int))) or diameter <= 0:
+                raise ValueError('invalid Excellon cut dimensions')
+            radius = diameter/2 + .001  # <=0.000957 mm rounding in XY and radius
+            cut = engine.buffer(primitive, radius)
+            x0,y0,x1,y1 = bounds
+            cut_bounds = (x0-radius, y0-radius, x1+radius, y1+radius)
+            owner_nets = {net for function, point, net, _, _ in features
+                          if function in ('ComponentPad', 'ViaPad') and point is not None and
+                          math.dist(point, center) <= .0011}
+            if len(owner_nets) > 1:
+                raise ValueError('Excellon cut has conflicting plotted pad nets at %s' % (center,))
+            is_npth = bool(non_plated[item])
+            owner = None if is_npth else next(iter(owner_nets), None)
+            if not is_npth and owner is None:
+                raise ValueError('plated Excellon cut lacks ComponentPad/ViaPad flash at %s' %
+                                 (center,))
+            for path_name, net, copper, (a0,b0,a1,b1) in objects:
+                if owner is not None and net == owner:
+                    continue
+                if (cut_bounds[0]-a1 >= copper_minimum+.002 or
+                        a0-cut_bounds[2] >= copper_minimum+.002 or
+                        cut_bounds[1]-b1 >= copper_minimum+.002 or
+                        b0-cut_bounds[3] >= copper_minimum+.002):
+                    continue
+                lower = engine.distance(cut, copper)
+                if lower < copper_minimum:
+                    upper = (lower + .001 + engine.overfill.get(cut, 0) +
+                             engine.overfill.get(copper, 0) + .000000002)
+                    detail = ('indeterminate' if upper >= copper_minimum else 'below rule')
+                    raise ValueError('%s: Excellon hole-to-copper %s at %s: lower %.9f, '
+                                     'upper %.9f, rule %.9f mm' %
+                                     (path_name, detail, center, lower, upper, copper_minimum))
+            if is_npth:
+                for edge, (a0,b0,a1,b1) in edges:
+                    if (cut_bounds[0]-a1 >= npth_edge_minimum+.002 or
+                            a0-cut_bounds[2] >= npth_edge_minimum+.002 or
+                            cut_bounds[1]-b1 >= npth_edge_minimum+.002 or
+                            b0-cut_bounds[3] >= npth_edge_minimum+.002):
+                        continue
+                    lower = engine.distance(cut, edge)
+                    if lower < npth_edge_minimum:
+                        upper = lower + .001 + engine.overfill.get(cut, 0) + .000000002
+                        detail = ('indeterminate' if upper >= npth_edge_minimum else 'below rule')
+                        raise ValueError('%s: NPTH hole-to-edge %s at %s: lower %.9f, '
+                                         'upper %.9f, rule %.9f mm' %
+                                         (Path(outline).name, detail, center, lower, upper,
+                                          npth_edge_minimum))
+            count += repeats
         return count
     finally:
         engine.close()

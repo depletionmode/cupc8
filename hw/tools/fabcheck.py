@@ -61,16 +61,27 @@ def export_parity(board, fab):
     return b, len(actual)
 
 
-def drill_hits(path):
+def drill_hits(path, return_types=False):
     lines = path.read_text().splitlines()
     if not lines or lines[0] != 'M48' or 'METRIC' not in lines or '%' not in lines:
         raise ValueError('%s: unsupported Excellon header' % path.name)
     tools = {}
+    tool_plating = {}
+    hit_plating = {}
+    pending_plating = None
     active = None
     hits = Counter()
     in_body = False
     for line in lines:
         line = line.strip()
+        if line.startswith('; #@! TA.AperFunction,'):
+            if line.startswith('; #@! TA.AperFunction,NonPlated,NPTH,'):
+                pending_plating = 'NPTH'
+            elif line.startswith('; #@! TA.AperFunction,Plated,PTH,'):
+                pending_plating = 'PTH'
+            else:
+                raise ValueError('%s: unsupported Excellon plating attribute %s' % (path.name, line))
+            continue
         if line == '%':
             in_body = True
             continue
@@ -79,6 +90,11 @@ def drill_hits(path):
         tool = TOOL.fullmatch(line)
         if tool and not in_body:
             tools[tool[1]] = round(float(tool[2]), 3)
+            if return_types:
+                if pending_plating is None:
+                    raise ValueError('%s: drill tool lacks plating attribute' % path.name)
+                tool_plating[tool[1]] = pending_plating
+            pending_plating = None
         elif in_body and re.fullmatch(r'T\d+', line):
             active = line[1:]
             if active not in tools:
@@ -86,32 +102,51 @@ def drill_hits(path):
         elif in_body and (hit := HIT.fullmatch(line)):
             if active is None:
                 raise ValueError('%s: drill hit before tool selection' % path.name)
-            hits[(round(float(hit[1]), 3), round(float(hit[2]), 3), tools[active])] += 1
+            key = (round(float(hit[1]), 3), round(float(hit[2]), 3), tools[active])
+            hits[key] += 1
+            if return_types:
+                kind = tool_plating[active]
+                if key in hit_plating and hit_plating[key] != kind:
+                    raise ValueError('%s: mixed plating class for same drill cut' % path.name)
+                hit_plating[key] = kind
         elif in_body and (slot := SLOT.fullmatch(line)):
             if active is None:
                 raise ValueError('%s: G85 slot before tool selection' % path.name)
-            hits[slot_key((slot[1], slot[2]), (slot[3], slot[4]), tools[active])] += 1
+            key = slot_key((slot[1], slot[2]), (slot[3], slot[4]), tools[active])
+            hits[key] += 1
+            if return_types:
+                kind = tool_plating[active]
+                if key in hit_plating and hit_plating[key] != kind:
+                    raise ValueError('%s: mixed plating class for same drill cut' % path.name)
+                hit_plating[key] = kind
         elif line in ('M48', 'FMAT,2', 'METRIC', 'G90', 'G05', 'M30') or line.startswith('T') and not in_body:
             continue
         else:
             raise ValueError('%s: unsupported Excellon command %s' % (path.name, line))
     if not hits or lines[-1].strip() != 'M30':
         raise ValueError('%s: empty or incomplete drill file' % path.name)
-    return hits
+    return (hits, hit_plating) if return_types else hits
 
 
-def board_holes(board):
+def board_holes(board, return_npth=False):
     holes = Counter()
+    npth = Counter()
 
-    def add(position, diameter):
+    def add(position, diameter, non_plated=False):
         # KiCad Excellon output uses Y-up; pcbnew board coordinates are Y-down.
-        holes[(round(pcbnew.ToMM(position.x), 3), round(-pcbnew.ToMM(position.y), 3),
-               round(pcbnew.ToMM(diameter), 3))] += 1
+        key = (round(pcbnew.ToMM(position.x), 3), round(-pcbnew.ToMM(position.y), 3),
+               round(pcbnew.ToMM(diameter), 3))
+        holes[key] += 1
+        if non_plated:
+            npth[key] += 1
 
     for footprint in board.GetFootprints():
         for pad in footprint.Pads():
             drill = pad.GetDrillSize()
             if drill.x or drill.y:
+                non_plated = pad.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH
+                if not non_plated and pad.GetAttribute() != pcbnew.PAD_ATTRIB_PTH:
+                    raise ValueError('drilled pad has unsupported plating attribute')
                 if drill.x != drill.y:
                     width = pcbnew.ToMM(min(drill.x, drill.y))
                     half_route = pcbnew.ToMM(abs(drill.x - drill.y)) / 2
@@ -124,9 +159,12 @@ def board_holes(board):
                     offsets = (half_route * direction[0], half_route * direction[1])
                     start = (center[0] - offsets[0], center[1] - offsets[1])
                     end = (center[0] + offsets[0], center[1] + offsets[1])
-                    holes[slot_key(start, end, width)] += 1
+                    key = slot_key(start, end, width)
+                    holes[key] += 1
+                    if non_plated:
+                        npth[key] += 1
                 else:
-                    add(pad.GetPosition(), drill.x)
+                    add(pad.GetPosition(), drill.x, non_plated)
     # KiCad 10's Python 3.14 binding wraps vias as PCB_TRACK, so read the
     # saved via S-expressions directly instead of trusting SWIG downcasts.
     import kicadgen
@@ -137,19 +175,30 @@ def board_holes(board):
         if at is None or drill is None or len(drill) != 2:
             raise ValueError('unsupported via drill in board file')
         holes[(round(float(at[1]), 3), round(-float(at[2]), 3), round(float(drill[1]), 3))] += 1
-    return holes
+    return (holes, npth) if return_npth else holes
 
 
-def check_drills(board, fab):
+def check_drills(board, fab, return_hits=False):
     files = sorted(fab.glob('*.drl'))
     if not files:
         raise ValueError('missing Excellon drill file')
     actual = Counter()
+    actual_plating = {}
     for path in files:
-        actual.update(drill_hits(path))
-    expected = board_holes(board)
+        if return_hits:
+            parsed, plating = drill_hits(path, return_types=True)
+            for item, kind in plating.items():
+                if item in actual_plating and actual_plating[item] != kind:
+                    raise ValueError('mixed Excellon plating class across files')
+                actual_plating[item] = kind
+            actual.update(parsed)
+        else:
+            actual.update(drill_hits(path))
+    expected, npth_expected = board_holes(board, return_npth=True) if return_hits else (board_holes(board), Counter())
     unmatched = list(expected.elements())
+    npth_remaining = npth_expected.copy()
     extra = []
+    npth_actual = Counter()
 
     def same_hole(actual_item, expected_item):
         if len(actual_item) != len(expected_item) or actual_item[-1] != expected_item[-1]:
@@ -168,12 +217,18 @@ def check_drills(board, fab):
         if match is None:
             extra.append(item)
         else:
-            unmatched.pop(match)
+            expected_item = unmatched.pop(match)
+            is_npth = bool(npth_remaining[expected_item])
+            if return_hits and actual_plating[item] != ('NPTH' if is_npth else 'PTH'):
+                raise ValueError('Excellon plating class differs from board pad/via at %s' % (item,))
+            if is_npth:
+                npth_remaining[expected_item] -= 1
+                npth_actual[item] += 1
     if unmatched or extra:
         missing = unmatched[:5]
         extra = extra[:5]
         raise ValueError('drill-to-pad/via mismatch: missing %s; extra %s' % (missing, extra))
-    return sum(actual.values())
+    return (sum(actual.values()), actual, npth_actual) if return_hits else sum(actual.values())
 
 
 def check_review(out):
@@ -197,7 +252,7 @@ def check_review(out):
 
 def check(out):
     board, layers = export_parity(out, out / 'fab')
-    holes = check_drills(board, out / 'fab')
+    holes, cuts, npth_cuts = check_drills(board, out / 'fab', return_hits=True)
     copper = sorted(path for path in (out / 'fab').iterdir()
                     if path.suffix.lower() in ('.gtl', '.gbl', '.g1', '.g2', '.g3', '.g4'))
     if len(copper) != board.GetCopperLayerCount():
@@ -215,6 +270,8 @@ def check(out):
         raise ValueError('expected one Edge.Cuts Gerber profile')
     gerberdrc.check_edge(copper, outlines[0],
                          pcbnew.ToMM(board.GetDesignSettings().m_CopperEdgeClearance))
+    gerberdrc.check_holes(cuts, npth_cuts, copper, outlines[0],
+                          pcbnew.ToMM(board.GetDesignSettings().m_HoleClearance), 1.0)
     masks = {path.suffix.lower(): path for path in (out / 'fab').iterdir()
              if path.suffix.lower() in ('.gts', '.gbs')}
     surfaces = {path.suffix.lower(): path for path in copper
@@ -236,14 +293,14 @@ def check(out):
             if path.suffix.lower() in ('.gto', '.gbo')}
     if set(silk) != {'.gto', '.gbo'}:
         raise ValueError('expected front and back silkscreen Gerbers')
-    ink = (gerberdrc.check_silk_clearance(silk['.gto'], masks['.gts'], .15) +
-           gerberdrc.check_silk_clearance(silk['.gbo'], masks['.gbs'], .15))
+    ink = (gerberdrc.check_silk_clearance(silk['.gto'], masks['.gts'], .15, .15) +
+           gerberdrc.check_silk_clearance(silk['.gbo'], masks['.gbs'], .15, .15))
     check_review(out)
     raise ValueError('Gerber re-import DRC incomplete: %d layers match fresh export, '
                      '%d drill hits match pads/vias, and %d plotted copper objects '
                      'passed %.3f mm net clearance with %d via and %d PTH annular checks, '
                      '%d exposed pads checked against mask, %d paste deposits checked '
                      'against copper/mask, and %d silkscreen objects checked against mask; '
-                     'hole-to-copper/edge, minimum ink geometry, and other rules remain unchecked%s' %
+                     'text height, filled ink necks, and other rules remain unchecked%s' %
                      (layers, holes, shapes, clearance, rings, pth_rings, exposed, deposits, ink,
                       '; no positive solder-mask web rule is configured' if mask_width <= 0 else ''))

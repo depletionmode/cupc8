@@ -2,15 +2,26 @@
 
 `boardcheck.py <board> fab` compares every Gerber command and aperture with a
 fresh export of the DRC-clean board, then matches Excellon round holes and G85
-slots to pads or vias. It independently parses plotted copper to check net
+slots to pads or vias and their plated/non-plated tool attributes. It
+independently parses plotted copper to check net
 clearance, trace width, copper-to-edge distance, and via and plated-pad annular
-width. It checks exposed pads against the plotted mask, paste deposits against
-copper and mask openings, and silkscreen against mask openings. It checks mask
-webs if the KiCad project has a positive solder-mask minimum width. The board
-needs a recorded visual CPL review. The fab gate remains red because
-hole-to-copper/edge, minimum ink geometry, and other plotted-layer rules still
-lack independent validation. Export parity and a review receipt do not complete
-Gerber re-import DRC.
+width. It compares verified Excellon cuts with plotted copper (the project
+hole-clearance rule) and non-plated cuts with plotted edges (JLC's 1.0 mm
+non-plated hole-to-edge rule). It checks exposed pads against the plotted mask,
+paste deposits against copper and mask openings, and silkscreen strokes against
+mask openings and JLC's 0.15 mm minimum line width. It checks mask webs if the
+KiCad project has a positive solder-mask minimum width. The board needs a
+recorded visual CPL review. The fab gate remains red because text height,
+filled ink necks, and other plotted-layer rules still lack independent
+validation. Export parity and a review receipt do not complete Gerber re-import
+DRC.
+
+The GPU and Wi-Fi plotted silkscreen each contain a 0.12 mm stroke against
+JLC's 0.15 mm minimum. Their mounting hole at (52.0, 40.0) also gives a
+conservative plotted hole-to-copper interval of 0.249379439..0.250500002 mm
+against the project 0.25 mm rule; the checker reports *indeterminate*, not a
+proven physical shortfall. Both findings keep the gate red independently of
+the key-notch issue.
 
 The 2026-09-27 GPU and Wi-Fi plots place GND connector fingers 0.20 mm from
 their key-notch route. The project rule is 0.30 mm copper-to-edge, so the
