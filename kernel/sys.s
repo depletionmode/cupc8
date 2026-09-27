@@ -1748,6 +1748,8 @@ sys_upload_poll:
 sys_upload_wait:
 	push r0
 	ld r0, API_RUN
+	eq r0, #5
+	bzf .cancel
 	eq r0, #3
 	bzf .ack
 	pop r0

@@ -4615,6 +4615,9 @@ proc testRunUploadHandshake() =
   echo "== upload handshake with a pending Enter =="
   let rom = buildKernelRom()
   bootBasic(rom)
+  mem[ApiRun] = 5
+  expectTrue("prompt clears a cancelled upload before acknowledgment",
+             runUntil(proc (): bool = mem[ApiRun] == 0 and waiting, 5_000_000))
   mem[ApiRun] = 3
   expectTrue("idle prompt acknowledges an upload",
              runUntil(proc (): bool = mem[ApiRun] == 4, 5_000_000))
