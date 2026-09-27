@@ -39,3 +39,13 @@ The changed solder-mask setup is outside the copper fingerprint. No new FDTD run
 for those equivalent field inputs. The saved reports retain their archived
 board hashes; this migration is the explicit link to the current receipts.
 It does not close full row 4.6 or USB mesh convergence.
+
+`usb-io-pml-mesh-060-interrupted.json` records the attempted finer-grid run
+on the current IO receipt. Routing contention left only 22,190 of 250,000
+steps (1.455 ns) after 16 minutes, so the solver was stopped. Its field
+XML, log, stats and partial port-file hashes are recorded. It has no valid
+S-parameters and must not be included in a mesh-convergence comparison.
+`usb-io-complex-port-comparison.json` independently transforms the saved
+0.075/0.090 mm raw port traces at the same 16 ns cutoff. It records complex
+S11/S21 and the 90 Ω terminated loaded input impedance, plus their mesh
+differences. Loaded input impedance is not trace characteristic impedance.

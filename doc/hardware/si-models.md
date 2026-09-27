@@ -229,6 +229,15 @@ This is a measured grid sensitivity, not a mesh-convergence result; a finer
 grid and a calibrated launch/physical-component model remain necessary
 before inferring the real differential impedance.
 
+The [complex-port comparison](si-evidence/usb-io-complex-port-comparison.json)
+uses the hashes of those same saved port traces and a common 16 ns Fourier
+cutoff. The absolute complex S11 change from 0.075 to 0.09 mm is
+0.00177/0.00425/0.00865 at 100/240/480 MHz. The 90 Ω terminated loaded
+input changes by at most 0.201 Ω resistive and 1.651 Ω reactive over those
+frequencies. This is a phase-aware measure of mesh sensitivity. Loaded input
+impedance includes the line and termination, so it is not the trace's 90 Ω
+characteristic-impedance measurement.
+
 The [RP2040 datasheet](https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)
 specifies a full/low-speed host, not a 480 Mb/s high-speed host. The
 [USB-IF states that full-speed edges are typically 12–25 ns](https://www.usb.org/node/214).
@@ -301,6 +310,30 @@ raw USB XML differs by copper polygon order, while its solver-relevant
 fingerprint is equal. The GPU/IO field models still omit pads, mask, finite
 losses, connector and source/sink behavior. USB mesh convergence and the
 full HDMI coupled physical path remain open, so row 4.6 stays open.
+
+A 0.060 mm USB geometry-only run on the rebuilt IO receipt has a
+186×302×34 grid with `pml_geometry_ok: true`. At 65.555 fs per FDTD step,
+250,000 steps would cover 16.389 ns, enough for the same 12–16 ns port
+window. The first two-thread run was stopped after 22,190 steps (1.455 ns)
+and 16.1 minutes because concurrent main-board routing kept throughput
+near 35–55 million cells/s. Its [interruption record](si-evidence/usb-io-pml-mesh-060-interrupted.json)
+hashes the partial files. It supplies no S-parameter or mesh result.
+After main-board routing releases CPU, repeat the bounded run and then use
+`compare_usb_mesh.py` to verify the raw field files and compare all three
+meshes against the migration-bound older reports:
+
+```sh
+python3 hw/si/openems_usb_io.py --board build/hw-current/io/io.kicad_pcb \
+  --out build/hw/si-current/usb-io-pml-060-fixed.json --mesh-mm 0.06 \
+  --pml-clearance-mm 1 --max-steps 250000 --fixed-window --threads 2
+python3 hw/si/compare_usb_mesh.py --reports doc/hardware/si-evidence \
+  --migration doc/hardware/si-evidence/board-migration.json \
+  --current-report build/hw/si-current/usb-io-pml-060-fixed.json \
+  --current-fields build/hw/si-current/usb-io-openems-pml-clear-1mm-mesh-0p060mm-fixed-window \
+  --current-build build/hw-current/io \
+  --current-source /home/depmod/code/cupc8 \
+  --out doc/hardware/si-evidence/usb-io-three-mesh-comparison.json
+```
 
 ## IBIS specification and pinned FPGA model
 
