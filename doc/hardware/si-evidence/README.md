@@ -71,3 +71,9 @@ modeled-input equivalence on the rebuilt IO receipt.
 `usb-io-three-mesh-comparison.json` compares all three receipt-bound meshes;
 it measures sensitivity but does not establish asymptotic convergence or close
 row 4.6.
+
+`ibis-current-route-top.json`, the two `ibis-current-route-*.json` diagnostic
+sweeps and `ibis-current-route-source-audit.json` bind the pinned vendor model
+and source-pin copper paths to the final main/CPU receipts. The waveform line
+models still use assumed lengths and loads, so the audit does not certify
+physical bus SI.

@@ -417,6 +417,22 @@ the archived CPU card are 16.627–36.650 mm. The main-board R18-to-J2
 not the CPU FPGA output path represented by `cpu_socket` in the waveform
 diagnostic.
 
+A [current-route source audit](si-evidence/ibis-current-route-source-audit.json)
+repeats receipt, netlist, TQ144 pin/bank, 33 Ω source and planar-copper checks
+on final main and CPU builds. It binds the [current top](si-evidence/ibis-current-route-top.json),
+[original-package diagnostic](si-evidence/ibis-current-route-original.json)
+and [vendor-package diagnostic](si-evidence/ibis-current-route-vendor-package.json)
+by SHA-256. The current main receipt is
+`1128563ddeb2a437ccc9268cf27fedfabfd9f9c4d90cbfcc0f00ff5f876425da`;
+its PCB is `74e76faa9ab34d76aeecfc6ad8368269648f84c26a60b993b1169fe2a18f57a2`.
+The six R36-to-slot SCK planar paths measure 119.039, 74.716, 104.160,
+123.140, 151.422 and 173.331 mm. The separate R18-to-J2 clock path is
+76.098 mm. All 31 CPU FPGA series-output paths are present, with 16.627–
+36.650 mm planar lengths. The co-simulation top uses the current seven card
+boards and main netlist; its system routing input remains the saved routed
+snapshot. The modeled 120/180 mm diagnostic lines and loads are still
+assumptions; measured branch geometry is not substituted into ngspice.
+
 The original diagnostic used 1.55 pF package capacitance and no package
 series resistance with the two commented TQ144 inductances. Neither vendor
 TQ144 typical capacitance is 1.55 pF. A bounded second 96-case run uses the
@@ -428,7 +444,7 @@ model, those counts are 10 and 8; 15 of the 96 cases change at least one
 receiver's threshold-stability status. The fixture replay error remains at
 most 0.07883 V. These are model-sensitivity results on assumed 180 mm
 50 Ω six-load topology. Receiver IBIS, nonlinear output behavior, package
-assignment, return paths and the current main-board route still prevent a
+assignment, return paths and routed branch extraction still prevent a
 physical bus pass/fail claim.
 
 ```sh

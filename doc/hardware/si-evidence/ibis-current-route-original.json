@@ -1,0 +1,5166 @@
+{
+  "source_sha256": "8acc5bf6bc90d6956b80d5e688b7bc47a48386b127533702c8d5f328a57390c9",
+  "models": [
+    "lvc330io",
+    "lvc330_b3io"
+  ],
+  "scope": "diagnostic IBIS-derived linear source, assumed copper",
+  "routed_evidence": false,
+  "package_assignment_confirmed": false,
+  "vendor_package_typical_sweep": false,
+  "cases": [
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3026,
+          "first_threshold_ns": 5.0295,
+          "post_cross_min_v": 2.0094,
+          "post_cross_max_v": 3.3026,
+          "late_min_v": 3.2999,
+          "late_max_v": 3.3001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3001,
+          "first_threshold_ns": 5.625,
+          "post_cross_min_v": 2.0257,
+          "post_cross_max_v": 3.3001,
+          "late_min_v": 3.2999,
+          "late_max_v": 3.3001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.31,
+          "first_threshold_ns": 5.055,
+          "post_cross_min_v": 2.0093,
+          "post_cross_max_v": 3.31,
+          "late_min_v": 3.2998,
+          "late_max_v": 3.3002,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3003,
+          "first_threshold_ns": 5.65,
+          "post_cross_min_v": 2.0261,
+          "post_cross_max_v": 3.3003,
+          "late_min_v": 3.2999,
+          "late_max_v": 3.3001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3017,
+          "first_threshold_ns": 9.5565,
+          "post_cross_min_v": 2.0013,
+          "post_cross_max_v": 3.3017,
+          "late_min_v": 3.2244,
+          "late_max_v": 3.3017,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.3071,
+          "first_threshold_ns": 9.7951,
+          "post_cross_min_v": 2.0022,
+          "post_cross_max_v": 3.3071,
+          "late_min_v": 3.2312,
+          "late_max_v": 3.3071,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.306,
+          "first_threshold_ns": 10.2,
+          "post_cross_min_v": 2.0053,
+          "post_cross_max_v": 3.306,
+          "late_min_v": 3.2453,
+          "late_max_v": 3.306,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.3106,
+          "first_threshold_ns": 10.715,
+          "post_cross_min_v": 2.0004,
+          "post_cross_max_v": 3.3106,
+          "late_min_v": 3.2374,
+          "late_max_v": 3.3106,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.3117,
+          "first_threshold_ns": 10.95,
+          "post_cross_min_v": 2.0004,
+          "post_cross_max_v": 3.3117,
+          "late_min_v": 3.2226,
+          "late_max_v": 3.3117,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.2999,
+          "first_threshold_ns": 11.3018,
+          "post_cross_min_v": 2.0032,
+          "post_cross_max_v": 3.2999,
+          "late_min_v": 3.2239,
+          "late_max_v": 3.2999,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.2056,
+          "first_threshold_ns": 17.0704,
+          "post_cross_min_v": 2.0015,
+          "post_cross_max_v": 3.2056,
+          "late_min_v": 2.9121,
+          "late_max_v": 3.2056,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.2032,
+          "first_threshold_ns": 17.038,
+          "post_cross_min_v": 2.0005,
+          "post_cross_max_v": 3.2032,
+          "late_min_v": 2.8848,
+          "late_max_v": 3.2032,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.2025,
+          "first_threshold_ns": 16.2291,
+          "post_cross_min_v": 2.0,
+          "post_cross_max_v": 3.2025,
+          "late_min_v": 2.8844,
+          "late_max_v": 3.2025,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.2148,
+          "first_threshold_ns": 14.4957,
+          "post_cross_min_v": 1.9634,
+          "post_cross_max_v": 3.2148,
+          "late_min_v": 2.9295,
+          "late_max_v": 3.2148,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.229,
+          "first_threshold_ns": 14.9205,
+          "post_cross_min_v": 2.0019,
+          "post_cross_max_v": 3.229,
+          "late_min_v": 2.9801,
+          "late_max_v": 3.229,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.2335,
+          "first_threshold_ns": 14.9492,
+          "post_cross_min_v": 2.0066,
+          "post_cross_max_v": 3.2335,
+          "late_min_v": 2.9653,
+          "late_max_v": 3.2335,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3055,
+          "first_threshold_ns": 9.5846,
+          "post_cross_min_v": 2.0052,
+          "post_cross_max_v": 3.3055,
+          "late_min_v": 3.2242,
+          "late_max_v": 3.3055,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.3107,
+          "first_threshold_ns": 9.7867,
+          "post_cross_min_v": 2.0002,
+          "post_cross_max_v": 3.3107,
+          "late_min_v": 3.2341,
+          "late_max_v": 3.3107,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.3075,
+          "first_threshold_ns": 10.2,
+          "post_cross_min_v": 2.0005,
+          "post_cross_max_v": 3.3075,
+          "late_min_v": 3.2481,
+          "late_max_v": 3.3075,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.3133,
+          "first_threshold_ns": 10.7238,
+          "post_cross_min_v": 2.0043,
+          "post_cross_max_v": 3.3133,
+          "late_min_v": 3.2382,
+          "late_max_v": 3.3133,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.3138,
+          "first_threshold_ns": 10.9614,
+          "post_cross_min_v": 2.0007,
+          "post_cross_max_v": 3.3138,
+          "late_min_v": 3.2205,
+          "late_max_v": 3.3138,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.304,
+          "first_threshold_ns": 11.3064,
+          "post_cross_min_v": 2.0018,
+          "post_cross_max_v": 3.304,
+          "late_min_v": 3.22,
+          "late_max_v": 3.304,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 26.096,
+      "fixture_max_error_v": 0.02134,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.2082,
+          "first_threshold_ns": 17.0751,
+          "post_cross_min_v": 2.0007,
+          "post_cross_max_v": 3.2082,
+          "late_min_v": 2.9126,
+          "late_max_v": 3.2082,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.2049,
+          "first_threshold_ns": 17.0502,
+          "post_cross_min_v": 2.0022,
+          "post_cross_max_v": 3.2049,
+          "late_min_v": 2.8838,
+          "late_max_v": 3.2049,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.2045,
+          "first_threshold_ns": 16.2423,
+          "post_cross_min_v": 2.0011,
+          "post_cross_max_v": 3.2045,
+          "late_min_v": 2.8822,
+          "late_max_v": 3.2045,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.2154,
+          "first_threshold_ns": 14.5216,
+          "post_cross_min_v": 1.9663,
+          "post_cross_max_v": 3.2154,
+          "late_min_v": 2.9322,
+          "late_max_v": 3.2154,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.2294,
+          "first_threshold_ns": 14.93,
+          "post_cross_min_v": 2.0026,
+          "post_cross_max_v": 3.2294,
+          "late_min_v": 2.9812,
+          "late_max_v": 3.2294,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.2394,
+          "first_threshold_ns": 14.9489,
+          "post_cross_min_v": 2.0023,
+          "post_cross_max_v": 3.2394,
+          "late_min_v": 2.9614,
+          "late_max_v": 3.2394,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0049,
+          "max_v": 3.3229,
+          "first_threshold_ns": 5.85,
+          "post_cross_min_v": -0.0049,
+          "post_cross_max_v": 0.7991,
+          "late_min_v": -0.0002,
+          "late_max_v": 0.0002,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0002,
+          "max_v": 3.3126,
+          "first_threshold_ns": 6.7175,
+          "post_cross_min_v": -0.0002,
+          "post_cross_max_v": 0.7956,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0087,
+          "max_v": 3.3222,
+          "first_threshold_ns": 5.885,
+          "post_cross_min_v": -0.0087,
+          "post_cross_max_v": 0.7916,
+          "late_min_v": -0.0004,
+          "late_max_v": 0.0004,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0005,
+          "max_v": 3.3122,
+          "first_threshold_ns": 6.76,
+          "post_cross_min_v": -0.0005,
+          "post_cross_max_v": 0.7914,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0007,
+          "max_v": 3.3094,
+          "first_threshold_ns": 14.6604,
+          "post_cross_min_v": 0.0007,
+          "post_cross_max_v": 0.7917,
+          "late_min_v": 0.0007,
+          "late_max_v": 0.0864,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0039,
+          "max_v": 3.3063,
+          "first_threshold_ns": 14.2379,
+          "post_cross_min_v": -0.0039,
+          "post_cross_max_v": 0.797,
+          "late_min_v": -0.0039,
+          "late_max_v": 0.0854,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0024,
+          "max_v": 3.3041,
+          "first_threshold_ns": 13.9647,
+          "post_cross_min_v": -0.0024,
+          "post_cross_max_v": 0.7985,
+          "late_min_v": -0.0024,
+          "late_max_v": 0.0624,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0079,
+          "max_v": 3.3027,
+          "first_threshold_ns": 13.4668,
+          "post_cross_min_v": -0.0079,
+          "post_cross_max_v": 0.7922,
+          "late_min_v": -0.0079,
+          "late_max_v": 0.0726,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0095,
+          "max_v": 3.3018,
+          "first_threshold_ns": 13.115,
+          "post_cross_min_v": -0.0095,
+          "post_cross_max_v": 0.7959,
+          "late_min_v": -0.0095,
+          "late_max_v": 0.0834,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0025,
+          "max_v": 3.3016,
+          "first_threshold_ns": 12.615,
+          "post_cross_min_v": 0.0025,
+          "post_cross_max_v": 0.7964,
+          "late_min_v": 0.0025,
+          "late_max_v": 0.0825,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.108,
+          "max_v": 3.3062,
+          "first_threshold_ns": 19.5,
+          "post_cross_min_v": 0.108,
+          "post_cross_max_v": 0.8373,
+          "late_min_v": 0.108,
+          "late_max_v": 0.4274,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": 0.1105,
+          "max_v": 3.3028,
+          "first_threshold_ns": 20.2155,
+          "post_cross_min_v": 0.1105,
+          "post_cross_max_v": 0.8289,
+          "late_min_v": 0.1105,
+          "late_max_v": 0.4388,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": 0.1111,
+          "max_v": 3.3012,
+          "first_threshold_ns": 20.8393,
+          "post_cross_min_v": 0.1111,
+          "post_cross_max_v": 0.7977,
+          "late_min_v": 0.1111,
+          "late_max_v": 0.4384,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0968,
+          "max_v": 3.3006,
+          "first_threshold_ns": 21.6084,
+          "post_cross_min_v": 0.0968,
+          "post_cross_max_v": 0.7947,
+          "late_min_v": 0.0968,
+          "late_max_v": 0.3957,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.1009,
+          "max_v": 3.3003,
+          "first_threshold_ns": 21.9429,
+          "post_cross_min_v": 0.1009,
+          "post_cross_max_v": 0.7978,
+          "late_min_v": 0.1009,
+          "late_max_v": 0.3721,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0809,
+          "max_v": 3.3002,
+          "first_threshold_ns": 22.1615,
+          "post_cross_min_v": 0.0809,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": 0.0809,
+          "late_max_v": 0.3532,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.003,
+          "max_v": 3.3091,
+          "first_threshold_ns": 14.6461,
+          "post_cross_min_v": -0.003,
+          "post_cross_max_v": 0.7989,
+          "late_min_v": -0.003,
+          "late_max_v": 0.0869,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0074,
+          "max_v": 3.3061,
+          "first_threshold_ns": 14.25,
+          "post_cross_min_v": -0.0074,
+          "post_cross_max_v": 0.7948,
+          "late_min_v": -0.0074,
+          "late_max_v": 0.0814,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.004,
+          "max_v": 3.3039,
+          "first_threshold_ns": 13.95,
+          "post_cross_min_v": -0.004,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": -0.004,
+          "late_max_v": 0.0594,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0105,
+          "max_v": 3.3026,
+          "first_threshold_ns": 13.4499,
+          "post_cross_min_v": -0.0105,
+          "post_cross_max_v": 0.7976,
+          "late_min_v": -0.0105,
+          "late_max_v": 0.0689,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0116,
+          "max_v": 3.3017,
+          "first_threshold_ns": 13.1003,
+          "post_cross_min_v": -0.0116,
+          "post_cross_max_v": 0.7955,
+          "late_min_v": -0.0116,
+          "late_max_v": 0.0855,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0007,
+          "max_v": 3.3016,
+          "first_threshold_ns": 12.6042,
+          "post_cross_min_v": -0.0007,
+          "post_cross_max_v": 0.7994,
+          "late_min_v": -0.0007,
+          "late_max_v": 0.0863,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 27.746,
+      "fixture_max_error_v": 0.01934,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.1053,
+          "max_v": 3.306,
+          "first_threshold_ns": 19.4707,
+          "post_cross_min_v": 0.1053,
+          "post_cross_max_v": 0.8385,
+          "late_min_v": 0.1053,
+          "late_max_v": 0.4264,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": 0.1092,
+          "max_v": 3.3027,
+          "first_threshold_ns": 20.1573,
+          "post_cross_min_v": 0.1092,
+          "post_cross_max_v": 0.828,
+          "late_min_v": 0.1092,
+          "late_max_v": 0.4396,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": 0.1091,
+          "max_v": 3.3012,
+          "first_threshold_ns": 20.8395,
+          "post_cross_min_v": 0.1091,
+          "post_cross_max_v": 0.7994,
+          "late_min_v": 0.1091,
+          "late_max_v": 0.4402,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0961,
+          "max_v": 3.3006,
+          "first_threshold_ns": 21.5677,
+          "post_cross_min_v": 0.0961,
+          "post_cross_max_v": 0.797,
+          "late_min_v": 0.0961,
+          "late_max_v": 0.3931,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0972,
+          "max_v": 3.3003,
+          "first_threshold_ns": 21.9327,
+          "post_cross_min_v": 0.0972,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.0972,
+          "late_max_v": 0.3669,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0754,
+          "max_v": 3.3002,
+          "first_threshold_ns": 22.1728,
+          "post_cross_min_v": 0.0754,
+          "post_cross_max_v": 0.7947,
+          "late_min_v": 0.0754,
+          "late_max_v": 0.3553,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0136,
+          "max_v": 3.1413,
+          "first_threshold_ns": 5.55,
+          "post_cross_min_v": 2.0248,
+          "post_cross_max_v": 3.1413,
+          "late_min_v": 3.1398,
+          "late_max_v": 3.1402,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0067,
+          "max_v": 3.1401,
+          "first_threshold_ns": 6.2125,
+          "post_cross_min_v": 2.0135,
+          "post_cross_max_v": 3.1401,
+          "late_min_v": 3.1399,
+          "late_max_v": 3.14,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.013,
+          "max_v": 3.1432,
+          "first_threshold_ns": 5.55,
+          "post_cross_min_v": 2.0028,
+          "post_cross_max_v": 3.1432,
+          "late_min_v": 3.1397,
+          "late_max_v": 3.1403,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0064,
+          "max_v": 3.1403,
+          "first_threshold_ns": 6.255,
+          "post_cross_min_v": 2.0182,
+          "post_cross_max_v": 3.1403,
+          "late_min_v": 3.1399,
+          "late_max_v": 3.1401,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0054,
+          "max_v": 3.1346,
+          "first_threshold_ns": 11.3006,
+          "post_cross_min_v": 2.0001,
+          "post_cross_max_v": 3.1346,
+          "late_min_v": 3.037,
+          "late_max_v": 3.1346,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0027,
+          "max_v": 3.1379,
+          "first_threshold_ns": 10.8102,
+          "post_cross_min_v": 1.9984,
+          "post_cross_max_v": 3.1379,
+          "late_min_v": 3.0379,
+          "late_max_v": 3.1379,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": -0.0014,
+          "max_v": 3.1358,
+          "first_threshold_ns": 11.2016,
+          "post_cross_min_v": 2.0003,
+          "post_cross_max_v": 3.1358,
+          "late_min_v": 3.0638,
+          "late_max_v": 3.1358,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0008,
+          "max_v": 3.1435,
+          "first_threshold_ns": 11.5444,
+          "post_cross_min_v": 2.0069,
+          "post_cross_max_v": 3.1435,
+          "late_min_v": 3.0507,
+          "late_max_v": 3.1435,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0005,
+          "max_v": 3.1458,
+          "first_threshold_ns": 11.9731,
+          "post_cross_min_v": 2.0042,
+          "post_cross_max_v": 3.1458,
+          "late_min_v": 3.0457,
+          "late_max_v": 3.1458,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0003,
+          "max_v": 3.1338,
+          "first_threshold_ns": 12.1016,
+          "post_cross_min_v": 2.0106,
+          "post_cross_max_v": 3.1338,
+          "late_min_v": 3.0464,
+          "late_max_v": 3.1338,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0033,
+          "max_v": 3.0101,
+          "first_threshold_ns": 18.5199,
+          "post_cross_min_v": 2.002,
+          "post_cross_max_v": 3.0101,
+          "late_min_v": 2.6794,
+          "late_max_v": 3.0101,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.001,
+          "max_v": 3.0074,
+          "first_threshold_ns": 18.015,
+          "post_cross_min_v": 2.0015,
+          "post_cross_max_v": 3.0074,
+          "late_min_v": 2.6707,
+          "late_max_v": 3.0074,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0004,
+          "max_v": 3.0079,
+          "first_threshold_ns": 17.501,
+          "post_cross_min_v": 2.0014,
+          "post_cross_max_v": 3.0079,
+          "late_min_v": 2.6727,
+          "late_max_v": 3.0079,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0001,
+          "max_v": 3.0223,
+          "first_threshold_ns": 16.95,
+          "post_cross_min_v": 2.0086,
+          "post_cross_max_v": 3.0223,
+          "late_min_v": 2.7136,
+          "late_max_v": 3.0223,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0001,
+          "max_v": 3.0164,
+          "first_threshold_ns": 16.394,
+          "post_cross_min_v": 2.0009,
+          "post_cross_max_v": 3.0164,
+          "late_min_v": 2.7284,
+          "late_max_v": 3.0164,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.0383,
+          "first_threshold_ns": 15.7577,
+          "post_cross_min_v": 2.0009,
+          "post_cross_max_v": 3.0383,
+          "late_min_v": 2.7477,
+          "late_max_v": 3.0383,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0051,
+          "max_v": 3.138,
+          "first_threshold_ns": 10.4625,
+          "post_cross_min_v": 1.9852,
+          "post_cross_max_v": 3.138,
+          "late_min_v": 3.0364,
+          "late_max_v": 3.138,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": -0.0025,
+          "max_v": 3.1412,
+          "first_threshold_ns": 10.8148,
+          "post_cross_min_v": 2.0,
+          "post_cross_max_v": 3.1412,
+          "late_min_v": 3.0409,
+          "late_max_v": 3.1412,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0013,
+          "max_v": 3.1373,
+          "first_threshold_ns": 11.1773,
+          "post_cross_min_v": 2.0008,
+          "post_cross_max_v": 3.1373,
+          "late_min_v": 3.0668,
+          "late_max_v": 3.1373,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0007,
+          "max_v": 3.1458,
+          "first_threshold_ns": 11.55,
+          "post_cross_min_v": 2.0065,
+          "post_cross_max_v": 3.1458,
+          "late_min_v": 3.0519,
+          "late_max_v": 3.1458,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0004,
+          "max_v": 3.1477,
+          "first_threshold_ns": 11.9789,
+          "post_cross_min_v": 2.0056,
+          "post_cross_max_v": 3.1477,
+          "late_min_v": 3.044,
+          "late_max_v": 3.1477,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0003,
+          "max_v": 3.1347,
+          "first_threshold_ns": 12.1067,
+          "post_cross_min_v": 2.0112,
+          "post_cross_max_v": 3.1347,
+          "late_min_v": 3.0433,
+          "late_max_v": 3.1347,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 31.419,
+      "fixture_max_error_v": 0.01264,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0032,
+          "max_v": 3.0125,
+          "first_threshold_ns": 18.525,
+          "post_cross_min_v": 2.001,
+          "post_cross_max_v": 3.0125,
+          "late_min_v": 2.6787,
+          "late_max_v": 3.0125,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.001,
+          "max_v": 3.0083,
+          "first_threshold_ns": 18.035,
+          "post_cross_min_v": 2.0029,
+          "post_cross_max_v": 3.0083,
+          "late_min_v": 2.6701,
+          "late_max_v": 3.0083,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0003,
+          "max_v": 3.0099,
+          "first_threshold_ns": 17.505,
+          "post_cross_min_v": 2.0004,
+          "post_cross_max_v": 3.0099,
+          "late_min_v": 2.6714,
+          "late_max_v": 3.0099,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0001,
+          "max_v": 3.0231,
+          "first_threshold_ns": 16.95,
+          "post_cross_min_v": 2.0055,
+          "post_cross_max_v": 3.0231,
+          "late_min_v": 2.716,
+          "late_max_v": 3.0231,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0001,
+          "max_v": 3.0175,
+          "first_threshold_ns": 16.378,
+          "post_cross_min_v": 2.0004,
+          "post_cross_max_v": 3.0175,
+          "late_min_v": 2.7285,
+          "late_max_v": 3.0175,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.0431,
+          "first_threshold_ns": 15.7663,
+          "post_cross_min_v": 2.0011,
+          "post_cross_max_v": 3.0431,
+          "late_min_v": 2.7525,
+          "late_max_v": 3.0431,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0008,
+          "max_v": 3.1643,
+          "first_threshold_ns": 6.525,
+          "post_cross_min_v": -0.0008,
+          "post_cross_max_v": 0.7928,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0,
+          "max_v": 3.1544,
+          "first_threshold_ns": 7.36,
+          "post_cross_min_v": -0.0,
+          "post_cross_max_v": 0.7972,
+          "late_min_v": -0.0,
+          "late_max_v": 0.0,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0019,
+          "max_v": 3.164,
+          "first_threshold_ns": 6.5625,
+          "post_cross_min_v": -0.0019,
+          "post_cross_max_v": 0.7873,
+          "late_min_v": -0.0003,
+          "late_max_v": 0.0003,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0001,
+          "max_v": 3.1541,
+          "first_threshold_ns": 7.36,
+          "post_cross_min_v": -0.0001,
+          "post_cross_max_v": 0.7979,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0113,
+          "max_v": 3.1499,
+          "first_threshold_ns": 15.15,
+          "post_cross_min_v": 0.0113,
+          "post_cross_max_v": 0.7995,
+          "late_min_v": 0.0113,
+          "late_max_v": 0.129,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.009,
+          "max_v": 3.1476,
+          "first_threshold_ns": 15.005,
+          "post_cross_min_v": 0.009,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.009,
+          "late_max_v": 0.1274,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.01,
+          "max_v": 3.1455,
+          "first_threshold_ns": 14.6424,
+          "post_cross_min_v": 0.01,
+          "post_cross_max_v": 0.7957,
+          "late_min_v": 0.01,
+          "late_max_v": 0.1092,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0026,
+          "max_v": 3.144,
+          "first_threshold_ns": 14.1103,
+          "post_cross_min_v": 0.0026,
+          "post_cross_max_v": 0.7998,
+          "late_min_v": 0.0026,
+          "late_max_v": 0.1188,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0003,
+          "max_v": 3.143,
+          "first_threshold_ns": 13.7905,
+          "post_cross_min_v": -0.0003,
+          "post_cross_max_v": 0.8093,
+          "late_min_v": -0.0003,
+          "late_max_v": 0.1127,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": 0.0117,
+          "max_v": 3.1431,
+          "first_threshold_ns": 13.1714,
+          "post_cross_min_v": 0.0117,
+          "post_cross_max_v": 0.8232,
+          "late_min_v": 0.0117,
+          "late_max_v": 0.1138,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.1614,
+          "max_v": 3.1468,
+          "first_threshold_ns": 25.1335,
+          "post_cross_min_v": 0.1614,
+          "post_cross_max_v": 0.799,
+          "late_min_v": 0.1614,
+          "late_max_v": 0.5295,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.1665,
+          "max_v": 3.1437,
+          "first_threshold_ns": 24.2535,
+          "post_cross_min_v": 0.1665,
+          "post_cross_max_v": 0.7992,
+          "late_min_v": 0.1665,
+          "late_max_v": 0.5239,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.1626,
+          "max_v": 3.1419,
+          "first_threshold_ns": 24.3035,
+          "post_cross_min_v": 0.1626,
+          "post_cross_max_v": 0.7988,
+          "late_min_v": 0.1626,
+          "late_max_v": 0.5225,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.1458,
+          "max_v": 3.141,
+          "first_threshold_ns": 23.5717,
+          "post_cross_min_v": 0.1458,
+          "post_cross_max_v": 0.7987,
+          "late_min_v": 0.1458,
+          "late_max_v": 0.482,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.159,
+          "max_v": 3.1406,
+          "first_threshold_ns": 22.6931,
+          "post_cross_min_v": 0.159,
+          "post_cross_max_v": 0.799,
+          "late_min_v": 0.159,
+          "late_max_v": 0.4973,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.1337,
+          "max_v": 3.1405,
+          "first_threshold_ns": 22.9127,
+          "post_cross_min_v": 0.1337,
+          "post_cross_max_v": 0.7992,
+          "late_min_v": 0.1337,
+          "late_max_v": 0.4616,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0079,
+          "max_v": 3.1496,
+          "first_threshold_ns": 15.15,
+          "post_cross_min_v": 0.0079,
+          "post_cross_max_v": 0.7995,
+          "late_min_v": 0.0079,
+          "late_max_v": 0.1294,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0058,
+          "max_v": 3.1473,
+          "first_threshold_ns": 15.0,
+          "post_cross_min_v": 0.0058,
+          "post_cross_max_v": 0.7978,
+          "late_min_v": 0.0058,
+          "late_max_v": 0.1244,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0105,
+          "max_v": 3.1454,
+          "first_threshold_ns": 14.6387,
+          "post_cross_min_v": 0.0105,
+          "post_cross_max_v": 0.7966,
+          "late_min_v": 0.0105,
+          "late_max_v": 0.109,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0003,
+          "max_v": 3.1439,
+          "first_threshold_ns": 14.1031,
+          "post_cross_min_v": 0.0003,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.0003,
+          "late_max_v": 0.1176,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0021,
+          "max_v": 3.1429,
+          "first_threshold_ns": 13.8,
+          "post_cross_min_v": -0.0021,
+          "post_cross_max_v": 0.8093,
+          "late_min_v": -0.0021,
+          "late_max_v": 0.1142,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": 0.0112,
+          "max_v": 3.143,
+          "first_threshold_ns": 13.1672,
+          "post_cross_min_v": 0.0112,
+          "post_cross_max_v": 0.8228,
+          "late_min_v": 0.0112,
+          "late_max_v": 0.1168,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 35.275,
+      "fixture_max_error_v": 0.01244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.159,
+          "max_v": 3.1467,
+          "first_threshold_ns": 25.1468,
+          "post_cross_min_v": 0.159,
+          "post_cross_max_v": 0.7981,
+          "late_min_v": 0.159,
+          "late_max_v": 0.5324,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.1663,
+          "max_v": 3.1436,
+          "first_threshold_ns": 24.2621,
+          "post_cross_min_v": 0.1663,
+          "post_cross_max_v": 0.7992,
+          "late_min_v": 0.1663,
+          "late_max_v": 0.5243,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.1608,
+          "max_v": 3.1418,
+          "first_threshold_ns": 24.3121,
+          "post_cross_min_v": 0.1608,
+          "post_cross_max_v": 0.7969,
+          "late_min_v": 0.1608,
+          "late_max_v": 0.5234,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.1449,
+          "max_v": 3.141,
+          "first_threshold_ns": 23.5346,
+          "post_cross_min_v": 0.1449,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.1449,
+          "late_max_v": 0.4797,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.1561,
+          "max_v": 3.1406,
+          "first_threshold_ns": 22.6933,
+          "post_cross_min_v": 0.1561,
+          "post_cross_max_v": 0.7978,
+          "late_min_v": 0.1561,
+          "late_max_v": 0.5008,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.1295,
+          "max_v": 3.1405,
+          "first_threshold_ns": 22.9293,
+          "post_cross_min_v": 0.1295,
+          "post_cross_max_v": 0.7938,
+          "late_min_v": 0.1295,
+          "late_max_v": 0.4596,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0045,
+          "max_v": 3.4909,
+          "first_threshold_ns": 4.6125,
+          "post_cross_min_v": 2.0247,
+          "post_cross_max_v": 3.4909,
+          "late_min_v": 3.4698,
+          "late_max_v": 3.4702,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.002,
+          "max_v": 3.4717,
+          "first_threshold_ns": 5.105,
+          "post_cross_min_v": 2.0028,
+          "post_cross_max_v": 3.4717,
+          "late_min_v": 3.4699,
+          "late_max_v": 3.4701,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.004,
+          "max_v": 3.5423,
+          "first_threshold_ns": 4.65,
+          "post_cross_min_v": 2.0485,
+          "post_cross_max_v": 3.5423,
+          "late_min_v": 3.4697,
+          "late_max_v": 3.4703,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0019,
+          "max_v": 3.4879,
+          "first_threshold_ns": 5.16,
+          "post_cross_min_v": 2.0441,
+          "post_cross_max_v": 3.4879,
+          "late_min_v": 3.4699,
+          "late_max_v": 3.4701,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0017,
+          "max_v": 3.4789,
+          "first_threshold_ns": 9.032,
+          "post_cross_min_v": 2.0013,
+          "post_cross_max_v": 3.4789,
+          "late_min_v": 3.423,
+          "late_max_v": 3.4789,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0007,
+          "max_v": 3.4864,
+          "first_threshold_ns": 8.7554,
+          "post_cross_min_v": 2.0065,
+          "post_cross_max_v": 3.4864,
+          "late_min_v": 3.4302,
+          "late_max_v": 3.4864,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0003,
+          "max_v": 3.486,
+          "first_threshold_ns": 8.3499,
+          "post_cross_min_v": 2.0111,
+          "post_cross_max_v": 3.486,
+          "late_min_v": 3.4299,
+          "late_max_v": 3.486,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0001,
+          "max_v": 3.488,
+          "first_threshold_ns": 7.899,
+          "post_cross_min_v": 2.0,
+          "post_cross_max_v": 3.488,
+          "late_min_v": 3.4236,
+          "late_max_v": 3.488,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0001,
+          "max_v": 3.4872,
+          "first_threshold_ns": 7.4443,
+          "post_cross_min_v": 2.0138,
+          "post_cross_max_v": 3.4872,
+          "late_min_v": 3.4048,
+          "late_max_v": 3.4872,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.4819,
+          "first_threshold_ns": 6.9835,
+          "post_cross_min_v": 2.005,
+          "post_cross_max_v": 3.4819,
+          "late_min_v": 3.4088,
+          "late_max_v": 3.4819,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.001,
+          "max_v": 3.4098,
+          "first_threshold_ns": 11.435,
+          "post_cross_min_v": 2.001,
+          "post_cross_max_v": 3.4098,
+          "late_min_v": 3.1441,
+          "late_max_v": 3.4098,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0002,
+          "max_v": 3.4097,
+          "first_threshold_ns": 12.2033,
+          "post_cross_min_v": 2.0022,
+          "post_cross_max_v": 3.4097,
+          "late_min_v": 3.1229,
+          "late_max_v": 3.4097,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0001,
+          "max_v": 3.4134,
+          "first_threshold_ns": 12.635,
+          "post_cross_min_v": 2.0078,
+          "post_cross_max_v": 3.4134,
+          "late_min_v": 3.1141,
+          "late_max_v": 3.4134,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0001,
+          "max_v": 3.4165,
+          "first_threshold_ns": 13.4439,
+          "post_cross_min_v": 2.0076,
+          "post_cross_max_v": 3.4165,
+          "late_min_v": 3.1617,
+          "late_max_v": 3.4165,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0,
+          "max_v": 3.4503,
+          "first_threshold_ns": 13.7634,
+          "post_cross_min_v": 2.0029,
+          "post_cross_max_v": 3.4503,
+          "late_min_v": 3.1973,
+          "late_max_v": 3.4503,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.4408,
+          "first_threshold_ns": 14.1246,
+          "post_cross_min_v": 2.0006,
+          "post_cross_max_v": 3.4408,
+          "late_min_v": 3.1808,
+          "late_max_v": 3.4408,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0016,
+          "max_v": 3.4832,
+          "first_threshold_ns": 9.0882,
+          "post_cross_min_v": 2.0367,
+          "post_cross_max_v": 3.4832,
+          "late_min_v": 3.4241,
+          "late_max_v": 3.4832,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0006,
+          "max_v": 3.4903,
+          "first_threshold_ns": 8.8197,
+          "post_cross_min_v": 2.0265,
+          "post_cross_max_v": 3.4903,
+          "late_min_v": 3.4273,
+          "late_max_v": 3.4903,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0003,
+          "max_v": 3.4876,
+          "first_threshold_ns": 8.3832,
+          "post_cross_min_v": 2.0065,
+          "post_cross_max_v": 3.4876,
+          "late_min_v": 3.4277,
+          "late_max_v": 3.4876,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0001,
+          "max_v": 3.4912,
+          "first_threshold_ns": 7.9489,
+          "post_cross_min_v": 2.0063,
+          "post_cross_max_v": 3.4912,
+          "late_min_v": 3.4212,
+          "late_max_v": 3.4912,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0001,
+          "max_v": 3.4894,
+          "first_threshold_ns": 7.4782,
+          "post_cross_min_v": 2.0092,
+          "post_cross_max_v": 3.4894,
+          "late_min_v": 3.4019,
+          "late_max_v": 3.4894,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.4848,
+          "first_threshold_ns": 7.06,
+          "post_cross_min_v": 2.0106,
+          "post_cross_max_v": 3.4848,
+          "late_min_v": 3.4038,
+          "late_max_v": 3.4848,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 20.546,
+      "fixture_max_error_v": 0.02486,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0009,
+          "max_v": 3.4122,
+          "first_threshold_ns": 11.475,
+          "post_cross_min_v": 2.0087,
+          "post_cross_max_v": 3.4122,
+          "late_min_v": 3.1441,
+          "late_max_v": 3.4122,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0002,
+          "max_v": 3.4119,
+          "first_threshold_ns": 12.1628,
+          "post_cross_min_v": 2.0001,
+          "post_cross_max_v": 3.4119,
+          "late_min_v": 3.1207,
+          "late_max_v": 3.4119,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0001,
+          "max_v": 3.4186,
+          "first_threshold_ns": 12.6335,
+          "post_cross_min_v": 2.0003,
+          "post_cross_max_v": 3.4186,
+          "late_min_v": 3.1102,
+          "late_max_v": 3.4186,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0,
+          "max_v": 3.4162,
+          "first_threshold_ns": 13.425,
+          "post_cross_min_v": 2.001,
+          "post_cross_max_v": 3.4162,
+          "late_min_v": 3.1649,
+          "late_max_v": 3.4162,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0,
+          "max_v": 3.4522,
+          "first_threshold_ns": 13.7629,
+          "post_cross_min_v": 2.0011,
+          "post_cross_max_v": 3.4522,
+          "late_min_v": 3.1979,
+          "late_max_v": 3.4522,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.448,
+          "first_threshold_ns": 14.1584,
+          "post_cross_min_v": 2.01,
+          "post_cross_max_v": 3.448,
+          "late_min_v": 3.1755,
+          "late_max_v": 3.448,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0071,
+          "max_v": 3.4905,
+          "first_threshold_ns": 5.3625,
+          "post_cross_min_v": -0.0071,
+          "post_cross_max_v": 0.7902,
+          "late_min_v": -0.0002,
+          "late_max_v": 0.0002,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0005,
+          "max_v": 3.4805,
+          "first_threshold_ns": 6.105,
+          "post_cross_min_v": -0.0005,
+          "post_cross_max_v": 0.7901,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.036,
+          "max_v": 3.4894,
+          "first_threshold_ns": 5.4,
+          "post_cross_min_v": -0.036,
+          "post_cross_max_v": 0.7753,
+          "late_min_v": -0.0002,
+          "late_max_v": 0.0003,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0091,
+          "max_v": 3.48,
+          "first_threshold_ns": 6.15,
+          "post_cross_min_v": -0.0091,
+          "post_cross_max_v": 0.7914,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0069,
+          "max_v": 3.4782,
+          "first_threshold_ns": 14.1195,
+          "post_cross_min_v": -0.0069,
+          "post_cross_max_v": 0.7979,
+          "late_min_v": -0.0069,
+          "late_max_v": 0.0523,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0142,
+          "max_v": 3.4745,
+          "first_threshold_ns": 13.677,
+          "post_cross_min_v": -0.0142,
+          "post_cross_max_v": 0.7998,
+          "late_min_v": -0.0142,
+          "late_max_v": 0.0478,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0142,
+          "max_v": 3.4726,
+          "first_threshold_ns": 13.1683,
+          "post_cross_min_v": -0.0142,
+          "post_cross_max_v": 0.7915,
+          "late_min_v": -0.0142,
+          "late_max_v": 0.0409,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.016,
+          "max_v": 3.4715,
+          "first_threshold_ns": 12.8453,
+          "post_cross_min_v": -0.016,
+          "post_cross_max_v": 0.7943,
+          "late_min_v": -0.016,
+          "late_max_v": 0.0472,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.016,
+          "max_v": 3.471,
+          "first_threshold_ns": 12.15,
+          "post_cross_min_v": -0.016,
+          "post_cross_max_v": 0.7989,
+          "late_min_v": -0.016,
+          "late_max_v": 0.0647,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0052,
+          "max_v": 3.4709,
+          "first_threshold_ns": 12.15,
+          "post_cross_min_v": -0.0052,
+          "post_cross_max_v": 0.7863,
+          "late_min_v": -0.0052,
+          "late_max_v": 0.0609,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0647,
+          "max_v": 3.4752,
+          "first_threshold_ns": 18.81,
+          "post_cross_min_v": 0.0647,
+          "post_cross_max_v": 0.7927,
+          "late_min_v": 0.0647,
+          "late_max_v": 0.3321,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.068,
+          "max_v": 3.4719,
+          "first_threshold_ns": 18.845,
+          "post_cross_min_v": 0.068,
+          "post_cross_max_v": 0.7986,
+          "late_min_v": 0.068,
+          "late_max_v": 0.3582,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0689,
+          "max_v": 3.4707,
+          "first_threshold_ns": 18.665,
+          "post_cross_min_v": 0.0689,
+          "post_cross_max_v": 0.8759,
+          "late_min_v": 0.0689,
+          "late_max_v": 0.3607,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": 0.0575,
+          "max_v": 3.4703,
+          "first_threshold_ns": 20.1924,
+          "post_cross_min_v": 0.0575,
+          "post_cross_max_v": 0.7978,
+          "late_min_v": 0.0575,
+          "late_max_v": 0.3161,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0409,
+          "max_v": 3.4702,
+          "first_threshold_ns": 21.2103,
+          "post_cross_min_v": 0.0409,
+          "post_cross_max_v": 0.799,
+          "late_min_v": 0.0409,
+          "late_max_v": 0.2706,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0394,
+          "max_v": 3.4702,
+          "first_threshold_ns": 16.1312,
+          "post_cross_min_v": 0.0394,
+          "post_cross_max_v": 0.9792,
+          "late_min_v": 0.0394,
+          "late_max_v": 0.2877,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0108,
+          "max_v": 3.4778,
+          "first_threshold_ns": 14.1136,
+          "post_cross_min_v": -0.0108,
+          "post_cross_max_v": 0.7998,
+          "late_min_v": -0.0108,
+          "late_max_v": 0.0521,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0179,
+          "max_v": 3.4743,
+          "first_threshold_ns": 13.6932,
+          "post_cross_min_v": -0.0179,
+          "post_cross_max_v": 0.7975,
+          "late_min_v": -0.0179,
+          "late_max_v": 0.0441,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0159,
+          "max_v": 3.4725,
+          "first_threshold_ns": 13.1441,
+          "post_cross_min_v": -0.0159,
+          "post_cross_max_v": 0.8,
+          "late_min_v": -0.0159,
+          "late_max_v": 0.041,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.019,
+          "max_v": 3.4715,
+          "first_threshold_ns": 12.859,
+          "post_cross_min_v": -0.019,
+          "post_cross_max_v": 0.7933,
+          "late_min_v": -0.019,
+          "late_max_v": 0.0463,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0182,
+          "max_v": 3.471,
+          "first_threshold_ns": 12.15,
+          "post_cross_min_v": -0.0182,
+          "post_cross_max_v": 0.7942,
+          "late_min_v": -0.0182,
+          "late_max_v": 0.0675,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0096,
+          "max_v": 3.4708,
+          "first_threshold_ns": 12.15,
+          "post_cross_min_v": -0.0096,
+          "post_cross_max_v": 0.782,
+          "late_min_v": -0.0096,
+          "late_max_v": 0.0657,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 21.118,
+      "fixture_max_error_v": 0.02484,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0618,
+          "max_v": 3.4749,
+          "first_threshold_ns": 18.8162,
+          "post_cross_min_v": 0.0618,
+          "post_cross_max_v": 0.7909,
+          "late_min_v": 0.0618,
+          "late_max_v": 0.3317,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0659,
+          "max_v": 3.4718,
+          "first_threshold_ns": 18.7826,
+          "post_cross_min_v": 0.0659,
+          "post_cross_max_v": 0.7988,
+          "late_min_v": 0.0659,
+          "late_max_v": 0.3596,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0637,
+          "max_v": 3.4707,
+          "first_threshold_ns": 18.675,
+          "post_cross_min_v": 0.0637,
+          "post_cross_max_v": 0.8715,
+          "late_min_v": 0.0637,
+          "late_max_v": 0.3637,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": 0.057,
+          "max_v": 3.4703,
+          "first_threshold_ns": 20.1804,
+          "post_cross_min_v": 0.057,
+          "post_cross_max_v": 0.7991,
+          "late_min_v": 0.057,
+          "late_max_v": 0.3131,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0405,
+          "max_v": 3.4702,
+          "first_threshold_ns": 21.2174,
+          "post_cross_min_v": 0.0405,
+          "post_cross_max_v": 0.7963,
+          "late_min_v": 0.0405,
+          "late_max_v": 0.2695,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0328,
+          "max_v": 3.4702,
+          "first_threshold_ns": 16.1159,
+          "post_cross_min_v": 0.0328,
+          "post_cross_max_v": 0.9799,
+          "late_min_v": 0.0328,
+          "late_max_v": 0.2926,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.4039,
+          "first_threshold_ns": 4.95,
+          "post_cross_min_v": 2.0682,
+          "post_cross_max_v": 3.4039,
+          "late_min_v": 3.2991,
+          "late_max_v": 3.3009,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3297,
+          "first_threshold_ns": 5.435,
+          "post_cross_min_v": 2.0178,
+          "post_cross_max_v": 3.3297,
+          "late_min_v": 3.2997,
+          "late_max_v": 3.3003,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.4744,
+          "first_threshold_ns": 4.95,
+          "post_cross_min_v": 2.0079,
+          "post_cross_max_v": 3.4744,
+          "late_min_v": 3.2984,
+          "late_max_v": 3.3015,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3728,
+          "first_threshold_ns": 5.46,
+          "post_cross_min_v": 2.0152,
+          "post_cross_max_v": 3.3728,
+          "late_min_v": 3.2994,
+          "late_max_v": 3.3005,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3134,
+          "first_threshold_ns": 9.3626,
+          "post_cross_min_v": 2.0047,
+          "post_cross_max_v": 3.3134,
+          "late_min_v": 3.2658,
+          "late_max_v": 3.3134,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.322,
+          "first_threshold_ns": 9.0762,
+          "post_cross_min_v": 2.0142,
+          "post_cross_max_v": 3.322,
+          "late_min_v": 3.2635,
+          "late_max_v": 3.322,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.3224,
+          "first_threshold_ns": 8.6322,
+          "post_cross_min_v": 2.001,
+          "post_cross_max_v": 3.3224,
+          "late_min_v": 3.2653,
+          "late_max_v": 3.3224,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.3226,
+          "first_threshold_ns": 8.2088,
+          "post_cross_min_v": 2.0054,
+          "post_cross_max_v": 3.3226,
+          "late_min_v": 3.2564,
+          "late_max_v": 3.3226,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.3211,
+          "first_threshold_ns": 7.7612,
+          "post_cross_min_v": 2.0199,
+          "post_cross_max_v": 3.3211,
+          "late_min_v": 3.242,
+          "late_max_v": 3.3211,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.3127,
+          "first_threshold_ns": 7.2456,
+          "post_cross_min_v": 2.0069,
+          "post_cross_max_v": 3.3127,
+          "late_min_v": 3.2501,
+          "late_max_v": 3.3127,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.263,
+          "first_threshold_ns": 11.7656,
+          "post_cross_min_v": 2.0128,
+          "post_cross_max_v": 3.263,
+          "late_min_v": 3.0406,
+          "late_max_v": 3.263,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.2658,
+          "first_threshold_ns": 12.5309,
+          "post_cross_min_v": 2.0013,
+          "post_cross_max_v": 3.2658,
+          "late_min_v": 3.016,
+          "late_max_v": 3.2658,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.2769,
+          "first_threshold_ns": 12.9685,
+          "post_cross_min_v": 2.0105,
+          "post_cross_max_v": 3.2769,
+          "late_min_v": 3.0123,
+          "late_max_v": 3.2769,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.2683,
+          "first_threshold_ns": 13.7802,
+          "post_cross_min_v": 2.0037,
+          "post_cross_max_v": 3.2683,
+          "late_min_v": 3.0544,
+          "late_max_v": 3.2683,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.2882,
+          "first_threshold_ns": 14.078,
+          "post_cross_min_v": 2.0022,
+          "post_cross_max_v": 3.2882,
+          "late_min_v": 3.0769,
+          "late_max_v": 3.2882,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.2937,
+          "first_threshold_ns": 14.46,
+          "post_cross_min_v": 2.0016,
+          "post_cross_max_v": 3.2937,
+          "late_min_v": 3.0627,
+          "late_max_v": 3.2937,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.3191,
+          "first_threshold_ns": 9.3896,
+          "post_cross_min_v": 2.0056,
+          "post_cross_max_v": 3.3191,
+          "late_min_v": 3.2625,
+          "late_max_v": 3.3191,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.3266,
+          "first_threshold_ns": 9.1125,
+          "post_cross_min_v": 2.0131,
+          "post_cross_max_v": 3.3266,
+          "late_min_v": 3.2632,
+          "late_max_v": 3.3266,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.3241,
+          "first_threshold_ns": 8.6769,
+          "post_cross_min_v": 2.0025,
+          "post_cross_max_v": 3.3241,
+          "late_min_v": 3.2627,
+          "late_max_v": 3.3241,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.3277,
+          "first_threshold_ns": 8.26,
+          "post_cross_min_v": 2.0124,
+          "post_cross_max_v": 3.3277,
+          "late_min_v": 3.253,
+          "late_max_v": 3.3277,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.3257,
+          "first_threshold_ns": 7.7763,
+          "post_cross_min_v": 2.0099,
+          "post_cross_max_v": 3.3257,
+          "late_min_v": 3.2385,
+          "late_max_v": 3.3257,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.3196,
+          "first_threshold_ns": 7.302,
+          "post_cross_min_v": 2.0054,
+          "post_cross_max_v": 3.3196,
+          "late_min_v": 3.2447,
+          "late_max_v": 3.3196,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 16.837,
+      "fixture_max_error_v": 0.07883,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.2648,
+          "first_threshold_ns": 11.7839,
+          "post_cross_min_v": 2.0054,
+          "post_cross_max_v": 3.2648,
+          "late_min_v": 3.0404,
+          "late_max_v": 3.2648,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.2682,
+          "first_threshold_ns": 12.485,
+          "post_cross_min_v": 2.0007,
+          "post_cross_max_v": 3.2682,
+          "late_min_v": 3.0142,
+          "late_max_v": 3.2682,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.2823,
+          "first_threshold_ns": 12.9741,
+          "post_cross_min_v": 2.006,
+          "post_cross_max_v": 3.2823,
+          "late_min_v": 3.0074,
+          "late_max_v": 3.2823,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.2674,
+          "first_threshold_ns": 13.7718,
+          "post_cross_min_v": 2.0016,
+          "post_cross_max_v": 3.2674,
+          "late_min_v": 3.0577,
+          "late_max_v": 3.2674,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.2935,
+          "first_threshold_ns": 14.0753,
+          "post_cross_min_v": 2.0001,
+          "post_cross_max_v": 3.2935,
+          "late_min_v": 3.0772,
+          "late_max_v": 3.2935,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.3013,
+          "first_threshold_ns": 14.4749,
+          "post_cross_min_v": 2.0032,
+          "post_cross_max_v": 3.3013,
+          "late_min_v": 3.0568,
+          "late_max_v": 3.3013,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0535,
+          "max_v": 3.3,
+          "first_threshold_ns": 5.405,
+          "post_cross_min_v": -0.0535,
+          "post_cross_max_v": 0.7951,
+          "late_min_v": -0.0003,
+          "late_max_v": 0.0003,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0098,
+          "max_v": 3.3,
+          "first_threshold_ns": 6.1042,
+          "post_cross_min_v": -0.0098,
+          "post_cross_max_v": 0.7805,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.1111,
+          "max_v": 3.3,
+          "first_threshold_ns": 5.435,
+          "post_cross_min_v": -0.1111,
+          "post_cross_max_v": 0.7918,
+          "late_min_v": -0.0007,
+          "late_max_v": 0.0006,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0302,
+          "max_v": 3.3,
+          "first_threshold_ns": 6.15,
+          "post_cross_min_v": -0.0302,
+          "post_cross_max_v": 0.771,
+          "late_min_v": -0.0002,
+          "late_max_v": 0.0002,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0091,
+          "max_v": 3.3,
+          "first_threshold_ns": 13.8686,
+          "post_cross_min_v": -0.0091,
+          "post_cross_max_v": 0.798,
+          "late_min_v": -0.0091,
+          "late_max_v": 0.0421,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0171,
+          "max_v": 3.3,
+          "first_threshold_ns": 11.0584,
+          "post_cross_min_v": -0.0171,
+          "post_cross_max_v": 0.922,
+          "late_min_v": -0.0171,
+          "late_max_v": 0.0447,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": -0.0169,
+          "max_v": 3.3,
+          "first_threshold_ns": 13.0549,
+          "post_cross_min_v": -0.0169,
+          "post_cross_max_v": 0.7993,
+          "late_min_v": -0.0169,
+          "late_max_v": 0.0339,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0179,
+          "max_v": 3.3,
+          "first_threshold_ns": 11.74,
+          "post_cross_min_v": -0.0179,
+          "post_cross_max_v": 0.8302,
+          "late_min_v": -0.0179,
+          "late_max_v": 0.0407,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": -0.0172,
+          "max_v": 3.3,
+          "first_threshold_ns": 12.105,
+          "post_cross_min_v": -0.0172,
+          "post_cross_max_v": 0.7922,
+          "late_min_v": -0.0172,
+          "late_max_v": 0.0568,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0066,
+          "max_v": 3.3,
+          "first_threshold_ns": 12.1649,
+          "post_cross_min_v": -0.0066,
+          "post_cross_max_v": 0.7981,
+          "late_min_v": -0.0066,
+          "late_max_v": 0.0521,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0486,
+          "max_v": 3.3,
+          "first_threshold_ns": 18.755,
+          "post_cross_min_v": 0.0486,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.0486,
+          "late_max_v": 0.2876,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0502,
+          "max_v": 3.3,
+          "first_threshold_ns": 18.3,
+          "post_cross_min_v": 0.0502,
+          "post_cross_max_v": 0.7934,
+          "late_min_v": 0.0502,
+          "late_max_v": 0.3115,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0451,
+          "max_v": 3.3,
+          "first_threshold_ns": 18.1203,
+          "post_cross_min_v": 0.0451,
+          "post_cross_max_v": 0.8,
+          "late_min_v": 0.0451,
+          "late_max_v": 0.3141,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0434,
+          "max_v": 3.3,
+          "first_threshold_ns": 17.25,
+          "post_cross_min_v": 0.0434,
+          "post_cross_max_v": 0.8456,
+          "late_min_v": 0.0434,
+          "late_max_v": 0.2695,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": 0.0316,
+          "max_v": 3.3,
+          "first_threshold_ns": 17.083,
+          "post_cross_min_v": 0.0316,
+          "post_cross_max_v": 0.8743,
+          "late_min_v": 0.0316,
+          "late_max_v": 0.2408,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": 0.0218,
+          "max_v": 3.3,
+          "first_threshold_ns": 15.9,
+          "post_cross_min_v": 0.0218,
+          "post_cross_max_v": 0.8867,
+          "late_min_v": 0.0218,
+          "late_max_v": 0.2531,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0129,
+          "max_v": 3.3,
+          "first_threshold_ns": 13.8193,
+          "post_cross_min_v": -0.0129,
+          "post_cross_max_v": 0.7993,
+          "late_min_v": -0.0129,
+          "late_max_v": 0.0444,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0207,
+          "max_v": 3.3,
+          "first_threshold_ns": 11.0187,
+          "post_cross_min_v": -0.0207,
+          "post_cross_max_v": 0.92,
+          "late_min_v": -0.0207,
+          "late_max_v": 0.0399,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": -0.0184,
+          "max_v": 3.3,
+          "first_threshold_ns": 13.0598,
+          "post_cross_min_v": -0.0184,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": -0.0184,
+          "late_max_v": 0.0359,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0208,
+          "max_v": 3.3,
+          "first_threshold_ns": 11.7157,
+          "post_cross_min_v": -0.0208,
+          "post_cross_max_v": 0.8219,
+          "late_min_v": -0.0208,
+          "late_max_v": 0.0428,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": -0.0191,
+          "max_v": 3.3,
+          "first_threshold_ns": 12.1189,
+          "post_cross_min_v": -0.0191,
+          "post_cross_max_v": 0.7825,
+          "late_min_v": -0.0191,
+          "late_max_v": 0.0596,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0119,
+          "max_v": 3.3,
+          "first_threshold_ns": 12.1594,
+          "post_cross_min_v": -0.0119,
+          "post_cross_max_v": 0.7988,
+          "late_min_v": -0.0119,
+          "late_max_v": 0.0569,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "typ",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 18.957,
+      "fixture_max_error_v": 0.03244,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.046,
+          "max_v": 3.3,
+          "first_threshold_ns": 18.765,
+          "post_cross_min_v": 0.046,
+          "post_cross_max_v": 0.7975,
+          "late_min_v": 0.046,
+          "late_max_v": 0.2876,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0486,
+          "max_v": 3.3,
+          "first_threshold_ns": 18.3,
+          "post_cross_min_v": 0.0486,
+          "post_cross_max_v": 0.7956,
+          "late_min_v": 0.0486,
+          "late_max_v": 0.313,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.04,
+          "max_v": 3.3,
+          "first_threshold_ns": 18.1036,
+          "post_cross_min_v": 0.04,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.04,
+          "late_max_v": 0.3178,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0433,
+          "max_v": 3.3,
+          "first_threshold_ns": 17.25,
+          "post_cross_min_v": 0.0433,
+          "post_cross_max_v": 0.8451,
+          "late_min_v": 0.0433,
+          "late_max_v": 0.2665,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": 0.0269,
+          "max_v": 3.3,
+          "first_threshold_ns": 17.085,
+          "post_cross_min_v": 0.0269,
+          "post_cross_max_v": 0.8744,
+          "late_min_v": 0.0269,
+          "late_max_v": 0.2382,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": 0.015,
+          "max_v": 3.3,
+          "first_threshold_ns": 15.88,
+          "post_cross_min_v": 0.015,
+          "post_cross_max_v": 0.8877,
+          "late_min_v": 0.015,
+          "late_max_v": 0.2583,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.1685,
+          "first_threshold_ns": 5.355,
+          "post_cross_min_v": 2.0413,
+          "post_cross_max_v": 3.1685,
+          "late_min_v": 3.1398,
+          "late_max_v": 3.1403,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.1435,
+          "first_threshold_ns": 5.925,
+          "post_cross_min_v": 2.0367,
+          "post_cross_max_v": 3.1435,
+          "late_min_v": 3.1399,
+          "late_max_v": 3.1401,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.2025,
+          "first_threshold_ns": 5.375,
+          "post_cross_min_v": 2.0302,
+          "post_cross_max_v": 3.2025,
+          "late_min_v": 3.1396,
+          "late_max_v": 3.1404,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.1597,
+          "first_threshold_ns": 5.925,
+          "post_cross_min_v": 2.0086,
+          "post_cross_max_v": 3.1597,
+          "late_min_v": 3.1399,
+          "late_max_v": 3.1401,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.1477,
+          "first_threshold_ns": 9.8506,
+          "post_cross_min_v": 2.0133,
+          "post_cross_max_v": 3.1477,
+          "late_min_v": 3.0924,
+          "late_max_v": 3.1477,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.1539,
+          "first_threshold_ns": 9.7816,
+          "post_cross_min_v": 2.0012,
+          "post_cross_max_v": 3.1539,
+          "late_min_v": 3.096,
+          "late_max_v": 3.1539,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.1528,
+          "first_threshold_ns": 10.4153,
+          "post_cross_min_v": 2.0032,
+          "post_cross_max_v": 3.1528,
+          "late_min_v": 3.1063,
+          "late_max_v": 3.1528,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.1544,
+          "first_threshold_ns": 10.4829,
+          "post_cross_min_v": 2.0002,
+          "post_cross_max_v": 3.1544,
+          "late_min_v": 3.0963,
+          "late_max_v": 3.1544,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.154,
+          "first_threshold_ns": 11.0392,
+          "post_cross_min_v": 2.0005,
+          "post_cross_max_v": 3.154,
+          "late_min_v": 3.0857,
+          "late_max_v": 3.154,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.1458,
+          "first_threshold_ns": 11.4808,
+          "post_cross_min_v": 2.0003,
+          "post_cross_max_v": 3.1458,
+          "late_min_v": 3.0888,
+          "late_max_v": 3.1458,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.0872,
+          "first_threshold_ns": 12.478,
+          "post_cross_min_v": 1.8894,
+          "post_cross_max_v": 3.0872,
+          "late_min_v": 2.843,
+          "late_max_v": 3.0872,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.0836,
+          "first_threshold_ns": 13.6868,
+          "post_cross_min_v": 1.889,
+          "post_cross_max_v": 3.0836,
+          "late_min_v": 2.8296,
+          "late_max_v": 3.0836,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.0885,
+          "first_threshold_ns": 14.022,
+          "post_cross_min_v": 1.9555,
+          "post_cross_max_v": 3.0885,
+          "late_min_v": 2.8281,
+          "late_max_v": 3.0885,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.093,
+          "first_threshold_ns": 14.6011,
+          "post_cross_min_v": 1.9982,
+          "post_cross_max_v": 3.093,
+          "late_min_v": 2.87,
+          "late_max_v": 3.093,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.1032,
+          "first_threshold_ns": 15.147,
+          "post_cross_min_v": 2.0084,
+          "post_cross_max_v": 3.1032,
+          "late_min_v": 2.8685,
+          "late_max_v": 3.1032,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.1136,
+          "first_threshold_ns": 15.1764,
+          "post_cross_min_v": 2.0038,
+          "post_cross_max_v": 3.1136,
+          "late_min_v": 2.8893,
+          "late_max_v": 3.1136,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.1514,
+          "first_threshold_ns": 9.8732,
+          "post_cross_min_v": 2.0114,
+          "post_cross_max_v": 3.1514,
+          "late_min_v": 3.0904,
+          "late_max_v": 3.1514,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.1574,
+          "first_threshold_ns": 9.8365,
+          "post_cross_min_v": 2.0064,
+          "post_cross_max_v": 3.1574,
+          "late_min_v": 3.1005,
+          "late_max_v": 3.1574,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.1542,
+          "first_threshold_ns": 10.4147,
+          "post_cross_min_v": 2.0001,
+          "post_cross_max_v": 3.1542,
+          "late_min_v": 3.1055,
+          "late_max_v": 3.1542,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.1572,
+          "first_threshold_ns": 10.515,
+          "post_cross_min_v": 2.0,
+          "post_cross_max_v": 3.1572,
+          "late_min_v": 3.0975,
+          "late_max_v": 3.1572,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.1559,
+          "first_threshold_ns": 11.0561,
+          "post_cross_min_v": 2.0005,
+          "post_cross_max_v": 3.1559,
+          "late_min_v": 3.0831,
+          "late_max_v": 3.1559,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.1508,
+          "first_threshold_ns": 11.4943,
+          "post_cross_min_v": 2.0024,
+          "post_cross_max_v": 3.1508,
+          "late_min_v": 3.0845,
+          "late_max_v": 3.1508,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 19.971,
+      "fixture_max_error_v": 0.02599,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0,
+          "max_v": 3.0895,
+          "first_threshold_ns": 12.5053,
+          "post_cross_min_v": 1.8906,
+          "post_cross_max_v": 3.0895,
+          "late_min_v": 2.8414,
+          "late_max_v": 3.0895,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": 0.0,
+          "max_v": 3.0843,
+          "first_threshold_ns": 13.7003,
+          "post_cross_min_v": 1.8904,
+          "post_cross_max_v": 3.0843,
+          "late_min_v": 2.8283,
+          "late_max_v": 3.0843,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": 0.0,
+          "max_v": 3.0932,
+          "first_threshold_ns": 13.965,
+          "post_cross_min_v": 1.9547,
+          "post_cross_max_v": 3.0932,
+          "late_min_v": 2.8249,
+          "late_max_v": 3.0932,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": 0.0,
+          "max_v": 3.093,
+          "first_threshold_ns": 14.6131,
+          "post_cross_min_v": 2.001,
+          "post_cross_max_v": 3.093,
+          "late_min_v": 2.8728,
+          "late_max_v": 3.093,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0,
+          "max_v": 3.1075,
+          "first_threshold_ns": 15.1228,
+          "post_cross_min_v": 2.0009,
+          "post_cross_max_v": 3.1075,
+          "late_min_v": 2.8703,
+          "late_max_v": 3.1075,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0,
+          "max_v": 3.1199,
+          "first_threshold_ns": 15.185,
+          "post_cross_min_v": 2.0037,
+          "post_cross_max_v": 3.1199,
+          "late_min_v": 2.8847,
+          "late_max_v": 3.1199,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0085,
+          "max_v": 3.14,
+          "first_threshold_ns": 5.85,
+          "post_cross_min_v": -0.0085,
+          "post_cross_max_v": 0.773,
+          "late_min_v": -0.0002,
+          "late_max_v": 0.0002,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0002,
+          "max_v": 3.14,
+          "first_threshold_ns": 6.5625,
+          "post_cross_min_v": -0.0002,
+          "post_cross_max_v": 0.7934,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0291,
+          "max_v": 3.14,
+          "first_threshold_ns": 5.85,
+          "post_cross_min_v": -0.0291,
+          "post_cross_max_v": 0.7959,
+          "late_min_v": -0.0004,
+          "late_max_v": 0.0004,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0019,
+          "max_v": 3.14,
+          "first_threshold_ns": 6.6,
+          "post_cross_min_v": -0.0019,
+          "post_cross_max_v": 0.7965,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0042,
+          "max_v": 3.14,
+          "first_threshold_ns": 14.4945,
+          "post_cross_min_v": -0.0042,
+          "post_cross_max_v": 0.7976,
+          "late_min_v": -0.0042,
+          "late_max_v": 0.0617,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0102,
+          "max_v": 3.14,
+          "first_threshold_ns": 14.0715,
+          "post_cross_min_v": -0.0102,
+          "post_cross_max_v": 0.7992,
+          "late_min_v": -0.0102,
+          "late_max_v": 0.0619,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0092,
+          "max_v": 3.14,
+          "first_threshold_ns": 13.5081,
+          "post_cross_min_v": -0.0092,
+          "post_cross_max_v": 0.7998,
+          "late_min_v": -0.0092,
+          "late_max_v": 0.0443,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.012,
+          "max_v": 3.14,
+          "first_threshold_ns": 13.2,
+          "post_cross_min_v": -0.012,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": -0.012,
+          "late_max_v": 0.0579,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0124,
+          "max_v": 3.14,
+          "first_threshold_ns": 12.5693,
+          "post_cross_min_v": -0.0124,
+          "post_cross_max_v": 0.7949,
+          "late_min_v": -0.0124,
+          "late_max_v": 0.064,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0014,
+          "max_v": 3.14,
+          "first_threshold_ns": 12.5693,
+          "post_cross_min_v": -0.0014,
+          "post_cross_max_v": 0.7973,
+          "late_min_v": -0.0014,
+          "late_max_v": 0.0612,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.074,
+          "max_v": 3.14,
+          "first_threshold_ns": 19.2,
+          "post_cross_min_v": 0.074,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": 0.074,
+          "late_max_v": 0.3574,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0822,
+          "max_v": 3.14,
+          "first_threshold_ns": 19.05,
+          "post_cross_min_v": 0.0822,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": 0.0822,
+          "late_max_v": 0.3583,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0778,
+          "max_v": 3.14,
+          "first_threshold_ns": 18.9,
+          "post_cross_min_v": 0.0778,
+          "post_cross_max_v": 0.8372,
+          "late_min_v": 0.0778,
+          "late_max_v": 0.3581,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": 0.0667,
+          "max_v": 3.14,
+          "first_threshold_ns": 20.4251,
+          "post_cross_min_v": 0.0667,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": 0.0667,
+          "late_max_v": 0.3155,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0645,
+          "max_v": 3.14,
+          "first_threshold_ns": 21.4288,
+          "post_cross_min_v": 0.0645,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": 0.0645,
+          "late_max_v": 0.334,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0493,
+          "max_v": 3.14,
+          "first_threshold_ns": 16.4941,
+          "post_cross_min_v": 0.0493,
+          "post_cross_max_v": 0.9292,
+          "late_min_v": 0.0493,
+          "late_max_v": 0.285,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0075,
+          "max_v": 3.14,
+          "first_threshold_ns": 14.488,
+          "post_cross_min_v": -0.0075,
+          "post_cross_max_v": 0.7991,
+          "late_min_v": -0.0075,
+          "late_max_v": 0.0628,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0135,
+          "max_v": 3.14,
+          "first_threshold_ns": 14.1,
+          "post_cross_min_v": -0.0135,
+          "post_cross_max_v": 0.7926,
+          "late_min_v": -0.0135,
+          "late_max_v": 0.0581,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0105,
+          "max_v": 3.14,
+          "first_threshold_ns": 13.5195,
+          "post_cross_min_v": -0.0105,
+          "post_cross_max_v": 0.7985,
+          "late_min_v": -0.0105,
+          "late_max_v": 0.0418,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0145,
+          "max_v": 3.14,
+          "first_threshold_ns": 13.2116,
+          "post_cross_min_v": -0.0145,
+          "post_cross_max_v": 0.7999,
+          "late_min_v": -0.0145,
+          "late_max_v": 0.0564,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0141,
+          "max_v": 3.14,
+          "first_threshold_ns": 12.5588,
+          "post_cross_min_v": -0.0141,
+          "post_cross_max_v": 0.7959,
+          "late_min_v": -0.0141,
+          "late_max_v": 0.0661,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0056,
+          "max_v": 3.14,
+          "first_threshold_ns": 12.6,
+          "post_cross_min_v": -0.0056,
+          "post_cross_max_v": 0.7779,
+          "late_min_v": -0.0056,
+          "late_max_v": 0.065,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "min",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 23.529,
+      "fixture_max_error_v": 0.02003,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0715,
+          "max_v": 3.14,
+          "first_threshold_ns": 19.2036,
+          "post_cross_min_v": 0.0715,
+          "post_cross_max_v": 0.7997,
+          "late_min_v": 0.0715,
+          "late_max_v": 0.3584,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0822,
+          "max_v": 3.14,
+          "first_threshold_ns": 19.05,
+          "post_cross_min_v": 0.0822,
+          "post_cross_max_v": 0.7961,
+          "late_min_v": 0.0822,
+          "late_max_v": 0.3594,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.076,
+          "max_v": 3.14,
+          "first_threshold_ns": 18.9,
+          "post_cross_min_v": 0.076,
+          "post_cross_max_v": 0.8336,
+          "late_min_v": 0.076,
+          "late_max_v": 0.3603,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": 0.066,
+          "max_v": 3.14,
+          "first_threshold_ns": 20.435,
+          "post_cross_min_v": 0.066,
+          "post_cross_max_v": 0.7996,
+          "late_min_v": 0.066,
+          "late_max_v": 0.3128,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": 0.0606,
+          "max_v": 3.14,
+          "first_threshold_ns": 21.4011,
+          "post_cross_min_v": 0.0606,
+          "post_cross_max_v": 0.7993,
+          "late_min_v": 0.0606,
+          "late_max_v": 0.3294,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": 0.0437,
+          "max_v": 3.14,
+          "first_threshold_ns": 16.4866,
+          "post_cross_min_v": 0.0437,
+          "post_cross_max_v": 0.9297,
+          "late_min_v": 0.0437,
+          "late_max_v": 0.2889,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0001,
+          "max_v": 3.7009,
+          "first_threshold_ns": 4.575,
+          "post_cross_min_v": 2.1099,
+          "post_cross_max_v": 3.7009,
+          "late_min_v": 3.4696,
+          "late_max_v": 3.4704,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0001,
+          "max_v": 3.5942,
+          "first_threshold_ns": 4.985,
+          "post_cross_min_v": 2.0088,
+          "post_cross_max_v": 3.5942,
+          "late_min_v": 3.4699,
+          "late_max_v": 3.4701,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0001,
+          "max_v": 3.7839,
+          "first_threshold_ns": 4.575,
+          "post_cross_min_v": 2.0244,
+          "post_cross_max_v": 3.7839,
+          "late_min_v": 3.4693,
+          "late_max_v": 3.4707,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0001,
+          "max_v": 3.6464,
+          "first_threshold_ns": 5.025,
+          "post_cross_min_v": 2.0303,
+          "post_cross_max_v": 3.6464,
+          "late_min_v": 3.4698,
+          "late_max_v": 3.4702,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0,
+          "max_v": 3.4906,
+          "first_threshold_ns": 8.906,
+          "post_cross_min_v": 2.0109,
+          "post_cross_max_v": 3.4906,
+          "late_min_v": 3.4428,
+          "late_max_v": 3.4906,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0,
+          "max_v": 3.5066,
+          "first_threshold_ns": 8.5424,
+          "post_cross_min_v": 2.0072,
+          "post_cross_max_v": 3.5066,
+          "late_min_v": 3.4392,
+          "late_max_v": 3.4978,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0,
+          "max_v": 3.5026,
+          "first_threshold_ns": 8.0837,
+          "post_cross_min_v": 2.0112,
+          "post_cross_max_v": 3.5026,
+          "late_min_v": 3.4372,
+          "late_max_v": 3.4982,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0001,
+          "max_v": 3.4999,
+          "first_threshold_ns": 7.6265,
+          "post_cross_min_v": 2.0009,
+          "post_cross_max_v": 3.4999,
+          "late_min_v": 3.4246,
+          "late_max_v": 3.4999,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0001,
+          "max_v": 3.5047,
+          "first_threshold_ns": 7.2192,
+          "post_cross_min_v": 2.0017,
+          "post_cross_max_v": 3.5047,
+          "late_min_v": 3.414,
+          "late_max_v": 3.5047,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.495,
+          "first_threshold_ns": 6.7193,
+          "post_cross_min_v": 2.0078,
+          "post_cross_max_v": 3.495,
+          "late_min_v": 3.4255,
+          "late_max_v": 3.495,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0,
+          "max_v": 3.4473,
+          "first_threshold_ns": 11.1985,
+          "post_cross_min_v": 2.0196,
+          "post_cross_max_v": 3.4473,
+          "late_min_v": 3.2468,
+          "late_max_v": 3.4473,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0,
+          "max_v": 3.4581,
+          "first_threshold_ns": 10.8947,
+          "post_cross_min_v": 2.0134,
+          "post_cross_max_v": 3.4581,
+          "late_min_v": 3.23,
+          "late_max_v": 3.4581,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0,
+          "max_v": 3.474,
+          "first_threshold_ns": 10.4131,
+          "post_cross_min_v": 1.9282,
+          "post_cross_max_v": 3.474,
+          "late_min_v": 3.2163,
+          "late_max_v": 3.474,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": -0.0,
+          "max_v": 3.4517,
+          "first_threshold_ns": 9.91,
+          "post_cross_min_v": 1.8273,
+          "post_cross_max_v": 3.4517,
+          "late_min_v": 3.2589,
+          "late_max_v": 3.4517,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": -0.0,
+          "max_v": 3.4904,
+          "first_threshold_ns": 9.1417,
+          "post_cross_min_v": 1.7981,
+          "post_cross_max_v": 3.4904,
+          "late_min_v": 3.2675,
+          "late_max_v": 3.4904,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.4843,
+          "first_threshold_ns": 8.2854,
+          "post_cross_min_v": 1.8277,
+          "post_cross_max_v": 3.4843,
+          "late_min_v": 3.2547,
+          "late_max_v": 3.4843,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0,
+          "max_v": 3.4975,
+          "first_threshold_ns": 8.935,
+          "post_cross_min_v": 2.0146,
+          "post_cross_max_v": 3.4975,
+          "late_min_v": 3.4374,
+          "late_max_v": 3.4975,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0,
+          "max_v": 3.5135,
+          "first_threshold_ns": 8.575,
+          "post_cross_min_v": 2.0055,
+          "post_cross_max_v": 3.5135,
+          "late_min_v": 3.4349,
+          "late_max_v": 3.5047,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0,
+          "max_v": 3.5123,
+          "first_threshold_ns": 8.11,
+          "post_cross_min_v": 2.0005,
+          "post_cross_max_v": 3.5123,
+          "late_min_v": 3.4341,
+          "late_max_v": 3.5002,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0,
+          "max_v": 3.5055,
+          "first_threshold_ns": 7.6645,
+          "post_cross_min_v": 2.0014,
+          "post_cross_max_v": 3.5055,
+          "late_min_v": 3.4196,
+          "late_max_v": 3.5055,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0001,
+          "max_v": 3.5103,
+          "first_threshold_ns": 7.2503,
+          "post_cross_min_v": 2.0009,
+          "post_cross_max_v": 3.5103,
+          "late_min_v": 3.4097,
+          "late_max_v": 3.5103,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.5038,
+          "first_threshold_ns": 6.76,
+          "post_cross_min_v": 2.0037,
+          "post_cross_max_v": 3.5038,
+          "late_min_v": 3.4196,
+          "late_max_v": 3.5038,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "rise",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 13.174,
+      "fixture_max_error_v": 0.04634,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0,
+          "max_v": 3.4494,
+          "first_threshold_ns": 11.2081,
+          "post_cross_min_v": 2.0014,
+          "post_cross_max_v": 3.4494,
+          "late_min_v": 3.246,
+          "late_max_v": 3.4494,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": -0.0,
+          "max_v": 3.46,
+          "first_threshold_ns": 10.9216,
+          "post_cross_min_v": 2.0043,
+          "post_cross_max_v": 3.46,
+          "late_min_v": 3.2274,
+          "late_max_v": 3.46,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": -0.0,
+          "max_v": 3.4801,
+          "first_threshold_ns": 10.4792,
+          "post_cross_min_v": 1.9344,
+          "post_cross_max_v": 3.4801,
+          "late_min_v": 3.2097,
+          "late_max_v": 3.4801,
+          "threshold_stable": false
+        },
+        {
+          "node": 4,
+          "min_v": -0.0,
+          "max_v": 3.4547,
+          "first_threshold_ns": 9.97,
+          "post_cross_min_v": 1.8332,
+          "post_cross_max_v": 3.4547,
+          "late_min_v": 3.2627,
+          "late_max_v": 3.4547,
+          "threshold_stable": false
+        },
+        {
+          "node": 5,
+          "min_v": -0.0,
+          "max_v": 3.4914,
+          "first_threshold_ns": 9.188,
+          "post_cross_min_v": 1.8057,
+          "post_cross_max_v": 3.4914,
+          "late_min_v": 3.2674,
+          "late_max_v": 3.4914,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": -0.0001,
+          "max_v": 3.4929,
+          "first_threshold_ns": 8.3549,
+          "post_cross_min_v": 1.8334,
+          "post_cross_max_v": 3.4929,
+          "late_min_v": 3.2474,
+          "late_max_v": 3.4929,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.1869,
+          "max_v": 3.47,
+          "first_threshold_ns": 5.0287,
+          "post_cross_min_v": -0.1869,
+          "post_cross_max_v": 0.7978,
+          "late_min_v": -0.0003,
+          "late_max_v": 0.0003,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.095,
+          "max_v": 3.47,
+          "first_threshold_ns": 5.675,
+          "post_cross_min_v": -0.095,
+          "post_cross_max_v": 0.7897,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 5.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.2648,
+          "max_v": 3.47,
+          "first_threshold_ns": 5.0587,
+          "post_cross_min_v": -0.2648,
+          "post_cross_max_v": 0.7949,
+          "late_min_v": -0.0003,
+          "late_max_v": 0.0004,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "cpu_socket",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 120,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.1441,
+          "max_v": 3.47,
+          "first_threshold_ns": 5.7,
+          "post_cross_min_v": -0.1441,
+          "post_cross_max_v": 0.7934,
+          "late_min_v": -0.0001,
+          "late_max_v": 0.0001,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0156,
+          "max_v": 3.47,
+          "first_threshold_ns": 9.7004,
+          "post_cross_min_v": -0.0156,
+          "post_cross_max_v": 0.8468,
+          "late_min_v": -0.0156,
+          "late_max_v": 0.0248,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": -0.024,
+          "max_v": 3.47,
+          "first_threshold_ns": 10.4115,
+          "post_cross_min_v": -0.024,
+          "post_cross_max_v": 0.8531,
+          "late_min_v": -0.0218,
+          "late_max_v": 0.028,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": -0.0218,
+          "max_v": 3.47,
+          "first_threshold_ns": 10.5918,
+          "post_cross_min_v": -0.0218,
+          "post_cross_max_v": 0.7965,
+          "late_min_v": -0.0218,
+          "late_max_v": 0.0296,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0233,
+          "max_v": 3.47,
+          "first_threshold_ns": 11.1532,
+          "post_cross_min_v": -0.0233,
+          "post_cross_max_v": 0.7994,
+          "late_min_v": -0.0233,
+          "late_max_v": 0.0389,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0241,
+          "max_v": 3.47,
+          "first_threshold_ns": 11.5945,
+          "post_cross_min_v": -0.0241,
+          "post_cross_max_v": 0.7993,
+          "late_min_v": -0.0241,
+          "late_max_v": 0.0499,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0169,
+          "max_v": 3.47,
+          "first_threshold_ns": 11.7026,
+          "post_cross_min_v": -0.0169,
+          "post_cross_max_v": 0.7997,
+          "late_min_v": -0.0169,
+          "late_max_v": 0.0427,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 7.98,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0272,
+          "max_v": 3.47,
+          "first_threshold_ns": 18.2788,
+          "post_cross_min_v": 0.0272,
+          "post_cross_max_v": 0.7985,
+          "late_min_v": 0.0272,
+          "late_max_v": 0.2341,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0219,
+          "max_v": 3.47,
+          "first_threshold_ns": 17.728,
+          "post_cross_min_v": 0.0219,
+          "post_cross_max_v": 0.7997,
+          "late_min_v": 0.0219,
+          "late_max_v": 0.257,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0082,
+          "max_v": 3.47,
+          "first_threshold_ns": 17.1745,
+          "post_cross_min_v": 0.0082,
+          "post_cross_max_v": 0.7976,
+          "late_min_v": 0.0082,
+          "late_max_v": 0.2636,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0237,
+          "max_v": 3.47,
+          "first_threshold_ns": 16.6125,
+          "post_cross_min_v": 0.0237,
+          "post_cross_max_v": 0.794,
+          "late_min_v": 0.0237,
+          "late_max_v": 0.2195,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0011,
+          "max_v": 3.47,
+          "first_threshold_ns": 15.9,
+          "post_cross_min_v": -0.0011,
+          "post_cross_max_v": 0.8091,
+          "late_min_v": -0.0011,
+          "late_max_v": 0.2027,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": -0.0055,
+          "max_v": 3.47,
+          "first_threshold_ns": 15.335,
+          "post_cross_min_v": -0.0055,
+          "post_cross_max_v": 0.8236,
+          "late_min_v": -0.0055,
+          "late_max_v": 0.2184,
+          "threshold_stable": false
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 15.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": -0.0215,
+          "max_v": 3.47,
+          "first_threshold_ns": 9.717,
+          "post_cross_min_v": -0.0215,
+          "post_cross_max_v": 0.8413,
+          "late_min_v": -0.0215,
+          "late_max_v": 0.029,
+          "threshold_stable": false
+        },
+        {
+          "node": 2,
+          "min_v": -0.0307,
+          "max_v": 3.47,
+          "first_threshold_ns": 10.3929,
+          "post_cross_min_v": -0.0307,
+          "post_cross_max_v": 0.8513,
+          "late_min_v": -0.0275,
+          "late_max_v": 0.032,
+          "threshold_stable": false
+        },
+        {
+          "node": 3,
+          "min_v": -0.0301,
+          "max_v": 3.47,
+          "first_threshold_ns": 10.5987,
+          "post_cross_min_v": -0.0301,
+          "post_cross_max_v": 0.7932,
+          "late_min_v": -0.0252,
+          "late_max_v": 0.0326,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": -0.0288,
+          "max_v": 3.47,
+          "first_threshold_ns": 11.16,
+          "post_cross_min_v": -0.0288,
+          "post_cross_max_v": 0.7937,
+          "late_min_v": -0.0288,
+          "late_max_v": 0.0429,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0289,
+          "max_v": 3.47,
+          "first_threshold_ns": 11.5802,
+          "post_cross_min_v": -0.0289,
+          "post_cross_max_v": 0.7989,
+          "late_min_v": -0.0289,
+          "late_max_v": 0.0534,
+          "threshold_stable": true
+        },
+        {
+          "node": 6,
+          "min_v": -0.0244,
+          "max_v": 3.47,
+          "first_threshold_ns": 11.705,
+          "post_cross_min_v": -0.0244,
+          "post_cross_max_v": 0.7971,
+          "late_min_v": -0.0244,
+          "late_max_v": 0.0482,
+          "threshold_stable": true
+        }
+      ]
+    },
+    {
+      "model": "lvc330_b3io",
+      "topology": "six_slot_sck",
+      "corner": "max",
+      "edge": "fall",
+      "assumed_length_mm": 180,
+      "assumed_receiver_pf": 30.0,
+      "commented_tq144_l_nh": 10.53,
+      "package_c_pf": 1.55,
+      "package_r_ohm": 0.0,
+      "output_resistance_ohm": 14.122,
+      "fixture_max_error_v": 0.03417,
+      "receivers": [
+        {
+          "node": 1,
+          "min_v": 0.0252,
+          "max_v": 3.47,
+          "first_threshold_ns": 18.2778,
+          "post_cross_min_v": 0.0252,
+          "post_cross_max_v": 0.7987,
+          "late_min_v": 0.0252,
+          "late_max_v": 0.2344,
+          "threshold_stable": true
+        },
+        {
+          "node": 2,
+          "min_v": 0.0197,
+          "max_v": 3.47,
+          "first_threshold_ns": 17.746,
+          "post_cross_min_v": 0.0197,
+          "post_cross_max_v": 0.7978,
+          "late_min_v": 0.0197,
+          "late_max_v": 0.2591,
+          "threshold_stable": true
+        },
+        {
+          "node": 3,
+          "min_v": 0.0022,
+          "max_v": 3.47,
+          "first_threshold_ns": 17.1978,
+          "post_cross_min_v": 0.0022,
+          "post_cross_max_v": 0.7935,
+          "late_min_v": 0.0022,
+          "late_max_v": 0.2692,
+          "threshold_stable": true
+        },
+        {
+          "node": 4,
+          "min_v": 0.0249,
+          "max_v": 3.47,
+          "first_threshold_ns": 16.6125,
+          "post_cross_min_v": 0.0249,
+          "post_cross_max_v": 0.7994,
+          "late_min_v": 0.0249,
+          "late_max_v": 0.2161,
+          "threshold_stable": true
+        },
+        {
+          "node": 5,
+          "min_v": -0.0069,
+          "max_v": 3.47,
+          "first_threshold_ns": 15.8191,
+          "post_cross_min_v": -0.0069,
+          "post_cross_max_v": 0.8092,
+          "late_min_v": -0.0069,
+          "late_max_v": 0.2026,
+          "threshold_stable": false
+        },
+        {
+          "node": 6,
+          "min_v": -0.0136,
+          "max_v": 3.47,
+          "first_threshold_ns": 15.335,
+          "post_cross_min_v": -0.0136,
+          "post_cross_max_v": 0.8253,
+          "late_min_v": -0.0136,
+          "late_max_v": 0.2252,
+          "threshold_stable": false
+        }
+      ]
+    }
+  ],
+  "main_board_sha256": "74e76faa9ab34d76aeecfc6ad8368269648f84c26a60b993b1169fe2a18f57a2",
+  "measured_copper_paths_mm": {
+    "slot_sck": {
+      "J11.B13": 119.039,
+      "J12.B13": 74.716,
+      "J13.B13": 104.16,
+      "J14.B13": 123.14,
+      "J15.B13": 151.422,
+      "J16.B13": 173.331
+    },
+    "cpu_clk": {
+      "J2.B13": 76.098
+    }
+  },
+  "measured_copper_paths_complete": true,
+  "top_sha256": "26ec4ea1ef293929d7a170be270eaeb37eee9ef3277166bea36e22844cefcc75",
+  "top_routed_signals": true
+}
