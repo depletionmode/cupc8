@@ -19,7 +19,7 @@ def sha(path):
 
 
 def compare(reports, migration_path, current_report_path, current_fields,
-            current_build, current_source):
+            current_build, current_source, fine_migration_path=None):
     migration = json.loads(migration_path.read_text())
     current_receipt = migration['receipts']['io']['current']
     archived_receipt = migration['receipts']['io']['archived']
@@ -38,8 +38,17 @@ def compare(reports, migration_path, current_report_path, current_fields,
             raise ValueError(f'{mesh}: archived report is not migration-validated')
         sources[mesh] = (record, path)
     current = json.loads(current_report_path.read_text())
-    if (current['board_sha256'] != current_receipt['board_sha256'] or
-        current['netlist_sha256'] != current_receipt['netlist_sha256'] or
+    fine_receipt = current_receipt
+    if fine_migration_path:
+        fine_migration = json.loads(fine_migration_path.read_text())
+        if (not fine_migration['modeled_input_equivalent'] or
+            any(fine_migration['rebuilt_receipt'][key] != current_receipt[key]
+                for key in ('receipt_sha256', 'board_sha256', 'netlist_sha256')) or
+            fine_migration['saved_report_sha256'] != sha(current_report_path)):
+            raise ValueError('0.060 mm migration does not bind the current IO receipt')
+        fine_receipt = fine_migration['saved_receipt']
+    if (current['board_sha256'] != fine_receipt['board_sha256'] or
+        current['netlist_sha256'] != fine_receipt['netlist_sha256'] or
         not current['valid_for_diagnostic_sparams']):
         raise ValueError('0.060 mm report is not valid on current IO receipt')
     if (sha(current_fields / 'usb-io.xml') != current['xml_sha256'] or
@@ -82,6 +91,7 @@ def compare(reports, migration_path, current_report_path, current_fields,
     return {
         'scope': 'three-grid IO USB routed-copper subset sensitivity on migration-equivalent receipts',
         'migration_report_sha256': sha(migration_path),
+        'fine_mesh_migration_report_sha256': sha(fine_migration_path) if fine_migration_path else None,
         'current_io_receipt_sha256': current_receipt['receipt_sha256'],
         'current_io_board_sha256': current_receipt['board_sha256'],
         'sources': {mesh: {'report_sha256': sha(path), 'board_sha256': record['board_sha256'],
@@ -107,10 +117,12 @@ def main():
     for name in ('reports', 'migration', 'current-report', 'current-fields', 'current-build',
                  'current-source', 'out'):
         parser.add_argument('--' + name, required=True, type=Path)
+    parser.add_argument('--fine-migration', type=Path)
     args = parser.parse_args()
     result = compare(args.reports.resolve(), args.migration.resolve(),
                      args.current_report.resolve(), args.current_fields.resolve(),
-                     args.current_build.resolve(), args.current_source.resolve())
+                     args.current_build.resolve(), args.current_source.resolve(),
+                     args.fine_migration.resolve() if args.fine_migration else None)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps({name: {key: values[key] for key in

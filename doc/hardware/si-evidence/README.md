@@ -62,3 +62,12 @@ and a second 96-case sweep using both commented vendor TQ144 typical R/L/C
 rows by report hash. The raw vendor IBIS remains in ignored `build/` under
 its license. Neither report substitutes routed branch topology into ngspice
 or closes physical bus SI.
+
+`board-migration-post-shared-tool.json` rebinds the six earlier PML-safe GPU/IO
+field inputs to the shared-tool rebuilt card receipts.
+`usb-io-pml-mesh-060-fixed.json` is the completed finer-grid USB subset run.
+`usb-io-060-receipt-migration.json` validates its raw field hashes and exact
+modeled-input equivalence on the rebuilt IO receipt.
+`usb-io-three-mesh-comparison.json` compares all three receipt-bound meshes;
+it measures sensitivity but does not establish asymptotic convergence or close
+row 4.6.

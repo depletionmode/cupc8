@@ -1,0 +1,204 @@
+{
+  "scope": "IO USB-A D+/D- R14/R15-to-J2 routed F.Cu subset",
+  "board_sha256": "2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41",
+  "netlist_sha256": "a01595539420eee40bc1f9449e92e77f934d5117097609b6ebb9a9fa1f5e3c66",
+  "stackup": "JLC04161H-7628",
+  "prepreg_mm": 0.2104,
+  "dielectric_er": 4.4,
+  "model": "lossless dielectric, PEC copper, rectangular L2 GND; pads/ESD/mask/connector absent",
+  "mesh_mm": 0.06,
+  "straight_control": false,
+  "fixed_window": true,
+  "max_steps": 250000,
+  "solver_threads": 2,
+  "boundary_margin_mm": 0.0,
+  "pml_clearance_mm": 1.0,
+  "air_bounds_mm": [
+    33.48,
+    44.52,
+    -35.52,
+    -17.46
+  ],
+  "material_bounds_mm": [
+    34.5,
+    43.5,
+    -34.5,
+    -18.5
+  ],
+  "pml_inner_bounds_mm": [
+    [
+      33.96,
+      44.04
+    ],
+    [
+      -35.04,
+      -17.94
+    ],
+    [
+      -1,
+      1.5
+    ]
+  ],
+  "pml_geometry_ok": true,
+  "port_geometry": "2D differential lumped ports at resistor/connector pad centers",
+  "declared_port_ohms": 100,
+  "reference_ohms": 90,
+  "energy_decay_db": -87.54,
+  "converged": true,
+  "passivity_ok": true,
+  "port_consistency_ok": true,
+  "spectral_stability_ok": true,
+  "port_window_audit": {
+    "scope": "USB numerical-convergence diagnosis, not accepted SI evidence",
+    "port_file_sha256": {
+      "ut_1": "7d5b214602c21e3a3843a2397f9fb7db753d369adf8b4f5877cba17e13e29c09",
+      "it_1": "4db1b7b71c835be87783917ea0f905832929172a933d2d5240ad822b25e06035",
+      "ut_2": "446f75ffd64617f77bbe5a0e3d6275280e8b64399c5ffefaa70c2e24c1b137e8",
+      "it_2": "b57ee360f1f93af94a08ef0f3435ebb04a06f5d0214cfab0e7471de92b4af35a"
+    },
+    "reference_ohms": 90.0,
+    "field_energy_best_db": -87.54,
+    "field_energy_final_db": -87.54,
+    "field_below_40db_at_final_sample": true,
+    "field_end_criterion_met": false,
+    "port_tail_last_1ns_max_relative_db": {
+      "ut_1": -168.738,
+      "it_1": -162.366,
+      "ut_2": -161.021,
+      "it_2": -157.225
+    },
+    "frequency_windows": [
+      {
+        "frequency_hz": 100000000,
+        "window_db": {
+          "8.5": {
+            "s11": -30.2074,
+            "s21": -0.0057
+          },
+          "12.0": {
+            "s11": -30.2077,
+            "s21": -0.0057
+          },
+          "14.0": {
+            "s11": -30.2079,
+            "s21": -0.0057
+          },
+          "16.0": {
+            "s11": -30.208,
+            "s21": -0.0057
+          }
+        },
+        "magnitude_drift_12_to_16_ns_db": {
+          "s11": 0.0003,
+          "s21": 0.0
+        }
+      },
+      {
+        "frequency_hz": 240000000,
+        "window_db": {
+          "8.5": {
+            "s11": -22.6773,
+            "s21": -0.0247
+          },
+          "12.0": {
+            "s11": -22.6772,
+            "s21": -0.0247
+          },
+          "14.0": {
+            "s11": -22.6772,
+            "s21": -0.0247
+          },
+          "16.0": {
+            "s11": -22.6772,
+            "s21": -0.0247
+          }
+        },
+        "magnitude_drift_12_to_16_ns_db": {
+          "s11": 0.0,
+          "s21": 0.0
+        }
+      },
+      {
+        "frequency_hz": 480000000,
+        "window_db": {
+          "8.5": {
+            "s11": -16.7989,
+            "s21": -0.0905
+          },
+          "12.0": {
+            "s11": -16.7989,
+            "s21": -0.0905
+          },
+          "14.0": {
+            "s11": -16.7989,
+            "s21": -0.0905
+          },
+          "16.0": {
+            "s11": -16.7989,
+            "s21": -0.0905
+          }
+        },
+        "magnitude_drift_12_to_16_ns_db": {
+          "s11": 0.0,
+          "s21": 0.0
+        }
+      }
+    ],
+    "spectral_stability_0p05db": true
+  },
+  "solver_version": "v0.37.0-rc3-1-g65f8771",
+  "timesteps": 250000,
+  "last_energy_sample_step": 249796,
+  "simulated_ns": 16.388875000000002,
+  "run_log_sha256": "020bab6ce6b593bf80d420d51741d8ee3318e2b115130edff0f944c6a5bfad40",
+  "xml_sha256": "b0b3ecc3409e9369b21d21ef4dfcda0786ef00ec72f40e2c428c10a24da42ac9",
+  "valid_for_diagnostic_sparams": true,
+  "valid_for_row_4_6": false,
+  "routes": {
+    "/USB_CONN_DP": {
+      "segments": 6,
+      "length_mm_sum": 12.8209,
+      "signal_path_mm": 9.4072
+    },
+    "/USB_CONN_DM": {
+      "segments": 11,
+      "length_mm_sum": 27.0451,
+      "signal_path_mm": 20.1009
+    }
+  },
+  "results": [
+    {
+      "frequency_hz": 100000000,
+      "s11_db": -30.20795058741203,
+      "s21_db": -0.00574204652163948,
+      "power_sum": 0.9996319644791111,
+      "passive_incident_ratio": 0.0001354026363564832,
+      "passive_load_ohm": [
+        89.9998824290337,
+        0.02438829286921762
+      ]
+    },
+    {
+      "frequency_hz": 240000000,
+      "s11_db": -22.677239548278685,
+      "s21_db": -0.02467584284085424,
+      "power_sum": 0.9997328247782227,
+      "passive_incident_ratio": 0.00032422909218112644,
+      "passive_load_ohm": [
+        89.99921670566745,
+        0.05852177800107596
+      ]
+    },
+    {
+      "frequency_hz": 480000000,
+      "s11_db": -16.798914025161306,
+      "s21_db": -0.09045840792034653,
+      "power_sum": 1.0002847897703526,
+      "passive_incident_ratio": 0.000643117607093694,
+      "passive_load_ohm": [
+        89.99686757930243,
+        0.11692909231801336
+      ]
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "scope": "three-grid IO USB routed-copper subset sensitivity on migration-equivalent receipts",
+  "migration_report_sha256": "dbdb4f1c1fd556dd516c1047f7559b9236526562811e77083e8f1c1b6816f8cc",
+  "fine_mesh_migration_report_sha256": "1a7c231f7922ef58b0d52626cf6cda8021e85e5608912d6058a5c9d1da88192b",
+  "current_io_receipt_sha256": "4a7b7b85faac2c27f7b46ca5196823294f622702e241cad0cf6f01370721c072",
+  "current_io_board_sha256": "2708b66ce7f6e42445c0c2f54186150f3622347ac51e7849c8501969e3052a20",
+  "sources": {
+    "0.075": {
+      "report_sha256": "ca10ba1a953f866c48823fd09e116ead858768502db33a99abbe5a5e70079e86",
+      "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c",
+      "mesh_mm": 0.075,
+      "timesteps": 220000,
+      "simulated_ns": 16.302153999999998,
+      "xml_sha256": "fc0ad04f788f3601a272ee50e38f6f45c5156165ece1f7a82202ebd100a65765",
+      "run_log_sha256": "b092604d3d9ba7d74580b47a363b0d6418ee0fb14c1695173f13c19565087dc6",
+      "energy_decay_db": -88.18,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true
+    },
+    "0.090": {
+      "report_sha256": "7d2654aaacee6a71e95737fb4ad384ceac22c65b6ee374787a359ff34a9308a7",
+      "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c",
+      "mesh_mm": 0.09,
+      "timesteps": 169000,
+      "simulated_ns": 16.3842627,
+      "xml_sha256": "f8395dd9232cc7e20aa767466f9a900f3683a246a9ad7ce7dfb6d8fccc869283",
+      "run_log_sha256": "e14204cf3b541cb05c838a906488961801c8c60b067abdaa4f87f2d620a5963d",
+      "energy_decay_db": -88.78,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true
+    },
+    "0.060": {
+      "report_sha256": "24852e46dd6d22ebefb771aa31376bb1a43da4df8a84263e2730ac27dee0e4b6",
+      "board_sha256": "2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41",
+      "mesh_mm": 0.06,
+      "timesteps": 250000,
+      "simulated_ns": 16.388875000000002,
+      "xml_sha256": "b0b3ecc3409e9369b21d21ef4dfcda0786ef00ec72f40e2c428c10a24da42ac9",
+      "run_log_sha256": "020bab6ce6b593bf80d420d51741d8ee3318e2b115130edff0f944c6a5bfad40",
+      "energy_decay_db": -87.54,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true
+    }
+  },
+  "comparisons": {
+    "0.090_to_0.075": {
+      "results": [
+        {
+          "frequency_hz": 100000000,
+          "s11_db": {
+            "0.090": -30.016345758284775,
+            "0.075": -30.517338103406146,
+            "finer_minus_coarser": -0.5009923451213716
+          },
+          "s21_db": {
+            "0.090": -0.005255151079724935,
+            "0.075": -0.0054221572486030335,
+            "finer_minus_coarser": -0.00016700616887809806
+          }
+        },
+        {
+          "frequency_hz": 240000000,
+          "s11_db": {
+            "0.090": -22.482258190171052,
+            "0.075": -22.987522042200105,
+            "finer_minus_coarser": -0.5052638520290529
+          },
+          "s21_db": {
+            "0.090": -0.0252057261683792,
+            "0.075": -0.023177005617252246,
+            "finer_minus_coarser": 0.0020287205511269543
+          }
+        },
+        {
+          "frequency_hz": 480000000,
+          "s11_db": {
+            "0.090": -16.586299745999092,
+            "0.075": -17.1055469782723,
+            "finer_minus_coarser": -0.5192472322732087
+          },
+          "s21_db": {
+            "0.090": -0.0948647403827451,
+            "0.075": -0.08479894086794255,
+            "finer_minus_coarser": 0.010065799514802548
+          }
+        }
+      ],
+      "maximum_absolute_s11_change_db": 0.5192472322732087,
+      "maximum_absolute_s21_change_db": 0.010065799514802548
+    },
+    "0.075_to_0.060": {
+      "results": [
+        {
+          "frequency_hz": 100000000,
+          "s11_db": {
+            "0.075": -30.517338103406146,
+            "0.060": -30.20795058741203,
+            "finer_minus_coarser": 0.30938751599411773
+          },
+          "s21_db": {
+            "0.075": -0.0054221572486030335,
+            "0.060": -0.00574204652163948,
+            "finer_minus_coarser": -0.00031988927303644617
+          }
+        },
+        {
+          "frequency_hz": 240000000,
+          "s11_db": {
+            "0.075": -22.987522042200105,
+            "0.060": -22.677239548278685,
+            "finer_minus_coarser": 0.31028249392142015
+          },
+          "s21_db": {
+            "0.075": -0.023177005617252246,
+            "0.060": -0.02467584284085424,
+            "finer_minus_coarser": -0.001498837223601994
+          }
+        },
+        {
+          "frequency_hz": 480000000,
+          "s11_db": {
+            "0.075": -17.1055469782723,
+            "0.060": -16.798914025161306,
+            "finer_minus_coarser": 0.30663295311099503
+          },
+          "s21_db": {
+            "0.075": -0.08479894086794255,
+            "0.060": -0.09045840792034653,
+            "finer_minus_coarser": -0.005659467052403971
+          }
+        }
+      ],
+      "maximum_absolute_s11_change_db": 0.31028249392142015,
+      "maximum_absolute_s21_change_db": 0.005659467052403971
+    }
+  },
+  "full_row_4_6_closed": false,
+  "limits": [
+    "three meshes alone do not establish asymptotic mesh convergence",
+    "simplified model omits pads, mask, connector, ESD and finite losses",
+    "lumped-port placement and impedance sensitivity remain unmeasured"
+  ]
+}

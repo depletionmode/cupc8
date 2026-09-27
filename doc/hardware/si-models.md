@@ -275,10 +275,12 @@ The earlier field runs name GPU PCB
 `2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031`
 and IO PCB
 `2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c`.
-The final rebuilt receipts name GPU
+The previous rebuilt receipts named GPU
 `7be7a81c7ed291ddb0fffb082c4b9a883bed1af6bc58c4d1987ecbca8c6fadf0`
-and IO
-`2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41`.
+and IO `2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41`.
+The shared-tool rebuild names GPU
+`0b4ccc5861ee22a050c72747555633ff95e548da51758083b5db74868112f5b4`
+and IO `2708b66ce7f6e42445c0c2f54186150f3622347ac51e7849c8501969e3052a20`.
 The [migration record](si-evidence/board-migration.json) validates both
 receipts against their respective source inputs and connects them with a
 fail-closed solver-input comparison. The full-board comparison matches tracks,
@@ -312,29 +314,49 @@ fingerprint is equal. The GPU/IO field models still omit pads, mask, finite
 losses, connector and source/sink behavior. USB mesh convergence and the
 full HDMI coupled physical path remain open, so row 4.6 stays open.
 
-A 0.060 mm USB geometry-only run on the earlier rebuilt IO receipt has a
-186×302×34 grid with `pml_geometry_ok: true`. At 65.555 fs per FDTD step,
-250,000 steps would cover 16.389 ns, enough for the same 12–16 ns port
-window. The first two-thread run was stopped after 22,190 steps (1.455 ns)
-and 16.1 minutes because concurrent main-board routing kept throughput
-near 35–55 million cells/s. Its [interruption record](si-evidence/usb-io-pml-mesh-060-interrupted.json)
-hashes the partial files. It supplies no S-parameter or mesh result.
-After main-board routing releases CPU, repeat the bounded run and then use
-`compare_usb_mesh.py` to verify the raw field files and compare all three
-meshes against the migration-bound older reports:
+The [shared-tool migration](si-evidence/board-migration-post-shared-tool.json)
+revalidates all six saved GPU/IO field models against the rebuilt receipts.
+The completed [0.060 mm USB run](si-evidence/usb-io-pml-mesh-060-fixed.json)
+used 250,000 steps, two threads and a fixed 16.389 ns window on a 186×302×34
+grid. Its field energy ended at −87.54 dB. PML, passivity, port consistency
+and spectral stability gates pass. The saved XML, log and four port files are
+hash checked, and [receipt migration](si-evidence/usb-io-060-receipt-migration.json)
+regenerates identical solver-relevant XML from the rebuilt IO board. It also
+matches physical and route fingerprints. This binds the field result to the
+rebuilt receipt while retaining the original run's PCB hash.
+
+The [three-mesh comparison](si-evidence/usb-io-three-mesh-comparison.json)
+compares 0.090, 0.075 and 0.060 mm PML-safe models at 100, 240 and 480 MHz.
+Maximum absolute S11 changes are 0.519 and 0.310 dB for successive
+refinements; maximum S21 changes are 0.0101 and 0.00566 dB. S11 changes
+reverse direction, so three points do not establish asymptotic convergence.
+The 0.060 mm S11 values are −30.208, −22.677 and −16.799 dB; S21 values
+are −0.00574, −0.02468 and −0.09046 dB. These are diagnostic values for the
+modeled routed-copper subset. Port placement, impedance sensitivity, pads,
+mask, ESD, connectors, source/sink and the complete path remain open.
+
+Reproduce the receipt migration and three-grid comparison from retained
+field files and receipt-bound builds:
 
 ```sh
-python3 hw/si/openems_usb_io.py --board build/hw-current/io/io.kicad_pcb \
-  --out build/hw/si-current/usb-io-pml-060-fixed.json --mesh-mm 0.06 \
-  --pml-clearance-mm 1 --max-steps 250000 --fixed-window --threads 2
+python3 hw/si/migrate_usb_060.py \
+  --old-build build/hw/si-current/pinned-io-build \
+  --old-source build/hw/si-current/pinned-io-source \
+  --new-build build/hw/io --new-source . \
+  --report doc/hardware/si-evidence/usb-io-pml-mesh-060-fixed.json \
+  --fields build/hw/si-current/usb-io-openems-pml-clear-1mm-mesh-0p060mm-fixed-window \
+  --out doc/hardware/si-evidence/usb-io-060-receipt-migration.json
 python3 hw/si/compare_usb_mesh.py --reports doc/hardware/si-evidence \
-  --migration doc/hardware/si-evidence/board-migration.json \
-  --current-report build/hw/si-current/usb-io-pml-060-fixed.json \
+  --migration doc/hardware/si-evidence/board-migration-post-shared-tool.json \
+  --fine-migration doc/hardware/si-evidence/usb-io-060-receipt-migration.json \
+  --current-report doc/hardware/si-evidence/usb-io-pml-mesh-060-fixed.json \
   --current-fields build/hw/si-current/usb-io-openems-pml-clear-1mm-mesh-0p060mm-fixed-window \
-  --current-build build/hw-current/io \
-  --current-source /home/depmod/code/cupc8 \
+  --current-build build/hw/io --current-source . \
   --out doc/hardware/si-evidence/usb-io-three-mesh-comparison.json
 ```
+
+The earlier [interrupted run](si-evidence/usb-io-pml-mesh-060-interrupted.json)
+contains no S-parameter result.
 
 ## IBIS specification and pinned FPGA model
 
