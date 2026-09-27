@@ -1502,9 +1502,11 @@ def _spi_ncs6_escape(board):
     return [a.GetNetname()]
 
 
-def _finish_route(board):
-    """Repair the few fixed-power escapes left by the salt-1 SES import.
+def _finish_route(board, replay_salt=None):
+    """Repair route-specific fixed-power and ground gaps after SES import.
 
+    Salt-9 replay needs only six guarded bus-tap width changes and one GND
+    pad-to-plane via. The normal route's original salt-1 repair follows.
     The +5V trunk already joins all six slot inputs, but the router omitted
     its CPU-card load and R9. The VBUS_F standby spur likewise stops at C16.
     Restore these with fixed copper, move the In2 VBUS_F branch away from
@@ -1534,6 +1536,50 @@ def _finish_route(board):
         v.SetDrill(mm(drill))
         v.SetNet(board.FindNet(name))
         board.Add(v)
+
+    if replay_salt == 9:
+        # The completed salt-9 SES already joins all four input power nets.
+        # Its bus copper faults are three north and three south edge taps. The
+        # salt-1 CPU_RW and VBUS_F edits below are absent in this session.
+        taps = []
+        south = []
+        tracks = board.Tracks()
+        for i in range(len(tracks)):
+            item = tracks[i]
+            if item.GetClass() != 'PCB_TRACK' or item.GetNetname() != '/+5V':
+                continue
+            if item.GetLayer() not in (pcbnew.B_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu):
+                continue
+            ends = ((round(to(item.GetStart().x), 4), round(to(item.GetStart().y), 4)),
+                    (round(to(item.GetEnd().x), 4), round(to(item.GetEnd().y), 4)))
+            if (item.GetWidth() == mm(7.5) and ends[0] == (4.5, 40.52) and
+                    ends[1][1] == 40.52 and 3.4 <= ends[1][0] <= 5.0):
+                taps.append(item)
+            if (item.GetWidth() == mm(7.5) and
+                    ((item.GetLayer() in (pcbnew.B_Cu, pcbnew.In2_Cu) and
+                      ends[0] == (4.5, 152.0) and ends[1][1] == 149.0 and
+                      3.4 <= ends[1][0] <= 5.0) or
+                     (item.GetLayer() == pcbnew.In3_Cu and
+                      ends[0] == (4.5, 149.0) and ends[1][1] == 149.0 and
+                      3.4 <= ends[1][0] <= 5.0))):
+                south.append(item)
+        if len(taps) != 3 or {t.GetLayer() for t in taps} != {pcbnew.B_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu}:
+            raise RuntimeError('_finish_route: salt-9 edge tap geometry changed')
+        if len(south) != 3 or {t.GetLayer() for t in south} != {pcbnew.B_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu}:
+            raise RuntimeError('_finish_route: salt-9 south bus tap geometry changed')
+        pad = next(p for p in board.FindFootprintByReference('U3').Pads() if p.GetNumber() == '2')
+        if (pad.GetNetname() != '/GND' or
+                (round(to(pad.GetPosition().x), 4), round(to(pad.GetPosition().y), 4)) != (39.15, 160.0)):
+            raise RuntimeError('_finish_route: salt-9 U3 GND pad moved')
+        if any(tracks[i].GetClass() == 'PCB_VIA' and
+               (round(to(tracks[i].GetPosition().x), 4), round(to(tracks[i].GetPosition().y), 4)) == (38.3, 160.0)
+               for i in range(len(tracks))):
+            raise RuntimeError('_finish_route: salt-9 U3 GND via already present')
+        for item in taps + south:
+            item.SetWidth(mm(1.0))
+        track((39.15, 160.0), (38.3, 160.0), 0.2, pcbnew.F_Cu, '/GND')
+        via((38.3, 160.0), 0.6, 0.3, '/GND')
+        return
 
     # +5V J2 load and C42 were left separate from the pre-routed slot trunk.
     track((7.225, 20.6), (4.5, 20.6), 0.5, pcbnew.F_Cu, "/+5V")
@@ -1801,7 +1847,7 @@ def main():
                        zone_min_width=0.3,          # at 0.25 KiCad's fill left a 0.063 mm plane neck
                        fanout_margin=FANOUT_MARGIN,
                        prepare=prepare,
-                       post_route=_finish_route,
+                       post_route=(lambda board: _finish_route(board, replay['salt'] if replay else None)),
                        replay=replay,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
