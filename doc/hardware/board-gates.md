@@ -114,6 +114,24 @@ fail until their contract coverage exists:
   GEOS circular-buffer resolution; they are neither demonstrated violations
   nor passes. These results leave the fab gate red alongside the remaining
   filled-neck and text-height coverage gaps and unreviewed CPL placement.
+
+  **After card-local silk correction.** CPU, GPU, IO and storage were rebuilt
+  again without shared-tool or copper-design changes. Each has a valid receipt,
+  fresh KiCad DRC with zero violations/opens/parity issues, and independently
+  passing plotted F/B silk-to-mask clearance. Current PCB / B.Cu / F.SilkS
+  SHA-256 prefixes and checked front-ink object counts are:
+
+  | Card | Current PCB / B.Cu / F.SilkS | F.SilkS objects |
+  | --- | --- | ---: |
+  | CPU | `61604b4792f3 / 77f4f790df0d / 3aa8888e8a5f` | 1636 |
+  | GPU | `7be7a81c7ed2 / 56aa2407e2c6 / ad03a32eb0e7` | 1689 |
+  | IO | `2dbf557fbc53 / 04a5b73048ef / bd03303ffeae` | 1629 |
+  | Storage | `11382ab5be4b / 187bcceb63c2 / 439aecf63e43` | 1464 |
+
+  B.SilkS is empty on all four. The older table above identifies the plots
+  that exposed the silk failures; its PCB hashes are not the current receipts.
+  The shared notch failure and the final independent-check coverage gate
+  remain open.
 - Connectors: pincheck validates the source tables; connectorcheck compares
   every contact, including intended no-connects, of the board's external
   connectors with its KiCad netlist and the published pinout.
