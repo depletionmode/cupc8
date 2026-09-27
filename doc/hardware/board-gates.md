@@ -42,19 +42,27 @@ fail until their contract coverage exists:
   The bounded scanline check catches additional proven failures. For
   orthogonal, hole-free filled polygons, exact half-micrometre-grid scanlines
   measure the union of touching regions and rectangular flashes. A thin span
-  from filled ink proves a violation; flash-only pad tongues are exempt. A
-  single touching stroke or nonrectangular flash is bounded by its
-  outward-rounded box, so a thin span that survives its possible widening is
-  also a proven failure. Exact rational scanlines detect an interior neck in
+  from filled ink proves a violation; flash-only pad tongues are exempt.
+  Touching strokes or nonrectangular flashes are bounded by outward-rounded
+  boxes, so a thin span that survives their possible widening is also a
+  proven failure. Up to four directly touching unsupported operations are
+  boxed for an orthogonal union; a fifth operation or another unmodeled
+  same-net object whose bounds touch a box defers the proof. Exact rational
+  scanlines detect an interior neck in
   an isolated nonorthogonal, hole-free polygon when wider spans overlap it on
   both sides; this excludes a rounded terminal tip. The same rational witness
   now also measures connected nonorthogonal, hole-free region unions with
   rectangular flash widening and at most one conservatively boxed unknown
   operation. It is a **failure witness**: an 80 µm neck in two touching
   regions is rejected for both copper and silk, while a flash that widens
-  the entire span and an exact-rule-width span are accepted. Holes, multiple
-  touching unsupported operations, large unions, and non-midpoint minima
-  remain outside these witnesses. The final incomplete-coverage gate stays
+  the entire span and an exact-rule-width span are accepted. Clear-polarity
+  holes and multiple contours in one `G36` region are rejected at Gerber
+  import; a parsed region with an interior hole defers the neck witness.
+  General hole support needs polarity-aware compositing with net provenance.
+  Unions that form holes, more than four touching unsupported operations,
+  indirect touching through them, nonorthogonal unions with two or more
+  boxed operations, large unions, and non-midpoint minima remain outside
+  complete coverage. The final incomplete-coverage gate stays
   red until all such ink and text-height rules are independently checked.
   The board generator now configures a 0.10 mm solder-mask web
   minimum, plus 0.01 mm opening expansion so KiCad's mask-region plot covers
