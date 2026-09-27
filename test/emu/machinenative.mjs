@@ -137,15 +137,17 @@ export class Machine {
     // pwrHi names the host source class. For the netlist top, drive the
     // comparator with the worst 3 A minimum or 1.5 A maximum CC voltage.
     const pwrHiAtFpga = netlistTop ? (pwrHi ? 1.524 : 1.090) >= Math.max(...trips) : pwrHi;
+    if (netlistTop && typeof netlistTop.runtime.io_usb_host !== 'boolean')
+      throw new Error('machinenative: invalid IO USB host path');
     m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
-      memoryWiring: netlistTop?.runtime,
+      ioUsbHost: netlistTop?.runtime.io_usb_host ?? true, memoryWiring: netlistTop?.runtime,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
     if (sysctl) {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
     }
-    if (Object.values(slots).includes('io')) {
+    if (Object.values(slots).includes('io') && (netlistTop?.runtime.io_usb_host ?? true)) {
       const h = m.h;
       m.keyboard = {
         press: (mods, ...keys) => native.press(h, mods, keys),

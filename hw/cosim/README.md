@@ -28,6 +28,9 @@ The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
 reference network before it reaches the chipset's `PWR_HI` pin. The nominal
 trip is 1.289 V on the active CC line; the test drives the 3 A minimum or
 1.5 A maximum CC voltage, so a bad resistor network changes the class.
+The IO card's USB host data pair must pass from the RP2040 pins through the
+27 Ω series resistors to the receptacle. That netlist path controls keyboard
+attachment in the native machine; an open path leaves it disconnected.
 
 From the repo root, after building the main board:
 

@@ -40,6 +40,12 @@ await m.runUntil(() => code !== null, 1e9);
 console.log(JSON.stringify({code, bridge: /bridge status \\$([0-9a-f]+)/i.exec(out)?.[1] ?? null}));
 m.stop();
 """
+USB_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+const m = await Machine.create({slots: {1: 'io'}, threaded: false});
+console.log(JSON.stringify({keyboard: Boolean(m.keyboard)}));
+m.stop();
+"""
 
 
 def run(top, probe=PROBE):
@@ -96,6 +102,14 @@ def main():
                 normal_status['bridge'] == bad_status['bridge']:
             raise AssertionError(f'bridge SCK/MOSI swap did not change status: {normal_status} / {bad_status}')
         print(f"bridge SCK/MOSI swap: status ${normal_status['bridge']} became ${bad_status['bridge']}")
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['io_usb_host'] = False
+        mutant = Path(directory) / 'open-io-usb.json'
+        mutant.write_text(json.dumps(changed))
+        usb_good, usb_bad = run(args.top, USB_PROBE), run(mutant, USB_PROBE)
+        if usb_good != {'keyboard': True} or usb_bad != {'keyboard': False}:
+            raise AssertionError(f'IO USB data path does not control keyboard attachment: {usb_good} / {usb_bad}')
+        print('open IO USB D+/D- path detaches the keyboard')
     print(f"valid netlist wiring runs normally to PC ${good['pc']:04x}")
 
 

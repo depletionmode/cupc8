@@ -422,7 +422,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     if (kind == "storage") c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
     if (kind == "io") {
       c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
-      keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
+      if (o.ioUsbHost) keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
     }
     cards.emplace_back(slot, std::move(c));
   }

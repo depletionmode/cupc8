@@ -332,6 +332,16 @@ def check(cards, main, pcb=None):
     fractions = (ohms(r_cc2.value) / (ohms(r_cc1.value) + ohms(r_cc2.value)),
                  ohms(r_cc1.value) / (ohms(r_cc1.value) + ohms(r_cc2.value)))
     manifest['runtime']['cc_trip_volts'] = [round(reference / f, 6) for f in fractions]
+    # The USB host lives on the IO card. Its two RP2040 PHY pads must reach
+    # the actual receptacle contacts through the fitted 27 ohm series parts.
+    for signal, connector_pin in (('DM', '2'), ('DP', '3')):
+        source = named_pin(cards['io'], 'U1', f'USB_{signal}')
+        resistor = path(cards['io'], source, ('J2', connector_pin), '27R')
+        manifest['paths'].append({'from': f'io.U1.{source[1]}',
+                                  'to': f'io.J2.{connector_pin}',
+                                  'series': resistor, 'ohms': 27,
+                                  'runtime': 'io_usb_host'})
+    manifest['runtime']['io_usb_host'] = True
     clock = named_pin(main, 'Y1', 'OUT')
     fpga_clk = [(ref, pin) for (ref, pin), net in main.pins.items()
                 if ref == 'U7' and net == '/CLK12']
@@ -389,6 +399,8 @@ def check(cards, main, pcb=None):
         runtime_net('main', f'SLOT_nIRQ{slot-1}')
     for name in ('BR_SCK', 'BR_MOSI', 'BR_MISO', 'BR_nCS'):
         runtime_net('system', name)
+    for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
+        runtime_net('io', name)
     unmodeled, structural_only = [], []
     for board, circuit in circuits.items():
         for net in circuit.nets:

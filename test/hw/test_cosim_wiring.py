@@ -62,6 +62,10 @@ def main_cli():
         broken_clock.resistors = tuple(r for r in broken_clock.resistors if r.ref != 'R17')
         rejected(cards, broken_clock, 'missing chipset oscillator series resistor')
 
+        broken_io = copy.deepcopy(cards)
+        broken_io['io'].resistors = tuple(r for r in broken_io['io'].resistors if r.ref != 'R14')
+        rejected(broken_io, main, 'missing IO USB D- series resistor')
+
 
 if __name__ == '__main__':
     main_cli()
