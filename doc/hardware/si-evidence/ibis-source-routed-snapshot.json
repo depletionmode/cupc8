@@ -1,0 +1,720 @@
+{
+  "scope": "pinned vendor IBIS source and archived main/CPU FPGA source-path audit",
+  "ibis_sha256": "8acc5bf6bc90d6956b80d5e688b7bc47a48386b127533702c8d5f328a57390c9",
+  "pinout_sha256": "f93acd663a6e62441cae3fe552c0fbe25e34fe9923ee475e84108f9645fbd71e",
+  "top_sha256": "59647a1c8c9a0b5df0e831677bd4a5b11bfbf7c138447f572962dc9fb41fadae",
+  "receipts": {
+    "main": {
+      "receipt_sha256": "89fe3fb643d11cc3b0670a1df339e480b36112e6bc10b12e05a07b1c36d5d165",
+      "board_sha256": "82594f84282241f279fcf3948493877acf2cb3112e5e5fb02ea2f246c7316834",
+      "netlist_sha256": "0b47da7cadb5b7f77f3632663002634090ebcd861b9de67c5a7e73b36d74bca0"
+    },
+    "cpu": {
+      "receipt_sha256": "b160995d101cb03ca902f8c67de46099b53c893b2b8d018124d57db0140b5ea4",
+      "board_sha256": "a37e4c90cf0e5dc0f87bf670bc78c0e2a9cc138c27894cbe88679194664ed5b3",
+      "netlist_sha256": "f8fcdcf0c45a7c775c619100750dc5a8d7990ab8c7b344402173a4a751f473d4"
+    }
+  },
+  "vendor_model_contract": {
+    "lvc330io": {
+      "model_type": "I/O",
+      "thresholds": {
+        "vil_v": 0.8,
+        "vih_v": 2.0
+      },
+      "voltage_range_v": {
+        "typ": 3.3,
+        "min": 3.14,
+        "max": 3.47
+      },
+      "c_comp_f": {
+        "typ": 1.3000000000000001e-12,
+        "min": 1.1699999999999999e-12,
+        "max": 1.43e-12
+      },
+      "waveform_fixtures": {
+        "rise": {
+          "R_fixture": 50.0,
+          "C_fixture": 2.5e-11,
+          "V_fixture": 0.0,
+          "V_fixture_min": 0.0,
+          "V_fixture_max": 0.0
+        },
+        "fall": {
+          "R_fixture": 50.0,
+          "C_fixture": 2.5e-11,
+          "V_fixture": 3.3,
+          "V_fixture_min": 3.14,
+          "V_fixture_max": 3.47
+        }
+      }
+    },
+    "lvc330_b3io": {
+      "model_type": "I/O",
+      "thresholds": {
+        "vil_v": 0.8,
+        "vih_v": 2.0
+      },
+      "voltage_range_v": {
+        "typ": 3.3,
+        "min": 3.14,
+        "max": 3.47
+      },
+      "c_comp_f": {
+        "typ": 1.3000000000000001e-12,
+        "min": 1.1699999999999999e-12,
+        "max": 1.43e-12
+      },
+      "waveform_fixtures": {
+        "rise": {
+          "R_fixture": 50.0,
+          "C_fixture": 2.5e-11,
+          "V_fixture": 0.0,
+          "V_fixture_min": 0.0,
+          "V_fixture_max": 0.0
+        },
+        "fall": {
+          "R_fixture": 50.0,
+          "C_fixture": 2.5e-11,
+          "V_fixture": 3.3,
+          "V_fixture_min": 3.14,
+          "V_fixture_max": 3.47
+        }
+      }
+    }
+  },
+  "tq144_commented_package_candidates": [
+    {
+      "r_ohm": [
+        0.764,
+        0.746,
+        0.786
+      ],
+      "l_h": [
+        7.980000000000001e-09,
+        6.960000000000001e-09,
+        9.12e-09
+      ],
+      "c_f": [
+        1.2159999999999999e-12,
+        1.1040000000000001e-12,
+        1.552e-12
+      ]
+    },
+    {
+      "r_ohm": [
+        0.673,
+        0.596,
+        0.739
+      ],
+      "l_h": [
+        1.053e-08,
+        8.18e-09,
+        1.1800000000000001e-08
+      ],
+      "c_f": [
+        1.207e-12,
+        1.4519999999999999e-12,
+        1.307e-12
+      ]
+    }
+  ],
+  "diagnostic_bus_model_package_c_f": 1.55e-12,
+  "diagnostic_bus_model_package_r_ohm": 0.0,
+  "diagnostic_bus_model_package_c_matches_typical_candidates": false,
+  "diagnostic_bus_model_package_r_matches_typical_candidates": false,
+  "slot_sck": {
+    "source_pin": "43",
+    "bank": "2",
+    "applicable_ibis_model": "lvc330io",
+    "paths": [
+      {
+        "connector": "J11.B13",
+        "source_pin": "43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "R36",
+        "planar_copper_mm": 116.953
+      },
+      {
+        "connector": "J12.B13",
+        "source_pin": "43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "R36",
+        "planar_copper_mm": 79.805
+      },
+      {
+        "connector": "J13.B13",
+        "source_pin": "43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "R36",
+        "planar_copper_mm": 101.485
+      },
+      {
+        "connector": "J14.B13",
+        "source_pin": "43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "R36",
+        "planar_copper_mm": 133.137
+      },
+      {
+        "connector": "J15.B13",
+        "source_pin": "43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "R36",
+        "planar_copper_mm": 154.792
+      },
+      {
+        "connector": "J16.B13",
+        "source_pin": "43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "R36",
+        "planar_copper_mm": 183.065
+      }
+    ]
+  },
+  "cpu_card": {
+    "source_count": 31,
+    "models_by_source_pin": {
+      "lvc330io": 12,
+      "lvc330_b3io": 19
+    },
+    "minimum_planar_copper_mm": 16.627,
+    "maximum_planar_copper_mm": 36.65,
+    "paths": [
+      {
+        "fpga_pin": "1",
+        "connector": "J1.A14",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN1.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 17.105
+      },
+      {
+        "fpga_pin": "2",
+        "connector": "J1.A16",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN1.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 17.648
+      },
+      {
+        "fpga_pin": "3",
+        "connector": "J1.A17",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN1.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 16.627
+      },
+      {
+        "fpga_pin": "4",
+        "connector": "J1.A19",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN1.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 16.909
+      },
+      {
+        "fpga_pin": "7",
+        "connector": "J1.A20",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN2.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 23.171
+      },
+      {
+        "fpga_pin": "8",
+        "connector": "J1.A22",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN2.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 17.466
+      },
+      {
+        "fpga_pin": "9",
+        "connector": "J1.A23",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN2.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 17.53
+      },
+      {
+        "fpga_pin": "10",
+        "connector": "J1.A25",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN2.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 18.491
+      },
+      {
+        "fpga_pin": "11",
+        "connector": "J1.A26",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN3.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 18.378
+      },
+      {
+        "fpga_pin": "12",
+        "connector": "J1.A28",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN3.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 20.625
+      },
+      {
+        "fpga_pin": "15",
+        "connector": "J1.A29",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN3.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 19.63
+      },
+      {
+        "fpga_pin": "16",
+        "connector": "J1.A31",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN3.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 20.68
+      },
+      {
+        "fpga_pin": "17",
+        "connector": "J1.A32",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN4.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 23.043
+      },
+      {
+        "fpga_pin": "18",
+        "connector": "J1.A34",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN4.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 26.293
+      },
+      {
+        "fpga_pin": "19",
+        "connector": "J1.A35",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN4.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 23.412
+      },
+      {
+        "fpga_pin": "20",
+        "connector": "J1.A37",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN4.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 23.457
+      },
+      {
+        "fpga_pin": "23",
+        "connector": "J1.B17",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN5.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 19.871
+      },
+      {
+        "fpga_pin": "25",
+        "connector": "J1.B20",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN5.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 19.102
+      },
+      {
+        "fpga_pin": "26",
+        "connector": "J1.B22",
+        "bank": "3",
+        "model": "lvc330_b3io",
+        "resistor": "RN5.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 19.265
+      },
+      {
+        "fpga_pin": "37",
+        "connector": "J1.B23",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN6.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 23.777
+      },
+      {
+        "fpga_pin": "38",
+        "connector": "J1.B25",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN6.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 21.73
+      },
+      {
+        "fpga_pin": "39",
+        "connector": "J1.B26",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN6.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 22.426
+      },
+      {
+        "fpga_pin": "41",
+        "connector": "J1.B28",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN6.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 23.621
+      },
+      {
+        "fpga_pin": "42",
+        "connector": "J1.B29",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN7.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 22.472
+      },
+      {
+        "fpga_pin": "43",
+        "connector": "J1.B31",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN7.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 21.017
+      },
+      {
+        "fpga_pin": "44",
+        "connector": "J1.B32",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN7.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 20.063
+      },
+      {
+        "fpga_pin": "45",
+        "connector": "J1.B34",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN7.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 17.962
+      },
+      {
+        "fpga_pin": "55",
+        "connector": "J1.B41",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN8.1",
+        "resistor_far_pad": "8",
+        "planar_copper_mm": 32.844
+      },
+      {
+        "fpga_pin": "56",
+        "connector": "J1.B43",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN8.2",
+        "resistor_far_pad": "7",
+        "planar_copper_mm": 32.92
+      },
+      {
+        "fpga_pin": "60",
+        "connector": "J1.B44",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN8.3",
+        "resistor_far_pad": "6",
+        "planar_copper_mm": 35.321
+      },
+      {
+        "fpga_pin": "61",
+        "connector": "J1.B46",
+        "bank": "2",
+        "model": "lvc330io",
+        "resistor": "RN8.4",
+        "resistor_far_pad": "5",
+        "planar_copper_mm": 36.65
+      }
+    ]
+  },
+  "valid_for_full_bus_si": false,
+  "limits": [
+    "these planar lengths exclude via/barrel length, branch topology and return-plane changes",
+    "the diagnostic still uses assumed 120/180 mm line lengths and loads",
+    "the two commented TQ144 package rows are not assigned to HX4K by this file",
+    "the present linear driver omits nonlinear I/V and receiver IBIS behavior",
+    "the main-board current route and loaded physical bus remain unverified"
+  ],
+  "diagnostic": {
+    "report_sha256": "f8ac64d79eda60dacf24aef0b17102ec3c4ff36bd7a53aa1644455647e28a13a",
+    "case_count": 96,
+    "maximum_fixture_replay_error_v": 0.07883,
+    "unstable_six_slot_cases_by_model": {
+      "lvc330io": 10,
+      "lvc330_b3io": 14
+    },
+    "applicable_sck_model_unstable_cases": 10,
+    "waveform_line_lengths_are_assumed": true,
+    "valid_for_physical_bus_si": false
+  },
+  "package_sensitivity": {
+    "vendor_report_sha256": "07df38d0ae64fc1c05515d1803a201992894ea91ead76248b94af2699ffbd8a9",
+    "vendor_case_count": 96,
+    "vendor_fixture_replay_error_max_v": 0.07883,
+    "vendor_unstable_six_slot_cases_by_model": {
+      "lvc330io": 8,
+      "lvc330_b3io": 13
+    },
+    "applicable_sck_model_unstable_cases": 8,
+    "cases_with_receiver_status_change": 15,
+    "receiver_status_changes": [
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "typ",
+          "rise",
+          180,
+          30.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          4
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "typ",
+          "fall",
+          180,
+          30.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          3
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "typ",
+          "fall",
+          180,
+          30.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          3
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "min",
+          "rise",
+          180,
+          15.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          1,
+          2
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "min",
+          "fall",
+          180,
+          15.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          4
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "min",
+          "fall",
+          180,
+          15.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          4
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "max",
+          "rise",
+          180,
+          15.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          6
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "max",
+          "fall",
+          180,
+          30.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          3,
+          6
+        ]
+      },
+      {
+        "case": [
+          "lvc330io",
+          "six_slot_sck",
+          "max",
+          "fall",
+          180,
+          30.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          3,
+          6
+        ]
+      },
+      {
+        "case": [
+          "lvc330_b3io",
+          "six_slot_sck",
+          "typ",
+          "fall",
+          180,
+          15.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          2,
+          4
+        ]
+      },
+      {
+        "case": [
+          "lvc330_b3io",
+          "six_slot_sck",
+          "typ",
+          "fall",
+          180,
+          15.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          2
+        ]
+      },
+      {
+        "case": [
+          "lvc330_b3io",
+          "six_slot_sck",
+          "min",
+          "rise",
+          180,
+          30.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          3
+        ]
+      },
+      {
+        "case": [
+          "lvc330_b3io",
+          "six_slot_sck",
+          "min",
+          "rise",
+          180,
+          30.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          3,
+          4
+        ]
+      },
+      {
+        "case": [
+          "lvc330_b3io",
+          "six_slot_sck",
+          "max",
+          "fall",
+          180,
+          15.0,
+          7.98
+        ],
+        "receiver_nodes": [
+          3
+        ]
+      },
+      {
+        "case": [
+          "lvc330_b3io",
+          "six_slot_sck",
+          "max",
+          "fall",
+          180,
+          15.0,
+          10.53
+        ],
+        "receiver_nodes": [
+          3
+        ]
+      }
+    ],
+    "valid_for_physical_bus_si": false
+  }
+}

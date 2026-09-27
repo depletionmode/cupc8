@@ -1,6 +1,6 @@
 {
   "scope": "16 ns complex-port and loaded-input diagnostic for 0.075/0.090 mm USB subset",
-  "migration_report_sha256": "713373ec73f867f4b75c0030a6519ca227a7f9800c76be859d4138ed19c59bc2",
+  "migration_report_sha256": "7cec8e08b034c770f7b6dcde3f360c241e177ea5b131d04ecebbb226a44075e6",
   "reference_ohms": 90,
   "fourier_cutoff_ns": 16,
   "sources": {

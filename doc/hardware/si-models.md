@@ -269,22 +269,23 @@ python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
 
 ### Later GPU/IO board receipt migration
 
-The mask/STEP verifier rebuild changed full board bytes and the IO netlist.
+The mask/STEP verifier and later card-local silk rebuilds changed full board
+bytes and the IO netlist.
 The earlier field runs name GPU PCB
 `2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031`
 and IO PCB
 `2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c`.
-The rebuilt receipts name GPU
-`c551b16b88b22b816eff202ed17db7f434f3320369971f7e8142ee6dd007965d`
+The final rebuilt receipts name GPU
+`7be7a81c7ed291ddb0fffb082c4b9a883bed1af6bc58c4d1987ecbca8c6fadf0`
 and IO
-`8ce463cc553aedbe0e620bc6d834d521dbd86012cd31278f1036cf102da304fc`.
+`2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41`.
 The [migration record](si-evidence/board-migration.json) validates both
 receipts against their respective source inputs and connects them with a
 fail-closed solver-input comparison. The full-board comparison matches tracks,
 vias, copper zones, footprints, layers and outline after UUID removal. One
 GPU filled zone has an added collinear point; normalizing that redundant
-vertex gives the same polygon. The solder-mask setup changed, while the
-copper geometry did not. All four HDMI pair routes and both USB
+vertex gives the same polygon. The solder-mask setup and footprint silk
+graphics changed, while the copper geometry did not. All four HDMI pair routes and both USB
 routes/endpoints match. Regenerated field XML matches the archived solver
 input for all six runs after ignoring CSXCAD's random display colors and
 same-priority copper polygon insertion order. The exact grid, stackup,
@@ -311,7 +312,7 @@ fingerprint is equal. The GPU/IO field models still omit pads, mask, finite
 losses, connector and source/sink behavior. USB mesh convergence and the
 full HDMI coupled physical path remain open, so row 4.6 stays open.
 
-A 0.060 mm USB geometry-only run on the rebuilt IO receipt has a
+A 0.060 mm USB geometry-only run on the earlier rebuilt IO receipt has a
 186×302×34 grid with `pml_geometry_ok: true`. At 65.555 fs per FDTD step,
 250,000 steps would cover 16.389 ns, enough for the same 12–16 ns port
 window. The first two-thread run was stopped after 22,190 steps (1.455 ns)
@@ -378,6 +379,60 @@ board are 116.953, 79.805, 101.485, 133.137, 154.792 and 183.065 mm for
 J11–J16; R18-to-J2 CPU clock is 60.564 mm. Earlier false open reports for
 J11/J13–J16 came from omitting those intermediate pad bridges, not from
 missing routed copper.
+
+The [archived source audit](si-evidence/ibis-source-routed-snapshot.json)
+checks those lengths against a co-simulation manifest regenerated from the
+archived routed boards and validates the main/CPU board receipts and netlists.
+It also checks the SHA-pinned vendor model's 0.8/2.0 V thresholds, 3.14/3.30/
+3.47 V supply corners and 50 Ω/25 pF waveform fixtures against the code.
+The SCK source is U7 pin 43, bank 2 in the reviewed TQ144 pin table, so its
+applicable 3.3 V model is `lvc330io`; the bank 3 model is a sensitivity case.
+All six SCK paths have the unique 33 Ω R36 source. The 31 CPU FPGA outputs
+likewise have unique 33 Ω series paths; 12 source pins take `lvc330io` and
+19 take `lvc330_b3io`. Their resistor-to-card-edge planar copper lengths on
+the archived CPU card are 16.627–36.650 mm. The main-board R18-to-J2
+`CPU_CLK` path measured above is a separate oscillator input path and is
+not the CPU FPGA output path represented by `cpu_socket` in the waveform
+diagnostic.
+
+The original diagnostic used 1.55 pF package capacitance and no package
+series resistance with the two commented TQ144 inductances. Neither vendor
+TQ144 typical capacitance is 1.55 pF. A bounded second 96-case run uses the
+two commented typical R/L/C sets (0.764 Ω/7.98 nH/1.216 pF and
+0.673 Ω/10.53 nH/1.207 pF) without choosing an unassigned package row.
+The original and vendor-package runs have 24 and 21 six-slot cases with at
+least one threshold re-crossing, respectively. For the actual bank-2 SCK
+model, those counts are 10 and 8; 15 of the 96 cases change at least one
+receiver's threshold-stability status. The fixture replay error remains at
+most 0.07883 V. These are model-sensitivity results on assumed 180 mm
+50 Ω six-load topology. Receiver IBIS, nonlinear output behavior, package
+assignment, return paths and the current main-board route still prevent a
+physical bus pass/fail claim.
+
+```sh
+python3 hw/si/fetch_ice40_ibis.py
+python3 hw/cosim/gen_top.py \
+  --main-netlist /home/depmod/code/cupc8/build/hw-baseline-c429827/main/main.net \
+  --card-board-dir /home/depmod/code/cupc8/build/hw-baseline-c429827 \
+  --system-board /home/depmod/code/cupc8/build/hw-baseline-c429827/system/system-routed.kicad_pcb \
+  --cpu-board /home/depmod/code/cupc8/build/hw-baseline-c429827/cpu/cpu.kicad_pcb \
+  --output build/hw/si/ibis-archived-top.json
+python3 hw/si/ibis_bus.py --ibis build/hw/si/FPGA-MD-02034-2-5-iCE40-IO.ibs \
+  --top build/hw/si/ibis-archived-top.json \
+  --main-board /home/depmod/code/cupc8/build/hw-baseline-c429827/main/main.kicad_pcb \
+  --out build/hw/si/ibis-archived-bus-original.json
+python3 hw/si/ibis_bus.py --ibis build/hw/si/FPGA-MD-02034-2-5-iCE40-IO.ibs \
+  --top build/hw/si/ibis-archived-top.json \
+  --main-board /home/depmod/code/cupc8/build/hw-baseline-c429827/main/main.kicad_pcb \
+  --vendor-package-typical --out build/hw/si/ibis-archived-bus-vendor-package.json
+python3 hw/si/ibis_source_audit.py --ibis build/hw/si/FPGA-MD-02034-2-5-iCE40-IO.ibs \
+  --main-build /home/depmod/code/cupc8/build/hw-baseline-c429827/main \
+  --cpu-build /home/depmod/code/cupc8/build/hw-baseline-c429827/cpu \
+  --top build/hw/si/ibis-archived-top.json \
+  --diagnostic build/hw/si/ibis-archived-bus-original.json \
+  --vendor-diagnostic build/hw/si/ibis-archived-bus-vendor-package.json \
+  --out doc/hardware/si-evidence/ibis-source-routed-snapshot.json
+```
 
 ```sh
 python3 hw/si/fetch_ice40_ibis.py

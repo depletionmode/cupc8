@@ -25,9 +25,9 @@ same IO board; `usb-io-mesh-comparison.json` records its exact S-parameter
 differences from the 0.075 mm report. Two grids quantify sensitivity but do
 not establish mesh convergence.
 
-`board-migration.json` binds those six saved field models to the later GPU
+`board-migration.json` binds those six saved field models to the final GPU
 and IO board receipts. The full PCB and IO netlist hashes changed after the
-mask/STEP verifier rebuild. The migration checker validates both receipts,
+mask/STEP verifier and card-local silkscreen rebuilds. The migration checker validates both receipts,
 compares every modeled copper segment and USB endpoint, regenerates each
 field XML, and matches a solver-relevant XML fingerprint against the saved
 field XML. The fingerprint preserves the grid, dielectric, ground, copper,
@@ -35,13 +35,17 @@ ports and excitation. It ignores CSXCAD's random display colors and the
 insertion order of same-priority copper polygons. A separate fingerprint
 also matches both boards' tracks, vias, copper zones, footprints, layers and
 outline after UUID removal and one redundant GPU zone vertex normalization.
-The changed solder-mask setup is outside the copper fingerprint. No new FDTD run was needed
+The changed solder-mask setup and footprint silk graphics are outside the copper fingerprint. No new FDTD run was needed
 for those equivalent field inputs. The saved reports retain their archived
 board hashes; this migration is the explicit link to the current receipts.
 It does not close full row 4.6 or USB mesh convergence.
+`board-migration-pre-silk.json` preserves the preceding receipt comparison;
+the interrupted 0.060 mm run names its IO receipt. The final migration is
+`board-migration.json`.
 
 `usb-io-pml-mesh-060-interrupted.json` records the attempted finer-grid run
-on the current IO receipt. Routing contention left only 22,190 of 250,000
+on the earlier rebuilt IO receipt (before the final silk-only rebuild).
+Routing contention left only 22,190 of 250,000
 steps (1.455 ns) after 16 minutes, so the solver was stopped. Its field
 XML, log, stats and partial port-file hashes are recorded. It has no valid
 S-parameters and must not be included in a mesh-convergence comparison.
@@ -49,3 +53,12 @@ S-parameters and must not be included in a mesh-convergence comparison.
 0.075/0.090 mm raw port traces at the same 16 ns cutoff. It records complex
 S11/S21 and the 90 Ω terminated loaded input impedance, plus their mesh
 differences. Loaded input impedance is not trace characteristic impedance.
+
+`ibis-source-routed-snapshot.json` audits the pinned Lattice source against
+the waveform fixture and threshold/voltage constants used by the diagnostic,
+then validates archived main and CPU board receipts, the TQ144 pin table,
+source resistors and planar copper paths. It binds the old 96-case diagnostic
+and a second 96-case sweep using both commented vendor TQ144 typical R/L/C
+rows by report hash. The raw vendor IBIS remains in ignored `build/` under
+its license. Neither report substitutes routed branch topology into ngspice
+or closes physical bus SI.
