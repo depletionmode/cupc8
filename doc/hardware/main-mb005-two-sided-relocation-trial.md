@@ -16,6 +16,17 @@ KiCad's pre-route check reports **zero copper-clearance violations** and
 tracks. It has neither a completed route nor post-fill DRC. The source-owned
 salt-9 DSN for a single no-optimizer route has SHA-256
 `c72cbe94baf2465d80f825bb9deb8949e7a77c568cab86e8e27be6c58cf54a53`.
+After Freerouting has saved `route-9.ses`, reproduce the diagnostic KiCad
+checks and corner scenarios with:
+
+```sh
+python3 hw/power/main_mb005_route_review.py \
+  --preroute build/hw/main-mb005-preroute-d \
+  --route build/hw/main-mb005-route-one \
+  --out build/hw/main-mb005-route-review
+```
+
+The review refuses a mismatched source PCB or DSN and creates no receipt.
 
 At 115 °C, 24.9/11.4 µm outer/inner copper, 80% effective drawn width,
 15 µm via wall and 1.76 mm board, the track/via sensitivity model gives:

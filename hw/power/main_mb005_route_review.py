@@ -64,10 +64,14 @@ def main():
     routed = out / 'main-routed-diagnostic.kicad_pcb'
     pcbnew.SaveBoard(str(routed), board)
     preroute_drc = salvage.drc(routed, out / 'drc-routed.json')
+    preroute_drc['schematic_parity_count'] = len(
+        json.loads((out / 'drc-routed.json').read_text()).get('schematic_parity', ()))
     stitches = salvage.fill(board)
     filled = out / 'main-filled-diagnostic.kicad_pcb'
     pcbnew.SaveBoard(str(filled), board)
     filled_drc = salvage.drc(filled, out / 'drc-filled.json')
+    filled_drc['schematic_parity_count'] = len(
+        json.loads((out / 'drc-filled.json').read_text()).get('schematic_parity', ()))
     copper.TRACE_WIDTH_FACTOR = 0.8
     copper.RHO = 17e-6 * (1 + copper.COPPER_ALPHA_PER_C *
                          (115 - copper.REFERENCE_C))
