@@ -42,9 +42,35 @@ contains a 2.2 mm, 0.3 mm trace followed by a 2.491 mm, 1.0 mm trace. At
 deliberately poor cooling, but does not bound heat from R4 itself.
 
 **Thermal and return-path gates remain open.** The long +5V trunk, R4 body,
-and GND plane are not in that one-dimensional model. The source-driven board
-has GND fills, yet no calibrated GND current/temperature mesh or physical
-minimum finished-copper thickness. The 100 °C copper row leaves 1.122 mΩ
-before the 20 mΩ budget at the farthest slot. An independently bounded
-conductor temperature, GND return heating and fabricated copper thickness
-are needed before this trial can replace the baseline.
+and GND plane are not in that one-dimensional model. The 100 °C copper row
+leaves 1.122 mΩ before the 20 mΩ budget at the farthest slot.
+
+`main_ground_mesh.py` samples the saved In1 GND fill and solves a two-pitch
+sheet-conductance mesh at 100 °C and 90% thickness. The U3 GND via to J1
+connector pads is 2.076/1.985 mΩ at 0.5/0.25 mm pitch; the nearest J11
+GND stitch via to J1 is 8.386/8.000 mΩ. The 4.4% and 4.6% mesh changes
+are small compared with unknown pad/via contact effects. A one-barrel
+20 µm-plated, 1.76 mm-long through via adds about 1.96 mΩ at 100 °C.
+At the expanded load, U3 draws 1.155 A input and the largest single +5V
+card load is about 0.81 A, so an In1-only return path plus one such barrel
+would dissipate roughly 5.3 mW at U3 or 6.5 mW at J11. These currents do
+not all flow through the same path. The F/B GND fills and other stitches
+would add parallel routes, but this mesh cannot certify their contacts.
+The deliberately narrow 2 mm-corridor raster path from U3 to J1 is
+19.62 mΩ in In1 alone before vias, showing the sensitivity to a local
+neck or poorly represented thermal relief.
+
+The move separates U2 from U3 by about 7 mm, and puts U2 4 mm from R4
+instead of about 10.6 mm. C15 is 4.9 mm from U2; it has no significant
+self-heating, but the closer R4 0 Ω link could warm U2. At the expanded
+1.276 A +5V load and the budgeted 50 mΩ R4 maximum, R4 could dissipate
+81 mW. Neither R4-to-U2 thermal transfer nor the GND plane temperature
+field is calibrated. Thus the existing 63.1 °C eFuse and 73.9 °C buck
+junction estimates cannot simply be reused as a proven copper boundary.
+
+This trial can replace the baseline only after the supplier gives a minimum
+finished outer/inner copper thickness and via-barrel plating for the ordered
+stackup, and a thermal measurement or calibrated board-level model bounds
+R4-to-U2 coupling, the far +5V trunk, GND return/pad contacts, and conductor
+temperature under the expanded load. The 100 °C scenario is a useful design
+margin check, not evidence that the conductors stay below 100 °C.
