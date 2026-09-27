@@ -156,6 +156,43 @@ def prepare(board):
     0.3 mm pads at 0.5 mm pitch that Freerouting's power-class tracks can't
     reach: VIN and EN to the input cap, SW to the inductor, VOUT to the
     output caps, FB to its divider (TPS61023 layout guide: short loops)."""
+    import pcbnew
+    # U4/U5 body marks and U5's pin-one dot touch the mask-clearance limit.
+    # Adjust these instances after the common footprint pad clipper runs.
+    edits = 0
+    for ref in ("U4", "U5", "L1"):
+        fp = next(f for f in board.GetFootprints() if f.GetReference() == ref)
+        for i in range(fp.GraphicalItems().size()):
+            g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
+            if not g or g.GetLayer() != pcbnew.F_SilkS:
+                continue
+            a, b = g.GetStart(), g.GetEnd()
+            ax, ay, bx, by = map(pcbnew.ToMM, (a.x, a.y, b.x, b.y))
+            if ref == "U4" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ay + 18.88) < .001 and abs(by + 18.88) < .001:
+                g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(16.3), a.y))
+                g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(16.7), b.y))
+                edits += 1
+            elif ref == "U5" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ay + 22.85) < .001 and abs(by + 22.85) < .001:
+                g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(50.43), a.y))
+                g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(49.57), b.y))
+                edits += 1
+            elif ref == "U5" and g.GetShape() == pcbnew.SHAPE_T_CIRCLE and abs(ax - 48.35) < .001 and abs(ay + 20.86) < .001:
+                g.Move(pcbnew.VECTOR2I(pcbnew.FromMM(-.04), 0))
+                edits += 1
+            elif ref == "L1" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ax - bx) < .001 and any(abs(ax - x) < .001 for x in (45.22, 49.78)):
+                if abs(ay + 12.094999) < .001:
+                    g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(-12.135)))
+                elif abs(by + 12.094999) < .001:
+                    g.SetEnd(pcbnew.VECTOR2I(b.x, pcbnew.FromMM(-12.135)))
+                elif abs(ay + 9.505) < .001:
+                    g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(-9.465)))
+                elif abs(by + 9.505) < .001:
+                    g.SetEnd(pcbnew.VECTOR2I(b.x, pcbnew.FromMM(-9.465)))
+                else:
+                    continue
+                edits += 1
+    if edits != 7:
+        raise ValueError("U4/U5/L1 silk geometry changed")
     rc.io_preroute(board)
     at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
     vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)

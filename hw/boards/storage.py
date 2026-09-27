@@ -129,6 +129,21 @@ def prepare(board):
     """rp2040card.pocket_escapes, with SWDIO's via a row further out and
     towards the fingers: from the first row Freerouting found no way past the
     SD lines to finger B7."""
+    import pcbnew
+    # The card-side J2 outline finishes exactly 0.15 mm from pad 11's
+    # plotted mask opening; shorten this one endpoint by 0.04 mm.
+    fp = next(f for f in board.GetFootprints() if f.GetReference() == "J2")
+    edits = 0
+    for i in range(fp.GraphicalItems().size()):
+        g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
+        if not g or g.GetLayer() != pcbnew.F_SilkS or g.GetShape() != pcbnew.SHAPE_T_SEGMENT:
+            continue
+        a = g.GetStart()
+        if abs(pcbnew.ToMM(a.x) - 47.37) < .001 and abs(pcbnew.ToMM(a.y) + 41.065) < .001:
+            g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(-41.105)))
+            edits += 1
+    if edits != 1:
+        raise ValueError("J2 card-side silk outline changed")
     rc.pocket_escapes(board, swdio=(2.26, -0.6))
 
 

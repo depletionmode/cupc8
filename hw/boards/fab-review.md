@@ -52,6 +52,14 @@ or physical mating evidence. The current UMAX drawing does not provide that
 qualification; there is no supported outline or pad edit that clears the
 project rule while retaining the stated CEM geometry.
 
+The completed system-board plot has the same failure: independent Gerber
+measurement of B.Cu `unconnected-(J2-+5V-PadA11)` at the notch gives
+0.200000 mm copper-to-edge against the 0.300000 mm project rule. It is a
+common connector geometry issue, not a system-board routing error. The
+candidate 0.65 mm/shifted fingers in `doc/hardware/card-notch-qualification.md`
+need socket wipe and fabrication registration evidence before they can replace
+the current mating pattern.
+
 The UMAX manufacturer's drawing 318307001, page 1
 (`hw/datasheets/C404113_UMAX-3183-10200P1T.pdf`), gives the socket key width
 *along the card edge* as 1.78 +/-0.05 mm. Its separate 1.77 +0.20/-0.05 mm
@@ -71,6 +79,15 @@ mask, paste, and legend; its fab check then stops at the absent human CPL
 review receipt. `cploverlay.py` renders 254 Top CPL positions for review,
 including the JLC midpoint offset of the J4 pin header. Its overlay manifest
 records pending review and does not serve as an approval receipt.
+
+The CPU U2 pin-one dot originally had at most 0.145005 mm to its pad's mask
+opening, below the 0.15 mm legend rule. GPU L1/U4, IO U4/U5/L1, and storage
+J2 had plotted gaps at the 0.15 mm numerical boundary. Their individual card
+generators now shorten or move those marks after footprint pad clipping. Fresh
+plots of the generated board files pass the independent front/back silk-to-mask
+check for CPU (1636 ink objects), GPU (1689), IO (1629), and storage (1464).
+These local silk changes do not address the key-notch failure or close the
+remaining text-height and filled-ink-neck gaps.
 
 After viewing the placement overlay and checking designators, pin one,
 polarized parts, and rotations against the board and BOM, put

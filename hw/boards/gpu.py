@@ -272,6 +272,46 @@ def preroute(board):
       fan-out via (or one of ours, 1.4 mm towards the chip) takes them down
     - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)
     - the HDMI +5V buck-boost (buck_boost)"""
+    # The clipped L1 outline ends exactly at the 0.15 mm mask clearance.
+    # Shorten its four upright ends to give the plotted Gerber real margin.
+    import pcbnew
+    fp = next(f for f in board.GetFootprints() if f.GetReference() == "L1")
+    changed = 0
+    for i in range(fp.GraphicalItems().size()):
+        g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
+        if not g or g.GetLayer() != pcbnew.F_SilkS or g.GetShape() != pcbnew.SHAPE_T_SEGMENT:
+            continue
+        a, b = g.GetStart(), g.GetEnd()
+        ax, ay, bx, by = map(pcbnew.ToMM, (a.x, a.y, b.x, b.y))
+        if abs(ax - bx) > .001 or not any(abs(ax - x) < .001 for x in (6.72, 11.28)):
+            continue
+        def shortened(y):
+            for old, new in ((-36.635, -36.68), (-37.505, -37.47), (-40.095, -40.13)):
+                if abs(y - old) < .001:
+                    return new
+            return y
+        new_ay, new_by = shortened(ay), shortened(by)
+        if new_ay == ay and new_by == by:
+            continue
+        g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(new_ay)))
+        g.SetEnd(pcbnew.VECTOR2I(b.x, pcbnew.FromMM(new_by)))
+        changed += 1
+    if changed != 4:
+        raise ValueError("L1 clipped silk outline changed")
+    # U4's lower body mark is clipped to exactly 0.15 mm from two mask pads.
+    fp = next(f for f in board.GetFootprints() if f.GetReference() == "U4")
+    changed = 0
+    for i in range(fp.GraphicalItems().size()):
+        g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
+        if not g or g.GetLayer() != pcbnew.F_SilkS or g.GetShape() != pcbnew.SHAPE_T_SEGMENT:
+            continue
+        a, b = g.GetStart(), g.GetEnd()
+        if abs(pcbnew.ToMM(a.y) + 13.38) < .001 and abs(pcbnew.ToMM(b.y) + 13.38) < .001:
+            g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(13.81), a.y))
+            g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(14.19), b.y))
+            changed += 1
+    if changed != 1:
+        raise ValueError("U4 clipped silk outline changed")
     rc.pocket_escapes(board)
     buck_boost(board)
     import pcbnew
