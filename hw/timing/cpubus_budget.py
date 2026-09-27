@@ -21,6 +21,9 @@ routed CPU and main boards. Missing layout evidence is a failed gate.
 """
 
 import json
+import hashlib
+import math
+from pathlib import Path
 import os
 import re
 import subprocess
@@ -75,10 +78,24 @@ def lengths():
         raise ValueError("BUS-005: routed trace lengths missing: " + path)
     with open(path) as f:
         got = json.load(f)
-    if not got.get("bus_mm") or not all(isinstance(v, (int, float)) and v > 0 for v in got["bus_mm"].values()):
-        raise ValueError("BUS-005: missing or invalid per-net routed bus lengths")
-    if not isinstance(got.get("clk_diff_mm"), (int, float)) or got["clk_diff_mm"] < 0:
-        raise ValueError("BUS-005: missing or invalid routed clock skew")
+    sys.path.insert(0, os.path.dirname(__file__))
+    from extract_lengths import bus_nets
+    expected = set(bus_nets())
+    if got.get('version') != 1 or set(got.get('bus_mm', {})) != expected:
+        raise ValueError('BUS-005: missing or invalid per-net routed bus lengths')
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) and v > 0
+               for v in got['bus_mm'].values()):
+        raise ValueError('BUS-005: missing or invalid per-net routed bus lengths')
+    if not isinstance(got.get('clk_diff_mm'), (int, float)) or \
+            not math.isfinite(got['clk_diff_mm']) or got['clk_diff_mm'] < 0:
+        raise ValueError('BUS-005: missing or invalid routed clock skew')
+    paths = ('build/hw/main/main.kicad_pcb', 'build/hw/cpu/cpu.kicad_pcb')
+    if set(got.get('sources', {})) != set(paths):
+        raise ValueError('BUS-005: routed board source hashes missing')
+    for relative in paths:
+        board = os.path.join(ROOT, relative)
+        if not os.path.isfile(board) or got['sources'][relative] != hashlib.sha256(Path(board).read_bytes()).hexdigest():
+            raise ValueError('BUS-005: stale routed length evidence: ' + relative)
     return max(got["bus_mm"].values()), got["clk_diff_mm"], "extracted from the layout"
 
 

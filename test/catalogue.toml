@@ -264,7 +264,7 @@ checks = "card clock-to-out + connector + trace + chipset setup leaves ≥ 30% m
 method = "hw/timing/cpubus_budget.py: nextpnr I/O delays of both placed designs, stated allowances for pads, clock insertion and minimum delays, and measured lengths from both routed boards (required)"
 kind = "static"
 vrow = "1.7"
-cmd = "python3 hw/timing/cpubus_budget.py"
+cmd = "python3 hw/timing/extract_lengths.py && python3 hw/timing/cpubus_budget.py"
 
 # ============================================================================
 # MMU: chipset address decode, GPO, SYSCTL, the memory bus
@@ -2543,3 +2543,11 @@ method = "test/hw/test_bus_lengths.py"
 kind = "static"
 vrow = "1.7"
 cmd = "python3 test/hw/test_bus_lengths.py"
+
+[[test]]
+id = "BUS-005B"
+title = "Routed SRAM and ROM timing budgets"
+checks = "FPGA I/O timing, the SRAM and ROM datasheet setup/read/write limits, and measured address/data/control routes leave at least 20% margin"
+method = "pending routed memory-bus timing extraction and datasheet-based budget"
+kind = "static"
+vrow = "1.7"
