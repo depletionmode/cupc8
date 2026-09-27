@@ -39,6 +39,37 @@ def main_cli():
         assert 'main:CPU_CLK' in manifest['structural_only_nets']
         assert 'main:CPU_CLK' in manifest['unmodeled_nets']
         assert not manifest['coverage_complete']
+        assert 'main:CPU_RSVD_A2' in manifest['reviewed_waivers']
+        assert 'main:SLOT1_RSVD_A1' in manifest['reviewed_waivers']
+        assert 'system:RSVD_B1' in manifest['reviewed_waivers']
+        assert 'main:CPU_RSVD_A2' not in manifest['unmodeled_nets']
+        assert 'main:CPU_CLK' in manifest['coverage_families']['clock_and_reset']
+        assert sorted(net for family in manifest['coverage_families'].values()
+                      for net in family) == manifest['unmodeled_nets']
+        assert not set(manifest['reviewed_waivers']) & set(manifest['unmodeled_nets'])
+
+        # A waiver is valid only while the pin-exact KiCad topology remains
+        # passive. These mutations do not need to break an unrelated wiring
+        # check: they must restore a strict coverage gap on their own.
+        used_reserved = copy.deepcopy(main)
+        old_net = used_reserved.pins[('U7', '1')]
+        used_reserved.nets[old_net] = tuple(pin for pin in used_reserved.nets[old_net]
+                                             if pin != ('U7', '1'))
+        used_reserved.nets['/CPU_RSVD_A2'] += (('U7', '1'),)
+        used_reserved.pins[('U7', '1')] = '/CPU_RSVD_A2'
+        exposed = check(cards, used_reserved)
+        assert 'main:CPU_RSVD_A2' not in exposed['reviewed_waivers']
+        assert 'main:CPU_RSVD_A2' in exposed['unmodeled_nets']
+
+        used_slot = copy.deepcopy(cards)
+        old_net = used_slot['io'].pins[('J1', 'A6')]
+        del used_slot['io'].nets[old_net]
+        used_slot['io'].nets['/SCK'] += (('J1', 'A6'),)
+        used_slot['io'].pins[('J1', 'A6')] = '/SCK'
+        exposed = check(used_slot, main)
+        assert 'main:SLOT1_RSVD_A1' not in exposed['reviewed_waivers']
+        assert 'main:SLOT1_RSVD_A1' in exposed['unmodeled_nets']
+        print('reserved-contact waivers fail closed for active-pin and mating-card mutations')
 
         if args.main_board:
             good_route = check(cards, main, args.main_board)

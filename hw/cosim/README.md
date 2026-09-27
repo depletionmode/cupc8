@@ -19,10 +19,24 @@ unrouted CPU, memory, slot, bridge, clock, reset and power-policy signal nets
 under `missing_routes`; `--require-route` rejects them.
 The generator separates `runtime_nets`, whose netlist values affect the
 machine, from `structural_only_nets`, which have only a connectivity check.
-All named nets without an executed model appear in `unmodeled_nets`, including
-the structural-only subset. E2E-001 through E2E-004 use `--require-coverage`
-and fail until each remaining net has a model or an explicit reviewed waiver.
-This keeps local card and power circuits from being silently counted as covered.
+All named nets without an executed model or a reviewed waiver appear in
+`unmodeled_nets`; `structural_only_nets` still lists every structural-only net,
+including waived ones. `coverage_families` groups the remaining gaps by their
+required model domain. This classification is a work queue and grants no
+coverage. E2E-001 through E2E-004 use `--require-coverage` and fail while any
+gap remains. This keeps local card and power circuits from being silently
+counted as covered.
+
+`reviewed_waivers` currently permits only reserved connector contacts with
+exactly one passive test point and no active electrical load. CPU and system
+reserved contacts require the corresponding card pad to be KiCad NC; a slot
+reserved contact requires all five possible card pads to be NC. The system's
+two B-side reserved contacts instead require a passive test point at each end.
+The waiver is recalculated from both netlists on every generation. Attaching
+an IC pin or changing a mating card pad to an active net restores the coverage
+gap; the wiring mutation probe checks both cases. The record includes the
+actual pin list, mating contact, and reason for review. No power, clock,
+programming, bus, LED, or data signal receives this waiver.
 
 The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
 reference network before it reaches the chipset's `PWR_HI` pin. The nominal
@@ -88,7 +102,10 @@ nPOR path, memory-write branches and ROM DQ0 read route change the running
 machine. The manifest currently covers the CPU, main memory, slot data paths,
 system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
-machine wiring. On the current routed-board snapshot, all required top-level
-routes are present, but 502 named nets remain without executed models or
-reviewed waivers. E2E-001 through E2E-004 therefore remain pending behind
-`--require-coverage` despite passing narrower runtime probes.
+machine wiring. On the routed-board snapshot used for this audit, all required
+top-level routes are present. Of 502 previously uncovered named nets, 45
+reserved contacts now have pin-bound waivers; 457 remain unmodeled. The
+remaining groups are boot/programming (98), slot/control bus (74), CPU/memory
+(71), power/return (65), clock/reset (53), indicators (52), external IO (26),
+and power policy (18). E2E-001 through E2E-004 remain
+pending behind `--require-coverage` despite passing narrower runtime probes.

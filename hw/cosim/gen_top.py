@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/boards'))
 sys.path.insert(0, str(ROOT / 'hw/tools'))
 from netlist import read
+from coverage import audit
 import kicadgen
 
 CARDS = ('cpu', 'system', 'gpu', 'io', 'storage', 'wifi', 'eink')
@@ -515,19 +516,8 @@ def check(cards, main, pcb=None):
     for name in epd_contacts:
         runtime_net('eink', name)
         runtime_net('eink', f'{name}_J')
-    unmodeled, structural_only = [], []
-    for board, circuit in circuits.items():
-        for net in circuit.nets:
-            if net.startswith('unconnected-'):
-                continue  # KiCad's explicit no-connect marker, no electrical node
-            if (board, net) not in executed:
-                unmodeled.append(f'{board}:{net.lstrip("/")}')
-                if (board, net) in structural:
-                    structural_only.append(f'{board}:{net.lstrip("/")}')
-    manifest['unmodeled_nets'] = sorted(unmodeled)
-    manifest['structural_only_nets'] = sorted(structural_only)
+    manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
-    manifest['coverage_complete'] = not unmodeled
     return manifest
 
 
