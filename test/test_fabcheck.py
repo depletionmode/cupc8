@@ -3,6 +3,9 @@ from collections import Counter
 import hashlib
 import json
 from pathlib import Path
+import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -163,6 +166,51 @@ class FabCheckTests(unittest.TestCase):
                 self.assertIn('silkscreen text height', message)
                 self.assertEqual('positive solder-mask web rule is not configured' in message,
                                  width == 0)
+
+    @unittest.skipUnless(shutil.which('kicad-cli'), 'KiCad Gerber exporter unavailable')
+    def test_silk_text_and_graphic_can_have_identical_plot_commands(self):
+        """A Gerber-only checker cannot identify every source text object."""
+        pcbnew = fabcheck.pcbnew
+        mm = pcbnew.FromMM
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            def plot(name, board):
+                source = directory / (name + '.kicad_pcb')
+                pcbnew.SaveBoard(str(source), board)
+                out = directory / name
+                subprocess.run(('kicad-cli', 'pcb', 'export', 'gerbers',
+                                '-l', 'F.Silkscreen', '-o', str(out), str(source)),
+                               check=True, capture_output=True, text=True)
+                return (out / (name + '-F_Silkscreen.gto')).read_text()
+
+            text_board = pcbnew.BOARD()
+            dash = pcbnew.PCB_TEXT(text_board)
+            dash.SetText('-')
+            dash.SetLayer(pcbnew.F_SilkS)
+            dash.SetTextSize(pcbnew.VECTOR2I(mm(.8), mm(.8)))
+            dash.SetTextThickness(mm(.15))
+            dash.SetPosition(pcbnew.VECTOR2I(mm(10), mm(10)))
+            text_board.Add(dash)
+            text_plot = plot('text', text_board)
+            segments = re.findall(r'X(-?\d+)Y(-?\d+)D0[12]\*', text_plot)
+            self.assertEqual(len(segments), 2)
+            self.assertNotIn('FlashText', text_plot)
+
+            graphic_board = pcbnew.BOARD()
+            line = pcbnew.PCB_SHAPE(graphic_board)
+            line.SetShape(pcbnew.SHAPE_T_SEGMENT)
+            # KiCad's internal unit is 1 nm, so convert the Gerber's
+            # six-decimal-millimetre coordinates through FromMM explicitly.
+            line.SetStart(pcbnew.VECTOR2I(mm(int(segments[0][0])/1000000),
+                                           mm(-int(segments[0][1])/1000000)))
+            line.SetEnd(pcbnew.VECTOR2I(mm(int(segments[1][0])/1000000),
+                                         mm(-int(segments[1][1])/1000000)))
+            line.SetWidth(mm(.15))
+            line.SetLayer(pcbnew.F_SilkS)
+            graphic_board.Add(line)
+            graphic_plot = plot('graphic', graphic_board)
+            self.assertEqual(text_plot[text_plot.index('G04 APERTURE LIST*'):],
+                             graphic_plot[graphic_plot.index('G04 APERTURE LIST*'):])
 
     def test_excellon_drill_spacing_exact_boundary_and_slot(self):
         circle = (1.0, 1.0, .3)
