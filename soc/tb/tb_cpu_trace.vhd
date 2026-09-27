@@ -14,7 +14,8 @@
 --
 -- BUS-003 options: STALL > 0 adds, to one cycle in eight, a stall of up to
 -- STALL clocks. RESET_AT > 0 pulls /CPU_RST in the middle of a bus cycle once,
--- at that cycle count or at the HALT fetch if that comes first; memory goes
+-- at that cycle count or at the HALT fetch if that comes first. A CPU parked
+-- in WAI with no bus cycle is reset at that clock while idle. Memory goes
 -- back to the image and only the run after the reset is traced, so it must
 -- match sim.nim exactly.
 
@@ -203,6 +204,19 @@ begin
 				-- protocol monitor: the request must hold still until /RDY
 				assert n_stb = '0' and to_integer(unsigned(a)) = cyc_a and rw = cyc_rw
 					report "CPU changed the request before /RDY" severity failure;
+			end if;
+
+			-- WAI has no bus cycle to interrupt. Reset at the requested clock
+			-- anyway, so the rerun tests that /CPU_RST wakes a parked CPU.
+			if not reset_done and cycles >= RESET_AT and waiting = '1' and not busy then
+				reset_done := true;
+				emit("R reset while parked in WAI, clock " & integer'image(cycles));
+				rst_count := 3;
+				n_rst <= '0';
+				started := false;
+				mem := mem_at_power_on;
+				p := "00000";
+				mask <= "00000";
 			end if;
 
 			if busy and n_rdy = '1' then
