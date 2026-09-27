@@ -1326,7 +1326,7 @@ cmd = "python3 test/host/test_lockstep.py"
 [[test]]
 id = "E2E-001"
 title = "Netlist-generated co-sim builds"
-checks = "the top level is generated from all five KiCad netlists; every net is connected to a model or explicitly waived"
+checks = "the top level is generated from the main board and all seven card KiCad netlists; every net is connected to an executed model or explicitly waived"
 method = "hw/cosim/gen_top.py"
 kind = "sim"
 vrow = "3.1"
