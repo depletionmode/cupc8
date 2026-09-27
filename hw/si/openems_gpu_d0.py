@@ -181,7 +181,7 @@ def port_window_audit(directory, frequencies):
 
 def simulate(board, directory, max_steps=120000, postprocess_only=False,
              straight_control=False, pair='d0', pml_clearance_mm=0,
-             geometry_only=False, fixed_window=False):
+             geometry_only=False, fixed_window=False, threads=4):
     directory = directory.resolve()
     nets, roi, ends = PAIR_GEOMETRY[pair]
     routes = routed_pair(board, pair)
@@ -238,6 +238,7 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
                 'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
                 'pml_clearance_mm': pml_clearance_mm,
                 'fixed_window': fixed_window, 'max_steps': max_steps,
+                'solver_threads': threads,
                 'air_bounds_mm': [float(x_lines[0]), float(x_lines[-1]),
                                   float(y_lines[0]), float(y_lines[-1])],
                 'material_bounds_mm': roi, 'pml_inner_bounds_mm': pml_inner_bounds,
@@ -262,7 +263,7 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
                 sys.stderr.flush()
                 os.dup2(log.fileno(), 1)
                 os.dup2(log.fileno(), 2)
-                fdtd.Run(str(directory), cleanup=True, verbose=0, numThreads=4,
+                fdtd.Run(str(directory), cleanup=True, verbose=0, numThreads=threads,
                          dump_statistics=True)
             finally:
                 sys.stdout.flush()
@@ -287,6 +288,9 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
     configured_cap = re.search(r'Max\. number of timesteps: (\d+)', runlog)
     if configured_cap is None or int(configured_cap[1]) != max_steps:
         raise ValueError('saved HDMI run has a different timestep cap')
+    configured_threads = re.search(r'openEMS - fixed number of threads: (\d+)', runlog)
+    if configured_threads is None or int(configured_threads[1]) != threads:
+        raise ValueError('saved HDMI run has a different solver thread count')
     cap_reached = 'Max. number of timesteps was reached' in runlog
     actual_steps = max_steps if cap_reached else final_step
     sampled_decay = -levels[-1] if levels else None
@@ -332,6 +336,7 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
         'port_geometry': '100-ohm differential lumped ports in the z=0 copper plane',
         'straight_control': straight_control,
         'fixed_window': fixed_window, 'max_steps': max_steps,
+        'solver_threads': threads,
         'pml_clearance_mm': pml_clearance_mm,
         'air_bounds_mm': [float(x_lines[0]), float(x_lines[-1]),
                           float(y_lines[0]), float(y_lines[-1])],
@@ -376,6 +381,8 @@ def main():
     parser.add_argument('--board', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--max-steps', type=int, default=120000)
+    parser.add_argument('--threads', type=int, default=4,
+                        help='bounded openEMS worker threads')
     parser.add_argument('--postprocess-only', action='store_true', help='re-evaluate saved fields for the same generated geometry')
     parser.add_argument('--geometry-only', action='store_true', help='write and audit geometry without FDTD')
     parser.add_argument('--fixed-window', action='store_true',
@@ -389,6 +396,8 @@ def main():
     args = parser.parse_args()
     if args.max_steps < 30000:
         parser.error('--max-steps must be at least 30000')
+    if not 1 <= args.threads <= 8:
+        parser.error('threads must be 1–8')
     if args.postprocess_only and args.geometry_only:
         parser.error('postprocess-only and geometry-only cannot be combined')
     board = args.board.resolve()
@@ -406,7 +415,8 @@ def main():
         directory += '-fixed-window'
     report = simulate(board, output.parent / directory, args.max_steps,
                       args.postprocess_only, args.straight_control, args.pair,
-                      args.pml_clearance_mm, args.geometry_only, args.fixed_window)
+                      args.pml_clearance_mm, args.geometry_only, args.fixed_window,
+                      args.threads)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
     if args.geometry_only:
