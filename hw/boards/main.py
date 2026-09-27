@@ -329,7 +329,7 @@ def build_parts():
     base = kg.load_symbol("FPGA_Lattice:ICE40HX4K-TQ144")
     unused = {int(n) for u in range(1, 6) for n, p in kg.symbol_pins(base, u).items()
               if chip.get(int(n)) is None and p[3] not in ("VCC", "GND") and not p[3].startswith("VCCIO")}
-    main_symbols({n for n in unused if n >= 100})
+    main_symbols(unused)
     sym = kg.load_symbol("cupc8_main:ICE40HX4K-TQ144")
     for unit in range(1, 6):
         conns = {}
@@ -507,15 +507,15 @@ def build_parts():
 # --------------------------------------------------------------- schematic
 
 MAIN_LIB = os.path.join(ROOT, "hw", "lib", "cupc8_main.kicad_sym")
-NC_ROOM = 1.6                            # a no-connect cross at a pin's end
+NC_ROOM = 6.0                            # leave adjacent pin numbers clear of no-connect crosses
 X4_SOCKET = "CUPC8_SystemSlot_64P11L"
 
 
 def fpga_symbol(unused):
     """KiCad's ICE40HX4K-TQ144 (its pinout agrees with Lattice's HX4K pinout,
     hw/datasheets/iCE40HX4K-TQ144-pinout.csv; EasyEDA's symbol for C1521989
-    has the HX1K's) with the `unused` pins that have three-digit numbers made
-    long enough for the number and a no-connect cross, as jlcimport.py does
+    has the HX1K's) with the unused pins made long enough for the pin number
+    and a no-connect cross, as jlcimport.py does
     for imported parts. The body end of each pin stays put."""
     sym = kg.load_symbol("FPGA_Lattice:ICE40HX4K-TQ144")
     sym[1] = kg.Q("ICE40HX4K-TQ144")
@@ -602,7 +602,7 @@ def _add(sch, s, at):
         if net is None:
             sch.nc(p, pin)
         else:
-            sch.connect(p, pin, net)
+            sch.connect(p, pin, net, stub=5 * G if s.ref == "U7" else 2 * G)
     left = [n for n in p.pins if n not in p.used]
     if left:
         raise SystemExit("%s unit %d: pins not wired: %s" % (s.ref, s.unit, sorted(left)))
@@ -677,7 +677,7 @@ def schematic(path, footprint_libs=("cupc8",)):
 # Indicator LEDs), east of the CPU socket; the reset button and AUX header
 # are on the east edge, beyond the cards.
 
-W, H = 125.0, 184.0
+W, H = 131.0, 188.0
 OUTLINE = (0, 0, W, H)
 PIN1_X = 12.0
 ROW_CPU = 12.0
@@ -702,7 +702,7 @@ LABEL_SIDE.update({r: "S" for r in ["R9", "R10", "R12", "R56"] + ["R%d" % (60 + 
 LABEL_SIDE.update({r: "W" for r in ("Q1", "Q2", "R11", "R55")})
 LED_X0 = 67.5                                     # the row's first LED after PWR: east of the CPU socket (J2)
 
-FPGA = (97.0, 47.0)                               # centre of U7
+FPGA = (101.0, 49.0)                               # centre of U7
 LOGO_MM = 12
 LOGO_AT = (113.0, 164.0)
 TITLE, REVISION = "CUPC/8 main board", "A"
@@ -719,7 +719,7 @@ def rev_box():
 # between slots 1 and 2 and south of slot 6 (east of the slot channels' parts)
 RAIL_X = PIN1_X + kg.IO_CARD_HOLE[0]
 RAIL_POSTS = [(RAIL_X, row_slot(1) + SLOT_PITCH / 2), (RAIL_X, row_slot(6) + SLOT_PITCH / 2)]
-HOLES = [(4.5, 10.0), (W - 4.5, 4.5), (4.5, H - 4.5), (W - 4.5, H - 4.5), (W - 4.5, 56.0), (W - 4.5, 128.0)] + \
+HOLES = [(4.5, 10.0), (120.5, 4.5), (4.5, 179.5), (120.5, 179.5), (120.5, 56.0), (120.5, 128.0)] + \
     RAIL_POSTS
 
 
@@ -756,8 +756,8 @@ def wanted(parts):
     # a quarter clockwise it is the KiCad/JEDEC view pin_xy() below assumes:
     # pin 1 top left, 1-36 down the left side (the CPU bus, facing the socket)
     at["U7"] = (fx, fy, 270)
-    at["U10"] = (88.5, 21.0, 0)                  # ROM, north of the chipset's memory pins
-    at["U9"] = (104.5, 24.0, 90)                 # SRAM
+    at["U10"] = (92.5, 23.0, 0)                  # ROM, north of the chipset's memory pins
+    at["U9"] = (108.5, 26.0, 90)                 # SRAM
     at["J1"] = (30.0, H - 4.58, 0)               # USB-C, opening south: the edge 5.79 mm off the pegs (y -1.21)
     at["J4"] = (116.6, 107.0, 0)                 # AUX SPI header, east edge
     # POWER and RESET side by side on the front (south) edge, between the
@@ -1104,7 +1104,7 @@ POWER_NETS = ("/VBUS", "/+5V", "/SLOT*_5V*", "/3V3_BUCK", "/BUCK_SW")
 # the eFuse's input and output: 0.5 mm tracks, but the QFN's pins are
 # 0.15-0.19 mm apart, so Fine's clearance (kicadgen FinePower). In the Fine
 # class they were routed 0.15 mm wide, 77 mm of them, for 3.5 A.
-FINE_POWER_NETS = ("/VBUS_F", "/5V_SYS")
+FINE_POWER_NETS = ("/VBUS_F", "/5V_SYS", "/GND")
 # In1 a solid GND plane; In2 carries signals too (two signal layers leave ~80
 # connections unrouted), with a +3V3 pour filled round them after routing
 # 6 layers, as the CPU card: F.Cu / In1 GND / In2 / In3 / In4 +3V3 / B.Cu.
@@ -1122,10 +1122,8 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # at most 30 + 60 + 90 passes. On 6 layers try 1 left 4 connections
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
-ROUTE_TIMEOUT = 180 * 60                   # each Freerouting run's wall-time cap, s (kicadgen route_timeout): with 16 at
-                                            # once on a loaded machine, pass 1 alone takes ~35 min
-ROUTE_PARALLEL = 16                         # orderings routed at once per try (kicadgen route_parallel; David,
-                                            # 2026-09-26: 16 of the 24 cores, the rest for other work)
+ROUTE_TIMEOUT = 180 * 60                   # per-run wall-time cap, seconds
+ROUTE_PARALLEL = 10                        # approved 2026-09-27, with 1 GB per worker
 ROUTE_HEAP = "1g"                           # each run's JVM heap cap (kicadgen route_heap): uncapped, Java takes 15.5 GB
 # the fan-out vias a clearance off their own pads, 0.05 mm further from other
 # nets' and clear of the NPTH holes' keep-outs, as Freerouting judges them:
@@ -1138,8 +1136,19 @@ FANOUT_MARGIN = 0.05
 def fine_nets():
     # the eFuse's VBUS_F and 5V_SYS carry the input current: FINE_POWER_NETS
     power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL0", "VCCPLL1", "VBUS_F", "5V_SYS"}
-    return sorted({"/" + n for s in build_parts() if s.ref in FINE_PARTS for n in s.conns.values()
-                   if n and n not in power} | {"unconnected-(U2-*", "/GND"})   # GND: the eFuse QFN GND pad sits 0.18 mm from DVDT
+    return sorted({"/" + n for s in build_parts() if s.ref == "U2" for n in s.conns.values()
+                   if n and n not in power} | {"unconnected-(U2-*"})
+
+
+def dense_nets():
+    """Only FPGA/memory signals use 0.1 mm track/space; power keeps its class.
+
+    JLC's multilayer minimum is 0.09 mm (capabilities/Capab, 2026-09-27).
+    Keep the existing 0.7/0.3 mm vias; no smaller paid drill option.
+    """
+    power = {"GND", "+3V3", "+1V2", "+5V", "VCCPLL0", "VCCPLL1"}
+    return sorted({"/" + n for s in build_parts() if s.ref in ("U7", "U9", "U10")
+                   for n in s.conns.values() if n and n not in power})
 
 
 def prepare(board):
@@ -1502,7 +1511,7 @@ def main():
     pl = placement()
     out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
-                       fine_nets=fine_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
+                       fine_nets=fine_nets(), dense_nets=dense_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
                        route_parallel=ROUTE_PARALLEL, route_timeout=ROUTE_TIMEOUT, route_heap=ROUTE_HEAP,
                        zone_min_width=0.3,          # at 0.25 KiCad's fill left a 0.063 mm plane neck
                        fanout_margin=FANOUT_MARGIN,

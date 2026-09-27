@@ -680,8 +680,8 @@
 				)
 			)
 			(pin bidirectional line
-				(at -12.7 27.94 0)
-				(length 3.81)
+				(at -19.05 27.94 0)
+				(length 10.16)
 				(name "IOR_111"
 					(effects
 						(font
@@ -698,8 +698,8 @@
 				)
 			)
 			(pin bidirectional line
-				(at -12.7 25.4 0)
-				(length 3.81)
+				(at -19.05 25.4 0)
+				(length 10.16)
 				(name "IOR_112"
 					(effects
 						(font
@@ -716,8 +716,8 @@
 				)
 			)
 			(pin bidirectional line
-				(at -12.7 22.86 0)
-				(length 3.81)
+				(at -19.05 22.86 0)
+				(length 10.16)
 				(name "IOR_114"
 					(effects
 						(font
@@ -1149,8 +1149,8 @@
 				)
 			)
 			(pin bidirectional line
-				(at -15.24 -33.02 0)
-				(length 6.35)
+				(at -12.7 -33.02 0)
+				(length 3.81)
 				(name "IOR_165"
 					(effects
 						(font
@@ -1167,8 +1167,8 @@
 				)
 			)
 			(pin bidirectional line
-				(at -15.24 -35.56 0)
-				(length 6.35)
+				(at -12.7 -35.56 0)
+				(length 3.81)
 				(name "IOR_166"
 					(effects
 						(font
@@ -1185,8 +1185,8 @@
 				)
 			)
 			(pin bidirectional line
-				(at -15.24 -38.1 0)
-				(length 6.35)
+				(at -12.7 -38.1 0)
+				(length 3.81)
 				(name "IOR_167"
 					(effects
 						(font
@@ -2236,8 +2236,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 12.7 5.08 180)
-				(length 3.81)
+				(at 19.05 5.08 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects
@@ -2255,8 +2255,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 12.7 2.54 180)
-				(length 3.81)
+				(at 19.05 2.54 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects
@@ -2293,8 +2293,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 12.7 -2.54 180)
-				(length 3.81)
+				(at 19.05 -2.54 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects
@@ -2312,8 +2312,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 12.7 -5.08 180)
-				(length 3.81)
+				(at 19.05 -5.08 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects
@@ -2367,8 +2367,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 12.7 -7.62 180)
-				(length 3.81)
+				(at 19.05 -7.62 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects
@@ -2550,8 +2550,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 12.7 7.62 180)
-				(length 3.81)
+				(at 19.05 7.62 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects
@@ -2644,8 +2644,8 @@
 				)
 			)
 			(pin power_in line
-				(at -2.54 20.32 270)
-				(length 6.35)
+				(at -2.54 24.13 270)
+				(length 10.16)
 				(name "VPP_FAST"
 					(effects
 						(font
@@ -2736,8 +2736,8 @@
 				)
 			)
 			(pin no_connect line
-				(at 15.24 -10.16 180)
-				(length 6.35)
+				(at 19.05 -10.16 180)
+				(length 10.16)
 				(hide yes)
 				(name "NC"
 					(effects

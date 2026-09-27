@@ -679,7 +679,7 @@ NET_CLASSES = [
 FINE_POWER_CLASS = ("FinePower", 0.5, 0.15, 0.8, 0.4)
 
 
-def write_project(path, power_nets=(), rules=None, fine_nets=(), fine_power_nets=()):
+def write_project(path, power_nets=(), rules=None, fine_nets=(), fine_power_nets=(), dense_nets=()):
     """A .kicad_pro with the design rules and net classes kicad-cli DRC uses."""
     import json
     classes = [{"name": n, "track_width": w, "clearance": c, "via_diameter": vd, "via_drill": vdr,
@@ -687,10 +687,11 @@ def write_project(path, power_nets=(), rules=None, fine_nets=(), fine_power_nets
                 "microvia_diameter": 0.3, "microvia_drill": 0.1, "bus_width": 12, "wire_width": 6,
                 "line_style": 0, "pcb_color": "rgba(0, 0, 0, 0.000)",
                 "schematic_color": "rgba(0, 0, 0, 0.000)", "priority": 2147483647 if n == "Default" else 0}
-               for n, w, c, vd, vdr in NET_CLASSES + ([FINE_POWER_CLASS] if fine_power_nets else [])]
+               for n, w, c, vd, vdr in NET_CLASSES + ([FINE_POWER_CLASS] if fine_power_nets else []) +
+               ([("DenseSignal", 0.1, 0.1, 0.7, 0.3)] if dense_nets else [])]
     pro = {
         "board": {"design_settings": {
-            "rules": dict(JLC_RULES, **(rules or {})),
+            "rules": dict(JLC_RULES, **(rules or {}), **({"min_clearance": 0.1} if dense_nets else {})),
             # boards are regenerated from the libraries on every run, so they
             # cannot drift from them; the only differences are the deliberate
             # edits here (designators placed, silkscreen trimmed to the edge)
@@ -699,7 +700,8 @@ def write_project(path, power_nets=(), rules=None, fine_nets=(), fine_power_nets
         "net_settings": {"classes": classes, "meta": {"version": 4},
                          "netclass_patterns": [{"netclass": "Power", "pattern": n} for n in power_nets] +
                                               [{"netclass": "Fine", "pattern": n} for n in fine_nets] +
-                                              [{"netclass": "FinePower", "pattern": n} for n in fine_power_nets]},
+                                              [{"netclass": "FinePower", "pattern": n} for n in fine_power_nets] +
+                                              [{"netclass": "DenseSignal", "pattern": n} for n in dense_nets]},
         "meta": {"filename": os.path.basename(path), "version": 3},
     }
     with open(path, "w") as f:
@@ -2621,7 +2623,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
-             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None):
+             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=()):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2678,7 +2680,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def sheet():
         schematic(sch, footprint_libs)
         write_project(pro, power_nets=power_nets, fine_nets=fine_nets, fine_power_nets=fine_power_nets,   # before ERC: it carries the library tables
-                      rules=JLC_RULES_4 if layers >= 4 else None)
+                      rules=JLC_RULES_4 if layers >= 4 else None, dense_nets=dense_nets)
     step("schematic", sheet)
     step("ERC", lambda: run(["kicad-cli", "sch", "erc", "--format", "json", "--severity-all",
                              "--exit-code-violations", "-o", os.path.join(out, "erc.json"), sch]) and None)

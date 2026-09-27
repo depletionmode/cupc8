@@ -198,6 +198,11 @@ ESP ROM bootloader sync.
   card keeps its own outline (`system-slot.md`).
 - **Slot pitch:** 20.32 mm, for the full-height cards, the CPU socket
   included. Seven sockets in the row take ≈ 142 mm.
+- **Main board outline:** 131 × 188 mm, six copper layers. Contact 1 of the
+  CPU and six I/O sockets remains on the same x coordinate and 20.32 mm pitch.
+  The eight M3 mounting holes retain their earlier coordinates; the extra
+  6 mm at the east edge and 4 mm at the south edge give the chipset and power
+  wiring more room without moving the card row or mounting rail.
 - **Card outline:** every I/O card has the **same outline**, so that cards
   line up in the case and their power LEDs sit in one row. In KiCad's
   `BUS_PCIexpress_x1` footprint frame (finger B1 at the origin, fingers
