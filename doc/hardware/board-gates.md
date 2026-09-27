@@ -81,6 +81,39 @@ fail until their contract coverage exists:
   copper-to-edge separation against the 0.30 mm board rule. This violation
   must be fixed in the plotted design, with an appropriate reroute and fresh
   exports; it is independent of the missing coverage and CPL review.
+
+  **Read-only six-card rebuild diagnostic (2026-09-27).** The saved CPU, GPU,
+  IO, storage, Wi-Fi and e-ink fab exports were checked directly with
+  `fabcheck.check_drills`, `check_drill_spacing`, and the independent
+  `gerberdrc` copper, silk, mask and edge parsers. The hash prefixes below
+  identify each measured `*.kicad_pcb` / B.Cu Gerber / F.SilkS Gerber triple;
+  they are not a fresh-export parity or CPL review receipt. All six match
+  Excellon cuts to board pads and vias and pass the 0.50 mm drill-spacing
+  rule. All copper layers import and pass the implemented clearance, stroke
+  width and isolated filled-island checks. Both silk layers import and pass
+  the implemented stroke and isolated-island width checks; every B.SilkS is
+  empty. Each board has a positive 0.10 mm mask-web rule, and both plotted
+  mask layers pass it.
+
+  | Card | SHA-256 prefixes: PCB / B.Cu / F.SilkS | Drill cuts | Copper objects | Mask openings | First F.SilkS-to-mask result |
+  | --- | --- | ---: | ---: | ---: | --- |
+  | CPU | `0a8fc2376283 / 59679f83640a / 4e929cfadea5` | 266 | 3011 | 397 | **Fail:** upper bound 0.145005 mm < 0.150 mm |
+  | GPU | `c551b16b88b2 / 4fbe9660ac31 / 31df0690e6fd` | 187 | 1683 | 269 | Indeterminate: 0.149994352–0.150000002 mm |
+  | IO | `8ce463cc553a / 965bc507b1a7 / caf92e942bf6` | 183 | 1490 | 225 | Indeterminate: 0.149994352–0.150000002 mm |
+  | Storage | `36234e1840cb / a6e6dbe7de96 / 19d72a16d011` | 221 | 1731 | 223 | Indeterminate: 0.149990587–0.150000002 mm |
+  | Wi-Fi | `d19a8e1c03c6 / 3e669a2903b3 / 3f421a32b467` | 196 | 940 | 151 | Pass |
+  | E-ink | `30cf2ebe6aa1 / fc195293d7f7 / d2da4ddc8b10` | 209 | 1602 | 224 | Pass |
+
+  All six independently fail copper-to-edge on the first B.Cu `/GND`
+  key-notch feature: 0.200000 mm lower bound against the board's 0.300000 mm
+  rule. The common finger spans x=9.65–10.35 mm and the adjacent notch wall
+  lies at x=10.55 mm. The CPU's definite silk failure is between ink bounds
+  (42.330, 34.770)–(42.930, 35.220) mm and mask-opening bounds
+  (43.075, 33.938)–(43.725, 36.202) mm in plotted coordinates. The three
+  indeterminate silk results are exact-rule boundary cases at the current
+  GEOS circular-buffer resolution; they are neither demonstrated violations
+  nor passes. These results leave the fab gate red alongside the remaining
+  filled-neck and text-height coverage gaps and unreviewed CPL placement.
 - Connectors: pincheck validates the source tables; connectorcheck compares
   every contact, including intended no-connects, of the board's external
   connectors with its KiCad netlist and the published pinout.
