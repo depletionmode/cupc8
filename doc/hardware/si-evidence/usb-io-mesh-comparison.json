@@ -1,0 +1,70 @@
+{
+  "scope": "two-grid USB IO field-model sensitivity; not mesh convergence or row 4.6 evidence",
+  "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c",
+  "netlist_sha256": "074f967c05707d2794262cf9cff36a98e247ebfaffd8a9040e1c5c6b7c86e7ff",
+  "pml_clearance_mm": 1,
+  "fixed_window": true,
+  "sources": {
+    "mesh_075": {
+      "report_sha256": "ca10ba1a953f866c48823fd09e116ead858768502db33a99abbe5a5e70079e86",
+      "mesh_mm": 0.075,
+      "timesteps": 220000,
+      "simulated_ns": 16.302153999999998,
+      "xml_sha256": "fc0ad04f788f3601a272ee50e38f6f45c5156165ece1f7a82202ebd100a65765",
+      "run_log_sha256": "b092604d3d9ba7d74580b47a363b0d6418ee0fb14c1695173f13c19565087dc6",
+      "valid_for_diagnostic_sparams": true
+    },
+    "mesh_090": {
+      "report_sha256": "7d2654aaacee6a71e95737fb4ad384ceac22c65b6ee374787a359ff34a9308a7",
+      "mesh_mm": 0.09,
+      "timesteps": 169000,
+      "simulated_ns": 16.3842627,
+      "xml_sha256": "f8395dd9232cc7e20aa767466f9a900f3683a246a9ad7ce7dfb6d8fccc869283",
+      "run_log_sha256": "e14204cf3b541cb05c838a906488961801c8c60b067abdaa4f87f2d620a5963d",
+      "valid_for_diagnostic_sparams": true
+    }
+  },
+  "results": [
+    {
+      "frequency_hz": 100000000,
+      "s11_db": {
+        "mesh_075": -30.517338103406146,
+        "mesh_090": -30.016345758284775,
+        "delta_090_minus_075": 0.5009923451213716
+      },
+      "s21_db": {
+        "mesh_075": -0.0054221572486030335,
+        "mesh_090": -0.005255151079724935,
+        "delta_090_minus_075": 0.00016700616887809806
+      }
+    },
+    {
+      "frequency_hz": 240000000,
+      "s11_db": {
+        "mesh_075": -22.987522042200105,
+        "mesh_090": -22.482258190171052,
+        "delta_090_minus_075": 0.5052638520290529
+      },
+      "s21_db": {
+        "mesh_075": -0.023177005617252246,
+        "mesh_090": -0.0252057261683792,
+        "delta_090_minus_075": -0.0020287205511269543
+      }
+    },
+    {
+      "frequency_hz": 480000000,
+      "s11_db": {
+        "mesh_075": -17.1055469782723,
+        "mesh_090": -16.586299745999092,
+        "delta_090_minus_075": 0.5192472322732087
+      },
+      "s21_db": {
+        "mesh_075": -0.08479894086794255,
+        "mesh_090": -0.0948647403827451,
+        "delta_090_minus_075": -0.010065799514802548
+      }
+    }
+  ],
+  "maximum_absolute_s11_change_db": 0.5192472322732087,
+  "maximum_absolute_s21_change_db": 0.010065799514802548
+}
