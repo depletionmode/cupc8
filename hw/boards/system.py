@@ -294,6 +294,39 @@ def prepare(board):
     return [pad.GetNetname()]
 
 
+def post_route(board):
+    """Remove J1 shell-pad fanout stubs after routing, before the GND fill.
+
+    The plated mounting slots beside these pads connect the shell to both
+    GND pours. Their nearby fanout drills overlap the slots, although KiCad's
+    copper DRC accepts them. Keep the stubs during routing so the established
+    signal escape ordering stays deterministic, then remove both together.
+    """
+    import pcbnew
+    connector = next(fp for fp in board.GetFootprints() if fp.GetReference() == "J1")
+    shell_pads = {p.GetNumber(): p.GetPosition() for p in connector.Pads()
+                  if p.GetNumber() in ("A1B12", "B1A12")}
+    if len(shell_pads) != 2:
+        raise ValueError("J1 shell pads changed: review their GND fanout")
+    tracks = board.Tracks()
+    items = [tracks[i] for i in range(len(tracks))]
+    removed = 0
+    for position in shell_pads.values():
+        stubs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T and t.IsLocked()
+                 and t.GetNetname() == "/GND" and t.GetStart() == position]
+        if len(stubs) != 1:
+            raise ValueError("J1 shell GND fanout changed: expected one locked stub")
+        stub = stubs[0]
+        vias = [t for t in items if t.Type() == pcbnew.PCB_VIA_T and t.IsLocked()
+                and t.GetNetname() == "/GND" and t.GetPosition() == stub.GetEnd()]
+        if len(vias) != 1:
+            raise ValueError("J1 shell GND fanout changed: expected one locked via")
+        board.Remove(stub)
+        board.Remove(vias[0])
+        removed += 1
+    assert removed == 2
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     logo.footprint(LOGO_MM)
@@ -302,7 +335,7 @@ def main():
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
-        title="CUPC/8 system", revision=REVISION, prepare=prepare, route_tries=6,
+        title="CUPC/8 system", revision=REVISION, prepare=prepare, post_route=post_route, route_tries=6,
         logo_keepout=True,
         # the presence link crosses on In2.Cu just above the tab (the key notch
         # reaches the body) and above the GND ties' vias: on B.Cu it would wall
