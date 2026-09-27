@@ -21,7 +21,9 @@ from CSXCAD import ContinuousStructure
 from openEMS import openEMS
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'cosim'))
 from kicadgen import find1, parse
+from netlist import read as read_netlist
 from openems_gpu_d0 import add_trace, completion_decay
 
 NETS = ('/USB_CONN_DP', '/USB_CONN_DM')
@@ -98,9 +100,19 @@ def routed_pair(board):
     return routes, endpoints
 
 
+def validate_series(netlist):
+    circuit = read_netlist(netlist)
+    for signal, connector, chip in (('DM', '2', '46'), ('DP', '3', '47')):
+        part = circuit.series(('U1', chip), ('J2', connector))
+        if part is None or part.value != '27R':
+            raise ValueError(f'USB {signal}: RP2040-to-J2 path lacks 27-ohm series resistor')
+    return hashlib.sha256(netlist.read_bytes()).hexdigest()
+
+
 def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=False,
-             port_ohms=100, postprocess_only=False):
+             port_ohms=100, postprocess_only=False, netlist=None):
     routes, endpoints = routed_pair(board)
+    schematic_hash = validate_series(netlist) if netlist else None
     if straight_control:
         routes = {net: [(pair[0], pair[1], .2)] for net, pair in endpoints.items()}
     fdtd = openEMS(EndCriteria=1e-4, NrTS=max_steps)
@@ -186,6 +198,7 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     valid = decay is not None and passivity_ok and port_ok
     return {'scope': 'IO USB-A D+/D- R14/R15-to-J2 routed F.Cu subset',
             'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
+            'netlist_sha256': schematic_hash,
             'stackup': 'JLC04161H-7628', 'prepreg_mm': PREPREG_MM, 'dielectric_er': DIELECTRIC_ER,
             'model': 'lossless dielectric, PEC copper, rectangular L2 GND; pads/ESD/mask/connector absent',
             'mesh_mm': mesh_mm, 'straight_control': straight_control,
@@ -211,6 +224,8 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--board', type=Path, required=True)
+    parser.add_argument('--netlist', type=Path,
+                        help='KiCad exported IO netlist; default is io.net beside the board')
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--mesh-mm', type=float, default=.075)
     parser.add_argument('--max-steps', type=int, default=120000)
@@ -224,12 +239,16 @@ def main():
     if not .035 <= args.mesh_mm <= .1 or args.max_steps < 30000:
         parser.error('mesh must be 0.035–0.1 mm and max steps >= 30000')
     board, output = args.board.resolve(), args.out.resolve()
+    netlist = args.netlist.resolve() if args.netlist else board.with_suffix('.net')
+    if not netlist.is_file():
+        parser.error(f'USB netlist missing: {netlist}')
     if args.require_evidence:
         import boardevidence
         boardevidence.validate('io', board.parent)
     directory = output.parent / ('usb-io-control-openems' if args.straight_control else 'usb-io-openems')
     report = simulate(board, directory, args.mesh_mm, args.max_steps,
-                      args.straight_control, args.port_ohms, args.postprocess_only)
+                      args.straight_control, args.port_ohms, args.postprocess_only,
+                      netlist)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

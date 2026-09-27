@@ -32,9 +32,11 @@ Saved-field postprocessing reproduces the generated geometry for all four pairs 
 ## IO card USB field model
 
 `hw/si/openems_usb_io.py` reads the completed IO card's actual F.Cu routes
-from the outputs of 27 Ω resistors R14/R15 to USB-A J2 pins 2/3. It verifies
-the four pad nets, direct copper connectivity, 0.2 mm track width, and absence
-of vias or layer changes. An open D+ segment is rejected by
+from the outputs of 27 Ω resistors R14/R15 to USB-A J2 pins 2/3. It also
+checks the sibling exported KiCad netlist for both RP2040-to-J2 series paths
+and records its SHA-256. It verifies the four pad nets, direct copper
+connectivity, 0.2 mm track width, and absence of vias or layer changes. An
+open D+ segment and a wrong D− resistor value are rejected by
 `test/hw/test_usb_io_field.py`. On the current routed-card snapshot, D+ is
 12.821 mm and D− is 27.045 mm. The model includes their ESD stubs and a
 rectangular In1.Cu ground plane with the [JLC04161H-7628 stackup](https://jlcpcb.com/impedance).

@@ -10,13 +10,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/tools'))
 sys.path.insert(0, str(ROOT / 'hw/si'))
 from kicadgen import dump, find1, parse
-from openems_usb_io import routed_pair
+from openems_usb_io import routed_pair, validate_series
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--board', type=Path, required=True)
     args = parser.parse_args()
+    netlist = args.board.with_suffix('.net')
+    validate_series(netlist)
     routes, endpoints = routed_pair(args.board)
     lengths = {net: sum(math.dist(a, b) for a, b, _ in parts) for net, parts in routes.items()}
     assert all(length > 0 for length in lengths.values())
@@ -39,7 +41,18 @@ def main():
             assert 'disconnected' in str(error), str(error)
         else:
             raise AssertionError('opened USB D+ route escaped connectivity check')
-    print(f"USB IO D+ {lengths['/USB_CONN_DP']:.3f} mm, D- {lengths['/USB_CONN_DM']:.3f} mm; open-track mutant rejected")
+        bad_netlist = Path(temporary) / 'wrong-series.net'
+        original = netlist.read_text()
+        old = '(ref "R14")\n\t\t\t(value "27R")'
+        assert original.count(old) == 1
+        bad_netlist.write_text(original.replace(old, '(ref "R14")\n\t\t\t(value "47R")'))
+        try:
+            validate_series(bad_netlist)
+        except ValueError as error:
+            assert 'lacks 27-ohm series' in str(error), str(error)
+        else:
+            raise AssertionError('wrong USB D- resistor escaped netlist check')
+    print(f"USB IO D+ {lengths['/USB_CONN_DP']:.3f} mm, D- {lengths['/USB_CONN_DM']:.3f} mm; open-track and wrong-series mutants rejected")
 
 
 if __name__ == '__main__':
