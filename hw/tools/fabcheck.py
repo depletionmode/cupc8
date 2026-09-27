@@ -207,23 +207,43 @@ def check(out):
     shapes = gerberdrc.check_clearance(copper, clearance, track_width)
     rings = gerberdrc.check_via_annular(board, copper,
                                        pcbnew.ToMM(board.GetDesignSettings().m_ViasMinAnnularWidth))
+    # JLCPCB lists 0.20 mm as the PTH annular-ring minimum for this process.
+    # Keep it distinct from KiCad's via-only 0.13 mm rule.
+    pth_rings = gerberdrc.check_pth_annular(board, copper, .20)
     outlines = sorted((out / 'fab').glob('*.gm1'))
     if len(outlines) != 1:
         raise ValueError('expected one Edge.Cuts Gerber profile')
     gerberdrc.check_edge(copper, outlines[0],
                          pcbnew.ToMM(board.GetDesignSettings().m_CopperEdgeClearance))
-    masks = sorted(path for path in (out / 'fab').iterdir()
-                   if path.suffix.lower() in ('.gts', '.gbs'))
-    if len(masks) != 2:
+    masks = {path.suffix.lower(): path for path in (out / 'fab').iterdir()
+             if path.suffix.lower() in ('.gts', '.gbs')}
+    surfaces = {path.suffix.lower(): path for path in copper
+                if path.suffix.lower() in ('.gtl', '.gbl')}
+    if set(masks) != {'.gts', '.gbs'} or set(surfaces) != {'.gtl', '.gbl'}:
         raise ValueError('expected front and back solder-mask Gerbers')
     mask_width = pcbnew.ToMM(board.GetDesignSettings().m_SolderMaskMinWidth)
     if mask_width > 0:
-        gerberdrc.check_mask(masks, mask_width)
+        gerberdrc.check_mask(masks.values(), mask_width)
+    exposed = (gerberdrc.check_mask_alignment(surfaces['.gtl'], masks['.gts']) +
+               gerberdrc.check_mask_alignment(surfaces['.gbl'], masks['.gbs']))
+    paste = {path.suffix.lower(): path for path in (out / 'fab').iterdir()
+             if path.suffix.lower() in ('.gtp', '.gbp')}
+    if set(paste) != {'.gtp', '.gbp'}:
+        raise ValueError('expected front and back solder-paste Gerbers')
+    deposits = (gerberdrc.check_paste_registration(surfaces['.gtl'], masks['.gts'], paste['.gtp']) +
+                gerberdrc.check_paste_registration(surfaces['.gbl'], masks['.gbs'], paste['.gbp']))
+    silk = {path.suffix.lower(): path for path in (out / 'fab').iterdir()
+            if path.suffix.lower() in ('.gto', '.gbo')}
+    if set(silk) != {'.gto', '.gbo'}:
+        raise ValueError('expected front and back silkscreen Gerbers')
+    ink = (gerberdrc.check_silk_clearance(silk['.gto'], masks['.gts'], .15) +
+           gerberdrc.check_silk_clearance(silk['.gbo'], masks['.gbs'], .15))
     check_review(out)
     raise ValueError('Gerber re-import DRC incomplete: %d layers match fresh export, '
                      '%d drill hits match pads/vias, and %d plotted copper objects '
-                     'passed %.3f mm net clearance with %d via annular checks; '
-                     'PTH pad annular, mask-to-copper, and other plotted layer '
-                     'rules remain unchecked%s' %
-                     (layers, holes, shapes, clearance, rings,
+                     'passed %.3f mm net clearance with %d via and %d PTH annular checks, '
+                     '%d exposed pads checked against mask, %d paste deposits checked '
+                     'against copper/mask, and %d silkscreen objects checked against mask; '
+                     'hole-to-copper/edge, minimum ink geometry, and other rules remain unchecked%s' %
+                     (layers, holes, shapes, clearance, rings, pth_rings, exposed, deposits, ink,
                       '; no positive solder-mask web rule is configured' if mask_width <= 0 else ''))

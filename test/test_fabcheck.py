@@ -92,7 +92,9 @@ class FabCheckTests(unittest.TestCase):
             out = Path(tmp) / 'wifi'
             (out / 'fab').mkdir(parents=True)
             for name in ('wifi-F_Cu.gtl', 'wifi-B_Cu.gbl',
-                         'wifi-Edge_Cuts.gm1', 'wifi-F_Mask.gts', 'wifi-B_Mask.gbs'):
+                         'wifi-Edge_Cuts.gm1', 'wifi-F_Mask.gts', 'wifi-B_Mask.gbs',
+                         'wifi-F_Paste.gtp', 'wifi-B_Paste.gbp',
+                         'wifi-F_Silkscreen.gto', 'wifi-B_Silkscreen.gbo'):
                 (out / 'fab' / name).write_text('stub')
             board = MagicMock()
             board.GetCopperLayerCount.return_value = 2
@@ -107,14 +109,22 @@ class FabCheckTests(unittest.TestCase):
                  patch.object(fabcheck, 'check_review'), \
                  patch.object(fabcheck.gerberdrc, 'check_clearance', return_value=123) as clearance, \
                  patch.object(fabcheck.gerberdrc, 'check_via_annular', return_value=12) as annular, \
+                 patch.object(fabcheck.gerberdrc, 'check_pth_annular', return_value=4) as pth, \
                  patch.object(fabcheck.gerberdrc, 'check_edge') as edge, \
-                 patch.object(fabcheck.gerberdrc, 'check_mask') as mask:
+                 patch.object(fabcheck.gerberdrc, 'check_mask') as mask, \
+                 patch.object(fabcheck.gerberdrc, 'check_mask_alignment', return_value=10) as align, \
+                 patch.object(fabcheck.gerberdrc, 'check_paste_registration', return_value=5) as paste, \
+                 patch.object(fabcheck.gerberdrc, 'check_silk_clearance', return_value=8) as silk:
                 with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC incomplete.*123 plotted copper objects'):
                     fabcheck.check(out)
                 clearance.assert_called_once()
                 annular.assert_called_once()
+                pth.assert_called_once()
                 edge.assert_called_once()
                 mask.assert_called_once()
+                self.assertEqual(align.call_count, 2)
+                self.assertEqual(paste.call_count, 2)
+                self.assertEqual(silk.call_count, 2)
 
     def test_exported_copper_short_and_clearance_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -212,6 +222,96 @@ class FabCheckTests(unittest.TestCase):
             copper.write_text(via(.5))
             with self.assertRaisesRegex(ValueError, 'via annular ring'):
                 gerberdrc.check_via_annular(board, [copper], .13)
+
+    def test_pth_annular_and_mask_to_pad_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            pad = MagicMock()
+            pad.GetAttribute.return_value = fabcheck.pcbnew.PAD_ATTRIB_PTH
+            pad.GetDrillSize.return_value = fabcheck.pcbnew.VECTOR2I(
+                fabcheck.pcbnew.FromMM(.9), fabcheck.pcbnew.FromMM(2.7))
+            pad.GetPosition.return_value = fabcheck.pcbnew.VECTOR2I(
+                fabcheck.pcbnew.FromMM(1), fabcheck.pcbnew.FromMM(-1))
+            pad.GetOrientationDegrees.return_value = 0
+            footprint = MagicMock()
+            footprint.GetReference.return_value = 'J1'
+            footprint.Pads.return_value = [pad]
+            board = MagicMock()
+            board.GetFootprints.return_value = [footprint]
+            copper = fab / 'sample-F_Cu.gtl'
+            def component(width, height):
+                return ('%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                        '%TA.AperFunction,ComponentPad*%\n'
+                        f'%ADD10O,{width:.6f}X{height:.6f}*%\n%TD*%\n'
+                        'D10*\n%TO.N,/GND*%\nX1000000Y1000000D03*\nM02*\n')
+            copper.write_text(component(1.5, 3.3))
+            self.assertEqual(gerberdrc.check_pth_annular(board, [copper], .2), 1)
+            copper.write_text(component(1.1, 2.9))
+            with self.assertRaisesRegex(ValueError, 'PTH annular ring'):
+                gerberdrc.check_pth_annular(board, [copper], .2)
+
+            copper.write_text(component(1.5, 3.3))
+            mask = fab / 'sample-F_Mask.gts'
+            def opening(width, height):
+                return ('%TF.FileFunction,Soldermask,Top*%\n%TF.FilePolarity,Negative*%\n'
+                        '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                        f'%ADD10O,{width:.6f}X{height:.6f}*%\nD10*\n'
+                        'X1000000Y1000000D03*\nM02*\n')
+            mask.write_text(opening(1.7, 3.5))
+            self.assertEqual(gerberdrc.check_mask_alignment(copper, mask), 1)
+            mask.write_text(opening(1.5, 3.3))
+            self.assertEqual(gerberdrc.check_mask_alignment(copper, mask), 1)
+            mask.write_text(opening(1.499998, 3.299998))
+            with self.assertRaisesRegex(ValueError, 'mask-to-copper coverage indeterminate'):
+                gerberdrc.check_mask_alignment(copper, mask)
+            mask.write_text(opening(1.1, 2.9))
+            with self.assertRaisesRegex(ValueError, 'mask opening does not cover'):
+                gerberdrc.check_mask_alignment(copper, mask)
+
+    def test_paste_registration_detects_oversized_deposit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper, mask, paste = (fab / ('sample-F_' + suffix) for suffix in
+                                   ('Cu.gtl', 'Mask.gts', 'Paste.gtp'))
+            copper.write_text('%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n%MOMM*%\n'
+                              '%LPD*%\n%TA.AperFunction,SMDPad,CuDef*%\n'
+                              '%ADD10C,0.600000*%\n%TD*%\nD10*\n%TO.N,/A*%\n'
+                              'X1000000Y1000000D03*\nM02*\n')
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n%MOMM*%\n'
+                            '%LPD*%\n%ADD10C,0.700000*%\nD10*\n'
+                            'X1000000Y1000000D03*\nM02*\n')
+            def deposit(width):
+                return ('%TF.FileFunction,Paste,Top*%\n%TF.FilePolarity,Positive*%\n'
+                        '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                        f'%ADD10C,{width:.6f}*%\nD10*\nX1000000Y1000000D03*\nM02*\n')
+            paste.write_text(deposit(.55))
+            self.assertEqual(gerberdrc.check_paste_registration(copper, mask, paste), 1)
+            paste.write_text(deposit(.6))
+            self.assertEqual(gerberdrc.check_paste_registration(copper, mask, paste), 1)
+            paste.write_text(deposit(.8))
+            with self.assertRaisesRegex(ValueError, 'paste deposit outside SMD copper'):
+                gerberdrc.check_paste_registration(copper, mask, paste)
+
+    def test_silkscreen_mask_clearance_and_arc(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            mask = fab / 'sample-F_Mask.gts'
+            silk = fab / 'sample-F_Silkscreen.gto'
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n%MOMM*%\n'
+                            '%LPD*%\n%ADD10C,0.200000*%\nD10*\n'
+                            'X1000000Y1000000D03*\nM02*\n')
+            prefix = ('%TF.FileFunction,Legend,Top*%\n%TF.FilePolarity,Positive*%\n'
+                      '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.150000*%\nD10*\n')
+            silk.write_text(prefix + 'X1400000Y1000000D02*\nX2000000Y1000000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15), 1)
+            silk.write_text(prefix + 'X1200000Y1000000D02*\nX2000000Y1000000D01*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'silkscreen-to-mask clearance below rule'):
+                gerberdrc.check_silk_clearance(silk, mask, .15)
+            silk.write_text(prefix + 'X3000000Y1000000D02*\nG75*\nG02*\n'
+                            'X3200000Y1000000I100000J0D01*\nG01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15), 1)
 
 
 if __name__ == '__main__':
