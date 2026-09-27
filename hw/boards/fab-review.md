@@ -16,23 +16,31 @@ filled ink necks, and other plotted-layer rules still lack independent
 validation. Export parity and a review receipt do not complete Gerber re-import
 DRC.
 
-The GPU and Wi-Fi plotted silkscreen each contain a 0.12 mm stroke against
-JLC's 0.15 mm minimum. Their mounting hole at (52.0, 40.0) also gives a
-conservative plotted hole-to-copper interval of 0.249379439..0.250500002 mm
-against the project 0.25 mm rule; the checker reports *indeterminate*, not a
-proven physical shortfall. Both findings keep the gate red independently of
-the key-notch issue.
+The GPU's `/1V1` and `/SWDIO` circular via flashes are 0.80 mm apart with
+0.65 mm diameters, so their nominal plotted clearance is exactly 0.150 mm.
+The earlier 0.149951 mm bound came from polygonizing the circles; the current
+checker uses the aperture diameters and integer Gerber positions for this
+case. It also measures nominal Excellon tool sizes directly and rejects input
+with precision finer than its 0.001 mm hole keys. These corrections do not
+waive any board-edge violation.
 
-The 2026-09-27 GPU and Wi-Fi plots place GND connector fingers 0.20 mm from
+The 2026-09-27 GPU, Wi-Fi, and other card plots place connector fingers 0.20 mm from
 their key-notch route. The project rule is 0.30 mm copper-to-edge, so the
 independent checker fails. [JLCPCB's current FR-4 routed-edge capability](https://jlcpcb.com/capabilities/Capab)
 states a 0.20 mm minimum. That vendor limit does not change the project rule
-or approve these fingers. The footprint's 0.70 mm finger width and 1.90 mm
+or approve these fingers. For example, the GPU B.Cu `/GND` ConnectorPad at
+(10.00, 0.00) spans x=9.65..10.35 mm, and the adjacent notch wall is at
+x=10.55 mm. The footprint's 0.70 mm finger width and 1.90 mm
 notch meet the CEM dimensions recorded in `hw/mech/fit.py`; narrowing the notch
 by 0.20 mm to gain 0.10 mm per side would fall below CEM's 1.84 mm notch
 minimum. Shrinking the fingers by 0.20 mm would fall below CEM's 0.65 mm
 finger-width minimum. Even taking both dimensions to their CEM minima gives
-only 0.255 mm nominal copper-to-notch clearance.
+only 0.255 mm nominal copper-to-notch clearance with the specified pad centres.
+Moving a key-adjacent finger away from the notch to obtain 0.30 mm would
+change its CEM contact location and needs a qualified socket-contact drawing
+or physical mating evidence. The current UMAX drawing does not provide that
+qualification; there is no supported outline or pad edit that clears the
+project rule while retaining the stated CEM geometry.
 
 The UMAX manufacturer's drawing 318307001, page 1
 (`hw/datasheets/C404113_UMAX-3183-10200P1T.pdf`), gives the socket key width
@@ -48,10 +56,11 @@ and inspection are agreed. Obtain manufacturer routing capability and mating
 evidence before approving a narrowly scoped 0.20 mm key-notch copper-edge
 exception; keep 0.30 mm everywhere else. The fab gate remains red.
 
-A GPU pad pair also has a 0.149951 mm *lower bound* against the
-0.150000 mm copper clearance rule. The curved-pad approximation permits up to
-0.150000002 mm for that pair, so the checker reports it as indeterminate and
-keeps the gate red rather than asserting a physical clearance violation.
+The main board's independent plotted checks proceed through copper, drills,
+mask, paste, and legend; its fab check then stops at the absent human CPL
+review receipt. `cploverlay.py` renders 254 Top CPL positions for review,
+including the JLC midpoint offset of the J4 pin header. Its overlay manifest
+records pending review and does not serve as an approval receipt.
 
 After viewing the placement overlay and checking designators, pin one,
 polarized parts, and rotations against the board and BOM, put

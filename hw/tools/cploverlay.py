@@ -11,6 +11,7 @@ import re
 import subprocess
 
 import pcbnew
+import bomcheck
 import gerberdrc
 
 
@@ -40,6 +41,8 @@ def render(board_dir, output_root):
             raise ValueError('missing overlay input: ' + str(path))
     board = pcbnew.LoadBoard(str(pcb))
     footprints = {footprint.GetReference(): footprint for footprint in board.GetFootprints()}
+    offsets = bomcheck.offsets()
+    rotations = bomcheck.rotations()
     rows = list(csv.DictReader(cpl.open(newline='')))
     if not rows:
         raise ValueError(name + ': empty CPL')
@@ -91,8 +94,16 @@ def render(board_dir, output_root):
             raise ValueError(name + ': non-finite CPL rotation for ' + ref)
         footprint = footprints[ref]
         position = footprint.GetPosition()
-        if abs(cx-pcbnew.ToMM(position.x)) > .01 or abs(cy+pcbnew.ToMM(position.y)) > .01:
+        fpid = footprint.GetFPIDAsString()
+        board_rotation = footprint.GetOrientationDegrees()
+        expected_x, expected_y = bomcheck.cpl_mid(
+            pcbnew.ToMM(position.x), pcbnew.ToMM(position.y),
+            board_rotation, offsets.get(fpid))
+        expected_rotation = (board_rotation + rotations.get(fpid, 0)) % 360
+        if math.hypot(cx-expected_x, cy-expected_y) > .01:
             raise ValueError(name + ': CPL placement differs from PCB footprint: ' + ref)
+        if abs((rotation-expected_rotation+180) % 360-180) > .01:
+            raise ValueError(name + ': CPL rotation differs from PCB footprint and JLC correction: ' + ref)
         x, y = cx-left, top-cy
         title = escape('%s — CPL (%.3f, %.3f) mm, Top, %.1f°; rotation arrow is not pin 1' %
                        (ref, cx, cy, rotation))
