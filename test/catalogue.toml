@@ -2148,3 +2148,12 @@ checks = "flash over the UART bootloader; IDENT = $03; join a network; HTTPS fet
 method = "cupc8.py card flash/ident + net test"
 kind = "hw"
 vrow = "5"
+
+[[test]]
+id = "SI-001"
+title = "Routed parallel-run screen regression"
+checks = "copper edge spacing, continuous split runs, diagonal tracks, net/layer separation, KiCad net formats, missing routes and unsupported arcs"
+method = "synthetic routed geometry and KiCad file fixtures; screening only, analog SI is separately required"
+kind = "sim"
+vrow = "4.6"
+cmd = "python3 test/hw/test_crosstalk.py"

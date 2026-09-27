@@ -1041,3 +1041,17 @@ fixed_in = "4270b21"
 revert = [["tools/patches/qemu-esp-lockstep.patch", "+    return ls.pending ? ls.at : ls.grant;", "+    return ls.pending ? ls.at + 1000000 : ls.grant;"]]
 cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
 must_fail = ["FAIL: the Wi-Fi card's clock is not the board's at its selects"]
+
+[[bug]]
+name = "crosstalk screen: split collinear tracks hid a long parallel run"
+fixed_in = "crosstalk initial implementation"
+revert = [["hw/tools/crosstalk.py", "if merged and lo <= merged[-1][1] + 1e-6:", "if False:"]]
+cmd = "python3 test/hw/test_crosstalk.py"
+must_fail = ["FAIL: test_split_tracks_still_detected"]
+
+[[bug]]
+name = "crosstalk screen: centerline spacing hid close copper edges"
+fixed_in = "crosstalk initial implementation"
+revert = [["hw/tools/crosstalk.py", "gap = b[0] - a[0] - (a[2] + b[2]) / 2", "gap = b[0] - a[0]"]]
+cmd = "python3 test/hw/test_crosstalk.py"
+must_fail = ["FAIL: test_long_close_run"]
