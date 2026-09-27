@@ -41,11 +41,22 @@ fail until their contract coverage exists:
   minimum, plus 0.01 mm opening expansion so KiCad's mask-region plot covers
   the pad copper. Saved board packages need regeneration before their receipts
   contain these rules and the new plotted masks. Gerber regions use `G36`
-  polygons and a zero-width
-  aperture; checking only draw aperture widths cannot establish their minimum
-  neck width. Gerber strokes have no text-object or character grouping, so
-  the saved PCB's text-size property alone would not be an independent
-  re-import check. `require_complete_plotted_drc` names these gaps and fails
+  polygons and a zero-width aperture; checking only draw aperture widths
+  cannot establish their minimum neck width. The saved system F.SilkS Gerber
+  has `%TO.C,<reference>*%` component tags but no text-object ID, literal,
+  font, or height attribute. A dash plotted by KiCad's stroke font and an
+  ordinary graphic line can have identical aperture and `D01` commands;
+  deterministic font matching alone cannot decide which strokes are text or
+  establish that every text object was found. Bounding a glyph is also not a
+  nominal text-height measurement: a dash has no vertical font extent. The
+  saved PCB's text-size property plus export parity checks the source, but is
+  not an independent Gerber re-import check. A sound plotted-height check
+  needs an exporter sidecar that assigns every text-owned Gerber operation to
+  a text ID and supplies its literal, font, and nominal size. The verifier
+  must compare that inventory against every source text ID, independently
+  match its operations to rendered glyph geometry, and reject missing IDs or
+  unmatched attributed operations. Until then,
+  `require_complete_plotted_drc` names the gap and fails
   after all implemented checks and the CPL review. Any future closure must
   establish the missing rules from the plotted outputs, or explicitly narrow
   the fab contract with documented approval; removing the final failure does

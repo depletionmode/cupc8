@@ -18,6 +18,13 @@ filled ink necks, and other plotted-layer rules still lack independent
 validation. Export parity and a review receipt do not complete Gerber re-import
 DRC.
 
+The plotted legend's `%TO.C` tags identify components, not text objects.
+Stroke-font glyphs and ordinary graphic lines share the same Gerber `D01`
+commands, so font recognition alone cannot prove the 0.8 mm text-height rule
+for every label. A future text-height check needs a complete text-to-Gerber
+operation mapping plus independent glyph rendering; source text-size fields
+alone do not close this plotted-layer gap.
+
 The GPU's `/1V1` and `/SWDIO` circular via flashes are 0.80 mm apart with
 0.65 mm diameters, so their nominal plotted clearance is exactly 0.150 mm.
 The earlier 0.149951 mm bound came from polygonizing the circles; the current
