@@ -6,6 +6,7 @@ the plotted coordinates, not on pcbnew board objects or a second board export.
 import ctypes
 import ctypes.util
 from decimal import Decimal, localcontext
+from fractions import Fraction
 import math
 from pathlib import Path
 import re
@@ -844,6 +845,48 @@ def orthogonal_region_min_span(points):
     return orthogonal_regions_min_span((points,))
 
 
+def polygon_scanline_witness(points, minimum):
+    """Find an exact interior neck at vertex-slab midpoints of a polygon.
+
+    Integer Gerber coordinates and rational edge intersections avoid a GEOS
+    approximation. A thin cross section must have overlapping wide sections
+    in the immediately preceding and following slabs. This excludes pointed
+    ends and rounded outline tips. Other dark ink and holes are excluded by
+    the caller; this remains a partial failure witness.
+    """
+    vertices = [(round(x * 1000000), round(y * 1000000)) for x, y in points]
+    if vertices[0] != vertices[-1]:
+        vertices.append(vertices[0])
+    if len(vertices) > 2000 or any(a == b for a, b in zip(vertices, vertices[1:])):
+        return None
+    edges = list(zip(vertices, vertices[1:]))
+    threshold = Fraction(Decimal(str(minimum)) * 1000000)
+    for axis in (0, 1):
+        levels = sorted({p[axis] for p in vertices})
+        slabs = []
+        for low, high in zip(levels, levels[1:]):
+            sample = Fraction(low + high, 2)
+            crossings = []
+            for a, b in edges:
+                u0, u1 = a[axis], b[axis]
+                if min(u0, u1) < sample < max(u0, u1):
+                    v0, v1 = a[1-axis], b[1-axis]
+                    crossings.append(Fraction(v0) + Fraction((v1-v0) * (sample-u0), u1-u0))
+            crossings.sort()
+            if len(crossings) % 2:
+                return None
+            slabs.append(list(zip(crossings[::2], crossings[1::2])))
+        for previous, current, following in zip(slabs, slabs[1:], slabs[2:]):
+            for left, right in current:
+                if not 0 < right-left < threshold:
+                    continue
+                if all(any(start < right and left < end and end-start >= threshold
+                           for start, end in neighbor)
+                       for neighbor in (previous, following)):
+                    return (right-left) / 1000000
+    return None
+
+
 def check_isolated_filled_necks(path, geometry, objects, filled_regions, minimum):
     """Reject a proven thin span inside an isolated orthogonal filled polygon.
 
@@ -870,6 +913,11 @@ def check_isolated_filled_necks(path, geometry, objects, filled_regions, minimum
             if width_grid is not None and width_grid < rule_grid:
                 raise ValueError('%s:%d: isolated filled region has a %.6f mm span below %.6f mm' %
                                  (Path(path).name, line, width_grid/2000000, minimum))
+            if width_grid is None:
+                witness = polygon_scanline_witness(points, minimum)
+                if witness is not None:
+                    raise ValueError('%s:%d: isolated nonorthogonal filled region has a %.6f mm span below %.6f mm' %
+                                     (Path(path).name, line, float(witness), minimum))
 
 
 def check_connected_filled_necks(path, geometry, objects, filled_regions, minimum):

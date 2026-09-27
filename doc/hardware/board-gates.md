@@ -52,8 +52,11 @@ fail until their contract coverage exists:
   A single touching stroke or nonrectangular flash can be bounded by its
   outward-rounded plotted bounding box. A thin span that survives this
   possible widening is a proven failure; a wider span is inconclusive.
-  Multiple such operations, holes, nonorthogonal boundaries, and components
-  over the explicit complexity limits (500 filled regions, 5000 eligible
+  For an isolated nonorthogonal, hole-free polygon, exact rational scanlines
+  also prove an interior neck if a thin span has overlapping wide spans in
+  both adjacent vertex slabs. This excludes a rounded outline tip.
+  Multiple touching operations, holes, connected nonorthogonal polygons, and
+  components over the explicit complexity limits (500 filled regions, 5000 eligible
   objects, 2000 contour vertices) still need analysis, so the final
   incomplete-coverage gate remains in force.
   To close it, the verifier needs a per-net, per-layer union of every dark

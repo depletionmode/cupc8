@@ -17,7 +17,9 @@ also fails by an exact plotted-grid scanline check. One touching stroke or
 nonrectangular flash may be bounded by an outward-rounded box; a thin span
 that survives this possible widening also fails. Multiple unsupported
 operations, holes, and other neck forms still need connected-layer width
-analysis. It checks mask
+analysis. An isolated, hole-free nonorthogonal region also fails when exact
+rational scanlines show a thin interior span between wider adjacent spans.
+This excludes rounded outline tips but does not prove every neck form. It checks mask
 webs if the KiCad project has a positive solder-mask minimum width. The board needs a
 recorded visual CPL review. The fab gate remains red because text height,
 filled ink necks, and other plotted-layer rules still lack independent

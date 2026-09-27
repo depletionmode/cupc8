@@ -464,6 +464,50 @@ class FabCheckTests(unittest.TestCase):
                               'X1400000Y1040000D03*\nX1600000Y1040000D03*\nM02*\n')
             self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
 
+    def test_nonorthogonal_filled_scanline_witness(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copper = Path(tmp) / 'sample-F_Cu.gtl'
+            prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                      '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                      '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n%TO.N,/GND*%\n')
+            # Diagonal shoulders surround a 0.080 mm neck. The two adjacent
+            # y-slabs are wider than the rule at exact rational midpoints.
+            narrow = ('G36*\nX1000000Y1000000D02*\nX2000000Y1000000D01*\n'
+                      'X2000000Y1200000D01*\nX1540000Y1300000D01*\n'
+                      'X1540000Y1400000D01*\nX2000000Y1500000D01*\n'
+                      'X2000000Y1700000D01*\nX1000000Y1700000D01*\n'
+                      'X1000000Y1500000D01*\nX1460000Y1400000D01*\n'
+                      'X1460000Y1300000D01*\nX1000000Y1200000D01*\n'
+                      'X1000000Y1000000D01*\nG37*\n')
+            copper.write_text(prefix + narrow + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated nonorthogonal filled region has a 0.080000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # Exactly 0.100 mm at the neck is accepted.
+            at_limit = narrow.replace('X1540000', 'X1550000').replace('X1460000', 'X1450000')
+            copper.write_text(prefix + at_limit + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 1)
+            # A taper ending at a narrow rounded tip has no two-sided neck.
+            taper = ('G36*\nX1000000Y1000000D02*\nX2000000Y1000000D01*\n'
+                     'X1559000Y1180000D01*\nX1510000Y1200000D01*\n'
+                     'X1490000Y1200000D01*\nX1441000Y1180000D01*\n'
+                     'X1000000Y1000000D01*\nG37*\n')
+            copper.write_text(prefix + taper + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 1)
+            # A touching same-net stroke may widen the sampled union.
+            copper.write_text(prefix + narrow +
+                              'X1500000Y1250000D02*\nX1500000Y1450000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            mask = Path(tmp) / 'sample-F_Mask.gts'
+            silk = Path(tmp) / 'sample-F_Silkscreen.gto'
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n'
+                            '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                            'D10*\nX9000000Y9000000D03*\nM02*\n')
+            silk.write_text(prefix.replace('Copper,L1,Top', 'Legend,Top')
+                            .replace('0.200000', '0.150000') + narrow + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated nonorthogonal filled region has a 0.080000 mm span'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)
