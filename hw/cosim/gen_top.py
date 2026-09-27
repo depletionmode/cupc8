@@ -11,6 +11,7 @@ import importlib.util
 import json
 import sys
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -163,7 +164,63 @@ def qspi_boot_routes(cards, card_boards, system_board):
     return rows, paths, missing
 
 
-def check(cards, main, pcb=None, card_boards=None, system_board=None):
+@lru_cache(maxsize=2)
+def cpu_board_geometry(path):
+    """Reuse CPU copper geometry across each route mutation in one audit."""
+    import pcbnew
+    board = pcbnew.LoadBoard(path)
+    return board, kicadgen.parse(Path(path).read_text())
+
+
+def cpu_bus_routes(card, board, address_map, data_map):
+    """Two copper legs per CPU-card address/data resistor channel."""
+    routed = board is not None and Path(board).is_file()
+    if routed:
+        sys.path.insert(0, str(ROOT / 'hw/si'))
+        from ibis_bus import routed_distances
+        loaded_board, parsed_tree = cpu_board_geometry(str(Path(board).resolve()))
+    links, paths, missing = {}, [], []
+    for kind, mapping in (('address', address_map), ('data', data_map)):
+        prefix = 'A' if kind == 'address' else 'D'
+        connected_bits = []
+        for main_bit, card_bit in enumerate(mapping):
+            source_net = f'/FPGA_{prefix}{card_bit}'
+            contact_net = f'/CPU_{prefix}{card_bit}'
+            source = [(ref, pin) for (ref, pin), net in card.pins.items()
+                      if ref == 'U1' and net == source_net]
+            finger = [(ref, pin) for (ref, pin), net in card.pins.items()
+                      if ref == 'J1' and net == contact_net]
+            source_pad = [(ref, pin) for (ref, pin), net in card.pins.items()
+                          if ref.startswith('RN') and net == source_net]
+            contact_pad = [(ref, pin) for (ref, pin), net in card.pins.items()
+                           if ref.startswith('RN') and net == contact_net]
+            if not all(len(items) == 1 for items in (source, finger, source_pad, contact_pad)) or \
+                    source_pad[0][0] != contact_pad[0][0]:
+                raise ValueError(f'CPU {prefix}{card_bit}: FPGA/series/contact pad mapping missing')
+            if path(card, source[0], finger[0], '33') is None:
+                raise ValueError(f'CPU {prefix}{card_bit}: 33-ohm driver channel missing')
+            legs = (('source', source_net, source[0], source_pad[0]),
+                    ('contact', contact_net, contact_pad[0], finger[0]))
+            connected = True
+            for stage, net, first, last in legs:
+                mm = None
+                if routed:
+                    mm = routed_distances(Path(board), net, first, [last],
+                                          loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                        f'{last[0]}.{last[1]}']
+                paths.append({'from': f'cpu.{first[0]}.{first[1]}',
+                              'to': f'cpu.{last[0]}.{last[1]}',
+                              'route_mm': mm,
+                              'runtime': f'cpu_{kind}{main_bit}_connected'})
+                if mm is None:
+                    connected = False
+                    missing.append(f'cpu:{prefix}{card_bit}_{stage}_copper')
+            connected_bits.append(connected)
+        links[kind] = connected_bits
+    return links, paths, missing
+
+
+def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
     fittings = [('cpu', 'J2', 'J1'), ('system', 'J3', 'J2')]
@@ -539,6 +596,14 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None):
         return mapping
     manifest['runtime']['cpu_address'] = cpu_map('A', 16)
     manifest['runtime']['cpu_data'] = cpu_map('D', 8)
+    cpu_links, cpu_paths, cpu_missing = cpu_bus_routes(
+        cards['cpu'], cpu_board, manifest['runtime']['cpu_address'], manifest['runtime']['cpu_data'])
+    manifest['runtime']['cpu_address_links'] = cpu_links['address']
+    manifest['runtime']['cpu_data_links'] = cpu_links['data']
+    manifest['paths'].extend(cpu_paths)
+    manifest['runtime']['missing_routes'].extend(cpu_missing)
+    manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     bridge = {}
     bridge_source = {'BR_SCK': 0, 'BR_MOSI': 1, 'BR_nCS': 2}
     for destination in ('BR_SCK', 'BR_MOSI', 'BR_nCS', 'BR_MISO'):
@@ -735,6 +800,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None):
         for name in ('QSPI_SCLK', 'QSPI_SD0', 'QSPI_SD1', 'QSPI_SD2', 'QSPI_SD3',
                      'QSPI_nSS' if card == 'system' else 'QSPI_SS'):
             runtime_net(card, name)
+    for prefix, count in (('A', 16), ('D', 8)):
+        for bit in range(count):
+            runtime_net('cpu', f'FPGA_{prefix}{bit}')
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest
@@ -748,6 +816,8 @@ def main_cli():
     parser.add_argument('--system-board', type=Path,
                         default=ROOT / 'build/hw/system/system-routed.kicad_pcb',
                         help='explicit routed system-card PCB for the QSPI boot prerequisite')
+    parser.add_argument('--cpu-board', type=Path, default=ROOT / 'build/hw/cpu/cpu.kicad_pcb',
+                        help='routed CPU-card PCB for address/data series links')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--require-route', action='store_true', help='fail unless required board/card paths have routed copper')
     parser.add_argument('--require-coverage', action='store_true', help='fail on any modeled/waiver coverage gap')
@@ -757,7 +827,7 @@ def main_cli():
                          args.main_netlist.with_suffix('.kicad_pcb'),
                          {card: args.card_board_dir / card / f'{card}.kicad_pcb'
                           for card in ('gpu', 'io', 'storage', 'wifi', 'eink')},
-                         args.system_board)
+                         args.system_board, args.cpu_board)
     if args.require_route and not manifest['runtime']['routed_top']:
         missing = manifest['runtime']['missing_routes']
         raise ValueError(f'co-sim paths lack routed copper: {", ".join(missing)}')

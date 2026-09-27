@@ -394,6 +394,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     board->wiring.romData = o.romData;
     board->wiring.cpuAddress = o.cpuAddress;
     board->wiring.cpuData = o.cpuData;
+    board->wiring.cpuAddressConnected = o.cpuAddressConnected;
+    board->wiring.cpuDataConnected = o.cpuDataConnected;
     board->timedMemory = true;
     board->ramAccessNs = o.ramAccessNs;
     board->romAccessNs = o.romAccessNs;

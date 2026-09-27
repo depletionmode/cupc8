@@ -18,6 +18,8 @@ entity machine_core is
 		cpu_a_map:		in std_logic_vector(63 downto 0);
 		cpu_d_map:		in std_logic_vector(23 downto 0);
 		cpu_d_inv_map:	in std_logic_vector(23 downto 0);
+		cpu_a_connected:	in std_logic_vector(15 downto 0);
+		cpu_d_connected:	in std_logic_vector(7 downto 0);
 
 		mem_a:			out std_logic_vector(18 downto 0);
 		mem_d_in:		in std_logic_vector(7 downto 0);
@@ -61,11 +63,18 @@ begin
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
-		a_chip(i) <= a(to_integer(unsigned(cpu_a_map(4*i+3 downto 4*i))));
+		-- An open series-channel bit has undefined voltage on real copper.
+		-- Hold it high here solely for a deterministic wiring counterexample.
+		a_chip(i) <= a(to_integer(unsigned(cpu_a_map(4*i+3 downto 4*i))))
+			when cpu_a_connected(i) = '1' else '1';
 	end generate;
 	data_wires: for i in 0 to 7 generate
-		cs_din(i) <= cpu_dout(to_integer(unsigned(cpu_d_map(3*i+2 downto 3*i)))) when cpu_doe = '1' else cs_dout(i);
-		cpu_din(i) <= cpu_dout(i) when cpu_doe = '1' else cs_dout(to_integer(unsigned(cpu_d_inv_map(3*i+2 downto 3*i))));
+		cs_din(i) <= cpu_dout(to_integer(unsigned(cpu_d_map(3*i+2 downto 3*i))))
+			when cpu_doe = '1' and cpu_d_connected(i) = '1' else
+			'1' when cpu_doe = '1' else cs_dout(i);
+		cpu_din(i) <= cpu_dout(i) when cpu_doe = '1' else
+			cs_dout(to_integer(unsigned(cpu_d_inv_map(3*i+2 downto 3*i))))
+			when cpu_d_connected(to_integer(unsigned(cpu_d_inv_map(3*i+2 downto 3*i)))) = '1' else '1';
 	end generate;
 
 	cpu0: entity work.cpu port map(

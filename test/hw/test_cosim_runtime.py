@@ -62,7 +62,7 @@ let out = '', code = null;
 p.stdout.on('data', d => out += d); p.stderr.on('data', d => out += d);
 p.on('exit', c => code = c);
 await m.runUntil(() => code !== null, 1e9);
-console.log(JSON.stringify({code, bridge: /bridge status \\$([0-9a-f]+)/i.exec(out)?.[1] ?? null}));
+console.log(JSON.stringify({code, gpo: /GPO \\$([0-9a-f]+)/i.exec(out)?.[1] ?? null}));
 m.stop();
 """
 USB_PROBE = """
@@ -187,6 +187,18 @@ def main():
             if good == bad:
                 raise AssertionError(f'{name} D0/D1 mutation did not change execution')
             print(f"{name} D0/D1 swap changes PC/GPO to ${bad['pc']:04x}/${bad['gpo']:02x}")
+        for kind in ('address', 'data'):
+            key = f'cpu_{kind}_links'
+            if not all(manifest['runtime'][key]):
+                raise AssertionError(f'CPU-card {kind} requires every routed resistor channel')
+            changed = copy.deepcopy(manifest)
+            changed['runtime'][key][0] = False
+            mutant = Path(directory) / f'open-cpu-card-{kind}0.json'
+            mutant.write_text(json.dumps(changed))
+            bad = run(mutant)
+            if (bad['pc'], bad['gpo']) == (good['pc'], good['gpo']):
+                raise AssertionError(f'open CPU-card {kind}0 did not change execution: {good} / {bad}')
+            print(f"open CPU-card {kind}0 changes PC ${good['pc']:04x} -> ${bad['pc']:04x}")
         changed = copy.deepcopy(manifest)
         slot = changed['runtime']['slots'][0]
         slot['sck'], slot['mosi'] = slot['mosi'], slot['sck']
@@ -278,10 +290,10 @@ def main():
         mutant = Path(directory) / 'swapped-bridge.json'
         mutant.write_text(json.dumps(changed))
         normal_status, bad_status = run(args.top, BRIDGE_PROBE), run(mutant, BRIDGE_PROBE)
-        if normal_status['code'] != 0 or normal_status['bridge'] is None or \
-                normal_status['bridge'] == bad_status['bridge']:
-            raise AssertionError(f'bridge SCK/MOSI swap did not change status: {normal_status} / {bad_status}')
-        print(f"bridge SCK/MOSI swap: status ${normal_status['bridge']} became ${bad_status['bridge']}")
+        if normal_status['code'] != 0 or normal_status['gpo'] != '02' or \
+                bad_status['gpo'] != '00':
+            raise AssertionError(f'bridge SCK/MOSI swap did not change GPO readback: {normal_status} / {bad_status}')
+        print(f"bridge SCK/MOSI swap: GPO ${normal_status['gpo']} became ${bad_status['gpo']}")
         changed = copy.deepcopy(manifest)
         changed['runtime']['io_usb_host'] = False
         mutant = Path(directory) / 'open-io-usb.json'

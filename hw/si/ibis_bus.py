@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -37,14 +38,22 @@ TRACE_Z0, TRACE_PS_PER_MM = 50.0, 7.0
 COPPER = ('F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'B.Cu')
 
 
-def routed_distances(board_path, net, source, receivers):
+@lru_cache(maxsize=16)
+def routed_geometry(path):
+    """Reuse parsed copper and pad geometry during repeated route audits."""
+    return pcbnew.LoadBoard(path), parse(Path(path).read_text())
+
+
+def routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None):
     """Measure layer-aware shortest copper paths; report disconnected pads.
 
     This measures planar track length only. It does not turn branches, vias, pad stubs or
     changing reference planes into an electrical transmission-line model.
     """
-    board = pcbnew.LoadBoard(str(board_path))
-    tree = parse(board_path.read_text())
+    if loaded_board is None or parsed_tree is None:
+        cached_board, cached_tree = routed_geometry(str(Path(board_path).resolve()))
+    board = loaded_board if loaded_board is not None else cached_board
+    tree = parsed_tree if parsed_tree is not None else cached_tree
     graph = {}
 
     def add_edge(a, b, length):

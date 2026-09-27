@@ -181,6 +181,25 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       pins("rom_data", opt.romData);
       pins("cpu_address", opt.cpuAddress);
       pins("cpu_data", opt.cpuData);
+      auto links = [&](const char *key, auto &out) {
+        napi_value values = prop(env, wiring, key);
+        bool array = false;
+        uint32_t count = 0;
+        if (!values || napi_is_array(env, values, &array) != napi_ok || !array ||
+            napi_get_array_length(env, values, &count) != napi_ok || count != out.size())
+          throw std::runtime_error(std::string("memory wiring: invalid link array ") + key);
+        for (uint32_t i = 0; i < count; ++i) {
+          napi_value value;
+          bool connected = false;
+          napi_get_element(env, values, i, &value);
+          if (!isType(env, value, napi_boolean) ||
+              napi_get_value_bool(env, value, &connected) != napi_ok)
+            throw std::runtime_error(std::string("memory wiring: invalid link bit ") + key);
+          out[i] = connected ? 1 : 0;
+        }
+      };
+      links("cpu_address_links", opt.cpuAddressConnected);
+      links("cpu_data_links", opt.cpuDataConnected);
       napi_value timing = prop(env, wiring, "memory_timing_ns");
       if (!isType(env, timing, napi_object)) throw std::runtime_error("netlist wiring: missing memory timing");
       auto delay = [&](const char *key) {

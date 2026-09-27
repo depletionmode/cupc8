@@ -4,7 +4,8 @@
 main-board netlist. For routed slot execution it also reads the generated
 GPU, IO, storage, Wi-Fi and e-ink card PCBs from `build/hw` (or
 `--card-board-dir`), and the explicitly selected routed system PCB
-(`--system-board`, default `build/hw/system/system-routed.kicad_pcb`). It joins contacts by physical pad number, including the
+(`--system-board`, default `build/hw/system/system-routed.kicad_pcb`) and CPU
+card PCB (`--cpu-board`). It joins contacts by physical pad number, including the
 system socket's x4 pad translation. It checks the shared slot buses, their
 chipset series resistors, the weak MISO pull, CPU socket and resistor packs,
 and SRAM/ROM attachment. Its JSON manifest lists contact joins and the
@@ -66,6 +67,15 @@ state from PC `$E2B9`/GPO `$02` to PC `$E35B`/GPO `$00`. The open net has no
 pull resistor, so its voltage is physically undefined; the digital model
 uses a deterministic high DQ0 value solely to expose the missing connection.
 This counterexample does not establish analog open-pin behavior.
+The CPU card's 16 address and 8 bidirectional data driver channels are now
+traced in two copper legs each: FPGA pad to the 33 Ω pack input, and pack
+output to the CPU socket finger. The generated per-bit links gate the native
+CPU–chipset RTL bus in both data directions. Opening the routed FPGA A0
+launch changes the native program counter; an open D0 link also changes
+execution. An open bit is held high only as a deterministic digital
+counterexample because its real voltage is undefined. This does not establish
+CPU-card propagation delay or analog margin, and the remaining control lines
+still need executed models.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
@@ -122,7 +132,7 @@ From the repo root, after building the main board and five slot cards:
 
 ```
 python3 hw/cosim/gen_top.py --output build/hw/cosim/top.json
-python3 test/hw/test_cosim_wiring.py --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb
+python3 test/hw/test_cosim_wiring.py --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb --cpu-board build/hw/cpu/cpu.kicad_pcb
 python3 test/hw/test_cosim_runtime.py --top build/hw/cosim/top.json
 # after the main route is complete:
 python3 hw/cosim/gen_top.py --require-route --output build/hw/cosim/top.json
@@ -137,7 +147,8 @@ python3 hw/cosim/run.py E2E-004
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
 supervisor's routed nPOR launch, slot 1 chip-select launch, shared SCK
-source launch, GPU card SCK launch and GPU QSPI clock launch, then executes the native SPI
+source launch, GPU card SCK launch, GPU QSPI clock launch and CPU-card A0
+launch, then executes the native
 counterexamples. The third proves
 that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
@@ -148,8 +159,9 @@ supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
-card-local slot nets and 30 QSPI boot nets now affect execution; 389 remain
-unmodeled. The remaining groups are boot/programming (68), slot/control bus (36), CPU/memory
-(71), power/return (65), clock/reset (53), indicators (52), external IO (26),
+card-local slot nets, 30 QSPI boot nets and 24 CPU-card bus nets now affect
+execution; 365 remain unmodeled. The remaining groups are boot/programming
+(68), slot/control bus (36), CPU/memory (47), power/return (65), clock/reset
+(53), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

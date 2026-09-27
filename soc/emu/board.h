@@ -29,10 +29,15 @@ struct MainBoard {
 		std::array<uint8_t, 8> ramData{}, romData{};
 		std::array<uint8_t, 16> cpuAddress{};
 		std::array<uint8_t, 8> cpuData{};
+		std::array<uint8_t, 16> cpuAddressConnected{};
+		std::array<uint8_t, 8> cpuDataConnected{};
 		MemoryWiring() {
 			for (unsigned i = 0; i < 19; ++i) ramAddress[i] = romAddress[i] = i;
-			for (unsigned i = 0; i < 16; ++i) cpuAddress[i] = i;
-			for (unsigned i = 0; i < 8; ++i) ramData[i] = romData[i] = cpuData[i] = i;
+			for (unsigned i = 0; i < 16; ++i) { cpuAddress[i] = i; cpuAddressConnected[i] = 1; }
+			for (unsigned i = 0; i < 8; ++i) {
+				ramData[i] = romData[i] = cpuData[i] = i;
+				cpuDataConnected[i] = 1;
+			}
 		}
 	};
 	MemoryWiring wiring;
@@ -73,6 +78,12 @@ struct MainBoard {
 		top->cpu_a_map = addressMap;
 		top->cpu_d_map = dataMap;
 		top->cpu_d_inv_map = dataInverse;
+		uint16_t addressConnected = 0;
+		uint8_t dataConnected = 0;
+		for (unsigned i = 0; i < 16; ++i) addressConnected |= uint16_t(wiring.cpuAddressConnected[i] != 0) << i;
+		for (unsigned i = 0; i < 8; ++i) dataConnected |= uint8_t(wiring.cpuDataConnected[i] != 0) << i;
+		top->cpu_a_connected = addressConnected;
+		top->cpu_d_connected = dataConnected;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);
 		for (size_t i = 0; i < sizeof ram; i++)

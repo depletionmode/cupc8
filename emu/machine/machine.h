@@ -220,6 +220,8 @@ class Machine {
     std::array<uint8_t, 8> ramData{}, romData{};
     std::array<uint8_t, 16> cpuAddress{};
     std::array<uint8_t, 8> cpuData{};
+    std::array<uint8_t, 16> cpuAddressConnected{};
+    std::array<uint8_t, 8> cpuDataConnected{};
     double ramAccessNs = 45.0, romAccessNs = 70.0;
     bool ramWriteConnected = true, romWriteConnected = true;
     bool romD0Connected = true;
