@@ -145,6 +145,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       return i;
     };
     opt.sysctl = flag("sysctl", false);
+    opt.pwrHi = flag("pwrHi", true);
     opt.threaded = flag("threaded", true);
     opt.spiLog = flag("spiLog", false);
     opt.espTx = integer("espTx", -1);

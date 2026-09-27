@@ -119,7 +119,7 @@ class Console {
 export class Machine {
   // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53'];
   // pcap: a file for the Wi-Fi card's network traffic
-  static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false,
+  static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false, pwrHi = true,
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
@@ -128,7 +128,7 @@ export class Machine {
     if (forward.length && !wifi.length) throw new Error('machinenative: forward needs a Wi-Fi card');
     hostfwd(forward);                    // a bad entry throws before QEMU starts
     if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward, pcap);
-    m.h = native.create({ slots, rom: m.rom, sysctl, root: ROOT, threaded, spiLog,
+    m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi, root: ROOT, threaded, spiLog,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
     if (sysctl) {

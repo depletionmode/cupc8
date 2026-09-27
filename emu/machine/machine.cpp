@@ -376,6 +376,7 @@ TmdsCapture::Frame TmdsCapture::frame(const std::vector<Line> &lines) const {
 // ------------------------------------------------------------ Machine
 
 Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(o.root), threaded_(o.threaded) {
+  pwrHi = o.pwrHi;
   if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {

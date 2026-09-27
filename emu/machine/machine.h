@@ -196,6 +196,7 @@ class Machine {
     std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;
     bool sysctl = false;
+    bool pwrHi = true;               // USB-C source advertises 3 A (chipset PWR_HI input)
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
     bool threaded = true;

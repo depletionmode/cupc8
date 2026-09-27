@@ -1428,6 +1428,15 @@ kind = "sim"
 vrow = "3.3"
 
 [[test]]
+id = "E2E-004A"
+title = "Native negative boot cases"
+checks = "the native whole-machine emulator boots across empty slots (HDMI in slot 2, IO in slot 4), distinguishes an empty SD socket from a storage card removed between power cycles, halts with the specified POST code and HDMI message for a bad kernel magic, header checksum, or body checksum, rejects a ROM upload stopped between verified 2048-byte system-card protocol chunks, and with PWR_HI low still boots and reaches storage reads while refusing SD writes"
+method = "test/emu/test_e2e.mjs E2E-004 (CUPC8_EMU=native); the full E2E-004 co-sim row remains pending"
+kind = "sim"
+vrow = "3.3"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-004"
+
+[[test]]
 id = "E2E-007"
 title = "Files: BASIC SAVE, power cycle, LOAD, RUN on the storage card"
 checks = "the whole machine on the native emulator with the GPU, IO and storage cards on their real firmware and a FAT image in the SD card model: a typed program SAVEd as text (read on the host), the machine powered off and on, LOAD and RUN print its output; DIR lists the files; a program written on the host LOADs and runs; a line typed during a SAVE to a 250 ms-per-block card is not lost; SAVE with no card, a write-protected card and a full card print their messages"

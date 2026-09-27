@@ -32,7 +32,9 @@ build/emu-machine/machinerun --root . --rom ROM --mode both \
 sysctl})`, `powerOn`, `runFor`, `runAsync`, `runUntil`, `ns`, `state`,
 `frame`, `screen`, `type`, `keyboard.press`, `stop`, `sysctlPort`), plus
 `setThreaded`, `stats`, `cards`, `spiLog` and the `spiLog`/`threaded` create
-options. `CUPC8_EMU_THREADS=0` runs serially. `runFor` runs on the calling
+options. `create({pwrHi: false})` drives the chipset's PWR_HI input low to
+exercise the kernel policy for a source below 3 A; it does not model CC
+voltage or supply current. `CUPC8_EMU_THREADS=0` runs serially. `runFor` runs on the calling
 thread's call and returns; `runAsync`/`runUntil` yield to Node's event loop
 between slices exactly as machine.mjs does, so cupc8.py can talk to the
 system card's TCP port. The system card's CDC output is collected during a
