@@ -39,7 +39,10 @@ fail until their contract coverage exists:
   missing portions fail.
 - Thermal: main/CPU regulator models need netlist binding, and RP2040 cards
   need internal-regulator dissipation at their maximum operating loads.
-- Wi-Fi strapping: reset RC and normal/download mode simulation.
+- Wi-Fi strapping: WC-006 checks the actual KiCad netlist's ESP32-C3 GPIO2/8/9,
+  EN, slot reset and programming connections, and runs ngspice for both normal
+  and download reset releases. The model holds the 3.3 V rail at nominal; the
+  separate Wi-Fi power gate owns rail start-up and load transients.
 - SI and board co-simulation remain separate workstreams; newly added rows
   remain pending until their checks are implemented.
 
