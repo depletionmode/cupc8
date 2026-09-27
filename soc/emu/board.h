@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <array>
 
 #include "Vmachine_core.h"
 #include "verilated.h"
@@ -23,6 +24,20 @@ extern "C" {
 
 struct MainBoard {
 	static constexpr double NS_PER_CLOCK = 1000.0 / 12.0;
+	struct MemoryWiring {
+		std::array<uint8_t, 19> ramAddress{}, romAddress{};
+		std::array<uint8_t, 8> ramData{}, romData{};
+		std::array<uint8_t, 16> cpuAddress{};
+		std::array<uint8_t, 8> cpuData{};
+		MemoryWiring() {
+			for (unsigned i = 0; i < 19; ++i) ramAddress[i] = romAddress[i] = i;
+			for (unsigned i = 0; i < 16; ++i) cpuAddress[i] = i;
+			for (unsigned i = 0; i < 8; ++i) ramData[i] = romData[i] = cpuData[i] = i;
+		}
+	};
+	MemoryWiring wiring;
+	bool timedMemory = false;
+	double ramAccessNs = 45.0, romAccessNs = 70.0;
 
 	Vmachine_core *top = nullptr;
 	sst39_t rom;
@@ -33,6 +48,8 @@ struct MainBoard {
 	int reading = 0;                      // 1 RAM, 2 ROM: a read cycle in progress
 	uint32_t read_addr = 0;
 	uint8_t read_data = 0;
+	uint8_t pending_data = 0;
+	double read_ready_ns = 0;
 
 	MainBoard() = default;
 	MainBoard(const MainBoard &) = delete;
@@ -44,6 +61,16 @@ struct MainBoard {
 	{
 		delete top;
 		top = new Vmachine_core;
+		uint64_t addressMap = 0;
+		uint32_t dataMap = 0, dataInverse = 0;
+		for (unsigned i = 0; i < 16; ++i) addressMap |= uint64_t(wiring.cpuAddress[i]) << (4 * i);
+		for (unsigned i = 0; i < 8; ++i) {
+			dataMap |= uint32_t(wiring.cpuData[i]) << (3 * i);
+			dataInverse |= uint32_t(i) << (3 * wiring.cpuData[i]);
+		}
+		top->cpu_a_map = addressMap;
+		top->cpu_d_map = dataMap;
+		top->cpu_d_inv_map = dataInverse;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);
 		for (size_t i = 0; i < sizeof ram; i++)
@@ -51,6 +78,7 @@ struct MainBoard {
 		clocks = 0;
 		last_we = 1;
 		reading = 0;
+		read_ready_ns = 0;
 		apply(1 | 0x3F << 1 | 1 << 9 | 1 << 11);         // nPOR low: the supervisor holds reset
 		top->clk = 0;
 		top->eval();
@@ -65,25 +93,44 @@ struct MainBoard {
 	double ns() const { return clocks * NS_PER_CLOCK; }
 
 	// the memory bus: the chips answer combinationally, and latch writes on /WE's rising edge
-	void memory()
+	static uint32_t toPhysical(uint32_t logical, const std::array<uint8_t, 19> &pins) {
+		uint32_t physical = 0;
+		for (unsigned i = 0; i < pins.size(); ++i) physical |= ((logical >> pins[i]) & 1u) << i;
+		return physical;
+	}
+	static uint8_t toPhysical(uint8_t logical, const std::array<uint8_t, 8> &pins) {
+		uint8_t physical = 0;
+		for (unsigned i = 0; i < pins.size(); ++i) physical |= ((logical >> pins[i]) & 1u) << i;
+		return physical;
+	}
+	static uint8_t fromPhysical(uint8_t physical, const std::array<uint8_t, 8> &pins) {
+		uint8_t logical = 0;
+		for (unsigned i = 0; i < pins.size(); ++i) logical |= ((physical >> i) & 1u) << pins[i];
+		return logical;
+	}
+	void memory(double now_ns)
 	{
 		uint32_t a = top->mem_a & ((1u << 19) - 1);
 		uint64_t us = (uint64_t)(clocks * NS_PER_CLOCK / 1000.0);
 		// one read per cycle (when /OE and /CE go low, or the address moves):
 		// the SST39's toggle bits flip once per read, as on the chip
 		int now_reading = !top->mem_n_oe ? (!top->mem_n_ce_ram ? 1 : !top->mem_n_ce_rom ? 2 : 0) : 0;
-		if (now_reading && (now_reading != reading || a != read_addr))
-			read_data = now_reading == 1 ? ram[a] : sst39_read(&rom, a, us);
-		if (now_reading == 1)
-			read_data = ram[a];      // RAM has no read side effects
+		const uint32_t chipAddress = now_reading == 1 ? toPhysical(a, wiring.ramAddress) : toPhysical(a, wiring.romAddress);
+		if (now_reading && (now_reading != reading || chipAddress != read_addr)) {
+			pending_data = now_reading == 1 ? ram[chipAddress] : sst39_read(&rom, chipAddress, us);
+			read_ready_ns = now_ns + (timedMemory ? (now_reading == 1 ? ramAccessNs : romAccessNs) : 0);
+		}
+		if (now_reading && now_ns >= read_ready_ns)
+			read_data = pending_data;
 		reading = now_reading;
-		read_addr = a;
-		uint8_t din = now_reading ? read_data : 0xFF;
+		read_addr = chipAddress;
+		uint8_t din = now_reading == 1 ? fromPhysical(read_data, wiring.ramData) :
+		              now_reading == 2 ? fromPhysical(read_data, wiring.romData) : 0xFF;
 		if (last_we == 0 && top->mem_n_we == 1) {         // /WE rose: the write happens
 			if (!top->mem_n_ce_ram)
-				ram[a] = last_din;
+				ram[toPhysical(a, wiring.ramAddress)] = toPhysical(last_din, wiring.ramData);
 			else if (!top->mem_n_ce_rom)
-				sst39_write(&rom, a, last_din, us);
+				sst39_write(&rom, toPhysical(a, wiring.romAddress), toPhysical(last_din, wiring.romData), us);
 		}
 		last_we = top->mem_n_we;
 		last_din = top->mem_d_out;
@@ -92,13 +139,14 @@ struct MainBoard {
 
 	void clock_once()
 	{
+		const double rise_ns = clocks * NS_PER_CLOCK;
 		top->clk = 1;
 		top->eval();
-		memory();
+		memory(rise_ns);
 		top->eval();
 		top->clk = 0;
 		top->eval();
-		memory();
+		memory(rise_ns + NS_PER_CLOCK / 2);
 		top->eval();
 		clocks++;
 	}

@@ -128,21 +128,42 @@ export class Machine {
     if (forward.length && !wifi.length) throw new Error('machinenative: forward needs a Wi-Fi card');
     hostfwd(forward);                    // a bad entry throws before QEMU starts
     if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward, pcap);
-    m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi, root: ROOT, threaded, spiLog,
+    const netlistTop = process.env.CUPC8_COSIM_TOP && JSON.parse(fs.readFileSync(process.env.CUPC8_COSIM_TOP, 'utf8'));
+    if (netlistTop && (!netlistTop.runtime || !netlistTop.boards?.includes('main')))
+      throw new Error('machinenative: invalid schematic-derived top');
+    const trips = netlistTop?.runtime.cc_trip_volts;
+    if (netlistTop && (!Array.isArray(trips) || trips.length !== 2 || trips.some(v => !Number.isFinite(v))))
+      throw new Error('machinenative: invalid Type-C comparator model');
+    // pwrHi names the host source class. For the netlist top, drive the
+    // comparator with the worst 3 A minimum or 1.5 A maximum CC voltage.
+    const pwrHiAtFpga = netlistTop ? (pwrHi ? 1.524 : 1.090) >= Math.max(...trips) : pwrHi;
+    if (netlistTop && typeof netlistTop.runtime.io_usb_host !== 'boolean')
+      throw new Error('machinenative: invalid IO USB host path');
+    if (netlistTop && typeof netlistTop.runtime.storage_sd_socket !== 'boolean')
+      throw new Error('machinenative: invalid storage SD socket path');
+    if (netlistTop && (typeof netlistTop.runtime.gpu_hdmi_link !== 'boolean' ||
+                      typeof netlistTop.runtime.eink_panel_link !== 'boolean'))
+      throw new Error('machinenative: invalid display output path');
+    m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
+      ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
+      storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
+      gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
+      einkPanelLink: netlistTop?.runtime.eink_panel_link ?? true,
+      memoryWiring: netlistTop?.runtime,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
     if (sysctl) {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
     }
-    if (Object.values(slots).includes('io')) {
+    if (Object.values(slots).includes('io') && (netlistTop?.runtime.io_usb_host ?? true)) {
       const h = m.h;
       m.keyboard = {
         press: (mods, ...keys) => native.press(h, mods, keys),
         get state() { return native.keyboard(h); },
       };
     }
-    if (Object.values(slots).includes('storage')) {
+    if (Object.values(slots).includes('storage') && (netlistTop?.runtime.storage_sd_socket ?? true)) {
       // the storage card's microSD socket (emu/rp2040/harness/sdcard.h): an
       // image file goes in (written through as blocks are programmed), comes out
       const h = m.h;

@@ -193,14 +193,34 @@ class SysctlCard {
 class Machine {
  public:
   struct Options {
+    struct SlotWiring {
+      uint8_t sck = 0, mosi = 1, cs = 2, irq = 0;
+      bool miso = true;
+    };
     std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;
     bool sysctl = false;
     bool pwrHi = true;               // USB-C source advertises 3 A (chipset PWR_HI input)
+    bool ioUsbHost = true;           // receptacle D+/D- physically reach the IO MCU
+    bool storageSdSocket = true;     // seven microSD contacts reach storage MCU
+    bool gpuHdmiLink = true;         // four TMDS pairs reach the HDMI receptacle
+    bool einkPanelLink = true;       // seven EPD signals reach the panel header
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
     bool threaded = true;
     bool spiLog = false;
+    bool memoryWiringOn = false;
+    std::array<uint8_t, 19> ramAddress{}, romAddress{};
+    std::array<uint8_t, 8> ramData{}, romData{};
+    std::array<uint8_t, 16> cpuAddress{};
+    std::array<uint8_t, 8> cpuData{};
+    double ramAccessNs = 45.0, romAccessNs = 70.0;
+    bool slotWiringOn = false;
+    std::array<SlotWiring, 6> slotWiring{};
+    uint8_t misoIdle = 1;
+    double seriesDelayNs = 0;
+    std::array<uint8_t, 3> bridgeInputs{{0, 1, 2}};
+    bool bridgeMiso = true;
   };
   struct Stats {
     uint64_t idleWindows = 0, busyIterations = 0, idleClocks = 0, busyClocks = 0;
@@ -247,10 +267,18 @@ class Machine {
   std::vector<uint8_t> romImage;
   bool threaded_;
   bool pwrHi = true;
+  std::array<Options::SlotWiring, 6> slotWiring{};
+  uint8_t misoIdle = 1;
+  double seriesDelayNs = 0;
+  std::array<uint8_t, 3> bridgeInputs{{0, 1, 2}};
+  bool bridgeMiso = true;
   BridgePins br;
   std::vector<std::array<uint8_t, 16>> font;
 
   uint32_t inputs(bool por = true);
+  bool selected(int slot, uint32_t out) const;
+  uint32_t sckFor(int slot, uint32_t out) const;
+  uint32_t mosiFor(int slot, uint32_t out) const;
   std::vector<std::string> cells(const std::function<uint32_t(int, int)> &px);
   void iterate();
   void iterateSerial(bool busy, uint32_t cs);

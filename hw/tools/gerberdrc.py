@@ -12,8 +12,11 @@ from collections import defaultdict
 
 
 COORD = re.compile(r'^(?:X(-?\d+))?(?:Y(-?\d+))?D(0[123])\*$')
+ARC_COORD = re.compile(r'^X(-?\d+)Y(-?\d+)I(-?\d+)J(-?\d+)D01\*$')
 APERTURE = re.compile(r'^%ADD(\d+)(C|R|O|RoundRect),([^*]+)\*%$')
 SELECT = re.compile(r'^D(\d+)\*$')
+PROFILE_MOVE = re.compile(r'^X(-?\d+)Y(-?\d+)D02\*$')
+PROFILE_DRAW = re.compile(r'^X(-?\d+)Y(-?\d+)(?:I(-?\d+)J(-?\d+))?D01\*$')
 ROUND_RECT_MACRO = (
     '0 Rectangle with rounded corners*',
     '0 $1 Rounding radius*',
@@ -42,6 +45,8 @@ class Geometry:
             raise ValueError('cannot initialize GEOS')
         self.reader = self.call('GEOSWKTReader_create_r', ctypes.c_void_p, [ctypes.c_void_p])(self.ctx)
         self.shapes = []
+        self.overfill = {}
+        self.outward = True
 
     def call(self, name, result, args):
         function = getattr(self.lib, name)
@@ -76,13 +81,14 @@ class Geometry:
         # inscribed in the requested circular arc and can overstate clearance.
         # At each chord midpoint the inradius is R*cos(pi/256); expanding R
         # by its reciprocal makes this approximation a superset of the plot.
-        conservative_radius = radius / math.cos(math.pi / 256)
+        conservative_radius = radius / math.cos(math.pi / 256) if self.outward else radius
         result = self.call('GEOSBuffer_r', ctypes.c_void_p,
                            [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_double, ctypes.c_int])(
                                self.ctx, shape, conservative_radius, 64)
         if not result:
             raise ValueError('GEOS failed to buffer plotted geometry')
         self.shapes.append(result)
+        self.overfill[result] = conservative_radius - radius
         return result
 
     def distance(self, first, second):
@@ -93,6 +99,31 @@ class Geometry:
         if result != 1 or not math.isfinite(value.value):
             raise ValueError('GEOS failed to measure Gerber clearance')
         return value.value
+
+    def covers(self, outer, inner):
+        result = self.call('GEOSCovers_r', ctypes.c_byte,
+                           [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p])(
+                               self.ctx, outer, inner)
+        if result not in (0, 1):
+            raise ValueError('GEOS failed to compare plotted coverage')
+        return result == 1
+
+    def equals(self, first, second):
+        result = self.call('GEOSEquals_r', ctypes.c_byte,
+                           [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p])(
+                               self.ctx, first, second)
+        if result not in (0, 1):
+            raise ValueError('GEOS failed to compare plotted shapes')
+        return result == 1
+
+    def union(self, first, second):
+        result = self.call('GEOSUnion_r', ctypes.c_void_p,
+                           [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p])(
+                               self.ctx, first, second)
+        if not result:
+            raise ValueError('GEOS failed to union plotted openings')
+        self.shapes.append(result)
+        return result
 
     def close(self):
         destroy = self.call('GEOSGeom_destroy_r', None, [ctypes.c_void_p, ctypes.c_void_p])
@@ -111,8 +142,28 @@ def polygon(points):
     return 'POLYGON ((' + ', '.join('%.9f %.9f' % point for point in points) + '))'
 
 
-def plotted_copper(path, geometry):
-    """Return (net, GEOS shape, bounds) for every dark copper operation."""
+def arc_points(start, target, offsets, mode):
+    center = (start[0]+offsets[0], start[1]+offsets[1])
+    radius = math.dist(start, center)
+    if radius <= 0 or abs(math.dist(target, center)-radius) > .000002:
+        raise ValueError('invalid Gerber arc radius')
+    begin = math.atan2(start[1]-center[1], start[0]-center[0])
+    finish = math.atan2(target[1]-center[1], target[0]-center[0])
+    sweep = ((finish-begin) % (2*math.pi) if mode == 'G03' else
+             -((begin-finish) % (2*math.pi)))
+    if abs(sweep) < 1e-12:
+        sweep = 2*math.pi if mode == 'G03' else -2*math.pi
+    count = max(2, math.ceil(abs(sweep)*radius/.01))
+    points = [(center[0]+radius*math.cos(begin+sweep*i/count),
+               center[1]+radius*math.sin(begin+sweep*i/count)) for i in range(count+1)]
+    points[0], points[-1] = start, target
+    sagitta = radius * (1-math.cos(abs(sweep)/(2*count)))
+    return points, sagitta
+
+
+def plotted_copper(path, geometry, minimum_track=None, require_net=True, features=None,
+                   extra_function=None, allow_empty=False):
+    """Return (net, GEOS shape, bounds) for every supported dark operation."""
     lines = path.read_text().splitlines()
     apertures = {}
     current = None
@@ -121,13 +172,19 @@ def plotted_copper(path, geometry):
     region = None
     result = []
     seen_format = seen_units = seen_end = False
+    file_polarity = None
+    file_function = None
     macro = None
     macro_defined = False
+    aperture_function = None
+    mode = 'G01'
 
-    def add(shape, bounds):
-        if net is None:
+    def add(shape, bounds, flash_function=None, at=None):
+        if require_net and net is None:
             raise ValueError('%s: copper geometry without TO.N net' % path.name)
         result.append((net, shape, bounds))
+        if features is not None and flash_function is not None:
+            features.append((flash_function, at, net, shape, bounds))
 
     for number, line in enumerate(lines, 1):
         line = line.strip()
@@ -155,19 +212,31 @@ def plotted_copper(path, geometry):
             if (kind == 'C' and len(params) != 1 or kind in ('R', 'O') and len(params) != 2 or
                     kind == 'RoundRect' and len(params) != 10 or
                     any(not math.isfinite(x) for x in params) or
-                    any(x <= 0 for x in params[:1 if kind not in ('R', 'O') else 2])):
+                    any(x < 0 if kind == 'C' and extra_function == 'Legend' else x <= 0
+                        for x in params[:1 if kind not in ('R', 'O') else 2])):
                 raise ValueError('%s:%d: unsupported aperture dimensions' % (path.name, number))
-            apertures[int(match[1])] = (kind, params)
+            apertures[int(match[1])] = (kind, params, aperture_function)
+        elif line.startswith('%TA.AperFunction,') and line.endswith('*%'):
+            aperture_function = line[len('%TA.AperFunction,'):-2].split(',')[0]
         elif line.startswith('%TO.N,') and line.endswith('*%'):
             net = line[6:-2]
             if not net:
                 raise ValueError('%s:%d: empty net attribute' % (path.name, number))
         elif line == '%TD*%' or line == '%TD.N*%':
             net = None
+            if line == '%TD*%':
+                aperture_function = None
+        elif line == '%TD.AperFunction*%':
+            aperture_function = None
         elif line == '%LPD*%':
             pass
+        elif line.startswith('%TF.FileFunction,'):
+            file_function = line[len('%TF.FileFunction,'):].split(',')[0]
         elif line.startswith('%TF.FilePolarity,'):
-            if line != '%TF.FilePolarity,Positive*%':
+            file_polarity = line
+            expected_polarity = ('%TF.FilePolarity,Negative*%' if not require_net and
+                                 extra_function is None else '%TF.FilePolarity,Positive*%')
+            if line != expected_polarity:
                 raise ValueError('%s:%d: unsupported file polarity' % (path.name, number))
         elif line == 'G36*':
             if region is not None:
@@ -179,10 +248,34 @@ def plotted_copper(path, geometry):
             xs, ys = zip(*region)
             add(geometry.wkt(polygon(region), repair=True), (min(xs), min(ys), max(xs), max(ys)))
             region = None
+        elif line in ('G01*', 'G02*', 'G03*'):
+            mode = line[:-1]
+        elif line == 'G75*':
+            pass
         elif match := SELECT.fullmatch(line):
             current = int(match[1])
             if current not in apertures:
                 raise ValueError('%s:%d: undefined aperture' % (path.name, number))
+        elif match := ARC_COORD.fullmatch(line):
+            if region is not None or position is None or current is None or mode not in ('G02', 'G03'):
+                raise ValueError('%s:%d: unsupported arc context' % (path.name, number))
+            kind, params, _ = apertures[current]
+            if kind != 'C' or params[0] <= 0:
+                raise ValueError('%s:%d: unsupported arc aperture' % (path.name, number))
+            if minimum_track is not None and params[0] < minimum_track:
+                raise ValueError('%s:%d: plotted trace width %.6f mm < %.6f mm' %
+                                 (path.name, number, params[0], minimum_track))
+            target = (int(match[1])/1e6, int(match[2])/1e6)
+            points, sagitta = arc_points(position, target,
+                                         (int(match[3])/1e6, int(match[4])/1e6), mode)
+            line_shape = geometry.wkt('LINESTRING (' + ', '.join('%.9f %.9f' % p for p in points) + ')')
+            shape = geometry.buffer(line_shape, params[0]/2 + sagitta + .000001)
+            engine_error = sagitta + .000001
+            geometry.overfill[shape] += engine_error
+            xs, ys = zip(*points)
+            radius = params[0]/2 + sagitta + .000001
+            add(shape, (min(xs)-radius,min(ys)-radius,max(xs)+radius,max(ys)+radius))
+            position = target
         elif match := COORD.fullmatch(line):
             if not seen_format or not seen_units:
                 raise ValueError('%s:%d: coordinate before supported format' % (path.name, number))
@@ -206,16 +299,21 @@ def plotted_copper(path, geometry):
             elif operation != '02':
                 if current is None:
                     raise ValueError('%s:%d: drawing before aperture selection' % (path.name, number))
-                kind, params = apertures[current]
+                kind, params, function = apertures[current]
                 if operation == '01':
-                    if position is None or kind != 'C':
+                    if position is None or kind != 'C' or params[0] <= 0 or mode != 'G01':
                         raise ValueError('%s:%d: unsupported stroked aperture' % (path.name, number))
+                    if minimum_track is not None and params[0] < minimum_track:
+                        raise ValueError('%s:%d: plotted trace width %.6f mm < %.6f mm' %
+                                         (path.name, number, params[0], minimum_track))
                     radius = params[0] / 2
                     shape = geometry.buffer(geometry.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' %
                                                          (*position, *target)), radius)
                     bounds = (min(x, position[0])-radius, min(y, position[1])-radius,
                               max(x, position[0])+radius, max(y, position[1])+radius)
                 elif kind == 'C':
+                    if params[0] <= 0:
+                        raise ValueError('%s:%d: zero-size flash aperture' % (path.name, number))
                     radius = params[0] / 2
                     shape = geometry.buffer(geometry.wkt('POINT (%.9f %.9f)' % target), radius)
                     bounds = (x-radius, y-radius, x+radius, y+radius)
@@ -245,24 +343,532 @@ def plotted_copper(path, geometry):
                     shape = geometry.buffer(geometry.wkt(polygon(corners)), radius)
                     xs, ys = zip(*corners)
                     bounds = (min(xs)-radius,min(ys)-radius,max(xs)+radius,max(ys)+radius)
-                add(shape, bounds)
+                add(shape, bounds, function if operation == '03' else None, target)
             position = target
         elif line == 'M02*':
             seen_end = True
             if number != len(lines):
                 raise ValueError('%s:%d: commands after end marker' % (path.name, number))
-        elif (not line or line.startswith('G04 ') or line == 'G01*' or
-              line.startswith(('%TF.', '%TA.', '%TO.P,', '%TD.AperFunction')) or
+        elif (not line or line.startswith('G04 ') or
+              line.startswith(('%TF.', '%TA.', '%TO.P,', '%TO.C,', '%TD.AperFunction')) or
               line == '%TD.P*%'):
             pass
         else:
             raise ValueError('%s:%d: unsupported Gerber command %s' % (path.name, number, line))
-    if macro is not None or region is not None or not seen_end or not seen_format or not seen_units or not result:
+    expected_function = extra_function or 'Soldermask'
+    expected_polarity = ('%TF.FilePolarity,Negative*%' if not require_net and
+                         extra_function is None else '%TF.FilePolarity,Positive*%')
+    if (macro is not None or region is not None or not seen_end or not seen_format or
+            not seen_units or not result and not allow_empty or not require_net and
+            (file_polarity != expected_polarity or file_function != expected_function) or
+            require_net and (file_polarity not in (None, expected_polarity) or
+                             file_function not in (None, 'Copper'))):
         raise ValueError('%s: incomplete or empty copper Gerber' % path.name)
     return result
 
 
-def check_clearance(paths, minimum):
+def check_mask(paths, minimum):
+    """Check positive mask webs between distinct plotted openings."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('board has no positive solder-mask web rule')
+    engine = Geometry()
+    try:
+        count = 0
+        for path in paths:
+            openings = plotted_copper(Path(path), engine, require_net=False)
+            for index, (_, shape, (x0,y0,x1,y1)) in enumerate(openings):
+                for _, other, (a0,b0,a1,b1) in openings[:index]:
+                    if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
+                        continue
+                    distance = engine.distance(shape, other)
+                    # Overlapping openings merge; there is no mask web between them.
+                    if 0 < distance < minimum:
+                        raise ValueError('%s: solder-mask web %.6f mm < %.6f mm' %
+                                         (Path(path).name, distance, minimum))
+                count += 1
+        return count
+    finally:
+        engine.close()
+
+
+def via_flash_diameters(path):
+    """Read X2 ViaPad aperture flashes as (position, copper diameter)."""
+    path = Path(path)
+    apertures = {}
+    via_function = False
+    current = None
+    flashes = {}
+    for number, line in enumerate(path.read_text().splitlines(), 1):
+        if line == '%TA.AperFunction,ViaPad*%':
+            via_function = True
+        elif line.startswith('%TA.AperFunction,') or line in ('%TD*%', '%TD.AperFunction*%'):
+            via_function = False
+        elif match := APERTURE.fullmatch(line):
+            if via_function:
+                if match[2] != 'C':
+                    raise ValueError('%s:%d: unsupported noncircular via aperture' % (path.name, number))
+                apertures[int(match[1])] = float(match[3])
+        elif match := SELECT.fullmatch(line):
+            current = int(match[1])
+        elif match := COORD.fullmatch(line):
+            if match[3] == '03' and current in apertures:
+                if match[1] is None or match[2] is None:
+                    raise ValueError('%s:%d: incomplete via flash coordinate' % (path.name, number))
+                point = (int(match[1])/1e6, int(match[2])/1e6)
+                flashes.setdefault(point, []).append(apertures[current])
+    return flashes
+
+
+def check_via_annular(board, paths, minimum):
+    """Require every through via's plotted pad on every copper layer to cover its drill."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('board has no positive via annular-ring rule')
+    import kicadgen
+    tree = kicadgen.parse(Path(board.GetFileName()).read_text())
+    vias = {}
+    for via in kicadgen.find(tree, 'via'):
+        at = kicadgen.find1(via, 'at')
+        drill = kicadgen.find1(via, 'drill')
+        layers = kicadgen.find1(via, 'layers')
+        if (at is None or len(at) != 3 or drill is None or len(drill) != 2 or
+                layers is None or layers[1:] != ['F.Cu', 'B.Cu']):
+            raise ValueError('unsupported blind, buried, or malformed via for annular check')
+        point = (float(at[1]), -float(at[2]))
+        if point in vias:
+            raise ValueError('coincident vias require separate annular validation')
+        vias[point] = float(drill[1])
+    if not vias:
+        raise ValueError('no vias available for annular check')
+    count = 0
+    for path in paths:
+        flashes = via_flash_diameters(path)
+        extra = set(flashes) - set(vias)
+        missing = set(vias) - set(flashes)
+        if extra or missing:
+            raise ValueError('%s: ViaPad flash mismatch: missing %s; extra %s' %
+                             (Path(path).name, sorted(missing)[:3], sorted(extra)[:3]))
+        for point, drill in vias.items():
+            if len(flashes[point]) != 1:
+                raise ValueError('%s: duplicate ViaPad flash at %s' % (Path(path).name, point))
+            ring = (flashes[point][0] - drill) / 2
+            if ring < minimum:
+                raise ValueError('%s: via annular ring %.6f mm < %.6f mm at %s' %
+                                 (Path(path).name, ring, minimum, point))
+            count += 1
+    return count
+
+
+def check_pth_annular(board, paths, minimum):
+    """Check plotted ComponentPad copper around every plated pad drill."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('no positive PTH annular-ring requirement')
+    import pcbnew
+    pads = []
+    for footprint in board.GetFootprints():
+        for pad in footprint.Pads():
+            if pad.GetAttribute() != pcbnew.PAD_ATTRIB_PTH:
+                continue
+            drill = pad.GetDrillSize()
+            if drill.x <= 0 or drill.y <= 0:
+                raise ValueError('%s: plated pad without drill' % footprint.GetReference())
+            center = (pcbnew.ToMM(pad.GetPosition().x), -pcbnew.ToMM(pad.GetPosition().y))
+            pads.append((footprint.GetReference(), pad, center))
+    engine = Geometry()
+    try:
+        holes = {}
+        for ref, pad, center in pads:
+            drill = pad.GetDrillSize()
+            dx, dy = pcbnew.ToMM(drill.x), pcbnew.ToMM(drill.y)
+            if dx == dy:
+                primitive = engine.wkt('POINT (%.9f %.9f)' % center)
+                radius = dx/2 + minimum
+            else:
+                half = abs(dx-dy)/2
+                angle = math.radians(pad.GetOrientationDegrees())
+                direction = ((math.cos(angle), math.sin(angle)) if dx > dy
+                             else (math.sin(angle), -math.cos(angle)))
+                offset = (half*direction[0], half*direction[1])
+                a = (center[0]-offset[0], center[1]-offset[1])
+                b = (center[0]+offset[0], center[1]+offset[1])
+                primitive = engine.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' % (*a, *b))
+                radius = min(dx,dy)/2 + minimum
+            holes[(ref, center)] = engine.buffer(primitive, radius)
+        count = 0
+        for path in paths:
+            features = []
+            engine.outward = False  # pad polygon lies inside the true plotted flash
+            plotted_copper(Path(path), engine, features=features)
+            engine.outward = True   # required drill clearance encloses the true drill
+            component = {}
+            for function, point, net, shape, _ in features:
+                if function == 'ComponentPad':
+                    component.setdefault(point, []).append(shape)
+            for ref, pad, center in pads:
+                shapes = component.get(center, ())
+                if len(shapes) != 1:
+                    raise ValueError('%s: expected one ComponentPad flash at %s (%s)' %
+                                     (Path(path).name, center, ref))
+                if not engine.covers(shapes[0], holes[(ref, center)]):
+                    raise ValueError('%s: PTH annular ring below %.3f mm at %s (%s)' %
+                                     (Path(path).name, minimum, center, ref))
+                count += 1
+        return count
+    finally:
+        engine.close()
+
+
+def check_mask_alignment(copper_path, mask_path):
+    """Require plotted openings to expose outer-layer component and connector pads."""
+    engine = Geometry()
+    try:
+        features = []
+        plotted_copper(Path(copper_path), engine, features=features)
+        engine.outward = False  # inscribed opening, compared with outer copper bound
+        openings = plotted_copper(Path(mask_path), engine, require_net=False)
+        count = 0
+        exposed_functions = {'SMDPad', 'ComponentPad', 'ConnectorPad', 'HeatsinkPad'}
+        uncertain_geometry = None
+        for function, point, net, copper, (x0,y0,x1,y1) in features:
+            if function not in exposed_functions:
+                continue
+            covering = None
+            for _, opening, (a0,b0,a1,b1) in openings:
+                if x0 > a1 or a0 > x1 or y0 > b1 or b0 > y1:
+                    continue
+                covering = opening if covering is None else engine.union(covering, opening)
+            if covering is None or not engine.covers(covering, copper):
+                if uncertain_geometry is None:
+                    inner_features = []
+                    engine.outward = False
+                    plotted_copper(Path(copper_path), engine, features=inner_features)
+                    engine.outward = True
+                    outer_openings = plotted_copper(Path(mask_path), engine, require_net=False)
+                    uncertain_geometry = (inner_features, outer_openings)
+                inner_features, outer_openings = uncertain_geometry
+                inner = next((shape for kind, at, label, shape, _ in inner_features
+                              if kind == function and at == point and label == net), None)
+                loose_covering = None
+                for _, opening, (a0,b0,a1,b1) in outer_openings:
+                    if x0 > a1 or a0 > x1 or y0 > b1 or b0 > y1:
+                        continue
+                    loose_covering = opening if loose_covering is None else engine.union(loose_covering, opening)
+                # An identical Gerber primitive on copper and mask has the
+                # same exact boundary; inner/outer tessellation is irrelevant.
+                if loose_covering is not None and engine.equals(loose_covering, copper):
+                    count += 1
+                    continue
+                if inner is not None and loose_covering is not None and engine.covers(loose_covering, inner):
+                    raise ValueError('%s: mask-to-copper coverage indeterminate at %s %s pad %s '
+                                     '(equal or near-equal plotted boundaries)' %
+                                     (Path(mask_path).name, net, function, point))
+                raise ValueError('%s: mask opening does not cover %s %s pad at %s' %
+                                 (Path(mask_path).name, net, function, point))
+            count += 1
+        if not count:
+            raise ValueError('%s: no exposed copper pads found for mask check' % Path(copper_path).name)
+        return count
+    finally:
+        engine.close()
+
+
+def check_paste_registration(copper_path, mask_path, paste_path):
+    """Require each plotted paste deposit to stay inside pad copper and mask."""
+    engine = Geometry()
+    try:
+        engine.outward = False
+        pad_features = []
+        plotted_copper(Path(copper_path), engine, features=pad_features)
+        pads = [(shape, bounds) for function, _, _, shape, bounds in pad_features
+                if function in ('SMDPad', 'HeatsinkPad')]
+        openings = [(shape, bounds) for _, shape, bounds in
+                    plotted_copper(Path(mask_path), engine, require_net=False)]
+        engine.outward = True
+        deposits = plotted_copper(Path(paste_path), engine, require_net=False,
+                                  extra_function='Paste', allow_empty=True)
+
+        def covered(shape, bounds, candidates):
+            x0,y0,x1,y1 = bounds
+            union = None
+            for other, (a0,b0,a1,b1) in candidates:
+                if x0 > a1 or a0 > x1 or y0 > b1 or b0 > y1:
+                    continue
+                union = other if union is None else engine.union(union, other)
+            return union is not None and engine.covers(union, shape)
+
+        def equal_candidate(shape, bounds, candidates):
+            x0,y0,x1,y1 = bounds
+            return any(engine.equals(shape, other) for other, (a0,b0,a1,b1) in candidates
+                       if not (x0 > a1 or a0 > x1 or y0 > b1 or b0 > y1))
+
+        loose = None
+        for index, (_, deposit, bounds) in enumerate(deposits):
+            for label, candidates in (('SMD copper', pads), ('mask opening', openings)):
+                if covered(deposit, bounds, candidates):
+                    continue
+                if loose is None:
+                    engine.outward = True
+                    outer_features = []
+                    plotted_copper(Path(copper_path), engine, features=outer_features)
+                    outer_pads = [(shape, bbox) for function, _, _, shape, bbox in outer_features
+                                  if function in ('SMDPad', 'HeatsinkPad')]
+                    outer_mask = [(shape, bbox) for _, shape, bbox in
+                                  plotted_copper(Path(mask_path), engine, require_net=False)]
+                    engine.outward = False
+                    inner_paste = plotted_copper(Path(paste_path), engine, require_net=False,
+                                                 extra_function='Paste', allow_empty=True)
+                    loose = (outer_pads, outer_mask, inner_paste)
+                outer_pads, outer_mask, inner_paste = loose
+                inner = inner_paste[index][1]
+                outer = outer_pads if label == 'SMD copper' else outer_mask
+                if equal_candidate(deposit, bounds, outer):
+                    continue
+                if covered(inner, bounds, outer):
+                    raise ValueError('%s: paste-to-%s registration indeterminate at %s '
+                                     '(equal or near-equal plotted boundaries)' %
+                                     (Path(paste_path).name, label, bounds))
+                raise ValueError('%s: paste deposit outside %s at %s' %
+                                 (Path(paste_path).name, label, bounds))
+        return len(deposits)
+    finally:
+        engine.close()
+
+
+def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
+    """Check plotted legend against negative-polarity mask openings."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('no positive silkscreen-to-mask requirement')
+    engine = Geometry()
+    try:
+        openings = plotted_copper(Path(mask_path), engine, require_net=False)
+        legend = plotted_copper(Path(silk_path), engine, require_net=False,
+                                extra_function='Legend', allow_empty=True,
+                                minimum_track=minimum_ink_width)
+        for _, ink, (x0,y0,x1,y1) in legend:
+            for _, opening, (a0,b0,a1,b1) in openings:
+                if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
+                    continue
+                lower = engine.distance(ink, opening)
+                if lower < minimum:
+                    upper = (lower + engine.overfill.get(ink, 0) +
+                             engine.overfill.get(opening, 0) + .000000002)
+                    if upper >= minimum:
+                        raise ValueError('%s: silkscreen-to-mask clearance indeterminate: '
+                                         'lower %.9f, upper %.9f, rule %.9f mm' %
+                                         (Path(silk_path).name, lower, upper, minimum))
+                    raise ValueError('%s: silkscreen-to-mask clearance below rule: '
+                                     'upper %.9f < %.9f mm' %
+                                     (Path(silk_path).name, upper, minimum))
+        return len(legend)
+    finally:
+        engine.close()
+
+
+def profile_segments(path, geometry):
+    """Read a KiCad Edge.Cuts Gerber as independent cut centerlines."""
+    path = Path(path)
+    lines = path.read_text().splitlines()
+    mode = 'G01'
+    position = None
+    segments = []
+    seen_format = seen_units = seen_end = False
+    seen_profile = False
+    apertures = set()
+    current = None
+    for number, line in enumerate(lines, 1):
+        line = line.strip()
+        if line == '%FSLAX46Y46*%':
+            seen_format = True
+        elif line == '%MOMM*%':
+            seen_units = True
+        elif line in ('G01*', 'G02*', 'G03*'):
+            mode = line[:-1]
+        elif line == 'G75*' or line == '%LPD*%':
+            pass
+        elif line.startswith('%TF.FileFunction,'):
+            if line != '%TF.FileFunction,Profile,NP*%':
+                raise ValueError('%s:%d: unsupported outline file function' % (path.name, number))
+            seen_profile = True
+        elif line.startswith('%TF.FilePolarity,'):
+            if line != '%TF.FilePolarity,Positive*%':
+                raise ValueError('%s:%d: unsupported outline polarity' % (path.name, number))
+        elif match := PROFILE_MOVE.fullmatch(line):
+            position = (int(match[1])/1e6, int(match[2])/1e6)
+        elif match := PROFILE_DRAW.fullmatch(line):
+            if not seen_format or not seen_units or position is None or current is None:
+                raise ValueError('%s:%d: outline draw before format or start' % (path.name, number))
+            target = (int(match[1])/1e6, int(match[2])/1e6)
+            if mode == 'G01':
+                if match[3] is not None:
+                    raise ValueError('%s:%d: arc offsets in line mode' % (path.name, number))
+                points = [position, target]
+            else:
+                if match[3] is None or match[4] is None:
+                    raise ValueError('%s:%d: arc lacks center offsets' % (path.name, number))
+                center = (position[0]+int(match[3])/1e6,
+                          position[1]+int(match[4])/1e6)
+                radius = math.dist(position, center)
+                if radius <= 0 or abs(math.dist(target, center)-radius) > .000002:
+                    raise ValueError('%s:%d: invalid outline arc radius' % (path.name, number))
+                begin = math.atan2(position[1]-center[1], position[0]-center[0])
+                finish = math.atan2(target[1]-center[1], target[0]-center[0])
+                sweep = ((finish-begin) % (2*math.pi) if mode == 'G03' else
+                         -((begin-finish) % (2*math.pi)))
+                if abs(sweep) < 1e-12:
+                    sweep = 2*math.pi if mode == 'G03' else -2*math.pi
+                count = max(2, math.ceil(abs(sweep)*radius/.01))
+                points = [(center[0]+radius*math.cos(begin+sweep*i/count),
+                           center[1]+radius*math.sin(begin+sweep*i/count))
+                          for i in range(count+1)]
+                points[0], points[-1] = position, target
+            if position == target and mode == 'G01':
+                raise ValueError('%s:%d: zero-length outline segment' % (path.name, number))
+            shape = geometry.wkt('LINESTRING (' + ', '.join('%.9f %.9f' % p for p in points) + ')')
+            # Curved segments are replaced by chords; this buffer bounds the
+            # largest possible sagitta for the 0.01 mm maximum chord length.
+            if mode != 'G01':
+                sagitta = radius * (1-math.cos(abs(sweep)/(2*count)))
+                shape = geometry.buffer(shape, sagitta + .000001)
+            xs, ys = zip(*points)
+            segments.append((shape, (min(xs),min(ys),max(xs),max(ys))))
+            position = target
+        elif match := APERTURE.fullmatch(line):
+            if match[2] != 'C' or len(match[3].split('X')) != 1 or float(match[3]) <= 0:
+                raise ValueError('%s:%d: unsupported outline aperture' % (path.name, number))
+            apertures.add(int(match[1]))
+        elif match := SELECT.fullmatch(line):
+            if int(match[1]) not in apertures:
+                raise ValueError('%s:%d: undefined outline aperture' % (path.name, number))
+            current = int(match[1])
+        elif line == 'M02*':
+            seen_end = True
+            if number != len(lines):
+                raise ValueError('%s:%d: commands after outline end' % (path.name, number))
+        elif (not line or line.startswith('G04 ') or line.startswith(('%TF.', '%TA.', '%TO.C,', '%TD'))):
+            pass
+        else:
+            raise ValueError('%s:%d: unsupported outline command %s' % (path.name, number, line))
+    if not seen_format or not seen_units or not seen_end or not seen_profile or not segments:
+        raise ValueError('%s: incomplete or empty outline Gerber' % path.name)
+    return segments
+
+
+def check_edge(paths, outline, minimum):
+    """Check plotted copper shapes against plotted board cut centerlines."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('board has no positive copper-to-edge rule')
+    engine = Geometry()
+    try:
+        edges = profile_segments(outline, engine)
+        count = 0
+        for path in paths:
+            for net, shape, (x0,y0,x1,y1) in plotted_copper(Path(path), engine):
+                for edge, (a0,b0,a1,b1) in edges:
+                    if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
+                        continue
+                    distance = engine.distance(shape, edge)
+                    if distance < minimum:
+                        raise ValueError('%s: %s copper-to-edge lower bound %.6f mm < %.6f mm' %
+                                         (Path(path).name, net, distance, minimum))
+                count += 1
+        return count
+    finally:
+        engine.close()
+
+
+def check_holes(holes, non_plated, copper_paths, outline, copper_minimum, npth_edge_minimum):
+    """Check verified Excellon cuts against plotted copper and NPTH edges.
+
+    `holes` is the multiset returned by fabcheck.drill_hits, after its parity
+    check against the board. `non_plated` is the subset matched to board NPTH
+    pads. A coincident ComponentPad or ViaPad flash supplies a plated hole's net.
+    Drill
+    coordinates and diameters were rounded to 0.001 mm by the parity parser,
+    so this check enlarges each cut by 0.001 mm and classifies any boundary
+    case within that uncertainty as indeterminate.
+    """
+    if (not math.isfinite(copper_minimum) or copper_minimum <= 0 or
+            not math.isfinite(npth_edge_minimum) or npth_edge_minimum <= 0):
+        raise ValueError('hole checks require positive clearance rules')
+    if not holes:
+        raise ValueError('no verified Excellon cuts for plotted hole checks')
+    if any(non_plated[item] > holes[item] for item in non_plated):
+        raise ValueError('non-plated cut classification exceeds verified Excellon hits')
+    engine = Geometry()
+    try:
+        objects = []
+        features = []
+        for path in copper_paths:
+            objects.extend((Path(path).name, net, shape, bounds) for net, shape, bounds in
+                           plotted_copper(Path(path), engine, features=features))
+        edges = profile_segments(Path(outline), engine)
+        count = 0
+        for item, repeats in holes.items():
+            if len(item) == 3:
+                x, y, diameter = item
+                center = (x, y)
+                primitive = engine.wkt('POINT (%.9f %.9f)' % center)
+                bounds = (x, y, x, y)
+            elif len(item) == 6 and item[0] == 'slot':
+                _, x0, y0, x1, y1, diameter = item
+                center = ((x0+x1)/2, (y0+y1)/2)
+                primitive = engine.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' % (x0,y0,x1,y1))
+                bounds = (min(x0,x1), min(y0,y1), max(x0,x1), max(y0,y1))
+            else:
+                raise ValueError('unsupported Excellon cut key: %r' % (item,))
+            if not all(math.isfinite(v) for v in item[1:] if isinstance(v, (float, int))) or diameter <= 0:
+                raise ValueError('invalid Excellon cut dimensions')
+            radius = diameter/2 + .001  # <=0.000957 mm rounding in XY and radius
+            cut = engine.buffer(primitive, radius)
+            x0,y0,x1,y1 = bounds
+            cut_bounds = (x0-radius, y0-radius, x1+radius, y1+radius)
+            owner_nets = {net for function, point, net, _, _ in features
+                          if function in ('ComponentPad', 'ViaPad') and point is not None and
+                          math.dist(point, center) <= .0011}
+            if len(owner_nets) > 1:
+                raise ValueError('Excellon cut has conflicting plotted pad nets at %s' % (center,))
+            is_npth = bool(non_plated[item])
+            owner = None if is_npth else next(iter(owner_nets), None)
+            if not is_npth and owner is None:
+                raise ValueError('plated Excellon cut lacks ComponentPad/ViaPad flash at %s' %
+                                 (center,))
+            for path_name, net, copper, (a0,b0,a1,b1) in objects:
+                if owner is not None and net == owner:
+                    continue
+                if (cut_bounds[0]-a1 >= copper_minimum+.002 or
+                        a0-cut_bounds[2] >= copper_minimum+.002 or
+                        cut_bounds[1]-b1 >= copper_minimum+.002 or
+                        b0-cut_bounds[3] >= copper_minimum+.002):
+                    continue
+                lower = engine.distance(cut, copper)
+                if lower < copper_minimum:
+                    upper = (lower + .001 + engine.overfill.get(cut, 0) +
+                             engine.overfill.get(copper, 0) + .000000002)
+                    detail = ('indeterminate' if upper >= copper_minimum else 'below rule')
+                    raise ValueError('%s: Excellon hole-to-copper %s at %s: lower %.9f, '
+                                     'upper %.9f, rule %.9f mm' %
+                                     (path_name, detail, center, lower, upper, copper_minimum))
+            if is_npth:
+                for edge, (a0,b0,a1,b1) in edges:
+                    if (cut_bounds[0]-a1 >= npth_edge_minimum+.002 or
+                            a0-cut_bounds[2] >= npth_edge_minimum+.002 or
+                            cut_bounds[1]-b1 >= npth_edge_minimum+.002 or
+                            b0-cut_bounds[3] >= npth_edge_minimum+.002):
+                        continue
+                    lower = engine.distance(cut, edge)
+                    if lower < npth_edge_minimum:
+                        upper = lower + .001 + engine.overfill.get(cut, 0) + .000000002
+                        detail = ('indeterminate' if upper >= npth_edge_minimum else 'below rule')
+                        raise ValueError('%s: NPTH hole-to-edge %s at %s: lower %.9f, '
+                                         'upper %.9f, rule %.9f mm' %
+                                         (Path(outline).name, detail, center, lower, upper,
+                                          npth_edge_minimum))
+            count += repeats
+        return count
+    finally:
+        engine.close()
+
+
+def check_clearance(paths, minimum, minimum_track=None):
     """Require distinct X2 nets on each copper layer to meet board clearance."""
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('board has no positive copper clearance rule')
@@ -270,7 +876,7 @@ def check_clearance(paths, minimum):
     try:
         count = 0
         for path in paths:
-            objects = plotted_copper(Path(path), engine)
+            objects = plotted_copper(Path(path), engine, minimum_track)
             cells = defaultdict(list)
             for index, (net, shape, (x0,y0,x1,y1)) in enumerate(objects):
                 # Two millimetre buckets avoid checking every distant pad/track
@@ -291,8 +897,20 @@ def check_clearance(paths, minimum):
                         continue
                     distance = engine.distance(shape, other)
                     if distance < minimum:
-                        raise ValueError('%s: %s to %s copper clearance %.6f mm < %.6f mm' %
-                                         (Path(path).name, net, other_net, distance, minimum))
+                        # The expanded 64-chord arcs guarantee a lower bound.
+                        # The largest possible excess over the true plotted arc
+                        # is the buffer radius inflation at each object, plus
+                        # two nanometres for WKT coordinate rounding.
+                        uncertainty = (engine.overfill.get(shape, 0) +
+                                       engine.overfill.get(other, 0) + .000000002)
+                        upper = distance + uncertainty
+                        if upper >= minimum:
+                            raise ValueError('%s: %s to %s copper clearance indeterminate: '
+                                             'lower bound %.9f mm, upper bound %.9f mm, rule %.9f mm' %
+                                             (Path(path).name, net, other_net, distance, upper, minimum))
+                        raise ValueError('%s: %s to %s copper clearance below rule: '
+                                         'upper bound %.9f mm < %.9f mm' %
+                                         (Path(path).name, net, other_net, upper, minimum))
                 for cx in range(xmin, xmax+1):
                     for cy in range(ymin, ymax+1):
                         cells[(cx, cy)].append(index)

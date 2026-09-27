@@ -85,16 +85,29 @@ EDGE_KIND = {"x1": "io", "x4": "system", "x8": "cpu"}
 # position (14.50 from the housing end to the key centre, 11.50 key to B1).
 SOCKETS = {
     "C404113": {"width": "x1", "part": "UMAX 3183-10200P1T", "height": 11.25, "depth": 7.60,
-                "slot_w": 1.78, "length": 25.00, "wide": 7.40, "rib_w": 1.75,
-                "ds": "UMAX drawing 318307001 (hw/datasheets/C404113_UMAX-3183-10200P1T.pdf): 11.25 MAX, 7.60 deep, slot 1.78 +/- 0.05, D 25.00, 7.40 wide"},
+                "slot_w": 1.77, "length": 25.00, "wide": 7.40, "rib_w": 1.78,
+                "rib_plus": 0.05, "slot_plus": 0.20,
+                "ds": "UMAX drawing 318307001 (hw/datasheets/C404113_UMAX-3183-10200P1T.pdf): 11.25 MAX, 7.60 deep, slot opening 1.77 +0.20/-0.05, key width 1.78 +/-0.05, D 25.00, 7.40 wide"},
     "C404111": {"width": "x8", "part": "UMAX 3183-10112P1T", "height": 11.25, "depth": 7.60,
-                "slot_w": 1.78, "length": 56.00, "wide": 7.40, "rib_w": 1.75,
-                "ds": "UMAX drawing 318307001, the one LCSC serves for C404111 and C404113 (hw/datasheets/C404113_UMAX-3183-10200P1T.pdf): 11.25 MAX, 7.60 deep, D 56.00 for 98 positions"},
+                "slot_w": 1.77, "length": 56.00, "wide": 7.40, "rib_w": 1.78,
+                "rib_plus": 0.05, "slot_plus": 0.20,
+                "ds": "UMAX drawing 318307001, the one LCSC serves for C404111 and C404113 (hw/datasheets/C404113_UMAX-3183-10200P1T.pdf): slot opening 1.77 +0.20/-0.05, key width 1.78 +/-0.05, D 56.00 for 98 positions"},
     "C19188869": {"width": "x4", "part": "SOFNG PCIE-64P11L", "height": 11.10, "depth": 7.60,
                   "slot_w": 1.78, "length": 39.00, "wide": 8.76, "rib_w": 1.75,
                   "ds": "hw/datasheets/C19188869_PCIE-64P11L.pdf: 11.10, 7.60 deep, 1.78 slot, 39.00 long, 8.76 wide",
                   "pads": ("1", "33")},    # JLC's pad numbers for A1 and B1 (hw/boards/sockets.py)
 }
+
+
+def key_mating_margin(sock, notch_width, notch_minus):
+    """Signed worst-case clearance on each side of a centered socket key."""
+    return (notch_width - notch_minus - sock["rib_w"] - sock.get("rib_plus", 0)) / 2
+
+
+# JLCPCB's published routed-edge dimensional tolerance is +/-0.20 mm
+# regular, +/-0.10 mm high precision. This is a best-case edge-location
+# uncertainty, not a proven rib-to-notch registration tolerance.
+JLC_HIGH_PRECISION_EDGE_TOLERANCE = 0.10
 HOUSING_BEFORE_B1 = 14.50 - 11.50      # housing end to finger B1's contact
 SLOT_BEFORE_B1 = 1.00                  # slot end to B1 (EasyEDA model of C404113: slot x -10.50, B1 -9.50)
 SLOT_AFTER_TAB = 0.40                  # tab's far edge to the slot end (model: 10.55 vs tab 10.15)
@@ -400,11 +413,26 @@ def check_fingers(b, res):
     res.add(cid, tab_h - sock["depth"] > 0,
             "%s in %s: card shoulder %.2f mm above the housing (tab %.2f, insertion depth %.2f)"
             % (name, sock["part"], tab_h - sock["depth"], tab_h, sock["depth"]))
-    res.add(cid, sock["rib_w"] < key_w - CEM["key_w"][1],
-            "%s in %s: key rib %.2f mm (EasyEDA model) in the %.2f notch, >= %.3f a side at the notch's min"
-            % (name, sock["part"], sock["rib_w"], key_w, (key_w - CEM["key_w"][1] - sock["rib_w"]) / 2))
+    # The UMAX drawing gives the molded key as 1.78 +/-0.05 mm along
+    # the card edge. Its 1.77 +0.20/-0.05 mm dimension is perpendicular:
+    # the slot opening for board thickness, not the molded key width.
+    # Its EasyEDA solid uses 1.75 mm; the solid alone cannot prove mating
+    # at the drawing's upper tolerance. Compare to the CEM notch minimum.
+    rib_max = sock["rib_w"] + sock.get("rib_plus", 0)
+    mating_margin = key_mating_margin(sock, key_w, CEM["key_w"][1])
+    res.add(cid, mating_margin > 0,
+            "%s in %s: key notch min %.2f mm vs rib max %.2f mm; per-side worst-case gap %.3f mm%s"
+            % (name, sock["part"], key_w - CEM["key_w"][1], rib_max, mating_margin,
+               " (UMAX drawing 318307001, page 1: key 1.78 +/-0.05)" if "rib_plus" in sock else ""))
+    if "rib_plus" in sock:
+        res.add(cid, mating_margin > JLC_HIGH_PRECISION_EDGE_TOLERANCE,
+                "%s in %s: %.3f mm centered key/notch gap per side vs JLC best listed +/-%.2f mm "
+                "routed-edge tolerance; positional fit needs qualified routing and mating evidence"
+                % (name, sock["part"], mating_margin, JLC_HIGH_PRECISION_EDGE_TOLERANCE))
     res.add(cid, b["thickness"] < sock["slot_w"] - 0.05,
-            "%s in %s: card %.2f mm in the %.2f +/- 0.05 slot" % (name, sock["part"], b["thickness"], sock["slot_w"]))
+            "%s in %s: card %.2f mm in slot min %.2f mm (nominal %.2f%s)" %
+            (name, sock["part"], b["thickness"], sock["slot_w"] - .05,
+             sock["slot_w"], " +0.20/-0.05" if "slot_plus" in sock else " +/-0.05"))
 
 
 def check_order(b, res):

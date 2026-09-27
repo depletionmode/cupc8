@@ -1,9 +1,9 @@
 """Bind the Wi-Fi buck model to KiCad components and routed power copper.
 
-Trace resistance uses an assumed 35 um outer copper thickness with a 1.4x
-hot-copper multiplier. It is a shortest copper path, with a conservative
-10 mOhm allowance for each plated-through via. The fab order does not specify
-copper weight, so this assumption cannot close WC-005 on its own.
+Trace resistance uses the ordered 1 oz (nominal 35 um) finished outer copper
+with a 1.4x hot-copper multiplier. It is a shortest copper path, with a
+conservative 10 mOhm allowance for each plated-through via. The order now
+specifies copper weight, but nominal thickness cannot close WC-005 on its own.
 Ground pours, pad spreading, temperature rise and capacitor ESR are not solved
 here; the caller must retain a failed coverage gate for those omissions.
 """
@@ -98,8 +98,8 @@ def pad_nodes(tree):
 
 def routes(board, order, circuit):
     spec = json.loads(Path(order).read_text())
-    if spec.get('layers') != 2 or spec.get('thickness_mm') != 1.6:
-        raise ValueError('Wi-Fi power model requires the ordered 2-layer 1.6 mm board')
+    if (spec.get('layers'), spec.get('thickness_mm'), spec.get('finished_outer_copper_oz')) != (2, 1.6, 1):
+        raise ValueError('Wi-Fi power model requires the ordered 2-layer 1.6 mm, 1 oz outer-copper board')
     tree = parse(Path(board).read_text())
     if tree[0] != 'kicad_pcb':
         raise ValueError('expected KiCad PCB')
@@ -114,7 +114,7 @@ def routes(board, order, circuit):
         if pin not in pads or pads[pin][0] != net:
             raise ValueError(f'PCB pad {pin} disagrees with netlist {net}')
     for net in RAILS:
-        if any(child(z, 'net')[1] == net for z in find(tree, 'zone')):
+        if any((find1(z, 'net') or [None, None])[1] == net for z in find(tree, 'zone')):
             raise ValueError(f'{net}: power pour resistance is not modelled')
     graphs = {net: {} for net in RAILS}
     endpoints = {net: set() for net in RAILS}

@@ -25,6 +25,7 @@ import path from 'node:path';
 const backend = process.env.CUPC8_EMU === 'native' ? 'native' : 'js';
 const { Machine } = await import(backend === 'native' ? './machinenative.mjs' : './machine.mjs');
 import { kernelRom, ROOT } from './romimage.mjs';
+import { compareGoldenHdmiFrame } from './hdmi_golden.mjs';
 
 const only = process.argv.slice(2).find((a) => a.startsWith('E2E-'));
 const record = process.argv.includes('--record');
@@ -86,7 +87,8 @@ async function e2e002() {
   while (end > 0 && rom[end - 1] === 0xff) end--;
   const image = path.join(ROOT, 'build/emu/e2e-rom.bin');
   fs.writeFileSync(image, rom.subarray(0, end));
-  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff), sysctl: true });
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff),
+    sysctl: true, spiLog: backend === 'native' && Boolean(process.env.CUPC8_COSIM_TOP) });
   m.powerOn();
   await m.runAsync(20e6);
   const ping = await cupc8(m, 'ping');
@@ -102,6 +104,11 @@ async function e2e002() {
   if (!expect(await waitFor(m, '42', 3e9), 'the typed program runs and prints 42')) console.log('---- screen\n' + screenText(m));
   await m.runAsync(200e6);
   golden('E2E-002', screenText(m));
+  if (backend === 'native' && process.env.CUPC8_COSIM_TOP) {
+    const pixel = compareGoldenHdmiFrame(m);
+    expect(pixel.differences === 0,
+      `captured HDMI pixels equal GPU golden (${pixel.differences} differences, first ${pixel.first}, cursor phase ${pixel.phase})`);
+  }
   m.stop();
 }
 
@@ -133,7 +140,8 @@ async function e2e003() {
     server.once('exit', (c) => reject(new Error(`E2E-003: the HTTP server exited (${c})`)));
   });
   server.stdout.on('data', (d) => (requests += String(d).split('request').length - 1));
-  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' } });
+  const m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io', 3: 'wifi' },
+    spiLog: backend === 'native' && Boolean(process.env.CUPC8_COSIM_TOP) });
   m.powerOn();
   expect(await waitFor(m, '>>', 6e9), 'the BASIC prompt appears on HDMI');
   m.type('net join cupc8 password\n');
@@ -144,6 +152,11 @@ async function e2e003() {
   expect(requests === 1, `the server saw one request (${requests})`);
   await m.runAsync(200e6);
   golden('E2E-003', screenText(m).replace(new RegExp(`10\\.0\\.2\\.2 ${port}`, 'g'), '10.0.2.2 PORT'));
+  if (backend === 'native' && process.env.CUPC8_COSIM_TOP) {
+    const pixel = compareGoldenHdmiFrame(m);
+    expect(pixel.differences === 0,
+      `network page HDMI pixels equal GPU golden (${pixel.differences} differences, first ${pixel.first}, cursor phase ${pixel.phase})`);
+  }
   log(`ended at ${m.ns} ns, CPU ${JSON.stringify(m.state())}`);
   m.stop();
   server.kill();
@@ -152,8 +165,10 @@ async function e2e003() {
 // ------------------------------------------------------------------ E2E-004
 // Negative boot cases on the native board and real card firmware. A new
 // Machine is a power cycle: the slot population changes only while off.
-// The model exposes the source class through the chipset's PWR_HI input;
-// analogue CC voltage and supply-current behavior are outside this test.
+// Without a netlist top the model drives PWR_HI from the source class. With
+// CUPC8_COSIM_TOP it uses the schematic's CC averaging/reference resistor
+// network and the source-class voltage corners. Supply-current behavior is
+// covered separately in POW-005/006.
 // An upload interrupted between verified protocol chunks goes through sysctl.
 async function e2e004() {
   log('E2E-004: empty slots, removal between power cycles, corrupt kernel');
