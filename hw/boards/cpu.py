@@ -569,6 +569,19 @@ def presence_ring(board, layer="In3.Cu", width=0.2, via=0.6, drill=0.3, rise=3.0
 
 def prepare(board):
     """The card's own pre-routing, run after the pad fan-out."""
+    import pcbnew
+    # U2's pin-one dot clears the plotted pad-1 mask by only 0.145 mm.
+    # Move this instance's dot 0.04 mm away from the pad after pad clipping.
+    fp = next(f for f in board.GetFootprints() if f.GetReference() == "U2")
+    dots = [pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
+            for i in range(fp.GraphicalItems().size())]
+    dots = [g for g in dots if g and g.GetLayer() == pcbnew.F_SilkS and
+            g.GetShape() == pcbnew.SHAPE_T_CIRCLE and
+            abs(pcbnew.ToMM(g.GetStart().x) - 42.63) < .001 and
+            abs(pcbnew.ToMM(g.GetStart().y) + 35.07) < .001]
+    if len(dots) != 1:
+        raise ValueError("U2 pin-one silk dot changed")
+    dots[0].Move(pcbnew.VECTOR2I(pcbnew.FromMM(-.04), 0))
     ring_pads(board)
     stubs(board)
     supply_fingers(board)
