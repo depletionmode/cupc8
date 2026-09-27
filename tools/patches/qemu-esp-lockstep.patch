@@ -53,18 +53,19 @@ index 8ebadf8..d573573 100644
              cpu_budget = icount_percpu_budget(cpu_count);
          }
 diff --git i/hw/riscv/esp32c3.c w/hw/riscv/esp32c3.c
-index ed698fb..e56aee9 100644
+index ed698fb..41cb66d 100644
 --- i/hw/riscv/esp32c3.c
 +++ w/hw/riscv/esp32c3.c
-@@ -8,6 +8,7 @@
+@@ -8,6 +8,8 @@
   * (at your option) any later version.
   */
  #include "qemu/osdep.h"
 +#include "qemu/guest-random.h"
++#include "sysemu/cupc8-lockstep.h"
  #include "qemu/log.h"
  #include "qemu/error-report.h"
  #include "hw/qdev-properties.h"
-@@ -151,13 +152,10 @@ static uint64_t esp32c3_io_read(void *opaque, hwaddr addr, unsigned int size)
+@@ -151,13 +153,10 @@ static uint64_t esp32c3_io_read(void *opaque, hwaddr addr, unsigned int size)
          /* Return "QEMU" as a 32-bit value */
          return 0x51454d55;
      } else if (addr + ESP32C3_IO_START_ADDR == DR_REG_SYSCON_BASE + A_SYSCON_RND_DATA_REG) {
@@ -82,21 +83,36 @@ index ed698fb..e56aee9 100644
      } else if (addr + ESP32C3_IO_START_ADDR == DR_REG_ASSIST_DEBUG_BASE + A_ASSIST_DEBUG_CORE_0_DEBUG_MODE_REG) {
          return 0;
      } else {
+@@ -650,6 +649,10 @@ static void esp32c3_machine_init(MachineState *machine)
+         memory_region_add_subregion_overlap(sys_mem, esp32c3_memmap[ESP32C3_MEMREGION_FRAMEBUF].base, &ms->rgb.vram, 0);
+     }
+ 
++    /* CUPC/8: a stand-in for the Wi-Fi card's slot SPI slave on GPSPI2 */
++    cupc8_slot_init(sys_mem, DR_REG_SPI2_BASE,
++                    qdev_get_gpio_in(DEVICE(&ms->intmatrix), ETS_SPI2_INTR_SOURCE));
++
+     /* TWAI peripheral realization */
+     sysbus_realize(SYS_BUS_DEVICE(&ms->twai), &error_fatal);
+     MemoryRegion *twai_mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&ms->twai), 0);
 diff --git i/include/sysemu/cupc8-lockstep.h w/include/sysemu/cupc8-lockstep.h
 new file mode 100644
-index 0000000..2fde4ca
+index 0000000..cabc5f5
 --- /dev/null
 +++ w/include/sysemu/cupc8-lockstep.h
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,22 @@
 +/*
 + * CUPC/8 lockstep (system/cupc8-lockstep.c): the Wi-Fi card's QEMU runs in
 + * step with the CUPC/8 whole-machine emulator. Hooks called by the TCG
 + * round-robin loop, the icount warp and user networking; each does nothing
-+ * unless a `-chardev cupc8` exists.
++ * unless a `-chardev cupc8` exists. The slot device is always there.
 + */
 +#ifndef SYSEMU_CUPC8_LOCKSTEP_H
 +#define SYSEMU_CUPC8_LOCKSTEP_H
 +
++#include "exec/hwaddr.h"
++
++/* the ESP32-C3 machine: the slot SPI slave's stand-in at base, on irq */
++void cupc8_slot_init(MemoryRegion *sys_mem, hwaddr base, qemu_irq irq);
 +/* the vCPU loop's top, BQL held: talk to the emulator until the guest may run */
 +void cupc8_lockstep_sync(void);
 +/* true while the guest must not run (nor its clock warp) until sync() */
@@ -136,33 +152,49 @@ index 102bec7..2ef6a36 100644
  }
 diff --git i/system/cupc8-lockstep.c w/system/cupc8-lockstep.c
 new file mode 100644
-index 0000000..dc1c887
+index 0000000..d43e648
 --- /dev/null
 +++ w/system/cupc8-lockstep.c
-@@ -0,0 +1,385 @@
+@@ -0,0 +1,416 @@
 +/*
 + * CUPC/8 lockstep: the Wi-Fi card's QEMU in step with the CUPC/8
 + * whole-machine emulator (emu/machine in the CUPC/8 repository).
 + *
-+ *   -icount shift=N,sleep=off -chardev cupc8,id=frames,path=FIFO -serial chardev:frames
++ *   -icount shift=N,sleep=off -chardev cupc8,id=lockstep,path=FIFO
 + *
 + * With icount the guest's clock (QEMU_CLOCK_VIRTUAL) is a function of the
 + * instructions executed, and with sleep=off an idle guest's clock jumps to
 + * the next timer; so the guest is deterministic except for its inputs. This
-+ * chardev makes the one that matters, the UART carrying the card's SPI
-+ * frames, arrive at defined guest times, and runs the guest only as far as
-+ * the emulator allows. It talks to the emulator over FIFO.in (commands) and
-+ * FIFO.out (replies), little-endian:
++ * runs the guest only as far as the emulator allows, and gives it the one
++ * input that matters, the card's slot SPI, at defined guest times through a
++ * stand-in for the ESP32-C3's GPSPI2 slave (the "slot" device below). The
++ * chardev is only the way in for the FIFO's path: nothing is attached to it.
++ * The emulator talks over FIFO.in (commands) and FIFO.out (replies),
++ * little-endian, with times in ns of guest time:
 + *
-+ *   'G' t:i64                    grant: the guest may run until its clock is t
-+ *   'X' t:i64 k:u32 n:u16 b[n]   exchange: run to t, the UART receives b at t,
-+ *                                run until the UART has sent k bytes, reply
-+ *   'R' now:i64 b[k]             the k bytes, and the guest time they were done
-+ *   'T' now:i64                  no k bytes within 10 s of guest time
++ *   'G' t:i64            grant: the guest may run until its clock is t
++ *   'S' t:i64            CS_n falls at t: run to t, reply with the preload
++ *   'F' t:i64 n:u16 b[n] CS_n rose at t ending a frame of MOSI bytes b
++ *   'R' now:i64 armed:u8 b[512]   reply to 'S': the MISO bytes the frame
++ *                        shifts out, and whether the guest re-armed since
++ *                        the last frame ended
 + *
-+ * The guest never runs past the last grant or exchange time except to answer
-+ * an exchange, so it is never ahead of the emulator when input arrives.
-+ * Everything the UART sends is kept and handed out only by 'R'.
++ * The guest never runs past the last command's time, so it is never ahead of
++ * the emulator, and the emulator never waits for the guest: like the real
++ * SPI slave, the device holds the preload the guest armed and shifts it out
++ * whenever the host selects.
++ *
++ * The slot device (at GPSPI2's address, on GPSPI2's interrupt source):
++ *
++ *   0x000-0x1ff  TX: the next preload, written by the guest
++ *   0x200-0x3ff  RX: the last frame's MOSI bytes
++ *   0x400  TXCOMMIT  write n: the preload becomes TX[0..n) then $00s (the
++ *                    real card's arm(): a whole DMA buffer, swapped in at once)
++ *   0x404  RXLEN     the last frame's length (at most 512, as the real DMA)
++ *   0x408  INT       bit 0 a frame ended, bit 1 another ended before bit 0
++ *                    was cleared (its bytes replaced the first's); write 1s
++ *                    to clear; the interrupt is level, while INT != 0
++ *   0x40c  ID        "C8SL" (a stock QEMU reads 0 here)
 + *
 + * User networking (slirp) is the host's, on the host's clock: it can never be
 + * in step. When the guest sends a packet the vCPU stops right after that
@@ -182,36 +214,110 @@ index 0000000..dc1c887
 +#include "qemu/error-report.h"
 +#include "sysemu/sysemu.h"
 +#include "chardev/char.h"
++#include "exec/memory.h"
++#include "hw/irq.h"
 +#include "hw/core/cpu.h"
 +#include "sysemu/cpu-timers.h"
 +#include "sysemu/cupc8-lockstep.h"
 +
 +#define TYPE_CHARDEV_CUPC8 "chardev-cupc8"
-+#define ANSWER_NS (10 * NANOSECONDS_PER_SECOND)
++#define SLOT_LEN 512
 +
 +typedef struct {
 +    Chardev parent;
 +    int fd_in, fd_out;
-+    GByteArray *out;           /* sent by the UART, not yet handed out */
-+    GByteArray *in;            /* for the UART, not yet taken */
 +} CharCupc8;
 +
 +DECLARE_INSTANCE_CHECKER(CharCupc8, CHARDEV_CUPC8, TYPE_CHARDEV_CUPC8)
 +
 +static struct {
++    MemoryRegion iomem;
++    qemu_irq irq;
++    uint8_t tx[SLOT_LEN];      /* staged by the guest */
++    uint8_t live[SLOT_LEN];    /* what the next frame shifts out */
++    uint8_t rx[SLOT_LEN];
++    uint32_t rxlen, intr;
++    bool armed;                /* committed since the last frame ended */
++} slot;
++
++static struct {
 +    CharCupc8 *chr;            /* NULL: no lockstep */
 +    QEMUTimer *timer;          /* at the next stop */
 +    int64_t grant;
-+    bool xpending;             /* an exchange waits for the clock to reach xt */
-+    int64_t xt;
-+    uint32_t xk;
-+    GByteArray *xbytes;
-+    uint32_t awaiting;         /* bytes the exchange waits for the UART to send */
-+    int64_t answer_by;
++    char pending;              /* 'S' or 'F' waiting for the clock to reach at */
++    int64_t at;
++    uint8_t frame[SLOT_LEN];
++    uint32_t framelen;
 +    bool net_tx;               /* the guest sent a packet: let the host answer */
 +    uint64_t net_rx;           /* packets given to the guest (atomic) */
 +    int64_t settle_us, settle_max_us;
 +} ls;
++
++/* ------------------------------------------------------------ the slot device */
++
++static uint64_t slot_read(void *opaque, hwaddr addr, unsigned size)
++{
++    uint64_t v = 0;
++    if (addr < 0x400) {
++        const uint8_t *buf = addr < 0x200 ? slot.tx : slot.rx;
++        for (unsigned i = 0; i < size; i++) {
++            v |= (uint64_t)buf[(addr & 0x1ff) + i] << (8 * i);
++        }
++        return v;
++    }
++    switch (addr) {
++    case 0x404:
++        return slot.rxlen;
++    case 0x408:
++        return slot.intr;
++    case 0x40c:
++        return 0x4c533843;     /* "C8SL" */
++    }
++    return 0;
++}
++
++static void slot_write(void *opaque, hwaddr addr, uint64_t v, unsigned size)
++{
++    if (addr < 0x200) {
++        for (unsigned i = 0; i < size; i++) {
++            slot.tx[addr + i] = v >> (8 * i);
++        }
++    } else if (addr == 0x400) {
++        uint32_t n = MIN(v, SLOT_LEN);
++        memcpy(slot.live, slot.tx, n);
++        memset(slot.live + n, 0, SLOT_LEN - n);
++        slot.armed = true;
++    } else if (addr == 0x408) {
++        slot.intr &= ~v;
++        qemu_set_irq(slot.irq, slot.intr != 0);
++    }
++}
++
++static const MemoryRegionOps slot_ops = {
++    .read = slot_read,
++    .write = slot_write,
++    .endianness = DEVICE_LITTLE_ENDIAN,
++    .valid = { .min_access_size = 1, .max_access_size = 4 },
++    .impl = { .min_access_size = 1, .max_access_size = 4 },
++};
++
++void cupc8_slot_init(MemoryRegion *sys_mem, hwaddr base, qemu_irq irq)
++{
++    memory_region_init_io(&slot.iomem, NULL, &slot_ops, NULL, "cupc8-slot", 0x1000);
++    memory_region_add_subregion_overlap(sys_mem, base, &slot.iomem, 1);
++    slot.irq = irq;
++}
++
++static void slot_frame(const uint8_t *b, uint32_t n)
++{
++    memcpy(slot.rx, b, n);
++    slot.rxlen = n;
++    slot.intr |= (slot.intr & 1) ? 2 : 1;
++    slot.armed = false;
++    qemu_set_irq(slot.irq, 1);
++}
++
++/* ------------------------------------------------------------ lockstep */
 +
 +static int64_t now_ns(void)
 +{
@@ -221,10 +327,7 @@ index 0000000..dc1c887
 +/* the guest time at which the vCPU must stop next */
 +static int64_t stop_time(void)
 +{
-+    if (ls.awaiting) {
-+        return ls.answer_by;
-+    }
-+    return ls.xpending ? ls.xt : ls.grant;
++    return ls.pending ? ls.at : ls.grant;
 +}
 +
 +bool cupc8_lockstep_due(void)
@@ -232,10 +335,7 @@ index 0000000..dc1c887
 +    if (!ls.chr) {
 +        return false;
 +    }
-+    if (ls.net_tx || (ls.awaiting && ls.chr->out->len >= ls.awaiting)) {
-+        return true;
-+    }
-+    return now_ns() >= stop_time();
++    return ls.net_tx || now_ns() >= stop_time();
 +}
 +
 +static void read_full(void *buf, size_t n)
@@ -270,34 +370,6 @@ index 0000000..dc1c887
 +    }
 +}
 +
-+/* move queued input into the UART as far as its FIFO takes it */
-+static void push_input(void)
-+{
-+    CharCupc8 *c = ls.chr;
-+    while (c->in->len) {
-+        int room = qemu_chr_be_can_write(&c->parent);
-+        if (room <= 0) {
-+            break;
-+        }
-+        int n = MIN((guint)room, c->in->len);
-+        qemu_chr_be_write(&c->parent, c->in->data, n);
-+        g_byte_array_remove_range(c->in, 0, n);
-+    }
-+}
-+
-+static void reply(char kind, uint32_t k)
-+{
-+    int64_t now = now_ns();
-+    uint8_t h[9];
-+    h[0] = kind;
-+    memcpy(h + 1, &now, 8);    /* x86-64 and aarch64 hosts: little-endian */
-+    write_full(h, 9);
-+    if (k) {
-+        write_full(ls.chr->out->data, k);
-+        g_byte_array_remove_range(ls.chr->out, 0, k);
-+    }
-+}
-+
 +/* one command from the emulator; the BQL is dropped while waiting for it */
 +static void read_command(void)
 +{
@@ -306,22 +378,25 @@ index 0000000..dc1c887
 +    bql_unlock();
 +    read_full(&kind, 1);
 +    read_full(&t, 8);
-+    if (kind == 'X') {
-+        uint32_t k;
++    if (kind == 'F') {
 +        uint16_t n;
-+        read_full(&k, 4);
 +        read_full(&n, 2);
-+        g_byte_array_set_size(ls.xbytes, n);
-+        read_full(ls.xbytes->data, n);
-+        ls.xk = k;
-+    } else if (kind != 'G') {
++        uint8_t skip[256];
++        ls.framelen = MIN(n, SLOT_LEN);
++        read_full(ls.frame, ls.framelen);
++        for (uint32_t left = n - ls.framelen; left;) {   /* the DMA takes 512 */
++            uint32_t k = MIN(left, sizeof skip);
++            read_full(skip, k);
++            left -= k;
++        }
++    } else if (kind != 'G' && kind != 'S') {
 +        fprintf(stderr, "cupc8 lockstep: unknown command %02x\n", kind);
 +        exit(1);
 +    }
 +    bql_lock();
-+    if (kind == 'X') {
-+        ls.xpending = true;
-+        ls.xt = t;
++    if (kind != 'G') {
++        ls.pending = kind;
++        ls.at = t;
 +    }
 +    ls.grant = MAX(ls.grant, t);
 +}
@@ -368,31 +443,21 @@ index 0000000..dc1c887
 +            net_settle();
 +            continue;
 +        }
-+        if (ls.awaiting) {
-+            if (ls.chr->out->len >= ls.awaiting) {
-+                reply('R', ls.awaiting);
-+                ls.awaiting = 0;
-+                continue;
++        if (ls.pending && now >= ls.at) {
++            if (ls.pending == 'S') {
++                uint8_t h[10];
++                h[0] = 'R';
++                memcpy(h + 1, &now, 8);  /* x86-64 and aarch64 hosts: little-endian */
++                h[9] = slot.armed;
++                write_full(h, sizeof h);
++                write_full(slot.live, SLOT_LEN);
++            } else {
++                slot_frame(ls.frame, ls.framelen);
 +            }
-+            if (now >= ls.answer_by) {
-+                reply('T', 0);
-+                ls.awaiting = 0;
-+                continue;
-+            }
-+            break;
-+        }
-+        if (ls.xpending && now >= ls.xt) {
-+            ls.xpending = false;
-+            g_byte_array_append(ls.chr->in, ls.xbytes->data, ls.xbytes->len);
-+            push_input();
-+            ls.awaiting = ls.xk;
-+            ls.answer_by = now + ANSWER_NS;
-+            if (!ls.awaiting) {
-+                reply('R', 0);
-+            }
++            ls.pending = 0;
 +            continue;
 +        }
-+        if (ls.xpending || now < ls.grant) {
++        if (ls.pending || now < ls.grant) {
 +            break;
 +        }
 +        read_command();
@@ -423,20 +488,7 @@ index 0000000..dc1c887
 +    }
 +}
 +
-+static int cupc8_chr_write(Chardev *chr, const uint8_t *buf, int len)
-+{
-+    CharCupc8 *c = CHARDEV_CUPC8(chr);
-+    g_byte_array_append(c->out, buf, len);
-+    if (ls.awaiting && c->out->len >= ls.awaiting && current_cpu) {
-+        cpu_exit(current_cpu);  /* stop after this instruction and reply */
-+    }
-+    return len;
-+}
-+
-+static void cupc8_chr_accept_input(Chardev *chr)
-+{
-+    push_input();
-+}
++/* ------------------------------------------------------------ the chardev */
 +
 +static int64_t env_ms(const char *name, int64_t def)
 +{
@@ -476,9 +528,6 @@ index 0000000..dc1c887
 +        close(c->fd_in);
 +        return;
 +    }
-+    c->out = g_byte_array_new();
-+    c->in = g_byte_array_new();
-+    ls.xbytes = g_byte_array_new();
 +    ls.settle_us = env_ms("CUPC8_LOCKSTEP_SETTLE_MS", 20);
 +    ls.settle_max_us = env_ms("CUPC8_LOCKSTEP_SETTLE_MAX_MS", 2000);
 +    ls.chr = c;
@@ -508,8 +557,6 @@ index 0000000..dc1c887
 +
 +    cc->parse = cupc8_chr_parse;
 +    cc->open = cupc8_chr_open;
-+    cc->chr_write = cupc8_chr_write;
-+    cc->chr_accept_input = cupc8_chr_accept_input;
 +}
 +
 +static const TypeInfo char_cupc8_type_info = {

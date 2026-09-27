@@ -904,12 +904,13 @@ before = "44bbccb"
 # the lockstep kept, the guest's clock from the host again (adaptive icount, idle in real time)
 revert = [["test/emu/machinenative.mjs", "'-icount', 'shift=3,sleep=off'", "'-icount', 'shift=auto,sleep=on'"]]
 cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
-must_fail = ["DIFFERENT"]
+# (on the host's clock the guest now also misses its task watchdog: the join fails)
+must_fail = ["wifi_lockstep: FAIL"]
 
 [[bug]]
 name = "Espressif QEMU: the ESP32-C3's random number register was rand() seeded from time(NULL), so the Wi-Fi card's DHCP transaction IDs and TCP sequence numbers changed run to run"
 fixed_in = "f1b7cda"
-revert = [["tools/patches/qemu-esp-lockstep.patch", "@@ -151,13 +152,10 @@", "@@ -151,13 +152,13 @@"], ["tools/patches/qemu-esp-lockstep.patch", """+        uint32_t r;
+revert = [["tools/patches/qemu-esp-lockstep.patch", "@@ -151,13 +153,10 @@", "@@ -151,13 +153,13 @@"], ["tools/patches/qemu-esp-lockstep.patch", """+        uint32_t r;
 +        qemu_guest_getrandom_nofail(&r, sizeof(r));
 +        return r;
 """, """+        static bool init = false;
@@ -1027,3 +1028,16 @@ revert = [["basic/ubasic.s", """.write:
 cmd = "tools/run_tests.sh testBasicBanks"
 must_fail = ["FAIL: BASIC reads banks 4 and 5"]
 
+[[bug]]
+name = "Wi-Fi card: the SPI slave's frame-end ISR built the preload with status(), which asks lwIP (FIONREAD on each socket) from an interrupt; once a socket was open FreeRTOS's lists were corrupted and the card hung (interrupt watchdog in vListInsert). The UART stand-in took the preload in a task and hid it; the lockstep QEMU's SPI slave stand-in found it"
+fixed_in = "0969702"
+revert = [["fw/wifi/port/esp32c3/main/frames.c", "miso[n++] = status_now;", "miso[n++] = (uint8_t)(card->ops->status(card) & 0x7f);"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["wifi_lockstep: FAIL"]
+
+[[bug]]
+name = "Wi-Fi card: the board waited for the guest to answer each frame over UART ($A6/$A5, ~1.3 ms of guest time each), so under back-to-back polling the card's clock ran 0.3 s ahead of the board's; now QEMU's slot SPI stand-in holds the preload. Put back here as QEMU running 1 ms past each select before it answers"
+fixed_in = "4270b21"
+revert = [["tools/patches/qemu-esp-lockstep.patch", "+    return ls.pending ? ls.at : ls.grant;", "+    return ls.pending ? ls.at + 1000000 : ls.grant;"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["FAIL: the Wi-Fi card's clock is not the board's at its selects"]

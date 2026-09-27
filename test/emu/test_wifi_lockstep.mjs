@@ -71,10 +71,16 @@ async function run(threaded) {
   const t = Date.now();
   m.powerOn();
   const steps = [];
+  let failed = false;
   const waitFor = async (want, ns) => {
+    if (failed) return;   // a step not seen: the rest cannot follow, and waiting for them takes long
     const ok = await m.runUntil(() => screenText(m).includes(want), ns, 100e6);
     steps.push(`${want}: ${ok ? m.ns : 'not seen'}`);
-    if (!ok) bad++;
+    if (!ok) {
+      console.log(`FAIL: '${want}' not seen`);
+      failed = true;
+      bad++;
+    }
   };
   await waitFor('>>', 6e9);
   m.type('net join cupc8 password\n');
@@ -84,7 +90,7 @@ async function run(threaded) {
   const secs = (Date.now() - t) / 1000;
   const out = {
     ns: m.ns, state: m.state(), steps,
-    cards: m.cards().map(({ slot, kind, ns, cycles }) => ({ slot, kind, ns, cycles })),
+    cards: m.cards().map(({ slot, kind, ns, cycles, ahead, early }) => ({ slot, kind, ns, cycles, ahead, early })),
     logs: Object.fromEntries([1, 2, 3].map((s) => [String(s), m.spiLog(s)])),
     screen: screenText(m),
   };
@@ -125,12 +131,25 @@ if (!runs.serial.out.logs['3'].length) {
   console.log('FAIL: the Wi-Fi card saw no frames');
   bad++;
 }
-// QEMU trails the board, except that each answer takes guest time while the
-// board waits (about 1.3 ms: the firmware's UART driver waits out an RX
-// timeout), so while the kernel polls the card back to back the card's clock
-// runs ahead of the board's (emu/machine/README.md)
-const lead = runs.serial.out.cards.find((c) => c.kind === 'wifi').ns - runs.serial.out.ns;
-console.log(`QEMU's clock is ${(lead / 1e6).toFixed(3)} ms ahead of the board's at the end`);
+// The card's clock tracks the board's: at every select QEMU has run to
+// the board's time and not beyond it (the board never waits for the
+// guest, as it never waits for the real SPI slave), through net join's
+// back-to-back polling too; and the firmware re-armed the preload after
+// every frame before the next select (slot.md gives it 20 us)
+const wifi = runs.serial.out.cards.find((c) => c.kind === 'wifi');
+const frames3 = runs.serial.out.logs['3'];
+console.log(`the Wi-Fi card: ${frames3.length} selects, QEMU at most ${wifi.ahead} ns ahead of the board at one, ${wifi.early} selects before a re-arm; ` +
+  `at the last QEMU at ${wifi.ns} ns, the board at ${Math.floor(frames3.at(-1).start)} ns`);
+// (QEMU stops at an instruction boundary: at most one instruction, 8 ns, past)
+const INSN_NS = 8;
+if (wifi.ahead >= INSN_NS || wifi.ahead < 0 || Math.abs(wifi.ns - Math.floor(frames3.at(-1).start)) >= INSN_NS) {
+  console.log('FAIL: the Wi-Fi card\'s clock is not the board\'s at its selects');
+  bad++;
+}
+if (wifi.early !== 0) {
+  console.log('FAIL: the host selected the Wi-Fi card before its firmware had re-armed');
+  bad++;
+}
 // every packet the guest gets here answers one it sent (DHCP, ARP, TCP from a
 // prompt server): QEMU lets the host answer before the guest runs on, so the
 // answer reaches the guest at the guest time of the packet that asked for it
