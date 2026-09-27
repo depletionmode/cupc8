@@ -1041,3 +1041,24 @@ fixed_in = "4270b21"
 revert = [["tools/patches/qemu-esp-lockstep.patch", "+    return ls.pending ? ls.at : ls.grant;", "+    return ls.pending ? ls.at + 1000000 : ls.grant;"]]
 cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
 must_fail = ["FAIL: the Wi-Fi card's clock is not the board's at its selects"]
+
+[[bug]]
+name = "Board gates accepted stale source provenance for a routed build"
+fixed_in = "board-evidence"
+revert = [["hw/tools/boardevidence.py", "if evidence.get('inputs') != inputs(board, root):", "if False:"]]
+cmd = "python3 test/hw/test_boardcheck.py EvidenceTests.test_stale_source"
+must_fail = ["FAIL: test_stale_source"]
+
+[[bug]]
+name = "Board gates accepted a changed routed PCB under an old success receipt"
+fixed_in = "board-evidence"
+revert = [["hw/tools/boardevidence.py", "if evidence.get('artifacts') != artifacts(out):", "if False:"]]
+cmd = "python3 test/hw/test_boardcheck.py EvidenceTests.test_changed_board"
+must_fail = ["FAIL: test_changed_board"]
+
+[[bug]]
+name = "Board gates ignored DRC unconnected and schematic parity findings"
+fixed_in = "board-evidence"
+revert = [["hw/tools/boardcheck.py", "findings = [v for key in keys for v in report[key]]", "findings = report['violations']"]]
+cmd = "python3 test/hw/test_boardcheck.py ReportTests.test_each_drc_failure_class"
+must_fail = ["FAIL: test_each_drc_failure_class"]

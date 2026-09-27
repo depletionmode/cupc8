@@ -1680,6 +1680,7 @@ checks = "0 errors; every waiver justified in writing"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py main erc"
 
 [[test]]
 id = "MB-002"
@@ -1688,6 +1689,7 @@ checks = "0 errors, 0 unconnected, JLC 4-layer rules"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py main drc"
 
 [[test]]
 id = "MB-003"
@@ -1696,6 +1698,7 @@ checks = "every line has an LCSC number, is in stock at ≥ 2× the build quanti
 method = "hw/tools/bomcheck.py + jlcparts.py"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py main bom"
 
 [[test]]
 id = "MB-004"
@@ -1704,6 +1707,7 @@ checks = "every symbol pin matches the datasheet table; pin 1 and rotation match
 method = "hw/tools/fpcheck.py"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py main footprints"
 
 [[test]]
 id = "MB-005"
@@ -1712,6 +1716,7 @@ checks = "3V3 buck startup and load step; 1V2 LDO; USB-C inrush; 6-slot worst ca
 method = "ngspice decks in hw/mainboard/sim/"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py main power"
 
 [[test]]
 id = "MB-006"
@@ -1720,6 +1725,7 @@ checks = "all regulators Tj ≤ 100 °C at 40 °C ambient"
 method = "hw/power/budget.py"
 kind = "static"
 vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py main thermal"
 
 [[test]]
 id = "MB-007"
@@ -1736,6 +1742,7 @@ checks = "CPU card + 6 cards fitted with no collisions; mounting holes; connecto
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py main mechanical"
 
 [[test]]
 id = "MB-009"
@@ -1744,6 +1751,7 @@ checks = "Gerbers re-imported and DRC-clean; drill file matches the holes; CPL r
 method = "hw/tools/fabcheck.py"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py main fab"
 
 [[test]]
 id = "MB-050"
@@ -1752,6 +1760,7 @@ checks = "CPU socket = cpu-bus.md table; each slot = slot.md table; pull-ups and
 method = "netlist check script"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py main connectors"
 
 [[test]]
 id = "MB-051"
@@ -1825,6 +1834,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py cpu erc"
 
 [[test]]
 id = "CC-002"
@@ -1833,6 +1843,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py cpu drc"
 
 [[test]]
 id = "CC-003"
@@ -1841,6 +1852,7 @@ checks = "LCSC, stock and package, as MB-003"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py cpu bom"
 
 [[test]]
 id = "CC-004"
@@ -1849,6 +1861,7 @@ checks = "as MB-004"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py cpu footprints"
 
 [[test]]
 id = "CC-005"
@@ -1857,6 +1870,7 @@ checks = "1V2 LDO from the socket's 3V3: startup, load step, dropout"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py cpu power"
 
 [[test]]
 id = "CC-007"
@@ -1873,6 +1887,7 @@ checks = "edge fingers match PCIe CEM x8 dimensions and key; fits the socket; cl
 method = "FreeCAD fit script + finger dimension check"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py cpu mechanical"
 
 [[test]]
 id = "CC-009"
@@ -1881,6 +1896,7 @@ checks = "as MB-009, plus gold fingers + bevel noted in the fab notes; the board
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py cpu fab"
 
 [[test]]
 id = "CC-050"
@@ -1889,6 +1905,7 @@ checks = "every finger net matches the spec table; CARD_ID straps = 10; PRSNT1 j
 method = "netlist check script"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py cpu connectors"
 
 [[test]]
 id = "CC-051"
@@ -1914,6 +1931,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py gpu erc"
 
 [[test]]
 id = "GC-002"
@@ -1922,6 +1940,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py gpu drc"
 
 [[test]]
 id = "GC-003"
@@ -1930,6 +1949,7 @@ checks = "as MB-003"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py gpu bom"
 
 [[test]]
 id = "GC-004"
@@ -1938,6 +1958,7 @@ checks = "as MB-004; HDMI connector pinout against the HDMI spec"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py gpu footprints"
 
 [[test]]
 id = "GC-005"
@@ -1946,6 +1967,7 @@ checks = "RP2040 at 252 MHz with the VREG bump: rail droop within spec"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py gpu power"
 
 [[test]]
 id = "GC-007"
@@ -1962,6 +1984,7 @@ checks = "x1 fingers per CEM; HDMI connector overhang; clearance to neighbours"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py gpu mechanical"
 
 [[test]]
 id = "GC-009"
@@ -1970,6 +1993,7 @@ checks = "as CC-009, plus the impedance-controlled stackup ordered; the board's 
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py gpu fab"
 
 [[test]]
 id = "GC-050"
@@ -1978,6 +2002,7 @@ checks = "fingers = slot.md; RP2040 TMDS GPIOs = the PicoDVI config used by the 
 method = "netlist check against fw/gpu pins.h"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py gpu connectors"
 
 [[test]]
 id = "GC-101"
@@ -1995,6 +2020,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py io erc"
 
 [[test]]
 id = "IC-002"
@@ -2003,6 +2029,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py io drc"
 
 [[test]]
 id = "IC-003"
@@ -2011,6 +2038,7 @@ checks = "as MB-003"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py io bom"
 
 [[test]]
 id = "IC-004"
@@ -2019,6 +2047,7 @@ checks = "as MB-004; USB-A pinout"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py io footprints"
 
 [[test]]
 id = "IC-005"
@@ -2027,6 +2056,7 @@ checks = "SY6280 current limit set to ≤ 500 mA; soft start; fault flag on shor
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py io power"
 
 [[test]]
 id = "IC-007"
@@ -2043,6 +2073,7 @@ checks = "x1 fingers per CEM; USB-A overhang; clearance"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py io mechanical"
 
 [[test]]
 id = "IC-009"
@@ -2051,6 +2082,7 @@ checks = "as CC-009; the board's name and revision ('<name> rev <X>') on the top
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py io fab"
 
 [[test]]
 id = "IC-050"
@@ -2059,6 +2091,7 @@ checks = "fingers = slot.md; RP2040 pins = fw/io pins.h"
 method = "netlist check"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py io connectors"
 
 [[test]]
 id = "IC-101"
@@ -2076,6 +2109,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py wifi erc"
 
 [[test]]
 id = "WC-002"
@@ -2084,6 +2118,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py wifi drc"
 
 [[test]]
 id = "WC-003"
@@ -2092,6 +2127,7 @@ checks = "as MB-003; antenna ordered as a loose part"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py wifi bom"
 
 [[test]]
 id = "WC-004"
@@ -2100,6 +2136,7 @@ checks = "as MB-004; module pad map against the ESP32-C3-MINI-1U datasheet"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py wifi footprints"
 
 [[test]]
 id = "WC-005"
@@ -2108,6 +2145,7 @@ checks = "TLV62569 buck + bulk capacitance hold 3V3 ≥ 3.0 V through a 350 mA T
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py wifi power"
 
 [[test]]
 id = "WC-006"
@@ -2116,6 +2154,7 @@ checks = "GPIO2/8/9 and EN levels at reset give normal boot with PROG_n released
 method = "ngspice RC model + a strapping-table check"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py wifi strapping"
 
 [[test]]
 id = "WC-008"
@@ -2124,6 +2163,7 @@ checks = "x1 fingers per CEM; MHF III access; antenna cable route"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py wifi mechanical"
 
 [[test]]
 id = "WC-009"
@@ -2132,6 +2172,7 @@ checks = "as CC-009; the board's name and revision ('<name> rev <X>') on the top
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py wifi fab"
 
 [[test]]
 id = "WC-050"
@@ -2140,6 +2181,7 @@ checks = "fingers = slot.md incl. PROG_n→GPIO9, SWCLK→U0RXD, SWDIO→U0TXD; 
 method = "netlist check"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py wifi connectors"
 
 [[test]]
 id = "WC-101"
@@ -2148,3 +2190,339 @@ checks = "flash over the UART bootloader; IDENT = $03; join a network; HTTPS fet
 method = "cupc8.py card flash/ident + net test"
 kind = "hw"
 vrow = "5"
+
+[[test]]
+id = "SC-001"
+title = "Storage card erc"
+checks = "Current board build: erc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py storage erc"
+
+[[test]]
+id = "SC-002"
+title = "Storage card drc"
+checks = "Current board build: drc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py storage drc"
+
+[[test]]
+id = "SC-003"
+title = "Storage card bom"
+checks = "Current board build: bom; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py storage bom"
+
+[[test]]
+id = "SC-004"
+title = "Storage card footprints"
+checks = "Current board build: footprints; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py storage footprints"
+
+[[test]]
+id = "SC-005"
+title = "Storage card power"
+checks = "Current board build: power; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py storage power"
+
+[[test]]
+id = "SC-006"
+title = "Storage card thermal"
+checks = "Current board build: thermal; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py storage thermal"
+
+[[test]]
+id = "SC-008"
+title = "Storage card mechanical"
+checks = "Current board build: mechanical; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py storage mechanical"
+
+[[test]]
+id = "SC-009"
+title = "Storage card fab"
+checks = "Current board build: fab; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py storage fab"
+
+[[test]]
+id = "SC-050"
+title = "Storage card connectors"
+checks = "Current board build: connectors; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py storage connectors"
+
+[[test]]
+id = "SC-007"
+title = "Storage card signal integrity"
+checks = "Board-level signal integrity against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "4.6"
+
+[[test]]
+id = "SC-051"
+title = "Storage card board-level co-sim"
+checks = "Board-level co-sim against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "3.1"
+
+[[test]]
+id = "EC-001"
+title = "Eink card erc"
+checks = "Current board build: erc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py eink erc"
+
+[[test]]
+id = "EC-002"
+title = "Eink card drc"
+checks = "Current board build: drc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py eink drc"
+
+[[test]]
+id = "EC-003"
+title = "Eink card bom"
+checks = "Current board build: bom; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py eink bom"
+
+[[test]]
+id = "EC-004"
+title = "Eink card footprints"
+checks = "Current board build: footprints; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py eink footprints"
+
+[[test]]
+id = "EC-005"
+title = "Eink card power"
+checks = "Current board build: power; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py eink power"
+
+[[test]]
+id = "EC-006"
+title = "Eink card thermal"
+checks = "Current board build: thermal; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py eink thermal"
+
+[[test]]
+id = "EC-008"
+title = "Eink card mechanical"
+checks = "Current board build: mechanical; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py eink mechanical"
+
+[[test]]
+id = "EC-009"
+title = "Eink card fab"
+checks = "Current board build: fab; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py eink fab"
+
+[[test]]
+id = "EC-050"
+title = "Eink card connectors"
+checks = "Current board build: connectors; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py eink connectors"
+
+[[test]]
+id = "EC-007"
+title = "Eink card signal integrity"
+checks = "Board-level signal integrity against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "4.6"
+
+[[test]]
+id = "EC-051"
+title = "Eink card board-level co-sim"
+checks = "Board-level co-sim against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "3.1"
+
+[[test]]
+id = "YC-001"
+title = "System card erc"
+checks = "Current board build: erc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py system erc"
+
+[[test]]
+id = "YC-002"
+title = "System card drc"
+checks = "Current board build: drc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py system drc"
+
+[[test]]
+id = "YC-003"
+title = "System card bom"
+checks = "Current board build: bom; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py system bom"
+
+[[test]]
+id = "YC-004"
+title = "System card footprints"
+checks = "Current board build: footprints; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py system footprints"
+
+[[test]]
+id = "YC-005"
+title = "System card power"
+checks = "Current board build: power; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py system power"
+
+[[test]]
+id = "YC-006"
+title = "System card thermal"
+checks = "Current board build: thermal; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py system thermal"
+
+[[test]]
+id = "YC-008"
+title = "System card mechanical"
+checks = "Current board build: mechanical; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py system mechanical"
+
+[[test]]
+id = "YC-009"
+title = "System card fab"
+checks = "Current board build: fab; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py system fab"
+
+[[test]]
+id = "YC-050"
+title = "System card connectors"
+checks = "Current board build: connectors; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py system connectors"
+
+[[test]]
+id = "YC-007"
+title = "System card signal integrity"
+checks = "Board-level signal integrity against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "4.6"
+
+[[test]]
+id = "YC-051"
+title = "System card board-level co-sim"
+checks = "Board-level co-sim against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "3.1"
+
+[[test]]
+id = "CC-006"
+title = "Cpu card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py cpu thermal"
+
+[[test]]
+id = "GC-006"
+title = "Gpu card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py gpu thermal"
+
+[[test]]
+id = "IC-006"
+title = "Io card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py io thermal"
+
+[[test]]
+id = "WC-010"
+title = "Wifi card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py wifi thermal"
+
+[[test]]
+id = "BRD-002"
+title = "Board evidence and result gate regressions"
+checks = "Missing and stale inputs, changed or missing artifacts, all DRC finding classes and unwaived ERC warnings fail"
+method = "test/hw/test_boardcheck.py"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_boardcheck.py"
