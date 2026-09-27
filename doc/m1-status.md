@@ -68,12 +68,14 @@ survives a lost session. Newest first within each section. Specs live in
 |---|---|
 | Main board | Salt-1 route and deterministic power/ground repairs are merged. The six-layer package has a valid receipt, 0 KiCad DRC violations, 0 opens and 0 parity errors. Worst slot is 16.85 mΩ at nominal 20°C copper, but 20.17 mΩ at 70°C before thickness tolerance; MB-005 remains red. |
 | BASIC follow-ups | Packed ROM image, approved dead-code removals, run/hook handshake, isolated Nim cache and assembler comment parsing. Simulator checks precede emulator checks. |
-| Board verification | Main, Wi-Fi and GPU have current evidence receipts and clean KiCad DRC. CPU, IO, storage, e-ink and system are rebuilding. Wi-Fi WC-005/WC-010 remain red for unbounded ESR, return contact and thermal transfer; plotted fab checks found further edge/clearance/parser issues. |
+| Board verification | All eight boards have current evidence receipts and clean KiCad DRC, ERC and schematic parity. Wi-Fi WC-005/WC-010 remain red for unbounded ESR, return contact and thermal transfer; plotted fab checks found further edge/clearance/parser issues. |
 | SI and schematic co-simulation | The four routed HDMI pair field-model subsets pass against the GPU receipt; full analog SI remains red. Routed main copper is available to the IBIS diagnostic. Strict E2E-001..004 remain red with 502 unmodeled nets after the routed nPOR reset and ROM/SRAM write-enable dependencies were added. |
 | Final gate | Run make verify after integration; regenerate fab-readiness; inspect renders and list David's hand checks. No manufacturing upload or order. |
 
 ## Done (recent)
 
+- All eight boards regenerated on the current source and each evidence receipt
+  validated; ERC, board DRC and schematic parity passed for every package.
 - CPU card now uses six layers. The seven card pipelines were reported complete
   at handoff; final integration reruns and live stock checks remain required.
 - SD card model in the native emulator (EMU-008), STO-003, E2E-007 (BASIC
@@ -97,6 +99,6 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## Left before ordering
 
-- All boards through the pipeline; E2E-001 (co-sim from the netlists);
+- E2E-001 (co-sim from the netlists);
   E2E-002/003/004 green on the native emulator; SI (4.6); the fab-readiness
   hand checks; David's sign-off; the final design critique.
