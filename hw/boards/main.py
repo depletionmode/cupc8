@@ -910,6 +910,11 @@ def wanted(parts):
     for r, v in power.items():
         east = v[0] > 105                       # the LEDs on the east edge stay
         at[r] = (v[0] + (0 if east else dx), v[1], v[2] if len(v) > 2 else 0)
+    # Input proximity study only: J1 stays fixed, F1 moves behind it and
+    # U2 faces F1. A new power preroute and full signal route are required.
+    at["F1"] = (25.0, 175.0, 90)
+    at["U2"] = (22.0, 168.5, 180)
+    at["R1"] = (19.0, 177.0, 0)
     # the POWER button's controller between the buttons; its LDO, EN's
     # pull-down and their pads in the free corner west of the eFuse
     at["U16"] = (BUTTONS_X + 7.0, H - 3.4, 0)
