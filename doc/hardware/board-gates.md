@@ -53,14 +53,51 @@ fail until their contract coverage exists:
   [copper guide](https://jlcpcb.com/help/article/jlcpcb-copper-weight) equates
   1 oz to a nominal 35 µm. The
   deck uses 100 mΩ ESR per capacitor as a sensitivity scenario. The path
-  scenario is distinct from a solved effective plane resistance. The check
-  remains red pending pad thermal/contact validation, a manufacturer
-  ESR maximum and local thermal coupling evidence for the 350 mA TX burst.
+  scenario is distinct from a solved effective plane resistance. WC-005 keeps
+  separate failing checks for a guaranteed ESR maximum and validated pad,
+  spoke and contact resistance. WC-010 owns the thermal transfer gap.
 - Wi-Fi thermal: WC-010 binds the same routed copper and adds its I²R heat to
   the buck's loss. It computes the maximum permitted ESP32-to-buck thermal
   transfer at 40 C ambient, and remains red until a calibrated board thermal
   model or measurement bounds that transfer. The JEDEC theta_JA alone does not
-  describe local heating from the nearby ESP32 module.
+  describe local heating from the nearby ESP32 module. TI measured 151 °C/W
+  for its TLV62569EVM-789 versus 188.2 °C/W on the JEDEC test board
+  ([TI EVM guide, table 3](https://www.ti.com/lit/ug/slvuay6/slvuay6.pdf));
+  neither value bounds transfer from the ESP32 on this card. TI's
+  [thermal application note](https://www.ti.com/lit/pdf/slvaeb1) recommends
+  estimating junction temperature from measured case temperature and the
+  package's characterization parameter for the actual board.
+
+### Wi-Fi card electrical and thermal limits still needed
+
+For the routed Wi-Fi PCB with SHA-256 prefix `06a8db9bcace` and exported
+netlist `9dd820f380cb` (the 2026-09-27 build), `wifi_board.routes` gives
+38.0 mΩ on +5 V and 134.7 mΩ on 3V3. The saved GND fills give a 123.4 mΩ
+fixed-corridor scenario with 152 represented GND vias; the 0.25/0.125 mm
+meshes differ by 1.4%. `wifi_coupling_budget` then allows at most
+34.4 °C/W of ESP32-to-buck transfer at the 40 °C, full-TX corner. A
+calibrated thermal model or a powered-board temperature measurement still
+has to establish a smaller transfer for this layout.
+
+`python3 hw/power/wifi_limits.py build/hw/wifi` reruns the TI transient model
+on that routed board while varying one unknown at a time. With no extra
+module return contact resistance, equal ESR on C1/C2/C3 of 0.1, 0.3 and
+0.5 Ω gives respective modeled TX minima of 3.113, 3.097 and 3.083 V after
+the low DC set-point correction. At 0.1 Ω ESR, adding 0.2 Ω to the module
+return gives 3.044 V; adding 0.33 Ω gives 3.000 V (2.9998 V before rounding),
+and 0.4 Ω gives 2.976 V, below the 3.0 V limit.
+These are sensitivity results, not component or contact specifications.
+
+The fitted C1/C2 part is Samsung CL21A226MAQNNNE. Its
+[manufacturer product page](https://product.samsungsem.com/mlcc/CL21A226MAQNNN.do)
+identifies the part and labels the displayed characteristics as typical
+design data. Samsung's [component library terms](https://weblib.samsungsem.com/mlcc/mlcc-ec.do?partNumber=CL21A226MAQNNN)
+likewise say its SPICE model is for reference, not a product warranty.
+No guaranteed transient ESR maximum was found for the fitted part. The
+remaining electrical evidence is a manufacturer ESR limit or a controlled
+qualification of the assembled parts, plus a bound for the pad and return
+contacts from calibrated extraction or measurement. Until then WC-005 and
+WC-010 remain red.
 - SI and board co-simulation remain separate workstreams; newly added rows
   remain pending until their checks are implemented.
 

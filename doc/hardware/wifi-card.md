@@ -28,7 +28,9 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   but gives no guaranteed ESR maximum for the fitted part. C3 is
   [Yageo CC0603KRX7R9BB104](https://www.lcsc.com/product-detail/YAGEO-C14663.html).
   The WC-005 deck therefore labels its 100 mΩ per-capacitor ESR as a
-  sensitivity scenario and keeps the laid-out-board power gate red.
+  sensitivity scenario and keeps the laid-out-board power gate red. The
+  routed-board ESR and return-contact sweeps, with their artifact hashes and
+  remaining evidence requirements, are recorded in `board-gates.md`.
 - **SPI slave:** ESP32-C3 GPSPI2 routed to SCK/MOSI/MISO/CS_n through the GPIO
   matrix. MISO reaches the slot through a **74LVC1G125** tri-state buffer
   whose /OE is CS_n, so this card releases the shared MISO line whenever it

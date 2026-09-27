@@ -104,7 +104,8 @@ def edges(t, v, a, b, level):
     return ts
 
 
-def wifi_deck(corner, r_board5, r_board3, r_ground):
+def wifi_deck(corner, r_board5, r_board3, r_ground, esr=WIFI_CAP_ESR_SCENARIO,
+              r_contact=0.0):
     """POW-003: hw/boards/wifi.py as built. The source, the input path and the
     other loads feed 5V_SYS; the card hangs off it through the slot's feed
     (PTC, link, sense, contacts), so the slot's +5V sags with the burst as it
@@ -141,15 +142,16 @@ wrdata {{name}}.dat v(out,return) v(sw) v(card)
 .endc
 """.format(vbus=ch["vbus"], ton=T_APPLY, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
            iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], rboard5=r_board5,
-           rboard3=r_board3, rground=r_ground, esr=WIFI_CAP_ESR_SCENARIO,
+           rboard3=r_board3, rground=r_ground + r_contact, esr=esr,
            cin=d.WIFI_CIN * d.CERAMIC_DERATE,
            l=d.WIFI_BUCK_L, cout=d.WIFI_COUT * d.CERAMIC_DERATE, chf=d.WIFI_COUT_HF, r1=d.WIFI_BUCK_R1,
            r2=d.WIFI_BUCK_R2, i0=i0, i1=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6, tend=T_END)
 
 
-def run_wifi(corner, r_board5, r_board3, r_ground):
-    name = "pow003_" + corner
-    spice.run(name, wifi_deck(corner, r_board5, r_board3, r_ground).replace("{name}", name),
+def run_wifi(corner, r_board5, r_board3, r_ground, *, esr=WIFI_CAP_ESR_SCENARIO,
+             r_contact=0.0, tag=''):
+    name = "pow003_" + corner + tag
+    spice.run(name, wifi_deck(corner, r_board5, r_board3, r_ground, esr, r_contact).replace("{name}", name),
               libs=("TLV62569_TRANS.lib",))
     return spice.wave(name)
 
@@ -197,11 +199,11 @@ def wifi_card(out=None):
         c.check("F3" + n, "%s: slot +5V at the card in the burst vs VOUT high + I x (RDS(on) hot + DCR)" % corner,
                 vcard_min, hi_dc + d.WIFI_I_3V3 * (d.BUCK_RHS * d.BUCK_RDS_HOT + d.WIFI_BUCK_DCR), ">=")
     # The GND raster is a fixed-width path scenario, not a solved effective
-    # resistance; pad thermal spokes still need validation. The ESR scenario
-    # needs a manufacturer bound; local converter/ESP32 thermal coupling needs
-    # calibrated evidence. Keep the laid-out-board claim red until those exist.
+    # resistance. The vendor's published capacitor data has no maximum ESR;
+    # neither pad/contact resistance nor local thermal coupling is calibrated.
     c.check('F4', 'GND mesh discrepancy <= 10%', discrepancy, 0.10, '<=', '', fmt='%.3f')
-    c.check('F5', 'capacitor ESR maximum and local thermal evidence complete', 0, 1, '>=', '', fmt='%d')
+    c.check('F5', 'C1/C2/C3 guaranteed ESR maximum available for the fitted parts', 0, 1, '>=', '', fmt='%d')
+    c.check('F6', 'routed GND pad/spoke/contact resistance validated', 0, 1, '>=', '', fmt='%d')
     return c.done()
 
 
