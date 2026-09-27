@@ -111,6 +111,24 @@ def main_cli():
                     'main:MEM_D0' not in bad_rom_data['runtime_nets']:
                 raise AssertionError('removed ROM DQ0 copper did not disable read-data path')
             print('open ROM MEM_D0 launch disables the executable read-data path')
+            bad_select = open_launch('U7', '34', '/SPI_nCS0_SRC')
+            if bad_select['runtime']['slots'][0]['cs_connected'] or \
+                    bad_select['runtime']['routed_top'] or \
+                    'main:SPI_nCS0_SRC' not in bad_select['runtime_nets']:
+                raise AssertionError('removed slot 1 select launch did not disconnect its executed path')
+            if not all(slot['cs_connected'] for slot in bad_select['runtime']['slots'][1:]):
+                raise AssertionError('slot 1 copper mutation altered another slot select')
+            from test_cosim_runtime import run, SLOT_PROBE
+            good_top = Path(temporary) / 'good-top.json'
+            bad_top = Path(temporary) / 'open-slot1-select.json'
+            import json
+            good_top.write_text(json.dumps(good_route))
+            bad_top.write_text(json.dumps(bad_select))
+            good_frames = run(good_top, SLOT_PROBE)['frames']
+            bad_frames = run(bad_top, SLOT_PROBE)['frames']
+            if good_frames < 1 or bad_frames != 0:
+                raise AssertionError(f'open routed slot select did not stop native SPI: {good_frames} / {bad_frames}')
+            print(f'open routed slot 1 select stops native SPI frames: {good_frames} -> {bad_frames}')
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')

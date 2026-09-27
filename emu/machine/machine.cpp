@@ -464,7 +464,8 @@ uint32_t Machine::inputs(bool por) {
 }
 
 bool Machine::selected(int slot, uint32_t out) const {
-  return slot >= 1 && slot <= 6 && !((out >> slotWiring[slot - 1].cs) & 1u);
+  return slot >= 1 && slot <= 6 && slotWiring[slot - 1].csConnected &&
+         !((out >> slotWiring[slot - 1].cs) & 1u);
 }
 
 uint32_t Machine::sckFor(int slot, uint32_t out) const { return (out >> slotWiring[slot - 1].sck) & 1u; }

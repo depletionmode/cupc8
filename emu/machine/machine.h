@@ -196,6 +196,7 @@ class Machine {
     struct SlotWiring {
       uint8_t sck = 0, mosi = 1, cs = 2, irq = 0;
       bool miso = true;
+      bool csConnected = true;
     };
     std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;

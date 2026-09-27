@@ -302,6 +302,48 @@ def check(cards, main, pcb=None):
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     manifest['runtime']['routed_timing'] &= all(write_links.values()) and \
         manifest['runtime']['rom_read_d0_connected']
+    # Each slot-select source crosses one 33-ohm resistor. Verify both copper
+    # legs from the actual package pads, then use the result to gate the
+    # native card select. Net-level route length alone can miss an open pad.
+    for slot, wiring in enumerate(manifest['runtime']['slots'], 1):
+        source_net = f'/SPI_nCS{slot-1}_SRC'
+        output_net = f'/SLOT{slot}_CS_n'
+        source = next(((ref, pin) for (ref, pin), net in main.pins.items()
+                       if ref == 'U7' and net == source_net), None)
+        if source is None:
+            raise ValueError(f'{source_net}: chipset source pad missing')
+        resistor = main.series(source, (f'J{10+slot}', 'A14'))
+        if resistor is None or resistor.value != '33':
+            raise ValueError(f'{source_net}: slot-select series resistor missing')
+        base_ref = resistor.ref.split('.')[0]
+        source_pad = next(((base_ref, pad) for (ref, pad), net in main.pins.items()
+                           if ref == base_ref and net == source_net), None)
+        output_pad = next(((base_ref, pad) for (ref, pad), net in main.pins.items()
+                           if ref == base_ref and net == output_net), None)
+        if source_pad is None or output_pad is None:
+            raise ValueError(f'{source_net}: resistor pad mapping missing')
+        legs = {'source': None, 'slot': None}
+        if pcb is not None and Path(pcb).is_file():
+            from ibis_bus import routed_distances
+            legs['source'] = routed_distances(Path(pcb), source_net, source, [source_pad])[
+                f'{source_pad[0]}.{source_pad[1]}']
+            target = (f'J{10+slot}', 'A14')
+            legs['slot'] = routed_distances(Path(pcb), output_net, output_pad, [target])[
+                f'{target[0]}.{target[1]}']
+        wiring['cs_connected'] = all(length is not None for length in legs.values())
+        manifest['paths'].append({'from': f'main.{source[0]}.{source[1]}',
+                                  'to': f'main.{source_pad[0]}.{source_pad[1]}',
+                                  'route_mm': legs['source'], 'runtime': f'slot{slot}_select_connected'})
+        manifest['paths'].append({'from': f'main.{output_pad[0]}.{output_pad[1]}',
+                                  'to': f'main.J{10+slot}.A14',
+                                  'route_mm': legs['slot'], 'runtime': f'slot{slot}_select_connected'})
+        if not wiring['cs_connected']:
+            for leg, length in legs.items():
+                if length is None:
+                    manifest['runtime']['missing_routes'].append(
+                        f'slot{slot}_select_{leg}:{source_net if leg == "source" else output_net}')
+    manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # CPU driver pack channels must remain explicit; the native board model
     # may use these channel values as edge delays after E2E-001 integration.
     import cpu
@@ -504,6 +546,7 @@ def check(cards, main, pcb=None):
     for slot in range(1, 7):
         runtime_net('main', f'SLOT{slot}_CS_n')
         runtime_net('main', f'SLOT_nIRQ{slot-1}')
+        runtime_net('main', f'SPI_nCS{slot-1}_SRC')
     for name in ('BR_SCK', 'BR_MOSI', 'BR_MISO', 'BR_nCS'):
         runtime_net('system', name)
     for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):

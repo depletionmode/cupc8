@@ -66,6 +66,15 @@ This counterexample does not establish analog open-pin behavior.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
+Each of the six main-board slot chip selects is now connected to the native
+card-select input through its netlist-identified 33 Ω resistor. Copper is
+traced separately from the chipset package pad to the resistor input and
+from the resistor output to the slot contact. A missing leg deasserts the
+corresponding card's select in the native machine and fails `--require-route`.
+The slot 1 source launch mutation leaves the other five selects intact and
+reduces recorded SPI frames from 15 to 0. This accounts for the six
+`SPI_nCS*_SRC` nets; clock and MOSI source legs and card-local slot signals
+remain separate coverage gaps.
 The storage card's seven SD signal contacts similarly control whether the
 microSD socket is attached to its RP2040 model.
 All four HDMI differential pairs, including the clock pair, must pass through
@@ -96,7 +105,8 @@ python3 hw/cosim/run.py E2E-004
 
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
-supervisor's routed nPOR launch. The third proves that ROM and CPU
+supervisor's routed nPOR launch and slot 1 chip-select launch, then executes
+the native SPI counterexample. The third proves that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
 nPOR path, memory-write branches and ROM DQ0 read route change the running
 machine. The manifest currently covers the CPU, main memory, slot data paths,
@@ -104,8 +114,9 @@ system bridge, Type-C source class and
 supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
-reserved contacts now have pin-bound waivers; 457 remain unmodeled. The
-remaining groups are boot/programming (98), slot/control bus (74), CPU/memory
+reserved contacts have pin-bound waivers and six slot-select sources now
+affect execution; 451 remain unmodeled. The remaining groups are
+boot/programming (98), slot/control bus (68), CPU/memory
 (71), power/return (65), clock/reset (53), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
