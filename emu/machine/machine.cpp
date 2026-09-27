@@ -419,7 +419,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     if (kind == "hdmi") tmds = std::make_unique<TmdsCapture>(c->e);
     if (kind == "eink" || kind == "eink750")  // the panel on its header: 5.83" 648x480 or 7.5" 800x480
       panels[slot] = std::make_unique<EinkPanel>(c->e, EinkPanel::config(kind == "eink" ? 648 : 800, 480));
-    if (kind == "storage") c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
+    if (kind == "storage" && o.storageSdSocket)
+      c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
     if (kind == "io") {
       c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
       if (o.ioUsbHost) keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});

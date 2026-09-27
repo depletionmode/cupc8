@@ -66,6 +66,10 @@ def main_cli():
         broken_io['io'].resistors = tuple(r for r in broken_io['io'].resistors if r.ref != 'R14')
         rejected(broken_io, main, 'missing IO USB D- series resistor')
 
+        broken_sd = copy.deepcopy(cards)
+        del broken_sd['storage'].pins[('J2', '5')]
+        rejected(broken_sd, main, 'missing storage SD clock contact')
+
 
 if __name__ == '__main__':
     main_cli()

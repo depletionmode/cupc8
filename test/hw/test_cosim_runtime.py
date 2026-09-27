@@ -42,8 +42,8 @@ m.stop();
 """
 USB_PROBE = """
 import { Machine } from './test/emu/machinenative.mjs';
-const m = await Machine.create({slots: {1: 'io'}, threaded: false});
-console.log(JSON.stringify({keyboard: Boolean(m.keyboard)}));
+const m = await Machine.create({slots: {1: 'io', 2: 'storage'}, threaded: false});
+console.log(JSON.stringify({keyboard: Boolean(m.keyboard), sd: Boolean(m.sd)}));
 m.stop();
 """
 
@@ -107,9 +107,17 @@ def main():
         mutant = Path(directory) / 'open-io-usb.json'
         mutant.write_text(json.dumps(changed))
         usb_good, usb_bad = run(args.top, USB_PROBE), run(mutant, USB_PROBE)
-        if usb_good != {'keyboard': True} or usb_bad != {'keyboard': False}:
+        if usb_good != {'keyboard': True, 'sd': True} or usb_bad != {'keyboard': False, 'sd': True}:
             raise AssertionError(f'IO USB data path does not control keyboard attachment: {usb_good} / {usb_bad}')
         print('open IO USB D+/D- path detaches the keyboard')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['storage_sd_socket'] = False
+        mutant = Path(directory) / 'open-storage-sd.json'
+        mutant.write_text(json.dumps(changed))
+        sd_bad = run(mutant, USB_PROBE)
+        if sd_bad != {'keyboard': True, 'sd': False}:
+            raise AssertionError(f'storage SD path does not control socket attachment: {sd_bad}')
+        print('open storage SD contact detaches the microSD socket')
     print(f"valid netlist wiring runs normally to PC ${good['pc']:04x}")
 
 

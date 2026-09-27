@@ -147,6 +147,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.sysctl = flag("sysctl", false);
     opt.pwrHi = flag("pwrHi", true);
     opt.ioUsbHost = flag("ioUsbHost", true);
+    opt.storageSdSocket = flag("storageSdSocket", true);
     opt.threaded = flag("threaded", true);
     opt.spiLog = flag("spiLog", false);
     opt.espTx = integer("espTx", -1);

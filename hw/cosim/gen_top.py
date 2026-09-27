@@ -342,6 +342,21 @@ def check(cards, main, pcb=None):
                                   'series': resistor, 'ohms': 27,
                                   'runtime': 'io_usb_host'})
     manifest['runtime']['io_usb_host'] = True
+    # The microSD socket is a direct seven-wire attachment to the storage
+    # RP2040. An absent or swapped contact removes that socket from co-sim.
+    sd_contacts = {'SD_DAT2': '1', 'SD_nCS': '2', 'SD_MOSI': '3',
+                   'SD_SCK': '5', 'SD_MISO': '7', 'SD_DAT1': '8',
+                   'SD_nDETECT': '9'}
+    for signal, connector_pin in sd_contacts.items():
+        sources = [(ref, pin) for (ref, pin), net in cards['storage'].pins.items()
+                   if ref == 'U1' and net == f'/{signal}']
+        if len(sources) != 1:
+            raise ValueError(f'storage {signal}: RP2040 pad missing')
+        path(cards['storage'], sources[0], ('J2', connector_pin))
+        manifest['paths'].append({'from': f'storage.U1.{sources[0][1]}',
+                                  'to': f'storage.J2.{connector_pin}',
+                                  'net': signal, 'runtime': 'storage_sd_socket'})
+    manifest['runtime']['storage_sd_socket'] = True
     clock = named_pin(main, 'Y1', 'OUT')
     fpga_clk = [(ref, pin) for (ref, pin), net in main.pins.items()
                 if ref == 'U7' and net == '/CLK12']
@@ -401,6 +416,8 @@ def check(cards, main, pcb=None):
         runtime_net('system', name)
     for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
         runtime_net('io', name)
+    for name in sd_contacts:
+        runtime_net('storage', name)
     unmodeled, structural_only = [], []
     for board, circuit in circuits.items():
         for net in circuit.nets:

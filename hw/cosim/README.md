@@ -31,6 +31,8 @@ trip is 1.289 V on the active CC line; the test drives the 3 A minimum or
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
+The storage card's seven SD signal contacts similarly control whether the
+microSD socket is attached to its RP2040 model.
 
 From the repo root, after building the main board:
 

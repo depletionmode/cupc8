@@ -139,8 +139,12 @@ export class Machine {
     const pwrHiAtFpga = netlistTop ? (pwrHi ? 1.524 : 1.090) >= Math.max(...trips) : pwrHi;
     if (netlistTop && typeof netlistTop.runtime.io_usb_host !== 'boolean')
       throw new Error('machinenative: invalid IO USB host path');
+    if (netlistTop && typeof netlistTop.runtime.storage_sd_socket !== 'boolean')
+      throw new Error('machinenative: invalid storage SD socket path');
     m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
-      ioUsbHost: netlistTop?.runtime.io_usb_host ?? true, memoryWiring: netlistTop?.runtime,
+      ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
+      storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
+      memoryWiring: netlistTop?.runtime,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
     if (sysctl) {
@@ -154,7 +158,7 @@ export class Machine {
         get state() { return native.keyboard(h); },
       };
     }
-    if (Object.values(slots).includes('storage')) {
+    if (Object.values(slots).includes('storage') && (netlistTop?.runtime.storage_sd_socket ?? true)) {
       // the storage card's microSD socket (emu/rp2040/harness/sdcard.h): an
       // image file goes in (written through as blocks are programmed), comes out
       const h = m.h;

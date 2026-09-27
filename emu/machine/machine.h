@@ -202,6 +202,7 @@ class Machine {
     bool sysctl = false;
     bool pwrHi = true;               // USB-C source advertises 3 A (chipset PWR_HI input)
     bool ioUsbHost = true;           // receptacle D+/D- physically reach the IO MCU
+    bool storageSdSocket = true;     // seven microSD contacts reach storage MCU
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
     bool threaded = true;
