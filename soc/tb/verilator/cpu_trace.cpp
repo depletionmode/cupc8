@@ -52,8 +52,8 @@ int main(int argc, char **argv) {
 			busy = false;
 			if (cyc_rw == 0) {
 				if (started) printf("W %04x %02x\n", cyc_a, cyc_d);
-				if (cyc_a == 0xf200) p &= ~cyc_d & 0xf;
-				else if (cyc_a == 0xf201) new_mask = cyc_d & 0xf;
+				if (cyc_a == 0xf200) p &= ~cyc_d & 0x1f;
+				else if (cyc_a == 0xf201) new_mask = cyc_d & 0x1f;
 				mem[cyc_a] = (uint8_t)cyc_d;
 			}
 		} else if (!busy && cpu.n_stb == 0 && cpu.n_rst) {	// new cycle
@@ -105,7 +105,8 @@ int main(int argc, char **argv) {
 		pending = p; mask = new_mask; rdy = new_rdy;
 		cpu.n_rdy = new_rdy;
 		cpu.d_in = new_din;
-		cpu.irq = pending & mask;
+		const unsigned active = pending & mask;
+		cpu.irq = (active & 7) | ((active & 0x18) ? 8 : 0);
 		if (cycle == 5) cpu.n_rst = 1;
 		cpu.clk = 0;
 		cpu.eval();
