@@ -1044,21 +1044,41 @@ must_fail = ["FAIL: the Wi-Fi card's clock is not the board's at its selects"]
 
 [[bug]]
 name = "Board gates accepted stale source provenance for a routed build"
-fixed_in = "board-evidence"
+fixed_in = "5729b36"
 revert = [["hw/tools/boardevidence.py", "if evidence.get('inputs') != inputs(board, root):", "if False:"]]
 cmd = "python3 test/hw/test_boardcheck.py EvidenceTests.test_stale_source"
 must_fail = ["FAIL: test_stale_source"]
 
 [[bug]]
 name = "Board gates accepted a changed routed PCB under an old success receipt"
-fixed_in = "board-evidence"
+fixed_in = "5729b36"
 revert = [["hw/tools/boardevidence.py", "if evidence.get('artifacts') != artifacts(out):", "if False:"]]
 cmd = "python3 test/hw/test_boardcheck.py EvidenceTests.test_changed_board"
 must_fail = ["FAIL: test_changed_board"]
 
 [[bug]]
 name = "Board gates ignored DRC unconnected and schematic parity findings"
-fixed_in = "board-evidence"
+fixed_in = "5729b36"
 revert = [["hw/tools/boardcheck.py", "findings = [v for key in keys for v in report[key]]", "findings = report['violations']"]]
 cmd = "python3 test/hw/test_boardcheck.py ReportTests.test_each_drc_failure_class"
 must_fail = ["FAIL: test_each_drc_failure_class"]
+[[bug]]
+name = "crosstalk screen: split collinear tracks hid a long parallel run"
+fixed_in = "crosstalk initial implementation"
+revert = [["hw/tools/crosstalk.py", "if merged and lo <= merged[-1][1] + 1e-6:", "if False:"]]
+cmd = "python3 test/hw/test_crosstalk.py"
+must_fail = ["FAIL: test_split_tracks_still_detected"]
+
+[[bug]]
+name = "crosstalk screen: centerline spacing hid close copper edges"
+fixed_in = "crosstalk initial implementation"
+revert = [["hw/tools/crosstalk.py", "gap = b[0] - a[0] - (a[2] + b[2]) / 2", "gap = b[0] - a[0]"]]
+cmd = "python3 test/hw/test_crosstalk.py"
+must_fail = ["FAIL: test_long_close_run"]
+
+[[bug]]
+name = "BUS-005: a missing routed layout silently passed with nominal limits"
+fixed_in = "BUS-005 routed-evidence gate"
+revert = [["hw/timing/cpubus_budget.py", '''raise ValueError("BUS-005: routed trace lengths missing: " + path)''', '''return 150.0, 50.0, "nominal limits"''']]
+cmd = "python3 test/hw/test_bus_lengths.py"
+must_fail = ["FAIL: test_missing_layout_is_red"]
