@@ -24,11 +24,16 @@ At 115 °C, 24.9/11.4 µm outer/inner copper, 80% effective drawn width,
 | --- | ---: |
 | J1 A4B9 → F1:1, with B.Cu branch | 6.203 mΩ |
 | J1 B4A9 → F1:1 | 20.165 mΩ |
+| Both J1 VBUS pads held at one ideal source potential → F1:1 | 5.466 mΩ |
 | F1:2 → U2:5, with B.Cu branch | 10.397 mΩ |
 | **A-side positive sum** | **16.600 mΩ** |
+| **Ideal tied-pad positive sum** | **15.863 mΩ** |
 
-The model fixes one J1 pad at a time and does not bound current sharing
-between mated contacts. Even the lower A-side sum leaves only **3.400 mΩ**
+The ordinary model fixes one J1 pad at a time. A separate optimistic solve
+contracts both connector VBUS pad nodes to one ideal voltage source; this
+assumes zero source-side contact imbalance and omits contact resistance.
+Neither solve bounds actual sharing. The A-side sum leaves **3.400 mΩ**,
+and even the ideal tied-pad sum leaves just **4.137 mΩ**
 for all GND copper, via/pad transitions, both mated contact groups and
 solder under the 20 mΩ loop requirement. The prior In1-only return *scenario*
 was about 3.46 mΩ at this corner before its via and pad contact, so this
