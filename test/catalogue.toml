@@ -1340,12 +1340,30 @@ kind = "sim"
 vrow = "3.2"
 
 [[test]]
+id = "E2E-002A"
+title = "Native emulator: blank ROM to BASIC screen text"
+checks = "with RTL and real card firmware, program a blank ROM via sysctl USB, boot, type a BASIC program and match the decoded HDMI text recording"
+method = "test/emu/test_e2e.mjs E2E-002 on the native machine; schematic wiring and a pixel golden are covered separately"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002"
+
+[[test]]
 id = "E2E-003"
 title = "Network fetch"
 checks = "Wi-Fi join → TCP fetch from a local server (a child process) → page shown; on the native emulator two runs with the same port (CUPC8_E2E003_PORT) are the same run (CUPC8_ESP_TRACE traces and end state identical)"
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
+
+[[test]]
+id = "E2E-003A"
+title = "Native emulator: Wi-Fi fetch reaches HDMI screen text"
+checks = "with RTL and real Wi-Fi firmware in lockstep QEMU, join, fetch from a local server, observe one request and match decoded HDMI text"
+method = "test/emu/test_e2e.mjs E2E-003 on the native machine; schematic wiring is covered separately"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-003"
 
 [[test]]
 id = "E2E-013"
@@ -2534,6 +2552,24 @@ method = "synthetic routed geometry and KiCad file fixtures; screening only, ana
 kind = "sim"
 vrow = "4.6"
 cmd = "python3 test/hw/test_crosstalk.py"
+
+[[test]]
+id = "COSIM-001"
+title = "KiCad netlist connectivity extraction regression"
+checks = "direct nets, two-pin series resistors and supply pulls are represented separately; missing or swapped wires change the graph"
+method = "synthetic KiCad exported-netlist fixtures; graph primitive only, not schematic-driven whole-machine simulation"
+kind = "static"
+vrow = "3.1"
+cmd = "python3 test/hw/test_cosim_netlist.py"
+
+[[test]]
+id = "COSIM-002"
+title = "CPU card series termination from its generated KiCad netlist"
+checks = "every driven CPU FPGA signal reaches exactly one edge finger through its own 33-ohm resistor-pack channel"
+method = "generate the CPU schematic, export its KiCad netlist, and trace all 31 driven signal paths"
+kind = "static"
+vrow = "3.1"
+cmd = "python3 hw/cosim/check_cpu.py"
 
 [[test]]
 id = "BUS-005A"
