@@ -399,7 +399,7 @@ net_c_ping:
 	ld r0, [ping_sent]
 	push pch
 	push pcl
-	b str_printuint8
+	b term_print_u8
 	mov r0, #>[ping_s_sent]
 	mov r1, #<[ping_s_sent]
 	push pch
@@ -408,7 +408,7 @@ net_c_ping:
 	ld r0, [ping_got]
 	push pch
 	push pcl
-	b str_printuint8
+	b term_print_u8
 	mov r0, #>[ping_s_got]
 	mov r1, #<[ping_s_got]
 	push pch
@@ -473,7 +473,7 @@ ping_print_seq:
 	ld r0, [ping_seq]
 	push pch
 	push pcl
-	b str_printuint8
+	b term_print_u8
 	pop pcl
 	pop pch
 

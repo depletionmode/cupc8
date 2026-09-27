@@ -4,6 +4,27 @@ What is decided, what is running, and what is left, kept current so the work
 survives a lost session. Newest first within each section. Specs live in
 `doc/hardware/`; this file points at them.
 
+## Decisions carried forward (2026-09-25–27)
+
+- BASIC is a loadable program at $7000, loaded from SD or the ROM fallback;
+  networking stays in the kernel (`proposals/basic-program.md`,
+  `proposals/kernel-api.md`). Keep BASIC's checksum on reload.
+- Banked RAM is 512 KB with the $8000–$bfff window selected by RAM_BANK
+  (`proposals/extended-ram.md`). SRAM A16–A18 must be connected.
+- USB console uses the system card's second CDC port, with the documented
+  timeout (`proposals/usb-console.md`).
+- The native emulator runs Wi-Fi QEMU in lockstep. The 125 MIPS versus
+  160 MHz approximation is recorded in `emu/machine/README.md`.
+- M1's e-ink display is the Waveshare 7.5-inch HAT V2
+  (`hardware/eink-card.md`).
+- Main board: six layers; POWER and RESET at the front, machine initially
+  off, system card unpowered while off (`hardware/power.md`). Eight layers
+  would need a new cost decision. Preserve socket alignment and mounting
+  geometry while opening routing channels.
+- All eight boards need assembled parts, stock at twice the order quantity,
+  branding/revision and the common LED placement. Final stock is checked
+  online. David performs the fabrication hand checks and places the order.
+
 ## Decisions (David, 2026-09-24)
 
 - **Card form factor:** the CPU card has the I/O card outline (62 × 39.05 mm
@@ -26,7 +47,7 @@ survives a lost session. Newest first within each section. Specs live in
   card can be tape or a hard disk. Replaces the microSD on the IO card
   (`proposals/io-microsd.md`, superseded). FatFs on the card, `SAVE` writes
   text, 4 handles. The IO card stays keyboard only.
-- **E-ink graphics card**: to explore, not build (`proposals/eink-gpu.md`).
+- **Earlier e-ink exploration decision superseded:** the e-ink card is included in M1.
 - **Native emulator** (`emu/`) is the emulator from now on; the JS one
   (`test/emu/machine.mjs`) is legacy and not kept up to date. Another agent
   owns `emu/`'s core work.
@@ -41,22 +62,20 @@ survives a lost session. Newest first within each section. Specs live in
   (`milestone-1.md`, Indicator LEDs).
 - **Board revision** on every board's silkscreen and title block.
 
-## In flight
+## In flight (2026-09-27)
 
 | Work | State |
 |---|---|
-| GPU, IO, storage card boards | IO passes every step; GPU one DRC item; storage drawn. IO gets a keyboard-port boost next (David) |
-| System card board | passes every step; merging milestone-1 (kicadgen overlaps with the CPU card's) |
-| Main board | routing; picking up the CPU card's pinout and the new power parts |
-| E-ink card board | pipeline run |
-| E-ink software (firmware, kernel INFO driver, UC8179 model, viewer) | done, all tests pass; merging milestone-1 (renumbers its E2E to E2E-008) |
-| Power: keyboard-port boost (B16), default USB = typical loads (B6/B7), drop THM T5–T7 | power agent |
-| Firmware bugs: storage slot frames at 20 µs gap, ST_EJECT before programming ends, IOC-004 key repeat | firmware agent |
+| Main board | Existing main-board branch: six-layer layout; pin remap, modest outline growth, fine signal rules and ten routing workers approved. Routing is incomplete. |
+| BASIC follow-ups | Packed ROM image, approved dead-code removals, run/hook handshake, isolated Nim cache and assembler comment parsing. Simulator checks precede emulator checks. |
+| Board verification | Wire static/power/thermal catalogue rows and add storage, e-ink and system rows with checks that reject missing evidence. |
+| SI and schematic co-simulation | Still required by verification.md; routed crosstalk screening alone does not satisfy analog SI. Main-board trace extraction waits for routing. |
+| Final gate | Run make verify after integration; regenerate fab-readiness; inspect renders and list David's hand checks. No manufacturing upload or order. |
 
 ## Done (recent)
 
-- CPU card board passes every step (4 layers; FPGA pinout reordered to the
-  socket's fingers; fmax 59.5 MHz, bus slack 65/64 %).
+- CPU card now uses six layers. The seven card pipelines were reported complete
+  at handoff; final integration reruns and live stock checks remain required.
 - SD card model in the native emulator (EMU-008), STO-003, E2E-007 (BASIC
   SAVE/LOAD on the whole machine).
 - Storage card software: FatFs core, RP2040 port, kernel/BASIC, 2668 host

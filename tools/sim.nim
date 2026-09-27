@@ -249,9 +249,12 @@ proc gpuPresent*() =
   let c = gpuCard()
   if c.isNil:
     return
-  if gpuFrame.len == 0:
-    gpuFrame = newSeq[uint32](GpuOutW * GpuOutH)
-  display_setSize(GpuOutW, GpuOutH)
+  # the card's whole picture: 640 x 480 on HDMI, the e-ink panel's 648 or 800 x 480
+  let w = int(simcard_out_w(c))
+  let h = int(simcard_out_h(c))
+  if gpuFrame.len != w * h:
+    gpuFrame = newSeq[uint32](w * h)
+  display_setSize(w, h)
   simcard_render(c, addr gpuFrame[0])
   display_blit(addr gpuFrame[0])
 
@@ -267,6 +270,19 @@ proc pushKey*(k: int) =
   raiseIrq(0)
 
 proc keyPending*(): bool = has_key
+
+proc pushUsage*(usage: int) =
+  ## A key without a character (arrows, Home, End, PgUp, PgDn, Insert,
+  ## Delete, F1-F12) by its USB HID usage: pressed and released on the IO
+  ## card's USB path, whose core (io_translate) gives the byte.
+  if ioModel == imCards:
+    let c = ioCard()
+    if not c.isNil:
+      var down = [0'u8, 0, uint8(usage), 0, 0, 0, 0, 0]
+      var up: array[8, uint8]
+      simcard_hid(c, addr down[0], simMillis())
+      simcard_hid(c, addr up[0], simMillis())
+      cardsTick()
 
 proc romWindow(a: int): int =
   ## ROM chip offset for CPU address a, or -1 if a is not in a ROM window.
@@ -915,6 +931,8 @@ const
   ProgramEnd* = 0xe000
   ApiRun* = 0x6f21               ## the API block's API_RUN mailbox (kernel/api.s)
 
+proc cpuStep*(): StepResult
+
 proc runProgram*(data: string): bool =
   ## What `cupc8.py run` does through the system card: the program's body at
   ## $7000, then API_RUN = 1; the kernel's terminal starts it while it waits
@@ -926,6 +944,16 @@ proc runProgram*(data: string): bool =
       return false
     body = body[4 .. ^1]
   if body.len > ProgramEnd - ProgramBase:
+    return false
+  if mem[ApiRun] != 0:
+    return false
+  mem[ApiRun] = 3
+  var steps = 0
+  while mem[ApiRun] != 4 and steps < 24_000_000:
+    if cpuStep() != sOk: break
+    inc steps
+  if mem[ApiRun] != 4:
+    mem[ApiRun] = 0
     return false
   for i, c in body:
     mem[ProgramBase + i] = ord(c)
@@ -1049,6 +1077,7 @@ when isMainModule:
   var doTrace = false
   var wantDisplay = true
   var dumpFb = ""
+  var dumpWindow = ""
   # the Milestone 1 machine (the default; --legacy for the old I/O model)
   var legacy = defined(emscripten)
   var cardList = "hdmi,io"
@@ -1064,15 +1093,18 @@ when isMainModule:
 
 The Milestone 1 machine (the default): reset runs the boot ROM, which loads
 the kernel from the ROM chip; the slot cards run the real card firmware cores.
-  --cards:LIST      slot cards, slots 1.. in order (default hdmi,io); kinds:
+  --slots LIST      slot cards, slots 1.. in order (default hdmi,io); kinds:
                     """ & CardKindNames & """
 
-  --sd:IMAGE        the storage card's SD card: a FAT image (a blank 32 MB one
+  --sd IMAGE        the storage card's SD card: a FAT image (a blank 32 MB one
                     is made if the file does not exist)
   --rom:FILE        boot this ROM image (default: built from rom/boot.s and
                     kernel.o, or from kernel/ when no kernel.o is given)
   --type:TEXT       type TEXT on the keyboard (\n = Enter), one key each time
-                    the CPU parks in WAI (the kernel's keyboard wait); repeatable
+                    the CPU parks in WAI (the kernel's keyboard wait); repeatable.
+                    \t Tab, \e Escape, \xHH the key giving byte HH (e.g. \x80);
+                    named keys {UP} {DOWN} {LEFT} {RIGHT} {HOME} {END} {PGUP}
+                    {PGDN} {INS} {DEL} {F1}..{F12}
   --dump-text:PATH  at exit, write the console's text (- = stdout)
   --settle:MS       headless: guest ms to run on once the typed text is used up
                     and the machine is idle again (default 2000); then exit
@@ -1092,24 +1124,57 @@ reaches the real network and localhost directly.
   --legacy          the old I/O model (ILI9340 display, SD on SPI 1, keyboard on
                     SPI 2); kernel.o (or stdin) is loaded at $1000 and run
 Both:
-  --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --trace  --log-mask:N"""
+  --headless  --max-ins:N  --scale:N  --dump-fb:PATH (a PPM)  --dump-window:PATH (the window, LEDs included; not headless)  --trace  --log-mask:N"""
 
   proc unescapeTyped(t: string): string =
-    ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash.
+    ## --type text: \n and \r are Enter, \t Tab, \e Escape, \\ a backslash,
+    ## \xHH byte HH; {NAME} a named key, as the byte the IO card gives for it
+    ## (iocard.h; pushKey sends each byte as its key). Other braces are text.
+    const named = {"UP": 0x80, "DOWN": 0x81, "LEFT": 0x82, "RIGHT": 0x83,
+                   "HOME": 0x84, "END": 0x85, "PGUP": 0x86, "PGDN": 0x87,
+                   "INS": 0x88, "INSERT": 0x88, "DEL": 0x7f, "DELETE": 0x7f}
     var i = 0
     while i < t.len:
-      if t[i] == '\\' and i + 1 < t.len:
+      if t[i] == '{' and t.find('}', i) > i:
+        let close = t.find('}', i)
+        let name = t[i + 1 ..< close].toUpperAscii
+        var key = -1
+        for (n, b) in named:
+          if n == name: key = b
+        if name.len in 2..3 and name[0] == 'F' and name[1 .. ^1].allCharsInSet(Digits) and
+           parseInt(name[1 .. ^1]) in 1..12:
+          key = 0x90 + parseInt(name[1 .. ^1])
+        if key >= 0:
+          result.add(chr(key))
+          i = close + 1
+          continue
+        result.add('{')
+      elif t[i] == '\\' and i + 1 < t.len:
         inc i
         case t[i]
         of 'n', 'r': result.add('\r')
         of 't': result.add('\t')
         of 'e': result.add('\x1b')
+        of 'x':
+          if i + 2 < t.len and t[i + 1] in HexDigits and t[i + 2] in HexDigits:
+            result.add(chr(parseHexInt(t[i + 1 .. i + 2])))
+            i += 2
+          else:
+            result.add('x')
         else: result.add(t[i])
       else:
         result.add(if t[i] == '\n': '\r' else: t[i])
       inc i
 
-  var p = initOptParser()
+  # Match the native viewer's --slots LIST / --sd IMAGE spelling. All other
+  # existing value options may still use Nim's colon syntax.
+  for arg in commandLineParams():
+    if arg.startsWith("--cards") or arg.startsWith("--slots:") or
+        arg.startsWith("--slots=") or arg.startsWith("--sd:") or arg.startsWith("--sd="):
+      stderr.writeLine("sim: use --slots LIST --sd IMAGE (see --help)")
+      quit(2)
+  var p = initOptParser(commandLineParams(),
+                        longNoVal = @["headless", "trace", "legacy", "console", "help"])
   for kind, key, val in p.getopt():
     case kind
     of cmdArgument:
@@ -1130,11 +1195,19 @@ Both:
         scaleSet = true
       of "dump-fb":
         dumpFb = val
+      of "dump-window":
+        dumpWindow = val
       of "legacy":
         legacy = true
-      of "cards":
+      of "slots":
+        if val.len == 0 or val.startsWith("-"):
+          stderr.writeLine("sim: --slots needs a card list")
+          quit(2)
         cardList = val
       of "sd":
+        if val.len == 0 or val.startsWith("-"):
+          stderr.writeLine("sim: --sd needs an image path")
+          quit(2)
         sdPath = val
       of "rom":
         romPath = val
@@ -1269,7 +1342,7 @@ Both:
     machineCards(kinds)
     if sdPath.len > 0:
       if CardStorage notin kinds:
-        die("--sd needs a storage card in --cards")
+        die("--sd needs a storage card in --slots")
       if not fileExists(sdPath):
         try:
           makeFatImage(sdPath)
@@ -1303,6 +1376,8 @@ Both:
   else:
     cpuLoadFile(binPath)
 
+  if not legacy:
+    display_leds = 0                  # the M1 machine: the GPO LED strip under the picture
   if wantDisplay:
     if not display_init():
       stderr.writeLine("display init failed: " & display_init_error)
@@ -1338,6 +1413,12 @@ Both:
             of K_TAB:
               pushKey(9)
             else:
+              # SDL's scancodes are the USB HID usages: F1-F12 ($3a-$45),
+              # Insert, Home, PgUp, Delete, End, PgDn and the arrows ($49-$52)
+              let sc = int(e.keysym.scancode)
+              if sc in 0x3a..0x45 or sc in 0x49..0x52:
+                pushUsage(sc)
+                continue
               # Ctrl+letter (no TextInput comes for it)
               let sym = int(e.keysym.sym)
               if (e.keysym.modstate and KMOD_CTRL) != 0 and sym >= ord('a') and sym <= ord('z'):
@@ -1452,6 +1533,7 @@ Both:
         if now - lastPresent >= 0.016:
           pumpInput()
           gpuPresent()
+          display_leds = mem[0xf000] and 0xff
           display_render()
           lastPresent = now
         if now - lastMhz >= 1.0:
@@ -1473,6 +1555,11 @@ Both:
       gpuPresent()
       display_dumpPpm(dumpFb)
       note("wrote framebuffer " & dumpFb)
+    if dumpWindow.len > 0:
+      gpuPresent()
+      display_leds = mem[0xf000] and 0xff
+      display_dumpWindow(dumpWindow)
+      note("wrote window " & dumpWindow)
     if not headless and maxIns == 0 and not atend:
       while not atend:                # halted: keep the window up until it is closed
         pumpInput()

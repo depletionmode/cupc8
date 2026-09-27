@@ -118,6 +118,8 @@ void simcard_free(simcard_t *c)
 		free(c->gpu);
 	}
 	free(c->io);
+	if (c->wifi)
+		netposix_free(c->wifi->ctx);    /* its host sockets closed: their ports free again */
 	free(c->wifi);
 	if (c->st) {
 		st_detect(c->st, false);        /* FatFs lets go of the volume before it is freed */
@@ -206,14 +208,16 @@ int simcard_storage_status(simcard_t *c)
 	return c->st ? st_status(c->st) : -1;
 }
 
+int simcard_out_w(simcard_t *c) { return c->eink ? c->panel->cfg.w : GPU_OUT_W; }
+int simcard_out_h(simcard_t *c) { return c->eink ? c->panel->cfg.h : GPU_OUT_H; }
+
 void simcard_render(simcard_t *c, uint32_t *rgb)
 {
 	if (c->eink) {
-		/* the panel's glass, as of its last refresh: the 640x480 middle */
-		int w = c->panel->cfg.w, ox = (w - GPU_OUT_W) / 2;
-		for (int y = 0; y < GPU_OUT_H; y++)
-			for (int x = 0; x < GPU_OUT_W; x++)
-				rgb[y * GPU_OUT_W + x] = c->panel->glass[y * w + ox + x] * 0x010101u;
+		/* the panel's whole glass (648 or 800 x 480), as of its last refresh */
+		int w = c->panel->cfg.w, h = c->panel->cfg.h;
+		for (int i = 0; i < w * h; i++)
+			rgb[i] = c->panel->glass[i] * 0x010101u;
 		return;
 	}
 	if (c->gpu)
@@ -243,6 +247,25 @@ int simcard_eink_refreshes(simcard_t *c, int waveform)
 
 int simcard_eink_errors(simcard_t *c) { return c->eink ? (int)c->panel->errors : -1; }
 
+int simcard_eink_pixel2(simcard_t *c, int x, int y)
+{
+	/* mode 2's picture (eink-card.md): 2 bits a pixel, the leftmost in bits 7-6 */
+	if (!c->eink || x < 0 || y < 0 || x >= c->eink->panel->w || y >= c->eink->panel->h)
+		return -1;
+	uint8_t b = c->eink->gpu.gfx_bytes[y * (c->eink->panel->w / 4) + x / 4];
+	return (b >> (6 - 2 * (x & 3))) & 3;
+}
+
+int simcard_gpu_errors(simcard_t *c) { return c->gpu ? (int)c->gpu->errors : -1; }
+
+/* hold the graphics card's execution (as an e-ink REFRESH does): frames keep
+ * queuing in its FIFO, FREE goes down */
+void simcard_gpu_hold(simcard_t *c, int on)
+{
+	if (c->gpu)
+		c->gpu->hold = on != 0;
+}
+
 void simcard_hid(simcard_t *c, const uint8_t report[8], uint32_t now_ms)
 {
 	if (c->io)
@@ -258,6 +281,11 @@ static int ascii_to_hid(uint8_t ch, uint8_t *mods, uint8_t *usage)
 	if (ch == '\n')
 		ch = '\r';
 	if (ch == 0x7F) { *usage = 0x4C; return 1; }                  /* Delete */
+	/* the IO card's key codes (iocard.h) back to the keys that give them:
+	 * Up, Down, Left, Right, Home, End, PgUp, PgDn, Insert; F1-F12 */
+	static const uint8_t nav[] = {0x52, 0x51, 0x50, 0x4F, 0x4A, 0x4D, 0x4B, 0x4E, 0x49};
+	if (ch >= 0x80 && ch <= 0x88) { *usage = nav[ch - 0x80]; return 1; }
+	if (ch >= 0x91 && ch <= 0x9C) { *usage = (uint8_t)(0x3A + ch - 0x91); return 1; }
 	if (ch >= 1 && ch <= 26 && ch != '\r' && ch != '\b' && ch != '\t') {
 		*mods = 0x01;                                                /* Ctrl+letter */
 		*usage = (uint8_t)(0x04 + ch - 1);

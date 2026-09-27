@@ -16,12 +16,14 @@ Hold:  the fastest data path must still arrive after the capture clock edge
 The FPGA numbers come from nextpnr's place and route of the real designs on
 their real pins (tools/fpga.py); they are the worst over all I/O pins, so they
 bound the bus pins. The rest are allowances, listed below with their source.
-Board lengths come from build/hw/cpubus_lengths.json once the boards are laid
-out (hw/tools/kicadgen.py writes it); until then the layout limits below are
-used, and the layout check must keep every CPU bus net within them.
+Board lengths must come from build/hw/cpubus_lengths.json extracted from the
+routed CPU and main boards. Missing layout evidence is a failed gate.
 """
 
 import json
+import hashlib
+import math
+from pathlib import Path
 import os
 import re
 import subprocess
@@ -50,9 +52,6 @@ ALLOW = {
     "min_data": 3.0,
 }
 
-# layout limits: every CPU bus net, main board + card, and the difference
-# between the two clock traces from the oscillator
-LIMITS = {"bus_trace_mm": 150.0, "clk_trace_diff_mm": 50.0}
 PS_PER_MM = 7.0                 # FR4 stripline, the slow case (microstrip is ~6)
 CONNECTOR_NS = 0.1              # PCIe CEM edge connector, ~15 mm of contact
 RC_NS = 2.2 * 33 * 15e-12 * 1e9 # 33 ohm series resistor into 15 pF, 10-90%
@@ -75,11 +74,29 @@ def io_delays(name):
 
 def lengths():
     path = os.path.join(ROOT, "build", "hw", "cpubus_lengths.json")
-    if os.path.exists(path):
-        with open(path) as f:
-            got = json.load(f)
-        return max(got["bus_mm"].values()), got["clk_diff_mm"], "extracted from the layout"
-    return LIMITS["bus_trace_mm"], LIMITS["clk_trace_diff_mm"], "layout limits (no layout yet)"
+    if not os.path.exists(path):
+        raise ValueError("BUS-005: routed trace lengths missing: " + path)
+    with open(path) as f:
+        got = json.load(f)
+    sys.path.insert(0, os.path.dirname(__file__))
+    from extract_lengths import bus_nets
+    expected = set(bus_nets())
+    if got.get('version') != 1 or set(got.get('bus_mm', {})) != expected:
+        raise ValueError('BUS-005: missing or invalid per-net routed bus lengths')
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) and v > 0
+               for v in got['bus_mm'].values()):
+        raise ValueError('BUS-005: missing or invalid per-net routed bus lengths')
+    if not isinstance(got.get('clk_diff_mm'), (int, float)) or \
+            not math.isfinite(got['clk_diff_mm']) or got['clk_diff_mm'] < 0:
+        raise ValueError('BUS-005: missing or invalid routed clock skew')
+    paths = ('build/hw/main/main.kicad_pcb', 'build/hw/cpu/cpu.kicad_pcb')
+    if set(got.get('sources', {})) != set(paths):
+        raise ValueError('BUS-005: routed board source hashes missing')
+    for relative in paths:
+        board = os.path.join(ROOT, relative)
+        if not os.path.isfile(board) or got['sources'][relative] != hashlib.sha256(Path(board).read_bytes()).hexdigest():
+            raise ValueError('BUS-005: stale routed length evidence: ' + relative)
+    return max(got["bus_mm"].values()), got["clk_diff_mm"], "extracted from the layout"
 
 
 def budget(launch, capture, bus_mm, clk_diff_mm):
@@ -104,8 +121,8 @@ def budget(launch, capture, bus_mm, clk_diff_mm):
 
 
 def main():
-    fpga = {"chipset": io_delays("chipset"), "cpucard": io_delays("cpucard")}
     bus_mm, clk_diff_mm, source = lengths()
+    fpga = {"chipset": io_delays("chipset"), "cpucard": io_delays("cpucard")}
     limit = PERIOD * (1 - MARGIN)
     bad = 0
     print("CPU bus at 12 MHz (%.1f ns): paths must fit in %.1f ns (%d%% slack); lengths: %s"

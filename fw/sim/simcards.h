@@ -27,7 +27,10 @@ int simcard_irq(simcard_t *c);             /* IRQ_n asserted */
 /* background work: execute queued GPU commands, vsync, key repeat */
 void simcard_tick(simcard_t *c, uint32_t now_ms);
 
-/* GPU: render the current picture (640x480, 0x00RRGGBB) */
+/* GPU: the picture's size: 640 x 480 on HDMI, the e-ink panel's (648 or
+ * 800 x 480); render it (0x00RRGGBB, out_w x out_h) */
+int simcard_out_w(simcard_t *c);
+int simcard_out_h(simcard_t *c);
 void simcard_render(simcard_t *c, uint32_t *rgb);
 
 /* GPU state, for tests: the character/attribute of a text cell, and a pixel */
@@ -38,6 +41,9 @@ int simcard_gpu_mode(simcard_t *c);
  * 3 partial) and the UC8179 model's error count; -1 on other cards */
 int simcard_eink_refreshes(simcard_t *c, int waveform);
 int simcard_eink_errors(simcard_t *c);
+int simcard_eink_pixel2(simcard_t *c, int x, int y);  /* mode 2's grey 0-3, -1 off the panel or not e-ink */
+int simcard_gpu_errors(simcard_t *c);       /* the graphics card's command errors (bad frames, bad greys) */
+void simcard_gpu_hold(simcard_t *c, int on); /* hold execution: frames queue in the FIFO */
 
 /* IO: type an ASCII character (press + release of the matching US key) */
 void simcard_type_ascii(simcard_t *c, uint8_t ch, uint32_t now_ms);

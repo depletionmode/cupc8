@@ -33,6 +33,181 @@ api_slots:
 	pop pcl
 	pop pch
 
+; The memory entries: API_ARGS = dst (lo, hi), src (lo, hi), len16 (lo, hi),
+; len 0-65535. They work in API_ARGS: the pointers step through the bytes
+; and len counts down.
+
+; API_MEM_CMP - compare len bytes at dst with those at src (memcmp). r0 = 0
+; if all are equal, else by the first pair that differs (unsigned): 1 if
+; dst's byte is the greater, $ff if it is the less; r1 = dst's byte - src's
+; there, and API_ARGS[0..3] point at that pair, API_ARGS[4..5] = the bytes
+; after it.
+mem_d: resb 2				; what mem_step adds to both pointers
+api_mem_cmp:
+	push pch
+	push pcl
+	b mem_one
+.loop:
+	push pch
+	push pcl
+	b mem_count
+	bzf .equal
+	ldd r0, $6f02
+	ldd r1, $6f00
+	eq r1, r0
+	bzf .next
+	lt r1, r0
+	sub r1, r0
+	bzf .less
+	mov r0, #1
+	b api_ret
+.less:
+	mov r0, #0xff
+	b api_ret
+.next:
+	push pch
+	push pcl
+	b mem_step
+	b .loop
+.equal:
+	xor r0, r0
+	b api_ret
+
+; API_MEM_CPY - copy len bytes from src to dst (memmove: overlapping areas
+; copy right, backwards when dst is above src). r0 = 0
+api_mem_cpy:
+	ld r0, $6f01
+	ld r1, $6f03
+	eq r0, r1
+	bzf .same_page
+	gt r0, r1
+	bzf .back
+	b .fwd
+.same_page:
+	ld r0, $6f00
+	ld r1, $6f02
+	gt r0, r1
+	bzf .back
+.fwd:
+	push pch
+	push pcl
+	b mem_one
+.floop:
+	push pch
+	push pcl
+	b mem_count
+	bzf .done
+	ldd r0, $6f02
+	std $6f00, r0
+	push pch
+	push pcl
+	b mem_step
+	b .floop
+.back:
+	; both pointers past their last byte, then down a byte before each copy
+	ld r0, $6f04
+	st [mem_d], r0
+	ld r0, $6f05
+	st [mem_d+1], r0
+	push pch
+	push pcl
+	b mem_step
+	mov r0, #0xff
+	st [mem_d], r0
+	st [mem_d+1], r0
+.bloop:
+	push pch
+	push pcl
+	b mem_count
+	bzf .done
+	push pch
+	push pcl
+	b mem_step
+	ldd r0, $6f02
+	std $6f00, r0
+	b .bloop
+.done:
+	xor r0, r0
+	b api_ret
+
+; API_TERM_HOOK - set the terminal's hook: r0, r1 = the address (low, high)
+; of a routine in the program at $7000 (0, 0: none). The terminal runs its own
+; commands (help, dir, del, type, net, refresh, exec) and calls the hook, as a
+; routine, with every other line: r0 = 0, API_ARGS[0..1] = a pointer to the
+; line as typed (up to 78 characters, a CR, a 0). exec "NAME" calls it for a
+; file with no program header: r0 = 1, API_ARGS[0..1] = a pointer to the
+; name (BASIC loads and runs it). With no hook the terminal says "invalid
+; cmd" (and exec "bad program header"). API_RUN is 2 while the hook runs.
+; The kernel clears the hook when it loads a program over $7000; BASIC, which
+; it loads there at boot and after each native program, sets it again. r0 = 0
+sys_hook: resb 2
+api_term_hook:
+	st [sys_hook], r0
+	st [sys_hook+1], r1
+	xor r0, r0
+	b api_ret
+
+; mem_d = 1
+mem_one:
+	mov r0, #1
+	st [mem_d], r0
+	xor r0, r0
+	st [mem_d+1], r0
+	pop pcl
+	pop pch
+
+; ZF set if len (API_ARGS[4..5]) is 0; else ZF clear and len one less
+mem_count:
+	ld r0, $6f04
+	ld r1, $6f05
+	eq r0, #0
+	bzf .borrow
+.lo:
+	sub r0, #1
+	st $6f04, r0
+	gt r0, r0				; ZF clear
+	pop pcl
+	pop pch
+.borrow:
+	eq r1, #0
+	bzf .end
+	sub r1, #1
+	st $6f05, r1
+	b .lo
+.end:
+	pop pcl
+	pop pch
+
+; dst and src (API_ARGS[0..3]) += mem_d, 16 bits each
+mem_step:
+	xor r1, r1
+	push pch
+	push pcl
+	b .add
+	mov r1, #2
+.add:
+	ld r0, $6f00+r1
+	push r1
+	ld r1, [mem_d]
+	add r0, r1
+	lt r0, r1				; the low byte carried
+	pop r1
+	st $6f00+r1, r0
+	add r1, #1
+	ld r0, $6f00+r1
+	bzf .carry
+	b .hi
+.carry:
+	add r0, #1
+.hi:
+	push r1
+	ld r1, [mem_d+1]
+	add r0, r1
+	pop r1
+	st $6f00+r1, r0
+	pop pcl
+	pop pch
+
 ; ============================================================ group 1: console
 ; The graphics card's TEXT mode, 80 x 30 (gpu-protocol.md). With no graphics
 ; card these do nothing, and the ones that answer give r0 = $ff.
@@ -104,6 +279,20 @@ api_poke:
 	mov r1, #4
 	b gpu_cmd
 
+; API_READLINE - a line from the keyboard with the terminal's line editor
+; (echoed; Backspace or DEL takes the last character back, Enter ends it)
+; into the buffer at the pointer in API_ARGS[0..1], 80 bytes: up to 78
+; characters, then a CR and a 0. r1 = the characters' count, r0 = 0
+api_readline:
+	ld r1, API_ARGS
+	ld r0, $6f01
+	push pch
+	push pcl
+	b read_string
+	ld r1, [rs_i]
+	xor r0, r0
+	b api_ret
+
 ; command r1 with the argument r0
 api_gpu1:
 	st API_ARGS, r0
@@ -128,10 +317,26 @@ api_query:
 ; protocol's, in API_ARGS: an x16 is two bytes, low first; y8 and colours one
 ; byte. Drawing is clipped to the screen.
 
-; API_GFX_MODE - r0 = 0 TEXT, 1 GFX; clears that mode's picture
+; API_GFX_MODE - r0 = 0 TEXT, 1 GFX, 2 the e-ink card's native mode
+; (eink-card.md: the panel's own resolution in 4 greys, the API_GFX2 entries
+; draw in it); clears that mode's picture. r0 = 0, or $ff for mode 2 on HDMI
+; (INFO says it is not e-paper: nothing is sent, the mode stays)
 api_gfx_mode:
+	eq r0, #2
+	bzf .native
+.send:
 	mov r1, #0x01
+	push pch
+	push pcl
 	b api_gpu1
+	xor r0, r0
+	b api_ret
+.native:
+	ld r1, [gpu_kind]
+	eq r1, #EINK_KIND
+	bzf .send
+	mov r0, #0xff
+	b api_ret
 
 ; API_GFX_PIXEL - API_ARGS = x16, y8, colour
 api_gfx_pixel:
@@ -170,7 +375,8 @@ api_gfx_palette_reset:
 
 ; API_GFX_TEXT8 - 8x8 text, no wrapping: API_ARGS = x16, y8, fg, bg ($ff
 ; transparent); API_ARGS[6..7] = a pointer to the NUL-terminated text (at
-; most 255 characters). The kernel puts the length in API_ARGS[5].
+; most 255 characters). The kernel puts the length in API_ARGS[5]. It waits
+; for the card to have room for the whole frame (FREE).
 api_gfx_text8:
 	ld r1, $6f06
 	ld r0, $6f07
@@ -178,6 +384,11 @@ api_gfx_text8:
 	push pcl
 	b str_len
 	st $6f05, r0
+	shr r0, #6				; the frame, 7 + length bytes, in 64s (rounded up, and 1 over)
+	add r0, #2
+	push pch
+	push pcl
+	b gpu_wait_free			; the card drops a frame it has no room for
 	mov r0, #0x6f
 	st [gpu_src+1], r0
 	xor r0, r0
@@ -231,6 +442,325 @@ api_gfx_getpixel:
 api_gfx_vsync:
 	mov r0, #0x07
 	b api_query0
+
+; ------------------------------------------------------------ mode 2
+; The e-ink card's native mode (API_GFX_MODE 2; eink-card.md, $40-$49): the
+; panel's own resolution, 648 x 480 or 800 x 480, 2 bits a pixel: grey 0
+; black, 1 dark grey, 2 light grey, 3 white. The arguments are the card's, in
+; API_ARGS: x16, y16, w16, h16 are two bytes, low first (positions signed);
+; g is a grey 0-3 (any other: the card draws nothing). Drawing is clipped to
+; the panel. They return r0 = 0, or $ff on HDMI (INFO says it is not
+; e-paper), which is sent nothing. In modes 0 and 1 the card ignores them.
+
+; API_GFX2_PIXEL - API_ARGS = x16, y16, g
+api_gfx2_pixel:
+	mov r0, #0x40
+	mov r1, #5
+	b api_eink_cmd
+
+; API_GFX2_FILL_RECT - API_ARGS = x16, y16, w16, h16, g
+api_gfx2_fill_rect:
+	mov r0, #0x41
+	b api_eink9
+
+; API_GFX2_RECT - a 1-pixel outline; API_ARGS as API_GFX2_FILL_RECT
+api_gfx2_rect:
+	mov r0, #0x42
+	b api_eink9
+
+; API_GFX2_LINE - both ends drawn; API_ARGS = x0_16, y0_16, x1_16, y1_16, g
+api_gfx2_line:
+	mov r0, #0x43
+api_eink9:
+	mov r1, #9
+; command r0 with the r1 bytes at API_ARGS, on e-paper only
+api_eink_cmd:
+	push r0
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	pop r0
+	bzf .eink
+	mov r0, #0xff
+	b api_ret
+.eink:
+	push pch
+	push pcl
+	b gpu_cmd
+	xor r0, r0
+	b api_ret
+
+; API_GFX2_VSCROLL - scroll the picture up API_ARGS[0..1] rows (a signed
+; 16-bit dy: down if negative), the rows uncovered in grey API_ARGS[2]
+api_gfx2_vscroll:
+	mov r0, #0x48
+	mov r1, #3
+	b api_eink_cmd
+
+; API_GFX2_GETPIXEL - API_ARGS = x16, y16; r0 = 0 and r1 = the pixel's grey
+; (0 off the panel or outside mode 2), or r0 = $ff
+api_gfx2_getpixel:
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	bzf .eink
+	mov r0, #0xff
+	b api_ret
+.eink:
+	mov r0, #0x49
+	mov r1, #4
+	b api_query
+
+; API_GFX2_TEXT16 - the 8 x 16 TEXT font anywhere: API_ARGS = x16, y16, fg,
+; bg (a grey, or $ff transparent); API_ARGS[7..8] = a pointer to the
+; NUL-terminated text (at most 255 characters). The kernel puts the length
+; in API_ARGS[6].
+api_gfx2_text16:
+	mov r0, #0x46
+	b api_eink_text
+
+; API_GFX2_TEXT8 - the 8 x 8 font; API_ARGS as API_GFX2_TEXT16
+api_gfx2_text8:
+	mov r0, #0x47
+api_eink_text:
+	push r0
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	bzf .eink
+	pop r0
+	mov r0, #0xff
+	b api_ret
+.eink:
+	ld r1, $6f07
+	ld r0, $6f08
+	push pch
+	push pcl
+	b str_len
+	st $6f06, r0
+	shr r0, #6				; the frame, 8 + length bytes, in 64s (rounded up, and 1 over)
+	add r0, #2
+	push pch
+	push pcl
+	b gpu_wait_free
+	mov r0, #0x6f
+	st [gpu_src+1], r0
+	xor r0, r0
+	st [gpu_src], r0
+	pop r0
+	mov r1, #7
+	push pch
+	push pcl
+	b gpu_cmd_open
+	xor r1, r1
+.loop:
+	ld r0, $6f06
+	eq r1, r0
+	bzf .end
+	push r1
+	ldd r0, $6f07+r1
+	push pch
+	push pcl
+	b gpu_send
+	pop r1
+	add r1, #1
+	b .loop
+.end:
+	push pch
+	push pcl
+	b gpu_cs_off
+	xor r0, r0
+	b api_ret
+
+blit_n: resb 2				; picture bytes still to send
+blit_op: resb 1
+blit_hdr: resb 1			; the arguments before the pointer
+
+; API_GFX2_BLIT1 - a 1-bit picture: API_ARGS = x16, y16, w16, h16, fg, bg
+; (a grey, or $ff transparent); API_ARGS[10..11] = a pointer to its
+; ceil(w/8) x h bytes, rows top first, the most significant bit the
+; leftmost pixel. w is at most 1020, and the frame (11 bytes and the
+; picture) at most 8128 bytes: otherwise nothing is sent and r0 = $fe (send
+; a big picture in several).
+api_gfx2_blit1:
+	mov r0, #0x44
+	mov r1, #10
+	st [blit_op], r0
+	st [blit_hdr], r1
+	mov r1, #7				; ceil(w / 8)
+	mov r0, #3
+	b api_eink_blit
+
+; API_GFX2_BLIT2 - a 2-bit picture: API_ARGS = x16, y16, w16, h16;
+; API_ARGS[8..9] = a pointer to its ceil(w/4) x h bytes, rows top first,
+; the leftmost pixel in bits 7-6. Limits as API_GFX2_BLIT1 (the frame is 9
+; bytes and the picture).
+api_gfx2_blit2:
+	mov r0, #0x45
+	mov r1, #8
+	st [blit_op], r0
+	st [blit_hdr], r1
+	mov r1, #3				; ceil(w / 4)
+	mov r0, #2
+; the picture's bytes a row: (w + r1) >> r0
+api_eink_blit:
+	push r0
+	ld r0, [gpu_kind]
+	eq r0, #EINK_KIND
+	bzf .eink
+	pop r0
+	mov r0, #0xff
+	b api_ret
+.eink:
+	ld r0, $6f05			; w at most 1020 ($3fc), so a row is at most 255 bytes
+	gt r0, #3
+	bzf .big_pop
+	eq r0, #3
+	bzf .w3
+	b .w_ok
+.w3:
+	ld r0, $6f04
+	gt r0, #0xfc
+	bzf .big_pop
+.w_ok:
+	ld r0, $6f04
+	add r0, r1
+	st [n_a], r0
+	lt r0, r1
+	ld r0, $6f05
+	bzf .carry
+	b .row
+.carry:
+	add r0, #1
+.row:
+	st [n_a+1], r0
+	mov r1, #8
+	pop r0					; the shift
+	sub r1, r0
+	push r0
+	ld r0, [n_a+1]
+	shl r0, r1				; the high byte's part
+	pop r1
+	st [n_a+1], r0
+	ld r0, [n_a]
+	shr r0, r1
+	ld r1, [n_a+1]
+	or r0, r1
+	st [blit_n], r0			; the row's bytes, 0-255
+	; h at most 8117 / row, so the picture fits one frame
+	st [n_b], r0
+	xor r0, r0
+	st [n_b+1], r0
+	mov r0, #0xb5			; 8117
+	st [n_a], r0
+	mov r0, #0x1f
+	st [n_a+1], r0
+	push pch
+	push pcl
+	b n16_udiv				; a row of 0 bytes - $ffff
+	ld r0, $6f07
+	ld r1, [n_a+1]
+	gt r0, r1
+	bzf .big
+	eq r0, r1
+	bzf .h_hi
+	b .fits
+.h_hi:
+	ld r0, $6f06
+	ld r1, [n_a]
+	gt r0, r1
+	bzf .big
+.fits:
+	ld r0, [blit_n]
+	st [n_a], r0
+	xor r0, r0
+	st [n_a+1], r0
+	ld r0, $6f06
+	st [n_b], r0
+	ld r0, $6f07
+	st [n_b+1], r0
+	push pch
+	push pcl
+	b n16_mul
+	ld r0, [n_a]
+	st [blit_n], r0
+	ld r0, [n_a+1]
+	st [blit_n+1], r0
+	; room for the frame (1 + header + picture bytes) in the card's FIFO
+	ld r0, [blit_n]
+	ld r1, [blit_hdr]
+	add r1, #64				; + 63, rounded up
+	add r0, r1
+	st [n_a], r0
+	lt r0, r1
+	ld r0, [blit_n+1]
+	bzf .c2
+	b .units
+.c2:
+	add r0, #1
+.units:
+	shl r0, #2				; (bytes + 64) >> 6
+	ld r1, [n_a]
+	shr r1, #6
+	or r0, r1
+	push pch
+	push pcl
+	b gpu_wait_free
+	mov r0, #0x6f
+	st [gpu_src+1], r0
+	xor r0, r0
+	st [gpu_src], r0
+	ld r0, [blit_op]
+	ld r1, [blit_hdr]
+	push pch
+	push pcl
+	b gpu_cmd_open
+	ld r1, [blit_hdr]		; the picture, from the pointer after the arguments
+	ld r0, API_ARGS+r1
+	st [gpu_src], r0
+	add r1, #1
+	ld r0, API_ARGS+r1
+	st [gpu_src+1], r0
+.byte:
+	ld r0, [blit_n]
+	ld r1, [blit_n+1]
+	or r0, r1
+	eq r0, #0
+	bzf .sent
+	ldd r0, [gpu_src]
+	push pch
+	push pcl
+	b gpu_send
+	ld r0, [gpu_src]
+	add r0, #1
+	st [gpu_src], r0
+	eq r0, #0
+	bzf .src_hi
+	b .count
+.src_hi:
+	ld r0, [gpu_src+1]
+	add r0, #1
+	st [gpu_src+1], r0
+.count:
+	ld r0, [blit_n]
+	eq r0, #0
+	sub r0, #1
+	st [blit_n], r0
+	bzf .n_hi
+	b .byte
+.n_hi:
+	ld r0, [blit_n+1]
+	sub r0, #1
+	st [blit_n+1], r0
+	b .byte
+.sent:
+	push pch
+	push pcl
+	b gpu_cs_off
+	xor r0, r0
+	b api_ret
+.big_pop:
+	pop r0
+.big:
+	mov r0, #0xfe
+	b api_ret
 
 ; ============================================================ group 3: e-ink
 ; The e-paper graphics card (eink-card.md; kernel/eink.s). On HDMI these do
@@ -481,6 +1011,12 @@ api_st_rename:
 	b st_rename
 	b api_ret
 
+; API_ST_PERROR - print the terminal's message for storage error r0 (not 0),
+; as SAVE, LOAD, DIR and DEL do: "no SD card", "file not found", ... on a
+; line of its own
+api_st_perror:
+	b st_print_err
+
 ; the name at the pointer in API_ARGS[0..1] into st_name (one longer than
 ; 12 characters is cut at 13, which the card refuses)
 api_st_name:
@@ -598,13 +1134,18 @@ api_wait_ms:
 ; reset. The console is left as the program left it.
 ;
 ; A program file on the storage card starts with a header - "C8P", then
-; version 1 - and the body follows it. exec "NAME" runs any other file as a
-; BASIC program (LOAD, then RUN).
+; version 1 - and the body follows it. exec "NAME" hands any other file to
+; the terminal's hook: BASIC loads and runs it (LOAD, then RUN).
 
 sys_sp: resb 2				; the terminal's stack pointer at its prompt
 sys_ptr: resb 2				; exec - where this chunk's byte 0 goes
 sys_end: resb 2
 sys_skip: resb 1			; exec - header bytes at the start of this chunk
+sys_basic_src: resb 1		; 1: the machine started with the card's BASIC.PRG
+; sys_dirty: sys_load wrote to $7000
+sys_dirty db 0
+; sys_top: sys_load's limit: the high byte past the last address
+sys_top db 0
 
 sys_s_usage db "\nEXEC \"NAME\"\n"
 sys_s_header db "\nbad program header\n"
@@ -660,7 +1201,7 @@ sys_mark:
 
 ; back to the terminal's prompt: pop until SP is sys_sp again (the same
 ; probe), the interrupt vectors planted again (a program may have changed
-; them), then the prompt
+; them), BASIC loaded again (the program was over it), then the prompt
 sys_restart:
 	cli
 .probe:
@@ -680,11 +1221,16 @@ sys_restart:
 	bzf .there
 	b .drop
 .there:
-	xor r0, r0
+	mov r0, #2				; API_RUN 2 while BASIC loads
 	st API_RUN, r0
 	push pch
 	push pcl
 	b irq_setup
+	push pch
+	push pcl
+	b sys_basic
+	xor r0, r0
+	st API_RUN, r0
 	b term_do.loop
 
 ; run the program at $7000. API_RUN is 2 while it runs (cupc8.py run then
@@ -700,14 +1246,67 @@ sys_run:
 	b $7000
 	b sys_restart
 
-; the terminal's exec "NAME"
+; the terminal's exec "NAME": a program file runs at $7000; any other file
+; goes to the hook (BASIC: LOAD, then RUN)
 sys_cmd_exec:
 	push pch
 	push pcl
-	b ub_get_name
+	b term_get_name
 	eq r0, #0
 	bzf .usage
+	mov r0, #0xe0			; up to $dfff
+	st [sys_top], r0
+	push pch
+	push pcl
+	b sys_load
+	eq r0, #0
+	bzf sys_run
+	eq r0, #0xfe
+	bzf .basic
+	push r0
+	ld r0, [sys_dirty]		; BASIC back, if a part was loaded over it
+	eq r0, #0
+	bzf .said
+	push pch
+	push pcl
+	b sys_basic
+.said:
+	pop r0
+	eq r0, #0xfd
+	bzf .bad_header
+	eq r0, #0xfc
+	bzf .big
+	b st_print_err
+.basic:
+	mov r0, #<[st_name]
+	st API_ARGS, r0
+	mov r0, #>[st_name]
+	st $6f01, r0
+	mov r0, #1
+	b term_hook
+.bad_header:
+	mov r0, #>[sys_s_header]
+	mov r1, #<[sys_s_header]
+	b str_printstr
+.big:
+	mov r0, #>[sys_s_big]
+	mov r1, #<[sys_s_big]
+	b str_printstr
+.usage:
+	mov r0, #>[sys_s_usage]
+	mov r1, #<[sys_s_usage]
+	b str_printstr
+
+; the program file named in st_name into $7000 (handle 0; exec's and
+; BASIC.PRG's): r0 = 0 loaded; $fe the file does not start with "C8P";
+; $fd "C8P" but not version 1 (or cut short); $fc it goes past sys_top (the
+; high byte of the first address it may not reach: a byte there is looked
+; for first, so nothing is loaded); or the card's error. The file is closed.
+; sys_dirty is 1 once bytes have gone to $7000 (the hook is cleared then:
+; its program is going).
+sys_load:
 	xor r0, r0
+	st [sys_dirty], r0
 	st [st_h], r0
 	st [st_mode], r0
 	push pch
@@ -715,7 +1314,7 @@ sys_cmd_exec:
 	b st_open
 	eq r0, #0
 	bzf .opened
-	b .error
+	b .done
 .opened:
 	mov r0, #0xfc			; the 4 header bytes fall before $7000
 	st [sys_ptr], r0
@@ -728,35 +1327,92 @@ sys_cmd_exec:
 	b sys_chunk
 	eq r0, #0
 	bzf .header
-	b .close_error
+	b .close
 .header:
-	ld r0, [st_n]
-	lt r0, #3
-	bzf .basic
-	ld r0, [st_rbuf+1]
-	eq r0, #67				; C
+	mov r0, #0xfe
+	ld r1, [st_n]
+	lt r1, #3
+	bzf .close
+	ld r1, [st_rbuf+1]
+	eq r1, #67				; C
 	bzf .c
-	b .basic
+	b .close
 .c:
-	ld r0, [st_rbuf+2]
-	eq r0, #56				; 8
+	ld r1, [st_rbuf+2]
+	eq r1, #56				; 8
 	bzf .c8
-	b .basic
+	b .close
 .c8:
-	ld r0, [st_rbuf+3]
-	eq r0, #80				; P
+	ld r1, [st_rbuf+3]
+	eq r1, #80				; P
 	bzf .c8p
-	b .basic
+	b .close
 .c8p:
-	ld r0, [st_n]
-	lt r0, #4
-	bzf .bad_header
-	ld r0, [st_rbuf+4]
-	eq r0, #1				; version 1
-	bzf .copy
-	b .bad_header
+	mov r0, #0xfd
+	ld r1, [st_n]
+	lt r1, #4
+	bzf .close
+	ld r1, [st_rbuf+4]
+	eq r1, #1				; version 1
+	bzf .accepted
+	b .close
+.accepted:
+	; too big is known before anything is loaded: is there a byte at
+	; sys_top - $7000 + 4 (past the header and the room)?
+	mov r0, #4
+	st [st_pos], r0
+	ld r0, [sys_top]
+	sub r0, #0x70
+	st [st_pos+1], r0
+	xor r0, r0
+	st [st_pos+2], r0
+	st [st_pos+3], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .probe
+	b .close
+.probe:
+	mov r0, #1
+	st [st_n], r0
+	push pch
+	push pcl
+	b st_read
+	eq r0, #0
+	bzf .probed
+	b .close
+.probed:
+	ld r1, [st_n]
+	eq r1, #0
+	bzf .room
+	mov r0, #0xfc
+	b .close
+.room:
+	xor r0, r0				; back to the start, the first chunk again
+	st [st_pos], r0
+	st [st_pos+1], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .again
+	b .close
+.again:
+	push pch
+	push pcl
+	b sys_chunk
+	eq r0, #0
+	bzf .load
+	b .close
+.load:
+	mov r0, #1
+	st [sys_dirty], r0
+	xor r0, r0
+	st [sys_hook], r0
+	st [sys_hook+1], r0
 .copy:
-	ld r0, [sys_ptr]		; sys_end = sys_ptr + st_n, at most $e000
+	ld r0, [sys_ptr]		; sys_end = sys_ptr + st_n, at most sys_top
 	ld r1, [st_n]
 	add r0, r1
 	st [sys_end], r0
@@ -768,16 +1424,19 @@ sys_cmd_exec:
 	add r1, #1
 .end_hi:
 	st [sys_end+1], r1
-	gt r1, #0xe0
+	ld r0, [sys_top]
+	gt r1, r0
 	bzf .big
-	eq r1, #0xe0
-	bzf .at_e0
+	eq r1, r0
+	bzf .at_top
 	b .fits
-.at_e0:
+.at_top:
 	ld r0, [sys_end]
 	eq r0, #0
 	bzf .fits
-	b .big
+.big:
+	mov r0, #0xfc
+	b .close
 .fits:
 	ld r1, [sys_skip]
 .byte:
@@ -798,71 +1457,320 @@ sys_cmd_exec:
 	ld r0, [st_n]
 	eq r0, #128				; a short chunk is the end of the file
 	bzf .more
-	push pch
-	push pcl
 	b st_close
-	eq r0, #0
-	bzf .run
-	b .error
-.run:
-	b sys_run
 .more:
 	push pch
 	push pcl
 	b sys_chunk
 	eq r0, #0
 	bzf .copy
-	b .close_error
-.basic:
-	push pch
-	push pcl
-	b st_close
-	push pch
-	push pcl
-	b ub_load_file
-	eq r0, #0
-	bzf .run_basic
-	b .error
-.run_basic:
-	b term_cmd_run
-.bad_header:
-	push pch
-	push pcl
-	b st_close
-	mov r0, #>[sys_s_header]
-	mov r1, #<[sys_s_header]
-	b .print
-.big:
-	push pch
-	push pcl
-	b st_close
-	mov r0, #>[sys_s_big]
-	mov r1, #<[sys_s_big]
-	b .print
-.usage:
-	mov r0, #>[sys_s_usage]
-	mov r1, #<[sys_s_usage]
-.print:
-	push pch
-	push pcl
-	b str_printstr
-	b .done
-.close_error:
+.close:
 	push r0
 	push pch
 	push pcl
 	b st_close
 	pop r0
-.error:
-	push pch
-	push pcl
-	b st_print_err
 .done:
 	pop pcl
 	pop pch
+
+; handle 0 to st_pos; r0 = error
+sys_seek:
+	xor r0, r0
+	st [st_h], r0
+	b st_seek
 
 ; the next 128 bytes of handle 0 into st_rbuf+1 (st_n = how many); r0 = error
 sys_chunk:
 	mov r0, #128
 	st [st_n], r0
 	b st_read
+
+; ------------------------------------------------------------ BASIC
+; BASIC is a program for $7000 (basic/, doc/proposals/basic-program.md). At
+; boot the kernel loads BASIC.PRG from the SD card when it can (a storage
+; card, an SD card in it, the file, a good header), else the ROM's (always
+; in the ROM image); after a native program it loads the same one again
+; (the ROM's if the card's no longer loads). It calls BASIC's main, which
+; sets the terminal's hook.
+
+sys_s_basic_prg db "BASIC.PRG"
+sys_s_basic_card db "BASIC from the SD card\n"
+
+; at boot: the card's BASIC if it loads (a line says so), else the ROM's
+sys_basic_boot:
+	mov r0, #1
+	st [sys_basic_src], r0
+	push pch
+	push pcl
+	b sys_basic_card
+	eq r0, #0
+	bzf .card
+	xor r0, r0
+	st [sys_basic_src], r0
+	b sys_basic
+.card:
+	mov r0, #>[sys_s_basic_card]
+	mov r1, #<[sys_s_basic_card]
+	push pch
+	push pcl
+	b str_printstr
+	b $7000
+
+; BASIC into $7000 and its main called (it sets the hook): the card's if the
+; machine started with it and it loads, else the ROM's; neither - no hook
+sys_basic:
+	xor r0, r0
+	st [sys_hook], r0
+	st [sys_hook+1], r0
+	mov r0, #2				; BASIC reaches into the RAM window - bank 2 there
+	st $f205, r0
+	ld r0, [sys_basic_src]
+	eq r0, #0
+	bzf .rom
+	push pch
+	push pcl
+	b sys_basic_card
+	eq r0, #0
+	bzf .start
+.rom:
+	push pch
+	push pcl
+	b sys_rom_basic
+	eq r0, #0
+	bzf .start
+	pop pcl
+	pop pch
+.start:
+	b $7000
+
+; BASIC.PRG from the SD card into $7000, as exec loads a program but no
+; higher than $bfff (the BASIC program is at $c000): r0 = 0, or sys_load's
+; error
+sys_basic_card:
+	xor r1, r1
+.name:
+	ld r0, [sys_s_basic_prg]+r1
+	st [st_name]+r1, r0
+	eq r0, #0
+	bzf .named
+	add r1, #1
+	b .name
+.named:
+	mov r0, #0xc0
+	st [sys_top], r0
+	b sys_load
+
+; the ROM's BASIC (memory-map.md, "ROM image layout"): a header as the
+; kernel's at the next page after the kernel body, its body one page later.
+; There are 0s after BASIC to a 256-byte
+; boundary. Into $7000: r0 = 0, or $ff if there is none - a bad header (not
+; "CUP8" version 1, flags 0, load and entry $7000, 1 to $5000 bytes; bytes
+; 0-13 summing to 0) or a body whose sum is not byte 12. The ROM windows
+; are on meanwhile, with interrupts off: $e000-$efff shows the ROM, not the
+; kernel's bss, so this keeps to the data area and the stack.
+sys_rom_hdr db 67, 85, 80, 56, 1, 0, 0, 112, 0, 0, 0, 112
+; sys_rp: where in the ROM window
+sys_rp db 0, 0
+; sys_wp: where in RAM
+sys_wp db 0, 0
+; sys_pages: pages still to copy
+sys_pages db 0
+sys_sum db 0
+sys_rom_basic:
+	cli
+	xor r0, r0
+	st $f203, r0			; ROM_OFF 0 - the ROM windows on
+	mov r0, #1                      ; the kernel header at ROM $00800
+	st $f204, r0
+	ld r0, $e808                    ; ceil(($810 + length) / 256)
+	ld r1, $e809
+	add r1, #8
+	add r0, #16
+	lt r0, #16
+	bzf .carry
+	b .round
+.carry:
+	add r1, #1
+.round:
+	eq r0, #0
+	bzf .address
+	add r1, #1
+.address:
+	mov r0, r1
+	shr r0, #3
+	st $f204, r0
+	and r1, #7
+	add r1, #0xe8
+	st [sys_rp+1], r1
+	xor r0, r0
+	st [sys_rp], r0
+	xor r1, r1				; the header's sum
+	st [sys_sum], r1
+.hsum:
+	ldd r0, [sys_rp]+r1
+	push r1
+	ld r1, [sys_sum]
+	add r0, r1
+	st [sys_sum], r0
+	pop r1
+	add r1, #1
+	eq r1, #14
+	bzf .summed
+	b .hsum
+.summed:
+	eq r0, #0
+	bzf .fields
+	b .none
+.fields:
+	xor r1, r1				; bytes 0-7 and 10-11 as sys_rom_hdr
+.field:
+	ldd r0, [sys_rp]+r1
+	push r1
+	ld r1, [sys_rom_hdr]+r1
+	eq r0, r1
+	pop r1
+	bzf .same
+	b .none
+.same:
+	add r1, #1
+	eq r1, #8
+	bzf .past_len
+	eq r1, #12
+	bzf .length
+	b .field
+.past_len:
+	mov r1, #10
+	b .field
+.length:
+	mov r1, #12
+	ldd r0, [sys_rp]+r1	; the body's sum, to compare at the end
+	st [sys_sum], r0
+	mov r1, #8
+	ldd r0, [sys_rp]+r1
+	push r0
+	mov r1, #9
+	ldd r0, [sys_rp]+r1
+	mov r1, r0
+	pop r0
+	gt r1, #0x50
+	bzf .none
+	eq r0, #0
+	bzf .whole
+	eq r1, #0x50
+	bzf .none
+	add r1, #1				; a part page is a page
+.whole:
+	eq r1, #0
+	bzf .none
+	st [sys_pages], r1
+	xor r0, r0
+	st [sys_rp], r0
+	st [sys_wp], r0
+	mov r0, #0x70
+	st [sys_wp+1], r0
+	push pch
+	push pcl
+	b sys_rom_next_page
+.page:
+	xor r1, r1
+.byte:
+	ldd r0, [sys_rp]+r1
+	std [sys_wp]+r1, r0
+	push r1					; the sum counts down from byte 12's
+	ld r1, [sys_sum]
+	sub r1, r0
+	st [sys_sum], r1
+	pop r1
+	add r1, #1
+	eq r1, #0
+	bzf .paged
+	b .byte
+.paged:
+	ld r0, [sys_wp+1]
+	add r0, #1
+	st [sys_wp+1], r0
+	push pch
+	push pcl
+	b sys_rom_next_page
+.count:
+	ld r0, [sys_pages]
+	sub r0, #1
+	st [sys_pages], r0
+	eq r0, #0
+	bzf .copied
+	b .page
+.copied:
+	ld r0, [sys_sum]		; 0 if the body summed to byte 12
+	eq r0, #0
+	bzf .off
+.none:
+	mov r0, #0xff
+.off:
+	mov r1, #1
+	st $f203, r1			; ROM_OFF 1 - RAM at $e000-$efff again
+	sti
+	pop pcl
+	pop pch
+
+; Advance the source one page, including a ROM window crossing.
+sys_rom_next_page:
+	ld r0, [sys_rp+1]
+	add r0, #1
+	eq r0, #0xf0
+	bzf .bank
+	st [sys_rp+1], r0
+	pop pcl
+	pop pch
+.bank:
+	mov r0, #0xe8
+	st [sys_rp+1], r0
+	ld r0, $f204
+	add r0, #1
+	st $f204, r0
+	pop pcl
+	pop pch
+
+; The host asks with 3, then waits for 4 before writing program memory.
+; Acknowledgement occurs only at a terminal key wait or before its hook.
+; The CPU stays here until upload completion (1) or cancellation (0).
+sys_upload_poll:
+	push r0
+	ld r0, [keyb_term]
+	eq r0, #0
+	pop r0
+	bzf .done
+	b sys_upload_wait
+.done:
+	pop pcl
+	pop pch
+
+sys_upload_wait:
+	push r0
+	ld r0, API_RUN
+	eq r0, #5
+	bzf .cancel
+	eq r0, #3
+	bzf .ack
+	pop r0
+	pop pcl
+	pop pch
+.ack:
+	mov r0, #4
+	st API_RUN, r0
+.wait:
+	ld r0, API_RUN
+	eq r0, #1
+	bzf sys_run
+	eq r0, #0
+	bzf .cancel
+	eq r0, #5
+	bzf .cancel
+	wai
+	b .wait
+.cancel:
+	xor r0, r0
+	st API_RUN, r0
+	pop r0
+	pop pcl
+	pop pch

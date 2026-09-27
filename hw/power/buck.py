@@ -31,11 +31,13 @@ flatters efficiency: losses are computed in thermal.py, not taken from here.
 """
 
 import concurrent.futures
+from pathlib import Path
 import sys
 
 import budget
 import design as d
 import spice
+import wifi_board
 from spice import Checks
 
 T_APPLY = 120e-6         # 5V_SYS rise in these decks (see the docstring)
@@ -100,7 +102,7 @@ def edges(t, v, a, b, level):
     return ts
 
 
-def wifi_deck(corner):
+def wifi_deck(corner, r_board5, r_board3):
     """POW-003: hw/boards/wifi.py as built. The source, the input path and the
     other loads feed 5V_SYS; the card hangs off it through the slot's feed
     (PTC, link, sense, contacts), so the slot's +5V sags with the burst as it
@@ -115,9 +117,11 @@ Rin src v5 {rin}
 Cbulk v5 0 {cbulk}
 Iother v5 0 PWL(0 0 {ton} {iother})
 Rslot v5 card {rslot}
-C1 card 0 {cin}
-X1 card fb sw card 0 TLV62569_TRANS
-L1 sw out {l}
+Rboard5 card vin {rboard5}
+C1 vin 0 {cin}
+X1 vin fb sw vin 0 TLV62569_TRANS
+L1 sw buck {l}
+Rboard3 buck out {rboard3}
 C2 out 0 {cout}
 C3 out 0 {chf}
 R9 out fb {r1}
@@ -130,18 +134,19 @@ run
 wrdata {{name}}.dat v(out) v(sw) v(card)
 .endc
 """.format(vbus=ch["vbus"], ton=T_APPLY, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
-           iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], cin=d.WIFI_CIN * d.CERAMIC_DERATE,
+           iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], rboard5=r_board5,
+           rboard3=r_board3, cin=d.WIFI_CIN * d.CERAMIC_DERATE,
            l=d.WIFI_BUCK_L, cout=d.WIFI_COUT * d.CERAMIC_DERATE, chf=d.WIFI_COUT_HF, r1=d.WIFI_BUCK_R1,
            r2=d.WIFI_BUCK_R2, i0=i0, i1=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6, tend=T_END)
 
 
-def run_wifi(corner):
+def run_wifi(corner, r_board5, r_board3):
     name = "pow003_" + corner
-    spice.run(name, wifi_deck(corner).replace("{name}", name), libs=("TLV62569_TRANS.lib",))
+    spice.run(name, wifi_deck(corner, r_board5, r_board3).replace("{name}", name), libs=("TLV62569_TRANS.lib",))
     return spice.wave(name)
 
 
-def wifi_card():
+def wifi_card(out=None):
     """POW-003: the Wi-Fi card's TLV62569 (U2, L1, C1-C3, R9/R10), an ESP32-C3
     TX burst at the typical and worst corners."""
     c = Checks("POW-003 Wi-Fi card 3V3, TLV62569 TI model (hw/power/buck.py wifi-card)")
@@ -150,8 +155,14 @@ def wifi_card():
         c.info(ref, "hw/boards/wifi.py has %s, these checks model %s (design.WIFI_BOARD)" % (got, want))
     c.check("F0", "Wi-Fi card regulator parts in hw/boards/wifi.py that differ from the model", len(bad), 0, "<=",
             "", fmt="%d")
+    out = Path(out) if out else Path(spice.ROOT) / 'build/hw/wifi'
+    circuit = wifi_board.topology(out / 'wifi.net')
+    r_board5, r_board3 = wifi_board.routes(out / 'wifi.kicad_pcb', out / 'fab/order.json', circuit)
+    c.info('routed board', '2-layer 1.6 mm, +5V %.1f mOhm, 3V3 %.1f mOhm; netlist and pads bound' %
+           (1e3 * r_board5, 1e3 * r_board3))
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
-        res = dict(zip(("typical", "worst"), pool.map(run_wifi, ("typical", "worst"))))
+        res = dict(zip(("typical", "worst"), pool.map(lambda corner: run_wifi(corner, r_board5, r_board3),
+                                                       ("typical", "worst"))))
     vnom = d.buck_vout(d.WIFI_BUCK_R1, d.WIFI_BUCK_R2)
     lo_dc, hi_dc = d.wifi_vout_range()
     k_lo, k_hi = lo_dc / vnom, hi_dc / vnom                    # sim -> worst DC corner
@@ -170,12 +181,18 @@ def wifi_card():
         # 100 % duty: the input must still cover VOUT + I x (high side hot + DCR)
         c.check("F3" + n, "%s: slot +5V at the card in the burst vs VOUT high + I x (RDS(on) hot + DCR)" % corner,
                 vcard_min, hi_dc + d.WIFI_I_3V3 * (d.BUCK_RHS * d.BUCK_RDS_HOT + d.WIFI_BUCK_DCR), ">=")
+    # The routed ground pour and via network, hot copper resistance, capacitor
+    # ESR and local converter/ESP32 thermal coupling are not in this deck.
+    # A positive rail transient alone cannot certify WC-005 on the laid-out board.
+    c.check('F4', 'routed GND return and hot copper/capacitor parasitics covered', 0, 1, '>=', '', fmt='%d')
     return c.done()
 
 
 def main():
-    if sys.argv[1:] == ["wifi-card"]:
-        return wifi_card()
+    if sys.argv[1:2] == ["wifi-card"]:
+        if len(sys.argv) not in (2, 3):
+            sys.exit('usage: buck.py wifi-card [board-build-directory]')
+        return wifi_card(sys.argv[2] if len(sys.argv) == 3 else None)
     c = Checks("POW-001 3V3 buck, TLV62569 TI model (hw/power/buck.py)")
     with concurrent.futures.ThreadPoolExecutor(3) as pool:
         res = dict(zip(("low", "high", "full"), pool.map(run, ("low", "high", "full"))))

@@ -5,6 +5,7 @@ import sdl2
 
 const
   DispScaleDefault* = 3
+  LedStrip = 28          # window pixels under the picture for the LEDs
 
 var
   # the framebuffer size follows the card in the slot: 320x240 for the
@@ -18,6 +19,9 @@ var
   display_init_error*: string = ""
   dispScale*: int = DispScaleDefault
   display_dirty*: bool = false
+  # the main board's GPO LEDs D8..D1 ($f000), drawn in a strip under the
+  # picture in the M1 machine; -1 = no strip (the legacy model)
+  display_leds*: int = -1
 
   # RGB888 packed 0x00RRGGBB
   fb: seq[uint32] = newSeq[uint32](320 * 240)
@@ -50,7 +54,7 @@ proc display_setSize*(w, h: int) =
   if display_inited:
     tex = createTexture(ren, SDL_PIXELFORMAT_ARGB8888.uint32,
                         SDL_TEXTUREACCESS_STREAMING.cint, w.cint, h.cint)
-    win.setSize(cint(w * dispScale), cint(h * dispScale))
+    win.setSize(cint(w * dispScale), cint(h * dispScale + (if display_leds >= 0: LedStrip else: 0)))
 
 proc display_blit*(src: ptr uint32) =
   ## Copy a full frame of 0x00RRGGBB pixels into the framebuffer.
@@ -118,7 +122,7 @@ proc display_init*(resetFramebuffer = true): bool =
     return false
   discard setHint(HINT_RENDER_SCALE_QUALITY, "0")
   let ww = cint(DispWidth * dispScale)
-  let hh = cint(DispHeight * dispScale)
+  let hh = cint(DispHeight * dispScale + (if display_leds >= 0: LedStrip else: 0))
   win = createWindow("CUPC/8",
                      SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                      ww, hh,
@@ -152,15 +156,33 @@ proc display_render*() =
   discard updateTexture(tex, nil, addr fb[0], cint(DispWidth * 4))
   var ww, hh: cint
   win.getSize(ww, hh)
-  let s = max(1.cint, min(ww div DispWidth.cint, hh div DispHeight.cint))
+  let strip = (if display_leds >= 0: LedStrip.cint else: 0.cint)
+  let s = max(1.cint, min(ww div DispWidth.cint, (hh - strip) div DispHeight.cint))
   var dst: Rect
   dst.w = DispWidth.cint * s
   dst.h = DispHeight.cint * s
   dst.x = (ww - dst.w) div 2
-  dst.y = (hh - dst.h) div 2
+  dst.y = (hh - strip - dst.h) div 2
   ren.setDrawColor(0, 0, 0, 255)
   discard ren.clear()
   discard ren.copy(tex, nil, addr dst)
+  if display_leds >= 0:
+    # eight lights, D8 (bit 7) on the left, amber when lit
+    const d = 14.cint
+    const gap = 12.cint
+    let total = 8 * d + 7 * gap
+    var r: Rect
+    r.w = d
+    r.h = d
+    r.y = hh - strip + (strip - d) div 2
+    for i in 0..7:
+      let bit = 7 - i
+      r.x = (ww - total) div 2 + cint(i) * (d + gap)
+      if ((display_leds shr bit) and 1) == 1:
+        ren.setDrawColor(255, 176, 32, 255)
+      else:
+        ren.setDrawColor(48, 30, 12, 255)
+      discard ren.fillRect(r)
   ren.present()
   display_dirty = false
 
@@ -228,3 +250,21 @@ proc display_transact*(b: int) =
         colorHi = -1
     else:
       discard
+
+proc display_dumpWindow*(path: string) =
+  ## What the window shows (picture and LED strip), as a PPM.
+  if not display_inited: return
+  display_render()
+  var ww, hh: cint
+  win.getSize(ww, hh)
+  var px = newSeq[uint32](int(ww) * int(hh))
+  discard ren.readPixels(nil, SDL_PIXELFORMAT_ARGB8888.cint, addr px[0], ww * 4)
+  var f = open(path, fmWrite)
+  f.write("P6\n$# $#\n255\n" % [$ww, $hh])
+  for p in px:
+    var pix: array[3, char]
+    pix[0] = char((p shr 16) and 0xff)
+    pix[1] = char((p shr 8) and 0xff)
+    pix[2] = char(p and 0xff)
+    discard f.writeBuffer(addr pix[0], 3)
+  f.close()

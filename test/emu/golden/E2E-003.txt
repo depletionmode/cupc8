@@ -1,5 +1,5 @@
 
-      CUPC/8 BASIC 2015.10
+      CUPC/8 BASIC 2026.09
 
 >> net join cupc8 password
 

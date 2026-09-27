@@ -1,121 +1,22 @@
-; spi driver
+; The slot SPI devices (memory-map.md, "SPI devices"): one byte each way.
+; Each card driver's _send is this with its device.
 
-; write byte (r0) - device (r1)
-spi_write:
-	eq r1, #0
-	bzf .do_0
-	eq r1, #1
-	bzf .do_1
-	eq r1, #2
-	bzf .do_2
-	eq r1, #3
-	bzf .do_3
-	b .end
-.do_0:
-    st $f100, r0  ;fill tx buffer
-    mov r0, #1
-    st $f102, r0  ;transact
-	b .wait_0
-.do_1:
-    st $f110, r0  ;fill tx buffer
-    mov r0, #1
-    st $f112, r0  ;transact
-	b .wait_1
-.do_2:
-    st $f120, r0  ;fill tx buffer
-    mov r0, #1
-    st $f122, r0  ;transact
-	b .wait_2
-.do_3:
-    st $f130, r0  ;fill tx buffer
-    mov r0, #1
-    st $f132, r0  ;transact
-	b .wait_3
-.wait_0:
-    ld r0, $f103  ;read status
-    eq r0, #1
-    bzf .end
-    wai
-    b .wait_0
-.wait_1:
-    ld r0, $f113  ;read status
-    eq r0, #1
-    bzf .end
-    wai
-    b .wait_1
-.wait_2:
-    ; keyboard status is "char ready", not SPI done
-    b .end
-.wait_3:
-    ld r0, $f133  ;read status
-    eq r0, #1
-    bzf .end
-    wai
-    b .wait_3
-.end:
-    pop pcl
-    pop pch
+spi_tmp: resb 1
 
-; read byte (r0) - device (r1)
-spi_read:
+; the byte r0 out to the device whose registers are at $f100 + r1 ($X0 for
+; device X), the byte that came back in r0 and r1
+spi_send:
+	st [spi_tmp], r0
+	mov r0, r1
+	ld r1, [spi_tmp]
+	st $f100+r0, r1
+	mov r1, #1
+	st $f102+r0, r1
+.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
+	ld r1, $f103+r0
 	eq r1, #0
-	bzf .wait_0
-	eq r1, #1
-	bzf .wait_1
-	eq r1, #2
-	bzf .wait_2
-	eq r1, #3
-	bzf .wait_3
-	b .end
-.wait_0:
-    mov r0, #255
-    st $f100, r0  ;fill tx buffer
-    mov r0, #1
-    st $f102, r0  ;transact
-.spin_0:
-    ld r0, $f103  ;read status
-    eq r0, #1
-    bzf .rx_0
-    wai
-    b .spin_0
-.rx_0:
-    ld r0, $f101  ;read rx buffer
-    b .end
-.wait_1:
-    mov r0, #255
-    st $f110, r0  ;fill tx buffer
-    mov r0, #1
-    st $f112, r0  ;transact
-.spin_1:
-    ld r0, $f113  ;read status
-    eq r0, #1
-    bzf .rx_1
-    wai
-    b .spin_1
-.rx_1:
-    ld r0, $f111  ;read rx buffer
-    b .end
-.wait_2:
-    mov r0, #255
-    st $f120, r0  ;fill tx buffer
-    mov r0, #1
-    st $f122, r0  ;transact
-    ld r0, $f121  ;read rx buffer
-    b .end
-.wait_3:
-    mov r0, #255
-    st $f130, r0  ;fill tx buffer
-    mov r0, #1
-    st $f132, r0  ;transact
-.spin_3:
-    ld r0, $f133  ;read status
-    eq r0, #1
-    bzf .rx_3
-    wai
-    b .spin_3
-.rx_3:
-    ld r0, $f131  ;read rx buffer
-    b .end
-.end:
-    pop pcl
-    pop pch
+	bzf .spi_wait
+	ld r1, $f101+r0
+	mov r0, r1
+	pop pcl
+	pop pch

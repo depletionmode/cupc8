@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Build a CUPC/8 ROM image (doc/hardware/memory-map.md, "ROM image layout").
 
-  mkrom.py boot.bin kernel.bin -o rom.bin [--load 0x1000] [--entry 0x1000]
+  mkrom.py boot.bin kernel.bin [--basic BASIC.PRG] -o rom.bin [--load 0x1000] [--entry 0x1000]
   mkrom.py --info rom.bin
 
   $00000  boot ROM (max 2 KB)
   $00800  kernel header (16 bytes)
   $00810  kernel body
+  next page  BASIC's header (16 bytes, as the kernel's: load and entry $7000)
+  next page  BASIC's body (basic/build.sh's BASIC.PRG without its "C8P" header),
+          then 0s to a 256-byte boundary (the kernel copies whole pages and
+          sums them)
   rest    erased ($ff)
 """
 import argparse
@@ -21,6 +25,13 @@ MAGIC = b"CUP8"
 RAM_TOP = 0xE000
 
 
+def basic_offsets(kernel_length):
+    hdr = (BODY_OFF + kernel_length + 255) & ~255
+    return hdr, hdr + 256
+
+BASIC_BASE, BASIC_MAX = 0x7000, 0x5000          # $7000-$bfff: the BASIC program is at $c000
+
+
 def header(load, length, entry, body_sum):
     h = bytearray(16)
     h[0:4] = MAGIC
@@ -32,41 +43,65 @@ def header(load, length, entry, body_sum):
     return bytes(h)
 
 
-def build(boot, kernel, load, entry):
+def build(boot, kernel, load, entry, basic=None):
     if len(boot) > BOOT_MAX:
         sys.exit("boot ROM is %d bytes, max %d" % (len(boot), BOOT_MAX))
     if load + len(kernel) > RAM_TOP:
         sys.exit("kernel does not fit: $%04x + %d bytes runs past $%04x" %
                  (load, len(kernel), RAM_TOP))
+    basic_hdr, basic_body = basic_offsets(len(kernel))
     rom = bytearray(b"\xff" * ROM_SIZE)
     rom[0:len(boot)] = boot
     body_sum = sum(kernel) & 0xFF
     rom[HDR_OFF:HDR_OFF + 16] = header(load, len(kernel), entry, body_sum)
     rom[BODY_OFF:BODY_OFF + len(kernel)] = kernel
+    if basic is not None:
+        if basic[:4] == b"C8P\x01":
+            basic = basic[4:]
+        if not 0 < len(basic) <= BASIC_MAX:
+            sys.exit("BASIC is %d bytes: 1 to %d fit $7000-$bfff" % (len(basic), BASIC_MAX))
+        rom[basic_hdr:basic_hdr + 16] = header(BASIC_BASE, len(basic), BASIC_BASE, sum(basic) & 0xFF)
+        padded = basic + bytes(-len(basic) % 256)
+        if basic_body + len(padded) > ROM_SIZE:
+            sys.exit("kernel and BASIC do not fit the ROM")
+        rom[basic_body:basic_body + len(padded)] = padded
     return bytes(rom)
 
 
 def info(rom):
-    h = rom[HDR_OFF:HDR_OFF + 16]
+    ok = show(rom, HDR_OFF, BODY_OFF, "kernel")
+    basic_hdr, basic_body = basic_offsets(struct.unpack_from("<H", rom, HDR_OFF + 8)[0])
+    if rom[basic_hdr:basic_hdr + 4] == MAGIC:
+        ok = show(rom, basic_hdr, basic_body, "BASIC") and ok
+    else:
+        print("BASIC    : none (ROM $%05x)" % basic_hdr)
+    return 0 if ok else 1
+
+
+def show(rom, hdr_off, body_off, what):
+    h = rom[hdr_off:hdr_off + 16]
     load, length, entry = struct.unpack_from("<HHH", h, 6)
     ok_magic = h[0:4] == MAGIC
     ok_hdr = sum(h[0:14]) & 0xFF == 0
-    body = rom[BODY_OFF:BODY_OFF + length]
+    body = rom[body_off:body_off + length]
     ok_body = (sum(body) & 0xFF) == h[12]
-    print("boot ROM : %d bytes used of %d" % (len(rom[:BOOT_MAX].rstrip(b"\xff")), BOOT_MAX))
+    if what == "kernel":
+        print("boot ROM : %d bytes used of %d" % (len(rom[:BOOT_MAX].rstrip(b"\xff")), BOOT_MAX))
+    print("%-9s: ROM $%05x" % (what, hdr_off))
     print("magic    : %s (%s)" % (h[0:4].decode("latin1"), "ok" if ok_magic else "BAD"))
     print("version  : %d" % h[4])
     print("load     : $%04x" % load)
     print("length   : %d bytes (ends at $%04x)" % (length, load + length))
     print("entry    : $%04x" % entry)
     print("checksums: header %s, body %s" % ("ok" if ok_hdr else "BAD", "ok" if ok_body else "BAD"))
-    return 0 if (ok_magic and ok_hdr and ok_body) else 1
+    return ok_magic and ok_hdr and ok_body
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="+", help="boot.bin kernel.bin, or a rom with --info")
     ap.add_argument("-o", "--out")
+    ap.add_argument("--basic", help="BASIC.PRG (basic/build.sh) after the kernel in ROM")
     ap.add_argument("--load", type=lambda v: int(v, 0), default=0x1000)
     ap.add_argument("--entry", type=lambda v: int(v, 0), default=0x1000)
     ap.add_argument("--info", action="store_true")
@@ -77,7 +112,7 @@ def main():
     if len(args.files) != 2 or not args.out:
         ap.error("need boot.bin kernel.bin -o rom.bin")
     rom = build(open(args.files[0], "rb").read(), open(args.files[1], "rb").read(),
-                args.load, args.entry)
+                args.load, args.entry, open(args.basic, "rb").read() if args.basic else None)
     with open(args.out, "wb") as f:
         f.write(rom)
     print("wrote %s (%d KB)" % (args.out, len(rom) // 1024))

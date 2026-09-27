@@ -11,11 +11,18 @@ static uint8_t ring[RING];
 static volatile uint32_t head, tail;             /* free-running */
 static volatile int commands;                    /* queued frames other than READ */
 static volatile bool busy;
+static volatile uint8_t status_now;              /* the task's last status(): see frames_status() */
 static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 
 void frames_init(card_t *c)
 {
 	card = c;
+	frames_status();
+}
+
+void frames_status(void)
+{
+	status_now = (uint8_t)(card->ops->status(card) & 0x7f);
 }
 
 static void put(uint32_t at, uint8_t b)
@@ -45,7 +52,7 @@ bool frames_received(const uint8_t *mosi, int len)
 int frames_preload(uint8_t *miso, int max)
 {
 	int n = 0;
-	miso[n++] = (uint8_t)(card->ops->status(card) & 0x7f);
+	miso[n++] = status_now;          /* not status(): the SPI ISR calls this, and it asks lwIP */
 	if (!commands && !busy && card->resp_ready && n + 1 + card->resp_len <= max) {
 		miso[n++] = (uint8_t)card->resp_len;
 		memcpy(&miso[n], card->resp, (size_t)card->resp_len);

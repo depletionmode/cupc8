@@ -1,22 +1,12 @@
 ; routines for printing text
 
-; global variables
-mem_p_dst: resb 2
-mem_p_src: resb 2
-
-; print_ascii_char / print_ascii_char_inverse now live in gpu.s
-
-g_echo_char: resb 1
-set_echo_char:
-	st [g_echo_char], r0
-    pop pcl
-    pop pch
+; print_ascii_char is gpu.s's gpu_putc
 
 rs_msg_addr: resb 2
 rs_i: resb 1
+; a line from the keyboard, echoed, into the buffer at r0 (high), r1 (low):
+; up to 78 characters, a CR and a 0; rs_i = the characters' count
 read_string:
-	; r0 - high address of string
-	; r1 = low address of string
 ;
 ;	; first store string address in memory
 	st [rs_msg_addr], r1
@@ -42,16 +32,9 @@ read_string:
   eq r1, #78
   bzf .loop
   std [rs_msg_addr]+r1, r0
-	; check if echo
-	ld r1, [g_echo_char]
-	eq r1, #1
-	bzf .echo
-	b .cont
-.echo:
     push pch
     push pcl
     b print_ascii_char
-.cont:
     ld r1, [rs_i]
     add r1, #1
     st [rs_i], r1
@@ -62,11 +45,7 @@ read_string:
 	bzf .loop
 	sub r1, #1
 	st [rs_i], r1
-	ld r1, [g_echo_char]
-	eq r1, #1
-	bzf .erase_echo
-	b .loop
-.erase_echo:				; back, space, back, so the character goes from the screen too
+	; back, space, back, so the character goes from the screen too
 	mov r0, #8
 	push pch
 	push pcl
@@ -92,87 +71,9 @@ read_string:
 
 ; dump_char_rom dumped the C64 font through the old pixel path; gone with it
 
-str_uint_rem: resb 1
-str_uint_buf: resb 5
-str_printuint8:
-	xor r1, r1
-	gt r0, #0
-	bzf .gt0
-	mov r1, #48
-	st [str_uint_buf], r1
-	mov r1, #1
-	b .done
-
-.gt0:
-.loop:
-	eq r0, #0
-	bzf .done
-	push r1		; idx
-
-	mov r1, r0	; num
-	push r1
-	mov r1, #10
-	push pch
-	push pcl
-	b math_div
-	mov r0, r1
-	pop r1		; num
-	st [str_uint_rem], r0
-	mov r0, r1
-
-	ld r1, [str_uint_rem]
-	gt r1, #9
-	bzf .gt9
-	add r1, #48
-	b .after_gt9
-.gt9:
-	sub r1, #10
-	add r1, #97
-.after_gt9:
-	st [str_uint_rem], r1
-	pop r1		; idx
-	push r0		; num
-	ld r0, [str_uint_rem]
-	st [str_uint_buf]+r1, r0
-	pop r0		; num
-	push r1
-	mov r1, #10
-	push pch
-	push pcl
-	b math_div
-	pop r1
-	add r1, #1
-	b .loop
-
-.done:
-	xor r0, r0
-	st [str_uint_buf]+r1, r0
-	mov r0, #>[str_uint_buf]
-	mov r1, #<[str_uint_buf]
-	push pch
-	push pcl
-	b str_reverse
-	mov r0, #>[str_uint_buf]
-	mov r1, #<[str_uint_buf]
-	push pch
-	push pcl
-	b str_printstr
-	pop pcl
-	pop pch
-
-str_printuint16:
-	pop pcl
-	pop pch
-
-str_printstr:
-	push pch
-	push pcl
-	b print_string
-	pop pcl
-	pop pch
-
 ps_msg_addr: resb 2
 ps_i: resb 1
+str_printstr:
 print_string:
 	; r0 - high address of string
 	; r1 = low address of string
@@ -244,44 +145,7 @@ print_string:
 ;    pop pcl
 ;    pop pch
 ;
-; clr_screen is now the graphics card's CLS (gpu.s)
-
-str_int_res: resb 1
-str_int_addr: resb 2
-str_atoi:
-	st [str_int_addr], r1
-	st [str_int_addr+1], r0
-
-	xor r1, r1
-	st [str_int_res], r1
-
-.loop:
-	ldd r0, [str_int_addr]+r1
-	eq r0, #0
-	bzf .done
-	lt r0, #48
-	bzf .done
-	gt r0, #57
-	bzf .done
-	push r1
-	sub r0, #48
-	push r0
-	mov r0, #10
-	ld r1, [str_int_res]
-	push pch
-	push pcl
-	b math_mul
-	pop r1
-	add r0, r1
-	st [str_int_res], r0
-	pop r1
-	add r1, #1
-	b .loop
-
-.done:
-	ld r0, [str_int_res]
-	pop pcl
-	pop pch
+; clearing the screen is the graphics card's CLS (API_CLS; BASIC's clr)
 
 str_len_ptr: resb 2
 str_len:
@@ -295,298 +159,6 @@ str_len:
 	bzf .done
 	add r0, #1
 	b .loop
-
-.done:
-	pop pcl
-	pop pch
-
-str_cmp_ptr0: resb 2
-str_cmp_set:
-	st [str_cmp_ptr0], r1
-	st [str_cmp_ptr0+1], r0
-
-	pop pcl
-	pop pch
-
-str_cmp_mismatch: resb 1
-str_cmp_pos: resb 1
-str_cmp_ptr1: resb 2
-str_cmp:
-	st [str_cmp_ptr1], r1
-	st [str_cmp_ptr1+1], r0
-
-	xor r1, r1
-	st [str_cmp_pos], r1
-.loop:
-	ld r1, [str_cmp_pos]
-	ldd r0, [str_cmp_ptr0]+r1
-	ldd r1, [str_cmp_ptr1]+r1
-  sub r1, r0
-  st [str_cmp_mismatch], r1
-  gt r1, #0
-  bzf .done
-	eq r0, #0
-	bzf .done
-
-	ld r1, [str_cmp_pos]
-  add r1, #1
-  st [str_cmp_pos], r1
-  b .loop
-
-.done:
-	ld r0, [str_cmp_mismatch]
-	pop pcl
-	pop pch
-
-str_cpy_pc: resb 2
-str_cpy_len: resb 1
-str_cpy:
-	; args on stack:
-	;  src >> 8
-    ;  src
-	;  dst >> 8
-	;  dst
-	pop r0
-	pop r1
-	st [str_cpy_pc], r0
-	st [str_cpy_pc+1], r1
-
-	pop r0
-	st [mem_p_src+1], r0
-	pop r1
-	st [mem_p_src], r1
-	pop r0
-	st [mem_p_dst+1], r0
-	pop r1
-	st [mem_p_dst], r1
-
-	ld r1, [mem_p_dst]
-	push r1
-	ld r0, [mem_p_dst+1]
-	push r0
-
-	ld r1, [mem_p_src]
-	push r1
-	ld r0, [mem_p_src+1]
-	push r0
-
-	push pch
-	push pcl
-	b str_len
-	st [str_cpy_len], r0
-
-	push pch
-	push pcl
-	b mem_cpy
-
-  xor r0, r0
-	ld r1, [str_cpy_len]
-  std [mem_p_dst]+r1, r0
-.done:
-	ld r0, [str_cpy_pc]
-	ld r1, [str_cpy_pc+1]
-	push r1
-	push r0
-	ld r0, [str_cpy_len]	; return length of string copied
-	pop pcl
-	pop pch
-
-mem_cmp_set0:
-	st [mem_p_dst], r1
-	st [mem_p_dst+1], r0
-	pop pcl
-	pop pch
-
-mem_cmp_set1:
-	st [mem_p_src], r1
-	st [mem_p_src+1], r0
-	pop pcl
-	pop pch
-
-mem_cmp_pc: resb 2
-mem_cmp_val: resb 1
-mem_cmp:
-	; length in r0
-	; args on stack:
-	;  src >> 8
-    ;  src
-	;  dst >> 8
-	;  dst
-
-	; save pc
-	pop r1
-	st [mem_cmp_pc], r1
-	pop r1
-	st [mem_cmp_pc+1], r1
-
-	pop r1
-	st [mem_p_src+1], r1
-	pop r1
-	st [mem_p_src], r1
-
-	pop r1
-	st [mem_p_dst+1], r1
-	pop r1
-	st [mem_p_dst], r1
-
-  ; 0 when all r0 bytes are equal, else the first difference (dst - src),
-  ; like memcmp (it used to keep only the last byte's difference)
-  xor r1, r1
-  st [mem_cmp_val], r1
-.loop:
-  eq r1, r0
-  bzf .done
-  push r0
-  push r1
-  ldd r0, [mem_p_src]+r1
-  ldd r1, [mem_p_dst]+r1
-  sub r1, r0
-  st [mem_cmp_val], r1
-  eq r1, #0
-  pop r1
-  pop r0
-  bzf .next
-  b .done
-.next:
-  add r1, #1
-  b .loop
-
-.done:
-	; restore pc
-	ld r1, [mem_cmp_pc+1]
-	push r1
-	ld r1, [mem_cmp_pc]
-	push r1
-
-  ld r0, [mem_cmp_val]
-
-  pop pcl
-  pop pch
-
-mem_cpy_pc: resb 2
-mem_cpy:
-	; length in r0
-	; args on stack:
-	;  src >> 8
-    ;  src
-	;  dst >> 8
-	;  dst
-
-	; save pc
-	pop r1
-	st [mem_cpy_pc], r1
-	pop r1
-	st [mem_cpy_pc+1], r1
-
-	pop r1
-	st [mem_p_src+1], r1
-	pop r1
-	st [mem_p_src], r1
-
-	pop r1
-	st [mem_p_dst+1], r1
-	pop r1
-	st [mem_p_dst], r1
-
-	push r0
-.loop:
-	pop r0
-	eq r0, #0
-	bzf .done
-	push r0
-	mov r1, r0
-	sub r1, #1
-	ldd r0, [mem_p_src]+r1
-	std [mem_p_dst]+r1, r0
-	pop r0
-	sub r0, #1
-	push r0
-	b .loop
-
-.done:
-	; restore pc
-	ld r1, [mem_cpy_pc+1]
-	push r1
-	ld r1, [mem_cpy_pc]
-	push r1
-
-	pop pcl
-	pop pch
-
-str_chr_ptr: resb 2
-str_chr_set:
-	st [str_chr_ptr], r1
-	st [str_chr_ptr+1], r0
-	pop pcl
-	pop pch
-
-str_chr_offset: resb 1
-str_chr:
-	xor r1, r1
-	st [str_chr_offset], r1
-.loop:
-	ldd r1, [str_chr_ptr]+r1
-	eq r1, #0
-	bzf .notfound
-	eq r1, r0
-	bzf .found
-	ld r1, [str_chr_offset]
-	add r1, #1
-	st [str_chr_offset], r1
-	b .loop
-
-.notfound:
-	xor r0, r0
-	xor r1, r1
-	b .end
-
-.found:
-	ld r1, [str_chr_ptr]
-	ld r0, [str_chr_offset]
-	add r0, r1
-	st [str_chr_ptr], r0
-	lt r0, r1
-	bzf .carry
-	b .end
-.carry:
-	ld r0, [str_chr_ptr+1]
-	add r0, #1
-	st [str_chr_ptr+1], r0
-
-	ld r1, [str_chr_ptr]
-	ld r0, [str_chr_ptr+1]
-.end:
-	pop pcl
-	pop pch
-
-str_rev_i: resb 1
-str_rev_ptr: resb 2
-str_reverse:
-	st [str_rev_ptr], r1
-	st [str_rev_ptr+1], r0
-
-	xor r0, r0
-	st [str_rev_i], r0
-.loop0:
-	ldd r1, [str_rev_ptr]+r0
-	eq r1, #0
-	bzf .loop1
-	push r1
-	add r0, #1
-	b .loop0
-
-.loop1:
-	eq r0, #0
-	bzf .done
-	pop r1
-	push r0
-	ld r0, [str_rev_i]
-	std [str_rev_ptr]+r0, r1
-	add r0, #1
-	st [str_rev_i], r0
-	pop r0
-	sub r0, #1
-	b .loop1
 
 .done:
 	pop pcl

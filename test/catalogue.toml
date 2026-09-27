@@ -38,11 +38,20 @@ cmd = "tools/run_tests.sh"
 [[test]]
 id = "SIM-010"
 title = "The simulator CLI runs the M1 machine with its slot cards"
-checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with hdmi,io,storage,wifi and --sd on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; --legacy still runs a program at $1000; interactively (SDL's dummy video driver) a guest woken from WAI by timer 0 every 50 instructions keeps its 12 MHz clock on the speed line (11-13 MHz: no sleep per WAI while the guest is behind the host clock)"
+checks = "tools/sim headless (--type, --dump-text, --dump-fb): the default machine (hdmi,io) boots through the boot ROM to the BASIC prompt and runs a typed program; keys typed with no IO card, at the prompt and at a program parked in WAI with nothing to wake it (tools/testdata/park.s), still let the run end; with --slots hdmi,io,storage,wifi and --sd IMAGE on a missing image (made blank): SAVE, NEW, DIR (name and size), LOAD, RUN, the image valid FAT with the saved bytes (fatcheck.py), LOAD again in a second run; net join with any SSID gives 127.0.0.1 and net get reaches an HTTP server on localhost (the request arrives, the reply is on screen); eink and eink750: the program runs and the text is on the panel's glass; BASIC graphics (basic-graphics.md): on hdmi mode 1, cls 1 and a filled box in 196 put red and VGA blue in the dumped picture, on eink mode 2 boxes in greys 0-2 and refresh put 0, 85, 170 and 255 on the glass; the picture is the whole panel, 648 x 480 on eink and 800 x 480 on eink750, where a box drawn in mode 2 at x 780-799 is in --dump-fb; the headless exits judged in guest instructions (--max-ins, the run must settle well before it), the two real-time checks tried twice on a loaded host; --legacy still runs a program at $1000; interactively (SDL's dummy video driver) a guest woken from WAI by timer 0 every 50 instructions keeps its 12 MHz clock on the speed line (11-13 MHz: no sleep per WAI while the guest is behind the host clock)"
 method = "test/sim/test_cli.py builds tools/sim and runs it as a user would; the HTTP server runs in the test"
 kind = "sim"
 vrow = "2.1"
 cmd = "python3 test/sim/test_cli.py"
+
+[[test]]
+id = "SIM-014"
+title = "The simulator's arrow, navigation and function keys"
+checks = "the keys with no character reach the kernel as the real IO card gives them (fw/io/core/iocard.h): tools/testdata/keys_prog.s prints the byte API_GETKEY returns for Up, Down, Left, Right, Home, End, PgUp, PgDn, Insert, Delete, F1-F12 ($80-$88, $7f, $91-$9c), pressed by HID usage (the window's path: SDL scancodes are the usages) and by byte (the --type path), both through the IO card core; tools/sim --type with {UP}..{F12} names and \\xHH escapes gives the same bytes headless, a lower-case name works and an unknown {name} is typed as text; examples/snake steered with the arrows (KRN-025)"
+method = "tools/simtest.nim testSimKeys; test/sim/test_keys.py (builds tools/sim, --run and --type headless)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testSimKeys && python3 test/sim/test_keys.py"
 
 [[test]]
 id = "SIM-011"
@@ -252,10 +261,10 @@ cmd = "python3 tools/formal.py chipset prove"
 id = "BUS-005"
 title = "Cross-connector timing budget"
 checks = "card clock-to-out + connector + trace + chipset setup leaves ≥ 30% margin at 12 MHz, both directions"
-method = "hw/timing/cpubus_budget.py: nextpnr I/O delays of both placed designs, stated allowances for pads, clock insertion and minimum delays, and the trace lengths (layout limits until build/hw/cpubus_lengths.json is extracted)"
+method = "hw/timing/cpubus_budget.py: nextpnr I/O delays of both placed designs, stated allowances for pads, clock insertion and minimum delays, and measured lengths from both routed boards (required)"
 kind = "static"
 vrow = "1.7"
-cmd = "python3 hw/timing/cpubus_budget.py"
+cmd = "python3 hw/timing/extract_lengths.py && python3 hw/timing/cpubus_budget.py"
 
 # ============================================================================
 # MMU: chipset address decode, GPO, SYSCTL, the memory bus
@@ -596,7 +605,7 @@ checks = "mkrom.py header fields, checksums, erased padding; round-trips; reject
 method = "pytest"
 kind = "sim"
 vrow = "2.8"
-cmd = "python3 tools/mkrom.py build/rom/boot.bin build/rom/kernel.o -o build/rom/test.rom && python3 tools/mkrom.py --info build/rom/test.rom"
+cmd = "d=$(mktemp -d) && python3 tools/as.py rom/boot.s $d/boot.bin 0xe000,0xe600,0x0f00 && bash kernel/assemble.sh $d && python3 tools/mkrom.py $d/boot.bin $d/kernel.o -o $d/test.rom && python3 tools/mkrom.py --info $d/test.rom; r=$?; rm -rf $d; exit $r"
 
 
 # ============================================================================
@@ -626,7 +635,7 @@ cmd = "tools/run_tests.sh"
 id = "KRN-003"
 title = "BASIC programs"
 checks = "a suite of BASIC programs gives golden output"
-method = "tools/simtest.nim testBasicPrograms: 23 programs typed into the real kernel on the M1 machine model, output worked out by hand (8-bit uBASIC); several pin a fixed kernel bug each"
+method = "tools/simtest.nim testBasicPrograms: 24 programs typed into the real kernel on the M1 machine model, output worked out by hand (uBASIC; re-checked for 16-bit numbers 2026-09-26: only 200+100 changed, 44 to 300); several pin a fixed kernel bug each"
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testBasicPrograms"
@@ -644,7 +653,7 @@ cmd = "tools/run_tests.sh testKernelNetwork testKernelNetWeakPower"
 id = "KRN-014"
 title = "Networking in assembly: DNS client, ping, net config"
 checks = "routines on the CPU: the Internet checksum equals RFC 1071 (odd and even lengths, many carries), ping's echo request, reply matching (identifier, sequence, type, checksum, sender, an IPv4 header in front), the DNS query's bytes, the answer parser (a compressed name, a CNAME then its A through a pointer to a pointer, a name in full, AAAA skipped, NXDOMAIN, SERVFAIL, no answer, class not IN, another id, not a response, truncated, a pointer loop, a pointer, label, RDATA or record past the end), dotted quads and numbers; the whole kernel against a scripted DNS server on host sockets: net config (show, dns IP [PORT], ip IP MASK GW, dhcp, save, bad arguments), net lookup (each answer above; an answer with another id ignored before the right one; only wrong ids and silence time out after exactly one retry with a new id; one answered only the second time; a dotted quad asks nothing), net ping to the host's loopback (replies, times, summary), by name, to an address that never answers (timeouts), of a name that does not exist; a silent DNS server and two unanswered echo requests each take 1000 ms of the chipset's millisecond counter (2000-2050 ms for two, from Enter); the CPU timers stay off and masked (the programs'); the example TCP and UDP echo servers (examples/net, user programs at $7000 on the net API) serve two TCP clients in turn and UDP datagrams from two ports"
-method = "tools/simtest.nim testNetRoutines (kernel routines called directly, kernel/kernel.map), testKernelDnsPing (Wi-Fi core on host sockets: netposix.c, Linux ping socket), testNetExamples (the programs assembled after kernel/api.inc, or API_NET_* names for api_net_* until it exists)"
+method = "tools/simtest.nim testNetRoutines (kernel routines called directly, the map of the kernel the run built), testKernelDnsPing (Wi-Fi core on host sockets: netposix.c, Linux ping socket), testNetExamples (the programs assembled after kernel/api.inc, or API_NET_* names for api_net_* until it exists)"
 kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testNetRoutines testKernelDnsPing testNetExamples"
@@ -661,7 +670,7 @@ cmd = "tools/run_tests.sh testKernelOnEink"
 [[test]]
 id = "KRN-006"
 title = "Files on the storage card: SAVE, LOAD, DIR, DEL"
-checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file too long for the program buffer stops at PROGRAM FULL and what fitted runs; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); a USB source under 3 A (PWR_HI low: SAVE and DEL refused with \"USB power under 3A: SD writes off\", the card unchanged, LOAD, RUN and DIR fine); no SD card, no storage card, a full card"
+checks = "a typed program SAVEd (text, CR LF after each line: pyfatfs reads exactly that from the image), the machine powered off and on, LOADed and RUN with the same output; DIR shows every file and its size (one over 65535); a PC's file loads (CR LF, a blank line and an unnumbered line skipped, no final line end); a file longer than the 8 KB program buffer stops at PROGRAM FULL with the lines that fit in (their length exact) and they run; that near-8 KB program SAVEd (as a PC reads it), LOADed back whole and run; DEL (a PC no longer sees the file), then LOAD and DEL say file not found; SAVE with no name (usage), a bad name, an unquoted name; a card that answers every command only after 30 ms (READ retried); a write-protected card (SAVE and DEL refused, LOAD fine); a USB source under 3 A (PWR_HI low: SAVE and DEL refused with \"USB power under 3A: SD writes off\", the card unchanged, LOAD, RUN and DIR fine); no SD card, no storage card, a full card"
 method = "tools/simtest.nim testStorage: the real kernel on sim.nim with the storage card model (the real fw/storage/core over an image file, fw/sim/simcards.c); images made and checked with tools/fatcheck.py"
 kind = "sim"
 vrow = "2.3"
@@ -688,7 +697,7 @@ cmd = "tools/run_tests.sh testKernelBanks"
 [[test]]
 id = "KRN-010"
 title = "Kernel memory layout and the API jump table"
-checks = "the kernel is assembled for code $1000, data $6000, bss $e000 and its code, data and bss end by $5fff, $6eff and $efff (the API block $6f00 and the user program $7000-$dfff stay free); the jump table from $1003 is 8 groups x 32 B instructions, each entry kernel/api.inc names goes to api_<name> (the bank entries to kernel/bank.s, the net group's 16 to kernel/net.s; api_none for a stub) and every other to api_none, api_none follows at $1303; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc of the 32-entry table still has its entries at the same addresses (entries are only added)"
+checks = "the kernel is assembled for code $1000, data $6800, bss $e000 and its code, data and bss end by $67ff, $6eff and $efff (the API block $6f00 and the user program $7000-$dfff stay free); no BASIC in the kernel (no bas_ or ubasic symbols); BASIC.PRG (basic/build.sh) is assembled for $7000 and its code, data and bss end below $9400 (the tests' buffers from there) and so below its program at $c000; in the ROM image BASIC follows the kernel at the next 256-byte page, with the correct load, entry, length and sums; the five approved dead routines are absent from the maps; the jump table from $1003 is 8 groups x 32 B instructions, each entry kernel/api.inc names goes to api_<name> (the bank entries to kernel/bank.s, the net group's 16 to kernel/net.s; api_none for a stub) and every other to api_none, api_none follows at $1303; API_ARGS/API_ERR/API_RUN agree between api.s and api.inc; every committed api.inc of the 32-entry table still has its entries at the same addresses (entries are only added)"
 method = "tools/simtest.nim testKernelLayout and testKernelApi on the kernel's map and image (every committed version of kernel/api.inc)"
 kind = "sim"
 vrow = "2.3"
@@ -697,7 +706,7 @@ cmd = "tools/run_tests.sh testKernelLayout testKernelApi"
 [[test]]
 id = "KRN-011"
 title = "Kernel API: a program at $7000 calls every group"
-checks = "tools/testdata/api_prog.s (tools/mkprg.py) put at $7000 with API_RUN = 1 as cupc8.py run does, on HDMI with the storage card: the terminal starts it from its key wait (API_RUN 2 while it runs, 0 after); it gets the version, API block and slot table; GFX pixel and filled rectangle read back with GETPIXEL, VSYNC; the e-ink calls give $ff on HDMI and leave $ff; storage INFO, OPEN/WRITE/CLOSE, OPEN/SEEK/READ (the bytes after the seek), RENAME, DIR_FIRST/NEXT, DELETE (a PC no longer sees the files), OPEN of the deleted file says not found; a blank entry of the net group and a reserved one give $ff and API_ERR $ff; WAIT_MS 20 is 21 or 22 steps of TICKS (the chipset's millisecond counter: to its next step, then 20); PUTS/PUTC/GOTOXY/ATTR/GETXY/POLLKEY/POKE on the screen; it returns and the terminal prompts with its stack as before. API_EXIT from a nested call with 6 bytes left on the stack does the same, and BASIC still works; a header of another version is refused"
+checks = "tools/testdata/api_prog.s (tools/mkprg.py) put at $7000 with API_RUN = 1 as cupc8.py run does, on HDMI with the storage card: the terminal starts it from its key wait (API_RUN 2 while it runs, 0 after); it gets the version, API block and slot table; GFX pixel and filled rectangle read back with GETPIXEL, VSYNC; the e-ink calls give $ff on HDMI and leave $ff; storage INFO, OPEN/WRITE/CLOSE, OPEN/SEEK/READ (the bytes after the seek), RENAME, DIR_FIRST/NEXT, DELETE (a PC no longer sees the files), OPEN of the deleted file says not found; a blank entry of the net group and a reserved one give $ff and API_ERR $ff; WAIT_MS 20 is 21 or 22 steps of TICKS (the chipset's millisecond counter: to its next step, then 20); PUTS/PUTC/GOTOXY/ATTR/GETXY/POLLKEY/POKE on the screen; it returns and the terminal prompts with its stack as before (its results at $be00, above BASIC, which the kernel loads over $7000 again). API_EXIT from a nested call with 6 bytes left on the stack does the same, and BASIC still works; a header of another version is refused"
 method = "tools/simtest.nim testApiProgram: the real kernel on sim.nim's M1 machine (runProgram), fw/*/core cards"
 kind = "sim"
 vrow = "2.3"
@@ -706,7 +715,7 @@ cmd = "tools/run_tests.sh testApiProgram"
 [[test]]
 id = "KRN-012"
 title = "exec \"NAME\" from the storage card"
-checks = "a program file (header \"C8P\", version 1) spanning three 128-byte chunks is loaded at $7000 byte for byte and runs; one filling $7000-$dfff exactly runs (its last byte at $dfff); a file without the header runs as BASIC (LOAD, then RUN); a header of version 2, a header cut short (\"bad program header\") and a body one byte too big (\"program too big\") run nothing; a missing file, no name (usage) and no storage card give their messages; the terminal's stack is as before throughout; help lists EXEC"
+checks = "a program file (header \"C8P\", version 1) spanning three 128-byte chunks is loaded at $7000 and runs (it sums its 300 bytes of data and says NATIVE OK); one filling $7000-$dfff exactly runs (its last byte at $dfff); a file without the header goes to BASIC (the terminal's hook), which loads and runs it; a header of version 2, a header cut short (\"bad program header\") and a body one byte too big (\"program too big\") run nothing; a missing file, no name (usage) and no storage card give their messages; the terminal's stack is as before throughout; help lists EXEC"
 method = "tools/simtest.nim testExec: the storage card model on an image made with tools/fatcheck.py"
 kind = "sim"
 vrow = "2.3"
@@ -730,6 +739,87 @@ kind = "sim"
 vrow = "2.3"
 cmd = "tools/run_tests.sh testEinkApi"
 
+[[test]]
+id = "KRN-016"
+title = "BASIC: 16-bit numbers"
+checks = "typed programs on the real kernel: negatives and unary minus; 32767, 30000, sums and products up to 32767; wrap at 32768 (32767+1, -32768-1, 200*200, the literals 32768 and 65535, -32768/-1); / and % truncating toward 0 with each sign combination; / 0 gives 0, % 0 the number; signed comparisons; & and | on 16 bits; line numbers to 32767 for GOTO and GOSUB; FOR past 255 and below 0; poke/peek with a 16-bit address (a literal, a variable, an expression; 61440 reaching the LEDs at $f000) and the old hi, lo form with variables and expressions (poke 240, 0, n on the LEDs); an old-style primes program as saved on David's card; a number of six figures is a tokenizer error"
+method = "tools/simtest.nim testBasic16: the real kernel on the simulator's HDMI and IO cards, output worked out by hand"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testBasic16"
+
+[[test]]
+id = "KRN-017"
+title = "BASIC: the 8 KB program buffer"
+checks = "a program 8173 bytes long at $c004 (\"BA\" and its end at $c000): a typed line one character too long for it is refused (PROGRAM FULL, the program unchanged), the 13-character one that fills it exactly is taken (its CR at $dffe, the 0 at $dfff, 8187 bytes), the next is refused and nothing is written past $dfff; the program (456 lines, line numbers to 32010, over the 300-line index: a GOSUB to its far end, a FOR loop past the index) runs to the right sum"
+method = "tools/simtest.nim testProgramFull: the program written into the buffer as typing leaves it, the last lines typed"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testProgramFull"
+
+[[test]]
+id = "KRN-018"
+title = "BASIC graphics statements"
+checks = "on the simulator's HDMI card: mode 1, cls, plot, line, box outlined and filled (a sixth argument 0 or 1), palette (the colour rendered red), refresh (nothing), y outside 0-255 clamped, off-screen clipped, no bad command on the card; the ended program keeps GFX until a key, then TEXT and DONE.; color fg, bg and cls c in TEXT (the attributes in the cells); mode 2 and mode 7 on HDMI ignored, palette with no arguments; ten wrong argument counts each one fatal error. On the e-ink card: mode 2, cls (white), boxes, plot, line in greys 0-3 in the card's mode-2 picture pixel by pixel; refresh (greyscale by default in mode 2): the four greys darkest to white on the glass; no command the panel would ignore; a key brings TEXT back"
+method = "tools/simtest.nim testBasicGraphics (the cards' state through fw/sim/simcards.c: simcard_gpu_pixel, simcard_eink_pixel2, simcard_gpu_errors, simcard_render)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testBasicGraphics"
+
+[[test]]
+id = "KRN-019"
+title = "Kernel API: the e-ink card's mode 2"
+checks = "tools/testdata/gfx2_prog.s (API_GFX_MODE 2, API_CLS, every API_GFX2 entry) on the simulator's e-ink card: each returns 0; the mode-2 picture pixel by pixel: PIXEL, FILL_RECT, RECT, LINE to x 640, BLIT1 ($f0 $0f / $aa $55 in fg 0, bg 3), BLIT2 ($1b $e4: greys 0-3 and back), TEXT16 on a transparent background, TEXT8 on grey 2, VSCROLL down 8 with the new rows in grey 1; GETPIXEL before and after the scroll; a BLIT 1021 wide and one 800 x 100 (over 8128 bytes) refused with $fe, one 1020 wide taken; no bad frame on the card. On HDMI every entry gives $ff, the card stays in TEXT and sees nothing bad"
+method = "tools/simtest.nim testGfx2Api"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testGfx2Api"
+
+[[test]]
+id = "KRN-021"
+title = "Kernel API: long frames wait for the card's FREE"
+checks = "tools/testdata/text8_prog.s on the simulator's HDMI card with its execution held (as an e-ink REFRESH holds it): 1150 PIXEL frames fill 8050 of the FIFO's 8192 bytes, then API_GFX_TEXT8 with 255 characters (a 262-byte frame) waits instead of sending, asking FREE with $FF frames that queue nothing (no dropped frame); released, it returns, the text arrives whole (its row drawn across the screen), the PIXELs ran, the card dropped no frame"
+method = "tools/simtest.nim testText8Free (simcard_gpu_hold in fw/sim/simcards.c)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testText8Free"
+
+[[test]]
+id = "KRN-022"
+title = "Kernel builds side by side"
+checks = "every test builds the kernel in a directory of its own (tools/simmachine.nim romDir(): build/rom-PID-*, removed at exit, a killed run's swept by the next; kernel/assemble.sh OUTDIR), never in kernel/: four rounds of two `simtest --build-kernel` at once each give a ROM and a map equal to the one built alone, and that map is whole (over 1000 symbols, term_do and main); simtest's programs, maps, .prg files and SD images go in its own directory too (workDir): two runs of six tests that write them (testAssemblerMap, testAssemblerRejects, testAluImm, testBootChain, testApiProgram, testExec, and testNetExamples, whose guest serves on the host's port 7007) at once both pass, and before that two `simtest --own-files` each write an SD image and a program where the tests do, the second while the first waits, and the first's are still its own; the tests on fixed host ports (KRN-004's 8088, examples/net's 7007) taking them one run at a time under a lock, and a freed Wi-Fi card's host sockets closed; tools/run_tests.sh and SIM-010 build under a lock and run a copy of their own of the binary"
+method = "tools/simtest.nim testKernelBuildsConcurrent, testRunsSideBySide: the test's own binary started twice at once (startProcess)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testKernelBuildsConcurrent testRunsSideBySide"
+
+[[test]]
+id = "KRN-024"
+title = "Kernel API: API_MEM_CMP and API_MEM_CPY"
+checks = "tools/testdata/mem_prog.s calls the group-0 entries ($101b, $101e) with 16-bit lengths: compare equal (0), less ($ff, r1 the difference, the pointers at byte 4), greater unsigned ($f0 against $10: 1), length 0 (equal, nothing moved), 300 bytes across pages differing at byte 290 (1, 9 left); copy 300 bytes (the bytes round the target untouched), 0 bytes (nothing written), overlapping with dst above src (backwards: the source's bytes, not a repeat) and below it, onto itself (memmove)"
+method = "tools/simtest.nim testMemApi"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testMemApi"
+
+[[test]]
+id = "KRN-025"
+title = "examples/snake on the HDMI and the e-ink card"
+checks = "examples/snake (mkprg.py) on the simulator. HDMI: GFX mode, walls in colour 9, the snake moving right, S turns it down, then the arrow keys as the sim window gives them (HID usages through the IO card) turn it right, down and left, Q gives TEXT, the goodbye and the terminal. E-ink 648 x 480: mode 2, 40 x 30 cells of 16 pixels 4 in (white outside), walls grey 1, the snake black, a greyscale refresh shows the field (grey, black and white on the glass); a step every 450-600 ms, each shown by a partial refresh; S turns it down, on the glass after the next partial refresh; Q gives TEXT and the automatic refresh back (the goodbye refreshed by itself); no panel or frame errors. E-ink 800 x 480: 50 x 30 cells to the panel's edges"
+method = "tools/simtest.nim testSnakeExample"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testSnakeExample"
+
+[[test]]
+id = "KRN-026"
+title = "examples/gfxdemo on the HDMI and the e-ink card"
+checks = "examples/gfxdemo (mkprg.py) on the simulator, a key between stages. HDMI: TEXT's colours, the palette grid pixel by pixel, the line art, then TEXT with stage 4 (mode 2) skipped as e-ink only. E-ink 648 x 480 and 800 x 480: the grid and the line art each followed by a greyscale refresh (several greys on the glass); stage 4 in mode 2, centred: four bars in greys 0-3 (the white one outlined), a fan of lines, the title, a greyscale refresh (0, 85, 170, 255 on the glass); then TEXT; no panel or frame errors"
+method = "tools/simtest.nim testGfxdemoExample"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testGfxdemoExample"
+
 # ============================================================================
 # CARD: common card protocol (every card firmware)
 # ============================================================================
@@ -744,13 +834,67 @@ vrow = "2.1"
 cmd = "tools/run_tests.sh testBackspace"
 
 [[test]]
+id = "KRN-023"
+title = "list prints the BASIC program"
+checks = "list on an empty program prints nothing; after new and two typed lines it prints exactly those two lines, one per line, after the command; help lists LIST (E2E-008's golden)"
+method = "tools/simtest.nim testBasicList: the real kernel on the simulator's HDMI and IO cards"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicList"
+
+[[test]]
+id = "KRN-027"
+title = "BASIC line editing: the program in line-number order"
+checks = "the bytes at $c000 (each line, its CR, the 0, the length) after every edit: lines typed out of order kept in order (by number: 9 < 10 < 100; 1 and 32767); a line of an existing number replaces it (the same length, longer, shorter); insert at the start, in the middle, at the end; a line number alone (spaces after it too) deletes the line, a missing one changes nothing, `25 5` is a line (not a delete), every line deleted leaves an empty program; new, then a line above the last typed one; list and run see the order; GOTO and GOSUB reach lines typed backwards and lines inserted, replaced and deleted between runs; PROGRAM FULL exact at $dfff for a replacement (8176 bytes: a line 11 bytes longer taken, the program 8187 bytes with its 0 at $dfff; one byte more refused, the program and $e000 untouched; a new line refused; a shorter replacement taken, then a new line that fits exactly); 16 lines typed in order after 263 take as long as into an empty program (within 10 %: each is looked for from the last typed line's place); SAVE of a program typed out of order writes it in order (the file as a PC reads it) and LOADs back the same; LOAD of a PC's file with lines out of order, one given twice (the later kept) and 40000 (skipped: line numbers are 1-32767, as typed) gives the sorted program, which runs"
+method = "tools/simtest.nim testBasicEdit, testBasicEditStorage: the real kernel on the simulator's HDMI, IO and storage cards"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicEdit testBasicEditStorage"
+
+[[test]]
 id = "KRN-030"
 title = "USB console: the kernel's side of the rings"
-checks = "on junk RAM (HOST set, CON_OUT nearly full) the kernel's boot zeroes the four indices and CON_FLAGS before it prints, so the banner and prompt reach CON_OUT and the prompt the graphics card; help typed into CON_IN runs, its echo and output in CON_OUT, CON_IN's tail caught up; a BASIC program typed into CON_IN runs and its output (over 300 bytes) comes out of the 128-byte ring whole and in order as the card takes it; with HOST set and nobody taking, the kernel waits at the full ring and goes on when the card drains it; with HOST clear it runs to the prompt with the ring full and the rest dropped"
+checks = "on junk RAM (HOST set, CON_OUT nearly full) the kernel's boot zeroes the four indices and CON_FLAGS before it prints, so the banner and prompt reach CON_OUT and the prompt the graphics card; help typed into CON_IN runs, its echo and output in CON_OUT, CON_IN's tail caught up; a BASIC program typed into CON_IN runs and its output (over 300 bytes) comes out of the 128-byte ring whole and in order as the card takes it; with HOST set and nobody taking, the kernel waits at the full ring (still waiting 400 ms on) and goes on, whole, when the card drains it; with HOST set and the card no longer taking, 490-600 ms after the ring filled the kernel is back at the prompt (the program ran to the end on the graphics card, the ring untouched), and further output goes straight past while the tail stays put; once the card has taken the ring the kernel waits again (still waiting 400 ms on) and the output then comes whole and in order; with HOST clear it runs to the prompt with the ring full and the rest dropped"
 method = "tools/simtest.nim testKernelConsole: the real kernel on the simulator; the test plays the system card on the rings (fw/sysctl/core/console.c's side)"
 kind = "sim"
 vrow = "2.1"
 cmd = "tools/run_tests.sh testKernelConsole"
+
+[[test]]
+id = "KRN-031"
+title = "BASIC as a program: loaded again after a native program"
+checks = "the kernel copies BASIC from the ROM to $7000 at boot and after every native program (cupc8.py run's API_RUN and exec from the card alike): each time $7000 holds BASIC.PRG's body and the terminal's hook is BASIC's (bas_hook), the terminal's stack as before; a program typed before a native program that stayed below $c000 is still there (list, run); after one that wrote over $c000 BASIC starts with no program (\"BA\" and the end written again, list empty) and a new one runs; API_RUN is 2 while BASIC runs a program and 0 at the prompt after; exec of a file with a broken FAT chain says card error and loads nothing; exec with the SD card taken out once its first chunk is in says no SD card and loads BASIC again, the program kept"
+method = "tools/simtest.nim testBasicReload: the real kernel and ROM image on sim.nim's M1 machine, tools/testdata/exec_prog.s and big_prog.s on the storage card model"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicReload"
+
+[[test]]
+id = "KRN-032"
+title = "BASIC.PRG from the SD card, the fallbacks, and the kernel with no BASIC"
+checks = "with a storage card, an SD card and BASIC.PRG with a good header, its body is at $7000 after boot and the line \"BASIC from the SD card\" is under the banner; it runs programs, and is loaded again after a native program (run and exec); with the SD card taken out the ROM's BASIC comes back after the next one, the program kept. The ROM's BASIC, with no message and within 20 ms of a machine with no storage card: no storage card, no SD card, no BASIC.PRG, a header of another version, a file that is not a program, a header cut short, one too big for $7000-$bfff (found before loading), a read error in the file (a FAT chain broken after its first cluster). A ROM with no BASIC, with a bad BASIC header or a BASIC body whose sum is wrong: the banner, the prompt and help, no hook, a BASIC line or run is ERROR: invalid cmd!"
+method = "tools/simtest.nim testBasicFromCard, testKernelNoBasic: the ROM image with and without BASIC (tools/mkrom.py --basic), FAT images made with tools/fatcheck.py (one with its FAT entry changed), the card's BASIC told apart by its D0NE."
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicFromCard testKernelNoBasic"
+
+[[test]]
+id = "KRN-034"
+title = "BASIC: PEEK and POKE through the RAM window"
+checks = "E2E-009's BASIC program in the simulator: POKE $f205 picks the bank BASIC's $8000-$bfff shows (5 bits: 255 reads back 31), PEEK reads banks 4 and 5 (bytes put in the SRAM), POKE writes SRAM $14020 and $7ffff, PEEK $f205 reads 2 again; the CPU's window stays on bank 2 (BASIC runs from $7000 into it) and BASIC runs on"
+method = "tools/simtest.nim testBasicBanks: sim.nim's SRAM (physRead, physWrite)"
+kind = "sim"
+vrow = "2.1"
+cmd = "tools/run_tests.sh testBasicBanks"
+
+[[test]]
+id = "KRN-033"
+title = "Kernel API: API_TERM_HOOK, API_READLINE, API_ST_PERROR"
+checks = "tools/testdata/api_line.s at $7000: API_ST_PERROR 3 prints file not found; API_READLINE reads h, i, Backspace, e, y, Enter into its buffer as hey, a CR and a 0 (r1 = 3, r0 = 0), echoed with the i taken back off the screen; API_TERM_HOOK 0, 0 gives r0 = 0; after the program the kernel loads BASIC, whose hook is set again, and a typed program runs"
+method = "tools/simtest.nim testApiLine: the real kernel on sim.nim's M1 machine; the table entries in testKernelApi (KRN-010)"
+kind = "sim"
+vrow = "2.3"
+cmd = "tools/run_tests.sh testApiLine"
 
 [[test]]
 id = "CARD-001"
@@ -857,6 +1001,15 @@ method = "emu/rp2040/test/sd/test_sdcard.cpp (build/emu-native/test_sdcard); tes
 kind = "sim"
 vrow = "2.4"
 cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native >/dev/null && build/emu-native/test_sdcard && tools/fw_rp2040.sh emu_sdspi && CUPC8_EMU=native node test/emu/test_sdspi.mjs"
+
+[[test]]
+id = "EMU-009"
+title = "Native whole-machine emulator: the Wi-Fi card in step with the board"
+checks = "the kernel ROM with the HDMI, IO and Wi-Fi cards (its real firmware in the lockstep QEMU, tools/qemu_build.sh): boot, net join, net get from an HTTP server in a child process, serially and threaded twice: identical board clock count, CPU state, every card's time (QEMU's clock at the last select for the Wi-Fi card) and core cycle counts, every slot SPI frame, the guest's network traffic (every packet and its guest time) and the screen; the page is shown; every packet the guest receives (DHCP, ARP, the TCP connect's SYN-ACK, the server's answer) reaches it at the guest time of the packet it sent that asked for it (QEMU lets the host answer first); the card's clock tracks the board's: at every select (6500 of them, through net join's back-to-back polling) QEMU's clock is the board's to within one instruction (8 ns), and the firmware had re-armed the preload after every frame before the next select"
+method = "test/emu/test_wifi_lockstep.mjs (machinenative.mjs's pcap option, emu/machine EspCard, tools/patches/qemu-esp-lockstep.patch)"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
 
 [[test]]
 id = "GPU-004"
@@ -1031,7 +1184,7 @@ checks = "Machine.create({ forward }) on the native emulator: QEMU accepts TCP o
 method = "test/emu/test_wifi_forward.mjs, test/emu/machinenative.mjs (hostfwd on the -nic user,model=open_eth line)"
 kind = "sim"
 vrow = "2.6"
-cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && node test/emu/test_wifi_forward.mjs"
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_forward.mjs"
 
 [[test]]
 id = "WIFI-004"
@@ -1151,7 +1304,7 @@ cmd = "python3 test/host/test_jlcparts.py"
 [[test]]
 id = "HOST-002"
 title = "cupc8.py end to end"
-checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read across $ffff, far RAM by address and BANK:OFFSET up to $7ffff (and refused past it, or for bank 32), run (a .prg's body at $7000 with its header left out, or a bare binary, then API_RUN = 1; refused while API_RUN is 1 or 2, for a version 2 header and for 28673 bytes), CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; console on the second port (sysctl_sim --console): the ring's text arrives with \\n as CR LF, piped-in text lands in CON_IN with LF as Enter, CON_OUT_TAIL moved and HOST set; the results checked in the models' memory"
+checks = "every cupc8.py command, run as a user runs it, against sysctl_sim (the real sysctl core on the model machine, over a pty): ping, status, power, ROM id/write/read, RAM write/read across $ffff, far RAM by address and BANK:OFFSET up to $7ffff (and refused past it, or for bank 32), run (a .prg's body at $7000 with its header left out, or a bare binary, only after API_RUN 3 is acknowledged as 4, then API_RUN = 1; refused while API_RUN is nonzero, for a version 2 header and for 28673 bytes), CPU stop/step/cycle/run/hold/release, trace, FPGA flash (and one that won't configure), flash id refused until held, the bridge refused with the chipset held, card reset hold/release, card flash of gpu.elf over SWD, an empty slot, bad slot numbers, reset; console on the second port (sysctl_sim --console): the ring's text arrives with \\n as CR LF, piped-in text lands in CON_IN with LF as Enter, CON_OUT_TAIL moved and HOST set; the results checked in the models' memory"
 method = "test/host/test_cupc8.py with build/fw/sysctl_sim --dump"
 cmd = "make -s -C fw sysctl_sim && python3 test/host/test_cupc8.py"
 kind = "sim"
@@ -1187,12 +1340,30 @@ kind = "sim"
 vrow = "3.2"
 
 [[test]]
+id = "E2E-002A"
+title = "Native emulator: blank ROM to BASIC screen text"
+checks = "with RTL and real card firmware, program a blank ROM via sysctl USB, boot, type a BASIC program and match the decoded HDMI text recording"
+method = "test/emu/test_e2e.mjs E2E-002 on the native machine; schematic wiring and a pixel golden are covered separately"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002"
+
+[[test]]
 id = "E2E-003"
 title = "Network fetch"
-checks = "Wi-Fi join → TCP fetch from a local server → page shown"
+checks = "Wi-Fi join → TCP fetch from a local server (a child process) → page shown; on the native emulator two runs with the same port (CUPC8_E2E003_PORT) are the same run (CUPC8_ESP_TRACE traces and end state identical)"
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
+
+[[test]]
+id = "E2E-003A"
+title = "Native emulator: Wi-Fi fetch reaches HDMI screen text"
+checks = "with RTL and real Wi-Fi firmware in lockstep QEMU, join, fetch from a local server, observe one request and match decoded HDMI text"
+method = "test/emu/test_e2e.mjs E2E-003 on the native machine; schematic wiring is covered separately"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-003"
 
 [[test]]
 id = "E2E-013"
@@ -1201,7 +1372,7 @@ checks = "the kernel's DNS client asks a DNS server on the PC (net config dns 10
 method = "test/emu/test_e2e.mjs E2E-013 (CUPC8_EMU=native): the native emulator, esp32c3 firmware in QEMU, a Node DNS server and HTTP server on 127.0.0.1"
 kind = "sim"
 vrow = "3.2"
-cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
+cmd = "tools/qemu_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-013"
 
 [[test]]
 id = "E2E-020"
@@ -1219,7 +1390,34 @@ checks = "on the native emulator (HDMI, IO, the Wi-Fi card's real firmware in QE
 method = "test/emu/test_e2e.mjs E2E-014 (CUPC8_EMU=native): Node's net and dgram sockets on 127.0.0.1, free host ports forwarded to the card's port 7007"
 kind = "sim"
 vrow = "3.2"
-cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-014"
+
+[[test]]
+id = "E2E-015"
+title = "BASIC graphics on the HDMI picture"
+checks = "on the native emulator (HDMI and IO cards, their real firmware): a typed BASIC program (mode 1, cls 1, a filled box in 196, a line in 15, plot in 226, an outline in 46, palette 100 set to blue and a box in it) gives, in the picture decoded from the card's TMDS output, VGA blue, red, white, yellow, green and blue at the places drawn (each GFX pixel 2 x 2, both of its corners); the ended program keeps the picture until a key, then TEXT and DONE.; the terminal works on"
+method = "test/emu/test_e2e.mjs E2E-015 (CUPC8_EMU=native): m.frame()"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-015"
+
+[[test]]
+id = "E2E-016"
+title = "BASIC in the e-ink card's mode 2 on the glass"
+checks = "on the native emulator (the real eink.elf with the UC8179 panel model): a typed BASIC program (mode 2, cls, filled boxes in greys 0, 1 and 2, a line across the panel, an outline in grey 1, refresh) makes a greyscale refresh; the glass then has 0, 85, 170 and 255 at the places drawn, the line from x 0 to 647; the panel model saw nothing the chip would ignore; a key brings TEXT and DONE. back on the panel"
+method = "test/emu/test_e2e.mjs E2E-016 (CUPC8_EMU=native): m.panel()"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-016"
+
+[[test]]
+id = "E2E-017"
+title = "examples/snake on the e-ink card, steered on the glass"
+checks = "on the native emulator (the real eink.elf with the UC8179 panel model, the system card): cupc8.py run of examples/snake; a greyscale refresh shows the field (the wall grey 85, the snake black, the ground and the margin white); the snake moves right on the glass by partial refreshes; S typed on the keyboard mid-game turns it down, and the glass shows it; Q brings TEXT and the goodbye on the panel; the panel model saw nothing the chip would ignore"
+method = "test/emu/test_e2e.mjs E2E-017 (CUPC8_EMU=native): Machine.type, m.panel()"
+kind = "sim"
+vrow = "3.2"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-017"
 
 [[test]]
 id = "E2E-004"
@@ -1228,6 +1426,15 @@ checks = "empty slots, a card removed between power cycles, corrupt kernel (bad 
 method = "co-sim"
 kind = "sim"
 vrow = "3.3"
+
+[[test]]
+id = "E2E-004A"
+title = "Native negative boot cases"
+checks = "the native whole-machine emulator boots across empty slots (HDMI in slot 2, IO in slot 4), distinguishes an empty SD socket from a storage card removed between power cycles, halts with the specified POST code and HDMI message for a bad kernel magic, header checksum, or body checksum, rejects a ROM upload stopped between verified 2048-byte system-card protocol chunks, and with PWR_HI low still boots and reaches storage reads while refusing SD writes"
+method = "test/emu/test_e2e.mjs E2E-004 (CUPC8_EMU=native); the full E2E-004 co-sim row remains pending"
+kind = "sim"
+vrow = "3.3"
+cmd = "CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-004"
 
 [[test]]
 id = "E2E-007"
@@ -1518,6 +1725,7 @@ checks = "0 errors; every waiver justified in writing"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py main erc"
 
 [[test]]
 id = "MB-002"
@@ -1526,6 +1734,7 @@ checks = "0 errors, 0 unconnected, JLC 4-layer rules"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py main drc"
 
 [[test]]
 id = "MB-003"
@@ -1534,6 +1743,7 @@ checks = "every line has an LCSC number, is in stock at ≥ 2× the build quanti
 method = "hw/tools/bomcheck.py + jlcparts.py"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py main bom"
 
 [[test]]
 id = "MB-004"
@@ -1542,6 +1752,7 @@ checks = "every symbol pin matches the datasheet table; pin 1 and rotation match
 method = "hw/tools/fpcheck.py"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py main footprints"
 
 [[test]]
 id = "MB-005"
@@ -1550,6 +1761,7 @@ checks = "3V3 buck startup and load step; 1V2 LDO; USB-C inrush; 6-slot worst ca
 method = "ngspice decks in hw/mainboard/sim/"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py main power"
 
 [[test]]
 id = "MB-006"
@@ -1558,6 +1770,7 @@ checks = "all regulators Tj ≤ 100 °C at 40 °C ambient"
 method = "hw/power/budget.py"
 kind = "static"
 vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py main thermal"
 
 [[test]]
 id = "MB-007"
@@ -1574,6 +1787,7 @@ checks = "CPU card + 6 cards fitted with no collisions; mounting holes; connecto
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py main mechanical"
 
 [[test]]
 id = "MB-009"
@@ -1582,6 +1796,7 @@ checks = "Gerbers re-imported and DRC-clean; drill file matches the holes; CPL r
 method = "hw/tools/fabcheck.py"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py main fab"
 
 [[test]]
 id = "MB-050"
@@ -1590,6 +1805,7 @@ checks = "CPU socket = cpu-bus.md table; each slot = slot.md table; pull-ups and
 method = "netlist check script"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py main connectors"
 
 [[test]]
 id = "MB-051"
@@ -1681,6 +1897,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py cpu erc"
 
 [[test]]
 id = "CC-002"
@@ -1689,6 +1906,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py cpu drc"
 
 [[test]]
 id = "CC-003"
@@ -1697,6 +1915,7 @@ checks = "LCSC, stock and package, as MB-003"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py cpu bom"
 
 [[test]]
 id = "CC-004"
@@ -1705,6 +1924,7 @@ checks = "as MB-004"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py cpu footprints"
 
 [[test]]
 id = "CC-005"
@@ -1713,6 +1933,7 @@ checks = "1V2 LDO from the socket's 3V3: startup, load step, dropout"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py cpu power"
 
 [[test]]
 id = "CC-007"
@@ -1729,6 +1950,7 @@ checks = "edge fingers match PCIe CEM x8 dimensions and key; fits the socket; cl
 method = "FreeCAD fit script + finger dimension check"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py cpu mechanical"
 
 [[test]]
 id = "CC-009"
@@ -1737,6 +1959,7 @@ checks = "as MB-009, plus gold fingers + bevel noted in the fab notes; the board
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py cpu fab"
 
 [[test]]
 id = "CC-050"
@@ -1745,6 +1968,7 @@ checks = "every finger net matches the spec table; CARD_ID straps = 10; PRSNT1 j
 method = "netlist check script"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py cpu connectors"
 
 [[test]]
 id = "CC-051"
@@ -1770,6 +1994,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py gpu erc"
 
 [[test]]
 id = "GC-002"
@@ -1778,6 +2003,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py gpu drc"
 
 [[test]]
 id = "GC-003"
@@ -1786,6 +2012,7 @@ checks = "as MB-003"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py gpu bom"
 
 [[test]]
 id = "GC-004"
@@ -1794,6 +2021,7 @@ checks = "as MB-004; HDMI connector pinout against the HDMI spec"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py gpu footprints"
 
 [[test]]
 id = "GC-005"
@@ -1802,6 +2030,7 @@ checks = "RP2040 at 252 MHz with the VREG bump: rail droop within spec"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py gpu power"
 
 [[test]]
 id = "GC-007"
@@ -1818,6 +2047,7 @@ checks = "x1 fingers per CEM; HDMI connector overhang; clearance to neighbours"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py gpu mechanical"
 
 [[test]]
 id = "GC-009"
@@ -1826,6 +2056,7 @@ checks = "as CC-009, plus the impedance-controlled stackup ordered; the board's 
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py gpu fab"
 
 [[test]]
 id = "GC-050"
@@ -1834,6 +2065,7 @@ checks = "fingers = slot.md; RP2040 TMDS GPIOs = the PicoDVI config used by the 
 method = "netlist check against fw/gpu pins.h"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py gpu connectors"
 
 [[test]]
 id = "GC-101"
@@ -1851,6 +2083,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py io erc"
 
 [[test]]
 id = "IC-002"
@@ -1859,6 +2092,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py io drc"
 
 [[test]]
 id = "IC-003"
@@ -1867,6 +2101,7 @@ checks = "as MB-003"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py io bom"
 
 [[test]]
 id = "IC-004"
@@ -1875,6 +2110,7 @@ checks = "as MB-004; USB-A pinout"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py io footprints"
 
 [[test]]
 id = "IC-005"
@@ -1883,6 +2119,7 @@ checks = "SY6280 current limit set to ≤ 500 mA; soft start; fault flag on shor
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py io power"
 
 [[test]]
 id = "IC-007"
@@ -1899,6 +2136,7 @@ checks = "x1 fingers per CEM; USB-A overhang; clearance"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py io mechanical"
 
 [[test]]
 id = "IC-009"
@@ -1907,6 +2145,7 @@ checks = "as CC-009; the board's name and revision ('<name> rev <X>') on the top
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py io fab"
 
 [[test]]
 id = "IC-050"
@@ -1915,6 +2154,7 @@ checks = "fingers = slot.md; RP2040 pins = fw/io pins.h"
 method = "netlist check"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py io connectors"
 
 [[test]]
 id = "IC-101"
@@ -1932,6 +2172,7 @@ checks = "0 errors"
 method = "kicad-cli sch erc"
 kind = "static"
 vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py wifi erc"
 
 [[test]]
 id = "WC-002"
@@ -1940,6 +2181,7 @@ checks = "0 errors, 0 unconnected"
 method = "kicad-cli pcb drc"
 kind = "static"
 vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py wifi drc"
 
 [[test]]
 id = "WC-003"
@@ -1948,6 +2190,7 @@ checks = "as MB-003; antenna ordered as a loose part"
 method = "bomcheck"
 kind = "static"
 vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py wifi bom"
 
 [[test]]
 id = "WC-004"
@@ -1956,6 +2199,7 @@ checks = "as MB-004; module pad map against the ESP32-C3-MINI-1U datasheet"
 method = "fpcheck"
 kind = "static"
 vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py wifi footprints"
 
 [[test]]
 id = "WC-005"
@@ -1964,6 +2208,7 @@ checks = "TLV62569 buck + bulk capacitance hold 3V3 ≥ 3.0 V through a 350 mA T
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py wifi power"
 
 [[test]]
 id = "WC-006"
@@ -1972,6 +2217,7 @@ checks = "GPIO2/8/9 and EN levels at reset give normal boot with PROG_n released
 method = "ngspice RC model + a strapping-table check"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py wifi strapping"
 
 [[test]]
 id = "WC-008"
@@ -1980,6 +2226,7 @@ checks = "x1 fingers per CEM; MHF III access; antenna cable route"
 method = "FreeCAD fit script"
 kind = "static"
 vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py wifi mechanical"
 
 [[test]]
 id = "WC-009"
@@ -1988,6 +2235,7 @@ checks = "as CC-009; the board's name and revision ('<name> rev <X>') on the top
 method = "fabcheck"
 kind = "static"
 vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py wifi fab"
 
 [[test]]
 id = "WC-050"
@@ -1996,6 +2244,7 @@ checks = "fingers = slot.md incl. PROG_n→GPIO9, SWCLK→U0RXD, SWDIO→U0TXD; 
 method = "netlist check"
 kind = "static"
 vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py wifi connectors"
 
 [[test]]
 id = "WC-101"
@@ -2004,3 +2253,419 @@ checks = "flash over the UART bootloader; IDENT = $03; join a network; HTTPS fet
 method = "cupc8.py card flash/ident + net test"
 kind = "hw"
 vrow = "5"
+
+[[test]]
+id = "SC-001"
+title = "Storage card erc"
+checks = "Current board build: erc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py storage erc"
+
+[[test]]
+id = "SC-002"
+title = "Storage card drc"
+checks = "Current board build: drc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py storage drc"
+
+[[test]]
+id = "SC-003"
+title = "Storage card bom"
+checks = "Current board build: bom; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py storage bom"
+
+[[test]]
+id = "SC-004"
+title = "Storage card footprints"
+checks = "Current board build: footprints; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py storage footprints"
+
+[[test]]
+id = "SC-005"
+title = "Storage card power"
+checks = "Current board build: power; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py storage power"
+
+[[test]]
+id = "SC-006"
+title = "Storage card thermal"
+checks = "Current board build: thermal; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py storage thermal"
+
+[[test]]
+id = "SC-008"
+title = "Storage card mechanical"
+checks = "Current board build: mechanical; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py storage mechanical"
+
+[[test]]
+id = "SC-009"
+title = "Storage card fab"
+checks = "Current board build: fab; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py storage fab"
+
+[[test]]
+id = "SC-050"
+title = "Storage card connectors"
+checks = "Current board build: connectors; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py storage connectors"
+
+[[test]]
+id = "SC-007"
+title = "Storage card signal integrity"
+checks = "Board-level signal integrity against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "4.6"
+
+[[test]]
+id = "SC-051"
+title = "Storage card board-level co-sim"
+checks = "Board-level co-sim against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "3.1"
+
+[[test]]
+id = "EC-001"
+title = "Eink card erc"
+checks = "Current board build: erc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py eink erc"
+
+[[test]]
+id = "EC-002"
+title = "Eink card drc"
+checks = "Current board build: drc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py eink drc"
+
+[[test]]
+id = "EC-003"
+title = "Eink card bom"
+checks = "Current board build: bom; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py eink bom"
+
+[[test]]
+id = "EC-004"
+title = "Eink card footprints"
+checks = "Current board build: footprints; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py eink footprints"
+
+[[test]]
+id = "EC-005"
+title = "Eink card power"
+checks = "Current board build: power; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py eink power"
+
+[[test]]
+id = "EC-006"
+title = "Eink card thermal"
+checks = "Current board build: thermal; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py eink thermal"
+
+[[test]]
+id = "EC-008"
+title = "Eink card mechanical"
+checks = "Current board build: mechanical; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py eink mechanical"
+
+[[test]]
+id = "EC-009"
+title = "Eink card fab"
+checks = "Current board build: fab; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py eink fab"
+
+[[test]]
+id = "EC-050"
+title = "Eink card connectors"
+checks = "Current board build: connectors; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py eink connectors"
+
+[[test]]
+id = "EC-007"
+title = "Eink card signal integrity"
+checks = "Board-level signal integrity against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "4.6"
+
+[[test]]
+id = "EC-051"
+title = "Eink card board-level co-sim"
+checks = "Board-level co-sim against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "3.1"
+
+[[test]]
+id = "YC-001"
+title = "System card erc"
+checks = "Current board build: erc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.1"
+cmd = "python3 hw/tools/boardcheck.py system erc"
+
+[[test]]
+id = "YC-002"
+title = "System card drc"
+checks = "Current board build: drc; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 hw/tools/boardcheck.py system drc"
+
+[[test]]
+id = "YC-003"
+title = "System card bom"
+checks = "Current board build: bom; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.8"
+cmd = "python3 hw/tools/boardcheck.py system bom"
+
+[[test]]
+id = "YC-004"
+title = "System card footprints"
+checks = "Current board build: footprints; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.3"
+cmd = "python3 hw/tools/boardcheck.py system footprints"
+
+[[test]]
+id = "YC-005"
+title = "System card power"
+checks = "Current board build: power; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 hw/tools/boardcheck.py system power"
+
+[[test]]
+id = "YC-006"
+title = "System card thermal"
+checks = "Current board build: thermal; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py system thermal"
+
+[[test]]
+id = "YC-008"
+title = "System card mechanical"
+checks = "Current board build: mechanical; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 hw/tools/boardcheck.py system mechanical"
+
+[[test]]
+id = "YC-009"
+title = "System card fab"
+checks = "Current board build: fab; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 hw/tools/boardcheck.py system fab"
+
+[[test]]
+id = "YC-050"
+title = "System card connectors"
+checks = "Current board build: connectors; missing coverage or stale evidence fails"
+method = "hw/tools/boardcheck.py: content hashes and board checks"
+kind = "static"
+vrow = "3.4"
+cmd = "python3 hw/tools/boardcheck.py system connectors"
+
+[[test]]
+id = "YC-007"
+title = "System card signal integrity"
+checks = "Board-level signal integrity against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "4.6"
+
+[[test]]
+id = "YC-051"
+title = "System card board-level co-sim"
+checks = "Board-level co-sim against verification contract"
+method = "Routed board and netlist models"
+kind = "sim"
+vrow = "3.1"
+
+[[test]]
+id = "CC-006"
+title = "Cpu card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py cpu thermal"
+
+[[test]]
+id = "GC-006"
+title = "Gpu card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py gpu thermal"
+
+[[test]]
+id = "IC-006"
+title = "Io card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py io thermal"
+
+[[test]]
+id = "WC-010"
+title = "Wifi card thermal"
+checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
+method = "Board evidence plus hw/power/thermal.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 hw/tools/boardcheck.py wifi thermal"
+
+[[test]]
+id = "BRD-002"
+title = "Board evidence and result gate regressions"
+checks = "Missing and stale inputs, changed or missing artifacts, all DRC finding classes and unwaived ERC warnings fail"
+method = "test/hw/test_boardcheck.py"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_boardcheck.py"
+[[test]]
+id = "SI-001"
+title = "Routed parallel-run screen regression"
+checks = "copper edge spacing, continuous split runs, diagonal tracks, net/layer separation, KiCad net formats, missing routes and unsupported arcs"
+method = "synthetic routed geometry and KiCad file fixtures; screening only, analog SI is separately required"
+kind = "sim"
+vrow = "4.6"
+cmd = "python3 test/hw/test_crosstalk.py"
+
+[[test]]
+id = "SI-002"
+title = "HDMI D0 field-model route input regressions"
+checks = "the extracted P/N copper connects its pad-side anchors and refuses a swapped endpoint, a missing section, a layer change or an unsupported via"
+method = "test/hw/test_openems_gpu_d0.py with KiCad PCB fixtures; the analog run is SI-003"
+kind = "static"
+vrow = "4.6"
+cmd = "python3 test/hw/test_openems_gpu_d0.py"
+
+[[test]]
+id = "SI-003"
+title = "Routed HDMI D0 differential openEMS subset"
+checks = "on a provenance-checked completed GPU board, openEMS produces finite S11/S21 through 1.26 GHz and reaches -40 dB field-energy decay for the RN2-to-HDMI D0 pair"
+method = "hw/si/openems_gpu_d0.py; partial TMDS route model, with full 4.6 analog coverage remaining in GC-007"
+kind = "sim"
+vrow = "4.6"
+cmd = "python3 hw/si/openems_gpu_d0.py --board build/hw/gpu/gpu.kicad_pcb --out build/hw/si/gpu-d0.json --require-evidence"
+
+[[test]]
+id = "SI-004"
+title = "Lattice iCE40HX4K IBIS source integrity"
+checks = "Lattice FPGA-MD-02034 rev 2.5 is downloaded from the vendor, SHA-256 checked, contains the 3.3 V normal/bank-3 output models and rising/falling waveforms, and a changed byte fails validation"
+method = "hw/si/fetch_ice40_ibis.py plus test/hw/test_ibis_model.py; model sourcing only, not ngspice bus simulation"
+kind = "static"
+vrow = "4.6"
+cmd = "python3 hw/si/fetch_ice40_ibis.py && python3 test/hw/test_ibis_model.py"
+
+[[test]]
+id = "COSIM-001"
+title = "KiCad netlist connectivity extraction regression"
+checks = "direct nets, two-pin series resistors and supply pulls are represented separately; missing or swapped wires change the graph"
+method = "synthetic KiCad exported-netlist fixtures; graph primitive only, not schematic-driven whole-machine simulation"
+kind = "static"
+vrow = "3.1"
+cmd = "python3 test/hw/test_cosim_netlist.py"
+
+[[test]]
+id = "COSIM-002"
+title = "CPU card series termination from its generated KiCad netlist"
+checks = "every driven CPU FPGA signal reaches exactly one edge finger through its own 33-ohm resistor-pack channel"
+method = "generate the CPU schematic, export its KiCad netlist, and trace all 31 driven signal paths"
+kind = "static"
+vrow = "3.1"
+cmd = "python3 hw/cosim/check_cpu.py"
+
+[[test]]
+id = "BUS-005A"
+title = "Routed bus length evidence is mandatory"
+checks = "missing, incomplete and invalid route lengths fail before timing can be declared green"
+method = "test/hw/test_bus_lengths.py"
+kind = "static"
+vrow = "1.7"
+cmd = "python3 test/hw/test_bus_lengths.py"
+
+[[test]]
+id = "BUS-005B"
+title = "Routed SRAM and ROM timing budgets"
+checks = "FPGA I/O timing, the SRAM and ROM datasheet setup/read/write limits, and measured address/data/control routes leave at least 20% margin"
+method = "hw/timing/memory_budget.py: nextpnr chipset I/O delays, ISSI/Microchip AC limits, and routed MEM_A/MEM_D/control traces"
+kind = "static"
+vrow = "1.7"
+cmd = "python3 hw/timing/memory_budget.py"
+
+[[test]]
+id = "BUS-005C"
+title = "Memory timing budget regression"
+checks = "a nominal routed memory path leaves margin; overlong and missing memory nets fail"
+method = "test/hw/test_memory_budget.py"
+kind = "static"
+vrow = "1.7"
+cmd = "python3 test/hw/test_memory_budget.py"

@@ -2667,6 +2667,11 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     out = os.path.abspath(out or os.path.join(ROOT, "build", "hw", name))
     os.makedirs(out, exist_ok=True)
     sch, pcb, pro = (os.path.join(out, name + e) for e in (".kicad_sch", ".kicad_pcb", ".kicad_pro"))
+    import boardevidence
+    evidence_inputs = boardevidence.inputs(name)
+    receipt = os.path.join(out, "evidence.json")
+    if os.path.exists(receipt):
+        os.unlink(receipt)  # a failed rebuild must invalidate the old success
     state = {}
     # the nets the pours join (not routed): a "routed" pour's net is routed
     pour_nets = list(dict.fromkeys(z if isinstance(z, str) else z[0] for z in zones
@@ -2855,5 +2860,6 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             run(["kicad-cli", "pcb", "render", "--width", "1200", "--height", "800", "--quality", "high",
                  "--side", side, "-o", os.path.join(out, "%s-%s.png" % (name, side)), pcb])
     step("3D render", render)
+    boardevidence.record(name, out, evidence_inputs, boards)
     print("all steps passed; outputs in", out)
     return state["lcsc"]

@@ -13,10 +13,10 @@ main:
 deeper:
 	push #4
 	mov r0, #0x5a
-	st $7e00, r0
+	st $be00, r0
 	push pch
 	push pcl
 	b API_EXIT
 	mov r0, #0xee			; never
-	st $7e00, r0
+	st $be00, r0
 	halt

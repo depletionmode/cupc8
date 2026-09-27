@@ -9,6 +9,77 @@
 # (Bugs in the RTL are also covered by mutants: tools/formal.py --mutants.)
 
 [[bug]]
+name = "BASIC follow-up: removed unused kernel and tokenizer routines stay out of the maps"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["basic/ubasic_tokenizer.s", "kernel/gfx.s", "kernel/gpu.s", "kernel/printf.s"]
+cmd = "tools/run_tests.sh testKernelLayout"
+must_fail = ["FAIL: approved dead routine removed: gfx_clrscreen", "FAIL: approved dead routine removed: gpu_fill_rect",
+             "FAIL: approved dead routine removed: print_ascii_char_inverse", "FAIL: approved dead routine removed: str_printuint16",
+             "FAIL: approved tokenizer routine removed"]
+
+[[bug]]
+name = "BASIC follow-up: ROM packing kept BASIC at the old fixed offset"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/mkrom.py"]
+cmd = "tools/run_tests.sh testKernelLayout"
+must_fail = ["FAIL: BASIC's packed header"]
+
+[[bug]]
+name = "BASIC follow-up: kernel ROM loader used the old BASIC bank"
+fixed_in = "1fa0806"
+revert = [["kernel/sys.s", "\tmov r0, #1                      ; the kernel header at ROM $00800", "\tmov r0, #16                     ; stale fixed BASIC bank"]]
+cmd = "tools/run_tests.sh testKernelNoBasic"
+must_fail = ["FAIL: good ROM installs BASIC's hook"]
+
+[[bug]]
+name = "BASIC follow-up: host wrote program bytes before upload acknowledgment"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/cupc8.py"]
+cmd = "python3 test/host/test_run_handshake.py"
+must_fail = ["FAIL run: body written only after acknowledgment"]
+
+[[bug]]
+name = "BASIC follow-up: terminal hook entered BASIC with an upload pending"
+fixed_in = "1fa0806"
+revert = [["kernel/term.s", "\tpush pch\n\tpush pcl\n\tb sys_upload_wait\n", ""]]
+cmd = "tools/run_tests.sh testRunUploadHandshake"
+must_fail = ["FAIL: pending Enter never enters BASIC before acknowledgment"]
+
+[[bug]]
+name = "BASIC follow-up: cancelled request remained stuck at idle prompt"
+fixed_in = "72b7cbe"
+revert = [["kernel/sys.s", "\teq r0, #5\n\tbzf .cancel\n\teq r0, #3", "\teq r0, #3"]]
+cmd = "tools/run_tests.sh testRunUploadHandshake"
+must_fail = ["FAIL: prompt clears a cancelled upload before acknowledgment"]
+
+[[bug]]
+name = "BASIC follow-up: idle terminal did not acknowledge upload requests"
+fixed_in = "1fa0806"
+revert = [["kernel/keyb.s", "keyb_read_char:\n\tpush pch\n\tpush pcl\n\tb sys_upload_poll\n", "keyb_read_char:\n"],
+          ["kernel/keyb.s", "\tpush pch\n\tpush pcl\n\tb sys_upload_poll\n\tld r0, API_RUN", "\tld r0, API_RUN"]]
+cmd = "tools/run_tests.sh testRunUploadHandshake"
+must_fail = ["FAIL: idle prompt acknowledges an upload"]
+
+[[bug]]
+name = "BASIC follow-up: Nim test builds shared the default compiler cache"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/run_tests.sh"]
+cmd = "python3 test/host/test_simtest_cache.py"
+must_fail = ["FAIL simtest builds share Nim cache"]
+
+[[bug]]
+name = "BASIC follow-up: assembler parsed labels inside comments"
+fixed_in = "1fa0806"
+before = "c9621cd"
+files = ["tools/as.py"]
+cmd = "python3 test/asm/test_asm.py"
+must_fail = ["FAIL 'mov r0, #1 ; comment: [missing]'"]
+
+[[bug]]
 name = "assembler: TMR0/TMR1 register in the Ra bit"
 fixed_in = "e635dbd"
 before = "f811788"
@@ -23,9 +94,12 @@ before = "f811788"
 # The fix touched ubasic.s, ubasic_tokenizer.s, printf.s, math.s and term.s;
 # those old files no longer assemble with today's kernel (sys.s, the API,
 # calls routines they lack), so the whole kernel as it was goes back, and
-# the files added since go.
+# the .s files added since go. (Since 2026-09-26 BASIC is basic/, a program
+# the ROM carries: that old kernel has its own BASIC and never loads it;
+# kernel/api.inc stays, for basic/build.sh; today's kernel/assemble.sh, which
+# builds in the test's own directory, replaces that time's.)
 files = ["kernel"]
-cmd = "rm -f kernel/api.inc kernel/api.s kernel/bank.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
+cmd = "git checkout HEAD -- kernel/assemble.sh && rm -f kernel/api.s kernel/bank.s kernel/console.s kernel/eink.s kernel/ping.s kernel/resolv.s kernel/storage.s kernel/sys.s && tools/run_tests.sh testBasicPrograms"
 must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/next", "FAIL: BASIC if/then/else",
              "FAIL: BASIC goto loop", "FAIL: BASIC gosub", "FAIL: BASIC nested for", "FAIL: BASIC parentheses",
              "FAIL: BASIC equals", "FAIL: BASIC zero", "FAIL: BASIC rem", "FAIL: BASIC mod, divide by 0",
@@ -34,10 +108,17 @@ must_fail = ["FAIL: BASIC precedence", "FAIL: BASIC string", "FAIL: BASIC for/ne
 [[bug]]
 name = "kernel: the BASIC program buffer overflowed"
 fixed_in = "e635dbd"
-before = "f811788"
-files = ["kernel/term.s"]
+# the full check taken out of today's program editor (f811788's term.s no
+# longer assembles with the 16-bit BASIC and its 8 KB buffer at $c000,
+# 2026-09-26; the check is on the new end since the lines are kept in order;
+# the editor is basic/basic.s's since BASIC became a program)
+revert = [["basic/basic.s", """	ld r0, $6f07
+	gt r0, #0x1f
+	bzf .full
+""", ""]]
 cmd = "tools/run_tests.sh testProgramFull"
-must_fail = ["the 8th line was refused"]
+must_fail = ["FAIL: a line that would end past $dfff is refused", "FAIL: a line past it is refused (PROGRAM FULL)",
+             "FAIL: nothing written past $dfff"]
 
 [[bug]]
 name = "sim: a card holding IRQ_n hid another card's IRQ"
@@ -72,16 +153,68 @@ must_fail = ["programmed $F0 reads"]
 name = "kernel BASIC: PEEK and POKE were empty stubs (the interpreter wedged on them)"
 fixed_in = "45d051b"
 # the empty stubs put back into today's ubasic.s (80c23a6's whole file no
-# longer assembles with the rest of the kernel)
+# longer assembles with the rest of the kernel; since 2026-09-26 the 16-bit
+# BASIC's peek and poke, with the address in either form; basic/ since BASIC
+# became a program)
 revert = [
-  ["kernel/ubasic.s", """ubasic_peek_statement:
+  ["basic/ubasic.s", """ubasic_peek_statement:
 	mov r0, TOKENIZER_PEEK
 	push pch
 	push pcl
 	b ubasic_accept
 	push pch
 	push pcl
-	b ubasic_mem_address
+	b ubasic_expr
+	st [ub_mem_ptr], r0
+	st [ub_mem_ptr+1], r1
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
+	; a variable and the statement's end: peek addr, var
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_VARIABLE
+	bzf .var
+	b .lo
+.var:
+	ld r0, [ub_ptr]
+	st [ub_peek_pos], r0
+	ld r0, [ub_ptr+1]
+	st [ub_peek_pos+1], r0
+	push pch
+	push pcl
+	b ubasic_tokenizer_variable_num
+	st [ub_peek_var], r0
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	push pch
+	push pcl
+	b ubasic_tokenizer_token
+	eq r0, TOKENIZER_CR
+	bzf .read
+	eq r0, TOKENIZER_ELSE
+	bzf .read
+	eq r0, TOKENIZER_ENDOFINPUT
+	bzf .read
+	ld r0, [ub_peek_pos+1]	; no - back to the variable, lo's expression
+	ld r1, [ub_peek_pos]
+	push pch
+	push pcl
+	b ubasic_tokenizer_goto
+.lo:
+	push pch
+	push pcl
+	b ubasic_expr
+	push pch
+	push pcl
+	b ub_mem_hi_lo
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
 	push pch
 	push pcl
 	b ubasic_tokenizer_variable_num
@@ -90,36 +223,67 @@ revert = [
 	push pch
 	push pcl
 	b ubasic_accept
-	ldd r1, [ub_mem_ptr]
+.read:
+	push pch
+	push pcl
+	b ub_peek
+	st [ub_val], r0
+	xor r0, r0
+	st [ub_val+1], r0
 	ld r0, [ub_peek_var]
 	push pch
 	push pcl
 	b ubasic_set_variable
-	push pch
-	push pcl
 	b ubasic_end_of_statement
-	pop pcl
 """, """ubasic_peek_statement:
 	pop pcl
+	pop pch
 """],
-  ["kernel/ubasic.s", """ubasic_poke_statement:
+  ["basic/ubasic.s", """ubasic_poke_statement:
 	mov r0, TOKENIZER_POKE
 	push pch
 	push pcl
 	b ubasic_accept
 	push pch
 	push pcl
-	b ubasic_mem_address
+	b ubasic_expr
+	st [ub_mem_ptr], r0
+	st [ub_mem_ptr+1], r1
+	mov r0, TOKENIZER_COMMA
+	push pch
+	push pcl
+	b ubasic_accept
 	push pch
 	push pcl
 	b ubasic_expr
-	std [ub_mem_ptr], r0
+	push r0
+	push r1
 	push pch
 	push pcl
+	b ubasic_tokenizer_token
+	pop r1
+	eq r0, TOKENIZER_COMMA
+	pop r0
+	bzf .three
+	b .write
+.three:
+	push pch
+	push pcl
+	b ub_mem_hi_lo
+	push pch
+	push pcl
+	b ubasic_tokenizer_next
+	push pch
+	push pcl
+	b ubasic_expr
+.write:
+	push pch
+	push pcl
+	b ub_poke
 	b ubasic_end_of_statement
-	pop pcl
 """, """ubasic_poke_statement:
 	pop pcl
+	pop pch
 """],
 ]
 cmd = "tools/run_tests.sh testBasicPrograms testBasicLeds"
@@ -340,11 +504,16 @@ must_fail = ["FAIL race sweep: every READ framed"]
 [[bug]]
 name = "kernel: the BASIC program buffer index was never cleared (junk at power-up: RUN gave TOKENIZER ERROR!)"
 fixed_in = "52423fa"
-revert = [["kernel/term.s", """	xor r0, r0
-	st [term_basic_prog_buf_idx], r0
-	st [term_basic_prog_buf], r0
-	st API_RUN, r0""", """	xor r0, r0
-	st API_RUN, r0"""]]
+# (term_do cleared it through term_cmd_new once the lines were kept in
+# order; since BASIC became a program, 2026-09-26, its main keeps the
+# program at $c000 only if "BA" and the end are right, else clears it: the
+# revert keeps whatever is there)
+revert = [["basic/basic.s", """.new:
+	push pch
+	push pcl
+	b bas_cmd_new
+.kept:""", """.new:
+.kept:"""]]
 cmd = "tools/run_tests.sh testBasicJunkRam"
 must_fail = ["FAIL: BASIC on junk RAM"]
 
@@ -358,13 +527,13 @@ must_fail = ["FAIL rom id after a killed run's late reply"]
 [[bug]]
 name = "kernel BASIC: variables were never cleared, so on power-up junk RAM an unset one printed junk"
 fixed_in = "f9150e6"
-revert = [["kernel/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
+revert = [["basic/ubasic.s", """	; every variable starts at 0: RAM powers up with junk
 	xor r1, r1
 .clear_variables:
-	gt r1, #39
-	bzf .done_clear_variables
 	st [ub_variables]+r1, r0
 	add r1, #1
+	eq r1, #52
+	bzf .done_clear_variables
 	b .clear_variables
 .done_clear_variables:
 
@@ -384,8 +553,10 @@ must_fail = ["FAIL (long)(size_on_medium(name)) == (long)(sizes[i])", "STO-001/0
 [[bug]]
 name = "kernel SAVE: the last chunk (under 128 bytes) was never written - the saved program lost its tail"
 fixed_in = "e4eeda1"
-revert = [["kernel/ubasic.s", """.last:
-	ld r0, [st_n]
+# (basic/ubasic.s since BASIC became a program, 2026-09-26: its chunk is ub_n
+# bytes of ub_buf)
+revert = [["basic/ubasic.s", """.last:
+	ld r0, [ub_n]
 	eq r0, #0
 	bzf .close
 """, """.last:
@@ -397,10 +568,12 @@ must_fail = ["FAIL: the saved program as a PC reads it (text, CR LF)", "FAIL: th
 [[bug]]
 name = "kernel SAVE: no F_CLOSE, so nothing flushed the file - a PC, or the machine after a power cycle, found it empty"
 fixed_in = "e4eeda1"
-revert = [["kernel/ubasic.s", """.close:
+# (basic/ubasic.s since BASIC became a program, 2026-09-26: ub_close is
+# API_ST_CLOSE)
+revert = [["basic/ubasic.s", """.close:
 	push pch
 	push pcl
-	b st_close
+	b ub_close
 	eq r0, #0
 	bzf .saved
 	b .error
@@ -727,3 +900,305 @@ fixed_in = "739f514"
 revert = [["hw/parts/jlc_rotation.yaml", "  offset:\n  - 1.27\n  - -5.08\n", ""]]
 cmd = "CUPC8_OFFLINE=1 python3 hw/tools/bomcheck.py main"
 must_fail = ["jlc_rotation.yaml's offset is None, but JLC's origin"]
+
+[[bug]]
+name = "kernel API: API_GFX_TEXT8 sent its frame (up to 262 bytes) without asking FREE - the card dropped it when its FIFO was full (an e-ink REFRESH holds it)"
+fixed_in = "0f99965"
+revert = [["kernel/sys.s", """	st $6f05, r0
+	shr r0, #6				; the frame, 7 + length bytes, in 64s (rounded up, and 1 over)
+	add r0, #2
+	push pch
+	push pcl
+	b gpu_wait_free			; the card drops a frame it has no room for
+""", """	st $6f05, r0
+"""]]
+cmd = "tools/run_tests.sh testText8Free"
+must_fail = ["FAIL: TEXT8 waits while the FIFO has no room for it", "FAIL: the text arrived whole"]
+
+[[bug]]
+name = "kernel: gpu_wait_free asked FREE with NOP frames, which queue - while the card's execution was held they filled its FIFO and were dropped"
+fixed_in = "0f99965"
+revert = [["kernel/gpu.s", """	mov r0, #0xff
+	push pch
+	push pcl
+	b gpu_send
+	and r0, #0x7f""", """	xor r0, r0				; NOP
+	push pch
+	push pcl
+	b gpu_send
+	and r0, #0x7f"""]]
+cmd = "tools/run_tests.sh testText8Free"
+must_fail = ["FAIL: ... and nothing was dropped"]
+
+[[bug]]
+name = "tests built the kernel in kernel/ itself - two builds at once (SIM-010 beside simtest) mixed their merged.ss, kernel.o and kernel.map"
+fixed_in = "e96aab2"
+revert = [["tools/simmachine.nim", """  let d = if dir.len > 0: dir else: romDir()
+  run("bash " & quoteShell(simRoot / "kernel" / "assemble.sh") & " " & quoteShell(d), "kernel build")
+  d / "kernel.o\"""", """  run("cd " & quoteShell(simRoot / "kernel") & " && bash assemble.sh", "kernel build")
+  simRoot / "kernel" / "kernel.o\""""], ["tools/simmachine.nim", """  romDir() / "kernel.map\"""", """  simRoot / "kernel" / "kernel.map\""""]]
+cmd = "tools/run_tests.sh testKernelBuildsConcurrent"
+must_fail = ["FAIL: 8 builds, two at a time: every ROM and map equals the one built alone"]
+
+[[bug]]
+name = "simtest wrote its programs, maps and SD images beside the sources (tools/testdata, build/storage) - two runs at once overwrote each other's"
+fixed_in = "da37914"
+revert = [["tools/simtest.nim", """let workDir = romDir() / "work\"""", """let workDir = testdata"""],
+          ["tools/simtest.nim", """let storeDir = workDir / "storage\"""", """let storeDir = rootDir / "build" / "storage\""""]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: two runs at once: each keeps its own SD image and program"]
+
+[[bug]]
+name = "simtest's network tests took fixed host ports (7007, 8088) with no lock - two runs at once took each other's and the echo servers answered the wrong run"
+fixed_in = "238e987"
+revert = [["tools/simtest.nim", "runOnHostPorts testNetExamples\n", "run testNetExamples\n"]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: run"]
+
+[[bug]]
+name = "sim: a freed Wi-Fi card kept its host sockets open (netposix_new cleared them without closing) - its ports stayed taken until the process ended"
+fixed_in = "238e987"
+revert = [["fw/sim/simcards.c", """	if (c->wifi)
+		netposix_free(c->wifi->ctx);    /* its host sockets closed: their ports free again */
+""", ""], ["fw/wifi/host/netposix.c", """	netposix_free(&g_net);                  /* the last card's sockets, if it was not freed */
+""", ""]]
+cmd = "tools/run_tests.sh testRunsSideBySide"
+must_fail = ["FAIL: run"]
+
+[[bug]]
+name = "the kernel waited for ever at a full CON_OUT while HOST was set - a PC that kept the console open but stopped reading stalled the terminal"
+fixed_in = "6fb42fb"
+revert = [["kernel/console.s", """	lt r0, #125
+	bzf .again				; under 500 ms, keep waiting
+""", """	b .again
+"""]]
+cmd = "tools/run_tests.sh testKernelConsole"
+must_fail = ["FAIL: HOST set, nobody reading: the terminal goes on"]
+
+[[bug]]
+name = "kernel BASIC: every typed line was appended - lines out of order ran out of order, a line typed again was kept twice, a line number alone was kept as an empty line"
+fixed_in = "37a6c41"
+# 44bbccb's term.s went back until BASIC became a program (2026-09-26: the
+# editor is basic/basic.s's, and the old term.s no longer assembles with the
+# kernel): now the editor's compare says "less" for every line, so a typed
+# line goes past them all to the end - appended, as before the fix
+revert = [["basic/basic.s", """	b bas_cmp
+	eq r0, #2
+	bzf .placed				; a bigger number - the typed line goes before it
+""", """	b bas_cmp
+	mov r0, #1
+	eq r0, #2
+	bzf .placed				; a bigger number - the typed line goes before it
+"""]]
+cmd = "tools/run_tests.sh testBasicEdit"
+must_fail = ["FAIL: typed out of order, kept in order", "FAIL: replace, the same length",
+             "FAIL: delete a line in the middle", "FAIL: GOSUB and GOTO to lines typed out of order"]
+
+[[bug]]
+name = "kernel BASIC: LOAD took line numbers past 32767 (typing refuses them) - kept in order, 40000 went first, as -25536"
+fixed_in = "be81d03"
+revert = [["basic/ubasic.s", """	gt r1, #0x7f			; a line number is 1-32767, as typed
+	bzf .done
+""", ""]]
+cmd = "tools/run_tests.sh testBasicEditStorage"
+must_fail = ["FAIL: ... in order, the later line 10 kept, 40000 skipped"]
+
+[[bug]]
+name = "Wi-Fi card: its QEMU ran on the host's clock, so a machine with a Wi-Fi card was not cycle-deterministic (E2E-003's exchanges with the card differed run to run from the first after the join)"
+fixed_in = "79a27c1"
+before = "44bbccb"
+# the lockstep kept, the guest's clock from the host again (adaptive icount, idle in real time)
+revert = [["test/emu/machinenative.mjs", "'-icount', 'shift=3,sleep=off'", "'-icount', 'shift=auto,sleep=on'"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+# (on the host's clock the guest now also misses its task watchdog: the join fails)
+must_fail = ["wifi_lockstep: FAIL"]
+
+[[bug]]
+name = "Espressif QEMU: the ESP32-C3's random number register was rand() seeded from time(NULL), so the Wi-Fi card's DHCP transaction IDs and TCP sequence numbers changed run to run"
+fixed_in = "f1b7cda"
+revert = [["tools/patches/qemu-esp-lockstep.patch", "@@ -151,13 +153,10 @@", "@@ -151,13 +153,13 @@"], ["tools/patches/qemu-esp-lockstep.patch", """+        uint32_t r;
++        qemu_guest_getrandom_nofail(&r, sizeof(r));
++        return r;
+""", """+        static bool init = false;
++        if (!init) {
++            srand(time(NULL));
++            init = true;
++        }
++        return rand();
+"""]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["network:"]
+
+[[bug]]
+name = "lockstep QEMU: the settle after a guest packet did not wake the main loop, so a TCP connect's new host socket was not polled and the SYN-ACK reached the guest 0.44 ms of guest time late, whenever the main loop went round"
+fixed_in = "c069a31"
+revert = [["tools/patches/qemu-esp-lockstep.patch", "+    qemu_notify_event();", "+    (void)0;"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["not when it asked"]
+
+[[bug]]
+name = "kernel: a BASIC.PRG too big for $7000-$bfff was loaded (20 KB, over a second at boot) before it was refused"
+fixed_in = "1cc9bbd"
+# sys_load looks for a byte past the room (a seek and a 1-byte read) before
+# it loads anything; without that, too big was only found at the limit
+revert = [["kernel/sys.s", """.accepted:
+	; too big is known before anything is loaded: is there a byte at
+	; sys_top - $7000 + 4 (past the header and the room)?
+	mov r0, #4
+	st [st_pos], r0
+	ld r0, [sys_top]
+	sub r0, #0x70
+	st [st_pos+1], r0
+	xor r0, r0
+	st [st_pos+2], r0
+	st [st_pos+3], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .probe
+	b .close
+.probe:
+	mov r0, #1
+	st [st_n], r0
+	push pch
+	push pcl
+	b st_read
+	eq r0, #0
+	bzf .probed
+	b .close
+.probed:
+	ld r1, [st_n]
+	eq r1, #0
+	bzf .room
+	mov r0, #0xfc
+	b .close
+.room:
+	xor r0, r0				; back to the start, the first chunk again
+	st [st_pos], r0
+	st [st_pos+1], r0
+	push pch
+	push pcl
+	b sys_seek
+	eq r0, #0
+	bzf .again
+	b .close
+.again:
+	push pch
+	push pcl
+	b sys_chunk
+	eq r0, #0
+	bzf .load
+	b .close
+.load:
+""", """.accepted:
+.load:
+"""]]
+cmd = "tools/run_tests.sh testBasicFromCard"
+must_fail = ["FAIL: too big for $7000-$bfff: no delay"]
+
+[[bug]]
+name = "kernel: the terminal's hook ran BASIC with API_RUN 0, so cupc8.py run could write a program over the running interpreter"
+fixed_in = "1cc9bbd"
+revert = [["kernel/term.s", """term_hook:
+	push r0
+	mov r0, #2
+	st API_RUN, r0
+""", """term_hook:
+	push r0
+"""]]
+cmd = "tools/run_tests.sh testBasicReload"
+must_fail = ["FAIL: API_RUN 2 while BASIC runs a program"]
+
+[[bug]]
+name = "kernel: an exec that failed after part of its program was in left BASIC at $7000 overwritten (the next line crashed it)"
+fixed_in = "1cc9bbd"
+revert = [["kernel/sys.s", """	push pch
+	push pcl
+	b sys_basic
+.said:""", """.said:"""]]
+cmd = "tools/run_tests.sh testBasicReload"
+must_fail = ["FAIL: ... BASIC at $7000 again, the program kept"]
+
+[[bug]]
+name = "BASIC at $7000: a POKE to RAM_BANK switched BASIC's own code at $8000-$8fff out of the window (E2E-009's program crashed it)"
+fixed_in = "4936c6e"
+# POKE writes straight to memory again, $f205 included
+revert = [["basic/ubasic.s", """.write:
+	push pch
+	push pcl
+	b ub_poke
+	b ubasic_end_of_statement""", """.write:
+	std [ub_mem_ptr], r0
+	b ubasic_end_of_statement"""]]
+cmd = "tools/run_tests.sh testBasicBanks"
+must_fail = ["FAIL: BASIC reads banks 4 and 5"]
+
+[[bug]]
+name = "Wi-Fi card: the SPI slave's frame-end ISR built the preload with status(), which asks lwIP (FIONREAD on each socket) from an interrupt; once a socket was open FreeRTOS's lists were corrupted and the card hung (interrupt watchdog in vListInsert). The UART stand-in took the preload in a task and hid it; the lockstep QEMU's SPI slave stand-in found it"
+fixed_in = "0969702"
+revert = [["fw/wifi/port/esp32c3/main/frames.c", "miso[n++] = status_now;", "miso[n++] = (uint8_t)(card->ops->status(card) & 0x7f);"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["wifi_lockstep: FAIL"]
+
+[[bug]]
+name = "Wi-Fi card: the board waited for the guest to answer each frame over UART ($A6/$A5, ~1.3 ms of guest time each), so under back-to-back polling the card's clock ran 0.3 s ahead of the board's; now QEMU's slot SPI stand-in holds the preload. Put back here as QEMU running 1 ms past each select before it answers"
+fixed_in = "4270b21"
+revert = [["tools/patches/qemu-esp-lockstep.patch", "+    return ls.pending ? ls.at : ls.grant;", "+    return ls.pending ? ls.at + 1000000 : ls.grant;"]]
+cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["FAIL: the Wi-Fi card's clock is not the board's at its selects"]
+
+[[bug]]
+name = "Board gates accepted stale source provenance for a routed build"
+fixed_in = "5729b36"
+revert = [["hw/tools/boardevidence.py", "if evidence.get('inputs') != inputs(board, root):", "if False:"]]
+cmd = "python3 test/hw/test_boardcheck.py EvidenceTests.test_stale_source"
+must_fail = ["FAIL: test_stale_source"]
+
+[[bug]]
+name = "Board gates accepted a changed routed PCB under an old success receipt"
+fixed_in = "5729b36"
+revert = [["hw/tools/boardevidence.py", "if evidence.get('artifacts') != artifacts(out):", "if False:"]]
+cmd = "python3 test/hw/test_boardcheck.py EvidenceTests.test_changed_board"
+must_fail = ["FAIL: test_changed_board"]
+
+[[bug]]
+name = "Board gates ignored DRC unconnected and schematic parity findings"
+fixed_in = "5729b36"
+revert = [["hw/tools/boardcheck.py", "findings = [v for key in keys for v in report[key]]", "findings = report['violations']"]]
+cmd = "python3 test/hw/test_boardcheck.py ReportTests.test_each_drc_failure_class"
+must_fail = ["FAIL: test_each_drc_failure_class"]
+[[bug]]
+name = "crosstalk screen: split collinear tracks hid a long parallel run"
+fixed_in = "crosstalk initial implementation"
+revert = [["hw/tools/crosstalk.py", "if merged and lo <= merged[-1][1] + 1e-6:", "if False:"]]
+cmd = "python3 test/hw/test_crosstalk.py"
+must_fail = ["FAIL: test_split_tracks_still_detected"]
+
+[[bug]]
+name = "crosstalk screen: centerline spacing hid close copper edges"
+fixed_in = "crosstalk initial implementation"
+revert = [["hw/tools/crosstalk.py", "gap = b[0] - a[0] - (a[2] + b[2]) / 2", "gap = b[0] - a[0]"]]
+cmd = "python3 test/hw/test_crosstalk.py"
+must_fail = ["FAIL: test_long_close_run"]
+
+[[bug]]
+name = "BUS-005: a missing routed layout silently passed with nominal limits"
+fixed_in = "BUS-005 routed-evidence gate"
+revert = [["hw/timing/cpubus_budget.py", '''raise ValueError("BUS-005: routed trace lengths missing: " + path)''', '''return 150.0, 50.0, "nominal limits"''']]
+cmd = "python3 test/hw/test_bus_lengths.py"
+must_fail = ["FAIL: test_missing_layout_is_red"]
+
+[[bug]]
+name = "Connector gate accepted swapped main-board slot chip-select contacts"
+fixed_in = "connectorcheck initial implementation"
+revert = [["hw/tools/connectorcheck.py", "elif a[pin] != b[pin]:", "elif False:"]]
+cmd = "python3 test/hw/test_connectors.py ConnectorTests.test_swapped_main_slot_chip_selects"
+must_fail = ["FAIL: test_swapped_main_slot_chip_selects"]
+
+[[bug]]
+name = "Connector gate accepted a missing CPU clock contact"
+fixed_in = "connectorcheck initial implementation"
+revert = [["hw/tools/connectorcheck.py", "elif a[pin] != b[pin]:", "elif False:"]]
+cmd = "python3 test/hw/test_connectors.py ConnectorTests.test_missing_cpu_bus_wire"
+must_fail = ["FAIL: test_missing_cpu_bus_wire"]

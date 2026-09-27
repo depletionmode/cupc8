@@ -106,6 +106,20 @@ bool Rp2040Card::irq() {
 
 // ------------------------------------------------------------ EspCard
 
+// The Wi-Fi card's firmware runs in the lockstep QEMU (tools/qemu_build.sh,
+// tools/patches/qemu-esp-lockstep.patch, system/cupc8-lockstep.c), its
+// clock a function of the instructions run (icount), and only as far as this
+// card lets it: advance(t) grants it the board's time t in GRANT_NS steps,
+// so it trails the board and runs beside it. The slot SPI slave is a device
+// in QEMU that holds the MISO preload the firmware armed when the previous
+// frame ended (fw/wifi/port/esp32c3/main/transport_slotdev.c, as
+// transport_spi.c's DMA descriptors): at CS_n falling QEMU runs to the
+// board's time and hands over that preload, and at CS_n rising the MOSI bytes
+// reach the device at the board's time and interrupt the guest. The board
+// never waits for the guest to answer, as it never waits for the real card:
+// QEMU's clock is the board's at every select. The same board run gives the
+// same guest run, cycle for cycle.
+
 EspCard::EspCard(int tx_, int rx_) : tx(tx_), rx(rx_) {
   kind = "wifi";
   if (const char *f = std::getenv("CUPC8_ESP_TRACE")) trace = std::fopen(f, "w");
@@ -115,26 +129,16 @@ EspCard::~EspCard() {
   if (trace) std::fclose(trace);
 }
 
-void EspCard::traceBytes(const char *dir, const uint8_t *b, size_t n) {
-  if (!trace) return;
-  std::fprintf(trace, "%.0f %s", now ? now() : 0.0, dir);
-  for (size_t i = 0; i < n; i++) std::fprintf(trace, " %02x", b[i]);
-  std::fprintf(trace, "\n");
-  std::fflush(trace);
-}
-
-void EspCard::read(uint8_t *b, size_t n) {
+void EspCard::readAll(uint8_t *b, size_t n) {
   for (size_t got = 0; got < n;) {
     const ssize_t r = ::read(rx, b + got, n - got);
     if (r < 0 && errno == EINTR) continue;
-    if (r <= 0) throw std::runtime_error("the Wi-Fi card's QEMU closed its UART");
+    if (r <= 0) throw std::runtime_error("the Wi-Fi card's QEMU has gone");
     got += static_cast<size_t>(r);
   }
-  traceBytes("R", b, n);
 }
 
-void EspCard::write(const std::vector<uint8_t> &b) {
-  traceBytes("W", b.data(), b.size());
+void EspCard::writeAll(const std::vector<uint8_t> &b) {
   for (size_t put = 0; put < b.size();) {
     const ssize_t r = ::write(tx, b.data() + put, b.size() - put);
     if (r < 0 && errno == EINTR) continue;
@@ -143,27 +147,77 @@ void EspCard::write(const std::vector<uint8_t> &b) {
   }
 }
 
+template <typename T>
+static void putLE(std::vector<uint8_t> &v, T x) {
+  for (size_t i = 0; i < sizeof x; i++) v.push_back(static_cast<uint8_t>(static_cast<uint64_t>(x) >> (8 * i)));
+}
+
+void EspCard::advance(double ns) {
+  if (ns < granted + GRANT_NS) return;
+  granted = ns;
+  std::vector<uint8_t> m = {'G'};
+  putLE(m, static_cast<int64_t>(ns));
+  writeAll(m);
+}
+
+// CS_n falls: QEMU runs to the board's time and gives the preload
+void EspCard::select() {
+  const double t = now();
+  std::vector<uint8_t> m = {'S'};
+  putLE(m, static_cast<int64_t>(t));
+  writeAll(m);
+  uint8_t h[10];
+  readAll(h, 10);
+  if (h[0] != 'R') throw std::runtime_error("the Wi-Fi card's QEMU answered a select with " + std::to_string(h[0]));
+  int64_t g = 0;
+  for (int i = 7; i >= 0; i--) g = (g << 8) | h[1 + i];
+  guestNs = g;
+  ahead = std::max(ahead, g - static_cast<int64_t>(t));
+  early += !h[9];
+  std::vector<uint8_t> pre(PRELOAD);
+  readAll(pre.data(), pre.size());
+  bits.clear();
+  for (uint8_t b : pre)
+    for (int i = 7; i >= 0; i--) bits.push_back((b >> i) & 1);
+  if (trace) {
+    std::fprintf(trace, "%.0f S @%lld%s", t, static_cast<long long>(g), h[9] ? "" : " (not re-armed)");
+    size_t n = pre.size();
+    while (n > 0 && pre[n - 1] == 0) n--;
+    for (size_t i = 0; i < n; i++) std::fprintf(trace, " %02x", pre[i]);
+    std::fprintf(trace, "\n");
+    std::fflush(trace);
+  }
+}
+
+// CS_n rises: the frame's MOSI bytes reach the guest at the board's time
+void EspCard::frameEnd(const std::vector<uint8_t> &bytes) {
+  const double t = now();
+  std::vector<uint8_t> m = {'F'};
+  putLE(m, static_cast<int64_t>(t));
+  putLE(m, static_cast<uint16_t>(bytes.size()));
+  m.insert(m.end(), bytes.begin(), bytes.end());
+  writeAll(m);
+  if (trace) {
+    std::fprintf(trace, "%.0f F", t);
+    for (uint8_t b : bytes) std::fprintf(trace, " %02x", b);
+    std::fprintf(trace, "\n");
+    std::fflush(trace);
+  }
+}
+
 void EspCard::drive(uint32_t sck, uint32_t mosi, bool sel) {
   if (sel && !selected) {
-    write({0xa6});
-    uint8_t h[3];
-    read(h, 3);
-    std::vector<uint8_t> pre(h[1] | (h[2] << 8));
-    read(pre.data(), pre.size());
-    bits.clear();
-    for (uint8_t b : pre)
-      for (int i = 7; i >= 0; i--) bits.push_back((b >> i) & 1);
+    select();
     mosi_.clear();
     bit = 0;
+    start = now();
   } else if (!sel && selected) {
     const std::vector<uint8_t> bytes = packBits(mosi_);
-    if (!bytes.empty()) {
-      std::vector<uint8_t> msg = {0xa5, static_cast<uint8_t>(bytes.size() & 0xff),
-                                  static_cast<uint8_t>(bytes.size() >> 8)};
-      msg.insert(msg.end(), bytes.begin(), bytes.end());
-      write(msg);
-      std::vector<uint8_t> reply(3 + bytes.size());
-      read(reply.data(), reply.size());
+    frameEnd(bytes);
+    if (logging) {
+      std::vector<uint8_t> shifted(bits.begin(), bits.begin() + static_cast<long>(std::min(bit, bits.size())));
+      shifted.resize(mosi_.size(), 0);
+      log.push_back({start, now(), bytes, packBits(shifted), static_cast<uint32_t>(mosi_.size() % 8)});
     }
   }
   if (sel && sck && !lastSck) {  // mode 0: sampled on the rising edge
@@ -322,12 +376,14 @@ TmdsCapture::Frame TmdsCapture::frame(const std::vector<Line> &lines) const {
 // ------------------------------------------------------------ Machine
 
 Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(o.root), threaded_(o.threaded) {
+  pwrHi = o.pwrHi;
   if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {
       auto c = std::make_unique<EspCard>(o.espTx, o.espRx);
       c->now = [this] { return board->ns(); };
       c->slot = slot;
+      c->logging = o.spiLog;
       cards.emplace_back(slot, std::move(c));
       continue;
     }
@@ -497,7 +553,10 @@ bool Machine::leadNext() {
     progress.v.store(static_cast<uint32_t>(board->clocks - windowStart) | FINAL, std::memory_order_seq_cst);
     progress.wake();
     const uint32_t sck = windowOut & 1, mosi = (windowOut >> 1) & 1, ncs = (windowOut >> 2) & 0x7f;
-    for (Card *c : mainCards) c->drive(sck, mosi, !((ncs >> (c->slot - 1)) & 1));
+    for (Card *c : mainCards) {  // as iterateSerial: advance to the window's end, then drive
+      c->advance(board->ns());
+      c->drive(sck, mosi, !((ncs >> (c->slot - 1)) & 1));
+    }
     stats.idleWindows++;
     pendingTrace = stats.traceOn;
     return true;

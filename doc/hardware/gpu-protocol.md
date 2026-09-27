@@ -71,7 +71,7 @@ bytes, which the host collects with a READ frame (`$FE`, see `slot.md`).
 | Op | Name | Args | Description |
 |---|---|---|---|
 | $00 | NOP | — | Also safe to use as filler |
-| $01 | MODE | m | 0 = TEXT, 1 = GFX. Clears that mode's buffer. Any other m is ignored (the e-ink card's mode 2, `eink-card.md`). |
+| $01 | MODE | m | 0 = TEXT, 1 = GFX. Clears that mode's buffer. Any other m is ignored (the e-ink card's mode 2, `eink-card.md`; the kernel's `API_GFX_MODE` does not send 2 to this card and returns an error). |
 | $02 | CLS | c | TEXT: every cell becomes space with attr `c`, and the cursor goes to 0,0. GFX: fill with colour `c`. |
 | $03 | PALETTE | idx, r, g, b | Set a palette entry (8-bit components, stored as RGB565) |
 | $04 | PALETTE_RESET | — | Restore the default palette |

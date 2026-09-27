@@ -222,23 +222,41 @@ gpu_query_from:
 	pop pcl
 	pop pch
 
-; exchange r0 with the console; result in r0
-gpu_send:
-	st [gpu_tmp], r0
+; wait until the console's FIFO has room for a frame of r0 x 64 bytes
+; (gpu-protocol.md: FREE, the status byte, in 64s), asking with $FF frames
+; (slot.md: never an opcode, so nothing is queued; a NOP would fill the FIFO
+; while an e-ink REFRESH holds it). A frame over 64 bytes checks first: the
+; card drops one that does not fit. With no console, at once.
+gpu_wait_free:
+	st [gpu_n], r0
 	ld r0, [gpu_spi]
-	ld r1, [gpu_tmp]
-	st $f100+r0, r1
-	mov r1, #1
-	st $f102+r0, r1
-.spi_wait:					; SPI_RX is only valid once SPI_STAT says done
-	ld r1, $f103+r0
-	eq r1, #0
-	bzf .spi_wait
-	ld r1, $f101+r0
-	st [gpu_tmp], r1
-	ld r0, [gpu_tmp]
+	eq r0, #0xff
+	bzf .done
+.poll:
+	push pch
+	push pcl
+	b gpu_cs_on
+	mov r0, #0xff
+	push pch
+	push pcl
+	b gpu_send
+	and r0, #0x7f
+	push r0
+	push pch
+	push pcl
+	b gpu_cs_off
+	pop r0
+	ld r1, [gpu_n]
+	lt r0, r1
+	bzf .poll
+.done:
 	pop pcl
 	pop pch
+
+; exchange r0 with the console; result in r0
+gpu_send:
+	ld r1, [gpu_spi]
+	b spi_send
 
 gpu_cs_on:
 	ld r0, [gpu_spi]
@@ -255,6 +273,7 @@ gpu_cs_off:
 	pop pch
 
 ; print the character in r0 (and mirror it to the USB console, console.s)
+print_ascii_char:
 gpu_putc:
 	push pch
 	push pcl
@@ -302,120 +321,5 @@ gpu_attr:
 	push pcl
 	b gpu_cs_off
 .none:
-	pop pcl
-	pop pch
-
-; ---------------------------------------------------------------- compatibility
-; the terminal and BASIC call these
-
-print_ascii_char:
-	push pch
-	push pcl
-	b gpu_putc
-	pop pcl
-	pop pch
-
-print_ascii_char_inverse:
-	st [gpu_char], r0
-	mov r0, #0x70			; black on light grey
-	push pch
-	push pcl
-	b gpu_attr
-	ld r0, [gpu_char]
-	push pch
-	push pcl
-	b gpu_putc
-	mov r0, #0x07
-	push pch
-	push pcl
-	b gpu_attr
-	pop pcl
-	pop pch
-
-clr_screen:
-	ld r0, [gpu_spi]
-	eq r0, #0xff
-	bzf .none
-	push pch
-	push pcl
-	b gpu_cs_on
-	mov r0, #0x02			; CLS
-	push pch
-	push pcl
-	b gpu_send
-	mov r0, #0x07			; light grey on black
-	push pch
-	push pcl
-	b gpu_send
-	push pch
-	push pcl
-	b gpu_cs_off
-.none:
-	pop pcl
-	pop pch
-
-; FILL_RECT with the old stack ABI - callers push colour, h, w, y, x
-gpu_fill_rect:
-	pop r0
-	st [gpu_args], r0		; return address low
-	pop r0
-	st [gpu_args+1], r0		; return address high
-	pop r0
-	st [gpu_args+2], r0		; x
-	pop r0
-	st [gpu_args+3], r0		; y
-	pop r0
-	st [gpu_args+4], r0		; w
-	pop r0
-	st [gpu_args+5], r0		; h
-	pop r0
-	st [gpu_args+6], r0		; colour
-
-	ld r0, [gpu_spi]
-	eq r0, #0xff
-	bzf .none
-	push pch
-	push pcl
-	b gpu_cs_on
-	mov r0, #0x21			; FILL_RECT
-	push pch
-	push pcl
-	b gpu_send
-	ld r0, [gpu_args+2]		; x low
-	push pch
-	push pcl
-	b gpu_send
-	mov r0, #0				; x high
-	push pch
-	push pcl
-	b gpu_send
-	ld r0, [gpu_args+3]		; y
-	push pch
-	push pcl
-	b gpu_send
-	ld r0, [gpu_args+4]		; w low
-	push pch
-	push pcl
-	b gpu_send
-	mov r0, #0				; w high
-	push pch
-	push pcl
-	b gpu_send
-	ld r0, [gpu_args+5]		; h
-	push pch
-	push pcl
-	b gpu_send
-	ld r0, [gpu_args+6]		; colour
-	push pch
-	push pcl
-	b gpu_send
-	push pch
-	push pcl
-	b gpu_cs_off
-.none:
-	ld r0, [gpu_args+1]
-	push r0
-	ld r0, [gpu_args]
-	push r0
 	pop pcl
 	pop pch

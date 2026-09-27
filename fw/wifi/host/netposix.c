@@ -355,8 +355,20 @@ const wifi_net_ops netposix_ops = {
 	.status = h_status, .close = h_close, .poll = h_poll,
 };
 
+/* the card's power going off: every host socket it had is closed, so its
+ * ports are free again (for a new card, or another process) */
+void netposix_free(netposix_t *n)
+{
+	for (int i = 0; i < MAXS; i++)
+		if (n->s[i].used) {
+			close(n->s[i].fd);
+			n->s[i].used = false;
+		}
+}
+
 netposix_t *netposix_new(void)
 {
+	netposix_free(&g_net);                  /* the last card's sockets, if it was not freed */
 	memset(&g_net, 0, sizeof g_net);
 	return &g_net;
 }

@@ -86,6 +86,8 @@ def assemble(line):
 # once took any line with a lower-case "db" in it for data, which is why
 # kernel/api.inc wrote API_ST_DELETE as $10DB)
 DIRECTIVE_WORDS = [
+    ("mov r0, #1 ; comment: [missing]", "8c 01"),
+    ("mov r0, #1 ; a: b: c", "8c 01"),
     ("%define ADDR $10db\n\tb ADDR",          "b0 db 10"),
     ("%define ADDR $10DB\n\tb ADDR",          "b0 db 10"),
     ("b $10db",                               "b0 db 10"),
@@ -118,7 +120,7 @@ def main():
             bad += 1
             print("FAIL %r: want %s got %s" % (line, want, "error" if got is None else got[:4].hex(" ")))
     # the directives themselves still work: data, bss and a variable in each
-    got = assemble_data('greet db "hi"\nnums db 1, 2, 219\ncount: resb 2\nmain:\n'
+    got = assemble_data('greet db "hi"\nnums db 1, 2, 219 ; quote " and colon: in comment\ncount: resb 2\nmain:\n'
                         '\tld r0, [nums+2]\n\tst [count+1], r0\n')
     want_code = bytes.fromhex("a0 05 30 a8 01 50")
     if got is None or got[0][:6] != want_code or got[1][:6] != b"hi\x00\x01\x02\xdb":
