@@ -98,9 +98,9 @@ saved per change.
   from $c004 (`memory-map.md`). The 4 bytes cost the longest program 4
   bytes: 8187 instead of 8191 (KRN-017, KRN-027 changed to match).
 - **The ROM image** (`tools/mkrom.py --basic`; `romimage.mjs`,
-  `simmachine.nim` pass it): BASIC's header at ROM $08000 (as the kernel's:
-  load and entry $7000), its body from $08800, 0s to a page. The kernel body
-  must end before $08000 (`mkrom.py` checks).
+  `simmachine.nim` pass it): BASIC's header follows the kernel body at the
+  next 256-byte page (as the kernel's: load and entry $7000), its body one
+  page later, 0s to a page. `mkrom.py` checks both RAM and ROM bounds.
 - **Boot** (`kernel/term.s term_do`, `sys.s sys_basic_boot`): the banner,
   then `BASIC.PRG` from the SD card through exec's loader (`sys_load`, to
   $bfff at most; too big is found before loading, by a byte past the room),
@@ -127,4 +127,3 @@ saved per change.
   layouts, the ROM header), SIM-010 (BASIC.PRG in the simulator). Test
   programs that leave results for the test now leave them at $bc00-$beff,
   above BASIC, which is loaded again over $7000 when they end.
-

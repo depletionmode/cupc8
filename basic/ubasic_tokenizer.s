@@ -560,13 +560,3 @@ ubasic_tokenizer_variable_num:
 
 	pop pcl
 	pop pch
-
-ubasic_tokenizer_pos:
-	; NOTE: unused; use ub_ptr directly!
-	; r0 high
-	; r1 low
-	mov r0, #>[ub_ptr]
-	mov r1, #<[ub_ptr]
-
-	pop pcl
-	pop pch

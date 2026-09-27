@@ -106,11 +106,13 @@ ring is dropped.
   lines as if typed), then RUN. `ret`
   (`pop pcl`/`pop pch`) or the `exit` API entry returns to the terminal,
   which resets its stack.
-- **From the PC:** `cupc8.py run prog.prg` (or the bare binary) writes the
-  body at $7000 with `RAM_WRITE`, then sets `API_RUN` to 1. The terminal
-  looks at `API_RUN` every time its key wait wakes: the chipset's tick
+- **From the PC:** `cupc8.py run prog.prg` (or the bare binary) asks with
+  `API_RUN` 3, waits for the terminal to acknowledge with 4, writes the
+  body at $7000 with `RAM_WRITE`, then sets `API_RUN` to 1. A timed-out upload
+  sets 5 to cancel without marking a running interpreter idle. The terminal
+  looks at `API_RUN` before the hook and in its key wait: the chipset's tick
   (IRQ_PEND bit 4, `memory-map.md`) wakes the `WAI` every 50 ms, and the look
-  is three instructions. It then calls $7000 as `exec` does. `API_RUN` is 2 while a program runs and 0 again at the prompt, and
+  starts it. It then calls $7000 as `exec` does. `API_RUN` is 2 while a program runs and 0 again at the prompt, and
   `cupc8.py run` refuses unless it is 0. Needs the system card. The bridge's
   RAM writes are safe while the CPU runs, byte by byte (`sysctl.md`), which
   is why `API_RUN` goes last.

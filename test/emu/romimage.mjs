@@ -1,5 +1,5 @@
 // The real ROM image: the boot ROM (rom/boot.s), the kernel and BASIC
-// (basic/build.sh, at ROM $08000), as simtest builds it (tools/simmachine.nim
+// (basic/build.sh, after the kernel in ROM), as simtest builds it (tools/simmachine.nim
 // buildKernelRom).
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

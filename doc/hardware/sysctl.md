@@ -120,10 +120,11 @@ the bridge's request is up (`soc/chipset.vhd`: the bridge goes first, the CPU
 waits on /RDY), so every byte is one whole SRAM cycle between CPU cycles: no
 bus contention and no torn byte. Nothing is atomic across bytes, though: the
 CPU can see a block half written. So `cupc8.py run` writes a program at $7000
-first and then, in a separate `RAM_WRITE`, sets `API_RUN` ($6f21) to 1, which
+after requesting a safe upload window with `API_RUN` ($6f21) = 3 and waiting
+for acknowledgment 4. It then sets `API_RUN` to 1 in a separate `RAM_WRITE`, which
 is the only byte the kernel's terminal looks at; and it refuses while
-`API_RUN` is 2 (a program is running at $7000, which it would write over) or
-still 1 (the last one not started yet).
+`API_RUN` is nonzero (a program is running, pending, or an upload is being
+cancelled).
 
 ### The card programming port
 

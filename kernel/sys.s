@@ -1562,7 +1562,8 @@ sys_basic_card:
 	b sys_load
 
 ; the ROM's BASIC (memory-map.md, "ROM image layout"): a header as the
-; kernel's at ROM $08000, its body from $08800, 0s after it to a 256-byte
+; kernel's at the next page after the kernel body, its body one page later.
+; There are 0s after BASIC to a 256-byte
 ; boundary. Into $7000: r0 = 0, or $ff if there is none - a bad header (not
 ; "CUP8" version 1, flags 0, load and entry $7000, 1 to $5000 bytes; bytes
 ; 0-13 summing to 0) or a body whose sum is not byte 12. The ROM windows
@@ -1580,12 +1581,34 @@ sys_rom_basic:
 	cli
 	xor r0, r0
 	st $f203, r0			; ROM_OFF 0 - the ROM windows on
-	mov r0, #16				; ROM bank 16 - ROM $08000 at $e800
+	mov r0, #1                      ; the kernel header at ROM $00800
 	st $f204, r0
+	ld r0, $e808                    ; ceil(($810 + length) / 256)
+	ld r1, $e809
+	add r1, #8
+	add r0, #16
+	lt r0, #16
+	bzf .carry
+	b .round
+.carry:
+	add r1, #1
+.round:
+	eq r0, #0
+	bzf .address
+	add r1, #1
+.address:
+	mov r0, r1
+	shr r0, #3
+	st $f204, r0
+	and r1, #7
+	add r1, #0xe8
+	st [sys_rp+1], r1
+	xor r0, r0
+	st [sys_rp], r0
 	xor r1, r1				; the header's sum
 	st [sys_sum], r1
 .hsum:
-	ld r0, $e800+r1
+	ldd r0, [sys_rp]+r1
 	push r1
 	ld r1, [sys_sum]
 	add r0, r1
@@ -1602,7 +1625,7 @@ sys_rom_basic:
 .fields:
 	xor r1, r1				; bytes 0-7 and 10-11 as sys_rom_hdr
 .field:
-	ld r0, $e800+r1
+	ldd r0, [sys_rp]+r1
 	push r1
 	ld r1, [sys_rom_hdr]+r1
 	eq r0, r1
@@ -1620,10 +1643,16 @@ sys_rom_basic:
 	mov r1, #10
 	b .field
 .length:
-	ld r0, $e80c			; the body's sum, to compare at the end
+	mov r1, #12
+	ldd r0, [sys_rp]+r1	; the body's sum, to compare at the end
 	st [sys_sum], r0
-	ld r0, $e808			; 1 to $5000 bytes ($7000-$bfff), in pages
-	ld r1, $e809
+	mov r1, #8
+	ldd r0, [sys_rp]+r1
+	push r0
+	mov r1, #9
+	ldd r0, [sys_rp]+r1
+	mov r1, r0
+	pop r0
 	gt r1, #0x50
 	bzf .none
 	eq r0, #0
@@ -1638,12 +1667,11 @@ sys_rom_basic:
 	xor r0, r0
 	st [sys_rp], r0
 	st [sys_wp], r0
-	mov r0, #0xe8
-	st [sys_rp+1], r0
 	mov r0, #0x70
 	st [sys_wp+1], r0
-	mov r0, #17				; the body - ROM $08800, bank 17
-	st $f204, r0
+	push pch
+	push pcl
+	b sys_rom_next_page
 .page:
 	xor r1, r1
 .byte:
@@ -1662,18 +1690,9 @@ sys_rom_basic:
 	ld r0, [sys_wp+1]
 	add r0, #1
 	st [sys_wp+1], r0
-	ld r0, [sys_rp+1]
-	add r0, #1
-	eq r0, #0xf0
-	bzf .bank
-	st [sys_rp+1], r0
-	b .count
-.bank:
-	mov r0, #0xe8			; the next bank, from the window's start
-	st [sys_rp+1], r0
-	ld r0, $f204
-	add r0, #1
-	st $f204, r0
+	push pch
+	push pcl
+	b sys_rom_next_page
 .count:
 	ld r0, [sys_pages]
 	sub r0, #1
@@ -1691,5 +1710,67 @@ sys_rom_basic:
 	mov r1, #1
 	st $f203, r1			; ROM_OFF 1 - RAM at $e000-$efff again
 	sti
+	pop pcl
+	pop pch
+
+; Advance the source one page, including a ROM window crossing.
+sys_rom_next_page:
+	ld r0, [sys_rp+1]
+	add r0, #1
+	eq r0, #0xf0
+	bzf .bank
+	st [sys_rp+1], r0
+	pop pcl
+	pop pch
+.bank:
+	mov r0, #0xe8
+	st [sys_rp+1], r0
+	ld r0, $f204
+	add r0, #1
+	st $f204, r0
+	pop pcl
+	pop pch
+
+; The host asks with 3, then waits for 4 before writing program memory.
+; Acknowledgement occurs only at a terminal key wait or before its hook.
+; The CPU stays here until upload completion (1) or cancellation (0).
+sys_upload_poll:
+	push r0
+	ld r0, [keyb_term]
+	eq r0, #0
+	pop r0
+	bzf .done
+	b sys_upload_wait
+.done:
+	pop pcl
+	pop pch
+
+sys_upload_wait:
+	push r0
+	ld r0, API_RUN
+	eq r0, #5
+	bzf .cancel
+	eq r0, #3
+	bzf .ack
+	pop r0
+	pop pcl
+	pop pch
+.ack:
+	mov r0, #4
+	st API_RUN, r0
+.wait:
+	ld r0, API_RUN
+	eq r0, #1
+	bzf sys_run
+	eq r0, #0
+	bzf .cancel
+	eq r0, #5
+	bzf .cancel
+	wai
+	b .wait
+.cancel:
+	xor r0, r0
+	st API_RUN, r0
+	pop r0
 	pop pcl
 	pop pch

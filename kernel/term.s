@@ -188,6 +188,9 @@ term_find:
 ; (the program at $7000 is running: cupc8.py run must not write over it).
 ; With no hook: "invalid cmd", or for a file "bad program header".
 term_hook:
+	push pch
+	push pcl
+	b sys_upload_wait
 	push r0
 	mov r0, #2
 	st API_RUN, r0

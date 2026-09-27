@@ -65,7 +65,7 @@ bridge's 24-bit RAM commands.
 |---|---|
 | $1000–$67ff | kernel code (`b main` at $1000, then the API jump table $1003–$1302: 8 groups of 32 entries) |
 | $6800–$6eff | kernel data (2026-09-26: moved up from $6000, as the code needed more room and the data used 1.4 KB of 3.75) |
-| $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 nothing, 1 the PC left a program at $7000, 2 a program is running); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
+| $6f00–$6fff | **API block**: `API_ARGS` $6f00–$6f1f (arguments and results), `API_ERR` $6f20 (the last call's code), `API_RUN` $6f21 (0 idle, 1 uploaded program ready, 2 a program is running, 3 upload requested, 4 upload acknowledged and CPU parked outside $7000–$dfff, 5 upload cancelled); the USB console (`../proposals/usb-console.md`, the table below): its indices and flags $6f22–$6f26, `CON_OUT` $6f40–$6fbf, `CON_IN` $6fc0–$6fff; the rest ($6f27–$6f3f) reserved |
 | $7000–$dfff | **user program** (28 KB), loaded and entered at $7000; **BASIC** (`basic/`, a program like any other: about 8 KB with its bss, $7000–$9fff) is there whenever no native program is |
 | $c000–$dfff | … whose top 8 KB holds the **BASIC program** (`basic/basic.s`): `"BA"` at $c000, the end at $c002 (two bytes: the offset of its 0 from $c000, 4 when empty), from $c004 its text, each line ending in a CR, then the 0 |
 | $e000–$efff | kernel bss: RAM once the kernel has turned the ROM off (its first instruction), and bss needs no loading |
@@ -231,12 +231,12 @@ anywhere does.
 |---|---|---|
 | $00000 | 2 KB | Boot ROM (`rom/boot.s`), assembled for $e000 |
 | $00800 | 16 B | Kernel header |
-| $00810 | ≤ 30 KB | Kernel body (to $07fff) |
-| $08000 | 16 B | **BASIC's header** (2026-09-26): as the kernel's, load and entry $7000, 1 to $5000 bytes |
-| $08800 | ≤ 20 KB | **BASIC's body** (`BASIC.PRG` without its `"C8P"` header), then 0s to a 256-byte boundary |
+| $00810 | ≤ 52 KB | Kernel body (limited by its RAM load address) |
+| `align256($00810 + kernel length)` | 16 B | **BASIC's header**: as the kernel's, load and entry $7000, 1 to $5000 bytes |
+| Header page + $100 | ≤ 20 KB | **BASIC's body** (`BASIC.PRG` without its `"C8P"` header), then 0s to a 256-byte boundary |
 | … | | Free (future cupfs ROM disk) |
 
-The kernel copies BASIC from ROM banks 16 (the header) and 17 on, a
+The kernel reads the kernel length from its header to locate BASIC, then copies BASIC a
 256-byte page at a time through the banked window, with the ROM windows on
 and interrupts off for the copy (about 100 ms for 6.5 KB, most of it the sum); it checks the
 header (its sum, "CUP8" version 1, flags 0, load and entry $7000, the

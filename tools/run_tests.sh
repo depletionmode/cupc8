@@ -10,7 +10,7 @@ export PATH="${HOME}/.local/bin:${PATH}"
 mkdir -p ../build
 exec 9>../build/.simtest.lock
 flock 9
-nim c --hints:off simtest.nim
+nim c --hints:off --nimcache="$(pwd)/../build/nimcache-simtest" simtest.nim
 run=$(mktemp -d ../build/simtest-XXXXXX)
 cp simtest "$run/simtest"
 flock -u 9

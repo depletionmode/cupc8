@@ -3160,19 +3160,23 @@ proc testKernelLayout() =
        readFile(prg).len - 4, " bytes in BASIC.PRG)"
   expectTrue("BASIC is assembled for $7000 (" & bBase & ")", bBase.startsWith("base 0x7000 "))
   expectTrue("BASIC ends below $9400 (at $" & toHex(bEnd - 1, 4) & ")", bEnd <= 0x9400)
-  # the ROM image: the kernel before ROM $08000, BASIC's header there
+  # BASIC follows the kernel at the next page, its body one page later.
   let rom = readFile(buildKernelRom())
   proc u16(o: int): int = ord(rom[o]) or (ord(rom[o + 1]) shl 8)
-  expectTrue("the kernel ends before ROM $08000", 0x810 + u16(0x808) <= 0x8000)
+  let hdr = (0x810 + u16(0x808) + 255) and not 255
+  let start = hdr + 256
   let body = readFile(prg)[4 .. ^1]
   var hsum, bsum = 0
-  for i in 0 .. 13: hsum += ord(rom[0x8000 + i])
+  for i in 0 .. 13: hsum += ord(rom[hdr + i])
   for c in body: bsum += ord(c)
-  expectTrue("BASIC's header at ROM $08000: CUP8, load and entry $7000, its length, the sums",
-             rom[0x8000 ..< 0x8004] == "CUP8" and u16(0x8006) == 0x7000 and u16(0x800a) == 0x7000 and
-             u16(0x8008) == body.len and (hsum and 0xff) == 0 and ord(rom[0x800c]) == (bsum and 0xff))
-  expectTrue("its body at ROM $08800, 0s to a page", rom[0x8800 ..< 0x8800 + body.len] == body and
-             rom[0x8800 + body.len ..< 0x8800 + ((body.len + 255) and not 255)].allIt(it == '\0'))
+  expectTrue("BASIC's packed header: CUP8, load and entry $7000, length and sums",
+             rom[hdr ..< hdr + 4] == "CUP8" and u16(hdr + 6) == 0x7000 and u16(hdr + 10) == 0x7000 and
+             u16(hdr + 8) == body.len and (hsum and 0xff) == 0 and ord(rom[hdr + 12]) == (bsum and 0xff))
+  expectTrue("BASIC's packed body, 0s to a page", rom[start ..< start + body.len] == body and
+             rom[start + body.len ..< start + ((body.len + 255) and not 255)].allIt(it == '\0'))
+  for name in ["gfx_clrscreen", "gpu_fill_rect", "print_ascii_char_inverse", "str_printuint16"]:
+    expectTrue("approved dead routine removed: " & name, name notin toSeq(kernelMap().syms.values))
+  expectTrue("approved tokenizer routine removed", not loadMap(basicMapPath()).byName.hasKey("ubasic_tokenizer_pos"))
 
 run testKernelLayout
 
@@ -3826,12 +3830,14 @@ proc testKernelNoBasic() =
   let good = buildKernelRom()
   let none = makeRom(buildBootRom(), buildKernel(), romDir() / "nobasic.rom", basic = "")
   var data = readFile(good)
-  data[0x8000] = 'X'                             # the magic
+  let hdr = (0x810 + ord(data[0x808]) + (ord(data[0x809]) shl 8) + 255) and not 255
+  data[hdr] = 'X'                             # the magic
   writeFile(romDir() / "badbasic.rom", data)
   data = readFile(good)
-  data[0x8900] = char(ord(data[0x8900]) xor 1)   # a body byte
+  data[hdr + 512] = char(ord(data[hdr + 512]) xor 1)   # a body byte
   writeFile(romDir() / "sumbasic.rom", data)
   let withBasic = bootStorageTimed(good, "", fitted = false)
+  expectTrue("good ROM installs BASIC's hook", hookAt() != 0)
   let without = bootStorageTimed(none, "", fitted = false)
   echo "  at the prompt ", withBasic, " ms after reset with the ROM's BASIC, ", without, " with none"
   expectTrue("copying the ROM's BASIC (and summing it) takes under 150 ms (" & $(withBasic - without) & ")",
@@ -4606,8 +4612,51 @@ proc testKernelConsole() =
 
 run testKernelConsole
 
+proc testRunUploadHandshake() =
+  echo "== upload handshake with a pending Enter =="
+  let rom = buildKernelRom()
+  bootBasic(rom)
+  mem[ApiRun] = 5
+  expectTrue("prompt clears a cancelled upload before acknowledgment",
+             runUntil(proc (): bool = mem[ApiRun] == 0 and waiting, 5_000_000))
+  mem[ApiRun] = 3
+  expectTrue("idle prompt acknowledges an upload",
+             runUntil(proc (): bool = mem[ApiRun] == 4, 5_000_000))
+  mem[ApiRun] = 5
+  expectTrue("cancelled idle upload returns to prompt",
+             runUntil(proc (): bool = mem[ApiRun] == 0 and waiting, 5_000_000))
+  # Stop just before BASIC's hook runs, with Enter already consumed.
+  for c in "print 123":
+    pushKey(ord(c))
+    settle(100_000)
+  pushKey(13)
+  let hook = kernelMap().syms
+  var hookPC = -1
+  for a, name in hook:
+    if name == "term_hook": hookPC = a
+  expectTrue("Enter reaches the hook", runUntil(proc (): bool = PC == hookPC, 5_000_000))
+  mem[ApiRun] = 3
+  var enteredProgram = false
+  expectTrue("kernel acknowledges upload only at a safe key wait",
+             runUntil(proc (): bool =
+               if PC >= 0x7000 and PC < 0xe000: enteredProgram = true
+               mem[ApiRun] == 4, 10_000_000))
+  expectTrue("pending Enter never enters BASIC before acknowledgment", not enteredProgram)
+  let saved = mem[0x7000]
+  mem[0x7000] = 0xf8               # a half-written program must never execute
+  pushKey(13)
+  settle(500_000)
+  expect("upload stays acknowledged while Enter is pending", mem[ApiRun], 4)
+  expectTrue("CPU remains outside the overwritten program", PC < 0x7000)
+  mem[0x7000] = saved
+  mem[ApiRun] = 5                 # cancelled before touching the program
+  expectTrue("cancel returns to the terminal and clears the mailbox",
+             runUntil(proc (): bool = mem[ApiRun] == 0 and waiting, 5_000_000))
+  ioModel = imLegacy
+
+run testRunUploadHandshake
+
 if failures > 0:
   echo "FAILED ", failures, " check(s)"
   quit(1)
 echo "ALL TESTS PASSED"
-

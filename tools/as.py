@@ -216,6 +216,17 @@ def __assemble(filename):
             # deal with comments alone on line
             if l[0] == ';': continue
 
+            # Strip comments before interpreting labels or variable references.
+            # A semicolon inside a quoted string is data.
+            quoted = escaped = False
+            for i, char in enumerate(l):
+                if char == '"' and not escaped:
+                    quoted = not quoted
+                if char == ';' and not quoted:
+                    l = l[:i].rstrip() + '\n'
+                    break
+                escaped = char == '\\' and not escaped
+
             # .bss and .data: `name: resb N` and `name db ...`. The directive
             # is the second token; "db" or "resb" anywhere else (a name such as
             # $10db, a comment) is not one.
