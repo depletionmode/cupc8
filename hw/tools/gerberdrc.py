@@ -887,6 +887,73 @@ def polygon_scanline_witness(points, minimum):
     return None
 
 
+def connected_polygon_scanline_witness(contours, measured_count, minimum):
+    """Prove a narrow interior span in a hole-free filled union.
+
+    Rational crossings at vertex-slab midpoints avoid floating geometry
+    errors. Non-region contours are widening flashes or conservative boxes;
+    only a span containing filled-region ink can be a witness. A neighboring
+    wide span on both sides excludes pointed terminal tips. This is a
+    failure witness, not complete minimum-width coverage.
+    """
+    if sum(len(points) for points in contours) > 2000:
+        return None
+    outlines = []
+    for points in contours:
+        vertices = []
+        for x, y in points:
+            scaled = (Decimal(str(x)) * 2000000, Decimal(str(y)) * 2000000)
+            if any(value != value.to_integral_value() for value in scaled):
+                return None
+            vertices.append(tuple(int(value) for value in scaled))
+        if len(vertices) < 3:
+            return None
+        if vertices[0] != vertices[-1]:
+            vertices.append(vertices[0])
+        if any(a == b for a, b in zip(vertices, vertices[1:])):
+            return None
+        outlines.append(list(zip(vertices, vertices[1:])))
+    threshold = Fraction(Decimal(str(minimum)) * 2000000)
+    for axis in (0, 1):
+        levels = sorted({point[axis] for edges in outlines for edge in edges for point in edge})
+        slabs = []
+        for low, high in zip(levels, levels[1:]):
+            sample = Fraction(low + high, 2)
+            intervals = []
+            for index, edges in enumerate(outlines):
+                crossings = []
+                for a, b in edges:
+                    u0, u1 = a[axis], b[axis]
+                    if min(u0, u1) < sample < max(u0, u1):
+                        v0, v1 = a[1-axis], b[1-axis]
+                        crossings.append(Fraction(v0) + Fraction(v1-v0) *
+                                         (sample-u0) / (u1-u0))
+                crossings.sort()
+                if len(crossings) % 2:
+                    return None
+                intervals.extend((start, end, index < measured_count)
+                                 for start, end in zip(crossings[::2], crossings[1::2]))
+            merged = []
+            for start, end, measured in sorted(intervals):
+                if end <= start:
+                    return None
+                if merged and start <= merged[-1][1]:
+                    merged[-1] = (merged[-1][0], max(end, merged[-1][1]),
+                                  merged[-1][2] or measured)
+                else:
+                    merged.append((start, end, measured))
+            slabs.append(merged)
+        for previous, current, following in zip(slabs, slabs[1:], slabs[2:]):
+            for left, right, measured in current:
+                if not measured or not 0 < right-left < threshold:
+                    continue
+                if all(any(start < right and left < end and end-start >= threshold
+                           for start, end, _ in neighbor)
+                       for neighbor in (previous, following)):
+                    return (right-left) / 2000000
+    return None
+
+
 def check_isolated_filled_necks(path, geometry, objects, filled_regions, minimum):
     """Reject a proven thin span inside an isolated orthogonal filled polygon.
 
@@ -1005,6 +1072,12 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
         if width_grid is not None and width_grid < rule_grid:
             raise ValueError('%s:%d: connected filled region union has a %.6f mm span below %.6f mm' %
                              (Path(path).name, regions[0][3], width_grid/2000000, minimum))
+        if width_grid is None:
+            witness = connected_polygon_scanline_witness(contours, len(regions), minimum)
+            if witness is not None:
+                raise ValueError('%s:%d: connected nonorthogonal filled region union has a %.6f mm '
+                                 'interior span below %.6f mm' %
+                                 (Path(path).name, regions[0][3], float(witness), minimum))
 
 
 def check_silk_clearance(silk_path, mask_path, minimum, minimum_ink_width=None):
