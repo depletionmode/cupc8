@@ -92,8 +92,8 @@ fail until their contract coverage exists:
 
 ### Wi-Fi card electrical and thermal limits still needed
 
-For the routed Wi-Fi PCB with SHA-256 prefix `06a8db9bcace` and exported
-netlist `9dd820f380cb` (the 2026-09-27 build), `wifi_board.routes` gives
+For the routed Wi-Fi PCB with SHA-256 prefix `a03625fc088d` and exported
+netlist `98648d1e9355` (the 2026-09-27 build), `wifi_board.routes` gives
 38.0 mΩ on +5 V and 134.7 mΩ on 3V3. The saved GND fills give a 123.4 mΩ
 fixed-corridor scenario with 152 represented GND vias; the 0.25/0.125 mm
 meshes differ by 1.4%. `wifi_coupling_budget` then allows at most
@@ -102,13 +102,50 @@ calibrated thermal model or a powered-board temperature measurement still
 has to establish a smaller transfer for this layout.
 
 `python3 hw/power/wifi_limits.py build/hw/wifi` reruns the TI transient model
-on that routed board while varying one unknown at a time. With no extra
-module return contact resistance, equal ESR on C1/C2/C3 of 0.1, 0.3 and
-0.5 Ω gives respective modeled TX minima of 3.113, 3.097 and 3.083 V after
-the low DC set-point correction. At 0.1 Ω ESR, adding 0.2 Ω to the module
-return gives 3.044 V; adding 0.33 Ω gives 3.000 V (2.9998 V before rounding),
-and 0.4 Ω gives 2.976 V, below the 3.0 V limit.
-These are sensitivity results, not component or contact specifications.
+on that routed board while varying one unknown at a time. The minimum is
+measured during the TX burst at the low DC set-point corner. The maximum
+covers start-up, burst and release at the high DC set-point corner. The
+ESP32-C3 module limits are 3.0–3.6 V; both must pass.
+
+| Equal C1/C2/C3 ESR | Extra module return contact | TX minimum | Whole-wave maximum | Modeled result |
+| ---: | ---: | ---: | ---: | :--- |
+| 0.10 Ω | 0 Ω | 3.113 V | 3.560 V | Within limits |
+| 0.15 Ω | 0 Ω | 3.109 V | 3.575 V | Within limits |
+| 0.18 Ω | 0 Ω | 3.106 V | 3.595 V | Within limits |
+| 0.30 Ω | 0 Ω | 3.097 V | 3.665 V | **Overvoltage** |
+| 0.50 Ω | 0 Ω | 3.083 V | 3.824 V | **Overvoltage** |
+| 0.10 Ω | 0.20 Ω | 3.044 V | 3.554 V | Within limits |
+| 0.10 Ω | 0.33 Ω | 3.000 V | 3.551 V | **Undervoltage** (2.9998 V unrounded) |
+| 0.10 Ω | 0.40 Ω | 2.976 V | 3.552 V | **Undervoltage** |
+
+These are sensitivity results, not component or contact specifications. The
+minimum-only version of this sweep missed the overvoltage at 0.30 and
+0.50 Ω ESR.
+
+The exact routed inputs are committed as
+`test/hw/fixtures/wifi-power-route-20260927.tar.xz` (SHA-256
+`c2fd1c4731c4b22769c1d6dbb44add85ccf6e8be4bb9bcdbbe72e1986bc440e9`).
+It contains `wifi.kicad_pcb`, `wifi.net`, and `fab/order.json`; their SHA-256
+values are checked by `test/hw/test_wifi_limits.py`. Extract into an isolated
+checkout's `build/hw/wifi` and run the sweep:
+
+```sh
+mkdir -p build/hw/wifi
+tar -xJf test/hw/fixtures/wifi-power-route-20260927.tar.xz -C build/hw/wifi
+python3 hw/power/wifi_limits.py build/hw/wifi
+```
+
+The deck uses `budget.chain('worst')`, the extracted 38.008/134.665/123.440
+mΩ +5 V/3V3/GND route scenarios, 22 µF C1 and C2 at 0.6 DC-bias factor,
+100 nF C3, a 120 µs input rise, and an 18.3→358.3 mA load step at 1.3 ms
+released at 1.6 ms with 1 µs edges. Transient stop is 1.9 ms and maximum
+step is 20 ns. The TI TLV62569 transient model is fetched by
+`hw/power/models/fetch.py` from the pinned [TI model ZIP](https://www.ti.com/lit/mo/slvmbw3a/slvmbw3a.zip)
+(SHA-256 `af0d920f2659195de7ba1437b4b435a33f01e128abf99a4c8a39abbcf515bd5d`);
+the ported library in this run had SHA-256
+`0f14829d253b36a6dd788c68385ff3536caba6db6b5f09725b3ab91d6686b08f`.
+The results above used ngspice 47. Generated `.cir`, `.dat` and `.log` files
+are saved under the isolated checkout's `build/power/`.
 
 The fitted C1/C2 part is Samsung CL21A226MAQNNNE. Its
 [manufacturer product page](https://product.samsungsem.com/mlcc/CL21A226MAQNNN.do)
@@ -119,7 +156,14 @@ No guaranteed transient ESR maximum was found for the fitted part. The
 remaining electrical evidence is a manufacturer ESR limit or a controlled
 qualification of the assembled parts, plus a bound for the pad and return
 contacts from calibrated extraction or measurement. Until then WC-005 and
-WC-010 remain red.
+WC-010 remain red. For WC-010, the bound is at most 34.429 °C/W of
+ESP32-to-buck transfer, with 88.3 mW assigned to the buck and adjacent
+copper and 1.26 W upper-bounded ESP32 TX heat. The missing input is a
+calibrated board-and-enclosure thermal solution or a powered-board
+measurement at 40 °C ambient and sustained 350 mA TX, including neighboring
+cards and the final airflow. TI's [TLV62569 datasheet](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
+provides DBV θJA 188.2 °C/W and ψJT 31.4 °C/W; these package parameters
+alone do not bound heat transfer from the ESP32 on this board.
 - SI and board co-simulation remain separate workstreams; newly added rows
   remain pending until their checks are implemented.
 

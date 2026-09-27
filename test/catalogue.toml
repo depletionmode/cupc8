@@ -2598,6 +2598,16 @@ method = "test/hw/test_cpu_power_board.py with synthetic KiCad netlist and PCB f
 kind = "static"
 vrow = "4.4"
 cmd = "python3 test/hw/test_cpu_power_board.py"
+
+[[test]]
+id = "WC-005A"
+title = "Wi-Fi power sensitivity limit classification"
+checks = "Both burst undervoltage and start-up or release overvoltage classify sensitivity runs; parameters enter the transient deck"
+method = "test/hw/test_wifi_limits.py with synthetic waves and a netlist deck inspection"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 test/hw/test_wifi_limits.py"
+
 [[test]]
 id = "SI-001"
 title = "Routed parallel-run screen regression"

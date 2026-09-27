@@ -1193,6 +1193,14 @@ fixed_in = "6af2668"
 revert = [["hw/power/cpu_board.py", "if circuit.net(*pin) != net:", "if False:"]]
 cmd = "python3 test/hw/test_cpu_power_board.py CpuPowerBoard.test_netlist_pin_swap_fails"
 must_fail = ["FAIL: test_netlist_pin_swap_fails"]
+
+[[bug]]
+name = "Wi-Fi ESR sensitivity accepted an overvoltage waveform because its burst minimum passed"
+fixed_in = "Wi-Fi sensitivity extrema"
+revert = [["hw/power/wifi_limits.py", "return minimum >= d.ESP32_VDD_MIN and maximum <= d.ESP32_VDD_MAX", "return minimum >= d.ESP32_VDD_MIN"]]
+cmd = "python3 test/hw/test_wifi_limits.py WifiLimits.test_overvoltage_fails_even_when_burst_minimum_passes"
+must_fail = ["FAIL: test_overvoltage_fails_even_when_burst_minimum_passes"]
+
 [[bug]]
 name = "crosstalk screen: split collinear tracks hid a long parallel run"
 fixed_in = "crosstalk initial implementation"
