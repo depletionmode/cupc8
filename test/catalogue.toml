@@ -1764,6 +1764,15 @@ vrow = "4.4"
 cmd = "python3 hw/tools/boardcheck.py main power"
 
 [[test]]
+id = "MB-005A"
+title = "Main input copper heat evidence classification"
+checks = "The routed input-loss model uses the eFuse maximum current and incomplete physical evidence stays red"
+method = "Synthetic resistance and stale-receipt cases in test/hw/test_main_input_heat.py"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 test/hw/test_main_input_heat.py"
+
+[[test]]
 id = "MB-006"
 title = "Main board thermal"
 checks = "all regulators Tj ≤ 100 °C at 40 °C ambient"
