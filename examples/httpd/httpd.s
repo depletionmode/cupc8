@@ -15,7 +15,7 @@
 ; Build- the API's names (kernel/api.inc) first, then this, for $7000:
 ;   python3 tools/mkprg.py examples/httpd/httpd.s -o build/HTTPD.PRG
 ; Run- exec "HTTPD.PRG" from the SD card (INDEX.HTM next to it), e.g.
-; tools/sim --cards:hdmi,io,wifi,storage --sd:card.img; then browse to
+; tools/sim --slots hdmi,io,wifi,storage --sd card.img; then browse to
 ; http://localhost:8080/ (the simulator's Wi-Fi card uses the host's sockets).
 
 %define HTTP_PORT_LO 144

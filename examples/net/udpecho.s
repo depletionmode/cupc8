@@ -7,7 +7,7 @@
 ; Build- the API's names (kernel/api.inc) first, then this, for $7000:
 ;   python3 tools/mkprg.py examples/net/udpecho.s -o build/udpecho.prg
 ; Run- cupc8.py run build/udpecho.prg (the system card), exec from the SD card,
-; or tools/sim --cards:hdmi,io,wifi --run:build/udpecho.prg. On the emulator,
+; or tools/sim --slots hdmi,io,wifi --run:build/udpecho.prg. On the emulator,
 ; forward a host port to it (forward- udp:PORT:7007).
 
 %define ECHO_PORT_LO 95

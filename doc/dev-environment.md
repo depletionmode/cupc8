@@ -31,15 +31,15 @@ does everything except KiCad.
   Build it with `cd tools && nim c -d:release sim.nim`; `kernel/simulate.sh`
   assembles the kernel and runs it. It simulates the Milestone 1 machine:
   reset runs the boot ROM, which loads the kernel from the ROM image, and
-  the slot cards are chosen with `--cards` (default `hdmi,io`):
+  the slot cards are chosen with `--slots LIST` (default `hdmi,io`):
 
   ```
-  tools/sim --cards:hdmi,io,storage,wifi --sd:card.img     # the kernel from kernel/
-  kernel/simulate.sh --cards:eink,io                       # the 5.83" e-ink card
+  tools/sim --slots hdmi,io,storage,wifi --sd card.img     # the kernel from kernel/
+  kernel/simulate.sh --slots eink,io                       # the 5.83" e-ink card
   ```
 
   Card kinds are the emulator's: `hdmi`, `eink`, `eink750`, `io`,
-  `storage`, `wifi` (and `empty`). `--sd:IMAGE` is the storage card's SD
+  `storage`, `wifi` (and `empty`). `--sd IMAGE` is the storage card's SD
   card, a FAT image; a missing file is made as a blank 32 MB FAT16 volume
   (`mkfs.fat`), and a PC reads it afterwards (`tools/fatcheck.py`,
   `mtools`, a loop mount). The Wi-Fi card uses the **host's own sockets**:
