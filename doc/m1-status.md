@@ -66,10 +66,10 @@ survives a lost session. Newest first within each section. Specs live in
 
 | Work | State |
 |---|---|
-| Main board | Existing main-board branch: six-layer layout; pin remap, modest outline growth, fine signal rules and ten routing workers approved. Routing is incomplete. |
+| Main board | Salt-1 route and deterministic power/ground repairs are merged. The six-layer package has a valid receipt, 0 KiCad DRC violations, 0 opens and 0 parity errors. Worst slot is 16.85 mΩ at nominal 20°C copper, but 20.17 mΩ at 70°C before thickness tolerance; MB-005 remains red. |
 | BASIC follow-ups | Packed ROM image, approved dead-code removals, run/hook handshake, isolated Nim cache and assembler comment parsing. Simulator checks precede emulator checks. |
-| Board verification | Wire static/power/thermal catalogue rows and add storage, e-ink and system rows with checks that reject missing evidence. |
-| SI and schematic co-simulation | Still required by verification.md; routed crosstalk screening alone does not satisfy analog SI. Main-board trace extraction waits for routing. |
+| Board verification | Main, Wi-Fi and GPU have current evidence receipts and clean KiCad DRC. CPU, IO, storage, e-ink and system are rebuilding. Wi-Fi WC-005/WC-010 remain red for unbounded ESR, return contact and thermal transfer; plotted fab checks found further edge/clearance/parser issues. |
+| SI and schematic co-simulation | The four routed HDMI pair field-model subsets pass against the GPU receipt; full analog SI remains red. Routed main copper is available to the IBIS diagnostic. Strict E2E-001..004 remain red with 502 unmodeled nets after the routed nPOR reset and ROM/SRAM write-enable dependencies were added. |
 | Final gate | Run make verify after integration; regenerate fab-readiness; inspect renders and list David's hand checks. No manufacturing upload or order. |
 
 ## Done (recent)
@@ -82,6 +82,9 @@ survives a lost session. Newest first within each section. Specs live in
   checks, KRN-006.
 - Power for four cards and a 3 A source: TPS259470 eFuse, 3.5 A PTC,
   TLV62569PDDCR, PWR_HI = 3.0 A; below it no radio and no SD writes.
+- Main board: source-driven salt-1 route, post-fill KiCad DRC/parity/connectivity
+  all zero, and current Gerber/BOM/CPL/render receipt. The hot-copper power
+  and signal-integrity gates remain open.
 
 - Wi-Fi card board through the whole pipeline (WIFI-004), TLV62569 buck
   after POW-003/THM-001, TX/RX/LINK LEDs, standard outline.
