@@ -1502,6 +1502,58 @@ def _spi_ncs6_escape(board):
     return [a.GetNetname()]
 
 
+def _clear_main_silk_mask(board):
+    """Keep four pin-1 rings and four socket strokes clear of mask openings."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    markers = {'U1': (28.33, 171.30), 'U3': (39.30, 161.67),
+               'U5': (56.519, 175.79), 'U8': (102.738, 83.92)}
+    for ref, at in markers.items():
+        fp = board.FindFootprintByReference(ref)
+        if fp is None:
+            raise RuntimeError(f'main pin-1 silk: missing {ref}')
+        shapes = fp.GraphicalItems()
+        found = []
+        for i in range(len(shapes)):
+            item = shapes[i].Cast()
+            if (item.GetClass() == 'PCB_SHAPE' and item.GetLayer() == pcbnew.F_SilkS and
+                    item.GetShape() == pcbnew.SHAPE_T_CIRCLE and item.GetWidth() == mm(0.3) and
+                    (round(to(item.GetStart().x), 4), round(to(item.GetStart().y), 4)) == at):
+                found.append(item)
+        if len(found) != 1:
+            raise RuntimeError(f'main pin-1 silk: {ref} marker changed ({len(found)} matches)')
+        found[0].SetWidth(mm(0.2))
+
+    socket = board.FindFootprintByReference('J3')
+    if socket is None:
+        raise RuntimeError('main socket silk: missing J3')
+    expected = {(76.635, 165.81, 78.365), (76.635, 158.19, 78.365),
+                (99.635, 165.81, 102.06), (99.635, 158.19, 102.06)}
+    matched = set()
+    shapes = socket.GraphicalItems()
+    for i in range(len(shapes)):
+        item = shapes[i].Cast()
+        if (item.GetClass() != 'PCB_SHAPE' or item.GetLayer() != pcbnew.F_SilkS or
+                item.GetShape() != pcbnew.SHAPE_T_SEGMENT or item.GetWidth() != mm(0.25)):
+            continue
+        start, end = item.GetStart(), item.GetEnd()
+        a, z = ((round(to(p.x), 4), round(to(p.y), 4)) for p in (start, end))
+        if a[1] != z[1]:
+            continue
+        key = (min(a[0], z[0]), a[1], max(a[0], z[0]))
+        if key not in expected:
+            continue
+        if key in matched:
+            raise RuntimeError(f'main socket silk: duplicate J3 stroke {key}')
+        matched.add(key)
+        if a[0] < z[0]:
+            item.SetStart(pcbnew.VECTOR2I(mm(a[0] + 0.05), mm(a[1])))
+        else:
+            item.SetEnd(pcbnew.VECTOR2I(mm(z[0] + 0.05), mm(z[1])))
+    if matched != expected:
+        raise RuntimeError(f'main socket silk: J3 strokes changed ({expected - matched})')
+
+
 def _finish_route(board, replay_salt=None):
     """Repair route-specific fixed-power and ground gaps after SES import.
 
@@ -1579,6 +1631,7 @@ def _finish_route(board, replay_salt=None):
             item.SetWidth(mm(1.0))
         track((39.15, 160.0), (38.3, 160.0), 0.2, pcbnew.F_Cu, '/GND')
         via((38.3, 160.0), 0.6, 0.3, '/GND')
+        _clear_main_silk_mask(board)
         return
 
     # +5V J2 load and C42 were left separate from the pre-routed slot trunk.
