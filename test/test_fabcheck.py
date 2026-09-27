@@ -153,9 +153,8 @@ class FabCheckTests(unittest.TestCase):
                         + '%TO.N,' + second_net + f'*%\nX{second_x}Y1000000D03*\nM02*\n')
             path.write_text(gerber(1351000))
             self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
-            path.write_text(gerber(1350000))  # exact rule, uncertain after tessellation
-            with self.assertRaisesRegex(ValueError, 'copper clearance indeterminate'):
-                gerberdrc.check_clearance([path], .15)
+            path.write_text(gerber(1350000))  # exact rule, circular flashes are analytic
+            self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
             path.write_text(gerber(1200000))
             with self.assertRaisesRegex(ValueError, 'copper clearance below rule'):
                 gerberdrc.check_clearance([path], .15)
@@ -174,6 +173,26 @@ class FabCheckTests(unittest.TestCase):
                 gerberdrc.check_clearance([path], .15)
             path.write_text(gerber(1351000, '/A'))
             self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
+
+    def test_kicad_freepoly_flash_and_unsupported_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sample-F_Cu.gtl'
+            macro = ('%AMFreePoly0*\n4,1,4,0,0,1,0,1,1,0,0,\n$1*%\n')
+            body = ('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                    '%ADD10FreePoly0,0.000000*%\nD10*\n%TO.N,/A*%\n'
+                    'X1000000Y1000000D03*\nM02*\n')
+            path.write_text(macro + body)
+            geometry = gerberdrc.Geometry()
+            try:
+                self.assertEqual(len(gerberdrc.plotted_copper(path, geometry)), 1)
+                for mutant in (macro.replace('4,1,4', '4,0,4') + body,
+                               macro + body.replace('FreePoly0,0.000000', 'FreePoly0,0.100000'),
+                               macro.replace('1,1,0,0,', '1,1,0,1,') + body):
+                    path.write_text(mutant)
+                    with self.assertRaises(ValueError):
+                        gerberdrc.plotted_copper(path, geometry)
+            finally:
+                geometry.close()
 
     def test_unsupported_gerber_geometry_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -271,6 +290,13 @@ class FabCheckTests(unittest.TestCase):
                         'D10*\n%TO.N,/GND*%\nX1000000Y1000000D03*\nM02*\n')
             copper.write_text(component(1.5, 3.3))
             self.assertEqual(gerberdrc.check_pth_annular(board, [copper], .2), 1)
+            # Exact nominal annulus at the threshold passes. A one-micron
+            # reduction of the plotted pad is a real plotted-rule failure.
+            copper.write_text(component(1.3, 3.1))
+            self.assertEqual(gerberdrc.check_pth_annular(board, [copper], .2), 1)
+            copper.write_text(component(1.299998, 3.1))
+            with self.assertRaisesRegex(ValueError, 'PTH annular ring'):
+                gerberdrc.check_pth_annular(board, [copper], .2)
             copper.write_text(component(1.1, 2.9))
             with self.assertRaisesRegex(ValueError, 'PTH annular ring'):
                 gerberdrc.check_pth_annular(board, [copper], .2)

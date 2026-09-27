@@ -5,6 +5,7 @@ the plotted coordinates, not on pcbnew board objects or a second board export.
 """
 import ctypes
 import ctypes.util
+from decimal import Decimal, localcontext
 import math
 from pathlib import Path
 import re
@@ -13,7 +14,7 @@ from collections import defaultdict
 
 COORD = re.compile(r'^(?:X(-?\d+))?(?:Y(-?\d+))?D(0[123])\*$')
 ARC_COORD = re.compile(r'^X(-?\d+)Y(-?\d+)I(-?\d+)J(-?\d+)D01\*$')
-APERTURE = re.compile(r'^%ADD(\d+)(C|R|O|RoundRect),([^*]+)\*%$')
+APERTURE = re.compile(r'^%ADD(\d+)(C|R|O|RoundRect|FreePoly\d+),([^*]+)\*%$')
 SELECT = re.compile(r'^D(\d+)\*$')
 PROFILE_MOVE = re.compile(r'^X(-?\d+)Y(-?\d+)D02\*$')
 PROFILE_DRAW = re.compile(r'^X(-?\d+)Y(-?\d+)(?:I(-?\d+)J(-?\d+))?D01\*$')
@@ -46,6 +47,9 @@ class Geometry:
         self.reader = self.call('GEOSWKTReader_create_r', ctypes.c_void_p, [ctypes.c_void_p])(self.ctx)
         self.shapes = []
         self.overfill = {}
+        self.circles = {}
+        self.obrounds = {}
+        self.flashes = {}
         self.outward = True
 
     def call(self, name, result, args):
@@ -99,6 +103,18 @@ class Geometry:
         if result != 1 or not math.isfinite(value.value):
             raise ValueError('GEOS failed to measure Gerber clearance')
         return value.value
+
+    def circle_distance(self, first, second):
+        """Exact decimal clearance of two circular flashes, if both qualify."""
+        if first not in self.circles or second not in self.circles:
+            return None
+        x0, y0, d0 = self.circles[first]
+        x1, y1, d1 = self.circles[second]
+        with localcontext() as context:
+            context.prec = 50
+            dx = Decimal(x0-x1) / Decimal(1000000)
+            dy = Decimal(y0-y1) / Decimal(1000000)
+            return (dx*dx + dy*dy).sqrt() - (Decimal(str(d0)) + Decimal(str(d1))) / 2
 
     def covers(self, outer, inner):
         result = self.call('GEOSCovers_r', ctypes.c_byte,
@@ -175,7 +191,9 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
     file_polarity = None
     file_function = None
     macro = None
+    macro_name = None
     macro_defined = False
+    free_polys = {}
     aperture_function = None
     mode = 'G01'
 
@@ -191,28 +209,58 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
         if macro is not None:
             macro.append(line)
             if line.endswith('*%'):
-                if tuple(macro) != ROUND_RECT_MACRO:
-                    raise ValueError('%s: unsupported RoundRect macro definition' % path.name)
+                if macro_name == 'RoundRect':
+                    if tuple(macro) != ROUND_RECT_MACRO:
+                        raise ValueError('%s: unsupported RoundRect macro definition' % path.name)
+                    macro_defined = True
+                elif re.fullmatch(r'FreePoly\d+', macro_name) and len(macro) == 2 and macro[1] == '$1*%':
+                    parts = macro[0].rstrip('*').split(',')
+                    if len(parts) < 10 or parts[:2] != ['4', '1'] or parts[-1] != '':
+                        raise ValueError('%s: unsupported FreePoly macro primitive' % path.name)
+                    try:
+                        count = int(parts[2])
+                        values = [float(value) for value in parts[3:-1]]
+                    except ValueError as error:
+                        raise ValueError('%s: invalid FreePoly coordinates' % path.name) from error
+                    if (count < 4 or len(values) not in (count * 2, (count + 1) * 2) or
+                            any(not math.isfinite(value) for value in values)):
+                        raise ValueError('%s: invalid FreePoly vertex count' % path.name)
+                    points = list(zip(values[::2], values[1::2]))
+                    # KiCad 10 repeats the closing point twice in this macro.
+                    if len(points) == count + 1:
+                        if points[-2] != points[0] or points[-1] != points[0]:
+                            raise ValueError('%s: invalid FreePoly closure' % path.name)
+                        points.pop()
+                    if points[0] != points[-1] or len(set(points[:-1])) < 3:
+                        raise ValueError('%s: FreePoly polygon is not closed' % path.name)
+                    free_polys[macro_name] = points
+                else:
+                    raise ValueError('%s: unsupported aperture macro definition' % path.name)
                 macro = None
-                macro_defined = True
+                macro_name = None
             continue
         if line == '%FSLAX46Y46*%':
             seen_format = True
         elif line == '%MOMM*%':
             seen_units = True
         elif line.startswith('%AM'):
-            if line != '%AMRoundRect*':
+            name = line[3:-1] if line.endswith('*') else ''
+            if name != 'RoundRect' and not re.fullmatch(r'FreePoly\d+', name):
                 raise ValueError('%s:%d: unsupported aperture macro' % (path.name, number))
+            macro_name = name
             macro = []
         elif match := APERTURE.fullmatch(line):
             params = tuple(float(x) for x in match[3].split('X'))
             kind = match[2]
             if kind == 'RoundRect' and not macro_defined:
                 raise ValueError('%s:%d: undefined RoundRect macro' % (path.name, number))
+            if kind.startswith('FreePoly') and (kind not in free_polys or len(params) != 1 or params[0] != 0):
+                raise ValueError('%s:%d: unsupported FreePoly aperture rotation' % (path.name, number))
             if (kind == 'C' and len(params) != 1 or kind in ('R', 'O') and len(params) != 2 or
                     kind == 'RoundRect' and len(params) != 10 or
                     any(not math.isfinite(x) for x in params) or
-                    any(x < 0 if kind == 'C' and extra_function == 'Legend' else x <= 0
+                    any(x < 0 if kind == 'C' and extra_function == 'Legend' else
+                        False if kind.startswith('FreePoly') else x <= 0
                         for x in params[:1 if kind not in ('R', 'O') else 2])):
                 raise ValueError('%s:%d: unsupported aperture dimensions' % (path.name, number))
             apertures[int(match[1])] = (kind, params, aperture_function)
@@ -316,6 +364,7 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                         raise ValueError('%s:%d: zero-size flash aperture' % (path.name, number))
                     radius = params[0] / 2
                     shape = geometry.buffer(geometry.wkt('POINT (%.9f %.9f)' % target), radius)
+                    geometry.circles[shape] = (round(x*1e6), round(y*1e6), params[0])
                     bounds = (x-radius, y-radius, x+radius, y+radius)
                 elif kind == 'R':
                     rx, ry = (p/2 for p in params)
@@ -334,7 +383,13 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                     else:
                         shape = geometry.buffer(geometry.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' %
                                                              (*ends[0], *ends[1])), radius)
+                    geometry.obrounds[shape] = (round(x*1e6), round(y*1e6), width, height)
                     bounds = (x-width/2,y-height/2,x+width/2,y+height/2)
+                elif kind.startswith('FreePoly'):
+                    points = [(x+px, y+py) for px, py in free_polys[kind]]
+                    shape = geometry.wkt(polygon(points))
+                    xs, ys = zip(*points)
+                    bounds = (min(xs), min(ys), max(xs), max(ys))
                 else:
                     radius = params[0]
                     corners = [(x+params[i], y+params[i+1]) for i in (1,3,5,7)]
@@ -343,6 +398,12 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                     shape = geometry.buffer(geometry.wkt(polygon(corners)), radius)
                     xs, ys = zip(*corners)
                     bounds = (min(xs)-radius,min(ys)-radius,max(xs)+radius,max(ys)+radius)
+                if operation == '03':
+                    definition = (tuple(free_polys[kind]) if kind.startswith('FreePoly')
+                                  else params)
+                    geometry.flashes[shape] = (round(x*1e6), round(y*1e6),
+                                               'FreePoly' if kind.startswith('FreePoly') else kind,
+                                               definition)
                 add(shape, bounds, function if operation == '03' else None, target)
             position = target
         elif line == 'M02*':
@@ -508,8 +569,40 @@ def check_pth_annular(board, paths, minimum):
                 if len(shapes) != 1:
                     raise ValueError('%s: expected one ComponentPad flash at %s (%s)' %
                                      (Path(path).name, center, ref))
+                # Circular and axis-aligned obround flashes have exact
+                # dimensions in the aperture definition. Use them directly
+                # at a boundary rule; polygonized GEOS buffers otherwise
+                # report a false sub-minimum annulus by tens of nanometres.
+                exact = None
+                drill = pad.GetDrillSize()
+                dx, dy = pcbnew.ToMM(drill.x), pcbnew.ToMM(drill.y)
+                origin = (round(center[0]*1e6), round(center[1]*1e6))
+                if dx == dy and shapes[0] in engine.circles:
+                    px, py, diameter = engine.circles[shapes[0]]
+                    if (px, py) == origin:
+                        exact = (Decimal(str(diameter)) - Decimal(str(dx))) / 2
+                elif dx != dy and shapes[0] in engine.obrounds:
+                    px, py, width, height = engine.obrounds[shapes[0]]
+                    angle = math.radians(pad.GetOrientationDegrees())
+                    direction = ((math.cos(angle), math.sin(angle)) if dx > dy
+                                 else (math.sin(angle), -math.cos(angle)))
+                    horizontal = abs(direction[0]) > 1 - 1e-9
+                    vertical = abs(direction[1]) > 1 - 1e-9
+                    if ((px, py) == origin and width != height and
+                            ((width > height and horizontal) or
+                             (height > width and vertical))):
+                        across = (Decimal(str(min(width, height))) - Decimal(str(min(dx, dy)))) / 2
+                        along = (Decimal(str(max(width, height))) - Decimal(str(max(dx, dy)))) / 2
+                        exact = min(across, along)
+                if exact is not None:
+                    if exact < Decimal(str(minimum)):
+                        raise ValueError('%s: PTH annular ring %s mm < %.3f mm at %s (%s)' %
+                                         (Path(path).name, exact, minimum, center, ref))
+                    count += 1
+                    continue
                 if not engine.covers(shapes[0], holes[(ref, center)]):
-                    raise ValueError('%s: PTH annular ring below %.3f mm at %s (%s)' %
+                    raise ValueError('%s: PTH annular ring indeterminate or below %.3f mm at %s (%s); '
+                                     'unsupported exact pad/drill geometry' %
                                      (Path(path).name, minimum, center, ref))
                 count += 1
         return count
@@ -532,10 +625,19 @@ def check_mask_alignment(copper_path, mask_path):
             if function not in exposed_functions:
                 continue
             covering = None
+            identical = False
             for _, opening, (a0,b0,a1,b1) in openings:
                 if x0 > a1 or a0 > x1 or y0 > b1 or b0 > y1:
                     continue
+                if (engine.equals(opening, copper) or
+                        (copper in engine.flashes and
+                         engine.flashes.get(opening) == engine.flashes[copper])):
+                    identical = True
+                    break
                 covering = opening if covering is None else engine.union(covering, opening)
+            if identical:
+                count += 1
+                continue
             if covering is None or not engine.covers(covering, copper):
                 if uncertain_geometry is None:
                     inner_features = []
@@ -781,10 +883,10 @@ def check_holes(holes, non_plated, copper_paths, outline, copper_minimum, npth_e
     `holes` is the multiset returned by fabcheck.drill_hits, after its parity
     check against the board. `non_plated` is the subset matched to board NPTH
     pads. A coincident ComponentPad or ViaPad flash supplies a plated hole's net.
-    Drill
-    coordinates and diameters were rounded to 0.001 mm by the parity parser,
-    so this check enlarges each cut by 0.001 mm and classifies any boundary
-    case within that uncertainty as indeterminate.
+    The Excellon coordinates and tool diameters are the nominal plotted cuts.
+    Board parity is checked separately; its rounding must not inflate these
+    plotted dimensions. GEOS buffering remains an outward enclosure, so a
+    boundary case within its polygonization error remains indeterminate.
     """
     if (not math.isfinite(copper_minimum) or copper_minimum <= 0 or
             not math.isfinite(npth_edge_minimum) or npth_edge_minimum <= 0):
@@ -817,7 +919,7 @@ def check_holes(holes, non_plated, copper_paths, outline, copper_minimum, npth_e
                 raise ValueError('unsupported Excellon cut key: %r' % (item,))
             if not all(math.isfinite(v) for v in item[1:] if isinstance(v, (float, int))) or diameter <= 0:
                 raise ValueError('invalid Excellon cut dimensions')
-            radius = diameter/2 + .001  # <=0.000957 mm rounding in XY and radius
+            radius = diameter/2
             cut = engine.buffer(primitive, radius)
             x0,y0,x1,y1 = bounds
             cut_bounds = (x0-radius, y0-radius, x1+radius, y1+radius)
@@ -834,14 +936,14 @@ def check_holes(holes, non_plated, copper_paths, outline, copper_minimum, npth_e
             for path_name, net, copper, (a0,b0,a1,b1) in objects:
                 if owner is not None and net == owner:
                     continue
-                if (cut_bounds[0]-a1 >= copper_minimum+.002 or
-                        a0-cut_bounds[2] >= copper_minimum+.002 or
-                        cut_bounds[1]-b1 >= copper_minimum+.002 or
-                        b0-cut_bounds[3] >= copper_minimum+.002):
+                if (cut_bounds[0]-a1 >= copper_minimum or
+                        a0-cut_bounds[2] >= copper_minimum or
+                        cut_bounds[1]-b1 >= copper_minimum or
+                        b0-cut_bounds[3] >= copper_minimum):
                     continue
                 lower = engine.distance(cut, copper)
                 if lower < copper_minimum:
-                    upper = (lower + .001 + engine.overfill.get(cut, 0) +
+                    upper = (lower + engine.overfill.get(cut, 0) +
                              engine.overfill.get(copper, 0) + .000000002)
                     detail = ('indeterminate' if upper >= copper_minimum else 'below rule')
                     raise ValueError('%s: Excellon hole-to-copper %s at %s: lower %.9f, '
@@ -849,14 +951,14 @@ def check_holes(holes, non_plated, copper_paths, outline, copper_minimum, npth_e
                                      (path_name, detail, center, lower, upper, copper_minimum))
             if is_npth:
                 for edge, (a0,b0,a1,b1) in edges:
-                    if (cut_bounds[0]-a1 >= npth_edge_minimum+.002 or
-                            a0-cut_bounds[2] >= npth_edge_minimum+.002 or
-                            cut_bounds[1]-b1 >= npth_edge_minimum+.002 or
-                            b0-cut_bounds[3] >= npth_edge_minimum+.002):
+                    if (cut_bounds[0]-a1 >= npth_edge_minimum or
+                            a0-cut_bounds[2] >= npth_edge_minimum or
+                            cut_bounds[1]-b1 >= npth_edge_minimum or
+                            b0-cut_bounds[3] >= npth_edge_minimum):
                         continue
                     lower = engine.distance(cut, edge)
                     if lower < npth_edge_minimum:
-                        upper = lower + .001 + engine.overfill.get(cut, 0) + .000000002
+                        upper = lower + engine.overfill.get(cut, 0) + .000000002
                         detail = ('indeterminate' if upper >= npth_edge_minimum else 'below rule')
                         raise ValueError('%s: NPTH hole-to-edge %s at %s: lower %.9f, '
                                          'upper %.9f, rule %.9f mm' %
@@ -894,6 +996,13 @@ def check_clearance(paths, minimum, minimum_track=None):
                 for previous in candidates:
                     other_net, other, (a0,b0,a1,b1) = objects[previous]
                     if net == other_net or x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
+                        continue
+                    exact = engine.circle_distance(shape, other)
+                    if exact is not None:
+                        if exact < Decimal(str(minimum)):
+                            raise ValueError('%s: %s to %s circular copper clearance below rule: '
+                                             '%s mm < %.9f mm' %
+                                             (Path(path).name, net, other_net, exact, minimum))
                         continue
                     distance = engine.distance(shape, other)
                     if distance < minimum:
