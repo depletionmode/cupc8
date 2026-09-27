@@ -33,6 +33,10 @@ The IO card's USB host data pair must pass from the RP2040 pins through the
 attachment in the native machine; an open path leaves it disconnected.
 The storage card's seven SD signal contacts similarly control whether the
 microSD socket is attached to its RP2040 model.
+All four HDMI differential pairs, including the clock pair, must pass through
+their 270 Ω series pack channels to the receptacle before the TMDS capture
+endpoint attaches. Seven e-paper data/control lines through 33 Ω resistors
+likewise control whether the panel attaches.
 
 From the repo root, after building the main board:
 

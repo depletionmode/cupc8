@@ -416,8 +416,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     auto c = std::make_unique<Rp2040Card>(kind, root + "/build/rp2040/" + elf + ".elf", kind == "hdmi" ? 252 : 125);
     c->slot = slot;
     c->logging = o.spiLog;
-    if (kind == "hdmi") tmds = std::make_unique<TmdsCapture>(c->e);
-    if (kind == "eink" || kind == "eink750")  // the panel on its header: 5.83" 648x480 or 7.5" 800x480
+    if (kind == "hdmi" && o.gpuHdmiLink) tmds = std::make_unique<TmdsCapture>(c->e);
+    if ((kind == "eink" || kind == "eink750") && o.einkPanelLink)  // the panel on its header
       panels[slot] = std::make_unique<EinkPanel>(c->e, EinkPanel::config(kind == "eink" ? 648 : 800, 480));
     if (kind == "storage" && o.storageSdSocket)
       c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in

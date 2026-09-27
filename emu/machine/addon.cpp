@@ -148,6 +148,8 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.pwrHi = flag("pwrHi", true);
     opt.ioUsbHost = flag("ioUsbHost", true);
     opt.storageSdSocket = flag("storageSdSocket", true);
+    opt.gpuHdmiLink = flag("gpuHdmiLink", true);
+    opt.einkPanelLink = flag("einkPanelLink", true);
     opt.threaded = flag("threaded", true);
     opt.spiLog = flag("spiLog", false);
     opt.espTx = integer("espTx", -1);

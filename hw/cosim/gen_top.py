@@ -357,6 +357,33 @@ def check(cards, main, pcb=None):
                                   'to': f'storage.J2.{connector_pin}',
                                   'net': signal, 'runtime': 'storage_sd_socket'})
     manifest['runtime']['storage_sd_socket'] = True
+    # All four HDMI differential lanes leave the RP2040 through the 270 ohm
+    # packs; the capture endpoint represents the receptacle, not MCU GPIOs.
+    hdmi_contacts = {'D2P': '1', 'D2N': '3', 'D1P': '4', 'D1N': '6',
+                     'D0P': '7', 'D0N': '9', 'CKP': '10', 'CKN': '12'}
+    for lane, connector_pin in hdmi_contacts.items():
+        source = [(ref, pin) for (ref, pin), net in cards['gpu'].pins.items()
+                  if ref == 'U1' and net == f'/TMDS_{lane}']
+        if len(source) != 1:
+            raise ValueError(f'gpu TMDS_{lane}: RP2040 pad missing')
+        resistor = path(cards['gpu'], source[0], ('J2', connector_pin), '270')
+        manifest['paths'].append({'from': f'gpu.U1.{source[0][1]}',
+                                  'to': f'gpu.J2.{connector_pin}', 'series': resistor,
+                                  'ohms': 270, 'runtime': 'gpu_hdmi_link'})
+    manifest['runtime']['gpu_hdmi_link'] = True
+    epd_contacts = {'EPD_DIN': '3', 'EPD_CLK': '4', 'EPD_nCS': '5',
+                    'EPD_DC': '6', 'EPD_nRST': '7', 'EPD_BUSY': '8',
+                    'EPD_PWR': '9'}
+    for signal, connector_pin in epd_contacts.items():
+        source = [(ref, pin) for (ref, pin), net in cards['eink'].pins.items()
+                  if ref == 'U1' and net == f'/{signal}']
+        if len(source) != 1:
+            raise ValueError(f'eink {signal}: RP2040 pad missing')
+        resistor = path(cards['eink'], source[0], ('J2', connector_pin), '33R')
+        manifest['paths'].append({'from': f'eink.U1.{source[0][1]}',
+                                  'to': f'eink.J2.{connector_pin}', 'series': resistor,
+                                  'ohms': 33, 'runtime': 'eink_panel_link'})
+    manifest['runtime']['eink_panel_link'] = True
     clock = named_pin(main, 'Y1', 'OUT')
     fpga_clk = [(ref, pin) for (ref, pin), net in main.pins.items()
                 if ref == 'U7' and net == '/CLK12']
@@ -418,6 +445,12 @@ def check(cards, main, pcb=None):
         runtime_net('io', name)
     for name in sd_contacts:
         runtime_net('storage', name)
+    for name in hdmi_contacts:
+        runtime_net('gpu', f'TMDS_{name}')
+        runtime_net('gpu', f'HD_{name}')
+    for name in epd_contacts:
+        runtime_net('eink', name)
+        runtime_net('eink', f'{name}_J')
     unmodeled, structural_only = [], []
     for board, circuit in circuits.items():
         for net in circuit.nets:

@@ -46,6 +46,20 @@ const m = await Machine.create({slots: {1: 'io', 2: 'storage'}, threaded: false}
 console.log(JSON.stringify({keyboard: Boolean(m.keyboard), sd: Boolean(m.sd)}));
 m.stop();
 """
+DISPLAY_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+const m = await Machine.create({slots: {1: 'hdmi', 2: 'eink'}, threaded: false});
+const panel = Boolean(m.panel());
+const videoError = m.frame().error ?? null;
+console.log(JSON.stringify({panel, videoError}));
+m.stop();
+"""
+PANEL_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+const m = await Machine.create({slots: {1: 'eink'}, threaded: false});
+console.log(JSON.stringify({panel: Boolean(m.panel())}));
+m.stop();
+"""
 
 
 def run(top, probe=PROBE):
@@ -118,6 +132,22 @@ def main():
         if sd_bad != {'keyboard': True, 'sd': False}:
             raise AssertionError(f'storage SD path does not control socket attachment: {sd_bad}')
         print('open storage SD contact detaches the microSD socket')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['gpu_hdmi_link'] = False
+        mutant = Path(directory) / 'open-hdmi-pair.json'
+        mutant.write_text(json.dumps(changed))
+        hdmi_bad = run(mutant, DISPLAY_PROBE)
+        if hdmi_bad['videoError'] != 'no graphics card' or not hdmi_bad['panel']:
+            raise AssertionError(f'HDMI pair does not control the capture endpoint: {hdmi_bad}')
+        print('open HDMI pair detaches video capture')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['eink_panel_link'] = False
+        mutant = Path(directory) / 'open-epd-signal.json'
+        mutant.write_text(json.dumps(changed))
+        epd_bad = run(mutant, PANEL_PROBE)
+        if epd_bad != {'panel': False} or run(args.top, PANEL_PROBE) != {'panel': True}:
+            raise AssertionError(f'e-paper signal does not control panel attachment: {epd_bad}')
+        print('open e-paper signal detaches the panel')
     print(f"valid netlist wiring runs normally to PC ${good['pc']:04x}")
 
 

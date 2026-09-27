@@ -70,6 +70,14 @@ def main_cli():
         del broken_sd['storage'].pins[('J2', '5')]
         rejected(broken_sd, main, 'missing storage SD clock contact')
 
+        broken_hdmi = copy.deepcopy(cards)
+        broken_hdmi['gpu'].resistors = tuple(r for r in broken_hdmi['gpu'].resistors if r.ref != 'RN2.3')
+        rejected(broken_hdmi, main, 'missing HDMI clock-positive series resistor')
+
+        broken_epd = copy.deepcopy(cards)
+        broken_epd['eink'].resistors = tuple(r for r in broken_epd['eink'].resistors if r.ref != 'R11')
+        rejected(broken_epd, main, 'missing e-paper clock series resistor')
+
 
 if __name__ == '__main__':
     main_cli()
