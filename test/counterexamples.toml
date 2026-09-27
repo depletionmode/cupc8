@@ -720,3 +720,10 @@ fixed_in = "036e0ad"
 revert = [["hw/tools/kicadgen.py", "    for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:\n        via = t.Type() == pcbnew.PCB_VIA_T", "    for t in [tracks[i] for i in range(len(tracks)) if tracks[i].GetNetname() in held]:\n        board.Remove(t)\n        continue\n        via = t.Type() == pcbnew.PCB_VIA_T"]]
 cmd = "python3 test/hw/test_route_held.py"
 must_fail = ["FAIL the held net is one piece after routing"]
+
+[[bug]]
+name = "main board CPL: J4 (KiCad's pin header, origin on pin 1) placed at pin 1, 5.5 mm off the centre JLC places on"
+fixed_in = "739f514"
+revert = [["hw/parts/jlc_rotation.yaml", "  offset:\n  - 1.27\n  - -5.08\n", ""]]
+cmd = "CUPC8_OFFLINE=1 python3 hw/tools/bomcheck.py main"
+must_fail = ["jlc_rotation.yaml's offset is None, but JLC's origin"]
