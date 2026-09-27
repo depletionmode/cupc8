@@ -76,6 +76,9 @@ fail until their contract coverage exists:
   deterministic font matching alone cannot decide which strokes are text or
   establish that every text object was found. Bounding a glyph is also not a
   nominal text-height measurement: a dash has no vertical font extent. The
+  [plotted text-height note](plotted-text-height.md) records an identical
+  KiCad plot from a text dash and a graphic segment and a source-backed
+  manufacturing acceptance procedure. The
   saved PCB's text-size property plus export parity checks the source, but is
   not an independent Gerber re-import check. A sound plotted-height check
   needs an exporter sidecar that assigns every text-owned Gerber operation to
