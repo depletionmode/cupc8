@@ -4,6 +4,8 @@
 fresh export of the DRC-clean board, then checks each Excellon drill hit
 against a footprint pad or via. This export parity is not Gerber re-import DRC.
 The board also needs a recorded visual CPL review before the fab gate passes.
+Gerber re-import DRC remains a separate missing check; a completed review
+receipt alone does not make this gate pass.
 
 After viewing the placement overlay and checking designators, pin one,
 polarized parts, and rotations against the board and BOM, put

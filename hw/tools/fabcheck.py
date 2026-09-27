@@ -165,4 +165,5 @@ def check(out):
     board, layers = export_parity(out, out / 'fab')
     holes = check_drills(board, out / 'fab')
     check_review(out)
-    return '%d Gerber layers match fresh export; %d drill hits match board pads/vias; CPL review recorded' % (layers, holes)
+    raise ValueError('Gerber re-import DRC is still missing; export parity on %d layers and %d drill hits is not enough' %
+                     (layers, holes))

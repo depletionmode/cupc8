@@ -69,6 +69,13 @@ class FabCheckTests(unittest.TestCase):
             self.assertIn('fab/board-F_Cu.gtl', artifacts)
             self.assertNotIn('fab/cpl-review.json', artifacts)
 
+    def test_export_parity_and_review_do_not_replace_reimport_drc(self):
+        with patch.object(fabcheck, 'export_parity', return_value=(object(), 9)), \
+             patch.object(fabcheck, 'check_drills', return_value=218), \
+             patch.object(fabcheck, 'check_review'):
+            with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC is still missing'):
+                fabcheck.check(Path('/tmp/wifi'))
+
 
 if __name__ == '__main__':
     unittest.main()
