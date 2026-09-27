@@ -36,8 +36,11 @@ Neither solve bounds actual sharing. The A-side sum leaves **3.400 mΩ**,
 and even the ideal tied-pad sum leaves just **4.137 mΩ**
 for all GND copper, via/pad transitions, both mated contact groups and
 solder under the 20 mΩ loop requirement. The prior In1-only return *scenario*
-was about 3.46 mΩ at this corner before its via and pad contact, so this
-candidate lacks defensible margin even if full routing passes. The local
+was about 3.46 mΩ at this corner before its via and pad contact, but U2 has
+moved much closer to J1, so that old number is not a bound for this trial.
+The new filled return must be extracted. Even an ideal zero-ohm return and
+contacts would leave this trial above the proposed 15 mΩ design target; the
+20 mΩ limit has little unallocated budget. The local
 0.3 mm eFuse escape and the adjacent PWR_EN pad are binding: shortening the
 escape by 0.3 mm and widening the adjacent feed produced a measured
 0.0581 mm clearance against the 0.150 mm rule and was discarded.
