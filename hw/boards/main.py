@@ -1189,8 +1189,8 @@ def prepare(board):
     board.Add(v)
     _plane_pads(board)
     nets = _efuse_escapes(board, fp)
-    standby = _standby_preroute(board)
-    _five_volt_bus(board)
+    standby = _standby_preroute_relocated(board)
+    _five_volt_bus(board, relocated=True)
     signal = _spi_ncs6_escape(board)
     _label_keepouts(board)
     # Freerouting reports the wide locked inner-layer +5V trunk as several
@@ -1330,7 +1330,61 @@ def _standby_preroute(board):
     return [vin.GetNetname()]
 
 
-def _five_volt_bus(board):
+def _standby_preroute_relocated(board):
+    """Preserve the fixed buck feed and standby spur with U2/F1 moved.
+
+    The new F1 to U2 and U2 to bulk-capacitor paths are left to the router;
+    the old QFN escape and via coordinates are not valid in this placement.
+    """
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def pad(ref, num):
+        return next(p for p in board.FindFootprintByReference(ref).Pads()
+                    if p.GetNumber() == num)
+
+    def xy(p):
+        return to(p.GetPosition().x), to(p.GetPosition().y)
+
+    def track(a, b, width, net):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
+        t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
+        t.SetWidth(mm(width))
+        t.SetLayer(pcbnew.F_Cu)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
+
+    f1, u2, c3, c5 = (pad(ref, num) for ref, num in
+                      (("F1", "2"), ("U2", "5"), ("C3", "1"), ("C5", "1")))
+    if any(abs(xy(p)[i] - target) > 0.05 for p, expected in
+           ((f1, (25.0, 172.8625)), (u2, (22.23, 168.5)),
+            (c3, (11.0, 160.95)), (c5, (34.0, 160.775)))
+           for i, target in enumerate(expected)):
+        raise SystemExit("_standby_preroute_relocated: power neighbours moved")
+    v5 = c3.GetNet()
+    track(xy(c3), (11.0, 162.0), 0.5, v5)
+    track((11.0, 162.0), (34.0, 162.0), 0.5, v5)
+    track((34.0, 162.0), xy(c5), 0.5, v5)
+    vin, c16 = pad("U15", "2"), pad("C16", "1")
+    vx, vy = xy(vin)
+    cx, cy = xy(c16)
+    track((vx, vy), (vx, cy + 1.2), 0.3, vin.GetNet())
+    track((vx, cy + 1.2), (cx, cy + 0.4), 0.3, vin.GetNet())
+    track((cx, cy + 0.4), (cx, cy), 0.3, vin.GetNet())
+    track((cx, cy), (cx - 1.3, cy), 0.3, vin.GetNet())
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(mm(cx - 1.3), mm(cy)))
+    v.SetWidth(mm(0.6))
+    v.SetDrill(mm(0.3))
+    v.SetNet(vin.GetNet())
+    v.SetLocked(True)
+    board.Add(v)
+    return [vin.GetNetname()]
+
+
+def _five_volt_bus(board, relocated=False):
     """Locked 5 V copper from the eFuse link to the six slot fuses.
 
     The 7.5 mm B.Cu/In2/In3 bus and three vias at each branch carry the 3 A
@@ -1401,7 +1455,7 @@ def _five_volt_bus(board):
                 abs(to(b.y) - 162) < 0.01 and abs(to(a.x - b.x)) > 20:
             item.SetWidth(mm(1.2))
             widened_f += 1
-    if (widened_f, widened_inner, len(parallel_inner)) != (1, 4, 3):
+    if (widened_f, widened_inner, len(parallel_inner)) != ((1, 0, 0) if relocated else (1, 4, 3)):
         raise SystemExit("_five_volt_bus: eFuse power pre-route changed; check widths")
     for a, b, net in parallel_inner:
         track(a, b, 2.0, net, pcbnew.In2_Cu)
@@ -1795,7 +1849,7 @@ def main():
                        zone_min_width=0.3,          # at 0.25 KiCad's fill left a 0.063 mm plane neck
                        fanout_margin=FANOUT_MARGIN,
                        prepare=prepare,
-                       post_route=_finish_route,
+                       post_route=None,  # relocation trial: old salt-1 post-route geometry is invalid
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
                        boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)
