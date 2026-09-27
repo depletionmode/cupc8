@@ -34,9 +34,13 @@ fail until their contract coverage exists:
   outline, and Excellon data for its implemented checks. Passing those checks
   still leaves the fab row red. The remaining plotted-geometry rules are
   minimum neck width in filled copper and silk regions and silkscreen text
-  height. The silk parser does reject isolated filled regions whose entire
-  plotted bounding width is below 0.15 mm. Regions touching other ink need a
-  union/neck check, so this partial rule does not close the filled-silk gap.
+  height. The parser rejects isolated filled copper and silk regions whose
+  entire plotted bounding width is below their respective 0.10/0.15 mm rules.
+  It evaluates copper per net and layer. A filled region touching a same-net
+  stroke or another region can form a wider union, so the local bounding rule
+  defers it. Separate contours for a hole fail as unsupported; an accepted
+  polygon with a hole or a wide bounding box can still have an interior neck.
+  A union and minimum-neck analysis remains necessary for both layers.
   The board generator now configures a 0.10 mm solder-mask web
   minimum, plus 0.01 mm opening expansion so KiCad's mask-region plot covers
   the pad copper. Saved board packages need regeneration before their receipts
