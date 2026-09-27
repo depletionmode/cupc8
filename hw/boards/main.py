@@ -1184,8 +1184,14 @@ def prepare(board):
     board.Add(v)
     _plane_pads(board)
     nets = _efuse_escapes(board, fp)
+    standby = _standby_preroute(board)
+    _five_volt_bus(board)
+    signal = _spi_ncs6_escape(board)
     _label_keepouts(board)
-    return nets + _standby_preroute(board)
+    # Freerouting reports the wide locked inner-layer +5V trunk as several
+    # unrouted via/slot links even though KiCad already joins R4 and all six
+    # fuse inputs. Check the entire net with KiCad after SES import instead.
+    return nets + standby + signal + ["/+5V"]
 
 
 def _label_keepouts(board):
@@ -1317,6 +1323,268 @@ def _standby_preroute(board):
     v.SetLocked(True)
     board.Add(v)
     return [vin.GetNetname()]
+
+
+def _five_volt_bus(board):
+    """Locked 5 V copper from the eFuse link to the six slot fuses.
+
+    The 7.5 mm B.Cu/In2/In3 bus and three vias at each branch carry the 3 A
+    source current. The nearby +3V3 pull-up vias are moved to the east of
+    this corridor so they cannot cut the bus into narrow copper necks.
+    Geometry is checked here because these power paths must be redrawn if
+    the slot-row or power-part placement changes.
+    """
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def xy(p):
+        pos = p.GetPosition()
+        return to(pos.x), to(pos.y)
+
+    def pad(ref, number):
+        fp = board.FindFootprintByReference(ref)
+        return next(p for p in fp.Pads() if p.GetNumber() == str(number))
+
+    def track(a, b, width, net, layer):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
+        t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
+        t.SetWidth(mm(width))
+        t.SetLayer(layer)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
+
+    def via(at, net):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(pcbnew.VECTOR2I(mm(at[0]), mm(at[1])))
+        v.SetWidth(mm(0.6))
+        v.SetDrill(mm(0.3))
+        v.SetNet(net)
+        v.SetLocked(True)
+        board.Add(v)
+
+    power = pad("R4", "2").GetNet()
+    v3 = pad("R203", "1").GetNet()
+    fuse_y = [xy(pad("F%d00" % n, "1"))[1] for n in range(2, 8)]
+    row_y = [xy(pad("R%d03" % n, "1"))[1] for n in range(2, 8)]
+    sx, sy = xy(pad("R4", "2"))
+    if not (abs(sx - 12.4625) < 0.05 and abs(sy - 152) < 0.05 and
+            all(abs(y - (40.52 + 20.32 * i)) < 0.05 for i, y in enumerate(fuse_y)) and
+            all(abs(y - (44.72 + 20.32 * i)) < 0.05 for i, y in enumerate(row_y))):
+        raise SystemExit("_five_volt_bus: power or slot rows moved; redraw the 5 V copper")
+
+    # The eFuse-to-R4 current initially runs through a 0.5 mm outer track
+    # and a 1 mm inner track. Both can be widened without a DRC clearance
+    # violation; the QFN's 0.3 mm pin escape stays narrow for only 2 mm.
+    tracks = board.Tracks()
+    items = [tracks[i].Cast() for i in range(len(tracks))]
+    widened_f, widened_inner = 0, 0
+    parallel_inner = []
+    for item in items:
+        if item.GetNetname() != "/5V_SYS" or item.Type() != pcbnew.PCB_TRACE_T:
+            continue
+        a, b = item.GetStart(), item.GetEnd()
+        if item.GetLayer() == pcbnew.In3_Cu and abs(to(item.GetWidth()) - 1.0) < 0.01:
+            item.SetWidth(mm(2.0))
+            widened_inner += 1
+            # The R4 pad-side horizontal segment is too near the +5V bus
+            # on In2; the other three fit there as a parallel current path.
+            if not (abs(to(a.y) - 153.875) < 0.01 and abs(to(b.y) - 153.875) < 0.01):
+                parallel_inner.append(((to(a.x), to(a.y)), (to(b.x), to(b.y)), item.GetNet()))
+        elif item.GetLayer() == pcbnew.F_Cu and abs(to(a.y) - 162) < 0.01 and \
+                abs(to(b.y) - 162) < 0.01 and abs(to(a.x - b.x)) > 20:
+            item.SetWidth(mm(1.2))
+            widened_f += 1
+    if (widened_f, widened_inner, len(parallel_inner)) != (1, 4, 3):
+        raise SystemExit("_five_volt_bus: eFuse power pre-route changed; check widths")
+    for a, b, net in parallel_inner:
+        track(a, b, 2.0, net, pcbnew.In2_Cu)
+
+    # ground_fanout gave each IRQ pull-up a +3V3 via at x=4.675. Move only
+    # those six vias and their short traces; the second +3V3 via at x=8.875
+    # remains clear of the 7.5 mm bus at x=4.5.
+    removed = []
+    for item in items:
+        if item.GetNetname() != "/+3V3":
+            continue
+        if item.Type() == pcbnew.PCB_VIA_T:
+            a = item.GetPosition()
+            matches = abs(to(a.x) - 4.675) < 0.01 and any(abs(to(a.y) - row) < 0.01 for row in row_y)
+        elif item.Type() == pcbnew.PCB_TRACE_T:
+            a, b = item.GetStart(), item.GetEnd()
+            matches = any(abs(to(a.y) - row) < 0.01 and abs(to(b.y) - row) < 0.01 for row in row_y) and \
+                {round(to(a.x), 3), round(to(b.x), 3)} == {4.675, 5.675}
+        else:
+            matches = False
+        if matches:
+            removed.append(item)
+    if len(removed) != 12:
+        raise SystemExit("_five_volt_bus: expected six +3V3 pull-up tracks and vias")
+    for item in removed:
+        board.Remove(item)
+    for y in row_y:
+        track((5.675, y), (5.675, y - 2.2), 0.2, v3, pcbnew.F_Cu)
+        track((5.675, y - 2.2), (10.0, y - 2.2), 0.2, v3, pcbnew.F_Cu)
+        via((10.0, y - 2.2), v3)
+
+    for layer in (pcbnew.In2_Cu, pcbnew.B_Cu):
+        track((4.5, fuse_y[0]), (4.5, sy), 7.5, power, layer)
+        track((4.5, sy - 2.5), (14.8, sy - 2.5), 4.0, power, layer)
+        track((14.8, sy - 2.5), (14.8, sy), 4.0, power, layer)
+    # In3 carries a third bus in parallel, but stops north of R4's separate
+    # 5V_SYS via fan-out. Three vias at its south end join the other layers.
+    track((4.5, fuse_y[0]), (4.5, sy - 3.0), 7.5, power, pcbnew.In3_Cu)
+    for x in (3.4, 4.2, 5.0):
+        via((x, sy - 3.0), power)
+    for y in fuse_y:
+        track((3.4, y), (6.1, y), 0.6, power, pcbnew.F_Cu)
+        for x in (3.4, 4.2, 5.0):
+            via((x, y), power)
+    track((sx, sy), (15.6, sy), 0.7, power, pcbnew.F_Cu)
+    for x in (14.0, 14.8, 15.6):
+        via((x, sy), power)
+
+    # The buck's VIN pads are on opposite sides of its six-pin package. A
+    # direct south-side feed to pin 1 and west-side feed to pin 4 avoid the
+    # long 0.5 mm detour the router used on the prior board (28 mOhm to
+    # pin 1). The C5-to-U3 path is under 17 mOhm in the nominal copper model.
+    buck = pad("U2", "6").GetNet()
+    if any(abs(xy(pad("U3", p))[i] - expect) > 0.05 for p, coords in
+           (("1", (39.15, 160.95)), ("4", (36.85, 159.05)))
+           for i, expect in enumerate(coords)):
+        raise SystemExit("_five_volt_bus: buck moved; redraw the VIN feeds")
+    for a, b, width in (
+            ((34.0, 162.0), (34.0, 163.0), 1.0),
+            ((34.0, 163.0), (40.0, 163.0), 1.0),
+            ((40.0, 163.0), (40.0, 160.95), 0.5),
+            ((40.0, 160.95), (39.15, 160.95), 0.5),
+            ((34.0, 160.775), (35.5, 160.775), 0.5),
+            ((35.5, 160.775), (35.5, 159.05), 0.5),
+            ((35.5, 159.05), (36.85, 159.05), 0.4)):
+        track(a, b, width, buck, pcbnew.F_Cu)
+
+
+def _spi_ncs6_escape(board):
+    """Route the short FPGA-to-R43 net at the board's 0.1 mm minimum.
+
+    Freerouting narrowed three pieces of this net to 0.075 mm despite the
+    DenseSignal class's 0.1 mm rule. Its 0.1 mm geometry passes KiCad's
+    copper DRC; locking the entire short net keeps the generated board at
+    JLC's allowed width rather than relying on a post-route width repair.
+    """
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    def pad(ref, number):
+        return next(p for p in board.FindFootprintByReference(ref).Pads()
+                    if p.GetNumber() == number)
+    a, b = pad("U7", "74"), pad("R43", "1")
+    if a.GetNetname() != "/SPI_nCS6_SRC" or b.GetNetname() != a.GetNetname() or \
+            abs(to(a.GetPosition().x) - 111.95) > 0.05 or \
+            abs(to(a.GetPosition().y) - 57.25) > 0.05 or \
+            abs(to(b.GetPosition().x) - 114.203) > 0.05 or \
+            abs(to(b.GetPosition().y) - 58.455) > 0.05:
+        raise SystemExit("_spi_ncs6_escape: FPGA/R43 moved; redraw the 0.1 mm escape")
+    points = ((111.95, 57.25), (112.9892, 57.25), (113.199, 57.4598),
+              (113.7807, 57.4598), (114.203, 57.8821), (114.203, 58.455))
+    for start, end in zip(points, points[1:]):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(mm(start[0]), mm(start[1])))
+        t.SetEnd(pcbnew.VECTOR2I(mm(end[0]), mm(end[1])))
+        t.SetWidth(mm(0.1))
+        t.SetLayer(pcbnew.F_Cu)
+        t.SetNet(a.GetNet())
+        t.SetLocked(True)
+        board.Add(t)
+    return [a.GetNetname()]
+
+
+def _finish_route(board):
+    """Repair the few fixed-power escapes left by the salt-1 SES import.
+
+    The +5V trunk already joins all six slot inputs, but the router omitted
+    its CPU-card load and R9. The VBUS_F standby spur likewise stops at C16.
+    Restore these with fixed copper, move the In2 VBUS_F branch away from
+    U3's GND via, and trim three south-end bus taps back inside the edge.
+    Every edit is checked against the expected route geometry; KiCad DRC and
+    connectivity run on the result before any pour or fabrication output.
+    """
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def point(xy):
+        return pcbnew.VECTOR2I(mm(xy[0]), mm(xy[1]))
+
+    def track(a, z, width, layer, name):
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(point(a))
+        t.SetEnd(point(z))
+        t.SetWidth(mm(width))
+        t.SetLayer(layer)
+        t.SetNet(board.FindNet(name))
+        board.Add(t)
+
+    def via(at, width, drill, name):
+        v = pcbnew.PCB_VIA(board)
+        v.SetPosition(point(at))
+        v.SetWidth(mm(width))
+        v.SetDrill(mm(drill))
+        v.SetNet(board.FindNet(name))
+        board.Add(v)
+
+    # +5V J2 load and C42 were left separate from the pre-routed slot trunk.
+    track((7.225, 20.6), (4.5, 20.6), 0.5, pcbnew.F_Cu, "/+5V")
+    via((4.5, 20.6), 1.0, 0.5, "/+5V")
+    track((4.5, 20.6), (4.5, 40.52), 3.0, pcbnew.B_Cu, "/+5V")
+    # R9 supplies only the LED. In3 goes around the CPU socket's PTH pads,
+    # the mounting hole, and the LED_PWR via at (7.825, 2.0161).
+    for a, z in zip(((4.5, 20.6), (7.225, 20.6), (7.225, 3.5),
+                     (10.0, 3.5), (10.0, 1.5), (68.5, 1.5), (68.5, 8.725)),
+                    ((7.225, 20.6), (7.225, 3.5), (10.0, 3.5),
+                     (10.0, 1.5), (68.5, 1.5), (68.5, 8.725))):
+        track(a, z, 0.5, pcbnew.In3_Cu, "/+5V")
+    via((68.5, 8.725), 0.6, 0.3, "/+5V")
+    track((68.5, 8.725), (67.5, 8.725), 0.5, pcbnew.F_Cu, "/+5V")
+    # Restore the standby regulator's VBUS_F input from its C16 via.
+    for a, z in zip(((4.425, 158.0), (4.425, 168.5), (17.2, 168.5)),
+                    ((4.425, 168.5), (17.2, 168.5), (17.2, 166.56))):
+        track(a, z, 0.5, pcbnew.In3_Cu, "/VBUS_F")
+
+    tracks = board.Tracks()
+    items = [tracks[i] for i in range(len(tracks))]
+    xy = lambda p: (round(to(p.x), 4), round(to(p.y), 4))
+    widened = narrowed = removed = 0
+    for t in items:
+        if t.GetClass() != "PCB_TRACK":
+            continue
+        ends = xy(t.GetStart()), xy(t.GetEnd())
+        if t.GetNetname() == "/CPU_RW" and t.GetWidth() == mm(0.075):
+            t.SetWidth(mm(0.1))
+            widened += 1
+        if t.GetNetname() == "/+5V" and t.GetWidth() == mm(7.5) and ends in (
+                ((4.5, 152.0), (3.4, 149.0)), ((4.5, 149.0), (3.4, 149.0))):
+            t.SetWidth(mm(1.0))
+            narrowed += 1
+        if t.GetNetname() == "/VBUS_F" and t.GetLayer() == pcbnew.In2_Cu and ends in (
+                ((43.0435, 155.3241), (38.0643, 160.3033)),
+                ((38.0643, 160.3033), (37.4225, 160.3033))):
+            board.Remove(t)
+            removed += 1
+    # Freerouting sometimes rejoins the southern bus via at x=5.0 (inside
+    # the outline) and sometimes at x=3.4 (the three overwide taps). Both
+    # variants have the same electrical trunk; only the latter needs trim.
+    if widened != 2 or narrowed not in (0, 3) or removed != 2:
+        raise RuntimeError("_finish_route: expected CPU_RW/bus/VBUS_F geometry (2,0-or-3,2); found %s" %
+                           ((widened, narrowed, removed),))
+    # U3:2 has a small F.Cu GND island. The standard through via's drill is
+    # completely outside its solder pad, and the lead reaches the In1 plane.
+    track((39.15, 160.0), (38.3, 160.0), 0.2, pcbnew.F_Cu, "/GND")
+    via((38.3, 160.0), 0.6, 0.3, "/GND")
+    for a, z in zip(((43.0435, 155.3241), (43.0435, 159.2),
+                     (36.5, 159.2), (36.5, 160.3033)),
+                    ((43.0435, 159.2), (36.5, 159.2),
+                     (36.5, 160.3033), (37.4225, 160.3033))):
+        track(a, z, 0.5, pcbnew.In2_Cu, "/VBUS_F")
 
 
 def _efuse_escapes(board, fp):
@@ -1516,6 +1784,7 @@ def main():
                        zone_min_width=0.3,          # at 0.25 KiCad's fill left a 0.063 mm plane neck
                        fanout_margin=FANOUT_MARGIN,
                        prepare=prepare,
+                       post_route=_finish_route,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
                        boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)

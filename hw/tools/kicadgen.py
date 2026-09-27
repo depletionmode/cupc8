@@ -2623,7 +2623,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
-             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=()):
+             fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=(),
+             post_route=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2640,6 +2641,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     would otherwise scatter). The nets it returns, if any, are finger escapes
     of its own, which Freerouting may report open: they are checked on KiCad's
     connectivity after routing, as the key-notch escapes are.
+
+    `post_route(board)`, if given, makes deterministic board-specific copper
+    corrections after SES import and before connectivity/DRC checks and pours.
 
     `logo_keepout`: no tracks or vias on the copper under the logo (silk_keepout),
     and the silkscreen step fails on any there.
@@ -2752,6 +2756,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             except RuntimeError as e:        # nets left unrouted: the next round's orderings
                 open_nets, too_close = [str(e)], []
                 continue
+            if post_route:
+                post_route(state["b"])
             open_nets = open_escapes(state["b"], escaped)
             too_close = []
             if not open_nets:
