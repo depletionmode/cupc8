@@ -766,7 +766,21 @@ must_fail = ["FAIL: net config ip IP MASK GW"]
 [[bug]]
 name = "assembler: any line with a lower-case \"db\" (or \"resb\") in it was taken for data (a %define of $10db, an address, a comment)"
 fixed_in = "2149249"
-revert = [["tools/as.py", """            if directive == 'resb':""", """            if l.find('resb') > -1:"""],
+# The old substring check ran before a later fix began stripping comments.
+# Restore that ordering too, so the comment counterexample is still exercised.
+revert = [["tools/as.py", """            # Strip comments before interpreting labels or variable references.
+            # A semicolon inside a quoted string is data.
+            quoted = escaped = False
+            for i, char in enumerate(l):
+                if char == '"' and not escaped:
+                    quoted = not quoted
+                if char == ';' and not quoted:
+                    l = l[:i].rstrip() + '\\n'
+                    break
+                escaped = char == '\\\\' and not escaped
+
+""", """"""],
+          ["tools/as.py", """            if directive == 'resb':""", """            if l.find('resb') > -1:"""],
           ["tools/as.py", """            if directive == 'db':""", """            if l.find('db') > -1:"""]]
 cmd = "python3 test/asm/test_asm.py"
 must_fail = ["FAIL '%define ADDR $10db", "FAIL 'b $10db'", "FAIL 'ld r0, $6fdb'", "FAIL 'mov r0, #1"]
@@ -1118,11 +1132,11 @@ must_fail = ["FAIL: too big for $7000-$bfff: no delay"]
 [[bug]]
 name = "kernel: the terminal's hook ran BASIC with API_RUN 0, so cupc8.py run could write a program over the running interpreter"
 fixed_in = "1cc9bbd"
-revert = [["kernel/term.s", """term_hook:
+revert = [["kernel/term.s", """	b sys_upload_wait
 	push r0
 	mov r0, #2
 	st API_RUN, r0
-""", """term_hook:
+""", """	b sys_upload_wait
 	push r0
 """]]
 cmd = "tools/run_tests.sh testBasicReload"
