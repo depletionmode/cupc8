@@ -17,6 +17,11 @@
 ; Run- exec "HTTPD.PRG" from the SD card (INDEX.HTM next to it), e.g.
 ; tools/sim --slots hdmi,io,wifi,storage --sd card.img; then browse to
 ; http://localhost:8080/ (the simulator's Wi-Fi card uses the host's sockets).
+; Native emulator: kernel/emulate.sh --slots hdmi,io,storage,wifi --sd card.img
+;   --forward tcp:18080:8080
+; Then run HTTPD.PRG on the machine and open http://127.0.0.1:18080/ on the
+; host. The card's 10.0.2.15 address is private to QEMU; the forward exposes
+; its port 8080 on the host's port 18080.
 
 %define HTTP_PORT_LO 144
 %define HTTP_PORT_HI 31

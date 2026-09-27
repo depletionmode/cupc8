@@ -1093,10 +1093,10 @@ when isMainModule:
 
 The Milestone 1 machine (the default): reset runs the boot ROM, which loads
 the kernel from the ROM chip; the slot cards run the real card firmware cores.
-  --cards:LIST      slot cards, slots 1.. in order (default hdmi,io); kinds:
+  --slots LIST      slot cards, slots 1.. in order (default hdmi,io); kinds:
                     """ & CardKindNames & """
 
-  --sd:IMAGE        the storage card's SD card: a FAT image (a blank 32 MB one
+  --sd IMAGE        the storage card's SD card: a FAT image (a blank 32 MB one
                     is made if the file does not exist)
   --rom:FILE        boot this ROM image (default: built from rom/boot.s and
                     kernel.o, or from kernel/ when no kernel.o is given)
@@ -1166,7 +1166,15 @@ Both:
         result.add(if t[i] == '\n': '\r' else: t[i])
       inc i
 
-  var p = initOptParser()
+  # Match the native viewer's --slots LIST / --sd IMAGE spelling. All other
+  # existing value options may still use Nim's colon syntax.
+  for arg in commandLineParams():
+    if arg.startsWith("--cards") or arg.startsWith("--slots:") or
+        arg.startsWith("--slots=") or arg.startsWith("--sd:") or arg.startsWith("--sd="):
+      stderr.writeLine("sim: use --slots LIST --sd IMAGE (see --help)")
+      quit(2)
+  var p = initOptParser(commandLineParams(),
+                        longNoVal = @["headless", "trace", "legacy", "console", "help"])
   for kind, key, val in p.getopt():
     case kind
     of cmdArgument:
@@ -1191,9 +1199,15 @@ Both:
         dumpWindow = val
       of "legacy":
         legacy = true
-      of "cards":
+      of "slots":
+        if val.len == 0 or val.startsWith("-"):
+          stderr.writeLine("sim: --slots needs a card list")
+          quit(2)
         cardList = val
       of "sd":
+        if val.len == 0 or val.startsWith("-"):
+          stderr.writeLine("sim: --sd needs an image path")
+          quit(2)
         sdPath = val
       of "rom":
         romPath = val
@@ -1328,7 +1342,7 @@ Both:
     machineCards(kinds)
     if sdPath.len > 0:
       if CardStorage notin kinds:
-        die("--sd needs a storage card in --cards")
+        die("--sd needs a storage card in --slots")
       if not fileExists(sdPath):
         try:
           makeFatImage(sdPath)

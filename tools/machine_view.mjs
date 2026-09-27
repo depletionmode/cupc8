@@ -74,8 +74,8 @@ environment:
   process.exit(0);
 }
 
-// The instruction-level simulator uses --cards:LIST and --sd:IMAGE. Reject
-// those spellings here: otherwise the native viewer quietly uses hdmi,io.
+// Old simulator commands used --cards:LIST and --sd:IMAGE. Reject those
+// spellings here: otherwise the native viewer quietly uses hdmi,io.
 const flags = new Set(['--native', '--console']);
 const values = new Set(['--slots', '--sd', '--forward', '--every', '--port', '--console-port']);
 for (let i = 2; i < process.argv.length; i++) {

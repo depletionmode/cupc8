@@ -16,12 +16,15 @@ DEFAULTS="$SRC/sdkconfig.defaults"
 [ "$VARIANT" = qemu ] && DEFAULTS="$DEFAULTS;$SRC/sdkconfig.qemu"
 LOG=$OUT.log
 mkdir -p "$ROOT/build"
+# Two emulator starts must not delete each other's sdkconfig while IDF builds.
+exec 9>"$ROOT/build/esp32c3-$VARIANT.lock"
+flock -x 9
 # the defaults only apply to a fresh sdkconfig: a stale one in $OUT would
 # silently keep old settings (it kept CONFIG_LWIP_SO_RCVBUF off after the
 # defaults turned it on), so the image is always built from the defaults
 rm -f "$OUT/sdkconfig"
 if ! idf.py -C "$SRC" -B "$OUT" -D SDKCONFIG="$OUT/sdkconfig" -D SDKCONFIG_DEFAULTS="$DEFAULTS" build > "$LOG" 2>&1; then
-	grep -E "error|Error|FAILED" "$LOG" | head -30
+	grep -aEn -m 30 "error|Error|FAILED" "$LOG" || tail -30 "$LOG"
 	exit 1
 fi
 if [ "$VARIANT" = qemu ]; then

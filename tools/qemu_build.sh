@@ -18,6 +18,9 @@ KEY=$( (echo $COMMIT; cat "$PATCH") | sha256sum | cut -c1-12)
 OUT=$SDK/qemu-esp-lockstep/$KEY
 BIN=$OUT/bin/qemu-system-riscv32
 
+mkdir -p "$SDK/qemu-esp-lockstep"
+exec 9>"$SDK/qemu-esp-lockstep/build.lock"
+flock -x 9
 if [ ! -x "$BIN" ]; then
 	SRC=$SDK/qemu-esp-src
 	if [ ! -d "$SRC/.git" ]; then

@@ -20,4 +20,23 @@ step() {   # run a build step quietly; on failure show its output and stop
 step bash -c "cd '$here' && ./assemble.sh"
 step "$root/tools/fw_rp2040.sh"
 step "$root/tools/emu_machine_build.sh"
+# Wi-Fi uses the ESP32-C3's real firmware in our patched lockstep QEMU.
+# Build these only when that card is selected; both scripts reuse cached work.
+need_wifi=0
+want_slots=0
+for arg in "$@"; do
+  if (( want_slots )); then
+    IFS=, read -ra kinds <<< "$arg"
+    for kind in "${kinds[@]}"; do
+      if [[ "$kind" == wifi ]]; then need_wifi=1; fi
+    done
+    want_slots=0
+  elif [[ "$arg" == --slots ]]; then
+    want_slots=1
+  fi
+done
+if (( need_wifi )); then
+  step "$root/tools/fw_esp32c3.sh" qemu
+  step "$root/tools/qemu_build.sh"
+fi
 exec node "$root/tools/machine_view.mjs" --native "$@"
