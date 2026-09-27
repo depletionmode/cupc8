@@ -9,6 +9,7 @@
   "straight_control": false,
   "fixed_window": true,
   "max_steps": 126000,
+  "solver_threads": 4,
   "pml_clearance_mm": 1.0,
   "air_bounds_mm": [
     23.5,

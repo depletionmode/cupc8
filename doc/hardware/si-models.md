@@ -10,8 +10,8 @@ The selected [JLC04161H-7628 stackup](https://jlcpcb.com/impedance) puts 0.2104 
 
 This is a subset, not `GC-007`. The pairs are solved separately, so inter-pair coupling is absent. Exact pad and HDMI connector metal, solder mask, finite copper and dielectric loss, and source/sink behavior are also absent. The reported S21 therefore cannot certify the real insertion-loss budget, and S11 includes the model's launch discontinuities. The script's `--straight-control` option keeps the same ports and endpoints while replacing bends and width changes with straight 0.2 mm tracks; a mesh/port sensitivity run is still needed before using the model to judge impedance. `GC-007` and the row 4.6 system gate remain pending.
 
-To audit the corrected geometry after building the GPU board, then run the
-bounded D0 comparison:
+To audit the corrected geometry after building the GPU board, then repeat
+the bounded four-pair subset:
 
 ```sh
 for pair in d0 d1 d2 ck; do
@@ -21,7 +21,12 @@ for pair in d0 d1 d2 ck; do
 done
 python3 hw/si/openems_gpu_d0.py --pair d0 --board build/hw/gpu/gpu.kicad_pcb \
   --out build/hw/si/gpu-d0-pml-fixed.json --pml-clearance-mm 1 \
-  --fixed-window --max-steps 126000 --require-evidence
+  --fixed-window --max-steps 126000 --threads 4 --require-evidence
+for pair in d1 d2 ck; do
+  python3 hw/si/openems_gpu_d0.py --pair "$pair" --board build/hw/gpu/gpu.kicad_pcb \
+    --out "build/hw/si/gpu-$pair-pml-fixed.json" --pml-clearance-mm 1 \
+    --fixed-window --max-steps 126000 --threads 1 --require-evidence
+done
 ```
 
 On a fresh, provenance-checked GPU board (SHA-256 `95fa5811164a2fb367d8bf085ae1cfb91ced5320b8bb77a9227961c85535c9fa`), the original lumped-port boxes extending from z=-0.05 to +0.05 mm reached -40.06 dB in 87,200 steps on openEMS v0.37.0-rc3-1-g65f8771. At 1.26 GHz they gave S11 -10.66 dB and S21 -0.26 dB, but their squared magnitudes summed to 1.027414, violating passive two-port power balance by 2.74%. The unexcited port had |uf_inc,2/uf_inc,1| about 0.18 and measured -U2/I2 about 145.4 Ω across 0.1–1.26 GHz, despite a declared 100 Ω load. Those data fail the new validity gates.
@@ -73,9 +78,26 @@ passive-port checks pass. At 1.26 GHz, S11 is −20.6154 dB, S21 is
 reproduced byte-identical XML (SHA-256
 `6c60b4d3ed307a0034b710f4e3ac8a72e74d6f77877f79fdc695b093bb5c084c`)
 and `valid_for_si_evidence: true` for this **D0 routed-copper subset**.
-`SI-003` remains open for D1, D2 and CK on boundary-safe grids, as well as
-mesh sensitivity. `GC-007` and row 4.6 still require coupling, physical
-losses, pads, connector and source/sink behavior.
+
+The same provenance-checked GPU board then completed PML-safe fixed-window
+runs for D1, D2 and CK. Each used one solver thread, a 126,000-step cap,
+the same 12.03 ns duration and a 133×227×34 grid. Saved-field
+postprocessing reproduced byte-identical XML for every pair. The
+[four-pair summary](si-evidence/gpu-four-pair-summary.json) links each full
+report and its board, XML and run-log hashes:
+
+| Pair | Final field energy | Maximum 8–12 ns drift | S11 at 1.26 GHz | S21 at 1.26 GHz | Power sum |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| D0 | −95.01 dB | 0.000023 dB | −20.615 dB | −0.03775 dB | 1.000024 |
+| D1 | −95.24 dB | 0.000081 dB | −20.604 dB | −0.03779 dB | 1.000038 |
+| D2 | −96.08 dB | 0.000123 dB | −20.178 dB | −0.04169 dB | 1.000045 |
+| CK | −96.30 dB | 0.000045 dB | −20.383 dB | −0.03983 dB | 1.000027 |
+
+All four pass the model's PML, −40 dB field, 0.05 dB spectral, passive
+power and passive-port checks. This closes `SI-003` for its stated four
+**independent routed-copper pairs**. It does not close `GC-007` or row 4.6:
+pair coupling, mesh and port sensitivity, finite loss, pads, connector metal
+and source/sink behavior remain unmodeled.
 
 ## IO card USB field model
 

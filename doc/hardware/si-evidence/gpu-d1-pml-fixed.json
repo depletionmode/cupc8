@@ -1,0 +1,161 @@
+{
+  "scope": "GPU HDMI D1 P/N, source resistor output to connector; partial 4.6 evidence",
+  "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+  "stackup": "JLC04161H-7628",
+  "prepreg_mm": 0.2104,
+  "dielectric_er": 4.4,
+  "model": "lossless dielectric, PEC copper, rectangular L2 GND, no pads/mask/connector",
+  "port_geometry": "100-ohm differential lumped ports in the z=0 copper plane",
+  "straight_control": false,
+  "fixed_window": true,
+  "max_steps": 126000,
+  "solver_threads": 1,
+  "pml_clearance_mm": 1.0,
+  "air_bounds_mm": [
+    21.2,
+    27.8,
+    -36.5,
+    -25.2
+  ],
+  "material_bounds_mm": [
+    22.2,
+    26.8,
+    -35.5,
+    -26.2
+  ],
+  "pml_inner_bounds_mm": [
+    [
+      21.6,
+      27.4
+    ],
+    [
+      -36.1,
+      -25.6
+    ],
+    [
+      -1,
+      1.5
+    ]
+  ],
+  "pml_geometry_ok": true,
+  "energy_decay_db": -95.24,
+  "converged": true,
+  "spectral_stability_ok": true,
+  "port_window_audit": {
+    "frequency_windows": [
+      {
+        "frequency_hz": 100000000,
+        "s11_db_12ns": -42.29895832383622,
+        "s21_db_12ns": -0.0010749712391295045,
+        "drift_8_to_12ns_db": {
+          "s11": 8.116965591794686e-05,
+          "s21": 7.126748000687525e-07
+        }
+      },
+      {
+        "frequency_hz": 480000000,
+        "s11_db_12ns": -28.72848964334227,
+        "s21_db_12ns": -0.006021386968704002,
+        "drift_8_to_12ns_db": {
+          "s11": 2.093084453339766e-06,
+          "s21": 9.981490673273964e-08
+        }
+      },
+      {
+        "frequency_hz": 800000000,
+        "s11_db_12ns": -24.367450956684188,
+        "s21_db_12ns": -0.015664748074916895,
+        "drift_8_to_12ns_db": {
+          "s11": 1.3071186099242084e-07,
+          "s21": 3.2417852434610566e-08
+        }
+      },
+      {
+        "frequency_hz": 1260000000,
+        "s11_db_12ns": -20.603615458069623,
+        "s21_db_12ns": -0.037792471816167746,
+        "drift_8_to_12ns_db": {
+          "s11": 1.6294869903840792e-07,
+          "s21": 1.6621751898410626e-08
+        }
+      }
+    ],
+    "limit_db": 0.05
+  },
+  "passivity_ok": true,
+  "passivity_tolerance": 0.001,
+  "maximum_passivity_excess": 5.76496029320861e-05,
+  "port_consistency_ok": true,
+  "valid_for_si_evidence": true,
+  "passive_port_incident_tolerance": 0.01,
+  "solver_version": "v0.37.0-rc3-1-g65f8771",
+  "timesteps": 126000,
+  "last_energy_sample_step": 126000,
+  "simulated_ns": 12.0328866,
+  "run_log_sha256": "57062694071fcd1a1dc7d531cc99af55ab4a50e0f869abd0873758a488481ea6",
+  "xml_sha256": "d2a3695dbe9de5b44dd6deb1bc70d4851bfccc5ef7b175b81cc64369eddcda18",
+  "routes": {
+    "/HD_D1P": {
+      "segments": 12,
+      "length_mm_sum": 6.5666,
+      "widths_mm": [
+        0.12,
+        0.15,
+        0.2
+      ]
+    },
+    "/HD_D1N": {
+      "segments": 8,
+      "length_mm_sum": 6.4575,
+      "widths_mm": [
+        0.2
+      ]
+    }
+  },
+  "results": [
+    {
+      "frequency_hz": 100000000,
+      "s11_db": -42.298959142443806,
+      "s21_db": -0.0010749763945182562,
+      "s11_s21_power_sum": 0.9998114066488492,
+      "passive_port_incident_ratio": 3.0155639922076614e-05,
+      "passive_port_load_ohm": [
+        99.99982340144619,
+        -0.006029283383356206
+      ]
+    },
+    {
+      "frequency_hz": 480000000,
+      "s11_db": -28.72848962415995,
+      "s21_db": -0.006021379681501375,
+      "s11_s21_power_sum": 0.9999546294785536,
+      "passive_port_incident_ratio": 0.0001438433188950875,
+      "passive_port_load_ohm": [
+        99.99924575000944,
+        -0.028778623668352106
+      ]
+    },
+    {
+      "frequency_hz": 800000000,
+      "s11_db": -24.367451035273795,
+      "s21_db": -0.015664749619152717,
+      "s11_s21_power_sum": 1.000057649602932,
+      "passive_port_incident_ratio": 0.00023799564657902612,
+      "passive_port_load_ohm": [
+        99.99796693394283,
+        -0.0476412066999453
+      ]
+    },
+    {
+      "frequency_hz": 1260000000,
+      "s11_db": -20.603615462166964,
+      "s21_db": -0.03779246806497197,
+      "s11_s21_power_sum": 1.0000381040025204,
+      "passive_port_incident_ratio": 0.0003721661400159689,
+      "passive_port_load_ohm": [
+        99.99488672356901,
+        -0.07458080969353532
+      ]
+    }
+  ]
+}
