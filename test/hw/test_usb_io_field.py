@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/tools'))
 sys.path.insert(0, str(ROOT / 'hw/si'))
 from kicadgen import dump, find1, parse
-from openems_usb_io import routed_pair, validate_series
+from openems_usb_io import routed_pair, signal_path_length, validate_series
 
 
 def main():
@@ -21,7 +21,9 @@ def main():
     validate_series(netlist)
     routes, endpoints = routed_pair(args.board)
     lengths = {net: sum(math.dist(a, b) for a, b, _ in parts) for net, parts in routes.items()}
+    paths = {net: signal_path_length(parts, *endpoints[net]) for net, parts in routes.items()}
     assert all(length > 0 for length in lengths.values())
+    assert all(0 < paths[net] <= lengths[net] for net in routes)
     with tempfile.TemporaryDirectory(prefix='cupc8-usb-open-') as temporary:
         board = parse(args.board.read_text())
         start = endpoints['/USB_CONN_DP'][0]
@@ -52,7 +54,9 @@ def main():
             assert 'lacks 27-ohm series' in str(error), str(error)
         else:
             raise AssertionError('wrong USB D- resistor escaped netlist check')
-    print(f"USB IO D+ {lengths['/USB_CONN_DP']:.3f} mm, D- {lengths['/USB_CONN_DM']:.3f} mm; open-track and wrong-series mutants rejected")
+    print(f"USB IO signal paths D+ {paths['/USB_CONN_DP']:.3f} mm, "
+          f"D- {paths['/USB_CONN_DM']:.3f} mm; total copper includes ESD branches. "
+          'Open-track and wrong-series mutants rejected')
 
 
 if __name__ == '__main__':

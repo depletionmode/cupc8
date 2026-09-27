@@ -37,8 +37,11 @@ checks the sibling exported KiCad netlist for both RP2040-to-J2 series paths
 and records its SHA-256. It verifies the four pad nets, direct copper
 connectivity, 0.2 mm track width, and absence of vias or layer changes. An
 open D+ segment and a wrong D− resistor value are rejected by
-`test/hw/test_usb_io_field.py`. On the current routed-card snapshot, D+ is
-12.821 mm and D− is 27.045 mm. The model includes their ESD stubs and a
+`test/hw/test_usb_io_field.py`. On the current routed-card snapshot, total
+copper including ESD branches is 12.821 mm on D+ and 27.045 mm on D−. The
+actual resistor-to-connector paths are **9.407 and 20.101 mm**, respectively:
+the signal-path mismatch is 10.694 mm, not the 14.224 mm difference between
+the total copper sums. The model includes their ESD stubs and a
 rectangular In1.Cu ground plane with the [JLC04161H-7628 stackup](https://jlcpcb.com/impedance).
 It omits exact pad and connector metal, ESD-device capacitance, copper and
 dielectric loss, solder mask, and the ground plane's local antipads.
@@ -56,10 +59,37 @@ The script exits nonzero and writes `converged: false` and
 source and receiver USB PHY behavior, the system card's USB-C path and final
 main-board route remain required for `MB-007` and row 4.6.
 
+`hw/si/usb_port_audit.py` checks the saved openEMS voltage/current traces
+without changing that −40 dB criterion. The 220,000-step run reached a best
+global field energy of −38.68 dB and then rose to −38.41 dB. In its final
+nanosecond, the four port traces are −89.6 dB or lower relative to their own
+peaks, but the 100 MHz S11 magnitude changes by 0.281 dB when the Fourier
+window grows from 12 to 16 ns. The corresponding 240 and 480 MHz changes are
+0.018 and 0.005 dB. A quiet port tail therefore does **not** substitute for
+field convergence here. The late field could be a weakly coupled resonance or
+a boundary/mesh artifact; the current data do not distinguish them. A new
+model with measured material loss or an audited boundary/mesh change must
+still satisfy the original −40 dB threshold and a window-stability check.
+[openEMS describes the global energy end criterion and the long decay of
+low-loss resonances](https://docs.openems.de/en/latest/concepts/simulation.html),
+and documents the raw port traces used by this audit in its
+[S-parameter guide](https://docs.openems.de/en/latest/concepts/postproc/sparams.html).
+
+The [RP2040 datasheet](https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)
+specifies a full/low-speed host, not a 480 Mb/s high-speed host. The
+[USB-IF states that full-speed edges are typically 12–25 ns](https://www.usb.org/node/214).
+At an assumed PCB delay of 5–7 ps/mm, the measured 10.694 mm path difference
+implies roughly 53–75 ps skew: about 0.064–0.090% of the 83.3 ns full-speed
+bit time and 0.21–0.62% of those typical edge times. This makes the mismatch
+a relatively small *timing* risk for this port, while ESD loading, impedance,
+common-mode conversion, and the complete cable/PHY path still need evidence.
+
 ```sh
 python3 test/hw/test_usb_io_field.py --board build/hw/io/io.kicad_pcb
 python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
   --out build/hw/si/usb-io.json --require-evidence
+python3 hw/si/usb_port_audit.py --simdir build/hw/si/usb-io-openems \
+  --out build/hw/si/usb-io-port-audit.json
 ```
 
 ## IBIS specification and pinned FPGA model

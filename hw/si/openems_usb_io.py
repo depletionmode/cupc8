@@ -8,6 +8,7 @@ before the S-parameters can support the 90-ohm row-4.6 gate.
 """
 import argparse
 import hashlib
+import heapq
 import json
 import math
 import os
@@ -98,6 +99,28 @@ def routed_pair(board):
         if stop not in seen:
             raise ValueError(f'{net}: R14/R15 to J2 copper is disconnected')
     return routes, endpoints
+
+
+def signal_path_length(segments, start, stop):
+    """Shortest resistor-to-connector track length, excluding ESD branches."""
+    graph = {}
+    for a, b, _ in segments:
+        length = math.dist(a, b)
+        graph.setdefault(a, []).append((b, length))
+        graph.setdefault(b, []).append((a, length))
+    distance, queue = {start: 0.0}, [(0.0, start)]
+    while queue:
+        length, point = heapq.heappop(queue)
+        if point == stop:
+            return length
+        if length > distance[point]:
+            continue
+        for other, step in graph.get(point, []):
+            proposed = length + step
+            if proposed < distance.get(other, math.inf):
+                distance[other] = proposed
+                heapq.heappush(queue, (proposed, other))
+    raise ValueError('USB signal path disconnected')
 
 
 def validate_series(netlist):
@@ -212,7 +235,8 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
             'valid_for_diagnostic_sparams': valid,
             'valid_for_row_4_6': False,
             'routes': {net: {'segments': len(parts),
-                             'length_mm_sum': round(sum(math.dist(a, b) for a, b, _ in parts), 4)}
+                             'length_mm_sum': round(sum(math.dist(a, b) for a, b, _ in parts), 4),
+                             'signal_path_mm': round(signal_path_length(parts, *endpoints[net]), 4)}
                        for net, parts in routes.items()},
             'results': [{'frequency_hz': int(f), 's11_db': float(20*np.log10(abs(a))),
                          's21_db': float(20*np.log10(abs(b))),
