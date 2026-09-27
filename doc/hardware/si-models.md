@@ -92,6 +92,32 @@ energy decay, but a converged field alone has not stabilized the
 low-frequency reflection result. The full USB SI gate remains open. Reproduce
 the one-box change with `--boundary-margin-mm 1` and a separate output file.
 
+A geometry audit found a specific boundary error in both historical USB
+models. [openEMS defines `PML_8` as the nearest eight mesh cells and says
+structures should stay out of those cells](https://docs.openems.de/en/latest/concepts/bc.html).
+The old rectangular dielectric and ground plane touch every x/y simulation
+boundary, including after `--boundary-margin-mm 1`, because that option moves
+the material edges with the PML. The legacy 18-line z mesh puts the L2 plane
+inside the lower PML and the z=0 copper at the upper PML's inner edge.
+Consequently the −40 dB result from the expanded box cannot isolate a
+physical resonance from a boundary artifact. The runner now records
+`pml_geometry_ok` and requires it before accepting diagnostic S-parameters.
+
+`--pml-clearance-mm 1` creates a separate air/PML box while leaving the
+routed copper, dielectric and L2 plane at their original coordinates. Its
+x/y regular grid stays registered to the original ROI; the requested 1 mm
+clearance rounds outward to whole 0.075 mm cells. Eight extra z lines on
+each side remove the ground and top copper from `PML_8`. A provenance-checked
+geometry-only run on IO board SHA-256
+`2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c`
+reports `pml_geometry_ok: true`, with air bounds
+`(33.45, 44.55, -35.55, -17.475)` mm and fixed material bounds
+`(34.5, 43.5, -34.5, -18.5)` mm. The legacy geometry reports false. This
+is a corrected comparison model, **not** a converged SI result: the new
+geometry has not yet been run to −40 dB or passed the 12–16 ns spectral
+stability audit. Its 150×243×34 grid is about 2.6 times the legacy cell
+count, so an FDTD run should use an explicit bounded `--max-steps` value.
+
 The [RP2040 datasheet](https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)
 specifies a full/low-speed host, not a 480 Mb/s high-speed host. The
 [USB-IF states that full-speed edges are typically 12–25 ns](https://www.usb.org/node/214).
@@ -107,6 +133,13 @@ python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
   --out build/hw/si/usb-io.json --require-evidence
 python3 hw/si/usb_port_audit.py --simdir build/hw/si/usb-io-openems \
   --out build/hw/si/usb-io-port-audit.json
+python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
+  --out build/hw/si/usb-io-pml-geometry.json --pml-clearance-mm 1 \
+  --geometry-only --require-evidence
+# Bounded follow-up field run; the script still rejects unstable spectra.
+python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
+  --out build/hw/si/usb-io-pml.json --pml-clearance-mm 1 \
+  --max-steps 220000 --require-evidence
 ```
 
 ## IBIS specification and pinned FPGA model

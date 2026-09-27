@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/tools'))
 sys.path.insert(0, str(ROOT / 'hw/si'))
 from kicadgen import dump, find1, parse
-from openems_usb_io import routed_pair, signal_path_length, validate_series
+from openems_usb_io import (PML_CELLS, PREPREG_MM, ROI, Z_LINES, cleared_axis,
+                            cleared_z_lines, routed_pair, signal_path_length,
+                            validate_series)
 
 
 def main():
@@ -24,6 +26,18 @@ def main():
     paths = {net: signal_path_length(parts, *endpoints[net]) for net, parts in routes.items()}
     assert all(length > 0 for length in lengths.values())
     assert all(0 < paths[net] <= lengths[net] for net in routes)
+    # The airbox keeps the historical interior lattice phase and moves the
+    # physical dielectric/copper outside the nearest eight PML cells.
+    for low, high in ((ROI[0], ROI[1]), (ROI[2], ROI[3])):
+        lines = cleared_axis(low, high, .075, 1.0)
+        assert lines[PML_CELLS] < low < high < lines[-PML_CELLS - 1]
+        assert low in lines
+        assert all(any(math.isclose(old, new, abs_tol=1e-9) for new in lines)
+                   for old in [low + index * .075
+                               for index in range(int((high - low) / .075) + 1)])
+    z_lines = cleared_z_lines()
+    assert z_lines[PML_CELLS] < -PREPREG_MM < 0 < z_lines[-PML_CELLS - 1]
+    assert z_lines[PML_CELLS:PML_CELLS + len(Z_LINES)] == Z_LINES
     with tempfile.TemporaryDirectory(prefix='cupc8-usb-open-') as temporary:
         board = parse(args.board.read_text())
         start = endpoints['/USB_CONN_DP'][0]

@@ -34,6 +34,30 @@ CONTACTS = {'/USB_CONN_DP': (('R15', '2'), ('J2', '3')),
 PREPREG_MM = .2104
 DIELECTRIC_ER = 4.4
 ROI = (34.5, 43.5, -34.5, -18.5)
+Z_LINES = [-1, -.8, -.6, -.4, -.3, -PREPREG_MM, -.16,
+           -.11, -.06, 0, .05, .1, .2, .35, .55, .8, 1.1, 1.5]
+PML_CELLS = 8
+
+
+def cleared_axis(base_lo, base_hi, mesh_mm, clearance_mm):
+    """Keep the original mesh phase while placing PML outside fixed geometry."""
+    first = -math.ceil(clearance_mm / mesh_mm)
+    last = math.ceil((base_hi - base_lo + clearance_mm) / mesh_mm)
+    lines = [round(base_lo + index * mesh_mm, 10)
+             for index in range(first, last + 1)]
+    if not lines[PML_CELLS] < base_lo or not lines[-PML_CELLS - 1] > base_hi:
+        raise ValueError('PML clearance is fewer than eight mesh cells')
+    return lines
+
+
+def cleared_z_lines():
+    """Pad the legacy z mesh so neither the L2 plane nor copper enters PML_8."""
+    lower = [round(Z_LINES[0] - .2 * index, 10) for index in range(PML_CELLS, 0, -1)]
+    upper = [round(Z_LINES[-1] + .2 * index, 10) for index in range(1, PML_CELLS + 1)]
+    lines = lower + Z_LINES + upper
+    if not lines[PML_CELLS] < -PREPREG_MM or not lines[-PML_CELLS - 1] > 0:
+        raise ValueError('z mesh overlaps PML_8')
+    return lines
 
 
 def pads(board):
@@ -134,7 +158,8 @@ def validate_series(netlist):
 
 
 def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=False,
-             port_ohms=100, postprocess_only=False, netlist=None, boundary_margin_mm=0):
+             port_ohms=100, postprocess_only=False, netlist=None, boundary_margin_mm=0,
+             pml_clearance_mm=0, geometry_only=False):
     routes, endpoints = routed_pair(board)
     schematic_hash = validate_series(netlist) if netlist else None
     if straight_control:
@@ -147,28 +172,50 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     grid = csx.GetGrid()
     grid.SetDeltaUnit(1e-3)
     xmin, xmax, ymin, ymax = ROI
-    xmin -= boundary_margin_mm
-    xmax += boundary_margin_mm
-    ymin -= boundary_margin_mm
-    ymax += boundary_margin_mm
+    if pml_clearance_mm and boundary_margin_mm:
+        raise ValueError('PML clearance and legacy boundary expansion are separate controls')
+    if pml_clearance_mm:
+        x_regular = cleared_axis(xmin, xmax, mesh_mm, pml_clearance_mm)
+        y_regular = cleared_axis(ymin, ymax, mesh_mm, pml_clearance_mm)
+        air_bounds = (x_regular[0], x_regular[-1], y_regular[0], y_regular[-1])
+        material_bounds = ROI
+        z_lines = cleared_z_lines()
+    else:
+        xmin -= boundary_margin_mm
+        xmax += boundary_margin_mm
+        ymin -= boundary_margin_mm
+        ymax += boundary_margin_mm
+        air_bounds = material_bounds = (xmin, xmax, ymin, ymax)
+        x_regular = np.arange(xmin, xmax + mesh_mm / 2, mesh_mm)
+        y_regular = np.arange(ymin, ymax + mesh_mm / 2, mesh_mm)
+        z_lines = Z_LINES
     # Put pad and port edges on the grid without making a tiny CFL cell where
     # a regular line nearly coincides with one of those coordinates.
-    def axis_lines(lo, hi, axis):
+    def axis_lines(regular, axis):
         anchors = sorted({round(point[axis] + delta, 5)
                           for pair in endpoints.values() for point in pair
                           for delta in (-.1, 0, .1)})
-        regular = np.arange(lo, hi + mesh_mm / 2, mesh_mm)
         keep = [value for value in regular
                 if all(abs(value - anchor) >= mesh_mm * .45 for anchor in anchors)]
         return sorted(set(float(v) for v in keep) | set(anchors))
-    grid.AddLine('x', axis_lines(xmin, xmax, 0))
-    grid.AddLine('y', axis_lines(ymin, ymax, 1))
-    grid.AddLine('z', [-1, -.8, -.6, -.4, -.3, -PREPREG_MM, -.16,
-                       -.11, -.06, 0, .05, .1, .2, .35, .55, .8, 1.1, 1.5])
+    x_lines = axis_lines(x_regular, 0)
+    y_lines = axis_lines(y_regular, 1)
+    grid.AddLine('x', x_lines)
+    grid.AddLine('y', y_lines)
+    grid.AddLine('z', z_lines)
+    material_xmin, material_xmax, material_ymin, material_ymax = material_bounds
+    pml_inner_bounds = ((x_lines[PML_CELLS], x_lines[-PML_CELLS - 1]),
+                        (y_lines[PML_CELLS], y_lines[-PML_CELLS - 1]),
+                        (z_lines[PML_CELLS], z_lines[-PML_CELLS - 1]))
+    pml_geometry_ok = (pml_inner_bounds[0][0] < material_xmin < material_xmax < pml_inner_bounds[0][1] and
+                       pml_inner_bounds[1][0] < material_ymin < material_ymax < pml_inner_bounds[1][1] and
+                       pml_inner_bounds[2][0] < -PREPREG_MM < 0 < pml_inner_bounds[2][1])
     substrate = csx.AddMaterial('JLC7628', epsilon=DIELECTRIC_ER)
-    substrate.AddBox([xmin, ymin, -PREPREG_MM], [xmax, ymax, 0])
+    substrate.AddBox([material_xmin, material_ymin, -PREPREG_MM],
+                     [material_xmax, material_ymax, 0])
     ground = csx.AddMetal('L2_GND')
-    ground.AddBox([xmin, ymin, -PREPREG_MM], [xmax, ymax, -PREPREG_MM])
+    ground.AddBox([material_xmin, material_ymin, -PREPREG_MM],
+                  [material_xmax, material_ymax, -PREPREG_MM])
     for net, segments in routes.items():
         metal = csx.AddMetal(net.lstrip('/'))
         add_trace(metal, segments)
@@ -183,6 +230,20 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
              fdtd.AddLumpedPort(2, port_ohms, [dp_out[0], dp_out[1], 0],
                                 [dm_out[0], dm_out[1], 0], 'x', priority=20)]
     directory.mkdir(parents=True, exist_ok=True)
+    if geometry_only:
+        csx.Write2XML(str(directory / 'usb-io.xml'))
+        return {'scope': 'IO USB-A field geometry only; no FDTD or S-parameters',
+                'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
+                'netlist_sha256': schematic_hash, 'mesh_mm': mesh_mm,
+                'straight_control': straight_control,
+                'boundary_margin_mm': boundary_margin_mm,
+                'pml_clearance_mm': pml_clearance_mm,
+                'air_bounds_mm': air_bounds, 'material_bounds_mm': material_bounds,
+                'pml_inner_bounds_mm': pml_inner_bounds,
+                'pml_geometry_ok': pml_geometry_ok,
+                'grid_lines': {'x': len(x_lines), 'y': len(y_lines), 'z': len(z_lines)},
+                'xml_sha256': hashlib.sha256((directory / 'usb-io.xml').read_bytes()).hexdigest(),
+                'valid_for_row_4_6': False}
     if postprocess_only:
         probe = directory / 'usb-io-check.xml'
         csx.Write2XML(str(probe))
@@ -229,7 +290,7 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     except ValueError as error:
         window_audit = {'unavailable': str(error)}
         spectral_stability_ok = False
-    valid = decay is not None and passivity_ok and port_ok and spectral_stability_ok
+    valid = decay is not None and passivity_ok and port_ok and spectral_stability_ok and pml_geometry_ok
     return {'scope': 'IO USB-A D+/D- R14/R15-to-J2 routed F.Cu subset',
             'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
             'netlist_sha256': schematic_hash,
@@ -237,6 +298,10 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
             'model': 'lossless dielectric, PEC copper, rectangular L2 GND; pads/ESD/mask/connector absent',
             'mesh_mm': mesh_mm, 'straight_control': straight_control,
             'boundary_margin_mm': boundary_margin_mm,
+            'pml_clearance_mm': pml_clearance_mm,
+            'air_bounds_mm': air_bounds, 'material_bounds_mm': material_bounds,
+            'pml_inner_bounds_mm': pml_inner_bounds,
+            'pml_geometry_ok': pml_geometry_ok,
             'port_geometry': '2D differential lumped ports at resistor/connector pad centers',
             'declared_port_ohms': port_ohms, 'reference_ohms': 90,
             'energy_decay_db': decay if decay is not None else measured_decay,
@@ -268,16 +333,24 @@ def main():
     parser.add_argument('--mesh-mm', type=float, default=.075)
     parser.add_argument('--max-steps', type=int, default=120000)
     parser.add_argument('--boundary-margin-mm', type=float, choices=(0.0, 1.0), default=0.0,
-                        help='expand the artificial field/ground boundary by 1 mm for sensitivity')
+                        help='legacy sensitivity: expand the field, dielectric and ground together')
+    parser.add_argument('--pml-clearance-mm', type=float, choices=(0.0, 1.0), default=0.0,
+                        help='extend only the air/PML box and z mesh, keeping copper and dielectric fixed')
     parser.add_argument('--port-ohms', type=float, default=100,
                         help='declared lumped resistance; compare measured passive load to 90 ohms')
     parser.add_argument('--postprocess-only', action='store_true',
                         help='reuse saved fields only when generated geometry is byte-identical')
+    parser.add_argument('--geometry-only', action='store_true',
+                        help='write the XML and mesh/clearance report without running FDTD')
     parser.add_argument('--straight-control', action='store_true')
     parser.add_argument('--require-evidence', action='store_true')
     args = parser.parse_args()
     if not .035 <= args.mesh_mm <= .1 or args.max_steps < 30000:
         parser.error('mesh must be 0.035–0.1 mm and max steps >= 30000')
+    if args.pml_clearance_mm and args.boundary_margin_mm:
+        parser.error('choose PML clearance or the legacy boundary-margin comparison')
+    if args.geometry_only and args.postprocess_only:
+        parser.error('geometry-only and postprocess-only cannot be combined')
     board, output = args.board.resolve(), args.out.resolve()
     netlist = args.netlist.resolve() if args.netlist else board.with_suffix('.net')
     if not netlist.is_file():
@@ -288,14 +361,19 @@ def main():
     run_name = 'usb-io-control-openems' if args.straight_control else 'usb-io-openems'
     if args.boundary_margin_mm:
         run_name += '-margin-1mm'
+    if args.pml_clearance_mm:
+        run_name += '-pml-clear-1mm'
+    if args.geometry_only:
+        run_name += '-geometry-only'
     directory = output.parent / run_name
     report = simulate(board, directory, args.mesh_mm, args.max_steps,
                       args.straight_control, args.port_ohms, args.postprocess_only,
-                      netlist, args.boundary_margin_mm)
+                      netlist, args.boundary_margin_mm, args.pml_clearance_mm,
+                      args.geometry_only)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
-    if not report['valid_for_diagnostic_sparams']:
+    if not args.geometry_only and not report['valid_for_diagnostic_sparams']:
         raise SystemExit('USB openEMS port or convergence validation failed')
 
 
