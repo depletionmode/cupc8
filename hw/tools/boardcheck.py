@@ -112,6 +112,8 @@ def check(board, mode, out):
             raise ValueError('missing power coverage: ' + GAPS['power'][board])
     elif mode == 'thermal':
         run([sys.executable, 'hw/power/thermal.py'])
+        if board == 'wifi':
+            run([sys.executable, 'hw/power/thermal.py', 'wifi-card', out])
         if board in GAPS['thermal']:
             raise ValueError('missing thermal coverage: ' + GAPS['thermal'][board])
         if board in ('main', 'cpu'):

@@ -25,10 +25,51 @@ at the corner that heats it most:
 """
 
 import sys
+from pathlib import Path
 
 import budget
 import design as d
 from spice import Checks
+
+
+def wifi_coupling_budget(r5, r3, rgnd):
+    """Maximum permissible ESP-to-buck thermal transfer, not an assumed value.
+
+    The ESP's full TX electrical input is counted as local heat. All estimated
+    copper I²R loss is pessimistically assigned to the buck junction. A board
+    thermal simulation or measurement must show a lower cross-coupling value.
+    """
+    vin = budget.chain('worst')['wifi_in']
+    iout = d.WIFI_I_3V3
+    ibuck = iout * d.wifi_vout_range()[1] / vin
+    copper_w = iout ** 2 * (r3 + rgnd) + ibuck ** 2 * r5
+    buck_w = buck_loss(vin, iout) + copper_w
+    esp_w = d.ESP32_VDD_MAX * d.ESP32_I_TX
+    theta = d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]
+    allowance = (d.TJ_LIMIT_C - d.AMBIENT_C - buck_w * theta) / esp_w
+    return buck_w, copper_w, esp_w, allowance
+
+
+def wifi_card(out):
+    import wifi_board
+    import wifi_ground
+    out = Path(out)
+    circuit = wifi_board.topology(out / 'wifi.net')
+    r5, r3 = wifi_board.routes(out / 'wifi.kicad_pcb', out / 'fab/order.json', circuit)
+    rgnd, vias, cells = wifi_ground.estimate(out / 'wifi.kicad_pcb')
+    buck_w, copper_w, esp_w, allowance = wifi_coupling_budget(r5, r3, rgnd)
+    c = Checks('WC-010 Wi-Fi board local thermal coupling at %.0f C ambient' % d.AMBIENT_C)
+    c.info('routed copper', '%.1f mOhm +5V, %.1f mOhm 3V3, %.1f mOhm GND; %d GND vias' %
+           (1e3 * r5, 1e3 * r3, 1e3 * rgnd, vias))
+    c.info('coupling budget', 'buck + allocated copper %.0f mW (of which copper %.0f mW); '
+           'ESP TX heat <= %.0f mW; allowable ESP-to-buck transfer <= %.1f C/W' %
+           (1e3 * buck_w, 1e3 * copper_w, 1e3 * esp_w, allowance))
+    c.check('T4b', 'buck junction without ESP thermal coupling', tj(buck_w, d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]),
+            d.TJ_LIMIT_C, '<=', 'C', fmt='%.1f')
+    # The layout's board and air path cannot be inferred from JEDEC theta_JA.
+    # A validated thermal solver or measurement must bound cross-coupling.
+    c.check('T4c', 'measured or calibrated ESP-to-buck thermal transfer bound supplied', 0, 1, '>=', '', fmt='%d')
+    return c.done()
 
 
 def buck_loss(vin, iout, vout=3.3):
@@ -120,4 +161,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ['wifi-card']:
+        if len(sys.argv) != 3:
+            sys.exit('usage: thermal.py wifi-card board-build-directory')
+        sys.exit(wifi_card(sys.argv[2]))
     sys.exit(main())
