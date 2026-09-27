@@ -209,8 +209,12 @@ def main():
         if (clock_bad['pc'], clock_bad['gpo']) == (good['pc'], good['gpo']):
             raise AssertionError(f'open CPU clock did not change execution: {good} / {clock_bad}')
         print(f"open CPU clock changes PC ${good['pc']:04x} -> ${clock_bad['pc']:04x}")
-        if not manifest['runtime']['cpu_reset_connected']:
-            raise AssertionError('CPU reset requires a routed socket and card path')
+        reset_paths = [path for path in manifest['paths']
+                       if path.get('runtime') == 'cpu_reset_connected']
+        if not manifest['runtime']['cpu_reset_connected'] or \
+                'main:CPU_nRST_SRC' not in manifest['runtime_nets'] or \
+                len(reset_paths) != 3 or any(path['route_mm'] is None for path in reset_paths):
+            raise AssertionError('CPU reset requires three executed routed copper legs')
         changed = copy.deepcopy(manifest)
         changed['runtime']['cpu_reset_connected'] = False
         mutant = Path(directory) / 'open-cpu-reset.json'
