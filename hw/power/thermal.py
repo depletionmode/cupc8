@@ -168,4 +168,9 @@ if __name__ == "__main__":
         if len(sys.argv) != 3:
             sys.exit('usage: thermal.py wifi-card board-build-directory')
         sys.exit(wifi_card(sys.argv[2]))
+    if sys.argv[1:2] == ['bind']:
+        import thermal_bind
+        sys.exit(thermal_bind.main(sys.argv[2:]))
+    if len(sys.argv) != 1:
+        sys.exit('usage: thermal.py [wifi-card DIR | bind BOARD DIR [--binding-only]]')
     sys.exit(main())
