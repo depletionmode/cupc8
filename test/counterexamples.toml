@@ -9,6 +9,14 @@
 # (Bugs in the RTL are also covered by mutants: tools/formal.py --mutants.)
 
 [[bug]]
+name = "BASIC ROM inspection accepted a corrupt header as absent"
+fixed_in = "a94a26b"
+before = "8c2a1d2"
+files = ["tools/mkrom.py"]
+cmd = "python3 test/host/test_mkrom_info.py"
+must_fail = ["FAIL: corrupt BASIC header was treated as absent"]
+
+[[bug]]
 name = "GPU card: SCK finger could not escape between ground fingers"
 fixed_in = "3e351d5"
 revert = [["hw/boards/gpu.py", """    # B13 (SCK) is between two top-side GND fingers, while A13 is GND on
