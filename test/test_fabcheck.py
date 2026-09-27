@@ -270,6 +270,45 @@ class FabCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'trace width'):
                 gerberdrc.check_clearance([copper], .15, .1)
 
+    def test_isolated_filled_copper_width_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copper = Path(tmp) / 'sample-F_Cu.gtl'
+            prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                      '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                      '%MOMM*%\n%LPD*%\n%ADD10C,0.100000*%\n'
+                      'D10*\n%TO.N,/GND*%\n')
+            def region(width):
+                return ('G36*\nX1000000Y1000000D02*\n'
+                        'X2000000Y1000000D01*\n'
+                        f'X2000000Y{1000000+width}D01*\n'
+                        f'X1000000Y{1000000+width}D01*\n'
+                        'X1000000Y1000000D01*\nG37*\n')
+            copper.write_text(prefix + region(100000) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 1)
+            copper.write_text(prefix + region(99999) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated filled region width 0.099999 mm'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # The same-net stroke makes a connected shape whose minimum
+            # width needs a full union/neck analysis.
+            copper.write_text(prefix + region(99999) +
+                              'X1500000Y900000D02*\nX1500000Y1200000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            # A different-net crossing is already a clearance violation; it
+            # cannot excuse the isolated /GND region's own width failure.
+            copper.write_text(prefix + region(99999) + '%TO.N,/VCC*%\n'
+                              'X1500000Y900000D02*\nX1500000Y1200000D01*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'isolated filled region width'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # A region with a separate interior contour cannot be treated as
+            # a simple island. The parser rejects it rather than guessing at
+            # the annular copper width around the hole.
+            copper.write_text(prefix + region(1000000).replace(
+                'G37*\n', 'X1300000Y1300000D02*\nX1700000Y1300000D01*\n'
+                         'X1700000Y1700000D01*\nX1300000Y1700000D01*\n'
+                         'X1300000Y1300000D01*\nG37*\n') + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'multiple region contours unsupported'):
+                gerberdrc.check_clearance([copper], .15, .1)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)

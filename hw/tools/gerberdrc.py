@@ -742,9 +742,9 @@ def check_paste_registration(copper_path, mask_path, paste_path):
 def check_isolated_filled_width(path, geometry, objects, filled_regions, minimum):
     """Reject a filled island whose entire plotted width is below the rule.
 
-    A narrow region touching other ink can form a wider combined shape. Such
-    regions need a full union/neck analysis and are deliberately left to the
-    final incomplete-coverage gate.
+    A narrow region touching another shape of the same net (or any silk ink)
+    can form a wider combined shape. Holes and connected necks need a full
+    union/neck analysis and remain at the final incomplete-coverage gate.
     """
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('no positive filled-ink width requirement')
@@ -1013,7 +1013,12 @@ def check_clearance(paths, minimum, minimum_track=None):
     try:
         count = 0
         for path in paths:
-            objects = plotted_copper(Path(path), engine, minimum_track)
+            filled_regions = []
+            objects = plotted_copper(Path(path), engine, minimum_track,
+                                     filled_regions=filled_regions)
+            if minimum_track is not None:
+                check_isolated_filled_width(path, engine, objects, filled_regions,
+                                            minimum_track)
             cells = defaultdict(list)
             for index, (net, shape, (x0,y0,x1,y1)) in enumerate(objects):
                 # Two millimetre buckets avoid checking every distant pad/track
