@@ -67,16 +67,18 @@ survives a lost session. Newest first within each section. Specs live in
 | Work | State |
 |---|---|
 | Main board | Salt-1 route and deterministic power/ground repairs are merged. The six-layer package has a valid receipt, 0 KiCad DRC violations, 0 opens and 0 parity errors. Worst slot is 16.85 mΩ at nominal 20°C copper, but 20.17 mΩ at 70°C before thickness tolerance; MB-005 remains red. The isolated, pushed `main-power-trial` branch adds U2/C15 placement and parallel power copper. It passes a source-replayed KiCad DRC with zero opens and models 19.128 mΩ at 100°C under assumed copper, but 20.452 mΩ at 115°C with thinner via plating. Finished copper minima, GND contact and thermal coupling remain unbounded; the trial is not merged. |
-| BASIC follow-ups | Packed ROM image, approved dead-code removals, run/hook handshake, isolated Nim cache and assembler comment parsing. Simulator checks precede emulator checks. |
 | Board verification | All eight boards rebuilt under the latest verifier and have valid receipts with clean KiCad DRC, ERC and schematic parity. Independent plotted fab checks stop at the 0.20 mm connector-notch copper-edge gap on all seven cards, versus the 0.30 mm project rule. Main plotted geometry passes and stops at the missing human CPL review record. The notch's fabrication and mating acceptance requirements are recorded in `hardware/card-notch-qualification.md`. Wi-Fi WC-005/WC-010 remain red at ESR, ground contact and thermal transfer; CPU CC-005 remains red for unbounded physical parameters. Current CPL overlays and top/bottom PNGs were refreshed for all eight boards. |
-| SI and schematic co-simulation | The four routed HDMI pair field-model subsets pass against the GPU receipt; full analog SI remains red. Routed main copper is available to the IBIS diagnostic. Strict E2E-001..004 remain red with 389 coverage gaps after routed nPOR, ROM/SRAM write-enable, ROM DQ0, slot-select/shared SPI links, 30 card-local slot nets and 30 QSPI boot nets plus pin-exact waivers for 45 unused reserved contacts. Root wiring and native runtime mutation checks passed after rebuilding the addon. |
+| SI and schematic co-simulation | The four routed HDMI pair field-model subsets pass against the GPU receipt; full analog SI remains red. The IO USB field geometry now separates physical copper/dielectric from the openEMS PML, but needs a converged field run. Routed main copper is available to the IBIS diagnostic. Strict E2E-001..004 remain red with 363 coverage gaps after routed nPOR, ROM/SRAM write-enable, ROM DQ0, slot-select/shared SPI links, 30 card-local slot nets, 30 QSPI boot nets, 24 CPU card address/data channels and two CPU clock links; 45 unused reserved contacts have pin-exact waivers. Root native runtime and routed wiring mutation checks pass. |
 | Final gate | The full `make verify` attempt was stopped at the long Wi-Fi lockstep mutation tail before a valid suite result; 17 nonhardware catalogue rows remain pending. Fab readiness is red. Integrate further co-simulation work, rerun the full gate, inspect renders and complete David's hand checks. No manufacturing upload or order. |
 
 ## Done (recent)
 
 - All eight boards regenerated after the Gerber precision checks and passed
-  ERC, board DRC and schematic parity; their receipts require a final refresh
-  after the later CPU power verifier edit.
+  ERC, board DRC and schematic parity; their current receipts validate.
+- BASIC follow-ups are integrated: packed ROM image, approved dead-code
+  removals, run/hook handshake, isolated Nim cache and assembler comment
+  parsing. Focused simulator/host checks, nine counterexamples, native
+  E2E-002 and E2E-010 passed on the BASIC branch.
 - CPU card now uses six layers. The seven card pipelines were reported complete
   at handoff; final integration reruns and live stock checks remain required.
 - SD card model in the native emulator (EMU-008), STO-003, E2E-007 (BASIC
