@@ -46,14 +46,16 @@ def main_cli():
                          system_board=args.system_board, cpu_board=args.cpu_board)
         print(f"valid top: {len(manifest['contacts'])} contacts, {len(manifest['paths'])} paths")
         assert 'main:MEM_A0' in manifest['runtime_nets']
-        assert 'main:CPU_CLK' in manifest['structural_only_nets']
-        assert 'main:CPU_CLK' in manifest['unmodeled_nets']
+        assert 'main:CPU_CLK' in manifest['runtime_nets']
+        assert 'cpu:CPU_CLK' in manifest['runtime_nets']
+        assert 'main:CLK12' in manifest['structural_only_nets']
+        assert 'main:CLK12' in manifest['unmodeled_nets']
         assert not manifest['coverage_complete']
         assert 'main:CPU_RSVD_A2' in manifest['reviewed_waivers']
         assert 'main:SLOT1_RSVD_A1' in manifest['reviewed_waivers']
         assert 'system:RSVD_B1' in manifest['reviewed_waivers']
         assert 'main:CPU_RSVD_A2' not in manifest['unmodeled_nets']
-        assert 'main:CPU_CLK' in manifest['coverage_families']['clock_and_reset']
+        assert 'main:CLK12' in manifest['coverage_families']['clock_and_reset']
         assert sorted(net for family in manifest['coverage_families'].values()
                       for net in family) == manifest['unmodeled_nets']
         assert not set(manifest['reviewed_waivers']) & set(manifest['unmodeled_nets'])
@@ -85,6 +87,7 @@ def main_cli():
             good_route = check(cards, main, args.main_board, card_boards,
                                args.system_board, args.cpu_board)
             assert good_route['runtime']['por_connected']
+            assert good_route['runtime']['cpu_clock_connected']
             assert good_route['runtime']['memory_write_links'] == {'ram': True, 'rom': True}
             physical = pcbnew.LoadBoard(str(args.main_board))
             def open_launch(ref, pin, net):
@@ -222,6 +225,22 @@ def main_cli():
                         raise AssertionError('open routed CPU A0 did not change native CPU execution')
                     print(f"open routed CPU A0 changes PC ${cpu_good_state['pc']:04x} -> "
                           f"${cpu_bad_state['pc']:04x}")
+
+                    opened_clock = open_card_launch(args.cpu_board, 'U1', '21', '/CPU_CLK', 'cpu-clock')
+                    clock_bad = check(cards, main, args.main_board, card_boards,
+                                      args.system_board, opened_clock)
+                    if clock_bad['runtime']['cpu_clock_connected'] or \
+                            clock_bad['runtime']['routed_top'] or \
+                            'cpu:CPU_CLK' not in clock_bad['runtime_nets']:
+                        raise AssertionError('open CPU clock launch did not disable the CPU clock link')
+                    clock_bad_top = Path(temporary) / 'open-cpu-clock.json'
+                    clock_bad_top.write_text(json.dumps(clock_bad))
+                    clock_good_state, clock_bad_state = run(good_top, PROBE), run(clock_bad_top, PROBE)
+                    if clock_good_state['pc'] == clock_bad_state['pc'] or \
+                            clock_bad_state['gpo'] == clock_good_state['gpo']:
+                        raise AssertionError('open routed CPU clock did not change native boot')
+                    print(f"open routed CPU clock changes PC ${clock_good_state['pc']:04x} -> "
+                          f"${clock_bad_state['pc']:04x}")
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')

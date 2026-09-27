@@ -220,6 +220,34 @@ def cpu_bus_routes(card, board, address_map, data_map):
     return links, paths, missing
 
 
+def cpu_clock_route(main, card, main_board, cpu_board):
+    """The resistor output and CPU-card copper carrying the CPU clock."""
+    oscillator = named_pin(main, 'Y1', 'OUT')
+    socket = ('J2', 'B13')
+    fpga = ('U1', '21')
+    finger = ('J1', 'B13')
+    resistor = path(main, oscillator, socket, '33')
+    if node(main, resistor, '2') != '/CPU_CLK' or node(card, *finger) != '/CPU_CLK':
+        raise ValueError('CPU clock resistor output or card contact is missing')
+    path(card, finger, fpga)
+    legs = (('main', main_board, '/CPU_CLK', (resistor, '2'), socket),
+            ('cpu', cpu_board, '/CPU_CLK', finger, fpga))
+    rows, missing = [], []
+    for board_name, board_file, net, source, target in legs:
+        length = None
+        if board_file is not None and Path(board_file).is_file():
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            length = routed_distances(Path(board_file), net, source, [target])[
+                f'{target[0]}.{target[1]}']
+        rows.append({'from': f'{board_name}.{source[0]}.{source[1]}',
+                     'to': f'{board_name}.{target[0]}.{target[1]}',
+                     'route_mm': length, 'runtime': 'cpu_clock_connected'})
+        if length is None:
+            missing.append(f'{board_name}:CPU_CLK_clock_copper')
+    return not missing, rows, missing
+
+
 def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
@@ -602,6 +630,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_data_links'] = cpu_links['data']
     manifest['paths'].extend(cpu_paths)
     manifest['runtime']['missing_routes'].extend(cpu_missing)
+    clock_connected, clock_paths, clock_missing = cpu_clock_route(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['runtime']['cpu_clock_connected'] = clock_connected
+    manifest['paths'].extend(clock_paths)
+    manifest['runtime']['missing_routes'].extend(clock_missing)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     bridge = {}
@@ -803,6 +836,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     for prefix, count in (('A', 16), ('D', 8)):
         for bit in range(count):
             runtime_net('cpu', f'FPGA_{prefix}{bit}')
+    runtime_net('main', 'CPU_CLK')
+    runtime_net('cpu', 'CPU_CLK')
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest

@@ -211,6 +211,7 @@ class Machine {
     bool gpuHdmiLink = true;         // four TMDS pairs reach the HDMI receptacle
     bool einkPanelLink = true;       // seven EPD signals reach the panel header
     bool porConnected = true;        // supervisor nPOR copper reaches the chipset
+    bool cpuClockConnected = true;   // CPU socket/card clock copper reaches the FPGA
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
     bool threaded = true;

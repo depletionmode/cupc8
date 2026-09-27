@@ -45,6 +45,7 @@ struct MainBoard {
 	double ramAccessNs = 45.0, romAccessNs = 70.0;
 	bool ramWriteConnected = true, romWriteConnected = true;
 	bool romD0Connected = true;
+	bool cpuClockConnected = true;
 
 	Vmachine_core *top = nullptr;
 	sst39_t rom;
@@ -84,6 +85,7 @@ struct MainBoard {
 		for (unsigned i = 0; i < 8; ++i) dataConnected |= uint8_t(wiring.cpuDataConnected[i] != 0) << i;
 		top->cpu_a_connected = addressConnected;
 		top->cpu_d_connected = dataConnected;
+		top->cpu_clk_connected = cpuClockConnected;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);
 		for (size_t i = 0; i < sizeof ram; i++)

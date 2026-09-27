@@ -199,6 +199,16 @@ def main():
             if (bad['pc'], bad['gpo']) == (good['pc'], good['gpo']):
                 raise AssertionError(f'open CPU-card {kind}0 did not change execution: {good} / {bad}')
             print(f"open CPU-card {kind}0 changes PC ${good['pc']:04x} -> ${bad['pc']:04x}")
+        if not manifest['runtime']['cpu_clock_connected']:
+            raise AssertionError('CPU clock requires a routed socket and card path')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['cpu_clock_connected'] = False
+        mutant = Path(directory) / 'open-cpu-clock.json'
+        mutant.write_text(json.dumps(changed))
+        clock_bad = run(mutant)
+        if (clock_bad['pc'], clock_bad['gpo']) == (good['pc'], good['gpo']):
+            raise AssertionError(f'open CPU clock did not change execution: {good} / {clock_bad}')
+        print(f"open CPU clock changes PC ${good['pc']:04x} -> ${clock_bad['pc']:04x}")
         changed = copy.deepcopy(manifest)
         slot = changed['runtime']['slots'][0]
         slot['sck'], slot['mosi'] = slot['mosi'], slot['sck']

@@ -76,6 +76,12 @@ execution. An open bit is held high only as a deterministic digital
 counterexample because its real voltage is undefined. This does not establish
 CPU-card propagation delay or analog margin, and the remaining control lines
 still need executed models.
+The CPU clock also follows the routed 33 Ω output on the main board to socket
+J2.B13, then the CPU card's J1.B13 to FPGA U1.21. The planar paths measure
+60.564 mm and 31.218 mm. Opening the FPGA clock launch holds the native CPU
+at its reset vector PC `$E000` instead of `$E2B9` after 20 ms, while the
+chipset continues to run. The shared oscillator source and chipset clock
+branch are still outside this executed model.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
@@ -159,9 +165,9 @@ supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
-card-local slot nets, 30 QSPI boot nets and 24 CPU-card bus nets now affect
-execution; 365 remain unmodeled. The remaining groups are boot/programming
-(68), slot/control bus (36), CPU/memory (47), power/return (65), clock/reset
-(53), indicators (52), external IO (26),
+card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets and two CPU
+clock nets now affect execution; 363 remain unmodeled. The remaining groups
+are boot/programming (68), slot/control bus (36), CPU/memory (47),
+power/return (65), clock/reset (51), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
