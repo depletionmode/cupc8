@@ -164,6 +164,37 @@ def qspi_boot_routes(cards, card_boards, system_board):
     return rows, paths, missing
 
 
+def system_bridge_source_routes(system, board):
+    """RP2040 bridge outputs must cross both legs of their 33-ohm series parts."""
+    signals = {'sck': ('BR_SCK_MCU', 'BR_SCK', ('U1', '4'), 'R11', ('J2', 'B13')),
+               'mosi': ('BR_MOSI_MCU', 'BR_MOSI', ('U1', '5'), 'R12', ('J2', 'A14')),
+               'ncs': ('BR_nCS_MCU', 'BR_nCS', ('U1', '7'), 'R13', ('J2', 'A15'))}
+    routed = board is not None and Path(board).is_file()
+    if routed:
+        sys.path.insert(0, str(ROOT / 'hw/si'))
+        from ibis_bus import routed_distances
+    links, paths, missing = {}, [], []
+    for signal, (source_net, socket_net, mcu, resistor, contact) in signals.items():
+        if node(system, *mcu) != f'/{source_net}' or node(system, *contact) != f'/{socket_net}' or \
+                path(system, mcu, contact, '33') != resistor:
+            raise ValueError(f'system bridge {signal}: wrong MCU, resistor or socket attachment')
+        links[signal] = True
+        for net, first, last in ((source_net, mcu, (resistor, '1')),
+                                 (socket_net, (resistor, '2'), contact)):
+            path(system, first, last)
+            length = None
+            if routed:
+                length = routed_distances(Path(board), f'/{net}', first, [last])[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'system.{first[0]}.{first[1]}',
+                          'to': f'system.{last[0]}.{last[1]}',
+                          'route_mm': length, 'runtime': f'bridge_{signal}_connected'})
+            if length is None:
+                links[signal] = False
+                missing.append(f'system:{net}_bridge_copper')
+    return links, paths, missing
+
+
 @lru_cache(maxsize=2)
 def cpu_board_geometry(path):
     """Reuse CPU copper geometry across each route mutation in one audit."""
@@ -744,6 +775,13 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             manifest['paths'].append({'from': f'system.U1.{mcu[0]}', 'to': f'system.J2.{contact}',
                                       'series': resistor, 'ohms': 33})
     manifest['runtime']['bridge'] = bridge
+    bridge_links, bridge_paths, bridge_missing = system_bridge_source_routes(
+        cards['system'], system_board)
+    manifest['runtime']['bridge_source_links'] = bridge_links
+    manifest['paths'].extend(bridge_paths)
+    manifest['runtime']['missing_routes'].extend(bridge_missing)
+    manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # Reset, oscillator and Type-C source policy reach actual chipset pads.
     for source_ref, source_pin, destination_net in (
             ('U5', 'OUT', '/PWR_HI'), ('U6', '~{RESET}', '/nPOR')):
@@ -883,6 +921,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('main', f'SLOT_nIRQ{slot-1}')
         runtime_net('main', f'SPI_nCS{slot-1}_SRC')
     for name in ('BR_SCK', 'BR_MOSI', 'BR_MISO', 'BR_nCS'):
+        runtime_net('system', name)
+    for name in ('BR_SCK_MCU', 'BR_MOSI_MCU', 'BR_nCS_MCU'):
         runtime_net('system', name)
     for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
         runtime_net('io', name)

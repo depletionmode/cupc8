@@ -385,6 +385,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     misoIdle = o.misoIdle;
     seriesDelayNs = o.seriesDelayNs;
     bridgeInputs = o.bridgeInputs;
+    bridgeSourceConnected = o.bridgeSourceConnected;
     bridgeMiso = o.bridgeMiso;
   }
   if (o.memoryWiringOn) {
@@ -463,7 +464,11 @@ uint32_t Machine::inputs(bool por) {
       nirq &= ~(1u << slotWiring[slot - 1].irq);
   }
   const bool reset = sysctl && sysctl->sysReset();
-  const uint32_t bridge = br.sck | (br.mosi << 1) | (br.ncs << 2);
+  // Open source pads have undefined voltage; fixed idle levels expose the
+  // disconnected digital path without predicting the physical voltage.
+  const uint32_t bridge = (bridgeSourceConnected[0] ? br.sck : 0) |
+                          ((bridgeSourceConnected[1] ? br.mosi : 0) << 1) |
+                          ((bridgeSourceConnected[2] ? br.ncs : 1) << 2);
   return miso | (nirq << 1) | (((bridge >> bridgeInputs[0]) & 1u) << 7) |
          (((bridge >> bridgeInputs[1]) & 1u) << 8) | (((bridge >> bridgeInputs[2]) & 1u) << 9) |
          ((pwrHi ? 1u : 0u) << 10) |
