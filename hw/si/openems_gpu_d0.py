@@ -67,6 +67,10 @@ def routed_pair(board):
     for name, segments in routes.items():
         if not segments:
             raise ValueError(f'{name} has no routed copper')
+        # KiCad may serialize the same tracks in a different order after an
+        # otherwise identical rebuild. Keep field primitives deterministic so
+        # the saved-geometry comparison tests geometry, not file order.
+        segments.sort(key=lambda item: (item[0], item[1], item[2]))
         xmin, xmax, ymin, ymax = ROI
         if any(not (xmin < x < xmax and ymin < y < ymax)
                for a, b, _ in segments for x, y in (a, b)):
