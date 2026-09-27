@@ -34,7 +34,7 @@ def artifacts(out):
     return {str(p.relative_to(out)): digest(p) for p in sorted(out.rglob('*'))
             if p.is_file() and p.name not in ('evidence.json', 'cpl-review.json')
             and (p.suffix in {'.kicad_pcb', '.kicad_sch', '.kicad_pro', '.net', '.json', '.csv', '.drl', '.png'} | GERBER_SUFFIXES
-                 or p.parent.name == 'fab')}
+                 or p.parent.name in ('fab', 'replay-source'))}
 
 
 def record(board, out, before, boards, root=ROOT):

@@ -14,8 +14,10 @@ generates build/hw/chipset.pcf), so the schematic cannot drift from the FPGA
 build. hw/tools/pincheck.py checks the netlist against the docs.
 
     python3 hw/boards/main.py [outdir]      (default build/hw/main)
+    python3 hw/boards/main.py outdir --replay-manifest snapshot.json
 """
 
+import argparse
 import os
 import sys
 
@@ -26,6 +28,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
+import sesreplay  # noqa: E402
 import edgesym  # noqa: E402
 import sockets  # noqa: E402
 
@@ -1772,6 +1775,15 @@ def _plane_pads(board):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Generate the CUPC/8 main board')
+    parser.add_argument('outdir', nargs='?')
+    parser.add_argument('--replay-manifest', help='content-bound completed main-board SES snapshot')
+    args = parser.parse_args()
+    if args.replay_manifest and not args.outdir:
+        parser.error('SES replay requires a separate explicit output directory')
+    out = args.outdir
+    replay = (sesreplay.load(args.replay_manifest, out, ROUTE_TRIES * ROUTE_PARALLEL * 3)
+              if args.replay_manifest else None)
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     import logo
     import pincheck
@@ -1783,7 +1795,6 @@ def main():
     print("%-28s ok (card fingers land on their contacts, 3 sockets)" % "socket mating")
     logo.footprint(LOGO_MM)
     pl = placement()
-    out = sys.argv[1] if len(sys.argv) > 1 else None
     lcsc = kg.pipeline("main", schematic, pl, OUTLINE, out=out, layers=LAYERS, zones=ZONES,
                        fine_nets=fine_nets(), dense_nets=dense_nets(), passes=ROUTE_PASSES, route_tries=ROUTE_TRIES,
                        route_parallel=ROUTE_PARALLEL, route_timeout=ROUTE_TIMEOUT, route_heap=ROUTE_HEAP,
@@ -1791,6 +1802,7 @@ def main():
                        fanout_margin=FANOUT_MARGIN,
                        prepare=prepare,
                        post_route=_finish_route,
+                       replay=replay,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
                        boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)
