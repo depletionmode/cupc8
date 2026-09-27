@@ -376,6 +376,28 @@ TmdsCapture::Frame TmdsCapture::frame(const std::vector<Line> &lines) const {
 // ------------------------------------------------------------ Machine
 
 Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(o.root), threaded_(o.threaded) {
+  for (int i = 0; i < 6; ++i) {
+    slotWiring[i].cs = static_cast<uint8_t>(i + 2);
+    slotWiring[i].irq = static_cast<uint8_t>(i);
+  }
+  if (o.slotWiringOn) {
+    slotWiring = o.slotWiring;
+    misoIdle = o.misoIdle;
+    seriesDelayNs = o.seriesDelayNs;
+    bridgeInputs = o.bridgeInputs;
+    bridgeMiso = o.bridgeMiso;
+  }
+  if (o.memoryWiringOn) {
+    board->wiring.ramAddress = o.ramAddress;
+    board->wiring.romAddress = o.romAddress;
+    board->wiring.ramData = o.ramData;
+    board->wiring.romData = o.romData;
+    board->wiring.cpuAddress = o.cpuAddress;
+    board->wiring.cpuData = o.cpuData;
+    board->timedMemory = true;
+    board->ramAccessNs = o.ramAccessNs;
+    board->romAccessNs = o.romAccessNs;
+  }
   pwrHi = o.pwrHi;
   if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
   for (const auto &[slot, kind] : o.slots) {
@@ -423,17 +445,25 @@ void Machine::powerOn() {
 
 uint32_t Machine::inputs(bool por) {
   const uint32_t out = board->outputs();
-  const uint32_t cs = (out >> 2) & 0x7f;
-  uint32_t miso = 1, nirq = 0x3f;
+  uint32_t miso = misoIdle, nirq = 0x3f;
   for (auto &[slot, card] : cards) {
-    const int dev = slot - 1;
-    if (!((cs >> dev) & 1)) miso &= card->miso();
-    if (card->irq()) nirq &= ~(1u << dev);
+    if (slot <= 6 && selected(slot, out) && slotWiring[slot - 1].miso) miso &= card->miso();
+    if (slot <= 6 && card->irq()) nirq &= ~(1u << slotWiring[slot - 1].irq);
   }
   const bool reset = sysctl && sysctl->sysReset();
-  return miso | (nirq << 1) | (br.sck << 7) | (br.mosi << 8) | (br.ncs << 9) | ((pwrHi ? 1u : 0u) << 10) |
+  const uint32_t bridge = br.sck | (br.mosi << 1) | (br.ncs << 2);
+  return miso | (nirq << 1) | (((bridge >> bridgeInputs[0]) & 1u) << 7) |
+         (((bridge >> bridgeInputs[1]) & 1u) << 8) | (((bridge >> bridgeInputs[2]) & 1u) << 9) |
+         ((pwrHi ? 1u : 0u) << 10) |
          (1u << 11) | ((por && !reset ? 1u : 0u) << 12);
 }
+
+bool Machine::selected(int slot, uint32_t out) const {
+  return slot >= 1 && slot <= 6 && !((out >> slotWiring[slot - 1].cs) & 1u);
+}
+
+uint32_t Machine::sckFor(int slot, uint32_t out) const { return (out >> slotWiring[slot - 1].sck) & 1u; }
+uint32_t Machine::mosiFor(int slot, uint32_t out) const { return (out >> slotWiring[slot - 1].mosi) & 1u; }
 
 double Machine::ns() const { return board->ns(); }
 
@@ -457,7 +487,7 @@ void Machine::runFor(double ns) {
 void Machine::iterate() {
   const uint32_t out = board->outputs();
   const uint32_t cs = (out >> 2) & 0x7f;
-  if (sysctl) br = sysctl->bridgePins((out >> 9) & 1);
+  if (sysctl) br = sysctl->bridgePins(bridgeMiso ? ((out >> 9) & 1) : 1);
   const bool busy = cs != 0x7f || (sysctl && (!br.ncs || sysctl->pending));
   iterateSerial(busy, cs);
   stats.busyIterations += busy;
@@ -476,10 +506,9 @@ void Machine::iterateSerial(bool busy, uint32_t cs) {
   const double t = board->ns();
   if (sysctl) sysctl->advance(t);
   const uint32_t now = board->outputs();
-  const uint32_t sck = now & 1, mosi = (now >> 1) & 1, ncs = (now >> 2) & 0x7f;
   for (auto &[slot, card] : cards) {
-    card->advance(t);
-    card->drive(sck, mosi, !((ncs >> (slot - 1)) & 1));
+    card->advance(t + seriesDelayNs);  // 33-ohm source edge reaches the receiver after its RC delay
+    card->drive(sckFor(slot, now), mosiFor(slot, now), selected(slot, now));
   }
 }
 
@@ -528,7 +557,7 @@ bool Machine::leadNext() {
     }
     const uint32_t out = board->outputs();
     const uint32_t cs = (out >> 2) & 0x7f;
-    if (sysctl) br = sysctl->bridgePins((out >> 9) & 1);
+    if (sysctl) br = sysctl->bridgePins(bridgeMiso ? ((out >> 9) & 1) : 1);
     const bool busy = cs != 0x7f || (sysctl && (!br.ncs || sysctl->pending));
     if (busy) {
       iterateSerial(busy, cs);
@@ -552,10 +581,9 @@ bool Machine::leadNext() {
     windowOut = board->outputs();
     progress.v.store(static_cast<uint32_t>(board->clocks - windowStart) | FINAL, std::memory_order_seq_cst);
     progress.wake();
-    const uint32_t sck = windowOut & 1, mosi = (windowOut >> 1) & 1, ncs = (windowOut >> 2) & 0x7f;
     for (Card *c : mainCards) {  // as iterateSerial: advance to the window's end, then drive
-      c->advance(board->ns());
-      c->drive(sck, mosi, !((ncs >> (c->slot - 1)) & 1));
+      c->advance(board->ns() + seriesDelayNs);
+      c->drive(sckFor(c->slot, windowOut), mosiFor(c->slot, windowOut), selected(c->slot, windowOut));
     }
     stats.idleWindows++;
     pendingTrace = stats.traceOn;
@@ -571,14 +599,15 @@ void Machine::cardWindow(Worker &w) {
   for (uint32_t p = progress.v.load(std::memory_order_acquire);;) {
     // the board has run this far, so the window ends no earlier: advance(t)
     // would take every one of these steps
-    const double target = static_cast<double>(windowStart + (p & ~FINAL)) * NS_PER_CLOCK;
+    const double target = static_cast<double>(windowStart + (p & ~FINAL)) * NS_PER_CLOCK +
+                          (w.card ? seriesDelayNs : 0);
     while (e.ns() < target) e.step();
     if (p & FINAL) break;
     p = progress.waitWhile(p, 300);
   }
   if (w.card) {
     const uint32_t out = windowOut;
-    w.card->drive(out & 1, (out >> 1) & 1, !((((out >> 2) & 0x7f) >> (w.card->slot - 1)) & 1));
+    w.card->drive(sckFor(w.card->slot, out), mosiFor(w.card->slot, out), selected(w.card->slot, out));
   }
 }
 

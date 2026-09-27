@@ -128,7 +128,11 @@ export class Machine {
     if (forward.length && !wifi.length) throw new Error('machinenative: forward needs a Wi-Fi card');
     hostfwd(forward);                    // a bad entry throws before QEMU starts
     if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward, pcap);
+    const netlistTop = process.env.CUPC8_COSIM_TOP && JSON.parse(fs.readFileSync(process.env.CUPC8_COSIM_TOP, 'utf8'));
+    if (netlistTop && (!netlistTop.runtime || !netlistTop.boards?.includes('main')))
+      throw new Error('machinenative: invalid schematic-derived top');
     m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi, root: ROOT, threaded, spiLog,
+      memoryWiring: netlistTop?.runtime,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };
     if (sysctl) {

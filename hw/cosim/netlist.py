@@ -33,6 +33,7 @@ class Circuit:
     nets: dict
     pins: dict
     resistors: tuple[Resistor, ...]
+    pin_names: dict | None = None
 
     def net(self, ref, pin):
         return self.pins.get((ref, str(pin)))
@@ -107,4 +108,13 @@ def read(path):
             resistors.append(Resistor(channel, value, ends))
     if not nets:
         raise ValueError('netlist has no nets')
-    return Circuit(components, nets, pins, tuple(resistors))
+    pin_names = {}
+    library = {}
+    for libpart in find(find1(tree, 'libparts') or [], 'libpart'):
+        key = (field(libpart, 'lib'), field(libpart, 'part'))
+        library[key] = {field(pin, 'num'): field(pin, 'name')
+                        for pin in find(find1(libpart, 'pins') or [], 'pin')}
+    for ref, (_, source) in components.items():
+        for number, name in library.get(source, {}).items():
+            pin_names[(ref, number)] = name
+    return Circuit(components, nets, pins, tuple(resistors), pin_names)

@@ -150,6 +150,85 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.spiLog = flag("spiLog", false);
     opt.espTx = integer("espTx", -1);
     opt.espRx = integer("espRx", -1);
+    if (napi_value wiring = prop(env, o, "memoryWiring"); isType(env, wiring, napi_object)) {
+      auto pins = [&](const char *key, auto &out) {
+        napi_value values = prop(env, wiring, key);
+        bool array = false;
+        if (!values || napi_is_array(env, values, &array) != napi_ok || !array)
+          throw std::runtime_error(std::string("memory wiring: missing ") + key);
+        uint32_t count = 0;
+        napi_get_array_length(env, values, &count);
+        if (count != out.size()) throw std::runtime_error(std::string("memory wiring: wrong length for ") + key);
+        std::vector<bool> used(count, false);
+        for (uint32_t i = 0; i < count; ++i) {
+          napi_value value;
+          napi_get_element(env, values, i, &value);
+          int32_t bit = -1;
+          if (napi_get_value_int32(env, value, &bit) != napi_ok || bit < 0 || bit >= static_cast<int32_t>(count) || used[bit])
+            throw std::runtime_error(std::string("memory wiring: invalid pin map for ") + key);
+          out[i] = static_cast<uint8_t>(bit);
+          used[bit] = true;
+        }
+      };
+      pins("ram_address", opt.ramAddress);
+      pins("rom_address", opt.romAddress);
+      pins("ram_data", opt.ramData);
+      pins("rom_data", opt.romData);
+      pins("cpu_address", opt.cpuAddress);
+      pins("cpu_data", opt.cpuData);
+      napi_value timing = prop(env, wiring, "memory_timing_ns");
+      if (!isType(env, timing, napi_object)) throw std::runtime_error("netlist wiring: missing memory timing");
+      auto delay = [&](const char *key) {
+        napi_value value = prop(env, timing, key);
+        double ns = -1;
+        if (!value || napi_get_value_double(env, value, &ns) != napi_ok || !(ns > 0 && ns < 200))
+          throw std::runtime_error(std::string("netlist wiring: invalid timing for ") + key);
+        return ns;
+      };
+      opt.ramAccessNs = delay("ram");
+      opt.romAccessNs = delay("rom");
+      opt.memoryWiringOn = true;
+      napi_value slots = prop(env, wiring, "slots");
+      bool array = false;
+      uint32_t count = 0;
+      if (!slots || napi_is_array(env, slots, &array) != napi_ok || !array ||
+          napi_get_array_length(env, slots, &count) != napi_ok || count != 6)
+        throw std::runtime_error("netlist wiring: six physical slots required");
+      auto integerPin = [&](napi_value object, const char *key, int lo, int hi) {
+        napi_value value = prop(env, object, key);
+        int32_t pin = -1;
+        if (!value || napi_get_value_int32(env, value, &pin) != napi_ok || pin < lo || pin > hi)
+          throw std::runtime_error(std::string("netlist wiring: invalid ") + key);
+        return static_cast<uint8_t>(pin);
+      };
+      for (uint32_t i = 0; i < 6; ++i) {
+        napi_value value;
+        napi_get_element(env, slots, i, &value);
+        auto &slot = opt.slotWiring[i];
+        slot.sck = integerPin(value, "sck", 0, 8);
+        slot.mosi = integerPin(value, "mosi", 0, 8);
+        slot.cs = integerPin(value, "cs", 0, 8);
+        slot.irq = integerPin(value, "irq", 0, 5);
+        napi_value miso = prop(env, value, "miso");
+        if (!isType(env, miso, napi_boolean) || napi_get_value_bool(env, miso, &slot.miso) != napi_ok)
+          throw std::runtime_error("netlist wiring: invalid miso presence");
+      }
+      opt.misoIdle = integerPin(wiring, "miso_idle", 0, 1);
+      napi_value series = prop(env, wiring, "series_delay_ns");
+      if (!series || napi_get_value_double(env, series, &opt.seriesDelayNs) != napi_ok ||
+          !(opt.seriesDelayNs > 0 && opt.seriesDelayNs < machine::NS_PER_CLOCK / 2))
+        throw std::runtime_error("netlist wiring: invalid series propagation delay");
+      napi_value bridge = prop(env, wiring, "bridge");
+      if (!isType(env, bridge, napi_object)) throw std::runtime_error("netlist wiring: missing system bridge");
+      opt.bridgeInputs[0] = integerPin(bridge, "sck", 0, 2);
+      opt.bridgeInputs[1] = integerPin(bridge, "mosi", 0, 2);
+      opt.bridgeInputs[2] = integerPin(bridge, "ncs", 0, 2);
+      napi_value bridgeMiso = prop(env, bridge, "miso");
+      if (!isType(env, bridgeMiso, napi_boolean) ||
+          napi_get_value_bool(env, bridgeMiso, &opt.bridgeMiso) != napi_ok)
+        throw std::runtime_error("netlist wiring: invalid bridge MISO");
+      opt.slotWiringOn = true;
+    }
     if (napi_value r = prop(env, o, "root"); isType(env, r, napi_string)) opt.root = str(env, r);
     auto *h = new std::unique_ptr<Machine>(std::make_unique<Machine>(opt));
     napi_value ext;

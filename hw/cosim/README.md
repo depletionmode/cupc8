@@ -7,17 +7,30 @@ chipset series resistors, the weak MISO pull, CPU socket and resistor packs,
 and SRAM/ROM attachment. Its JSON manifest lists contact joins and the
 verified model attachment paths. A broken connection exits nonzero.
 
+The native RTL machine consumes the manifest when `CUPC8_COSIM_TOP` points to
+it. CPU address/data wires and SRAM/ROM address/data pins use physical bit
+maps read from KiCad pads. Slot SPI/IRQ and system bridge lines use their
+connector maps. The shared MISO idle level comes from the verified 47 kΩ
+pull-up. Cards receive edges after the 33 Ω source RC delay (1.089 ns for a
+15 pF input). SRAM and ROM reads wait their 45 ns and 70 ns maximum access
+times plus routed copper delay (7 ps/mm). A memory bus with no routed copper
+gets provisional access times and `routed_timing: false`.
+
 From the repo root, after building the main board:
 
 ```
 python3 hw/cosim/gen_top.py --output build/hw/cosim/top.json
 python3 test/hw/test_cosim_wiring.py
+python3 test/hw/test_cosim_runtime.py --top build/hw/cosim/top.json
+# after the main route is complete:
+python3 hw/cosim/gen_top.py --require-route --output build/hw/cosim/top.json
+CUPC8_COSIM_TOP=build/hw/cosim/top.json CUPC8_EMU=native node test/emu/test_e2e.mjs E2E-002
 ```
 
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
-and a missing MISO pull are rejected. The generated manifest is a wiring
-prerequisite. The native emulator still uses its hardcoded board interconnect;
-it does not yet consume the manifest or model trace delay and weak pulls.
-Consequently E2E-001 through E2E-004 remain pending as full co-simulation
-rows. The native emulator's E2E-002A, E2E-003A and E2E-004A cover the
-functional scenarios separately.
+and a missing MISO pull are rejected. The third proves that ROM and CPU A0/A1
+contact swaps change the running machine's result. The manifest currently
+covers the CPU, main memory, slot data paths and system bridge. Power and
+reset circuits still use native machine wiring, and the current main-board
+route lacks memory copper. E2E-001 through E2E-004 remain pending until those
+paths and the full programs are exercised with a final routed board.
