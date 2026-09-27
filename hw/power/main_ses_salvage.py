@@ -179,7 +179,11 @@ def main_cli():
     if not pcbnew.ExportSpecctraDSN(board, str(check)):
         raise RuntimeError('matching DSN export failed')
     canonical = kg.canonical_dsn(check.read_text(), a.salt)
-    if canonical != (out / dsn.name).read_text():
+    saved_dsn = (out / dsn.name).read_text()
+    # KiCad embeds the export destination in the first line. The sandbox
+    # export necessarily has a different path; every design byte after that
+    # line must still match the saved router input.
+    if canonical.split('\n', 1)[1] != saved_dsn.split('\n', 1)[1]:
         raise RuntimeError('saved route DSN does not match copied preroute PCB at this salt')
     check.unlink()
     stats = replay_import(board, out / ses.name, a.salt)
