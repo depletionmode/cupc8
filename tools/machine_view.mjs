@@ -74,6 +74,28 @@ environment:
   process.exit(0);
 }
 
+// The instruction-level simulator uses --cards:LIST and --sd:IMAGE. Reject
+// those spellings here: otherwise the native viewer quietly uses hdmi,io.
+const flags = new Set(['--native', '--console']);
+const values = new Set(['--slots', '--sd', '--forward', '--every', '--port', '--console-port']);
+for (let i = 2; i < process.argv.length; i++) {
+  const option = process.argv[i];
+  if (flags.has(option)) continue;
+  if (values.has(option)) {
+    if (i + 1 >= process.argv.length || process.argv[i + 1].startsWith('--')) {
+      console.error(`missing value for ${option}; see --help`);
+      process.exit(2);
+    }
+    i++;
+    continue;
+  }
+  const hint = option.startsWith('--cards:') || option.startsWith('--sd:')
+    ? ' (native syntax: --slots hdmi,io,storage,wifi --sd card.img)'
+    : '';
+  console.error(`unknown option ${option}${hint}; see --help`);
+  process.exit(2);
+}
+
 const native = process.argv.includes('--native') || process.env.CUPC8_EMU === 'native';
 const { Machine } = await import(native ? '../test/emu/machinenative.mjs' : '../test/emu/machine.mjs');
 
