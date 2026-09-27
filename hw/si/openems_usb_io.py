@@ -159,12 +159,16 @@ def validate_series(netlist):
 
 def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=False,
              port_ohms=100, postprocess_only=False, netlist=None, boundary_margin_mm=0,
-             pml_clearance_mm=0, geometry_only=False):
+             pml_clearance_mm=0, geometry_only=False, fixed_window=False,
+             threads=4):
     routes, endpoints = routed_pair(board)
     schematic_hash = validate_series(netlist) if netlist else None
     if straight_control:
         routes = {net: [(pair[0], pair[1], .2)] for net, pair in endpoints.items()}
-    fdtd = openEMS(EndCriteria=1e-4, NrTS=max_steps)
+    # A normal -40 dB stop can precede the 16 ns port-window audit.  A
+    # fixed-window run uses a much lower automatic threshold and judges the
+    # sampled final field against the same -40 dB requirement instead.
+    fdtd = openEMS(EndCriteria=1e-15 if fixed_window else 1e-4, NrTS=max_steps)
     fdtd.SetGaussExcite(3e9, 3e9)
     fdtd.SetBoundaryCond(['PML_8'] * 6)
     csx = ContinuousStructure()
@@ -236,6 +240,8 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
                 'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
                 'netlist_sha256': schematic_hash, 'mesh_mm': mesh_mm,
                 'straight_control': straight_control,
+                'fixed_window': fixed_window, 'max_steps': max_steps,
+                'solver_threads': threads,
                 'boundary_margin_mm': boundary_margin_mm,
                 'pml_clearance_mm': pml_clearance_mm,
                 'air_bounds_mm': air_bounds, 'material_bounds_mm': material_bounds,
@@ -257,7 +263,7 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
             try:
                 sys.stdout.flush(); sys.stderr.flush()
                 os.dup2(log.fileno(), 1); os.dup2(log.fileno(), 2)
-                fdtd.Run(str(directory), cleanup=True, verbose=0, numThreads=4,
+                fdtd.Run(str(directory), cleanup=True, verbose=0, numThreads=threads,
                          dump_statistics=True)
             finally:
                 sys.stdout.flush(); sys.stderr.flush()
@@ -267,7 +273,19 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     decay = completion_decay(log)
     energy_samples = re.findall(r'Energy: ~[\deE+.-]+ \(-\s*([\d.]+)dB\)', log)
     measured_decay = -float(energy_samples[-1]) if energy_samples else None
-    steps = re.search(r'(?:after|for) (\d+) (?:timesteps|iterations)', log)
+    stats = (directory / 'openEMS_run_stats.txt').read_text().splitlines()
+    final_step = int(stats[-1].split()[1])
+    configured_cap = re.search(r'Max\. number of timesteps: (\d+)', log)
+    if configured_cap is None or int(configured_cap[1]) != max_steps:
+        raise ValueError('saved USB run has a different timestep cap')
+    configured_threads = re.search(r'openEMS - fixed number of threads: (\d+)', log)
+    if configured_threads is None or int(configured_threads[1]) != threads:
+        raise ValueError('saved USB run has a different solver thread count')
+    cap_reached = 'Max. number of timesteps was reached' in log
+    actual_steps = max_steps if cap_reached else final_step
+    timestep_match = re.search(r'FDTD timestep is: ([\deE+.-]+) s', log)
+    simulated_ns = (actual_steps * float(timestep_match[1]) * 1e9
+                    if timestep_match else None)
     version = re.search(r'openEMS 64bit -- version (\S+)', log)
     frequencies = np.array([.1e9, .24e9, .48e9])
     for port in ports:
@@ -290,13 +308,18 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     except ValueError as error:
         window_audit = {'unavailable': str(error)}
         spectral_stability_ok = False
-    valid = decay is not None and passivity_ok and port_ok and spectral_stability_ok and pml_geometry_ok
+    field_ok = (measured_decay is not None and measured_decay <= -40 and
+                (fixed_window and cap_reached and final_step >= .99 * max_steps or
+                 decay is not None))
+    valid = field_ok and passivity_ok and port_ok and spectral_stability_ok and pml_geometry_ok
     return {'scope': 'IO USB-A D+/D- R14/R15-to-J2 routed F.Cu subset',
             'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
             'netlist_sha256': schematic_hash,
             'stackup': 'JLC04161H-7628', 'prepreg_mm': PREPREG_MM, 'dielectric_er': DIELECTRIC_ER,
             'model': 'lossless dielectric, PEC copper, rectangular L2 GND; pads/ESD/mask/connector absent',
             'mesh_mm': mesh_mm, 'straight_control': straight_control,
+            'fixed_window': fixed_window, 'max_steps': max_steps,
+            'solver_threads': threads,
             'boundary_margin_mm': boundary_margin_mm,
             'pml_clearance_mm': pml_clearance_mm,
             'air_bounds_mm': air_bounds, 'material_bounds_mm': material_bounds,
@@ -305,12 +328,15 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
             'port_geometry': '2D differential lumped ports at resistor/connector pad centers',
             'declared_port_ohms': port_ohms, 'reference_ohms': 90,
             'energy_decay_db': decay if decay is not None else measured_decay,
-            'converged': decay is not None, 'passivity_ok': passivity_ok,
+            'converged': field_ok, 'passivity_ok': passivity_ok,
             'port_consistency_ok': port_ok,
             'spectral_stability_ok': spectral_stability_ok,
             'port_window_audit': window_audit,
             'solver_version': version[1] if version else None,
-            'timesteps': int(steps[1]) if steps else None,
+            'timesteps': actual_steps, 'last_energy_sample_step': final_step,
+            'simulated_ns': simulated_ns,
+            'run_log_sha256': hashlib.sha256(log.encode()).hexdigest(),
+            'xml_sha256': hashlib.sha256((directory / 'usb-io.xml').read_bytes()).hexdigest(),
             'valid_for_diagnostic_sparams': valid,
             'valid_for_row_4_6': False,
             'routes': {net: {'segments': len(parts),
@@ -332,6 +358,8 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--mesh-mm', type=float, default=.075)
     parser.add_argument('--max-steps', type=int, default=120000)
+    parser.add_argument('--threads', type=int, default=4,
+                        help='bounded openEMS worker threads')
     parser.add_argument('--boundary-margin-mm', type=float, choices=(0.0, 1.0), default=0.0,
                         help='legacy sensitivity: expand the field, dielectric and ground together')
     parser.add_argument('--pml-clearance-mm', type=float, choices=(0.0, 1.0), default=0.0,
@@ -342,11 +370,15 @@ def main():
                         help='reuse saved fields only when generated geometry is byte-identical')
     parser.add_argument('--geometry-only', action='store_true',
                         help='write the XML and mesh/clearance report without running FDTD')
+    parser.add_argument('--fixed-window', action='store_true',
+                        help='run to max steps for the 12-16 ns spectral audit, then judge final field energy')
     parser.add_argument('--straight-control', action='store_true')
     parser.add_argument('--require-evidence', action='store_true')
     args = parser.parse_args()
     if not .035 <= args.mesh_mm <= .1 or args.max_steps < 30000:
         parser.error('mesh must be 0.035–0.1 mm and max steps >= 30000')
+    if not 1 <= args.threads <= 8:
+        parser.error('threads must be 1–8')
     if args.pml_clearance_mm and args.boundary_margin_mm:
         parser.error('choose PML clearance or the legacy boundary-margin comparison')
     if args.geometry_only and args.postprocess_only:
@@ -363,13 +395,17 @@ def main():
         run_name += '-margin-1mm'
     if args.pml_clearance_mm:
         run_name += '-pml-clear-1mm'
+    if not math.isclose(args.mesh_mm, .075, abs_tol=1e-9):
+        run_name += f'-mesh-{args.mesh_mm:.3f}'.replace('.', 'p') + 'mm'
     if args.geometry_only:
         run_name += '-geometry-only'
+    if args.fixed_window:
+        run_name += '-fixed-window'
     directory = output.parent / run_name
     report = simulate(board, directory, args.mesh_mm, args.max_steps,
                       args.straight_control, args.port_ohms, args.postprocess_only,
                       netlist, args.boundary_margin_mm, args.pml_clearance_mm,
-                      args.geometry_only)
+                      args.geometry_only, args.fixed_window, args.threads)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

@@ -1,0 +1,39 @@
+{
+  "scope": "GPU HDMI D0 field geometry only",
+  "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+  "pml_clearance_mm": 0.0,
+  "air_bounds_mm": [
+    24.5,
+    28.500000000000057,
+    -35.5,
+    -26.20000000000053
+  ],
+  "material_bounds_mm": [
+    24.5,
+    28.5,
+    -35.5,
+    -26.2
+  ],
+  "pml_inner_bounds_mm": [
+    [
+      24.900000000000006,
+      28.10000000000005
+    ],
+    [
+      -35.10000000000002,
+      -26.600000000000506
+    ],
+    [
+      -0.06,
+      0
+    ]
+  ],
+  "pml_geometry_ok": false,
+  "grid_lines": {
+    "x": 81,
+    "y": 187,
+    "z": 18
+  },
+  "xml_sha256": "2adde852aba6eb789b26b7617d0c0b021d606ba4b1cb24b5fbbcd39af7c7dc30",
+  "valid_for_si_evidence": false
+}

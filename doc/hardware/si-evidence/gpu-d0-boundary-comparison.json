@@ -1,0 +1,82 @@
+{
+  "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+  "cutoff_ns": 9.8,
+  "frequency_results": [
+    {
+      "frequency_hz": 100000000,
+      "legacy": {
+        "s11_db": -27.575987489107114,
+        "s21_db": -0.2134814821134415,
+        "power_sum": 0.9537801056209182
+      },
+      "corrected": {
+        "s11_db": -42.33903763012491,
+        "s21_db": -0.0009655908584741986,
+        "power_sum": 0.9998360466436875
+      }
+    },
+    {
+      "frequency_hz": 480000000,
+      "legacy": {
+        "s11_db": -19.93330618334745,
+        "s21_db": -0.21303223288310438,
+        "power_sum": 0.9622859097838542
+      },
+      "corrected": {
+        "s11_db": -28.765031799658214,
+        "s21_db": -0.0059348693041799145,
+        "power_sum": 0.9999632929776747
+      }
+    },
+    {
+      "frequency_hz": 800000000,
+      "legacy": {
+        "s11_db": -15.8106985455995,
+        "s21_db": -0.3526848765956006,
+        "power_sum": 0.9482392201139054
+      },
+      "corrected": {
+        "s11_db": -24.397897280445836,
+        "s21_db": -0.015583981785887834,
+        "power_sum": 1.000050624884014
+      }
+    },
+    {
+      "frequency_hz": 1260000000,
+      "legacy": {
+        "s11_db": -12.443482323513171,
+        "s21_db": -0.5421885192851669,
+        "power_sum": 0.939605734126549
+      },
+      "corrected": {
+        "s11_db": -20.6154034807886,
+        "s21_db": -0.037749750831410654,
+        "power_sum": 1.000024266043735
+      }
+    }
+  ],
+  "sources": {
+    "legacy": {
+      "xml_sha256": "2adde852aba6eb789b26b7617d0c0b021d606ba4b1cb24b5fbbcd39af7c7dc30",
+      "run_log_sha256": "f3990afd4ea8b749666d03203400c85b97a4f24937fb993241811c9c6a667697",
+      "port_sha256": {
+        "ut_1": "0e08516c04b115a664ac02a516c96def7b01cc862bb41989ed84d3c2fbe7c559",
+        "it_1": "e9dfea02227e996bb084e8fe5f7ea1fa574b7ea206a860fe721cabde664d3ae7",
+        "ut_2": "11e4026df144d66e9259d819fc57c107fa8fd1995b2c0cffb4010fd8c7ecefba",
+        "it_2": "25b147ad33c72621c218f232456768430428ef4a6d12f394ebc5e585b2548287"
+      },
+      "pml_geometry_ok": false
+    },
+    "corrected": {
+      "xml_sha256": "6c60b4d3ed307a0034b710f4e3ac8a72e74d6f77877f79fdc695b093bb5c084c",
+      "run_log_sha256": "d79642368cf28b42ac4f1931e5ebc6c7150e1f5e6f9043a1008988d6997ce26c",
+      "port_sha256": {
+        "ut_1": "f305bd0da067f9931781f32a68f741254908d4dfe293ec484b6aa17359ceed9b",
+        "it_1": "5b8fc9f574d645ee3b63361555a23baa5094c9e749f9bb33033414d829d4f148",
+        "ut_2": "cd73ace7027b708b7b93c756427c752cabcba6d667d8ad317a7d18270b69ecba",
+        "it_2": "c859f6f5beb5dee1dd5614daacbdc7476defe0c84885485a8f9c41c6e8930bdb"
+      },
+      "pml_geometry_ok": true
+    }
+  }
+}
