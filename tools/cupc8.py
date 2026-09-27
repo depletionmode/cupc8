@@ -630,7 +630,7 @@ def program_body(data):
 
 def run_program(sc, data, log=print):
     """Write the program at $7000 and set API_RUN: the terminal starts it
-    the next time it waits for a key. The bridge's writes are safe while the
+    after acknowledging a safe upload window at its key wait. The bridge's writes are safe while the
     CPU runs (each stalls it for one memory cycle), but a program running at
     $7000 would be written over, so the kernel keeps API_RUN at 2 meanwhile
     and this refuses."""
@@ -641,6 +641,19 @@ def run_program(sc, data, log=print):
         return 1
     if state != 0:
         log("the last program has not started yet (API_RUN = %d): is the terminal at its prompt?" % state)
+        return 1
+    # The kernel must park outside BASIC before the first body write.
+    sc.ram_write(API_RUN, b"\x03")
+    deadline = time.monotonic() + 2.0 * float(os.environ.get("CUPC8_TIMEOUT_SCALE", "1"))
+    while time.monotonic() < deadline:
+        if sc.ram_read(API_RUN, 1)[0] == 4:
+            break
+        time.sleep(0.01)
+    else:
+        # A request can cross BASIC's transition to state 2. Keep the
+        # mailbox non-idle until the kernel observes cancellation or exits.
+        sc.ram_write(API_RUN, b"\x05")
+        log("upload not acknowledged by the terminal; program memory untouched")
         return 1
     sc.ram_write(PROGRAM_BASE, body)
     sc.ram_write(API_RUN, b"\x01")      # last: the terminal only looks at API_RUN

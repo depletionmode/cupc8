@@ -75,8 +75,8 @@ proc basicMapPath*(): string =
   romDir() / "basic.map"
 
 proc makeRom*(boot, kernel, dest: string; basic = "*"): string =
-  ## The ROM image: the boot ROM, the kernel with its header and BASIC at ROM
-  ## $08000 (tools/mkrom.py). `basic` is a BASIC.PRG; "*" builds basic/
+  ## The ROM image: the boot ROM, the kernel with its header and BASIC after
+  ## the kernel (tools/mkrom.py). `basic` is a BASIC.PRG; "*" builds basic/
   ## (buildBasic), "" leaves it out (a kernel with no BASIC).
   createDir(dest.parentDir)
   let prg = if basic == "*": buildBasic() else: basic

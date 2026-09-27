@@ -931,6 +931,8 @@ const
   ProgramEnd* = 0xe000
   ApiRun* = 0x6f21               ## the API block's API_RUN mailbox (kernel/api.s)
 
+proc cpuStep*(): StepResult
+
 proc runProgram*(data: string): bool =
   ## What `cupc8.py run` does through the system card: the program's body at
   ## $7000, then API_RUN = 1; the kernel's terminal starts it while it waits
@@ -942,6 +944,16 @@ proc runProgram*(data: string): bool =
       return false
     body = body[4 .. ^1]
   if body.len > ProgramEnd - ProgramBase:
+    return false
+  if mem[ApiRun] != 0:
+    return false
+  mem[ApiRun] = 3
+  var steps = 0
+  while mem[ApiRun] != 4 and steps < 24_000_000:
+    if cpuStep() != sOk: break
+    inc steps
+  if mem[ApiRun] != 4:
+    mem[ApiRun] = 0
     return false
   for i, c in body:
     mem[ProgramBase + i] = ord(c)

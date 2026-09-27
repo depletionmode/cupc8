@@ -71,10 +71,6 @@ read_string:
 
 ; dump_char_rom dumped the C64 font through the old pixel path; gone with it
 
-str_printuint16:
-	pop pcl
-	pop pch
-
 ps_msg_addr: resb 2
 ps_i: resb 1
 str_printstr:
