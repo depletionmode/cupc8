@@ -5,6 +5,10 @@ fabrication approval, or waiver. Do not order cards from the proposed footprint
 until the evidence below is recorded and the board checks pass. No supplier has
 been contacted.
 
+The [socket source review](card-notch-socket-source-review.md) checks published
+UMAX, Amphenol, Molex, TE, and Samtec drawings against the worst-case rib and
+shifted-contact requirements. It identifies no qualified substitute.
+
 ## Proposed copper geometry
 
 The current card footprint has a 1.90 mm notch centered at x=11.50 mm and
