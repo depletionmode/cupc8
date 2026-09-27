@@ -79,7 +79,8 @@ fail until their contract coverage exists:
   (`main.py`, `chipset.vhd`). U13's six slot reset pins have 10 kΩ pull-ups
   to 3V3 and its outputs power up as inputs. Sysctl has no direct CPU-reset
   output: its `SYS_nRST` reaches U6's manual-reset input. Its only rail ADC
-  is the main 1V2 divider; firmware reads that channel for `STATUS` and
+  is the main 1V2 sense input through a 1 kΩ series resistor (R100);
+  firmware reads that channel for `STATUS` and
   initializes all machine-facing pins as inputs. `sysctl_init` does no
   power-on hold or rail check. Thus CPU and cards can be released before
   sysctl boots, and the machine is designed to boot without that card. The
