@@ -33,6 +33,14 @@ class FabCheckTests(unittest.TestCase):
             drill.write_text('M48\nMETRIC\nT1C0.300\n%\nG90\nG05\nT1\nX1.0Y2.0\nM30\n')
             with patch.object(fabcheck, 'board_holes', return_value=Counter({(1.0, 2.0, .3): 1})):
                 self.assertEqual(fabcheck.check_drills(object(), fab), 1)
+                drill.write_text(drill.read_text().replace('X1.0Y2.0', 'X1.0001Y2.0'))
+                with self.assertRaisesRegex(ValueError, 'unsupported Excellon command'):
+                    fabcheck.check_drills(object(), fab)
+                drill.write_text(drill.read_text().replace('X1.0001Y2.0', 'X1.0Y2.0')
+                                 .replace('T1C0.300', 'T1C0.3001'))
+                with self.assertRaisesRegex(ValueError, 'unsupported Excellon command'):
+                    fabcheck.check_drills(object(), fab)
+                drill.write_text(drill.read_text().replace('T1C0.3001', 'T1C0.300'))
                 drill.write_text(drill.read_text().replace('X1.0Y2.0', 'X1.2Y2.0'))
                 with self.assertRaisesRegex(ValueError, 'drill-to-pad/via mismatch'):
                     fabcheck.check_drills(object(), fab)

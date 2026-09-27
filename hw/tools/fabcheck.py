@@ -15,9 +15,12 @@ import gerberdrc
 GERBER_EXTENSIONS = {'.gtl', '.gbl', '.gts', '.gbs', '.gtp', '.gbp',
                      '.gto', '.gbo', '.gm1', '.g1', '.g2', '.g3', '.g4', '.gbr'}
 TIMESTAMP = re.compile(r'^(?:%TF.CreationDate,|G04 Created by KiCad )')
-TOOL = re.compile(r'^T(\d+)C(\d+(?:\.\d+)?)$')
-HIT = re.compile(r'^X(-?\d+(?:\.\d+)?)Y(-?\d+(?:\.\d+)?)$')
-SLOT = re.compile(r'^X(-?\d+(?:\.\d+)?)Y(-?\d+(?:\.\d+)?)G85X(-?\d+(?:\.\d+)?)Y(-?\d+(?:\.\d+)?)$')
+# Hole keys use millimetres rounded to 0.001. Reject finer Excellon
+# coordinates rather than silently changing the plotted drill geometry.
+DECIMAL_MM = r'-?\d+(?:\.\d{1,3})?'
+TOOL = re.compile(r'^T(\d+)C(' + DECIMAL_MM + r')$')
+HIT = re.compile(r'^X(' + DECIMAL_MM + r')Y(' + DECIMAL_MM + r')$')
+SLOT = re.compile(r'^X(' + DECIMAL_MM + r')Y(' + DECIMAL_MM + r')G85X(' + DECIMAL_MM + r')Y(' + DECIMAL_MM + r')$')
 
 
 def slot_key(start, end, diameter):
@@ -119,7 +122,7 @@ def drill_hits(path, return_types=False):
                 if key in hit_plating and hit_plating[key] != kind:
                     raise ValueError('%s: mixed plating class for same drill cut' % path.name)
                 hit_plating[key] = kind
-        elif line in ('M48', 'FMAT,2', 'METRIC', 'G90', 'G05', 'M30') or line.startswith('T') and not in_body:
+        elif line in ('M48', 'FMAT,2', 'METRIC', 'G90', 'G05', 'M30'):
             continue
         else:
             raise ValueError('%s: unsupported Excellon command %s' % (path.name, line))
