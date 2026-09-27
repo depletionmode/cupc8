@@ -601,11 +601,11 @@ cmd = "tools/run_tests.sh"
 [[test]]
 id = "BOOT-004"
 title = "ROM image tool"
-checks = "mkrom.py header fields, checksums, erased padding; round-trips; rejects oversize kernels"
-method = "pytest"
+checks = "mkrom.py header fields, checksums, erased padding; a truly absent BASIC header is accepted and a damaged BASIC header is rejected; round-trips; rejects oversize kernels"
+method = "mkrom.py --info on a built ROM, plus test/host/test_mkrom_info.py"
 kind = "sim"
 vrow = "2.8"
-cmd = "d=$(mktemp -d) && python3 tools/as.py rom/boot.s $d/boot.bin 0xe000,0xe600,0x0f00 && bash kernel/assemble.sh $d && python3 tools/mkrom.py $d/boot.bin $d/kernel.o -o $d/test.rom && python3 tools/mkrom.py --info $d/test.rom; r=$?; rm -rf $d; exit $r"
+cmd = "d=$(mktemp -d) && python3 tools/as.py rom/boot.s $d/boot.bin 0xe000,0xe600,0x0f00 && bash kernel/assemble.sh $d && python3 tools/mkrom.py $d/boot.bin $d/kernel.o -o $d/test.rom && python3 tools/mkrom.py --info $d/test.rom && python3 test/host/test_mkrom_info.py; r=$?; rm -rf $d; exit $r"
 
 
 # ============================================================================

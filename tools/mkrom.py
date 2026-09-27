@@ -73,6 +73,9 @@ def info(rom):
     basic_hdr, basic_body = basic_offsets(struct.unpack_from("<H", rom, HDR_OFF + 8)[0])
     if rom[basic_hdr:basic_hdr + 4] == MAGIC:
         ok = show(rom, basic_hdr, basic_body, "BASIC") and ok
+    elif rom[basic_hdr:basic_hdr + 256] != b"\xff" * 256:
+        print("BASIC    : invalid header (ROM $%05x)" % basic_hdr)
+        ok = False
     else:
         print("BASIC    : none (ROM $%05x)" % basic_hdr)
     return 0 if ok else 1
