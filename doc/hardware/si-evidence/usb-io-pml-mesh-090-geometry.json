@@ -1,0 +1,46 @@
+{
+  "scope": "IO USB-A field geometry only; no FDTD or S-parameters",
+  "board_sha256": "2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c",
+  "netlist_sha256": "074f967c05707d2794262cf9cff36a98e247ebfaffd8a9040e1c5c6b7c86e7ff",
+  "mesh_mm": 0.09,
+  "straight_control": false,
+  "fixed_window": false,
+  "max_steps": 120000,
+  "solver_threads": 2,
+  "boundary_margin_mm": 0.0,
+  "pml_clearance_mm": 1.0,
+  "air_bounds_mm": [
+    33.42,
+    44.58,
+    -35.58,
+    -17.49
+  ],
+  "material_bounds_mm": [
+    34.5,
+    43.5,
+    -34.5,
+    -18.5
+  ],
+  "pml_inner_bounds_mm": [
+    [
+      34.14,
+      43.86
+    ],
+    [
+      -34.86,
+      -18.21
+    ],
+    [
+      -1,
+      1.5
+    ]
+  ],
+  "pml_geometry_ok": true,
+  "grid_lines": {
+    "x": 125,
+    "y": 202,
+    "z": 34
+  },
+  "xml_sha256": "f8395dd9232cc7e20aa767466f9a900f3683a246a9ad7ce7dfb6d8fccc869283",
+  "valid_for_row_4_6": false
+}

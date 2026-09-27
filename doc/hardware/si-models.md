@@ -186,6 +186,27 @@ message is expected; the sampled −88.18 dB field separately exceeds the
 required −40 dB decay. The model still omits pad, connector, ESD loading,
 losses and the complete USB path. Row 4.6 remains open.
 
+A bounded coarser-grid comparison keeps the same IO board/netlist, routed
+copper, ports, material box, 1 mm PML clearance and 12–16 ns audit windows.
+At 0.09 mm the grid is 125×202×34 cells (versus 150×243×34 at 0.075 mm),
+and 169,000 steps cover 16.38 ns. It used two solver threads and ended at
+−88.78 dB; passive power, port consistency, PML placement and spectral
+stability all pass. Saved-field postprocessing reproduced byte-identical
+XML (SHA-256 `f8395dd9232cc7e20aa767466f9a900f3683a246a9ad7ce7dfb6d8fccc869283`).
+The [two-grid comparison](si-evidence/usb-io-mesh-comparison.json) records
+these changes from 0.075 to 0.09 mm:
+
+| Frequency | ΔS11 | ΔS21 |
+| --- | ---: | ---: |
+| 100 MHz | +0.5010 dB | +0.00017 dB |
+| 240 MHz | +0.5053 dB | −0.00203 dB |
+| 480 MHz | +0.5192 dB | −0.01007 dB |
+
+The two individually stable runs differ by as much as 0.519 dB in S11.
+This is a measured grid sensitivity, not a mesh-convergence result; a finer
+grid and a calibrated launch/physical-component model remain necessary
+before inferring the real differential impedance.
+
 The [RP2040 datasheet](https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)
 specifies a full/low-speed host, not a 480 Mb/s high-speed host. The
 [USB-IF states that full-speed edges are typically 12–25 ns](https://www.usb.org/node/214).
@@ -208,6 +229,11 @@ python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
 python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
   --out build/hw/si/usb-io-pml-fixed.json --pml-clearance-mm 1 \
   --max-steps 220000 --fixed-window --require-evidence
+# Bounded coarser-grid sensitivity with the same 16 ns audit window.
+python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
+  --out build/hw/si/usb-io-pml-090-fixed.json --mesh-mm 0.09 \
+  --pml-clearance-mm 1 --max-steps 169000 --fixed-window --threads 2 \
+  --require-evidence
 ```
 
 ## IBIS specification and pinned FPGA model
