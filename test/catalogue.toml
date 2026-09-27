@@ -2591,6 +2591,15 @@ vrow = "4.5"
 cmd = "python3 hw/tools/boardcheck.py wifi thermal"
 
 [[test]]
+id = "WC-010A"
+title = "Wi-Fi board thermal transfer sensitivity classification"
+checks = "Buck, routed copper, return contact and ESP heat stay separate; DRC findings and missing transfer bounds cannot pass"
+method = "test/hw/test_wifi_thermal_board.py"
+kind = "static"
+vrow = "4.5"
+cmd = "python3 test/hw/test_wifi_thermal_board.py"
+
+[[test]]
 id = "BRD-002"
 title = "Board evidence and result gate regressions"
 checks = "Missing and stale inputs, changed or missing artifacts, all DRC finding classes and unwaived ERC warnings fail"
