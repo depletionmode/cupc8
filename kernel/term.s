@@ -1,7 +1,7 @@
 ; The terminal (doc/proposals/basic-program.md): the banner, BASIC loaded
 ; into $7000 (sys.s sys_basic_boot), the prompt and its line editor (printf.s
 ; read_string), and the commands the kernel runs itself - help, dir, del, net,
-; refresh, exec. Every other line goes to the program at $7000 that set the
+; refresh, exec, type. Every other line goes to the program at $7000 that set the
 ; terminal's hook (API_TERM_HOOK: BASIC, basic/basic.s); with none it is an
 ; invalid command.
 
@@ -19,7 +19,8 @@ term_dig: resb 1
 term_digs: resb 12
 
 term_s_usage db "\nSAVE, LOAD or DEL \"NAME\"\n"
-term_cmds db "help net dir del refresh exec "
+term_s_type_usage db "\nTYPE \"NAME\"\n"
+term_cmds db "help net dir del refresh exec type "
 
 term_do:
 	mov r0, #2				; API_RUN 2 while BASIC loads (cupc8.py run waits)
@@ -102,6 +103,8 @@ term_parse:
 	bzf eink_cmd_refresh
 	eq r0, #6
 	bzf sys_cmd_exec
+	eq r0, #7
+	bzf term_cmd_type
 	; any other line: the program's at $7000
 	mov r0, #<[term_line_buf]
 	st API_ARGS, r0
@@ -231,7 +234,7 @@ term_hook:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN LIST CLR NET SAVE LOAD DIR DEL REFRESH EXEC\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
+	term_s_help_buf db "\nNEW RUN LIST CLR NET SAVE LOAD DIR DEL TYPE REFRESH EXEC\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch
@@ -243,7 +246,7 @@ term_cmd_help:
 	pop pch
 
 ; ------------------------------------------------------------ files on the storage card
-; DIR and DEL "NAME" (kernel/storage.s); SAVE and LOAD are BASIC's.
+; DIR, DEL "NAME" and TYPE "NAME" (kernel/storage.s); SAVE and LOAD are BASIC's.
 
 ; the name after the command word, quoted or not, into st_name; r0 = its length
 term_get_name:
@@ -316,6 +319,73 @@ term_cmd_del:
 .usage:
 	mov r0, #>[term_s_usage]
 	mov r1, #<[term_s_usage]
+	push pch
+	push pcl
+	b str_printstr
+.done:
+	pop pcl
+	pop pch
+
+; the file's bytes on the screen (handle 0), CRs dropped so a PC's CR LF
+; lines come out as the terminal's own
+term_cmd_type:
+	push pch
+	push pcl
+	b term_get_name
+	eq r0, #0
+	bzf .usage
+	xor r0, r0
+	st [st_h], r0
+	st [st_mode], r0
+	push pch
+	push pcl
+	b st_open
+	eq r0, #0
+	bzf .chunk
+	push pch
+	push pcl
+	b st_print_err
+	b .done
+.chunk:
+	mov r0, #128
+	st [st_n], r0
+	push pch
+	push pcl
+	b st_read
+	eq r0, #0
+	bzf .got
+	push pch
+	push pcl
+	b st_print_err
+	b .close
+.got:
+	ld r0, [st_n]
+	eq r0, #0				; the end of the file
+	bzf .close
+	xor r1, r1
+.byte:
+	ld r0, [st_n]
+	eq r1, r0
+	bzf .chunk
+	push r1
+	ld r0, [st_rbuf+1]+r1
+	eq r0, #13
+	bzf .next
+	push pch
+	push pcl
+	b print_ascii_char
+.next:
+	pop r1
+	add r1, #1
+	b .byte
+.close:
+	push pch
+	push pcl
+	b st_close
+	b .done
+.usage:
+	mov r0, #>[term_s_type_usage]
+	mov r1, #<[term_s_type_usage]
 	push pch
 	push pcl
 	b str_printstr

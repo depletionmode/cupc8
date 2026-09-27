@@ -2535,6 +2535,12 @@ proc testStorage() =
   writeFile(storeDir / "big.dat", "x".repeat(70000))
   discard fatcheck("put " & quoteShell(img) & " PC.BAS " & quoteShell(storeDir / "pc.txt"))
   discard fatcheck("put " & quoteShell(img) & " BIG.DAT " & quoteShell(storeDir / "big.dat"))
+  # for TYPE: 12 CR LF lines, some 540 bytes (5 reads of 128, lines across them)
+  var typeLines: seq[string]
+  for i in 1..12:
+    typeLines.add("line " & $i & " abcdefghijklmnopqrstuvwxyz0123456789")
+  writeFile(storeDir / "type.txt", typeLines.join("\r\n") & "\r\n")
+  discard fatcheck("put " & quoteShell(img) & " TYPE.TXT " & quoteShell(storeDir / "type.txt"))
   # more than the 8 KB buffer: "1 print "long"", then 300 REM lines; a line
   # goes in while it, its CR and a 0 end by $dfff (the program from $c004)
   var long = "1 print \"long\"\r\n"
@@ -2574,7 +2580,7 @@ proc testStorage() =
 
   # DIR: names and sizes (a 32-bit size too)
   let dir = cmdOutput("dir")
-  if dir.len != 4: echo "dir ", dir
+  if dir.len != 5: echo "dir ", dir
   expectTrue("DIR lists the saved program", ("PROG.BAS     " & $text.len) in dir)
   expectTrue("DIR lists a PC's file", ("PC.BAS       " & $getFileSize(storeDir / "pc.txt")) in dir)
   expectTrue("DIR prints a size over 65535", "BIG.DAT      70000" in dir)
@@ -2585,6 +2591,16 @@ proc testStorage() =
   if pcRan != @["from a pc", "25", "no line end"]: echo "got ", pcRan
   expectTrue("a PC's file runs (CR LF, blank and unnumbered lines, no last line end)",
              pcRan == @["from a pc", "25", "no line end"])
+
+  # TYPE: a file's text on the screen, the PC's CR LF as the terminal's lines
+  let typed = cmdOutput("type \"pc.bas\"")
+  if typed != @["10 print \"from a pc\"", "no number here", "20 print 5 * 5", "30 print \"no line end\""]: echo "type ", typed
+  expectTrue("TYPE a PC's file", typed == @["10 print \"from a pc\"", "no number here", "20 print 5 * 5", "30 print \"no line end\""])
+  let typed2 = cmdOutput("type type.txt")
+  if typed2 != typeLines: echo "type ", typed2
+  expectTrue("TYPE a file of several reads, unquoted", typed2 == typeLines)
+  expectTrue("TYPE a missing file", cmdOutput("type \"nothing\"") == @["file not found"])
+  expectTrue("TYPE without a name", cmdOutput("type") == @["TYPE \"NAME\""])
 
   # a file longer than the program buffer: the load stops at the first line that does not fit
   expectTrue("LOAD more than fits", cmdOutput("load \"long.bas\"") == @["PROGRAM FULL", "LOADED"])
@@ -2611,7 +2627,7 @@ proc testStorage() =
 
   # DEL
   expectTrue("DEL", cmdOutput("del \"prog.bas\"").len == 0)
-  expectTrue("DIR after DEL", cmdOutput("dir").len == 3)
+  expectTrue("DIR after DEL", cmdOutput("dir").len == 4)
   expectTrue("LOAD a deleted file", cmdOutput("load \"prog.bas\"") == @["file not found"])
   expectTrue("DEL a missing file", cmdOutput("del \"nothing\"") == @["file not found"])
   r = fatcheck("check " & quoteShell(img) & " --absent PROG.BAS --size PC.BAS=" & $getFileSize(storeDir / "pc.txt"))

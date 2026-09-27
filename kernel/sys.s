@@ -132,7 +132,7 @@ api_mem_cpy:
 
 ; API_TERM_HOOK - set the terminal's hook: r0, r1 = the address (low, high)
 ; of a routine in the program at $7000 (0, 0: none). The terminal runs its own
-; commands (help, dir, del, net, refresh, exec) and calls the hook, as a
+; commands (help, dir, del, type, net, refresh, exec) and calls the hook, as a
 ; routine, with every other line: r0 = 0, API_ARGS[0..1] = a pointer to the
 ; line as typed (up to 78 characters, a CR, a 0). exec "NAME" calls it for a
 ; file with no program header: r0 = 1, API_ARGS[0..1] = a pointer to the
