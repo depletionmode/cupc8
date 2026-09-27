@@ -1423,8 +1423,11 @@ def check_silk(board, clearance=0.15, artwork=False, labels=None):          # JL
                 # a text by its strokes: its bounding box pads it by ~0.25 mm a side
                 gb = g.GetEffectiveTextShape().BBox() if isinstance(g, pcbnew.EDA_TEXT) else g.GetBoundingBox()
                 hit = lambda bb, pad, gb=gb: bb.Intersects(gb)           # noqa: E731
+            # Most footprint artwork is nowhere near most pads. Reject by a
+            # cheap bounding box before probing every point on each stroke.
+            art_box = gb if isinstance(g, pcbnew.EDA_TEXT) else g.GetBoundingBox()
             for ref, num, on_f, on_b, bb, pad in pads:
-                if (on_f if front else on_b) and hit(bb, pad):
+                if (on_f if front else on_b) and art_box.Intersects(bb) and hit(bb, pad):
                     bad.append("silkscreen of %s touches pad %s of %s" % (fp.GetReference(), num, ref))
     # the board's own silkscreen words (labels, the revision) against every
     # pad, and the free-standing ones (not a part's label) against every
