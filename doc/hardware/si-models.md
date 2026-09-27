@@ -47,8 +47,9 @@ Two 2D differential lumped ports are normalized to 90 Ω. A declared 90 Ω
 port measured about 81 Ω at the passive end on the 0.075 mm mesh, so its
 S-parameters were invalid. A 100 Ω declared resistor measures about 90.0 Ω
 and leaves less than 0.05% passive-port incident voltage at 100–480 MHz. The
-longer run reached only −34.4 dB energy decay after 120,000 timesteps, short
-of the required −40 dB. Its S11/S21 values are therefore **not accepted** as
+longer run reached only −34.4 dB energy decay after 120,000 timesteps; an
+extended 220,000-step run plateaued at −38.41 dB, short of the required
+−40 dB. Its S11/S21 values are therefore **not accepted** as
 signal-integrity evidence even though passive power and port checks pass.
 The script exits nonzero and writes `converged: false` and
 `valid_for_row_4_6: false`. A converged rerun, mesh/straight-route sensitivity,
