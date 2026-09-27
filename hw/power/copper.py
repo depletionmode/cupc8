@@ -24,6 +24,7 @@ COPPER_ALPHA_PER_C = 0.00393
 THICKNESS = {"outer": 0.0348, "inner": 0.0174}
 VIA_PLATING = 0.025  # mm; conservatively use one full 1.6 mm barrel per hop
 BOARD_THICKNESS = 1.6
+TRACE_WIDTH_FACTOR = 1.0
 
 
 def pad(board, ref, number):
@@ -52,7 +53,7 @@ def network(board, netname):
         if item.Type() == pcbnew.PCB_TRACE_T:
             a, b = item.GetStart(), item.GetEnd()
             layer = item.GetLayer()
-            width = pcbnew.ToMM(item.GetWidth())
+            width = TRACE_WIDTH_FACTOR * pcbnew.ToMM(item.GetWidth())
             segments.append(((a.x, a.y), (b.x, b.y), layer, width))
             points[layer].update(((a.x, a.y), (b.x, b.y)))
         elif item.Type() == pcbnew.PCB_VIA_T:
