@@ -66,7 +66,7 @@ class EvidenceTests(unittest.TestCase):
     def test_missing_fab_export_even_with_matching_manifest(self):
         (self.out / 'fab/cpu-F_Cu.gbr').unlink()
         evidence.record('cpu', self.out, self.before, 3, self.root)
-        with self.assertRaisesRegex(ValueError, 'missing or empty fab artifact'):
+        with self.assertRaisesRegex(ValueError, 'missing or empty Gerber artifact'):
             evidence.validate('cpu', self.out, self.root)
 
     def test_changed_render(self):
