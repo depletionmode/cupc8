@@ -18,7 +18,8 @@ gets provisional access times and `routed_timing: false`. The manifest lists
 unrouted CPU, memory, slot, bridge, clock, reset and power-policy signal nets
 under `missing_routes`; `--require-route` rejects them.
 The generator also lists every named net that is not attached to an executed
-model path under `unmodeled_nets`. E2E-001 uses `--require-coverage` and fails
+model path under `unmodeled_nets`. E2E-001 through E2E-004 use
+`--require-coverage` and fail
 until each remaining net has a model or an explicit reviewed waiver. This
 keeps local card and power circuits from being silently counted as covered.
 
