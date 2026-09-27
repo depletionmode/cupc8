@@ -638,6 +638,9 @@ def export_netlist(sch_path, out_path):
 
 # ----------------------------------------------------------------- project
 
+SOLDER_MASK_WEB = 0.1  # mm; also checked on plotted F/B mask openings
+SOLDER_MASK_EXPANSION = 0.01  # KiCad's region plot needs a little opening margin over pad copper
+
 # JLCPCB standard capabilities are 0.127 mm track/space (2-layer), 0.3 mm via
 # drill, 0.3 mm copper to edge; these rules keep a margin above them.
 JLC_RULES = {
@@ -649,6 +652,7 @@ JLC_RULES = {
     "min_copper_edge_clearance": 0.3,
     "min_hole_clearance": 0.25,
     "min_hole_to_hole": 0.5,
+    "min_solder_mask_web": SOLDER_MASK_WEB,
     "min_connection": 0.15,
     "min_resolved_spokes": 2,
     "min_silk_clearance": 0.0,
@@ -846,6 +850,9 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     mm = pcbnew.FromMM
     board = pcbnew.BOARD()
     board.SetCopperLayerCount(layers)
+    # fabcheck reads this saved-board rule when checking the plotted masks.
+    board.GetDesignSettings().m_SolderMaskMinWidth = mm(SOLDER_MASK_WEB)
+    board.GetDesignSettings().m_SolderMaskExpansion = mm(SOLDER_MASK_EXPANSION)
 
     netinfo = {}
     for name in nets:
