@@ -56,16 +56,19 @@ def wifi_card(out):
     out = Path(out)
     circuit = wifi_board.topology(out / 'wifi.net')
     r5, r3 = wifi_board.routes(out / 'wifi.kicad_pcb', out / 'fab/order.json', circuit)
-    rgnd, vias, cells = wifi_ground.estimate(out / 'wifi.kicad_pcb')
+    rgnd, coarse, fine, discrepancy = wifi_ground.compare(out / 'wifi.kicad_pcb')
     buck_w, copper_w, esp_w, allowance = wifi_coupling_budget(r5, r3, rgnd)
     c = Checks('WC-010 Wi-Fi board local thermal coupling at %.0f C ambient' % d.AMBIENT_C)
     c.info('routed copper', '%.1f mOhm +5V, %.1f mOhm 3V3, %.1f mOhm GND; %d GND vias' %
-           (1e3 * r5, 1e3 * r3, 1e3 * rgnd, vias))
+           (1e3 * r5, 1e3 * r3, 1e3 * rgnd, coarse[1]))
+    c.info('GND mesh', '0.25/0.125 mm %.1f/%.1f mOhm; discrepancy %.0f%%' %
+           (1e3 * coarse[0], 1e3 * fine[0], 100 * discrepancy))
     c.info('coupling budget', 'buck + allocated copper %.0f mW (of which copper %.0f mW); '
            'ESP TX heat <= %.0f mW; allowable ESP-to-buck transfer <= %.1f C/W' %
            (1e3 * buck_w, 1e3 * copper_w, 1e3 * esp_w, allowance))
     c.check('T4b', 'buck junction without ESP thermal coupling', tj(buck_w, d.BUCK_THETA_JA[d.WIFI_BUCK_PACKAGE]),
             d.TJ_LIMIT_C, '<=', 'C', fmt='%.1f')
+    c.check('T4m', 'GND thermal copper path mesh discrepancy <= 10%', discrepancy, 0.10, '<=', '', fmt='%.3f')
     # The layout's board and air path cannot be inferred from JEDEC theta_JA.
     # A validated thermal solver or measurement must bound cross-coupling.
     c.check('T4c', 'measured or calibrated ESP-to-buck thermal transfer bound supplied', 0, 1, '>=', '', fmt='%d')

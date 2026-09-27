@@ -114,7 +114,7 @@ def routes(board, order, circuit):
         if pin not in pads or pads[pin][0] != net:
             raise ValueError(f'PCB pad {pin} disagrees with netlist {net}')
     for net in RAILS:
-        if any(child(z, 'net')[1] == net for z in find(tree, 'zone')):
+        if any((find1(z, 'net') or [None, None])[1] == net for z in find(tree, 'zone')):
             raise ValueError(f'{net}: power pour resistance is not modelled')
     graphs = {net: {} for net in RAILS}
     endpoints = {net: set() for net in RAILS}

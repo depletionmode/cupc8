@@ -20,6 +20,15 @@ over the common SPI framing in `slot.md`, and never touches a packet.
   0.1 µF at the module). An AMS1117 LDO was used first. It failed the power
   checks: 2.71 V at the module in a TX burst at the worst-case corner, and
   Tj ≈ 120 °C (`power.md`, POW-003, THM-001).
+
+  C1/C2 are LCSC C45783, identified as Samsung CL21A226MAQNNNE by
+  [LCSC](https://www.lcsc.com/product-detail/C45783.html). Samsung's
+  [product page](https://product.samsungsem.com/mlcc/CL21A226MAQNNN.do)
+  lists this family as NRND and offers characteristic and simulation data,
+  but gives no guaranteed ESR maximum for the fitted part. C3 is
+  [Yageo CC0603KRX7R9BB104](https://www.lcsc.com/product-detail/YAGEO-C14663.html).
+  The WC-005 deck therefore labels its 100 mΩ per-capacitor ESR as a
+  sensitivity scenario and keeps the laid-out-board power gate red.
 - **SPI slave:** ESP32-C3 GPSPI2 routed to SCK/MOSI/MISO/CS_n through the GPIO
   matrix. MISO reaches the slot through a **74LVC1G125** tri-state buffer
   whose /OE is CS_n, so this card releases the shared MISO line whenever it

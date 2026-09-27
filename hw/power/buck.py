@@ -44,6 +44,7 @@ from spice import Checks
 T_APPLY = 120e-6         # 5V_SYS rise in these decks (see the docstring)
 T_STEP, T_REL, T_END = 1.3e-3, 1.6e-3, 1.9e-3
 I_LIGHT, I_STEP = 0.010, 0.500
+WIFI_CAP_ESR_SCENARIO = 0.100  # ohm each; sensitivity scenario, no vendor maximum yet
 
 
 def deck(v5_src, r_in, i_other, cout, load):
@@ -119,12 +120,15 @@ Cbulk v5 0 {cbulk}
 Iother v5 0 PWL(0 0 {ton} {iother})
 Rslot v5 card {rslot}
 Rboard5 card vin {rboard5}
-C1 vin 0 {cin}
+Rcesr1 vin c1term {esr}
+C1 c1term 0 {cin}
 X1 vin fb sw vin 0 TLV62569_TRANS
 L1 sw buck {l}
-C2 buck 0 {cout}
+Rcesr2 buck c2term {esr}
+C2 c2term 0 {cout}
 Rboard3 buck out {rboard3}
-C3 out return {chf}
+Rcesr3 out c3term {esr}
+C3 c3term return {chf}
 Rground return 0 {rground}
 R9 buck fb {r1}
 R10 fb 0 {r2}
@@ -137,7 +141,8 @@ wrdata {{name}}.dat v(out,return) v(sw) v(card)
 .endc
 """.format(vbus=ch["vbus"], ton=T_APPLY, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
            iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], rboard5=r_board5,
-           rboard3=r_board3, rground=r_ground, cin=d.WIFI_CIN * d.CERAMIC_DERATE,
+           rboard3=r_board3, rground=r_ground, esr=WIFI_CAP_ESR_SCENARIO,
+           cin=d.WIFI_CIN * d.CERAMIC_DERATE,
            l=d.WIFI_BUCK_L, cout=d.WIFI_COUT * d.CERAMIC_DERATE, chf=d.WIFI_COUT_HF, r1=d.WIFI_BUCK_R1,
            r2=d.WIFI_BUCK_R2, i0=i0, i1=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6, tend=T_END)
 
@@ -161,10 +166,15 @@ def wifi_card(out=None):
     out = Path(out) if out else Path(spice.ROOT) / 'build/hw/wifi'
     circuit = wifi_board.topology(out / 'wifi.net')
     r_board5, r_board3 = wifi_board.routes(out / 'wifi.kicad_pcb', out / 'fab/order.json', circuit)
-    r_ground, via_count, fill_cells = wifi_ground.estimate(out / 'wifi.kicad_pcb')
+    r_ground, coarse, fine, discrepancy = wifi_ground.compare(out / 'wifi.kicad_pcb')
     c.info('routed board', '2-layer 1.6 mm, +5V %.1f mOhm, 3V3 %.1f mOhm, GND return %.1f mOhm; '
-           '%d GND vias, %d/%d filled grid cells' %
-           (1e3 * r_board5, 1e3 * r_board3, 1e3 * r_ground, via_count, *fill_cells))
+           '%d GND vias' %
+           (1e3 * r_board5, 1e3 * r_board3, 1e3 * r_ground, coarse[1]))
+    c.info('GND mesh', '0.25 mm %.1f mOhm (%d/%d cells); 0.125 mm %.1f mOhm (%d/%d cells); '
+           'discrepancy %.0f%%' %
+           (1e3 * coarse[0], *coarse[2], 1e3 * fine[0], *fine[2], 100 * discrepancy))
+    c.info('capacitors', 'C1/C2/C3 each %.0f mOhm ESR sensitivity scenario; manufacturer maximum unverified' %
+           (1e3 * WIFI_CAP_ESR_SCENARIO))
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
         res = dict(zip(("typical", "worst"), pool.map(lambda corner: run_wifi(corner, r_board5, r_board3, r_ground),
                                                        ("typical", "worst"))))
@@ -186,10 +196,12 @@ def wifi_card(out=None):
         # 100 % duty: the input must still cover VOUT + I x (high side hot + DCR)
         c.check("F3" + n, "%s: slot +5V at the card in the burst vs VOUT high + I x (RDS(on) hot + DCR)" % corner,
                 vcard_min, hi_dc + d.WIFI_I_3V3 * (d.BUCK_RHS * d.BUCK_RDS_HOT + d.WIFI_BUCK_DCR), ">=")
-    # The GND raster gives a path bound, but its pad thermal spokes and copper
-    # spreading need convergence and independent validation. Capacitor ESR and
-    # local converter/ESP32 thermal coupling remain unsupported by the deck.
-    c.check('F4', 'GND mesh, capacitor ESR and local thermal evidence complete', 0, 1, '>=', '', fmt='%d')
+    # The GND raster is a fixed-width path scenario, not a solved effective
+    # resistance; pad thermal spokes still need validation. The ESR scenario
+    # needs a manufacturer bound; local converter/ESP32 thermal coupling needs
+    # calibrated evidence. Keep the laid-out-board claim red until those exist.
+    c.check('F4', 'GND mesh discrepancy <= 10%', discrepancy, 0.10, '<=', '', fmt='%.3f')
+    c.check('F5', 'capacitor ESR maximum and local thermal evidence complete', 0, 1, '>=', '', fmt='%d')
     return c.done()
 
 

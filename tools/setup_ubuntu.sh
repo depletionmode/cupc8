@@ -9,7 +9,8 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
 apt-get update -qq
 apt-get install -y -qq nim gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
-	libsdl2-dev ngspice cmake ninja-build python3-yaml poppler-utils libusb-1.0-0 libslirp0 >/dev/null
+	libsdl2-dev ngspice cmake ninja-build python3-yaml python3-numpy python3-matplotlib \
+	poppler-utils libusb-1.0-0 libslirp0 >/dev/null
 
 # OSS CAD Suite (GHDL, Yosys + ghdl plugin, Verilator, SBY, bitwuzla, nextpnr)
 # at the path the scripts use. The distribution packages are too old: Yosys

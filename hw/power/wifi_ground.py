@@ -1,11 +1,11 @@
-"""Conservative raster path estimate through saved KiCad GND fills and vias.
+"""Raster path sensitivity through saved KiCad GND fills and vias.
 
-A filled grid cell is accepted only after eroding its polygon by the cell's
-full diagonal. Each cardinal hop uses a one-square, hot 1 oz copper sheet
-resistance. This single-path result is an upper bound on the resistance of the
-represented fill. Narrow copper omitted by rasterization can make the model
-fail closed. Pad thermal spokes, track-to-pour contact and ESR require further
-independent checks before this estimate can certify WC-005.
+A filled grid point is accepted only after eroding its polygon by half a
+fixed 0.25 mm corridor width. Each cardinal hop is charged hot 1 oz sheet
+resistance times its length divided by that width. This is a conservative
+fixed-width path scenario, not the effective resistance of the filled plane.
+Two pitches expose raster error. Pad thermal spokes and track-to-pour contact
+also need validation before WC-005 can be certified.
 """
 import heapq
 import math
@@ -16,18 +16,18 @@ from matplotlib.path import Path as Polygon
 
 from wifi_board import child, find, find1, pad_nodes, parse, point, COPPER_OHM_MM, VIA_OHM
 
-PITCH_MM = 0.25
+DEFAULT_PITCH_MM = 0.25
+PATH_WIDTH_MM = 0.25
 LAYERS = ('F.Cu', 'B.Cu')
-# A square of width=length has rho / copper thickness resistance.  The
-# extractor's COPPER_OHM_MM is per millimetre of a 1 mm-wide strip, after the
-# hot-copper factor.  No length/width scaling is needed for a grid square.
+# The extractor's COPPER_OHM_MM is per millimetre of a 1 mm-wide strip,
+# after the hot-copper factor.
 SHEET_OHM = COPPER_OHM_MM / 1000
 
 
 def polygons(tree):
     result = {layer: [] for layer in LAYERS}
     for zone in find(tree, 'zone'):
-        if child(zone, 'net')[1] != '/GND':
+        if (find1(zone, 'net') or [None, None])[1] != '/GND':
             continue
         layer = child(zone, 'layer')[1]
         if layer not in result:
@@ -48,51 +48,51 @@ def polygons(tree):
     return result
 
 
-def raster(fills):
+def raster(fills, pitch):
     all_points = np.concatenate([poly for group in fills.values() for poly in group])
     xmin, ymin = all_points.min(axis=0)
     xmax, ymax = all_points.max(axis=0)
-    xs = np.arange(xmin + PITCH_MM / 2, xmax, PITCH_MM)
-    ys = np.arange(ymin + PITCH_MM / 2, ymax, PITCH_MM)
+    xs = np.arange(xmin + pitch / 2, xmax, pitch)
+    ys = np.arange(ymin + pitch / 2, ymax, pitch)
     xx, yy = np.meshgrid(xs, ys)
     points = np.column_stack((xx.ravel(), yy.ravel()))
     masks = []
     for layer in LAYERS:
         mask = np.zeros(len(points), dtype=bool)
         for vertices in fills[layer]:
-            # Matplotlib contracts the polygon by half the full cell diagonal
-            # on each side (its radius is a full-width parameter).
-            mask |= Polygon(vertices).contains_points(points, radius=-PITCH_MM * math.sqrt(2))
+            # Matplotlib's radius is a full-width parameter, so -0.25 mm
+            # keeps each point approximately 0.125 mm inside the fill.
+            mask |= Polygon(vertices).contains_points(points, radius=-PATH_WIDTH_MM)
         masks.append(mask.reshape(xx.shape))
     return xs, ys, np.stack(masks)
 
 
-def within(xs, ys, mask, center, radius, layer):
+def within(xs, ys, mask, center, radius, layer, pitch):
     if layer not in LAYERS:
         return []
     li = LAYERS.index(layer)
-    ix0 = max(0, int((center[0] - radius - xs[0]) / PITCH_MM) - 1)
-    ix1 = min(len(xs), int((center[0] + radius - xs[0]) / PITCH_MM) + 2)
-    iy0 = max(0, int((center[1] - radius - ys[0]) / PITCH_MM) - 1)
-    iy1 = min(len(ys), int((center[1] + radius - ys[0]) / PITCH_MM) + 2)
+    ix0 = max(0, int((center[0] - radius - xs[0]) / pitch) - 1)
+    ix1 = min(len(xs), int((center[0] + radius - xs[0]) / pitch) + 2)
+    iy0 = max(0, int((center[1] - radius - ys[0]) / pitch) - 1)
+    iy1 = min(len(ys), int((center[1] + radius - ys[0]) / pitch) + 2)
     return [(li, iy, ix) for iy in range(iy0, iy1) for ix in range(ix0, ix1)
             if mask[li, iy, ix] and math.hypot(xs[ix] - center[0], ys[iy] - center[1]) <= radius]
 
 
-def pad_cells(pads, xs, ys, mask, pins):
+def pad_cells(pads, xs, ys, mask, pins, pitch):
     found = set()
     for pin in pins:
         net, center, radius, layers = pads[pin]
         if net != '/GND':
             raise ValueError(f'{pin}: expected GND pad')
         for layer in layers:
-            found.update(within(xs, ys, mask, center, radius, layer))
+            found.update(within(xs, ys, mask, center, radius, layer, pitch))
     if not found:
         raise ValueError(f'GND pads {pins} do not touch represented filled copper')
     return found
 
 
-def via_links(tree, xs, ys, mask):
+def via_links(tree, xs, ys, mask, pitch):
     links = {}
     count = 0
     for via in find(tree, 'via'):
@@ -102,8 +102,8 @@ def via_links(tree, xs, ys, mask):
             raise ValueError('GND via has unsupported layer span')
         center = point(via, 'at')
         radius = float(child(via, 'size')[1]) / 2
-        a = within(xs, ys, mask, center, radius, LAYERS[0])
-        b = within(xs, ys, mask, center, radius, LAYERS[1])
+        a = within(xs, ys, mask, center, radius, LAYERS[0], pitch)
+        b = within(xs, ys, mask, center, radius, LAYERS[1], pitch)
         if not a or not b:
             continue  # stitching via outside one saved fill cannot bridge it
         count += 1
@@ -120,7 +120,7 @@ def via_links(tree, xs, ys, mask):
     return links, count
 
 
-def shortest(mask, links, starts, targets):
+def shortest(mask, links, starts, targets, pitch):
     rows, cols = mask.shape[1:]
     pending = [(0.0, node) for node in starts]
     heapq.heapify(pending)
@@ -139,25 +139,37 @@ def shortest(mask, links, starts, targets):
                 if 0 <= ny < rows and 0 <= nx < cols and mask[layer, ny, nx]:
                     nxt = (layer, ny, nx)
                     if nxt not in best:
-                        heapq.heappush(pending, (cost + SHEET_OHM, nxt))
+                        heapq.heappush(pending, (cost + SHEET_OHM * pitch / PATH_WIDTH_MM, nxt))
         for nxt, resistance in links.get(node, ()):
             if nxt not in best:
                 heapq.heappush(pending, (cost + resistance, nxt))
     raise ValueError('GND filled copper does not connect return pads')
 
 
-def estimate(board):
+def estimate(board, pitch=DEFAULT_PITCH_MM):
+    if pitch <= 0 or pitch > 0.5:
+        raise ValueError('GND raster pitch must be in (0, 0.5] mm')
     tree = parse(Path(board).read_text())
     if tree[0] != 'kicad_pcb':
         raise ValueError('expected KiCad PCB')
     fills = polygons(tree)
-    xs, ys, mask = raster(fills)
+    xs, ys, mask = raster(fills, pitch)
     pads = pad_nodes(tree)
-    links, via_count = via_links(tree, xs, ys, mask)
+    links, via_count = via_links(tree, xs, ys, mask, pitch)
     esp = [pin for pin, (net, _, _, _) in pads.items() if pin[0] == 'U1' and net == '/GND']
-    source = pad_cells(pads, xs, ys, mask, esp)
+    source = pad_cells(pads, xs, ys, mask, esp, pitch)
     paths = {}
     for sink in (('C2', '2'), ('C3', '2'), ('U2', '2')):
-        target = pad_cells(pads, xs, ys, mask, [sink])
-        paths[sink] = shortest(mask, links, source, target)
+        target = pad_cells(pads, xs, ys, mask, [sink], pitch)
+        paths[sink] = shortest(mask, links, source, target, pitch)
     return max(paths.values()), via_count, tuple(int(mask[i].sum()) for i in range(2))
+
+
+def compare(board):
+    """Return conservative scenario and explicit two-pitch discrepancy."""
+    coarse = estimate(board, 0.25)
+    fine = estimate(board, 0.125)
+    if coarse[1] != fine[1]:
+        raise ValueError('GND via contact changes between 0.25 and 0.125 mm meshes')
+    discrepancy = abs(fine[0] - coarse[0]) / max(fine[0], coarse[0])
+    return max(coarse[0], fine[0]), coarse, fine, discrepancy

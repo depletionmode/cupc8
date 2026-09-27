@@ -46,13 +46,16 @@ fail until their contract coverage exists:
   separate Wi-Fi power gate owns rail start-up and load transients.
 - Wi-Fi power: WC-005 checks U2/L1/R9/R10/C1-C3 values and pins in the exported
   netlist, matches those pads to the routed PCB, and adds the board's +5V and
-  3V3 track/via resistance to the TI TLV62569 transient deck. A raster path
-  through the saved GND fills and vias bounds the module's return path. The
+  3V3 track/via resistance to the TI TLV62569 transient deck. A fixed 0.25 mm
+  copper corridor through the saved GND fills and vias supplies a conservative
+  path scenario. Runs at 0.25 and 0.125 mm pitch expose mesh sensitivity. The
   ordered card is 1.6 mm, two layers with 1 oz finished outer copper. JLCPCB's
   [copper guide](https://jlcpcb.com/help/article/jlcpcb-copper-weight) equates
   1 oz to a nominal 35 µm. The
-  check remains red pending GND mesh convergence/contact validation, capacitor
-  ESR evidence and local thermal coupling evidence for the 350 mA TX burst.
+  deck uses 100 mΩ ESR per capacitor as a sensitivity scenario. The path
+  scenario is distinct from a solved effective plane resistance. The check
+  remains red pending pad thermal/contact validation, a manufacturer
+  ESR maximum and local thermal coupling evidence for the 350 mA TX burst.
 - Wi-Fi thermal: WC-010 binds the same routed copper and adds its I²R heat to
   the buck's loss. It computes the maximum permitted ESP32-to-buck thermal
   transfer at 40 C ambient, and remains red until a calibrated board thermal

@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/power'))
-from wifi_ground import estimate
+from wifi_ground import compare, estimate
 
 
 def zone(layer, lo, hi):
@@ -42,6 +42,9 @@ class WifiGround(unittest.TestCase):
             self.assertGreater(resistance, 0)
             self.assertEqual(count, 2)
             self.assertTrue(all(cells))
+            scenario, coarse, fine, discrepancy = compare(board)
+            self.assertEqual(scenario, max(coarse[0], fine[0]))
+            self.assertLess(discrepancy, 0.1)  # fixed physical corridor width
             fixture(board, second_via=False)
             with self.assertRaisesRegex(ValueError, 'does not connect'):
                 estimate(board)

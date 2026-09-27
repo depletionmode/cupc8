@@ -11,6 +11,7 @@ does everything except KiCad.
 | arm-none-eabi-gcc, pico-sdk, PicoDVI, rp2040js | the RP2040 card firmware and its emulated tests | apt; `tools/fetch_sdks.sh` |
 | ESP-IDF v5.5.5, Espressif QEMU | the Wi-Fi firmware, WIFI-003, E2E-003 | `tools/fetch_sdks.sh`. If dl.espressif.com is unreachable, `tools/setup_ubuntu.sh` seeds `tools/devenv/espidf.constraints.v5.5.txt` (a hand-written stand-in with the IDF 5.x major versions, not Espressif's file) and sets `IDF_PIP_WHEELS_URL=` so pip uses PyPI only. QEMU and openocd need `libslirp0` and `libusb-1.0-0`. |
 | ngspice, TI PSpice models | POW-*, THM-001 | apt; the TI models are fetched from www.ti.com by `hw/power/models/fetch.py` (pinned by SHA-256; not redistributable) |
+| NumPy, Matplotlib | WC-005 GND fill and via raster model | apt `python3-numpy`, `python3-matplotlib` |
 | KiCad 10, Freerouting | the board tests (BRD-001, WIFI-004, E2E-006, the board rows) | below |
 
 **Emulator and simulator** (David, 2026-09-25):
