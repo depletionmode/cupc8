@@ -330,8 +330,13 @@ compares 0.090, 0.075 and 0.060 mm PML-safe models at 100, 240 and 480 MHz.
 Maximum absolute S11 changes are 0.519 and 0.310 dB for successive
 refinements; maximum S21 changes are 0.0101 and 0.00566 dB. S11 changes
 reverse direction, so three points do not establish asymptotic convergence.
-The 0.060 mm S11 values are −30.208, −22.677 and −16.799 dB; S21 values
-are −0.00574, −0.02468 and −0.09046 dB. These are diagnostic values for the
+The [complex-port comparison](si-evidence/usb-io-three-mesh-complex-port.json)
+retransforms all 12 raw port traces through the same 16 ns Fourier cutoff.
+The maximum successive |ΔS11| is 0.00865 then 0.00513; the loaded input
+reactance changes by as much as 1.65 then 0.96 Ω at 480 MHz, reversing
+direction. Loaded input impedance includes the terminated line and is not
+trace characteristic impedance. The 0.060 mm S11 values are −30.208,
+−22.677 and −16.799 dB; S21 values are −0.00574, −0.02468 and −0.09046 dB. These are diagnostic values for the
 modeled routed-copper subset. Port placement, impedance sensitivity, pads,
 mask, ESD, connectors, source/sink and the complete path remain open.
 
@@ -385,7 +390,7 @@ not yet extract branch geometry from routed copper. The provisional run has
 six-slot line; the smallest excursions are on the order of the fixture-fit
 error. These are risk indicators, not proof of a physical failure. The
 missing receiver IBIS, package assignment, nonlinear clamp behavior and
-finished main-board route keep `MB-007`, `CC-007` and row 4.6 pending. With
+routed branch extraction keep `MB-007`, `CC-007` and row 4.6 pending. With
 `--main-board`, the diagnostic separately audits shortest planar F.Cu/In1.Cu/
 In2.Cu/In3.Cu/B.Cu track paths from R36 to all six slot SCK pins and R18 to
 the CPU clock socket. It records disconnected pads as `null` and hashes the

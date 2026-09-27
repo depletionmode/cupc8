@@ -26,17 +26,38 @@ def parts(value):
     return [float(value.real), float(value.imag)]
 
 
-def compare(reports, fields, migration_path):
+def compare(reports, fields, migration_path, fine_report_path=None,
+            fine_fields=None, fine_migration_path=None):
     migration = json.loads(migration_path.read_text())
+    runs = {mesh: (reports / report_name, fields / field_name)
+            for mesh, (report_name, field_name) in RUNS.items()}
+    fine_migration = None
+    if any(value is not None for value in
+           (fine_report_path, fine_fields, fine_migration_path)):
+        if not all(value is not None for value in
+                   (fine_report_path, fine_fields, fine_migration_path)):
+            raise ValueError('fine report, fields and migration must be supplied together')
+        fine_migration = json.loads(fine_migration_path.read_text())
+        if (not fine_migration['modeled_input_equivalent'] or
+            any(fine_migration['rebuilt_receipt'][key] !=
+                migration['receipts']['io']['current'][key]
+                for key in ('receipt_sha256', 'board_sha256', 'netlist_sha256')) or
+            fine_migration['saved_report_sha256'] != sha(fine_report_path)):
+            raise ValueError('fine mesh migration does not match rebuilt IO receipt')
+        runs['0.060'] = (fine_report_path, fine_fields)
     rows_by_mesh = {}
     source = {}
-    for mesh, (report_name, field_name) in RUNS.items():
-        report_path = reports / report_name
+    for mesh, (report_path, directory) in runs.items():
         report = json.loads(report_path.read_text())
-        model = migration['models']['usb-' + mesh.split('.')[1]]
-        directory = fields / field_name
-        if (sha(report_path) != model['report_sha256'] or
-            report['board_sha256'] != migration['receipts']['io']['archived']['board_sha256'] or
+        if mesh == '0.060':
+            migrated_hash = fine_migration['saved_report_sha256']
+            migrated_board = fine_migration['saved_receipt']['board_sha256']
+        else:
+            model = migration['models']['usb-' + mesh.split('.')[1]]
+            migrated_hash = model['report_sha256']
+            migrated_board = migration['receipts']['io']['archived']['board_sha256']
+        if (sha(report_path) != migrated_hash or
+            report['board_sha256'] != migrated_board or
             not report['valid_for_diagnostic_sparams'] or
             not report['port_window_audit']['spectral_stability_0p05db'] or
             sha(directory / 'usb-io.xml') != report['xml_sha256'] or
@@ -75,36 +96,48 @@ def compare(reports, fields, migration_path):
                         'run_log_sha256': report['run_log_sha256'],
                         'port_file_sha256': hashes,
                         'board_sha256': report['board_sha256']}
-    comparisons = []
-    for fine, coarse in zip(rows_by_mesh['0.075'], rows_by_mesh['0.090']):
-        s_fine = complex(*fine['s11_complex'])
-        s_coarse = complex(*coarse['s11_complex'])
-        z_fine = complex(*fine['loaded_input_ohms'])
-        z_coarse = complex(*coarse['loaded_input_ohms'])
-        comparisons.append({'frequency_hz': fine['frequency_hz'],
-                            'complex_s11_delta_abs': float(abs(s_coarse - s_fine)),
-                            'loaded_input_delta_ohms': parts(z_coarse - z_fine)})
-    return {'scope': '16 ns complex-port and loaded-input diagnostic for 0.075/0.090 mm USB subset',
+    def differences(coarser, finer):
+        comparisons = []
+        for coarse, fine in zip(rows_by_mesh[coarser], rows_by_mesh[finer]):
+            s_fine = complex(*fine['s11_complex'])
+            s_coarse = complex(*coarse['s11_complex'])
+            z_fine = complex(*fine['loaded_input_ohms'])
+            z_coarse = complex(*coarse['loaded_input_ohms'])
+            comparisons.append({'frequency_hz': fine['frequency_hz'],
+                                'complex_s11_delta_abs': float(abs(s_coarse - s_fine)),
+                                'loaded_input_delta_ohms': parts(z_coarse - z_fine)})
+        return comparisons
+    result = {'scope': '16 ns complex-port and loaded-input diagnostic for ' +
+                       ('three' if fine_migration else 'two') + ' USB subset meshes',
             'migration_report_sha256': sha(migration_path),
             'reference_ohms': 90,
             'fourier_cutoff_ns': 16,
             'sources': source,
             'results': rows_by_mesh,
-            'mesh_differences_090_minus_075': comparisons,
+            'mesh_differences_090_minus_075': differences('0.090', '0.075'),
             'characteristic_impedance_convergence_evaluated': False,
             'full_row_4_6_closed': False,
             'limits': ['loaded input impedance includes finite line length and 90-ohm termination; '
                        'it is not trace characteristic impedance',
                        'the 100-ohm lumped launch and omitted pads/connector/ESD/mask/losses remain',
-                       'two meshes do not establish port or mesh convergence']}
+                       'these meshes do not establish port or mesh convergence']}
+    if fine_migration:
+        result['fine_mesh_migration_report_sha256'] = sha(fine_migration_path)
+        result['mesh_differences_075_minus_060'] = differences('0.075', '0.060')
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('reports', 'fields', 'migration', 'out'):
         parser.add_argument('--' + name, type=Path, required=True)
+    for name in ('fine-report', 'fine-fields', 'fine-migration'):
+        parser.add_argument('--' + name, type=Path)
     args = parser.parse_args()
-    result = compare(args.reports.resolve(), args.fields.resolve(), args.migration.resolve())
+    result = compare(args.reports.resolve(), args.fields.resolve(), args.migration.resolve(),
+                     args.fine_report.resolve() if args.fine_report else None,
+                     args.fine_fields.resolve() if args.fine_fields else None,
+                     args.fine_migration.resolve() if args.fine_migration else None)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result['mesh_differences_090_minus_075'], indent=2))
