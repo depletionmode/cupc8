@@ -305,10 +305,18 @@ cards and the final airflow. TI's [TLV62569 datasheet](https://www.ti.com/lit/ds
 provides DBV θJA 188.2 °C/W and ψJT 31.4 °C/W; these package parameters
 alone do not bound heat transfer from the ESP32 on this board.
 
-The 2026-09-28 rebuilt receipt (PCB SHA-256 `c580049e7c1e`, netlist
-`92302b79bc58`, order `5f535efc038f`) validates against the current source
-and has a clean DRC report. Its routed +5 V/3V3/GND resistance scenarios are
-still 38.008/134.665/123.440 mΩ. `python3 hw/power/thermal.py wifi-card
+The current 2026-09-28 rebuilt receipt (SHA-256 `6f002dd83aa0`;
+`wifi.kicad_pcb` `c7721b27c3b8`, routed PCB `e87dd82474dfc`, netlist
+`8b2bf1c41604`, order `5f535efc038f`) validates against the current source
+and has a clean final DRC report. Compared with the previous `512c905496d1`
+receipt, the order is byte-identical and the netlist differs only by its
+export timestamp. After removing regenerated UUIDs and ignoring object order,
+the two saved and routed PCBs contain identical footprints, tracks, vias,
+filled zones, and board outlines. Its routed +5 V/3V3/GND resistance
+scenarios are still 38.008/134.665/123.440 mΩ, with 152 represented GND
+vias and a 1.4% two-pitch GND mesh difference. The following WC-010 heat
+balance therefore uses the same physical route inputs.
+`python3 hw/power/thermal.py wifi-card
 build/hw/wifi` now validates that receipt and exposes the physical heat
 balance for the 40 °C, 350 mA TX scenario:
 
