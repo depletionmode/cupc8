@@ -2,6 +2,7 @@
 """Check fabrication files against a DRC-clean KiCad board and plotted copper."""
 from collections import Counter
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -16,6 +17,15 @@ GERBER_EXTENSIONS = {'.gtl', '.gbl', '.gts', '.gbs', '.gtp', '.gbp',
 TIMESTAMP = re.compile(r'^(?:%TF.CreationDate,|G04 Created by KiCad )')
 TOOL = re.compile(r'^T(\d+)C(\d+(?:\.\d+)?)$')
 HIT = re.compile(r'^X(-?\d+(?:\.\d+)?)Y(-?\d+(?:\.\d+)?)$')
+SLOT = re.compile(r'^X(-?\d+(?:\.\d+)?)Y(-?\d+(?:\.\d+)?)G85X(-?\d+(?:\.\d+)?)Y(-?\d+(?:\.\d+)?)$')
+
+
+def slot_key(start, end, diameter):
+    a, b = sorted((tuple(round(float(x), 3) for x in start),
+                   tuple(round(float(x), 3) for x in end)))
+    if a == b:
+        raise ValueError('zero-length G85 slot route')
+    return ('slot', *a, *b, round(float(diameter), 3))
 
 
 def gerber_geometry(path):
@@ -77,6 +87,10 @@ def drill_hits(path):
             if active is None:
                 raise ValueError('%s: drill hit before tool selection' % path.name)
             hits[(round(float(hit[1]), 3), round(float(hit[2]), 3), tools[active])] += 1
+        elif in_body and (slot := SLOT.fullmatch(line)):
+            if active is None:
+                raise ValueError('%s: G85 slot before tool selection' % path.name)
+            hits[slot_key((slot[1], slot[2]), (slot[3], slot[4]), tools[active])] += 1
         elif line in ('M48', 'FMAT,2', 'METRIC', 'G90', 'G05', 'M30') or line.startswith('T') and not in_body:
             continue
         else:
@@ -99,8 +113,20 @@ def board_holes(board):
             drill = pad.GetDrillSize()
             if drill.x or drill.y:
                 if drill.x != drill.y:
-                    raise ValueError('%s: slotted pad requires drill-route validation' % footprint.GetReference())
-                add(pad.GetPosition(), drill.x)
+                    width = pcbnew.ToMM(min(drill.x, drill.y))
+                    half_route = pcbnew.ToMM(abs(drill.x - drill.y)) / 2
+                    angle = math.radians(pad.GetOrientationDegrees())
+                    # Local long axis rotated into Gerber/Excellon Y-up space.
+                    direction = ((math.cos(angle), math.sin(angle)) if drill.x > drill.y
+                                 else (math.sin(angle), -math.cos(angle)))
+                    center = (pcbnew.ToMM(pad.GetPosition().x),
+                              -pcbnew.ToMM(pad.GetPosition().y))
+                    offsets = (half_route * direction[0], half_route * direction[1])
+                    start = (center[0] - offsets[0], center[1] - offsets[1])
+                    end = (center[0] + offsets[0], center[1] + offsets[1])
+                    holes[slot_key(start, end, width)] += 1
+                else:
+                    add(pad.GetPosition(), drill.x)
     # KiCad 10's Python 3.14 binding wraps vias as PCB_TRACK, so read the
     # saved via S-expressions directly instead of trusting SWIG downcasts.
     import kicadgen
@@ -124,11 +150,23 @@ def check_drills(board, fab):
     expected = board_holes(board)
     unmatched = list(expected.elements())
     extra = []
-    for x, y, d in actual.elements():
-        match = next((i for i, (ex, ey, ed) in enumerate(unmatched)
-                      if ed == d and abs(ex - x) <= .0011 and abs(ey - y) <= .0011), None)
+
+    def same_hole(actual_item, expected_item):
+        if len(actual_item) != len(expected_item) or actual_item[-1] != expected_item[-1]:
+            return False
+        if len(actual_item) == 6:
+            if actual_item[0] != 'slot' or expected_item[0] != 'slot':
+                return False
+            coordinates = zip(actual_item[1:-1], expected_item[1:-1])
+        else:
+            coordinates = zip(actual_item[:-1], expected_item[:-1])
+        return all(abs(a - b) <= .0011 for a, b in coordinates)
+
+    for item in actual.elements():
+        match = next((i for i, expected_item in enumerate(unmatched)
+                      if same_hole(item, expected_item)), None)
         if match is None:
-            extra.append((x, y, d))
+            extra.append(item)
         else:
             unmatched.pop(match)
     if unmatched or extra:
@@ -165,10 +203,27 @@ def check(out):
     if len(copper) != board.GetCopperLayerCount():
         raise ValueError('Gerber copper layer count differs from board stackup')
     clearance = pcbnew.ToMM(board.GetDesignSettings().m_MinClearance)
-    shapes = gerberdrc.check_clearance(copper, clearance)
+    track_width = pcbnew.ToMM(board.GetDesignSettings().m_TrackMinWidth)
+    shapes = gerberdrc.check_clearance(copper, clearance, track_width)
+    rings = gerberdrc.check_via_annular(board, copper,
+                                       pcbnew.ToMM(board.GetDesignSettings().m_ViasMinAnnularWidth))
+    outlines = sorted((out / 'fab').glob('*.gm1'))
+    if len(outlines) != 1:
+        raise ValueError('expected one Edge.Cuts Gerber profile')
+    gerberdrc.check_edge(copper, outlines[0],
+                         pcbnew.ToMM(board.GetDesignSettings().m_CopperEdgeClearance))
+    masks = sorted(path for path in (out / 'fab').iterdir()
+                   if path.suffix.lower() in ('.gts', '.gbs'))
+    if len(masks) != 2:
+        raise ValueError('expected front and back solder-mask Gerbers')
+    mask_width = pcbnew.ToMM(board.GetDesignSettings().m_SolderMaskMinWidth)
+    if mask_width > 0:
+        gerberdrc.check_mask(masks, mask_width)
     check_review(out)
     raise ValueError('Gerber re-import DRC incomplete: %d layers match fresh export, '
                      '%d drill hits match pads/vias, and %d plotted copper objects '
-                     'passed %.3f mm net clearance; copper-to-edge, trace width, '
-                     'mask, and annular-ring rules remain unchecked' %
-                     (layers, holes, shapes, clearance))
+                     'passed %.3f mm net clearance with %d via annular checks; '
+                     'PTH pad annular, mask-to-copper, and other plotted layer '
+                     'rules remain unchecked%s' %
+                     (layers, holes, shapes, clearance, rings,
+                      '; no positive solder-mask web rule is configured' if mask_width <= 0 else ''))

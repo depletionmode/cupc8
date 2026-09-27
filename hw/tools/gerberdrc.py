@@ -14,6 +14,8 @@ from collections import defaultdict
 COORD = re.compile(r'^(?:X(-?\d+))?(?:Y(-?\d+))?D(0[123])\*$')
 APERTURE = re.compile(r'^%ADD(\d+)(C|R|O|RoundRect),([^*]+)\*%$')
 SELECT = re.compile(r'^D(\d+)\*$')
+PROFILE_MOVE = re.compile(r'^X(-?\d+)Y(-?\d+)D02\*$')
+PROFILE_DRAW = re.compile(r'^X(-?\d+)Y(-?\d+)(?:I(-?\d+)J(-?\d+))?D01\*$')
 ROUND_RECT_MACRO = (
     '0 Rectangle with rounded corners*',
     '0 $1 Rounding radius*',
@@ -111,8 +113,8 @@ def polygon(points):
     return 'POLYGON ((' + ', '.join('%.9f %.9f' % point for point in points) + '))'
 
 
-def plotted_copper(path, geometry):
-    """Return (net, GEOS shape, bounds) for every dark copper operation."""
+def plotted_copper(path, geometry, minimum_track=None, require_net=True):
+    """Return (net, GEOS shape, bounds) for every supported dark operation."""
     lines = path.read_text().splitlines()
     apertures = {}
     current = None
@@ -121,11 +123,13 @@ def plotted_copper(path, geometry):
     region = None
     result = []
     seen_format = seen_units = seen_end = False
+    file_polarity = None
+    mask_function = False
     macro = None
     macro_defined = False
 
     def add(shape, bounds):
-        if net is None:
+        if require_net and net is None:
             raise ValueError('%s: copper geometry without TO.N net' % path.name)
         result.append((net, shape, bounds))
 
@@ -166,8 +170,13 @@ def plotted_copper(path, geometry):
             net = None
         elif line == '%LPD*%':
             pass
+        elif line.startswith('%TF.FileFunction,'):
+            mask_function = line.startswith('%TF.FileFunction,Soldermask,')
         elif line.startswith('%TF.FilePolarity,'):
-            if line != '%TF.FilePolarity,Positive*%':
+            file_polarity = line
+            expected_polarity = ('%TF.FilePolarity,Positive*%' if require_net else
+                                 '%TF.FilePolarity,Negative*%')
+            if line != expected_polarity:
                 raise ValueError('%s:%d: unsupported file polarity' % (path.name, number))
         elif line == 'G36*':
             if region is not None:
@@ -210,6 +219,9 @@ def plotted_copper(path, geometry):
                 if operation == '01':
                     if position is None or kind != 'C':
                         raise ValueError('%s:%d: unsupported stroked aperture' % (path.name, number))
+                    if minimum_track is not None and params[0] < minimum_track:
+                        raise ValueError('%s:%d: plotted trace width %.6f mm < %.6f mm' %
+                                         (path.name, number, params[0], minimum_track))
                     radius = params[0] / 2
                     shape = geometry.buffer(geometry.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' %
                                                          (*position, *target)), radius)
@@ -252,17 +264,222 @@ def plotted_copper(path, geometry):
             if number != len(lines):
                 raise ValueError('%s:%d: commands after end marker' % (path.name, number))
         elif (not line or line.startswith('G04 ') or line == 'G01*' or
-              line.startswith(('%TF.', '%TA.', '%TO.P,', '%TD.AperFunction')) or
+              line.startswith(('%TF.', '%TA.', '%TO.P,', '%TO.C,', '%TD.AperFunction')) or
               line == '%TD.P*%'):
             pass
         else:
             raise ValueError('%s:%d: unsupported Gerber command %s' % (path.name, number, line))
-    if macro is not None or region is not None or not seen_end or not seen_format or not seen_units or not result:
+    if (macro is not None or region is not None or not seen_end or not seen_format or
+            not seen_units or not result or not require_net and
+            (file_polarity != '%TF.FilePolarity,Negative*%' or not mask_function)):
         raise ValueError('%s: incomplete or empty copper Gerber' % path.name)
     return result
 
 
-def check_clearance(paths, minimum):
+def check_mask(paths, minimum):
+    """Check positive mask webs between distinct plotted openings."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('board has no positive solder-mask web rule')
+    engine = Geometry()
+    try:
+        count = 0
+        for path in paths:
+            openings = plotted_copper(Path(path), engine, require_net=False)
+            for index, (_, shape, (x0,y0,x1,y1)) in enumerate(openings):
+                for _, other, (a0,b0,a1,b1) in openings[:index]:
+                    if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
+                        continue
+                    distance = engine.distance(shape, other)
+                    # Overlapping openings merge; there is no mask web between them.
+                    if 0 < distance < minimum:
+                        raise ValueError('%s: solder-mask web %.6f mm < %.6f mm' %
+                                         (Path(path).name, distance, minimum))
+                count += 1
+        return count
+    finally:
+        engine.close()
+
+
+def via_flash_diameters(path):
+    """Read X2 ViaPad aperture flashes as (position, copper diameter)."""
+    path = Path(path)
+    apertures = {}
+    via_function = False
+    current = None
+    flashes = {}
+    for number, line in enumerate(path.read_text().splitlines(), 1):
+        if line == '%TA.AperFunction,ViaPad*%':
+            via_function = True
+        elif line.startswith('%TA.AperFunction,') or line in ('%TD*%', '%TD.AperFunction*%'):
+            via_function = False
+        elif match := APERTURE.fullmatch(line):
+            if via_function:
+                if match[2] != 'C':
+                    raise ValueError('%s:%d: unsupported noncircular via aperture' % (path.name, number))
+                apertures[int(match[1])] = float(match[3])
+        elif match := SELECT.fullmatch(line):
+            current = int(match[1])
+        elif match := COORD.fullmatch(line):
+            if match[3] == '03' and current in apertures:
+                if match[1] is None or match[2] is None:
+                    raise ValueError('%s:%d: incomplete via flash coordinate' % (path.name, number))
+                point = (int(match[1])/1e6, int(match[2])/1e6)
+                flashes.setdefault(point, []).append(apertures[current])
+    return flashes
+
+
+def check_via_annular(board, paths, minimum):
+    """Require every through via's plotted pad on every copper layer to cover its drill."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('board has no positive via annular-ring rule')
+    import kicadgen
+    tree = kicadgen.parse(Path(board.GetFileName()).read_text())
+    vias = {}
+    for via in kicadgen.find(tree, 'via'):
+        at = kicadgen.find1(via, 'at')
+        drill = kicadgen.find1(via, 'drill')
+        layers = kicadgen.find1(via, 'layers')
+        if (at is None or len(at) != 3 or drill is None or len(drill) != 2 or
+                layers is None or layers[1:] != ['F.Cu', 'B.Cu']):
+            raise ValueError('unsupported blind, buried, or malformed via for annular check')
+        point = (float(at[1]), -float(at[2]))
+        if point in vias:
+            raise ValueError('coincident vias require separate annular validation')
+        vias[point] = float(drill[1])
+    if not vias:
+        raise ValueError('no vias available for annular check')
+    count = 0
+    for path in paths:
+        flashes = via_flash_diameters(path)
+        extra = set(flashes) - set(vias)
+        missing = set(vias) - set(flashes)
+        if extra or missing:
+            raise ValueError('%s: ViaPad flash mismatch: missing %s; extra %s' %
+                             (Path(path).name, sorted(missing)[:3], sorted(extra)[:3]))
+        for point, drill in vias.items():
+            if len(flashes[point]) != 1:
+                raise ValueError('%s: duplicate ViaPad flash at %s' % (Path(path).name, point))
+            ring = (flashes[point][0] - drill) / 2
+            if ring < minimum:
+                raise ValueError('%s: via annular ring %.6f mm < %.6f mm at %s' %
+                                 (Path(path).name, ring, minimum, point))
+            count += 1
+    return count
+
+
+def profile_segments(path, geometry):
+    """Read a KiCad Edge.Cuts Gerber as independent cut centerlines."""
+    path = Path(path)
+    lines = path.read_text().splitlines()
+    mode = 'G01'
+    position = None
+    segments = []
+    seen_format = seen_units = seen_end = False
+    seen_profile = False
+    apertures = set()
+    current = None
+    for number, line in enumerate(lines, 1):
+        line = line.strip()
+        if line == '%FSLAX46Y46*%':
+            seen_format = True
+        elif line == '%MOMM*%':
+            seen_units = True
+        elif line in ('G01*', 'G02*', 'G03*'):
+            mode = line[:-1]
+        elif line == 'G75*' or line == '%LPD*%':
+            pass
+        elif line.startswith('%TF.FileFunction,'):
+            if line != '%TF.FileFunction,Profile,NP*%':
+                raise ValueError('%s:%d: unsupported outline file function' % (path.name, number))
+            seen_profile = True
+        elif line.startswith('%TF.FilePolarity,'):
+            if line != '%TF.FilePolarity,Positive*%':
+                raise ValueError('%s:%d: unsupported outline polarity' % (path.name, number))
+        elif match := PROFILE_MOVE.fullmatch(line):
+            position = (int(match[1])/1e6, int(match[2])/1e6)
+        elif match := PROFILE_DRAW.fullmatch(line):
+            if not seen_format or not seen_units or position is None or current is None:
+                raise ValueError('%s:%d: outline draw before format or start' % (path.name, number))
+            target = (int(match[1])/1e6, int(match[2])/1e6)
+            if mode == 'G01':
+                if match[3] is not None:
+                    raise ValueError('%s:%d: arc offsets in line mode' % (path.name, number))
+                points = [position, target]
+            else:
+                if match[3] is None or match[4] is None:
+                    raise ValueError('%s:%d: arc lacks center offsets' % (path.name, number))
+                center = (position[0]+int(match[3])/1e6,
+                          position[1]+int(match[4])/1e6)
+                radius = math.dist(position, center)
+                if radius <= 0 or abs(math.dist(target, center)-radius) > .000002:
+                    raise ValueError('%s:%d: invalid outline arc radius' % (path.name, number))
+                begin = math.atan2(position[1]-center[1], position[0]-center[0])
+                finish = math.atan2(target[1]-center[1], target[0]-center[0])
+                sweep = ((finish-begin) % (2*math.pi) if mode == 'G03' else
+                         -((begin-finish) % (2*math.pi)))
+                if abs(sweep) < 1e-12:
+                    sweep = 2*math.pi if mode == 'G03' else -2*math.pi
+                count = max(2, math.ceil(abs(sweep)*radius/.01))
+                points = [(center[0]+radius*math.cos(begin+sweep*i/count),
+                           center[1]+radius*math.sin(begin+sweep*i/count))
+                          for i in range(count+1)]
+                points[0], points[-1] = position, target
+            if position == target and mode == 'G01':
+                raise ValueError('%s:%d: zero-length outline segment' % (path.name, number))
+            shape = geometry.wkt('LINESTRING (' + ', '.join('%.9f %.9f' % p for p in points) + ')')
+            # Curved segments are replaced by chords; this buffer bounds the
+            # largest possible sagitta for the 0.01 mm maximum chord length.
+            if mode != 'G01':
+                sagitta = radius * (1-math.cos(abs(sweep)/(2*count)))
+                shape = geometry.buffer(shape, sagitta + .000001)
+            xs, ys = zip(*points)
+            segments.append((shape, (min(xs),min(ys),max(xs),max(ys))))
+            position = target
+        elif match := APERTURE.fullmatch(line):
+            if match[2] != 'C' or len(match[3].split('X')) != 1 or float(match[3]) <= 0:
+                raise ValueError('%s:%d: unsupported outline aperture' % (path.name, number))
+            apertures.add(int(match[1]))
+        elif match := SELECT.fullmatch(line):
+            if int(match[1]) not in apertures:
+                raise ValueError('%s:%d: undefined outline aperture' % (path.name, number))
+            current = int(match[1])
+        elif line == 'M02*':
+            seen_end = True
+            if number != len(lines):
+                raise ValueError('%s:%d: commands after outline end' % (path.name, number))
+        elif (not line or line.startswith('G04 ') or line.startswith(('%TF.', '%TA.', '%TO.C,', '%TD'))):
+            pass
+        else:
+            raise ValueError('%s:%d: unsupported outline command %s' % (path.name, number, line))
+    if not seen_format or not seen_units or not seen_end or not seen_profile or not segments:
+        raise ValueError('%s: incomplete or empty outline Gerber' % path.name)
+    return segments
+
+
+def check_edge(paths, outline, minimum):
+    """Check plotted copper shapes against plotted board cut centerlines."""
+    if not math.isfinite(minimum) or minimum <= 0:
+        raise ValueError('board has no positive copper-to-edge rule')
+    engine = Geometry()
+    try:
+        edges = profile_segments(outline, engine)
+        count = 0
+        for path in paths:
+            for net, shape, (x0,y0,x1,y1) in plotted_copper(Path(path), engine):
+                for edge, (a0,b0,a1,b1) in edges:
+                    if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
+                        continue
+                    distance = engine.distance(shape, edge)
+                    if distance < minimum:
+                        raise ValueError('%s: %s copper-to-edge lower bound %.6f mm < %.6f mm' %
+                                         (Path(path).name, net, distance, minimum))
+                count += 1
+        return count
+    finally:
+        engine.close()
+
+
+def check_clearance(paths, minimum, minimum_track=None):
     """Require distinct X2 nets on each copper layer to meet board clearance."""
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('board has no positive copper clearance rule')
@@ -270,7 +487,7 @@ def check_clearance(paths, minimum):
     try:
         count = 0
         for path in paths:
-            objects = plotted_copper(Path(path), engine)
+            objects = plotted_copper(Path(path), engine, minimum_track)
             cells = defaultdict(list)
             for index, (net, shape, (x0,y0,x1,y1)) in enumerate(objects):
                 # Two millimetre buckets avoid checking every distant pad/track
@@ -291,7 +508,7 @@ def check_clearance(paths, minimum):
                         continue
                     distance = engine.distance(shape, other)
                     if distance < minimum:
-                        raise ValueError('%s: %s to %s copper clearance %.6f mm < %.6f mm' %
+                        raise ValueError('%s: %s to %s copper clearance lower bound %.6f mm < %.6f mm' %
                                          (Path(path).name, net, other_net, distance, minimum))
                 for cx in range(xmin, xmax+1):
                     for cy in range(ymin, ymax+1):

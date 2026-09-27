@@ -40,6 +40,23 @@ class FabCheckTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'empty or incomplete'):
                     fabcheck.check_drills(object(), fab)
 
+    def test_gpu_g85_slot_matches_pad_and_mutations_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            drill = fab / 'gpu.drl'
+            header = 'M48\nFMAT,2\nMETRIC\nT3C0.900\n%\nG90\nG05\nT3\n'
+            expected = Counter({fabcheck.slot_key((20.25, 40.06), (20.25, 40.86), .9): 1})
+            with patch.object(fabcheck, 'board_holes', return_value=expected):
+                drill.write_text(header + 'X20.25Y40.06G85X20.25Y40.86\nG05\nM30\n')
+                self.assertEqual(fabcheck.check_drills(object(), fab), 1)
+                drill.write_text(header + 'X20.25Y40.86G85X20.25Y40.06\nG05\nM30\n')
+                self.assertEqual(fabcheck.check_drills(object(), fab), 1)
+                for route in ('X20.35Y40.06G85X20.25Y40.86',
+                              'X20.25Y40.06G85X20.25Y40.76'):
+                    drill.write_text(header + route + '\nG05\nM30\n')
+                    with self.assertRaisesRegex(ValueError, 'drill-to-pad/via mismatch'):
+                        fabcheck.check_drills(object(), fab)
+
     def test_review_binds_to_exact_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'wifi'
@@ -74,18 +91,30 @@ class FabCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'wifi'
             (out / 'fab').mkdir(parents=True)
-            for name in ('wifi-F_Cu.gtl', 'wifi-B_Cu.gbl'):
+            for name in ('wifi-F_Cu.gtl', 'wifi-B_Cu.gbl',
+                         'wifi-Edge_Cuts.gm1', 'wifi-F_Mask.gts', 'wifi-B_Mask.gbs'):
                 (out / 'fab' / name).write_text('stub')
             board = MagicMock()
             board.GetCopperLayerCount.return_value = 2
-            board.GetDesignSettings.return_value.m_MinClearance = 150000
+            settings = board.GetDesignSettings.return_value
+            settings.m_MinClearance = 150000
+            settings.m_TrackMinWidth = 100000
+            settings.m_ViasMinAnnularWidth = 130000
+            settings.m_CopperEdgeClearance = 300000
+            settings.m_SolderMaskMinWidth = 100000
             with patch.object(fabcheck, 'export_parity', return_value=(board, 9)), \
                  patch.object(fabcheck, 'check_drills', return_value=218), \
                  patch.object(fabcheck, 'check_review'), \
-                 patch.object(fabcheck.gerberdrc, 'check_clearance', return_value=123) as clearance:
+                 patch.object(fabcheck.gerberdrc, 'check_clearance', return_value=123) as clearance, \
+                 patch.object(fabcheck.gerberdrc, 'check_via_annular', return_value=12) as annular, \
+                 patch.object(fabcheck.gerberdrc, 'check_edge') as edge, \
+                 patch.object(fabcheck.gerberdrc, 'check_mask') as mask:
                 with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC incomplete.*123 plotted copper objects'):
                     fabcheck.check(out)
                 clearance.assert_called_once()
+                annular.assert_called_once()
+                edge.assert_called_once()
+                mask.assert_called_once()
 
     def test_exported_copper_short_and_clearance_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -129,6 +158,57 @@ class FabCheckTests(unittest.TestCase):
                 path.write_text(mutant)
                 with self.assertRaises(ValueError):
                     gerberdrc.check_clearance([path], .15)
+
+    def test_plotted_trace_width_and_edge_clearance_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper = fab / 'sample-F_Cu.gtl'
+            edge = fab / 'sample-Edge_Cuts.gm1'
+            edge.write_text('%TF.FileFunction,Profile,NP*%\n%FSLAX46Y46*%\n'
+                            '%MOMM*%\n%LPD*%\n%ADD10C,0.100000*%\n'
+                            'D10*\nX2000000Y0D02*\nX2000000Y2000000D01*\nM02*\n')
+            def flash(x):
+                return ('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                        f'D10*\n%TO.N,/A*%\nX{x}Y1000000D03*\nM02*\n')
+            copper.write_text(flash(1500000))
+            self.assertEqual(gerberdrc.check_edge([copper], edge, .3), 1)
+            copper.write_text(flash(1750000))
+            with self.assertRaisesRegex(ValueError, 'copper-to-edge'):
+                gerberdrc.check_edge([copper], edge, .3)
+            copper.write_text('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.090000*%\n'
+                              'D10*\n%TO.N,/A*%\nX1000000Y1000000D02*\n'
+                              'X1500000Y1000000D01*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'trace width'):
+                gerberdrc.check_clearance([copper], .15, .1)
+
+    def test_plotted_mask_web_and_via_annular_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            mask = fab / 'sample-F_Mask.gts'
+            prefix = ('%TF.FileFunction,Soldermask,Top*%\n%TF.FilePolarity,Negative*%\n'
+                      '%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n')
+            mask.write_text(prefix + 'X1000000Y1000000D03*\nX1350000Y1000000D03*\nM02*\n')
+            self.assertEqual(gerberdrc.check_mask([mask], .1), 2)
+            mask.write_text(prefix + 'X1000000Y1000000D03*\nX1250000Y1000000D03*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'solder-mask web'):
+                gerberdrc.check_mask([mask], .1)
+
+            board_file = fab / 'board.kicad_pcb'
+            board_file.write_text('(kicad_pcb (via (at 1 -1) (size 0.6) (drill 0.3) '
+                                  '(layers "F.Cu" "B.Cu")))')
+            board = MagicMock()
+            board.GetFileName.return_value = str(board_file)
+            copper = fab / 'sample-F_Cu.gtl'
+            def via(diameter):
+                return ('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                        '%TA.AperFunction,ViaPad*%\n'
+                        f'%ADD10C,{diameter:.6f}*%\n%TD*%\n'
+                        'D10*\n%TO.N,/A*%\nX1000000Y1000000D03*\nM02*\n')
+            copper.write_text(via(.6))
+            self.assertEqual(gerberdrc.check_via_annular(board, [copper], .13), 1)
+            copper.write_text(via(.5))
+            with self.assertRaisesRegex(ValueError, 'via annular ring'):
+                gerberdrc.check_via_annular(board, [copper], .13)
 
 
 if __name__ == '__main__':
