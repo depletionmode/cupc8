@@ -251,28 +251,33 @@ def cpu_clock_route(main, card, main_board, cpu_board):
 
 
 def cpu_reset_route(main, card, main_board, cpu_board):
-    """The resistor output and CPU-card copper carrying active-low reset."""
+    """All three copper legs carrying chipset reset to the CPU FPGA."""
     source, socket = ('U7', '32'), ('J2', 'B16')
     finger, fpga = ('J1', 'B16'), ('U1', '22')
     resistor = path(main, source, socket, '33')
-    if node(main, resistor, '2') != '/CPU_nRST' or node(card, *finger) != '/CPU_nRST':
+    if node(main, *source) != '/CPU_nRST_SRC' or \
+            node(main, resistor, '1') != '/CPU_nRST_SRC' or \
+            node(main, resistor, '2') != '/CPU_nRST' or \
+            node(card, *finger) != '/CPU_nRST':
         raise ValueError('CPU reset resistor output or card contact is missing')
     path(card, finger, fpga)
-    legs = (('main', main_board, (resistor, '2'), socket),
-            ('cpu', cpu_board, finger, fpga))
+    legs = (('main', main_board, '/CPU_nRST_SRC', source, (resistor, '1')),
+            ('main', main_board, '/CPU_nRST', (resistor, '2'), socket),
+            ('cpu', cpu_board, '/CPU_nRST', finger, fpga))
     rows, missing = [], []
-    for board_name, board_file, first, last in legs:
+    for board_name, board_file, net, first, last in legs:
+        path(main if board_name == 'main' else card, first, last)
         length = None
         if board_file is not None and Path(board_file).is_file():
             sys.path.insert(0, str(ROOT / 'hw/si'))
             from ibis_bus import routed_distances
-            length = routed_distances(Path(board_file), '/CPU_nRST', first, [last])[
+            length = routed_distances(Path(board_file), net, first, [last])[
                 f'{last[0]}.{last[1]}']
         rows.append({'from': f'{board_name}.{first[0]}.{first[1]}',
                      'to': f'{board_name}.{last[0]}.{last[1]}',
                      'route_mm': length, 'runtime': 'cpu_reset_connected'})
         if length is None:
-            missing.append(f'{board_name}:CPU_nRST_reset_copper')
+            missing.append(f'{board_name}:{net.lstrip("/")}_reset_copper')
     return not missing, rows, missing
 
 
@@ -903,6 +908,7 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     runtime_net('main', 'CPU_CLK')
     runtime_net('cpu', 'CPU_CLK')
     runtime_net('main', 'CPU_nRST')
+    runtime_net('main', 'CPU_nRST_SRC')
     runtime_net('cpu', 'CPU_nRST')
     runtime_net('main', 'OSC_OUT')
     runtime_net('main', 'CLK12')

@@ -114,6 +114,27 @@ def main_cli():
                     'main:nPOR' not in bad_route['runtime_nets']:
                 raise AssertionError('removed nPOR copper did not change the executed reset path')
             print('open supervisor nPOR copper disables the native reset-release path')
+            bad_reset_source = open_launch('U7', '32', '/CPU_nRST_SRC')
+            reset_paths = [path for path in bad_reset_source['paths']
+                           if path.get('runtime') == 'cpu_reset_connected']
+            if bad_reset_source['runtime']['cpu_reset_connected'] or \
+                    bad_reset_source['runtime']['routed_top'] or \
+                    'main:CPU_nRST_SRC' not in bad_reset_source['runtime_nets'] or \
+                    len(reset_paths) != 3 or \
+                    [path['route_mm'] is None for path in reset_paths] != [True, False, False]:
+                raise AssertionError('open chipset reset source did not isolate only its copper leg')
+            if card_boards:
+                import json
+                from test_cosim_runtime import run, PROBE
+                good_reset_top = Path(temporary) / 'good-reset-source.json'
+                bad_reset_top = Path(temporary) / 'open-reset-source.json'
+                good_reset_top.write_text(json.dumps(good_route))
+                bad_reset_top.write_text(json.dumps(bad_reset_source))
+                reset_good, reset_bad = run(good_reset_top, PROBE), run(bad_reset_top, PROBE)
+                if reset_good['pc'] == reset_bad['pc'] or reset_bad['nrst'] != 0:
+                    raise AssertionError('open routed chipset reset source did not hold CPU in reset')
+                print(f"open routed CPU reset source holds PC ${reset_bad['pc']:04x} "
+                      f"instead of ${reset_good['pc']:04x}")
             bad_chipset_clock = open_launch('U7', '21', '/CLK12')
             if bad_chipset_clock['runtime']['chipset_clock_connected'] or \
                     bad_chipset_clock['runtime']['routed_top'] or \
