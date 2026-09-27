@@ -397,6 +397,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     board->timedMemory = true;
     board->ramAccessNs = o.ramAccessNs;
     board->romAccessNs = o.romAccessNs;
+    board->ramWriteConnected = o.ramWriteConnected;
+    board->romWriteConnected = o.romWriteConnected;
   }
   pwrHi = o.pwrHi;
   porConnected = o.porConnected;

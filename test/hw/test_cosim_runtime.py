@@ -60,6 +60,32 @@ const m = await Machine.create({slots: {1: 'eink'}, threaded: false});
 console.log(JSON.stringify({panel: Boolean(m.panel())}));
 m.stop();
 """
+ROM_WRITE_PROBE = """
+import { Machine } from './test/emu/machinenative.mjs';
+import { kernelRom } from './test/emu/romimage.mjs';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-we-rom-'));
+const image = path.join(directory, 'first-4k.bin');
+fs.writeFileSync(image, kernelRom().subarray(0, 4096));
+const m = await Machine.create({slots: {}, rom: Buffer.alloc(512*1024, 0xff), sysctl: true, threaded: false});
+try {
+  m.powerOn();
+  const p = spawn('python3', ['tools/cupc8.py', '--port', `tcp:127.0.0.1:${m.sysctlPort}`,
+                              'rom', 'write', image],
+                  {env: {...process.env, CUPC8_TIMEOUT_SCALE: '300'}});
+  let out = '', code = null;
+  p.stdout.on('data', d => out += d); p.stderr.on('data', d => out += d);
+  p.on('exit', c => code = c);
+  await m.runUntil(() => code !== null, 60e9);
+  console.log(JSON.stringify({code, verified: /wrote and verified 4096 bytes/.test(out),
+                              failed: /verify failed/.test(out)}));
+} finally {
+  m.stop(); fs.rmSync(directory, {recursive: true, force: true});
+}
+"""
 
 
 def run(top, probe=PROBE):
@@ -86,6 +112,26 @@ def main():
         if good['nrst'] != 1 or por_bad['nrst'] != 0 or por_bad['pc'] == good['pc']:
             raise AssertionError(f'open nPOR path did not hold the native machine in reset: {good} / {por_bad}')
         print(f"open routed nPOR holds CPU at ${por_bad['pc']:04x} rather than ${good['pc']:04x}")
+        if manifest['runtime']['memory_write_links'] != {'ram': True, 'rom': True} or \
+                'main:MEM_nWE' not in manifest['runtime_nets']:
+            raise AssertionError('memory writes require both executed, routed /WE branches')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['memory_write_links']['ram'] = False
+        mutant = Path(directory) / 'open-sram-we.json'
+        mutant.write_text(json.dumps(changed))
+        ram_bad = run(mutant)
+        if (ram_bad['pc'], ram_bad['sp']) == (good['pc'], good['sp']):
+            raise AssertionError(f'open SRAM /WE did not alter CPU execution: {good} / {ram_bad}')
+        print(f"open SRAM /WE moves CPU from ${good['pc']:04x} to ${ram_bad['pc']:04x}")
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['memory_write_links']['rom'] = False
+        mutant = Path(directory) / 'open-rom-we.json'
+        mutant.write_text(json.dumps(changed))
+        rom_good, rom_bad = run(args.top, ROM_WRITE_PROBE), run(mutant, ROM_WRITE_PROBE)
+        if rom_good != {'code': 0, 'verified': True, 'failed': False} or \
+                rom_bad != {'code': 1, 'verified': False, 'failed': True}:
+            raise AssertionError(f'open ROM /WE did not break programming verification: {rom_good} / {rom_bad}')
+        print('open ROM /WE makes sysctl flash-program verify fail')
         for name, key in (('ROM', 'rom_address'), ('CPU', 'cpu_address')):
             changed = copy.deepcopy(manifest)
             bits = changed['runtime'][key]

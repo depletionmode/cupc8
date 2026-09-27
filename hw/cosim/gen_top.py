@@ -227,7 +227,7 @@ def check(cards, main, pcb=None):
     manifest['runtime']['memory_timing_ns'] = {
         'ram': access(45, 'MEM_nCE_RAM'), 'rom': access(70, 'MEM_nCE_ROM')}
     required_routes = {f'MEM_A{i}' for i in range(19)} | {f'MEM_D{i}' for i in range(8)} | \
-                      {'MEM_nOE', 'MEM_nCE_RAM', 'MEM_nCE_ROM'}
+                      {'MEM_nOE', 'MEM_nWE', 'MEM_nCE_RAM', 'MEM_nCE_ROM'}
     manifest['runtime']['routed_timing'] = all(route.get(net, 0) > 0 for net in required_routes)
     required_top = required_routes | {f'CPU_A{i}' for i in range(16)} | \
                    {f'CPU_D{i}' for i in range(8)} | \
@@ -254,6 +254,36 @@ def check(cards, main, pcb=None):
                               'to': f'main.{por_input[0]}.{por_input[1]}',
                               'route_mm': por_mm, 'runtime': 'por_connected'})
     manifest['runtime']['por_connected'] = por_mm is not None
+    # Both memory chips use the chipset's /WE, but their actual copper branches
+    # are independent. An open branch prevents writes only at that chip.
+    write_source = ('U7', '114')
+    if node(main, *write_source) != '/MEM_nWE':
+        raise ValueError('chipset memory write pad is not MEM_nWE')
+    write_targets = {'ram': named_pin(main, 'U9', '~{WE}'),
+                     'rom': named_pin(main, 'U10', '~{WE}')}
+    write_lengths = {}
+    for target in write_targets.values():
+        path(main, write_source, target)
+    if pcb is not None and Path(pcb).is_file():
+        from ibis_bus import routed_distances
+        write_lengths = routed_distances(Path(pcb), '/MEM_nWE', write_source,
+                                         list(write_targets.values()))
+    write_links = {}
+    for kind, target in write_targets.items():
+        length = write_lengths.get(f'{target[0]}.{target[1]}')
+        write_links[kind] = length is not None
+        manifest['paths'].append({'from': 'main.U7.114',
+                                  'to': f'main.{target[0]}.{target[1]}',
+                                  'route_mm': length, 'runtime': f'{kind}_write_connected'})
+    manifest['runtime']['memory_write_links'] = write_links
+    for name, connected in (('nPOR:U6.2->U7.61', manifest['runtime']['por_connected']),
+                            ('MEM_nWE:U7.114->U9.5', write_links['ram']),
+                            ('MEM_nWE:U7.114->U10.31', write_links['rom'])):
+        if not connected:
+            manifest['runtime']['missing_routes'].append(name)
+    manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
+    manifest['runtime']['routed_timing'] &= all(write_links.values())
     # CPU driver pack channels must remain explicit; the native board model
     # may use these channel values as edge delays after E2E-001 integration.
     import cpu
@@ -448,7 +478,7 @@ def check(cards, main, pcb=None):
     for i in range(16):
         runtime_net('main', f'CPU_A{i}')
         runtime_net('cpu', f'CPU_A{i}')
-    for name in ('MEM_nOE', 'MEM_nCE_RAM', 'MEM_nCE_ROM',
+    for name in ('MEM_nOE', 'MEM_nWE', 'MEM_nCE_RAM', 'MEM_nCE_ROM',
                  'SPI_SCK', 'SPI_MOSI', 'SPI_MISO', 'BR_SCK', 'BR_MOSI',
                  'BR_MISO', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF',
                  'nPOR'):

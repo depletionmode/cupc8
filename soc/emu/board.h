@@ -38,6 +38,7 @@ struct MainBoard {
 	MemoryWiring wiring;
 	bool timedMemory = false;
 	double ramAccessNs = 45.0, romAccessNs = 70.0;
+	bool ramWriteConnected = true, romWriteConnected = true;
 
 	Vmachine_core *top = nullptr;
 	sst39_t rom;
@@ -127,10 +128,13 @@ struct MainBoard {
 		uint8_t din = now_reading == 1 ? fromPhysical(read_data, wiring.ramData) :
 		              now_reading == 2 ? fromPhysical(read_data, wiring.romData) : 0xFF;
 		if (last_we == 0 && top->mem_n_we == 1) {         // /WE rose: the write happens
-			if (!top->mem_n_ce_ram)
-				ram[toPhysical(a, wiring.ramAddress)] = toPhysical(last_din, wiring.ramData);
-			else if (!top->mem_n_ce_rom)
-				sst39_write(&rom, toPhysical(a, wiring.romAddress), toPhysical(last_din, wiring.romData), us);
+			if (!top->mem_n_ce_ram) {
+				if (ramWriteConnected)
+					ram[toPhysical(a, wiring.ramAddress)] = toPhysical(last_din, wiring.ramData);
+			} else if (!top->mem_n_ce_rom) {
+				if (romWriteConnected)
+					sst39_write(&rom, toPhysical(a, wiring.romAddress), toPhysical(last_din, wiring.romData), us);
+			}
 		}
 		last_we = top->mem_n_we;
 		last_din = top->mem_d_out;

@@ -192,6 +192,17 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       };
       opt.ramAccessNs = delay("ram");
       opt.romAccessNs = delay("rom");
+      napi_value writes = prop(env, wiring, "memory_write_links");
+      if (!isType(env, writes, napi_object)) throw std::runtime_error("netlist wiring: missing memory write links");
+      auto writeLink = [&](const char *key) {
+        napi_value value = prop(env, writes, key);
+        bool connected = false;
+        if (!isType(env, value, napi_boolean) || napi_get_value_bool(env, value, &connected) != napi_ok)
+          throw std::runtime_error(std::string("netlist wiring: invalid memory write link ") + key);
+        return connected;
+      };
+      opt.ramWriteConnected = writeLink("ram");
+      opt.romWriteConnected = writeLink("rom");
       opt.memoryWiringOn = true;
       napi_value slots = prop(env, wiring, "slots");
       bool array = false;
