@@ -1589,6 +1589,8 @@ def _finish_route(board):
     reinforce_5v_sys(board)
     from main_power_trial5 import reinforce_slot_5v
     reinforce_slot_5v(board)
+    from main_power_input_trial import reinforce_input_vbus
+    reinforce_input_vbus(board)
 
 
 def _efuse_escapes(board, fp):

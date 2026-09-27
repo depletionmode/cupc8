@@ -38,8 +38,10 @@ def main():
     for temp, barrel in ((70, 20), (100, 20), (100, 15), (115, 20), (115, 15)):
         up, slots, buck, input_a, input_b = row(board, temp, barrel)
         print("%3d C, %2d um via: U2-R4 %.3f; far slot %.3f; "
-              "U3 VIN %.3f/%.3f; J1-F1 %.3f; F1-U2 %.3f mOhm" %
-              (temp, barrel, up, max(slots), *buck, input_a, input_b))
+              "U3 VIN %.3f/%.3f; J1-F1 %.3f; F1-U2 %.3f; "
+              "input positive sum %.3f mOhm" %
+              (temp, barrel, up, max(slots), *buck, input_a, input_b,
+               input_a + input_b))
     print("SENSITIVITY ONLY: no zone, pad/contact, copper-minimum or thermal qualification")
 
 

@@ -208,3 +208,91 @@ needed for those dimensions. A measured or calibrated board thermal field,
 including R4, input traces, via/pad contacts and the GND return, is also
 needed before claiming the 20 mΩ input-loop and distribution budgets. **The
 trial remains unmerged and MB-005 remains red.**
+
+## Input bypass experiment (2026-09-27)
+
+The input copper is now also source-driven after the saved SES import:
+`main_power_input_trial.py` adds a three-segment B.Cu VBUS path between
+the existing F1 and J1 vias, with widths 3, 1.8 and 0.7 mm. It skirts
+the J1 GND fanout vias and plated GND hold-down. **No GND via or pad
+fanout is removed.** Footprints, socket row, mounting holes, J1 and F1
+positions, and the routed signal tracks stay at their saved coordinates.
+Refilling the source replay gave **0 KiCad DRC violations and 0
+unconnected items**. The unchanged In1 GND return mesh at 100 °C and
+90% inner copper gives U2-to-J1 2.478/2.410 mΩ, U3-to-J1
+2.171/2.043 mΩ and J11-to-J1 8.391/8.004 mΩ at 0.5/0.25 mm pitch.
+
+At 115 °C, 80% width, 24.9/11.4 µm outer/inner copper, 15 µm via wall
+and 1.76 mm board, the track/via graph now gives **18.610 mΩ** for
+J1 VBUS to F1:1, down from 66.831 mΩ. F1:2 to U2:5 remains
+**48.247 mΩ**, so the two positive sections still total **66.858 mΩ**
+before GND. At nominal 20 °C copper and 25 µm vias they total about
+**26.765 mΩ** before GND. At the expanded 2.431 A load the harsh-corner
+positive sections imply 163 mV and 395 mW in the track/via graph;
+at the 2.62 A eFuse current limit they imply 459 mW. The
+0.25 mm-pitch U2 In1 return mesh scales to roughly 3.46 mΩ at 115 °C and
+11.4 µm inner copper; one 15 µm, 0.3 mm drill GND via would add about
+2.77 mΩ. Thus even an In1-only return sensitivity would raise the
+66.858 mΩ positive estimate to about 73.1 mΩ before J1 pad/contact
+effects. The F/B return pours and other GND stitches can conduct in
+parallel, so that is a scenario, not a certified loop resistance. The
+bypass's 2.848, 5.686 and 2.637 mm segments alone would dissipate
+7.6, 25.4 and 30.3 mW if all 2.62 A flowed through them at that corner;
+the existing In2 path shares current. A one-ended 1D copper-only model
+with 350 W/(m·K) conductivity puts the end of those three bypass segments
+about 36 °C above a fixed F1-side endpoint at 2.62 A, without board
+cooling or heat from F1. The 1.8 mm by 0.3 mm U2 input neck alone is
+about 7.03 mΩ and 48 mW at that fault corner; with one end fixed and no
+cooling, its own distributed heat gives about a 21 °C rise at the other
+end, before heat arriving from upstream. These sensitivity calculations
+do not bound the actual conductor temperature. One illustrative 5 mΩ
+contact would dissipate 29.6 mW and drop 12.2 mV at 2.431 A. The
+[HRO product page](https://en.krhro.com/Product-Details/726.html) for
+TYPE-C-31-M-12 specifies **≤50 mΩ contact resistance**, 5 A rated load
+and an 80 °C maximum operating temperature. A single VBUS plus GND
+contact at that ceiling would add up to 100 mΩ to the supply loop,
+243 mV and 591 mW at 2.431 A. Two independent, equally loaded contacts
+per rail would reduce that illustrative ceiling to 50 mΩ; the connector's
+actual sharing, cable plug, and solder interfaces are unqualified. These
+values exclude the PTC and
+eFuse, USB-C contact, solder joints and GND pad/barrel resistance. The
+supplied HRO drawing for J1 specifies footprint geometry but has no
+order-specific contact or local heating measurement.
+
+Trying to widen the existing In3 VBUS_F vertical from 1 mm to 4 mm
+reduced that net's modeled value to 31.3 mΩ, but shorted three GND vias.
+Moving the proposed VBUS_F path to B.Cu and removing the overlapping
+5V_SYS track passed DRC but left VBUS_F at 27.9 mΩ and raised the buck
+VIN route to 20.5 mΩ. Both variants were discarded. The clean bypass is
+a useful input reduction, but the **20 mΩ loop target remains unmet even
+before the return and contacts**. Closing it requires relocating F1/U2
+near J1 or reserving a multi-layer, broad input corridor with parallel
+transitions, then rerouting and validating the whole board. The current
+salt-1 route cannot support that change by simply widening its narrow
+input tracks. This experiment has no new end-to-end board receipt and
+stays on the isolated branch.
+
+### Placement feasibility, not a routed revision
+
+The current courtyards put J1 at x25.07–34.93, y180.30–188.56 mm;
+F1 at x16–20, y167–173; and U2 at x9.74–12.26, y154.75–157.25.
+This separation forces a roughly 10.5 mm USB-to-PTC bypass and an
+8.56 mm narrow In3 VBUS_F run even before the local pad escapes. The
+In3 run cannot simply widen: GND vias at (19.825,156), (20.11,160.23)
+and (20,164) short a 4 mm trace. B.Cu crosses the 5V_SYS feed at y162.
+The clean B.Cu bypass preserves those GND vias and does not clear the
+VBUS_F obstacles. This is the binding geometry of the saved salt-1
+route, not a vendor-tolerance issue.
+
+A placement study found physical courtyard room for F1 centered near
+(25,175) mm and U2 near (22,168.5) mm, with U2 rotated so its input
+faces F1 and its output faces the slot bus. F1 would occupy approximately
+x23–27, y172–178, clearing J1 by 2.3 mm and U1 by 1.5 mm; R1's present
+courtyard intrudes 0.52 mm and must move. U2 would occupy approximately
+x20.74–23.26, y167.25–169.75, clear of C1 by 1.47 mm. These numbers
+show that component bodies can fit. They do **not** prove a route, the
+eFuse's fine-pitch input escape, USB GND return, or the relocated output
+bus. The existing deterministic preroutes and post-route guards use the
+old positions, so this move requires replacing them and a new whole-board
+autoroute, parity/DRC and thermal audit. No clean routed revision or
+≤20 mΩ result exists for this placement, and the board remains red.

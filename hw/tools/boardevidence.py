@@ -21,7 +21,9 @@ def inputs(board, root=ROOT):
     paths = [root / 'hw' / 'boards' / (board + '.py'),
              root / 'hw' / 'boards' / 'rp2040card.py', root / 'hw' / 'pins.yaml']
     if board == 'main':
-        paths.append(root / 'hw' / 'boards' / 'main_power_reinforce.py')
+        paths.extend(root / 'hw' / 'boards' / name for name in
+                     ('main_power_reinforce.py', 'main_power_trial5.py',
+                      'main_power_input_trial.py'))
     for directory in ('hw/tools', 'hw/lib', 'hw/parts'):
         paths.extend(p for p in (root / directory).rglob('*')
                      if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')
