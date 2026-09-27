@@ -2,6 +2,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/406f13c11d944519b4ea113900723c66.pdf
 source: "Microchip SST39VF010/020/040 datasheet, Figure 2-2: Pin Assignments for 32-lead PLCC (top view)"
 package: PLCC-32(11.4x14)
+footprints: [PLCC-32_11.4x14.0mm_P1.27mm]   # KiCad's PLCC-32 11.4 x 14.0 mm: JLC's 'PLCC-32(11.4x14)'
 pins:
   1: "A18"
   2: "A16"

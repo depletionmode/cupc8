@@ -2,6 +2,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/53f82b9f905b8a9e4281b8d43e1074c3.pdf
 source: "the maker's drawing: pins 1-10 in two rows, odd numbers in the first"
 package: Plugin,P=2.54mm
+footprints: [PinHeader_2x05_P2.54mm_Vertical]   # KiCad's 2 x 5 2.54 mm header: JLC calls it 'Plugin,P=2.54mm'
 pins:
   1: ["1", "Pin_1"]
   2: ["2", "Pin_2"]
@@ -13,3 +14,7 @@ pins:
   8: ["8", "Pin_8"]
   9: ["9", "Pin_9"]
   10: ["10", "Pin_10"]
+# every pin is the same square post: KiCad numbers the rows one way round,
+# EasyEDA's footprint the other (mirror images), so the pads are matched by
+# position, not by number; JLC places the same header either way
+interchangeable_pins: true

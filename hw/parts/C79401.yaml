@@ -1,0 +1,12 @@
+# MAX16054AZT+T (Analog Devices), pushbutton on/off controller, TSOT-23-6
+datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/MAX16054.pdf
+source: "Analog Devices MAX16054 datasheet, Pin Configuration (TSOT, top view) and Pin Description: 1 IN, 2 GND, 3 CLEAR, 4 OUT-bar (active-low CMOS output), 5 OUT (active-high CMOS output), 6 VCC"
+package: TSOT-23-6
+pins:
+  1: IN
+  2: GND
+  3: CLEAR
+  4: ["#OUT", "~{OUT}"]
+  5: OUT
+  6: VCC
+ccw: [1, 6]

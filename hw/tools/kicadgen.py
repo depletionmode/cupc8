@@ -2548,14 +2548,19 @@ def jlc_fab(sch, pcb, comps, fab):
          "-o", raw, pcb])
     import bomcheck
     turn = bomcheck.rotations()           # JLC's footprint zero vs KiCad's (hw/parts/jlc_rotation.yaml)
+    shift = bomcheck.offsets()            # and its origin, where it is not KiCad's (a pin header's pin 1)
     with open(raw) as f, open(os.path.join(fab, "cpl.csv"), "w", newline="") as g:
         w = csv.writer(g)
         w.writerow(["Designator", "Mid X", "Mid Y", "Layer", "Rotation"])
         for row in csv.DictReader(f):
             if row["Ref"] in placed:
-                rot = (float(row["Rot"]) + turn.get(placed[row["Ref"]]["footprint"], 0)) % 360
-                w.writerow([row["Ref"], row["PosX"] + "mm", row["PosY"] + "mm",
-                            "Top" if row["Side"] == "top" else "Bottom", "%.6f" % rot])
+                fp = placed[row["Ref"]]["footprint"]
+                rot = (float(row["Rot"]) + turn.get(fp, 0)) % 360
+                mid = (row["PosX"] + "mm", row["PosY"] + "mm")
+                if fp in shift:
+                    mx, my = bomcheck.cpl_mid(float(row["PosX"]), -float(row["PosY"]), float(row["Rot"]), shift[fp])
+                    mid = ("%.6fmm" % mx, "%.6fmm" % my)
+                w.writerow([row["Ref"], mid[0], mid[1], "Top" if row["Side"] == "top" else "Bottom", "%.6f" % rot])
     os.remove(raw)
     counts = {}
     for (_, _, code), refs in groups.items():

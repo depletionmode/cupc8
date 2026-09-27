@@ -1,0 +1,18 @@
+# JLC's part C3662799 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C3662799
+jlc_package: QFN-10(2x2)
+easyeda_footprint: VQFN-10_L2.0-W2.0-P0.45-TL
+pins: {'1': EN/UVLO, '2': OVLO/OVCSEL, '3': PG/AUXOFF, '4': '~{FLT}/PGTH', '5': IN, '6': OUT, '7': DVDT, '8': GND, '9': ILM, '10': ITIMER}
+pads:
+- ['1', -0.91, 0.9]
+- ['4', -0.91, -0.9]
+- ['7', 0.91, -0.9]
+- ['10', 0.91, 0.9]
+- ['5', -0.23, 0.0]
+- ['6', 0.26, 0.0]
+- ['2', -0.91, 0.23]
+- ['3', -0.91, -0.23]
+- ['9', 0.91, 0.23]
+- ['8', 0.91, -0.23]

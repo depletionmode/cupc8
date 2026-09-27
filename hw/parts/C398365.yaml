@@ -2,6 +2,7 @@
 datasheet: https://www.ti.com/lit/ds/symlink/tlv62569.pdf
 source: "TI TLV62569 datasheet, 5 Pin Configuration and Functions: DDC package (SOT23-6, top view) and Pin Functions (SOT23-6 column)"
 package: SOT-23-THIN-6
+footprints: [SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL]   # JLC's SOT-23-6 footprint: the DDC is TI's thin SOT-23-6, JLC's 'SOT-23-THIN-6'
 pins:
   1: EN
   2: GND

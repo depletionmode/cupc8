@@ -1,0 +1,8 @@
+# SMD1812P350TF/16 (Ruilon), 3.5 A hold PTC, 1812: the main board's input fuse F1
+datasheet: https://www.lcsc.com/datasheet/C46970911.pdf
+source: "a two-terminal part: the table exists for its land. KiCad's R_1812_4532Metric (the IPC land; KiCad's Fuse_1812 is the same) puts the pad centres at +-2.14 mm, 1.125 x 3.4 mm; JLC's EasyEDA F1812 at +-1.85 mm. Hand check (2026-09-27): a 4.5 mm 1812 body's end terminations lie under both lands; JLC places the part on its own centre, which both share"
+package: "1812"
+pins:
+  1: ""
+  2: ""
+pad_tolerance: 0.3

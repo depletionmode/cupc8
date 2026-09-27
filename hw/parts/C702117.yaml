@@ -2,6 +2,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/d955c7471084950f84e5242f5ec7a175.pdf
 source: "TI TLV7011/TLV7021 datasheet (SLVSD17), 5 Pin Configuration and Functions: DBV package, Pin Functions"
 package: SOT-23-5
+footprints: [TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL]   # JLC's own TSOT-23-5 footprint: JLC's 'SOT-23-5' (the same land)
 pins:
   1: "OUT"
   2: "VEE"

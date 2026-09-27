@@ -80,6 +80,18 @@ def rotations():
         return {fp: e["rotation"] for fp, e in (yaml.safe_load(f) or {}).items()}
 
 
+def offsets():
+    """{footprint id: (x, y)}: where JLC's footprint origin is in KiCad's
+    footprint (mm, y up), for a footprint whose origin is not its pads'
+    centre (KiCad's pin headers: pin 1). jlc_fab moves the CPL's Mid X/Y there."""
+    with open(ROTATIONS) as f:
+        return {fp: tuple(e["offset"]) for fp, e in (yaml.safe_load(f) or {}).items() if e.get("offset")}
+
+
+def centroid(pads):
+    return (sum(p[1] for p in pads) / len(pads), sum(p[2] for p in pads) / len(pads))
+
+
 # ------------------------------------------------------------------ inputs
 
 def footprint_pads(path):
@@ -184,13 +196,21 @@ def schematic_parts(sch):
 
 
 def board_rotations(pcb):
-    """{ref: (rotation, layer)} of the footprints on the board."""
+    """{ref: (rotation, layer, x, y)} of the footprints on the board (y down, KiCad's)."""
     out = {}
     for fp in kg.find(kg.parse(open(pcb).read()), "footprint"):
         at = kg.find1(fp, "at")
         ref = {str(p[1]): str(p[2]) for p in kg.find(fp, "property")}.get("Reference")
-        out[ref] = (float(at[3]) if len(at) > 3 else 0.0, str(kg.find1(fp, "layer")[1]))
+        out[ref] = (float(at[3]) if len(at) > 3 else 0.0, str(kg.find1(fp, "layer")[1]), float(at[1]), float(at[2]))
     return out
+
+
+def cpl_mid(x, y, rotation, offset):
+    """JLC's Mid X/Y (y up) for a footprint at KiCad's (x, y), turned by
+    `rotation`, whose JLC origin is `offset` (mm, y up) from its own."""
+    ox, oy = offset or (0.0, 0.0)
+    a = math.radians(rotation)
+    return x + ox * math.cos(a) - oy * math.sin(a), -y + ox * math.sin(a) + oy * math.cos(a)
 
 
 # ------------------------------------------------------------------ checks
@@ -201,14 +221,14 @@ def rot(pads, deg):
     return [(n, x * c - y * s, x * s + y * c) for n, x, y in pads]
 
 
-def fits(kpads, epads, key):
+def fits(kpads, epads, key, tolerance=PAD_TOLERANCE):
     """The KiCad pads (already turned) land each on an EasyEDA pad with the
-    same key (a pin number or function), within PAD_TOLERANCE."""
+    same key (a pin number or function), within `tolerance`."""
     if len(kpads) != len(epads):
         return False
     for n, x, y in kpads:
         near = min(epads, key=lambda e: math.hypot(e[1] - x, e[2] - y))
-        if math.hypot(near[1] - x, near[2] - y) > PAD_TOLERANCE or (key and key(n, "k") != key(near[0], "e")):
+        if math.hypot(near[1] - x, near[2] - y) > tolerance or (key and key(n, "k") != key(near[0], "e")):
             return False
     return True
 
@@ -326,24 +346,49 @@ def check_line(fpid, lcsc, refs, parts, table, problems, notes, refetch=False):
         key = lambda n, side: names[side].get(n)
         if sorted(names["e"].values()) != ["A", "K"]:
             say("EasyEDA's symbol (%s) names its pins %s, not a cathode and an anode" % (ee_name, epins))
-    elif len(pins) == 2:
-        key = None                              # a resistor or capacitor turns either way
+    elif len(pins) == 2 or (ds and ds[0].get("interchangeable_pins")):
+        # a resistor or capacitor turns either way; so does a part whose
+        # table says every pin is the same (a pin header's posts), whatever
+        # order KiCad and EasyEDA number them in
+        key = None
     else:
         key = lambda n, side: n                 # pad numbers are the datasheet's pin numbers
-    turns = [a for a in (0, 90, 180, 270) if fits(rot(kpads, a), epads, key)]
+    # a table's pad_tolerance: a land KiCad draws for the same package a
+    # little apart from EasyEDA's, checked by hand against the datasheet
+    tol = (ds[0].get("pad_tolerance") if ds else None) or PAD_TOLERANCE
+    turns = [a for a in (0, 90, 180, 270) if fits(rot(kpads, a), epads, key, tol)]
+    shifts = {}
+    if not turns and kpads and epads:
+        # the same pads about another origin (KiCad's pin headers have theirs
+        # on pin 1, EasyEDA's footprints on the centre): the CPL's Mid X/Y
+        # then needs the offset to JLC's origin, from the table
+        ce = centroid(epads)
+        for a in (0, 90, 180, 270):
+            turned = rot(kpads, a)
+            ck = centroid(turned)
+            t = (ck[0] - ce[0], ck[1] - ce[1])
+            if fits([(n, x - t[0], y - t[1]) for n, x, y in turned], epads, key, tol):
+                back = rot([("", t[0], t[1])], -a)[0]
+                shifts[(-a) % 360] = (round(back[1], 3) + 0.0, round(back[2], 3) + 0.0)
+        turns = [(-a) % 360 for a in shifts]
     if not turns:
         say("its pads match EasyEDA's %s in no orientation (%d pads vs %d, within %.1f mm%s)"
-            % (ee_name, len(kpads), len(epads), PAD_TOLERANCE, ", by pin" if key else ""))
+            % (ee_name, len(kpads), len(epads), tol, ", by pin" if key else ""))
         return []
     # the KiCad footprint turned by a is JLC's at 0: JLC's angle is KiCad's - a
-    ok = sorted((-a) % 360 for a in turns)
+    ok = sorted(shifts) if shifts else sorted((-a) % 360 for a in turns)
     if fpid not in table:
         say("no entry in hw/parts/jlc_rotation.yaml; the pads say %s (bomcheck.py --update-rotations)"
             % " or ".join(map(str, ok)))
     elif table[fpid] % 360 not in ok:
         say("jlc_rotation.yaml adds %s degrees, but JLC's footprint (EasyEDA %s) is KiCad's turned by %s"
             % (table[fpid], ee_name, " or ".join(map(str, ok))))
-    return ok, ee_name
+    else:
+        want, have = shifts.get(table[fpid] % 360), offsets().get(fpid)
+        if (want is None) != (have is None) or (want and math.hypot(want[0] - have[0], want[1] - have[1]) > 0.05):
+            say("jlc_rotation.yaml's offset is %s, but JLC's origin (EasyEDA %s's centre) is at %s in KiCad's "
+                "footprint (bomcheck.py --update-rotations)" % (have, ee_name, want))
+    return ok, ee_name, shifts
 
 
 def bom_groups(parts):
@@ -377,6 +422,10 @@ def check_fab(fab, groups, pcb, table, problems):
         row = cpl[ref]
         if row["Layer"] != "Top":
             problems.append("%s: cpl.csv has it on the %s; JLC assembles the top side" % (ref, row["Layer"]))
+        mx, my = cpl_mid(board[ref][2], board[ref][3], board[ref][0], offsets().get(fps[ref]))
+        if math.hypot(float(row["Mid X"].rstrip("mm")) - mx, float(row["Mid Y"].rstrip("mm")) - my) > 0.01:
+            problems.append("%s: cpl.csv puts it at %s, %s; JLC's origin for it is at %.3f, %.3f"
+                            % (ref, row["Mid X"], row["Mid Y"], mx, my))
         want_rot = (board[ref][0] + table.get(fps[ref], 0)) % 360
         if abs((float(row["Rotation"]) - want_rot + 180) % 360 - 180) > 0.01:
             problems.append("%s: cpl.csv rotation %s, the board's %g plus jlc_rotation.yaml's %s is %g"
@@ -388,13 +437,16 @@ def update_rotations(derived):
         text = f.read()
     head = text[:text.index("\n\n") + 2] if "\n\n" in text else ""
     entries = yaml.safe_load(text) or {}
-    for fpid, (ok, sources) in derived.items():
-        if fpid in entries and entries[fpid]["rotation"] % 360 in ok:
+    for fpid, (ok, sources, shifts) in derived.items():
+        if fpid in entries and entries[fpid]["rotation"] % 360 in ok and \
+                tuple(entries[fpid].get("offset") or ()) == tuple(shifts.get(entries[fpid]["rotation"] % 360) or ()):
             continue
         entries[fpid] = {"rotation": ok[0],
                          "source": "derived by bomcheck.py: the KiCad pads onto EasyEDA's %s (%s)"
                                    % (", ".join(sorted({s[0] for s in sources})),
                                       ", ".join(sorted({s[1] for s in sources})))}
+        if shifts.get(ok[0]):
+            entries[fpid]["offset"] = list(shifts[ok[0]])
     with open(ROTATIONS, "w") as f:
         f.write(head + yaml.safe_dump(entries, sort_keys=True, width=200, allow_unicode=True))
 
@@ -422,13 +474,13 @@ def check(name, out=None, update=False, refetch=False):
     for (_, fpid, lcsc), refs in sorted(groups.items(), key=lambda g: g[1][0]):
         r = check_line(fpid, lcsc, refs, parts, table, problems, notes, refetch)
         if r and r[0]:
-            ok, ee_name = r
+            ok, ee_name, shifts = r
             prev = derived.get(fpid)
             if prev and not set(prev[0]) & set(ok):
                 problems.append("%s: %s needs %s but %s needs %s; key the table by part"
                                 % (fpid, lcsc, ok, prev[1][0][1], prev[0]))
             derived[fpid] = (sorted(set(ok) & set(prev[0])) if prev else ok,
-                             (prev[1] if prev else []) + [(ee_name, lcsc)])
+                             (prev[1] if prev else []) + [(ee_name, lcsc)], shifts)
     if update:
         update_rotations(derived)
         return "jlc_rotation.yaml updated"

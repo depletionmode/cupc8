@@ -1,0 +1,14 @@
+# JLC's part C79401 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C79401
+jlc_package: TSOT-23-6
+easyeda_footprint: TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-TL
+pins: {'1': IN, '2': GND, '3': CLEAR, '4': '#OUT', '5': OUT, '6': VCC}
+pads:
+- ['6', 1.1, 0.95]
+- ['4', 1.1, -0.95]
+- ['3', -1.1, -0.95]
+- ['2', -1.1, 0.0]
+- ['1', -1.1, 0.95]
+- ['5', 1.1, 0.0]

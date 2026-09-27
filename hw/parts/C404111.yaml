@@ -3,6 +3,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/17851c16fcb3fc467f11b90110e33a8e.pdf
 source: "UMAX 3183-XXXXXPXT drawing 318307001 sheet 1: 'A PIN#1' starts the north row and 'B PIN#1' the south row, pin 1 at the short side of the key (sheet 4, recommended PCB layout); signal names from doc/hardware/cpu-bus.md"
 package: Plugin,P=1mm
+footprints: [UMAX_3183-10112P1T]   # cupc8's UMAX 3183 x8 footprint (the drawing's layout): JLC calls it 'Plugin,P=1mm'
 pins:
   "A1": ["A1", "PRSNT1_n"]
   "A2": ["A2", "+5V"]

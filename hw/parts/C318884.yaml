@@ -3,6 +3,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/56c8799ae5193945a16a1ffbe378246a.pdf
 source: "XKB TS-1187A datasheet, drawing: four terminals, joined in two pairs by the switch body; the board wires two diagonal pads, which are always on different terminals"
 package: SMD-4P,5.1x5.1mm
+footprints: [SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5]   # JLC's own footprint, 5.1 x 5.1 mm: JLC calls it 'SMD-4P,5.1x5.1mm'
 pins:
   1: ["1", "A"]
   2: ["2", "B"]

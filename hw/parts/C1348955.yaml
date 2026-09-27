@@ -2,6 +2,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/90ea0a0c4d567eb1821e29d9d114e8d1.pdf
 source: "ISSI IS62WV5128EALL/EBLL/ECLL datasheet Rev. A4, page 2: Pin Configurations, 32-pin STSOP (Type I)"
 package: STSOP-32-11.8mm
+footprints: [STSOP-32_L8.0-W11.8-P0.50-LS13.4-TL]   # JLC's own footprint, 8.0 x 11.8 mm: JLC's 'STSOP-32-11.8mm'
 pins:
   1: "A11"
   2: "A9"

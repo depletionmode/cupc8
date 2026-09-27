@@ -1,0 +1,11 @@
+# HT7533-2 (Holtek), 3.3 V 100 mA micropower LDO (24 V in, 2.5 uA), SOT-23-5 (variant A)
+datasheet: https://www.holtek.com/webapi/116711/HT75xx-2v190.pdf
+source: "Holtek HT75xx-2 datasheet (Rev 1.30), Pin Assignment: SOT23-5-A (top view) GND, VIN, VOUT on pins 1-3, NC on 4-5; the Selection Table puts every HT75xx-2 but the HT7541-2 in SOT23-5-A"
+package: SOT-23-5
+pins:
+  1: GND
+  2: VIN
+  3: VOUT
+  4: NC
+  5: NC
+ccw: [1, 5]

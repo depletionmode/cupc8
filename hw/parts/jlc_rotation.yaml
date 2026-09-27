@@ -22,6 +22,12 @@ Capacitor_SMD:C_0805_2012Metric:
 Capacitor_SMD:C_1206_3216Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s C1206 (C15008)'
+Connector_PinHeader_2.54mm:PinHeader_2x05_P2.54mm_Vertical:
+  offset:
+  - 1.27
+  - -5.08
+  rotation: 90
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s HDR-TH_10P-P2.54-V-M-R2-C5-S2.54_2 (C42431818)'
 Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s CRYSTAL-SMD_4P-L3.2-W2.5-BL (C9002)'
@@ -31,12 +37,18 @@ Diode_SMD:D_SOD-123:
 Fuse:Fuse_0805_2012Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s F0805 (C20975)'
+Fuse:Fuse_1206_3216Metric:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s F1206 (C143975)'
 LED_SMD:LED_0603_1608Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s LED-SMD_L1.6-W0.8-R-RD, LED0603-RD (C12624, C2286)'
 Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s LQFN-56_L7.0-W7.0-P0.4-EP (C2040)'
+Package_LCC:PLCC-32_11.4x14.0mm_P1.27mm:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s PLCC-32_L14.0-W11.5-P1.27-T (C645939)'
 Package_SO:SOIC-8_5.3x5.3mm_P1.27mm:
   rotation: 270
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL (C131025)'
@@ -55,12 +67,33 @@ Resistor_SMD:R_0402_1005Metric:
 Resistor_SMD:R_0603_1608Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0603 (C21190, C22775, C25804)'
+Resistor_SMD:R_0805_2012Metric:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0805 (C17477)'
+Resistor_SMD:R_1206_3216Metric:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R1206 (C127691, C17888)'
+Resistor_SMD:R_1812_4532Metric:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s F1812 (C46970911)'
 Resistor_SMD:R_Array_Convex_4x0603:
   rotation: 270
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL (C425067)'
+cupc8:D_SOD-123FL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOD-123FL_L2.7-W1.8-LS3.8-RD (C193402)'
 cupc8:HDMI_A_SHOUHAN_HDMI-19PIN-043:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s HDMI-SMD_HDMI-19PIN-043 (C2858275)'
+cupc8:SOFNG_PCIE-64P11L:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s PCIE-SMD_PCIE-64P11L (C19188869)'
+cupc8:UMAX_3183-10112P1T:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s CONN-TH_98P-P1.00-V_3183-XXXXXPXT (C404111)'
+cupc8:UMAX_3183-10200P1T:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s CONN-TH_36P-P1.00-V_3183-XXXXXPXT (C404113)'
 cupc8:USB_A_SOFNG_USB-302S-T:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-A-SMD_USB-302S (C112455)'
@@ -76,6 +109,12 @@ jlc:IND-SMD_L3.0-W3.0_FNR30XXS:
 jlc:IND-SMD_L4.4-W4.2:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s IND-SMD_L4.4-W4.2 (C167203)'
+jlc:IND-SMD_L5.0-W5.0:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s IND-SMD_L5.0-W5.0 (C357060)'
+jlc:OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE (C160457)'
 jlc:RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL (C25501)'
@@ -85,6 +124,9 @@ jlc:RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL:
 jlc:SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL (C179173)'
+jlc:SOT-143_L2.9-W1.3-P1.92-LS2.3-BR:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-143_L2.9-W1.3-P1.92-LS2.3-BR (C7272)'
 jlc:SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR (C6186)'
@@ -94,33 +136,48 @@ jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL:
 jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR (C141836)'
+jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
 jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL (C52140430)'
 jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-563_L1.6-W1.2-P0.50-LS1.6-BR (C919459)'
+jlc:STSOP-32_L8.0-W11.8-P0.50-LS13.4-TL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s STSOP-32_L8.0-W11.8-P0.50-LS13.4-TL (C1348955)'
+jlc:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5 (C318884)'
 jlc:TF-SMD_TF-01A:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TF-SMD_TF-01A (C91145)'
 jlc:TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL (C1521989)'
+jlc:TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL (C702117)'
+jlc:TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-TL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-TL (C79401)'
+jlc:TSSOP-16_L5.0-W4.4-P0.65-LS6.4-BL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TSSOP-16_L5.0-W4.4-P0.65-LS6.4-BL (C352826)'
+jlc:TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL (C465732)'
 jlc:USB-C_SMD-TYPE-C-31-M-12_1:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-C_SMD-TYPE-C-31-M-12_1 (C165948)'
+jlc:VQFN-10_L2.0-W2.0-P0.45-TL:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s VQFN-10_L2.0-W2.0-P0.45-TL (C3662799)'
 jlc:VSON-10_L3.0-W2.0-P0.50-TL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s VSON-10_L3.0-W2.0-P0.50-TL (C2845237)'
 jlc:WIFIM-SMD_61P-L13.2-W12.5-P0.80:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s WIFIM-SMD_61P-L13.2-W12.5-P0.80 (C2911374)'
-cupc8:D_SOD-123FL:
-  rotation: 0
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOD-123FL_L2.7-W1.8-LS3.8-RD (C193402)'
-jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL:
-  rotation: 0
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
-jlc:USB-C_SMD-TYPE-C-31-M-12_1:
-  rotation: 0
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s USB-C_SMD-TYPE-C-31-M-12_1 (C165948)'

@@ -1,0 +1,24 @@
+# JLC's part C352826 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C352826
+jlc_package: TSSOP-16
+easyeda_footprint: TSSOP-16_L5.0-W4.4-P0.65-LS6.4-BL
+pins: {'1': A4, '2': A6, '3': A, '4': A7, '5': A5, '6': '~{E}', '7': VEE, '8': GND, '9': S2, '10': S1, '11': S0, '12': A3, '13': A0, '14': A1, '15': A2, '16': VCC}
+pads:
+- ['1', -2.28, -2.87]
+- ['2', -1.63, -2.87]
+- ['3', -0.98, -2.87]
+- ['4', -0.32, -2.87]
+- ['5', 0.33, -2.87]
+- ['6', 0.98, -2.87]
+- ['7', 1.63, -2.87]
+- ['8', 2.28, -2.87]
+- ['16', -2.28, 2.87]
+- ['15', -1.63, 2.87]
+- ['14', -0.98, 2.87]
+- ['13', -0.32, 2.87]
+- ['12', 0.33, 2.87]
+- ['11', 0.98, 2.87]
+- ['10', 1.63, 2.87]
+- ['9', 2.28, 2.87]

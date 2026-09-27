@@ -3,6 +3,7 @@
 datasheet: https://datasheet.lcsc.com/datasheet/pdf/59d0cfcc0c1dbe1d6c53b9459f153d74.pdf
 source: "Sofng PCIE-64P11L datasheet page 1-2 (contacts 1.00 pitch, 11 then 21 per row, two fitting nails); EasyEDA's symbol for C19188869 names pads 1-32 A1-A32 and 33-64 B1-B32 (hw/boards/sockets.py checks the rows against the card); signal names from doc/hardware/system-slot.md"
 package: SMD
+footprints: [SOFNG_PCIE-64P11L]   # cupc8's copy of JLC's footprint for it: JLC calls it 'SMD'
 pins:
   1: ["A1", "PRSNT1_n"]
   2: ["A2", "+3V3"]

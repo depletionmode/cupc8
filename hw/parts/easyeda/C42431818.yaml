@@ -1,0 +1,18 @@
+# JLC's part C42431818 as hw/tools/bomcheck.py fetched it: JLC's package name, and the
+# EasyEDA footprint JLC places (pads: number, x, y up, mm) with its symbol's pin
+# names. bomcheck.py --refetch compares it with JLC's today.
+lcsc: C42431818
+jlc_package: Plugin,P=2.54mm
+easyeda_footprint: HDR-TH_10P-P2.54-V-M-R2-C5-S2.54_2
+pins: {'1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '10': '10'}
+pads:
+- ['10', 5.08, 1.27]
+- ['9', 5.08, -1.27]
+- ['8', 2.54, 1.27]
+- ['7', 2.54, -1.27]
+- ['6', 0.0, 1.27]
+- ['5', 0.0, -1.27]
+- ['4', -2.54, 1.27]
+- ['3', -2.54, -1.27]
+- ['2', -5.08, 1.27]
+- ['1', -5.08, -1.27]

@@ -2,6 +2,7 @@
 datasheet: https://www.ti.com/lit/ds/symlink/tps25947.pdf
 source: "TI TPS25947 datasheet SLVSFC9C, section 5: Figure 5-1 RPW package (top view) and Table 5-1 Pin Functions"
 package: QFN-10(2x2)
+footprints: [VQFN-10_L2.0-W2.0-P0.45-TL]   # JLC's own footprint, 2 x 2 mm: JLC's 'QFN-10(2x2)'
 pins:
   1: EN/UVLO
   2: [OVLO/OVCSEL, OVLO]
