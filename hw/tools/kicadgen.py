@@ -732,6 +732,69 @@ def silk_keepout(board, fp, margin=0.3):
     board.Add(z)
 
 
+def normalize_silk_strokes(board, minimum_mm=0.15):
+    """Widen printable footprint strokes; move pad-adjacent fragments to Fab.
+
+    Stock footprints commonly use 0.10/0.12 mm outlines. Filled polygons have
+    zero stroke and need a separate minimum-ink-width check. A stock passive
+    outline may end exactly at the old width's pad clearance; widening that
+    fragment would print over the pad. Its Fab outline remains available for
+    assembly when the fragment cannot fit on silkscreen.
+    """
+    import pcbnew
+    minimum = pcbnew.FromMM(minimum_mm)
+    to = pcbnew.ToMM
+    pads = []
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            box = pad.GetBoundingBox()
+            pads.append((to(box.GetLeft()), to(box.GetTop()), to(box.GetRight()),
+                         to(box.GetBottom()), pad.IsOnLayer(pcbnew.F_Cu),
+                         pad.IsOnLayer(pcbnew.B_Cu)))
+
+    def would_touch_pad(segment, front):
+        a, b = segment.GetStart(), segment.GetEnd()
+        ax, ay, bx, by = to(a.x), to(a.y), to(b.x), to(b.y)
+        dx, dy = bx - ax, by - ay
+        pad_margin = minimum_mm / 2 + 0.15 + 0.01
+        for x0, y0, x1, y1, on_f, on_b in pads:
+            if not (on_f if front else on_b):
+                continue
+            lo, hi = 0.0, 1.0
+            for p, q in ((-dx, ax - x0 + pad_margin), (dx, x1 + pad_margin - ax),
+                         (-dy, ay - y0 + pad_margin), (dy, y1 + pad_margin - ay)):
+                if p == 0:
+                    if q < 0:
+                        lo, hi = 1.0, 0.0
+                elif p < 0:
+                    lo = max(lo, q / p)
+                else:
+                    hi = min(hi, q / p)
+            if hi > lo:
+                return True
+        return False
+
+    changed = 0
+    for fp in board.GetFootprints():
+        graphics = fp.GraphicalItems()
+        # KiCad 10's Python 3.14 SWIG iterator lacks next(); indexing works.
+        for index in range(graphics.size()):
+            item = graphics[index].Cast()
+            if item.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS) or not hasattr(item, "GetWidth"):
+                continue
+            width = item.GetWidth()
+            if 0 < width < minimum:
+                if (isinstance(item, pcbnew.PCB_SHAPE) and
+                        item.GetShape() == pcbnew.SHAPE_T_SEGMENT and
+                        would_touch_pad(item, item.GetLayer() == pcbnew.F_SilkS)):
+                    item.SetLayer(pcbnew.F_Fab if item.GetLayer() == pcbnew.F_SilkS
+                                  else pcbnew.B_Fab)
+                else:
+                    item.SetWidth(minimum)
+                changed += 1
+    return changed
+
+
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
                 zone_outline=None, labels=None, plane=False, silk_text=None, logo_keepout=False):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
@@ -2507,6 +2570,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
                         plane=plane, silk_text=silk_text, logo_keepout=logo_keepout)
+        state["silk_widened"] = normalize_silk_strokes(b)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
             state["fingers"] = ground_fingers(b, pour_nets[0], outline[3])
@@ -2534,6 +2598,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         state["b"] = pcbnew.LoadBoard(pcb)
         return ("%d GND fingers tied to the pour, " % state["fingers"] if card_edge else "") + \
             "%d GND pad vias" % state["fanout"] + \
+            ("; %d thin silk strokes normalized" % state["silk_widened"] if state["silk_widened"] else "") + \
             ("; designators moved off them: " + " ".join(state["pre_moved"]) if state["pre_moved"] else "")
     step("board", build)
     def route():
