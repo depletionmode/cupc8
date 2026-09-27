@@ -68,14 +68,15 @@ survives a lost session. Newest first within each section. Specs live in
 |---|---|
 | Main board | Salt-1 route and deterministic power/ground repairs are merged. The six-layer package has a valid receipt, 0 KiCad DRC violations, 0 opens and 0 parity errors. Worst slot is 16.85 mΩ at nominal 20°C copper, but 20.17 mΩ at 70°C before thickness tolerance; MB-005 remains red. |
 | BASIC follow-ups | Packed ROM image, approved dead-code removals, run/hook handshake, isolated Nim cache and assembler comment parsing. Simulator checks precede emulator checks. |
-| Board verification | All eight boards have current evidence receipts and clean KiCad DRC, ERC and schematic parity. Wi-Fi WC-005/WC-010 remain red for unbounded ESR, return contact and thermal transfer; plotted fab checks found further edge/clearance/parser issues. |
+| Board verification | All eight boards passed their board pipelines with clean KiCad DRC, ERC and schematic parity. The latest verifier edit changed the broad receipt fingerprint, so evidence is being refreshed after the pending main power decision. Wi-Fi WC-005/WC-010 and CPU CC-005 remain red for unbounded physical parameters; plotted fab checks retain notch-edge and CPL-review blockers. |
 | SI and schematic co-simulation | The four routed HDMI pair field-model subsets pass against the GPU receipt; full analog SI remains red. Routed main copper is available to the IBIS diagnostic. Strict E2E-001..004 remain red with 451 coverage gaps after routed nPOR, ROM/SRAM write-enable, ROM DQ0 and six slot-select dependencies plus pin-exact waivers for 45 unused reserved contacts. |
 | Final gate | Run make verify after integration; regenerate fab-readiness; inspect renders and list David's hand checks. No manufacturing upload or order. |
 
 ## Done (recent)
 
-- All eight boards regenerated on the current source and each evidence receipt
-  validated; ERC, board DRC and schematic parity passed for every package.
+- All eight boards regenerated after the Gerber precision checks and passed
+  ERC, board DRC and schematic parity; their receipts require a final refresh
+  after the later CPU power verifier edit.
 - CPU card now uses six layers. The seven card pipelines were reported complete
   at handoff; final integration reruns and live stock checks remain required.
 - SD card model in the native emulator (EMU-008), STO-003, E2E-007 (BASIC
