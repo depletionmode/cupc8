@@ -15,6 +15,23 @@ import gerberdrc
 GERBER_EXTENSIONS = {'.gtl', '.gbl', '.gts', '.gbs', '.gtp', '.gbp',
                      '.gto', '.gbo', '.gm1', '.g1', '.g2', '.g3', '.g4', '.gbr'}
 TIMESTAMP = re.compile(r'^(?:%TF.CreationDate,|G04 Created by KiCad )')
+# These are missing checks over the plotted fabrication geometry. Keep the
+# fabrication gate red even when every implemented check and CPL review passes.
+# A source-board DRC result cannot substitute for these re-import checks.
+PLOTTED_DRC_GAPS = (
+    'minimum neck width in filled copper regions',
+    'minimum neck width in filled silkscreen regions',
+    'silkscreen text height (Gerber has no text objects or character grouping)',
+    'drill-to-drill clearance from the Excellon cuts',
+)
+
+
+def require_complete_plotted_drc(mask_width):
+    """Refuse fabrication approval until the remaining plotted rules exist."""
+    gaps = list(PLOTTED_DRC_GAPS)
+    if mask_width <= 0:
+        gaps.append('positive solder-mask web rule is not configured')
+    raise ValueError('Gerber re-import DRC incomplete: ' + '; '.join(gaps))
 # Hole keys use millimetres rounded to 0.001. Reject finer Excellon
 # coordinates rather than silently changing the plotted drill geometry.
 DECIMAL_MM = r'-?\d+(?:\.\d{1,3})?'
@@ -299,11 +316,4 @@ def check(out):
     ink = (gerberdrc.check_silk_clearance(silk['.gto'], masks['.gts'], .15, .15) +
            gerberdrc.check_silk_clearance(silk['.gbo'], masks['.gbs'], .15, .15))
     check_review(out)
-    raise ValueError('Gerber re-import DRC incomplete: %d layers match fresh export, '
-                     '%d drill hits match pads/vias, and %d plotted copper objects '
-                     'passed %.3f mm net clearance with %d via and %d PTH annular checks, '
-                     '%d exposed pads checked against mask, %d paste deposits checked '
-                     'against copper/mask, and %d silkscreen objects checked against mask; '
-                     'text height, filled ink necks, and other rules remain unchecked%s' %
-                     (layers, holes, shapes, clearance, rings, pth_rings, exposed, deposits, ink,
-                      '; no positive solder-mask web rule is configured' if mask_width <= 0 else ''))
+    require_complete_plotted_drc(mask_width)

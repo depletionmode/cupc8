@@ -140,7 +140,7 @@ class FabCheckTests(unittest.TestCase):
                  patch.object(fabcheck.gerberdrc, 'check_mask_alignment', return_value=10) as align, \
                  patch.object(fabcheck.gerberdrc, 'check_paste_registration', return_value=5) as paste, \
                  patch.object(fabcheck.gerberdrc, 'check_silk_clearance', return_value=8) as silk:
-                with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC incomplete.*123 plotted copper objects'):
+                with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC incomplete.*filled copper regions'):
                     fabcheck.check(out)
                 clearance.assert_called_once()
                 annular.assert_called_once()
@@ -151,6 +151,18 @@ class FabCheckTests(unittest.TestCase):
                 self.assertEqual(align.call_count, 2)
                 self.assertEqual(paste.call_count, 2)
                 self.assertEqual(silk.call_count, 2)
+
+    def test_plotted_drc_coverage_stays_closed_with_or_without_mask_rule(self):
+        for width in (0, .1):
+            with self.subTest(mask_width=width):
+                with self.assertRaisesRegex(ValueError, 'minimum neck width in filled copper') as caught:
+                    fabcheck.require_complete_plotted_drc(width)
+                message = str(caught.exception)
+                self.assertIn('filled silkscreen regions', message)
+                self.assertIn('silkscreen text height', message)
+                self.assertIn('drill-to-drill clearance', message)
+                self.assertEqual('positive solder-mask web rule is not configured' in message,
+                                 width == 0)
 
     def test_exported_copper_short_and_clearance_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:

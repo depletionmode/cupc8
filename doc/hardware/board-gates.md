@@ -29,6 +29,28 @@ fail until their contract coverage exists:
 - Fab: Gerber re-import with DRC, drills compared to footprint holes and
   recorded CPL review. Existing clean PCB DRC and exported files do not
   prove these requirements.
+
+  `fabcheck.py` independently parses plotted copper, mask, paste, silk,
+  outline, and Excellon data for its implemented checks. Passing those checks
+  still leaves the fab row red. The remaining plotted-geometry rules are
+  minimum neck width in filled copper and silk regions, silkscreen text height,
+  and drill-to-drill clearance. The card boards also configure no positive
+  solder-mask web minimum. Gerber regions use `G36` polygons and a zero-width
+  aperture; checking only draw aperture widths cannot establish their minimum
+  neck width. Gerber strokes have no text-object or character grouping, so
+  the saved PCB's text-size property alone would not be an independent
+  re-import check. `require_complete_plotted_drc` names these gaps and fails
+  after all implemented checks and the CPL review. Any future closure must
+  establish the missing rules from the plotted outputs, or explicitly narrow
+  the fab contract with documented approval; removing the final failure does
+  not certify a package.
+
+  The 2026-09-27 seven-card diagnostic skipped only copper-to-edge and CPL
+  review to reach that final coverage gate. Its success on implemented checks
+  is not a fab pass. All seven card outlines have a real 0.20 mm notch
+  copper-to-edge separation against the 0.30 mm board rule. This violation
+  must be fixed in the plotted design, with an appropriate reroute and fresh
+  exports; it is independent of the missing coverage and CPL review.
 - Connectors: pincheck validates the source tables; connectorcheck compares
   every contact, including intended no-connects, of the board's external
   connectors with its KiCad netlist and the published pinout.
