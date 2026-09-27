@@ -40,13 +40,14 @@ def main():
             cmd.extend(('--main-board', args.main_board))
         subprocess.run(cmd, cwd=ROOT, check=True)
         report = json.loads(output.read_text())
-        assert len(report['cases']) == 96 and report['top_routed_signals'] is False
+        top = json.loads(args.top.read_text())
+        assert len(report['cases']) == 96
+        assert report['top_routed_signals'] == bool(top.get('runtime', {}).get('routed_top'))
         assert max(c['fixture_max_error_v'] for c in report['cases']) < .08
         assert any(not all(n['threshold_stable'] for n in c['receivers'])
                    for c in report['cases'] if c['topology'] == 'six_slot_sck')
         if args.main_board:
             assert report['measured_copper_paths_mm'] == {'slot_sck': slot, 'cpu_clk': cpu}
-        top = json.loads(args.top.read_text())
         path = next(p for p in top['paths'] if p.get('to') == 'main.J11.B13')
         path['ohms'] = 47
         broken = directory / 'wrong-termination.json'

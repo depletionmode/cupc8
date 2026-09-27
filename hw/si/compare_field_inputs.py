@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import boardevidence
-from kicadgen import parse
+from kicadgen import find1, parse
 from openems_gpu_d0 import routed_pair as gpu_routes, simulate as gpu_simulate
 from openems_usb_io import (routed_pair as usb_routes, simulate as usb_simulate,
                             validate_series)
@@ -26,6 +26,7 @@ from openems_usb_io import (routed_pair as usb_routes, simulate as usb_simulate,
 PAIRS = ('d0', 'd1', 'd2', 'ck')
 PHYSICAL_ITEMS = ('segment', 'via', 'arc', 'zone', 'footprint', 'layers',
                   'gr_line', 'gr_arc', 'gr_poly', 'gr_rect', 'gr_circle')
+FOOTPRINT_GRAPHICS = ('fp_line', 'fp_arc', 'fp_poly', 'fp_rect', 'fp_circle')
 RUNS = {
     'gpu-d0': ('gpu', 'gpu-d0-pml-fixed.json', 'gpu-d0-openems-pml-clear-1mm-fixed-window/gpu-d0.xml'),
     'gpu-d1': ('gpu', 'gpu-d1-pml-fixed.json', 'gpu-d1-openems-pml-clear-1mm-fixed-window/gpu-d1.xml'),
@@ -114,6 +115,10 @@ def physical_item(item, parent=None):
     for child in item[1:]:
         if isinstance(child, list) and child and child[0] in ('uuid', 'tstamp'):
             continue
+        if (item[0] == 'footprint' and isinstance(child, list) and child and
+            child[0] in FOOTPRINT_GRAPHICS and
+            (find1(child, 'layer') or [None, None])[1] in ('F.SilkS', 'B.SilkS')):
+            continue  # Display-only silk stroke; pads/copper/3-D placement remain strict.
         result.append(physical_item(child, item[0] if item[0] == 'filled_polygon' else None))
     return result
 
@@ -248,7 +253,8 @@ def compare(old_build, new_build, old_source, new_source, fields, reports):
     return {
         'scope': 'modeled GPU HDMI D0/D1/D2/CK and IO USB routed-copper field-input migration',
         'method': 'validated receipts; identical full-board track/via/zone/footprint/layer/outline '
-                  'geometry after UUID removal and collinear filled-zone vertex normalization; '
+                  'geometry after UUID removal, collinear filled-zone vertex normalization and '
+                  'omission of F/B.SilkS footprint graphics only; '
                   'identical routed segments/endpoints; regenerated saved XML; '
                   'strict solver-relevant XML tree equality except random display colors and '
                   'same-priority copper Polygon ordering',
@@ -258,6 +264,7 @@ def compare(old_build, new_build, old_source, new_source, fields, reports):
         'full_row_4_6_closed': False,
         'limits': ['saved field runs were made on archived PCB bytes; this report proves equality of modeled inputs',
                    'board solder-mask setup changed and is intentionally outside the copper-geometry fingerprint',
+                   'footprint F/B.SilkS graphics changed and are outside the copper-geometry fingerprint',
                    'USB copper polygon order differs in raw XML; the same-priority primitive set is identical',
                    'field models omit pads, finite copper/dielectric losses, solder mask, connectors and source/sink',
                    'USB impedance mesh convergence and full HDMI physical coupling remain open'],

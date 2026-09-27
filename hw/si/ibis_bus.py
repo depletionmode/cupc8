@@ -36,6 +36,8 @@ VIH, VIL = 2.0, 0.8  # vendor [Model] VinH/VinL
 FIXTURE_R, FIXTURE_C = 50.0, 25e-12
 TRACE_Z0, TRACE_PS_PER_MM = 50.0, 7.0
 COPPER = ('F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'B.Cu')
+LEGACY_PACKAGE = ((7.98, 1.55, 0.0), (10.53, 1.55, 0.0))  # L nH, C pF, R ohm
+VENDOR_TQ144_TYPICAL = ((7.98, 1.216, .764), (10.53, 1.207, .673))
 
 
 @lru_cache(maxsize=16)
@@ -201,7 +203,7 @@ def source(sections, edge, corner):
 
 def run_spice(source_t, drive, resistance, fixture=False, slots=6, length_mm=120,
               package_nh=10.53, package_pf=1.55, receiver_pf=15.0,
-              fixture_vref=0.0):
+              fixture_vref=0.0, package_ohm=0.0):
     with tempfile.TemporaryDirectory(prefix='cupc8-ibis-') as temporary:
         work = Path(temporary)
         deck = work / 'bus.cir'
@@ -214,7 +216,11 @@ def run_spice(source_t, drive, resistance, fixture=False, slots=6, length_mm=120
             lines += [f'Vref rail 0 {fixture_vref:.9g}', 'Rfixture drv rail 50', 'Cfixture drv 0 25p']
             nodes = ['drv']
         else:
-            lines += [f'Rterm drv pkg 33', f'Lpkg pkg launch {package_nh:.9g}n',
+            if package_ohm:
+                lines += ['Rterm drv term 33', f'Rpkg term pkg {package_ohm:.9g}']
+            else:
+                lines += ['Rterm drv pkg 33']
+            lines += [f'Lpkg pkg launch {package_nh:.9g}n',
                       f'Cpkg launch 0 {package_pf:.9g}p']
             previous = 'launch'
             step = length_mm / slots
@@ -265,12 +271,16 @@ def main():
     parser.add_argument('--top', type=Path, help='schematic-derived co-simulation manifest to validate 33-ohm sources')
     parser.add_argument('--main-board', type=Path,
                         help='optional routed main PCB for layer-aware copper path audit')
+    parser.add_argument('--vendor-package-typical', action='store_true',
+                        help='sweep both commented TQ144 typical R/L/C rows instead of legacy 1.55 pF/zero-R assumption')
     parser.add_argument('--out', type=Path, default=ROOT / 'build/hw/si/ibis-bus-diagnostic.json')
     args = parser.parse_args()
     data = args.ibis.read_bytes()
     digest = verify(data)
     report = {'source_sha256': digest, 'models': MODELS, 'scope': 'diagnostic IBIS-derived linear source, assumed copper',
-              'routed_evidence': False, 'package_assignment_confirmed': False, 'cases': []}
+              'routed_evidence': False, 'package_assignment_confirmed': False,
+              'vendor_package_typical_sweep': args.vendor_package_typical,
+              'cases': []}
     if args.main_board:
         board = args.main_board.resolve()
         slot = routed_distances(board, '/SPI_SCK', ('R36', '2'),
@@ -309,15 +319,19 @@ def main():
                     raise ValueError(f'{model}/{corner}/{edge}: IBIS fixture replay differs by {fixture_error:.3f} V')
                 for topology, slots, length, loads in (('cpu_socket', 1, 120, (5.0, 15.0)),
                                                        ('six_slot_sck', 6, 180, (15.0, 30.0))):
-                    for package in (7.98, 10.53):
+                    packages = VENDOR_TQ144_TYPICAL if args.vendor_package_typical else LEGACY_PACKAGE
+                    for package_nh, package_pf, package_ohm in packages:
                         for receiver_pf in loads:
                             bt, bo = run_spice(t, drive, resistance, slots=slots, length_mm=length,
-                                               package_nh=package, receiver_pf=receiver_pf)
+                                               package_nh=package_nh, package_pf=package_pf,
+                                               package_ohm=package_ohm, receiver_pf=receiver_pf)
                             report['cases'].append({'model': model, 'topology': topology,
                                                     'corner': corner, 'edge': edge,
                                                     'assumed_length_mm': length,
                                                     'assumed_receiver_pf': receiver_pf,
-                                                    'commented_tq144_l_nh': package,
+                                                    'commented_tq144_l_nh': package_nh,
+                                                    'package_c_pf': package_pf,
+                                                    'package_r_ohm': package_ohm,
                                                     'output_resistance_ohm': round(resistance, 3),
                                                     'fixture_max_error_v': round(fixture_error, 5),
                                                     'receivers': evaluate(bt, bo, edge, VDD[corner])})

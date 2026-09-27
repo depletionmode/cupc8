@@ -1,6 +1,6 @@
 {
   "scope": "modeled GPU HDMI D0/D1/D2/CK and IO USB routed-copper field-input migration",
-  "method": "validated receipts; identical full-board track/via/zone/footprint/layer/outline geometry after UUID removal, collinear filled-zone vertex normalization and omission of F/B.SilkS footprint graphics only; identical routed segments/endpoints; regenerated saved XML; strict solver-relevant XML tree equality except random display colors and same-priority copper Polygon ordering",
+  "method": "validated receipts; identical full-board track/via/zone/footprint/layer/outline geometry after UUID removal and collinear filled-zone vertex normalization; identical routed segments/endpoints; regenerated saved XML; strict solver-relevant XML tree equality except random display colors and same-priority copper Polygon ordering",
   "receipts": {
     "gpu": {
       "archived": {
@@ -10,10 +10,10 @@
         "netlist_sha256": "c8ee1de8349d52ae958b5ebfc9c5114329626b47fe69d0e431c1b2f500f62d24"
       },
       "current": {
-        "receipt_sha256": "693ff11b14341a1938b0d63b08d68ded369161fcf0c16464975c2559915cbb02",
-        "input_fingerprint": "61a6f5cd49f392a9ba0a52f62413d79ea7786cbb35bef4dc46e5185e4d90a564",
-        "board_sha256": "7be7a81c7ed291ddb0fffb082c4b9a883bed1af6bc58c4d1987ecbca8c6fadf0",
-        "netlist_sha256": "9780c6d4b417369eb5491862dc2833c72819156e1adf196969d618dcff72bf0a"
+        "receipt_sha256": "871eb3c2e2b2fb2cb989fc30f8c15105ac1c1800e0859aaf930c65cbe7961574",
+        "input_fingerprint": "76abea47ca0002922f47758b46c9b5ec06c19d21143cb86086561c2bb14b2269",
+        "board_sha256": "c551b16b88b22b816eff202ed17db7f434f3320369971f7e8142ee6dd007965d",
+        "netlist_sha256": "981c5eea76345bde958081480cf005568ccc98172363b0ee49c985aeae784b1d"
       }
     },
     "io": {
@@ -24,10 +24,10 @@
         "netlist_sha256": "074f967c05707d2794262cf9cff36a98e247ebfaffd8a9040e1c5c6b7c86e7ff"
       },
       "current": {
-        "receipt_sha256": "e27f89a630b740acc52a672c1560051415122af83591d043c3d1fb24865adfc1",
-        "input_fingerprint": "b36c1f6c9ff62b2d88924abb895026e09b1310491e7e020eb3621366f64380e3",
-        "board_sha256": "2dbf557fbc5339235121e368d580c31db4807b3f8a8033d77971212a143f9e41",
-        "netlist_sha256": "a01595539420eee40bc1f9449e92e77f934d5117097609b6ebb9a9fa1f5e3c66"
+        "receipt_sha256": "80da7696052d2e7da752b4b2f52382e5b79d0592f631f2e728fb1e2c6f72d663",
+        "input_fingerprint": "f5936d4bc544298317f3febdce436cfe4c46789203f83cba5bff407e1fad6f4b",
+        "board_sha256": "8ce463cc553aedbe0e620bc6d834d521dbd86012cd31278f1036cf102da304fc",
+        "netlist_sha256": "6699aaeb9b88023f73eb53f2af0e64c768068367d3ca6d991a9b5632ed171f51"
       }
     }
   },
@@ -43,12 +43,12 @@
   },
   "board_physical_fingerprints": {
     "gpu": {
-      "archived": "3be1936c79b46cdb0bb1bc7e106c914c8ba47771798f9d8acb399fb7bf12555a",
-      "current": "3be1936c79b46cdb0bb1bc7e106c914c8ba47771798f9d8acb399fb7bf12555a"
+      "archived": "c0e4ca946ff518a65a6b4bfb9b5821b284271c9094d6a433182c0c026710a0d9",
+      "current": "c0e4ca946ff518a65a6b4bfb9b5821b284271c9094d6a433182c0c026710a0d9"
     },
     "io": {
-      "archived": "8cd43bfaa5142544dfdeb1172712d2c1609dd2a3ed0e689cab56e281d88774eb",
-      "current": "8cd43bfaa5142544dfdeb1172712d2c1609dd2a3ed0e689cab56e281d88774eb"
+      "archived": "ccf639cf07ffe2d754825b738800a0e9507345d202045596754a5618aca45b68",
+      "current": "ccf639cf07ffe2d754825b738800a0e9507345d202045596754a5618aca45b68"
     }
   },
   "models": {
@@ -190,7 +190,6 @@
   "limits": [
     "saved field runs were made on archived PCB bytes; this report proves equality of modeled inputs",
     "board solder-mask setup changed and is intentionally outside the copper-geometry fingerprint",
-    "footprint F/B.SilkS graphics changed and are outside the copper-geometry fingerprint",
     "USB copper polygon order differs in raw XML; the same-priority primitive set is identical",
     "field models omit pads, finite copper/dielectric losses, solder mask, connectors and source/sink",
     "USB impedance mesh convergence and full HDMI physical coupling remain open"
