@@ -180,11 +180,12 @@ building a broad, via-connected input bus are candidate redesigns; neither
 has a clean routed realization yet.
 
 The saved In1 GND fill, sampled after the new power geometry at 100 °C and
-90% inner copper, gives U3-to-J1 **2.171/2.043 mΩ** and J11-to-J1
-**8.391/8.004 mΩ** at 0.5/0.25 mm mesh pitch. One 0.3 mm drill via with
+90% inner copper, gives U2-to-J1 **2.478/2.410 mΩ**, U3-to-J1
+**2.171/2.043 mΩ** and J11-to-J1 **8.391/8.004 mΩ** at 0.5/0.25 mm
+mesh pitch. One 0.3 mm drill via with
 a 15 µm wall and 1.76 mm length costs about 2.77 mΩ at 115 °C. The mesh
 excludes that via, pad contacts, thermal spokes, and other return layers;
-its 5.9%/4.6% pitch differences do not make it a certified loop bound.
+its 2.8%/5.9%/4.6% pitch differences do not make it a certified loop bound.
 
 The R4 link can dissipate up to about **81 mW** at its budgeted 50 mΩ
 and the expanded 1.276 A branch load. At the 2.62 A eFuse current limit,

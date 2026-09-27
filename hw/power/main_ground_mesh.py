@@ -19,6 +19,7 @@ from main_ground_raster import J1_GND
 
 
 CASES = (
+    ("eFuse U2 return", (8.9, 159.05), (0.0, 45.0, 150.0, 188.0)),
     ("buck U3 return", (38.3, 160.0), (5.0, 45.0, 150.0, 188.0)),
     ("far slot J11 return", (23.0, 29.0), (0.0, 45.0, 20.0, 188.0)),
 )
