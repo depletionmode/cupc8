@@ -1055,3 +1055,10 @@ fixed_in = "crosstalk initial implementation"
 revert = [["hw/tools/crosstalk.py", "gap = b[0] - a[0] - (a[2] + b[2]) / 2", "gap = b[0] - a[0]"]]
 cmd = "python3 test/hw/test_crosstalk.py"
 must_fail = ["FAIL: test_long_close_run"]
+
+[[bug]]
+name = "BUS-005: a missing routed layout silently passed with nominal limits"
+fixed_in = "BUS-005 routed-evidence gate"
+revert = [["hw/timing/cpubus_budget.py", "raise ValueError("BUS-005: routed trace lengths missing: " + path)", "return 150.0, 50.0, "nominal limits""]]
+cmd = "python3 test/hw/test_bus_lengths.py"
+must_fail = ["FAIL: test_missing_layout_is_red"]
