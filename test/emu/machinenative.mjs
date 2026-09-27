@@ -144,11 +144,14 @@ export class Machine {
     if (netlistTop && (typeof netlistTop.runtime.gpu_hdmi_link !== 'boolean' ||
                       typeof netlistTop.runtime.eink_panel_link !== 'boolean'))
       throw new Error('machinenative: invalid display output path');
+    if (netlistTop && typeof netlistTop.runtime.por_connected !== 'boolean')
+      throw new Error('machinenative: invalid supervisor reset path');
     m.h = native.create({ slots, rom: m.rom, sysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
       ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
       storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
       einkPanelLink: netlistTop?.runtime.eink_panel_link ?? true,
+      porConnected: netlistTop?.runtime.por_connected ?? true,
       memoryWiring: netlistTop?.runtime,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...slots };

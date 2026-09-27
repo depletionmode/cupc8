@@ -28,6 +28,12 @@ The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
 reference network before it reaches the chipset's `PWR_HI` pin. The nominal
 trip is 1.289 V on the active CC line; the test drives the 3 A minimum or
 1.5 A maximum CC voltage, so a bad resistor network changes the class.
+The main-board supervisor U6 reset output must connect to chipset U7's nPOR
+input in the KiCad netlist **and** over measured routed copper. The manifest
+passes `por_connected` to the native machine's reset input. On the routed
+snapshot the shortest planar path is 88.152 mm; removing the supervisor
+launch track makes `por_connected` false, and the native CPU stays at reset
+PC `$E000` instead of reaching `$E2B9` in the 20 ms probe.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
@@ -60,11 +66,13 @@ python3 hw/cosim/run.py E2E-004
 ```
 
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
-and a missing MISO pull are rejected. The third proves that ROM and CPU
-address/data swaps, slot SCK/MOSI swaps and bridge SCK/MOSI swaps change the
-running machine's result. The manifest currently
-covers the CPU, main memory, slot data paths and system bridge. Power and
-reset circuits still use native machine wiring except the Type-C class input,
-and the current main-board
-route lacks memory copper. E2E-001 through E2E-004 remain pending until those
-paths and the full programs are exercised with a final routed board.
+and a missing MISO pull are rejected. With `--main-board` it also opens the
+supervisor's routed nPOR launch. The third proves that ROM and CPU
+address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps and an open
+nPOR path change the running machine. The manifest currently covers the CPU,
+main memory, slot data paths, system bridge, Type-C source class and
+supervisor nPOR release. Other power and reset circuits still use native
+machine wiring. On the current routed-board snapshot, all required top-level
+routes are present, but 503 named nets remain without executed models or
+reviewed waivers. E2E-001 through E2E-004 therefore remain pending behind
+`--require-coverage` despite passing narrower runtime probes.

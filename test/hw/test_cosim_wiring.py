@@ -6,10 +6,14 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pcbnew
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/cosim'))
 from gen_top import check, exported_cards, named_pin
 from netlist import read
+sys.path.insert(0, str(ROOT / 'hw/tools'))
+from kicadgen import dump, find1, parse
 
 
 def rejected(cards, main, description):
@@ -24,6 +28,7 @@ def rejected(cards, main, description):
 def main_cli():
     parser = argparse.ArgumentParser()
     parser.add_argument('--main-netlist', type=Path, default=ROOT / 'build/hw/main/main.net')
+    parser.add_argument('--main-board', type=Path, help='routed PCB for the nPOR copper-open counterexample')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='cupc8-cosim-cx-') as temporary:
         cards = exported_cards(Path(temporary))
@@ -34,6 +39,30 @@ def main_cli():
         assert 'main:CPU_CLK' in manifest['structural_only_nets']
         assert 'main:CPU_CLK' in manifest['unmodeled_nets']
         assert not manifest['coverage_complete']
+
+        if args.main_board:
+            good_route = check(cards, main, args.main_board)
+            assert good_route['runtime']['por_connected']
+            board = parse(args.main_board.read_text())
+            physical = pcbnew.LoadBoard(str(args.main_board))
+            footprint = physical.FindFootprintByReference('U6')
+            reset_pad = next(pad for pad in footprint.Pads() if pad.GetNumber() == '2')
+            pos = reset_pad.GetPosition()
+            launch = (round(pcbnew.ToMM(pos.x), 4), round(pcbnew.ToMM(pos.y), 4))
+            matches = [item for item in board[1:]
+                       if isinstance(item, list) and item and item[0] == 'segment' and
+                       find1(item, 'net') and find1(item, 'net')[1] == '/nPOR' and
+                       launch in (tuple(round(float(x), 4) for x in find1(item, end)[1:])
+                                  for end in ('start', 'end'))]
+            if len(matches) != 1:
+                raise AssertionError(f'nPOR supervisor launch has {len(matches)} tracks, expected one')
+            board.remove(matches[0])
+            opened = Path(temporary) / 'open-npor.kicad_pcb'
+            opened.write_text(dump(board) + '\n')
+            bad_route = check(cards, main, opened)
+            if bad_route['runtime']['por_connected'] or 'main:nPOR' not in bad_route['runtime_nets']:
+                raise AssertionError('removed nPOR copper did not change the executed reset path')
+            print('open supervisor nPOR copper disables the native reset-release path')
 
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')
@@ -61,6 +90,10 @@ def main_cli():
         broken_clock = copy.deepcopy(main)
         broken_clock.resistors = tuple(r for r in broken_clock.resistors if r.ref != 'R17')
         rejected(cards, broken_clock, 'missing chipset oscillator series resistor')
+
+        broken_por = copy.deepcopy(main)
+        del broken_por.pins[('U6', '2')]
+        rejected(cards, broken_por, 'missing supervisor reset output')
 
         broken_io = copy.deepcopy(cards)
         broken_io['io'].resistors = tuple(r for r in broken_io['io'].resistors if r.ref != 'R14')

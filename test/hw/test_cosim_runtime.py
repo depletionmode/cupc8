@@ -76,6 +76,16 @@ def main():
     manifest = json.loads(args.top.read_text())
     good = run(args.top)
     with tempfile.TemporaryDirectory(prefix='cupc8-cosim-runtime-') as directory:
+        if 'main:nPOR' not in manifest['runtime_nets'] or not manifest['runtime']['por_connected']:
+            raise AssertionError('supervisor reset requires executed, routed nPOR copper')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['por_connected'] = False
+        mutant = Path(directory) / 'open-supervisor-reset.json'
+        mutant.write_text(json.dumps(changed))
+        por_bad = run(mutant)
+        if good['nrst'] != 1 or por_bad['nrst'] != 0 or por_bad['pc'] == good['pc']:
+            raise AssertionError(f'open nPOR path did not hold the native machine in reset: {good} / {por_bad}')
+        print(f"open routed nPOR holds CPU at ${por_bad['pc']:04x} rather than ${good['pc']:04x}")
         for name, key in (('ROM', 'rom_address'), ('CPU', 'cpu_address')):
             changed = copy.deepcopy(manifest)
             bits = changed['runtime'][key]

@@ -205,6 +205,7 @@ class Machine {
     bool storageSdSocket = true;     // seven microSD contacts reach storage MCU
     bool gpuHdmiLink = true;         // four TMDS pairs reach the HDMI receptacle
     bool einkPanelLink = true;       // seven EPD signals reach the panel header
+    bool porConnected = true;        // supervisor nPOR copper reaches the chipset
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
     bool threaded = true;
@@ -267,6 +268,7 @@ class Machine {
   std::vector<uint8_t> romImage;
   bool threaded_;
   bool pwrHi = true;
+  bool porConnected = true;
   std::array<Options::SlotWiring, 6> slotWiring{};
   uint8_t misoIdle = 1;
   double seriesDelayNs = 0;

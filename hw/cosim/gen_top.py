@@ -238,6 +238,22 @@ def check(cards, main, pcb=None):
                     'BR_SCK', 'BR_MOSI', 'BR_MISO', 'BR_nCS', 'nPOR', 'PWR_HI'}
     manifest['runtime']['routed_top'] = all(route.get(net, 0) > 0 for net in required_top)
     manifest['runtime']['missing_routes'] = sorted(net for net in required_top if route.get(net, 0) <= 0)
+    # The supervisor must release the chipset's nPOR input through actual
+    # routed copper. This contact decides whether the native board ever leaves
+    # reset; a net name or a trace somewhere on nPOR is insufficient.
+    supervisor = named_pin(main, 'U6', '~{RESET}')
+    por_input = named_pin(main, 'U7', 'IOB_96')
+    path(main, supervisor, por_input)
+    por_mm = None
+    if pcb is not None and Path(pcb).is_file():
+        sys.path.insert(0, str(ROOT / 'hw/si'))
+        from ibis_bus import routed_distances
+        por_mm = routed_distances(Path(pcb), '/nPOR', supervisor, [por_input])[
+            f'{por_input[0]}.{por_input[1]}']
+    manifest['paths'].append({'from': f'main.{supervisor[0]}.{supervisor[1]}',
+                              'to': f'main.{por_input[0]}.{por_input[1]}',
+                              'route_mm': por_mm, 'runtime': 'por_connected'})
+    manifest['runtime']['por_connected'] = por_mm is not None
     # CPU driver pack channels must remain explicit; the native board model
     # may use these channel values as edge delays after E2E-001 integration.
     import cpu
@@ -434,7 +450,8 @@ def check(cards, main, pcb=None):
         runtime_net('cpu', f'CPU_A{i}')
     for name in ('MEM_nOE', 'MEM_nCE_RAM', 'MEM_nCE_ROM',
                  'SPI_SCK', 'SPI_MOSI', 'SPI_MISO', 'BR_SCK', 'BR_MOSI',
-                 'BR_MISO', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF'):
+                 'BR_MISO', 'BR_nCS', 'PWR_HI', 'CC1', 'CC2', 'CC_AVG', 'CC_REF',
+                 'nPOR'):
         runtime_net('main', name)
     for slot in range(1, 7):
         runtime_net('main', f'SLOT{slot}_CS_n')
