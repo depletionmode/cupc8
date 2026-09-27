@@ -398,6 +398,39 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
                               'to': f'main.{por_input[0]}.{por_input[1]}',
                               'route_mm': por_mm, 'runtime': 'por_connected'})
     manifest['runtime']['por_connected'] = por_mm is not None
+    # The chipset reset output crosses R34, the CPU socket, and the CPU-card
+    # trace before reaching the CPU FPGA. Preserve each copper leg separately.
+    reset_source, reset_in, reset_out, reset_socket = (
+        ('U7', '32'), ('R34', '1'), ('R34', '2'), ('J2', 'B16'))
+    reset_card_socket, reset_cpu = ('J1', 'B16'), ('U1', '22')
+    if path(main, reset_source, reset_socket, '33') != 'R34':
+        raise ValueError('CPU reset is not routed through R34')
+    path(cards['cpu'], reset_card_socket, reset_cpu)
+    reset_lengths = {'source': None, 'socket': None, 'card': None}
+    if pcb is not None and Path(pcb).is_file():
+        reset_lengths['source'] = routed_distances(
+            Path(pcb), '/CPU_nRST_SRC', reset_source, [reset_in])['R34.1']
+        reset_lengths['socket'] = routed_distances(
+            Path(pcb), '/CPU_nRST', reset_out, [reset_socket])['J2.B16']
+    if cpu_board is not None and Path(cpu_board).is_file():
+        sys.path.insert(0, str(ROOT / 'hw/si'))
+        from ibis_bus import routed_distances
+        reset_lengths['card'] = routed_distances(
+            Path(cpu_board), '/CPU_nRST', reset_card_socket, [reset_cpu])['U1.22']
+    for leg, first, last in (
+            ('source', 'main.U7.32', 'main.R34.1'),
+            ('socket', 'main.R34.2', 'main.J2.B16'),
+            ('card', 'cpu.J1.B16', 'cpu.U1.22')):
+        manifest['paths'].append({'from': first, 'to': last,
+                                  'route_mm': reset_lengths[leg],
+                                  'runtime': 'cpu_reset_connected'})
+        if reset_lengths[leg] is None:
+            manifest['runtime']['missing_routes'].append(f'CPU_nRST:{first}->{last}')
+    manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
+    manifest['runtime']['cpu_reset_legs_mm'] = reset_lengths
+    manifest['runtime']['cpu_reset_connected'] = all(
+        length is not None for length in reset_lengths.values())
     # Both memory chips use the chipset's /WE, but their actual copper branches
     # are independent. An open branch prevents writes only at that chip.
     write_source = ('U7', '114')
@@ -776,6 +809,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('main', name)
     for name in ('SPI_SCK_SRC', 'SPI_MOSI_SRC'):
         runtime_net('main', name)
+    for board, name in (('main', 'CPU_nRST_SRC'), ('main', 'CPU_nRST'),
+                        ('cpu', 'CPU_nRST')):
+        runtime_net(board, name)
     for slot in range(1, 7):
         runtime_net('main', f'SLOT{slot}_CS_n')
         runtime_net('main', f'SLOT_nIRQ{slot-1}')

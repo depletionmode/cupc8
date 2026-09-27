@@ -151,6 +151,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.gpuHdmiLink = flag("gpuHdmiLink", true);
     opt.einkPanelLink = flag("einkPanelLink", true);
     opt.porConnected = flag("porConnected", true);
+    opt.cpuResetConnected = flag("cpuResetConnected", true);
     opt.threaded = flag("threaded", true);
     opt.spiLog = flag("spiLog", false);
     opt.espTx = integer("espTx", -1);

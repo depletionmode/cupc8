@@ -52,6 +52,15 @@ passes `por_connected` to the native machine's reset input. On the routed
 snapshot the shortest planar path is 88.152 mm; removing the supervisor
 launch track makes `por_connected` false, and the native CPU stays at reset
 PC `$E000` instead of reaching `$E2B9` in the 20 ms probe.
+The separate chipset-to-CPU reset path crosses U7.32 to R34.1 on
+`CPU_nRST_SRC`, R34.2 to main socket J2.B16 on `CPU_nRST`, and CPU-card
+J1.B16 to U1.22. The archived main and current CPU card measure 12.342,
+103.930, and 27.014 mm on these legs. The native RTL now gates the CPU's
+reset input with their combined continuity while leaving the chipset's own
+reset output visible. Opening the U7 launch removes only the source leg;
+the native 20 ms probe leaves the chipset reset output high but holds the
+CPU PC at `$E000` instead of `$E2B9`. Holding the otherwise floating input
+low is a deterministic digital counterexample, not a voltage prediction.
 The chipset's MEM_nWE pad U7.114 must also connect by KiCad net and routed
 copper to SRAM U9.5 and ROM U10.31. The two independent branch flags gate
 native memory writes. On the routed snapshot the shortest planar branches
@@ -146,22 +155,22 @@ python3 hw/cosim/run.py E2E-004
 
 The second command proves swapped SCK/MOSI contacts, a missing chip select,
 and a missing MISO pull are rejected. With `--main-board` it also opens the
-supervisor's routed nPOR launch, slot 1 chip-select launch, shared SCK
+supervisor's routed nPOR launch, chipset CPU-reset launch, slot 1 chip-select launch, shared SCK
 source launch, GPU card SCK launch, GPU QSPI clock launch and CPU-card A0
 launch, then executes the native
 counterexamples. The third proves
 that ROM and CPU
 address/data swaps, slot SCK/MOSI swaps, bridge SCK/MOSI swaps, an open
-nPOR path, memory-write branches and ROM DQ0 read route change the running
+nPOR and CPU-reset paths, memory-write branches and ROM DQ0 read route change the running
 machine. The manifest currently covers the CPU, main memory, slot data paths,
 system bridge, Type-C source class and
-supervisor nPOR release. Other power and reset circuits still use native
+supervisor nPOR release and CPU reset delivery. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
-card-local slot nets, 30 QSPI boot nets and 24 CPU-card bus nets now affect
-execution; 365 remain unmodeled. The remaining groups are boot/programming
+card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets and three CPU
+reset nets now affect execution; 362 remain unmodeled. The remaining groups are boot/programming
 (68), slot/control bus (36), CPU/memory (47), power/return (65), clock/reset
-(53), indicators (52), external IO (26),
+(50), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

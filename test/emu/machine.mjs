@@ -260,7 +260,7 @@ export class Machine {
     const br = this.br ?? { sck: 0, mosi: 0, ncs: 1 };
     const reset = this.sysctl?.sysReset();
     return miso | (nirq << 1) | (br.sck << 7) | (br.mosi << 8) | (br.ncs << 9) | ((this.pwrHi ? 1 : 0) << 10) |
-      (1 << 11) | ((por && !reset ? 1 : 0) << 12);
+      (1 << 11) | ((por && !reset ? 1 : 0) << 12) | (1 << 13);
   }
 
   // run the machine for `ns` of emulated time

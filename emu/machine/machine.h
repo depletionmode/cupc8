@@ -211,6 +211,7 @@ class Machine {
     bool gpuHdmiLink = true;         // four TMDS pairs reach the HDMI receptacle
     bool einkPanelLink = true;       // seven EPD signals reach the panel header
     bool porConnected = true;        // supervisor nPOR copper reaches the chipset
+    bool cpuResetConnected = true;   // chipset reset reaches CPU FPGA through R34 and socket
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
     bool threaded = true;
@@ -278,6 +279,7 @@ class Machine {
   bool threaded_;
   bool pwrHi = true;
   bool porConnected = true;
+  bool cpuResetConnected = true;
   std::array<Options::SlotWiring, 6> slotWiring{};
   uint8_t misoIdle = 1;
   double seriesDelayNs = 0;

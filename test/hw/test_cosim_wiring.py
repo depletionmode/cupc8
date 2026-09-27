@@ -85,6 +85,7 @@ def main_cli():
             good_route = check(cards, main, args.main_board, card_boards,
                                args.system_board, args.cpu_board)
             assert good_route['runtime']['por_connected']
+            assert good_route['runtime']['cpu_reset_connected']
             assert good_route['runtime']['memory_write_links'] == {'ram': True, 'rom': True}
             physical = pcbnew.LoadBoard(str(args.main_board))
             def open_launch(ref, pin, net):
@@ -110,6 +111,25 @@ def main_cli():
                     'main:nPOR' not in bad_route['runtime_nets']:
                 raise AssertionError('removed nPOR copper did not change the executed reset path')
             print('open supervisor nPOR copper disables the native reset-release path')
+            bad_cpu_reset = open_launch('U7', '32', '/CPU_nRST_SRC')
+            if bad_cpu_reset['runtime']['cpu_reset_connected'] or \
+                    bad_cpu_reset['runtime']['routed_top'] or \
+                    bad_cpu_reset['runtime']['cpu_reset_legs_mm']['source'] is not None or \
+                    bad_cpu_reset['runtime']['cpu_reset_legs_mm']['socket'] is None or \
+                    bad_cpu_reset['runtime']['cpu_reset_legs_mm']['card'] is None:
+                raise AssertionError('removed CPU reset source copper did not isolate its executed leg')
+            from test_cosim_runtime import run
+            import json
+            reset_good_top = Path(temporary) / 'reset-good.json'
+            reset_bad_top = Path(temporary) / 'reset-open-source.json'
+            reset_good_top.write_text(json.dumps(good_route))
+            reset_bad_top.write_text(json.dumps(bad_cpu_reset))
+            reset_good_state, reset_bad_state = run(reset_good_top), run(reset_bad_top)
+            if reset_good_state['pc'] == reset_bad_state['pc'] or \
+                    reset_good_state['nrst'] != 1 or reset_bad_state['nrst'] != 1:
+                raise AssertionError('routed CPU reset launch open did not alter native CPU execution')
+            print(f"open chipset CPU reset copper holds PC at ${reset_bad_state['pc']:04x} "
+                  f"instead of ${reset_good_state['pc']:04x}")
             bad_write = open_launch('U7', '114', '/MEM_nWE')
             if bad_write['runtime']['memory_write_links'] != {'ram': False, 'rom': False} or \
                     bad_write['runtime']['routed_top'] or \

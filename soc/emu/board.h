@@ -5,7 +5,7 @@
 // whole-machine emulator (emu/machine/).
 //
 // inputs:  bit 0 SPI MISO, 1-6 SLOT_nIRQ[5:0], 7 BR_SCK, 8 BR_MOSI, 9 BR_nCS,
-//          10 PWR_HI, 11 CPU_CDONE, 12 nPOR
+//          10 PWR_HI, 11 CPU_CDONE, 12 nPOR, 13 CPU reset copper continuity
 // outputs: bit 0 SPI SCK, 1 MOSI, 2-8 SPI_nCS[6:0], 9 BR_MISO, 10 CPU_nRST,
 //          11 halted, 16-23 GPO
 #pragma once
@@ -179,6 +179,7 @@ struct MainBoard {
 		top->pwr_hi = (in >> 10) & 1;
 		top->cpu_cdone = (in >> 11) & 1;
 		top->n_por = (in >> 12) & 1;
+		top->cpu_reset_connected = (in >> 13) & 1;
 	}
 
 	// run up to `max` 12 MHz clocks with `in` on the input pins; stops after

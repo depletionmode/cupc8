@@ -137,6 +137,20 @@ def main():
         if good['nrst'] != 1 or por_bad['nrst'] != 0 or por_bad['pc'] == good['pc']:
             raise AssertionError(f'open nPOR path did not hold the native machine in reset: {good} / {por_bad}')
         print(f"open routed nPOR holds CPU at ${por_bad['pc']:04x} rather than ${good['pc']:04x}")
+        reset_legs = manifest['runtime']['cpu_reset_legs_mm']
+        if set(reset_legs) != {'source', 'socket', 'card'} or \
+                any(length is None for length in reset_legs.values()) or \
+                not manifest['runtime']['cpu_reset_connected'] or \
+                not {'main:CPU_nRST_SRC', 'main:CPU_nRST', 'cpu:CPU_nRST'} <= set(manifest['runtime_nets']):
+            raise AssertionError('CPU reset requires three executed, routed legs')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['cpu_reset_connected'] = False
+        mutant = Path(directory) / 'open-cpu-reset.json'
+        mutant.write_text(json.dumps(changed))
+        reset_bad = run(mutant)
+        if good['nrst'] != 1 or reset_bad['nrst'] != 1 or reset_bad['pc'] == good['pc']:
+            raise AssertionError(f'open CPU reset copper did not hold native CPU in reset: {good} / {reset_bad}')
+        print(f"open routed CPU reset holds PC at ${reset_bad['pc']:04x} rather than ${good['pc']:04x}")
         if manifest['runtime']['memory_write_links'] != {'ram': True, 'rom': True} or \
                 'main:MEM_nWE' not in manifest['runtime_nets']:
             raise AssertionError('memory writes require both executed, routed /WE branches')

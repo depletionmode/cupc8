@@ -405,6 +405,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
   }
   pwrHi = o.pwrHi;
   porConnected = o.porConnected;
+  cpuResetConnected = o.cpuResetConnected;
   if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {
@@ -464,7 +465,8 @@ uint32_t Machine::inputs(bool por) {
   return miso | (nirq << 1) | (((bridge >> bridgeInputs[0]) & 1u) << 7) |
          (((bridge >> bridgeInputs[1]) & 1u) << 8) | (((bridge >> bridgeInputs[2]) & 1u) << 9) |
          ((pwrHi ? 1u : 0u) << 10) |
-         (1u << 11) | ((por && porConnected && !reset ? 1u : 0u) << 12);
+         (1u << 11) | ((por && porConnected && !reset ? 1u : 0u) << 12) |
+         ((cpuResetConnected ? 1u : 0u) << 13);
 }
 
 bool Machine::selected(int slot, uint32_t out) const {

@@ -14,6 +14,7 @@ entity machine_core is
 		n_por:			in std_logic;
 		pwr_hi:			in std_logic;
 		cpu_cdone:		in std_logic;
+		cpu_reset_connected:	in std_logic;
 		-- Physical CPU-socket contacts, packed source-bit indices from KiCad.
 		cpu_a_map:		in std_logic_vector(63 downto 0);
 		cpu_d_map:		in std_logic_vector(23 downto 0);
@@ -78,7 +79,7 @@ begin
 	end generate;
 
 	cpu0: entity work.cpu port map(
-		clk => clk, n_rst => n_rst, a => a, d_in => cpu_din, d_out => cpu_dout, d_oe => cpu_doe,
+		clk => clk, n_rst => n_rst and cpu_reset_connected, a => a, d_in => cpu_din, d_out => cpu_dout, d_oe => cpu_doe,
 		rw => rw, n_stb => n_stb, n_rdy => n_rdy, sync => sync, irq => irq, tmr_exp => tmr_exp,
 		halted => halted, waiting => waiting,
 		dbg_pc => dbg_pc, dbg_sp => dbg_sp, dbg_r0 => dbg_r0, dbg_r1 => dbg_r1, dbg_f => fl);

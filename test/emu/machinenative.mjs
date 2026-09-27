@@ -146,6 +146,8 @@ export class Machine {
       throw new Error('machinenative: invalid display output path');
     if (netlistTop && typeof netlistTop.runtime.por_connected !== 'boolean')
       throw new Error('machinenative: invalid supervisor reset path');
+    if (netlistTop && typeof netlistTop.runtime.cpu_reset_connected !== 'boolean')
+      throw new Error('machinenative: invalid CPU reset path');
     const boardKind = { hdmi: 'gpu', io: 'io', storage: 'storage', wifi: 'wifi',
       eink: 'eink', eink750: 'eink' };
     const boot = netlistTop?.runtime.qspi_boot_connected;
@@ -182,6 +184,7 @@ export class Machine {
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
       einkPanelLink: netlistTop?.runtime.eink_panel_link ?? true,
       porConnected: netlistTop?.runtime.por_connected ?? true,
+      cpuResetConnected: netlistTop?.runtime.cpu_reset_connected ?? true,
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...activeSlots };
