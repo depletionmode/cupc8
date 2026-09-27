@@ -81,3 +81,9 @@ physical bus SI.
 `usb-io-three-mesh-complex-port.json` checks the three runs against their
 raw port traces at 16 ns and quantifies complex reflection and loaded input
 impedance sensitivity. Loaded input impedance is not characteristic impedance.
+
+`gpu-coupled-d0-fixed.json`, `gpu-coupled-d1-fixed.json` and
+`gpu-coupled-d0-d1-audit.json` bind two four-port adjacent HDMI D0/D1
+excitations to the final GPU receipt and every saved raw port trace. This
+quantifies copper-subset cross response and reciprocal consistency; it does
+not close the physical TMDS path or row 4.6.

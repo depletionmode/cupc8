@@ -99,6 +99,52 @@ power and passive-port checks. This closes `SI-003` for its stated four
 pair coupling, mesh and port sensitivity, finite loss, pads, connector metal
 and source/sink behavior remain unmodeled.
 
+### Adjacent D0/D1 four-port copper model
+
+The [coupled-field audit](si-evidence/gpu-coupled-d0-d1-audit.json) binds two
+[GPU D0](si-evidence/gpu-coupled-d0-fixed.json) and
+[D1](si-evidence/gpu-coupled-d1-fixed.json) excitations to final GPU receipt
+`5c7808f1f5294b09e289feb08b5f138583fd5bf411bca826e8ef9410fde42575`.
+The model places both routed differential pairs, four 100 Ω lumped ports,
+the common lossless dielectric, and L2 ground in one PML-safe 167×227×34
+grid. Each excitation ran 180,000 steps (17.190 ns) with two threads. Final
+field energy was −104.98/−106.57 dB. Both pass the PML, power-balance,
+passive-port and 8–12 ns spectral checks; the largest spectral drift is
+0.00135/0.00202 dB. The audit verifies both source hashes, receipts, XML,
+logs, all 16 raw port files, and identical passive geometry after removing
+only excitation and CSXCAD-generated property IDs.
+
+| Frequency | D0→D1 source | D0→D1 load | D1→D0 source |
+| --- | ---: | ---: | ---: |
+| 100 MHz | −67.86 dB | −75.33 dB | −67.86 dB |
+| 480 MHz | −54.33 dB | −61.88 dB | −54.33 dB |
+| 800 MHz | −49.92 dB | −57.54 dB | −49.92 dB |
+| 1.26 GHz | −46.07 dB | −53.82 dB | −46.07 dB |
+
+The reciprocal source-to-source complex responses differ by at most
+4.45×10⁻⁷ in linear magnitude. This is an adjacent D0/D1 **routed-copper
+subset** result. The D2 and CK conductors, pads, connector, solder mask,
+finite loss, cable and actual source/sink loads are absent. Two excitations
+also leave half the four-port matrix unmeasured. The field result therefore
+does not establish the required ±10% impedance or insertion-loss budget for
+the full TMDS path and does not close `GC-007` or row 4.6.
+
+Reproduce with an absolute `--out` path; openEMS changes the working
+directory during a field run:
+
+```sh
+python3 hw/si/openems_gpu_coupled.py --board build/hw/gpu/gpu.kicad_pcb \
+  --source-root . --excite-pair d0 --max-steps 180000 --threads 2 \
+  --out "$(pwd)/build/hw/si-current/gpu-coupled-d0-fixed.json"
+python3 hw/si/openems_gpu_coupled.py --board build/hw/gpu/gpu.kicad_pcb \
+  --source-root . --excite-pair d1 --max-steps 180000 --threads 2 \
+  --out "$(pwd)/build/hw/si-current/gpu-coupled-d1-fixed.json"
+python3 hw/si/audit_gpu_coupling.py --board build/hw/gpu/gpu.kicad_pcb \
+  --source . --reports build/hw/si-current --fields build/hw/si-current \
+  --model-source hw/si/openems_gpu_coupled.py \
+  --out build/hw/si-current/gpu-coupled-d0-d1-audit.json
+```
+
 ## IO card USB field model
 
 `hw/si/openems_usb_io.py` reads the completed IO card's actual F.Cu routes
