@@ -258,6 +258,50 @@ python3 hw/si/openems_usb_io.py --board build/hw/io/io.kicad_pcb \
   --require-evidence
 ```
 
+### Later GPU/IO board receipt migration
+
+The mask/STEP verifier rebuild changed full board bytes and the IO netlist.
+The earlier field runs name GPU PCB
+`2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031`
+and IO PCB
+`2c2c84b21fabd3bcf32adcc582f826c1b017b600267f08672ed0d6d310c42a7c`.
+The rebuilt receipts name GPU
+`c551b16b88b22b816eff202ed17db7f434f3320369971f7e8142ee6dd007965d`
+and IO
+`8ce463cc553aedbe0e620bc6d834d521dbd86012cd31278f1036cf102da304fc`.
+The [migration record](si-evidence/board-migration.json) validates both
+receipts against their respective source inputs and connects them with a
+fail-closed solver-input comparison. The full-board comparison matches tracks,
+vias, copper zones, footprints, layers and outline after UUID removal. One
+GPU filled zone has an added collinear point; normalizing that redundant
+vertex gives the same polygon. The solder-mask setup changed, while the
+copper geometry did not. All four HDMI pair routes and both USB
+routes/endpoints match. Regenerated field XML matches the archived solver
+input for all six runs after ignoring CSXCAD's random display colors and
+same-priority copper polygon insertion order. The exact grid, stackup,
+ground, copper coordinates, lumped port and excitation properties remain
+in the fingerprint. Both IO netlists still give the required 27 Ω series
+paths. The saved run-log and XML hashes match their committed reports.
+
+To reproduce this local comparison without FDTD, supply the two matching
+source checkouts as well as the archived and current build directories:
+
+```sh
+python3 hw/si/compare_field_inputs.py \
+  --old-build /home/depmod/code/cupc8/build/hw-baseline-c429827 \
+  --new-build build/hw-current \
+  --old-source . --new-source /home/depmod/code/cupc8 \
+  --fields build/hw/si --reports doc/hardware/si-evidence \
+  --out doc/hardware/si-evidence/board-migration.json
+```
+
+This transfers the saved *modeled copper subset* evidence to those exact
+rebuilt receipts; it is not a new field run on the rebuilt PCB bytes. The
+raw USB XML differs by copper polygon order, while its solver-relevant
+fingerprint is equal. The GPU/IO field models still omit pads, mask, finite
+losses, connector and source/sink behavior. USB mesh convergence and the
+full HDMI coupled physical path remain open, so row 4.6 stays open.
+
 ## IBIS specification and pinned FPGA model
 
 [IBIS](https://ibis.org/about/) means *I/O Buffer Information Specification*. It describes a chip pin's analog input/output behavior with current-versus-voltage tables, switching waveforms, clamps, and package parasitics. It does not describe the FPGA's logic or the PCB trace. The applicable format reference for our file is the [official IBIS 4.0 specification](https://www.ibis.org/ver4.0/ver4_0.pdf): the vendor file says `[IBIS ver] 4.0`. The [IBIS Open Forum's specification index](https://www.ibis.org/specs/) lists later revisions, including 8.0, but those do not change which format this pinned file declares.

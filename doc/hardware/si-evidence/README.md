@@ -24,3 +24,18 @@ path.
 same IO board; `usb-io-mesh-comparison.json` records its exact S-parameter
 differences from the 0.075 mm report. Two grids quantify sensitivity but do
 not establish mesh convergence.
+
+`board-migration.json` binds those six saved field models to the later GPU
+and IO board receipts. The full PCB and IO netlist hashes changed after the
+mask/STEP verifier rebuild. The migration checker validates both receipts,
+compares every modeled copper segment and USB endpoint, regenerates each
+field XML, and matches a solver-relevant XML fingerprint against the saved
+field XML. The fingerprint preserves the grid, dielectric, ground, copper,
+ports and excitation. It ignores CSXCAD's random display colors and the
+insertion order of same-priority copper polygons. A separate fingerprint
+also matches both boards' tracks, vias, copper zones, footprints, layers and
+outline after UUID removal and one redundant GPU zone vertex normalization.
+The changed solder-mask setup is outside the copper fingerprint. No new FDTD run was needed
+for those equivalent field inputs. The saved reports retain their archived
+board hashes; this migration is the explicit link to the current receipts.
+It does not close full row 4.6 or USB mesh convergence.
