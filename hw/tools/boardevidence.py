@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+GERBER_SUFFIXES = {'.gbr', '.gtl', '.gbl', '.gts', '.gbs', '.gtp', '.gbp',
+                   '.gto', '.gbo', '.gm1', '.g1', '.g2', '.g3', '.g4'}
 
 
 def digest(path):
@@ -26,8 +28,8 @@ def inputs(board, root=ROOT):
 
 def artifacts(out):
     return {str(p.relative_to(out)): digest(p) for p in sorted(out.rglob('*'))
-            if p.is_file() and p.name != 'evidence.json'
-            and (p.suffix in ('.kicad_pcb', '.kicad_sch', '.kicad_pro', '.net', '.json', '.csv', '.gbr', '.drl', '.png')
+            if p.is_file() and p.name not in ('evidence.json', 'cpl-review.json')
+            and (p.suffix in {'.kicad_pcb', '.kicad_sch', '.kicad_pro', '.net', '.json', '.csv', '.drl', '.png'} | GERBER_SUFFIXES
                  or p.parent.name == 'fab')}
 
 
@@ -56,9 +58,10 @@ def validate(board, out, root=ROOT):
     for name in required:
         if not (out / name).is_file() or not (out / name).stat().st_size:
             raise ValueError('missing or empty artifact: ' + name)
-    for suffix in ('.gbr', '.drl'):
-        if not any(p.stat().st_size for p in (out / 'fab').glob('*' + suffix)):
-            raise ValueError('missing or empty fab artifact: *' + suffix)
+    if not any(p.stat().st_size for p in (out / 'fab').iterdir() if p.suffix in GERBER_SUFFIXES):
+        raise ValueError('missing or empty Gerber artifact')
+    if not any(p.stat().st_size for p in (out / 'fab').glob('*.drl')):
+        raise ValueError('missing or empty drill artifact')
     if type(evidence.get('boards')) is not int or evidence['boards'] < 1:
         raise ValueError('missing assembly quantity')
     return evidence

@@ -124,9 +124,8 @@ def check(board, mode, out):
         run([sys.executable, 'hw/tools/strapcheck.py', out / 'wifi.net'])
     elif mode == 'fab':
         check_report(json.loads((out / 'drc.json').read_text()), 'drc')
-        if not list((out / 'fab').glob('*.gbr')) or not list((out / 'fab').glob('*.drl')):
-            raise ValueError('missing Gerbers or drills')
-        raise ValueError('fab coverage missing: Gerber re-import DRC, drill-to-footprint check, recorded CPL review')
+        import fabcheck
+        print(fabcheck.check(out))
 
 
 def main():
