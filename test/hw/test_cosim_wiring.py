@@ -88,6 +88,7 @@ def main_cli():
                                args.system_board, args.cpu_board)
             assert good_route['runtime']['por_connected']
             assert good_route['runtime']['cpu_clock_connected']
+            assert good_route['runtime']['cpu_reset_connected']
             assert good_route['runtime']['memory_write_links'] == {'ram': True, 'rom': True}
             physical = pcbnew.LoadBoard(str(args.main_board))
             def open_launch(ref, pin, net):
@@ -242,6 +243,21 @@ def main_cli():
                     print(f"open routed CPU clock changes PC ${clock_good_state['pc']:04x} -> "
                           f"${clock_bad_state['pc']:04x}")
 
+                    opened_reset = open_card_launch(args.cpu_board, 'U1', '22', '/CPU_nRST', 'cpu-reset')
+                    reset_bad = check(cards, main, args.main_board, card_boards,
+                                      args.system_board, opened_reset)
+                    if reset_bad['runtime']['cpu_reset_connected'] or \
+                            reset_bad['runtime']['routed_top'] or \
+                            'cpu:CPU_nRST' not in reset_bad['runtime_nets']:
+                        raise AssertionError('open CPU reset launch did not disable the CPU reset link')
+                    reset_bad_top = Path(temporary) / 'open-cpu-reset.json'
+                    reset_bad_top.write_text(json.dumps(reset_bad))
+                    reset_good_state, reset_bad_state = run(good_top, PROBE), run(reset_bad_top, PROBE)
+                    if reset_good_state['pc'] == reset_bad_state['pc'] or reset_bad_state['nrst'] != 0:
+                        raise AssertionError('open routed CPU reset did not hold the native CPU in reset')
+                    print(f"open routed CPU reset changes PC ${reset_good_state['pc']:04x} -> "
+                          f"${reset_bad_state['pc']:04x}")
+
         swapped = copy.deepcopy(main)
         a, b = ('J11', 'B13'), ('J11', 'B15')
         swapped.pins[a], swapped.pins[b] = swapped.pins[b], swapped.pins[a]
@@ -300,6 +316,10 @@ def main_cli():
         broken_cpu_local = copy.deepcopy(cards)
         del broken_cpu_local['cpu'].pins[('U1', '1')]
         rejected(broken_cpu_local, main, 'missing CPU-card FPGA A0 driver')
+
+        broken_cpu_reset = copy.deepcopy(cards)
+        del broken_cpu_reset['cpu'].pins[('U1', '22')]
+        rejected(broken_cpu_reset, main, 'missing CPU-card FPGA reset input')
 
         broken_sd = copy.deepcopy(cards)
         del broken_sd['storage'].pins[('J2', '5')]

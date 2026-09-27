@@ -209,6 +209,16 @@ def main():
         if (clock_bad['pc'], clock_bad['gpo']) == (good['pc'], good['gpo']):
             raise AssertionError(f'open CPU clock did not change execution: {good} / {clock_bad}')
         print(f"open CPU clock changes PC ${good['pc']:04x} -> ${clock_bad['pc']:04x}")
+        if not manifest['runtime']['cpu_reset_connected']:
+            raise AssertionError('CPU reset requires a routed socket and card path')
+        changed = copy.deepcopy(manifest)
+        changed['runtime']['cpu_reset_connected'] = False
+        mutant = Path(directory) / 'open-cpu-reset.json'
+        mutant.write_text(json.dumps(changed))
+        reset_bad = run(mutant)
+        if reset_bad['pc'] == good['pc'] or reset_bad['nrst'] != 0:
+            raise AssertionError(f'open CPU reset did not hold the CPU in reset: {good} / {reset_bad}')
+        print(f"open CPU reset holds PC ${reset_bad['pc']:04x} and /RST low")
         changed = copy.deepcopy(manifest)
         slot = changed['runtime']['slots'][0]
         slot['sck'], slot['mosi'] = slot['mosi'], slot['sck']

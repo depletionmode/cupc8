@@ -82,6 +82,11 @@ J2.B13, then the CPU card's J1.B13 to FPGA U1.21. The planar paths measure
 at its reset vector PC `$E000` instead of `$E2B9` after 20 ms, while the
 chipset continues to run. The shared oscillator source and chipset clock
 branch are still outside this executed model.
+The active-low CPU reset follows main R34.2 to socket J2.B16 (103.930 mm)
+and card J1.B16 to FPGA U1.22 (27.014 mm). Opening the FPGA reset launch
+holds the native CPU at PC `$E000` with `/RST` low instead of booting to
+`$E2B9`. The digital open-pad value is forced low for this counterexample;
+the physical voltage and the chipset's reset-source leg are still unmodeled.
 The IO card's USB host data pair must pass from the RP2040 pins through the
 27 Ω series resistors to the receptacle. That netlist path controls keyboard
 attachment in the native machine; an open path leaves it disconnected.
@@ -165,9 +170,9 @@ supervisor nPOR release. Other power and reset circuits still use native
 machine wiring. On the routed-board snapshot used for this audit, all required
 top-level routes are present. Of 502 previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
-card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets and two CPU
-clock nets now affect execution; 363 remain unmodeled. The remaining groups
+card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
+nets and two CPU reset nets now affect execution; 361 remain unmodeled. The remaining groups
 are boot/programming (68), slot/control bus (36), CPU/memory (47),
-power/return (65), clock/reset (51), indicators (52), external IO (26),
+power/return (65), clock/reset (49), indicators (52), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

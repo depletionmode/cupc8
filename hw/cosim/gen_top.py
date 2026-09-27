@@ -248,6 +248,32 @@ def cpu_clock_route(main, card, main_board, cpu_board):
     return not missing, rows, missing
 
 
+def cpu_reset_route(main, card, main_board, cpu_board):
+    """The resistor output and CPU-card copper carrying active-low reset."""
+    source, socket = ('U7', '32'), ('J2', 'B16')
+    finger, fpga = ('J1', 'B16'), ('U1', '22')
+    resistor = path(main, source, socket, '33')
+    if node(main, resistor, '2') != '/CPU_nRST' or node(card, *finger) != '/CPU_nRST':
+        raise ValueError('CPU reset resistor output or card contact is missing')
+    path(card, finger, fpga)
+    legs = (('main', main_board, (resistor, '2'), socket),
+            ('cpu', cpu_board, finger, fpga))
+    rows, missing = [], []
+    for board_name, board_file, first, last in legs:
+        length = None
+        if board_file is not None and Path(board_file).is_file():
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            length = routed_distances(Path(board_file), '/CPU_nRST', first, [last])[
+                f'{last[0]}.{last[1]}']
+        rows.append({'from': f'{board_name}.{first[0]}.{first[1]}',
+                     'to': f'{board_name}.{last[0]}.{last[1]}',
+                     'route_mm': length, 'runtime': 'cpu_reset_connected'})
+        if length is None:
+            missing.append(f'{board_name}:CPU_nRST_reset_copper')
+    return not missing, rows, missing
+
+
 def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=None):
     """Return a physical wiring manifest; a missing/swapped net raises ValueError."""
     manifest = {'boards': ['main', *CARDS], 'contacts': [], 'paths': [], 'pulls': [], 'runtime': {}}
@@ -635,6 +661,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_clock_connected'] = clock_connected
     manifest['paths'].extend(clock_paths)
     manifest['runtime']['missing_routes'].extend(clock_missing)
+    reset_connected, reset_paths, reset_missing = cpu_reset_route(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['runtime']['cpu_reset_connected'] = reset_connected
+    manifest['paths'].extend(reset_paths)
+    manifest['runtime']['missing_routes'].extend(reset_missing)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     bridge = {}
@@ -838,6 +869,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             runtime_net('cpu', f'FPGA_{prefix}{bit}')
     runtime_net('main', 'CPU_CLK')
     runtime_net('cpu', 'CPU_CLK')
+    runtime_net('main', 'CPU_nRST')
+    runtime_net('cpu', 'CPU_nRST')
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest

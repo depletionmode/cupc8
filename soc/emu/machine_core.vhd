@@ -21,6 +21,7 @@ entity machine_core is
 		cpu_a_connected:	in std_logic_vector(15 downto 0);
 		cpu_d_connected:	in std_logic_vector(7 downto 0);
 		cpu_clk_connected:	in std_logic;
+		cpu_rst_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
 		mem_d_in:		in std_logic_vector(7 downto 0);
@@ -59,10 +60,14 @@ architecture rtl of machine_core is
 	signal cpu_doe, cs_doe, rw, n_stb, n_rdy, sync, halted, waiting, n_rst: std_logic;
 	signal irq: std_logic_vector(3 downto 0);
 	signal cpu_clk: std_logic;
+	signal cpu_rst_at_pad: std_logic;
 	signal tmr_exp: std_logic_vector(1 downto 0);
 	signal fl: std_logic_vector(1 downto 0);
 begin
 	cpu_clk <= clk when cpu_clk_connected = '1' else '0';
+	-- An open FPGA reset pad has undefined voltage. Holding it low is a
+	-- deterministic digital counterexample, not a prediction of that voltage.
+	cpu_rst_at_pad <= n_rst when cpu_rst_connected = '1' else '0';
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
@@ -81,7 +86,7 @@ begin
 	end generate;
 
 	cpu0: entity work.cpu port map(
-		clk => cpu_clk, n_rst => n_rst, a => a, d_in => cpu_din, d_out => cpu_dout, d_oe => cpu_doe,
+		clk => cpu_clk, n_rst => cpu_rst_at_pad, a => a, d_in => cpu_din, d_out => cpu_dout, d_oe => cpu_doe,
 		rw => rw, n_stb => n_stb, n_rdy => n_rdy, sync => sync, irq => irq, tmr_exp => tmr_exp,
 		halted => halted, waiting => waiting,
 		dbg_pc => dbg_pc, dbg_sp => dbg_sp, dbg_r0 => dbg_r0, dbg_r1 => dbg_r1, dbg_f => fl);
@@ -98,6 +103,6 @@ begin
 		slot_n_irq => slot_n_irq, gpo => gpo, pwr_hi => pwr_hi,
 		br_sck => br_sck, br_mosi => br_mosi, br_miso => br_miso, br_n_cs => br_n_cs);
 
-	cpu_n_rst <= n_rst;
+	cpu_n_rst <= cpu_rst_at_pad;
 	cpu_halted <= halted;
 end architecture;
