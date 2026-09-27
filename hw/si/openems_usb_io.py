@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'cosim'))
 from kicadgen import find1, parse
 from netlist import read as read_netlist
 from openems_gpu_d0 import add_trace, completion_decay
+from usb_port_audit import audit as audit_ports
 
 NETS = ('/USB_CONN_DP', '/USB_CONN_DM')
 CONTACTS = {'/USB_CONN_DP': (('R15', '2'), ('J2', '3')),
@@ -133,7 +134,7 @@ def validate_series(netlist):
 
 
 def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=False,
-             port_ohms=100, postprocess_only=False, netlist=None):
+             port_ohms=100, postprocess_only=False, netlist=None, boundary_margin_mm=0):
     routes, endpoints = routed_pair(board)
     schematic_hash = validate_series(netlist) if netlist else None
     if straight_control:
@@ -146,6 +147,10 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     grid = csx.GetGrid()
     grid.SetDeltaUnit(1e-3)
     xmin, xmax, ymin, ymax = ROI
+    xmin -= boundary_margin_mm
+    xmax += boundary_margin_mm
+    ymin -= boundary_margin_mm
+    ymax += boundary_margin_mm
     # Put pad and port edges on the grid without making a tiny CFL cell where
     # a regular line nearly coincides with one of those coordinates.
     def axis_lines(lo, hi, axis):
@@ -218,18 +223,27 @@ def simulate(board, directory, mesh_mm=.075, max_steps=120000, straight_control=
     passivity_ok = bool(np.all(power <= 1.001))
     port_ok = bool(np.all(passive_incident <= .01) and
                    np.all(np.abs(load_z - 90) <= .01 * 90))
-    valid = decay is not None and passivity_ok and port_ok
+    try:
+        window_audit = audit_ports(directory)
+        spectral_stability_ok = window_audit['spectral_stability_0p05db']
+    except ValueError as error:
+        window_audit = {'unavailable': str(error)}
+        spectral_stability_ok = False
+    valid = decay is not None and passivity_ok and port_ok and spectral_stability_ok
     return {'scope': 'IO USB-A D+/D- R14/R15-to-J2 routed F.Cu subset',
             'board_sha256': hashlib.sha256(board.read_bytes()).hexdigest(),
             'netlist_sha256': schematic_hash,
             'stackup': 'JLC04161H-7628', 'prepreg_mm': PREPREG_MM, 'dielectric_er': DIELECTRIC_ER,
             'model': 'lossless dielectric, PEC copper, rectangular L2 GND; pads/ESD/mask/connector absent',
             'mesh_mm': mesh_mm, 'straight_control': straight_control,
+            'boundary_margin_mm': boundary_margin_mm,
             'port_geometry': '2D differential lumped ports at resistor/connector pad centers',
             'declared_port_ohms': port_ohms, 'reference_ohms': 90,
             'energy_decay_db': decay if decay is not None else measured_decay,
             'converged': decay is not None, 'passivity_ok': passivity_ok,
             'port_consistency_ok': port_ok,
+            'spectral_stability_ok': spectral_stability_ok,
+            'port_window_audit': window_audit,
             'solver_version': version[1] if version else None,
             'timesteps': int(steps[1]) if steps else None,
             'valid_for_diagnostic_sparams': valid,
@@ -253,6 +267,8 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--mesh-mm', type=float, default=.075)
     parser.add_argument('--max-steps', type=int, default=120000)
+    parser.add_argument('--boundary-margin-mm', type=float, choices=(0.0, 1.0), default=0.0,
+                        help='expand the artificial field/ground boundary by 1 mm for sensitivity')
     parser.add_argument('--port-ohms', type=float, default=100,
                         help='declared lumped resistance; compare measured passive load to 90 ohms')
     parser.add_argument('--postprocess-only', action='store_true',
@@ -269,10 +285,13 @@ def main():
     if args.require_evidence:
         import boardevidence
         boardevidence.validate('io', board.parent)
-    directory = output.parent / ('usb-io-control-openems' if args.straight_control else 'usb-io-openems')
+    run_name = 'usb-io-control-openems' if args.straight_control else 'usb-io-openems'
+    if args.boundary_margin_mm:
+        run_name += '-margin-1mm'
+    directory = output.parent / run_name
     report = simulate(board, directory, args.mesh_mm, args.max_steps,
                       args.straight_control, args.port_ohms, args.postprocess_only,
-                      netlist)
+                      netlist, args.boundary_margin_mm)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

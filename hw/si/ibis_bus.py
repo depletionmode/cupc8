@@ -86,6 +86,21 @@ def routed_distances(board_path, net, source, receivers):
         return [(xy, layer) for layer in COPPER
                 if pad.IsOnLayer(getattr(pcbnew, layer.replace('.', '_')))]
 
+    # Plated through-hole connector pads can bridge signal tracks on different
+    # copper layers. A path to J11, for example, may pass through J12's barrel.
+    # Connecting only the source and queried receiver pads falsely reports it
+    # open despite KiCad DRC finding continuous copper.
+    for footprint in board.GetFootprints():
+        for pad in footprint.Pads():
+            if pad.GetNetname() != net:
+                continue
+            pos = pad.GetPosition()
+            xy = (round(pcbnew.ToMM(pos.x), 4), round(pcbnew.ToMM(pos.y), 4))
+            nodes = [(xy, layer) for layer in COPPER
+                     if pad.IsOnLayer(getattr(pcbnew, layer.replace('.', '_')))]
+            for a, b in zip(nodes, nodes[1:]):
+                add_edge(a, b, 0.0)
+
     distances, pending = {}, []
     for node in pad_nodes(source):
         distances[node] = 0.0

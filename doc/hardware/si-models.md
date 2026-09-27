@@ -75,6 +75,23 @@ low-loss resonances](https://docs.openems.de/en/latest/concepts/simulation.html)
 and documents the raw port traces used by this audit in its
 [S-parameter guide](https://docs.openems.de/en/latest/concepts/postproc/sparams.html).
 
+A bounded box-sensitivity rerun expanded the artificial dielectric,
+ground and PML box by 1 mm on every side. It kept routed copper, port
+geometry, nominal mesh resolution and −40 dB end criterion fixed. Because
+the regular x/y mesh starts at the box edge, the expansion also shifts its
+line alignment by 0.025 mm; this run cannot isolate a PML effect from mesh
+registration. This version met
+−40.00 dB after 214,578 steps, and its passive power/port checks passed.
+Nevertheless its 100 MHz S11 magnitude still moved **0.282 dB** between 12
+and 16 ns windows (the audit's limit is 0.05 dB); S11 also moved 0.287,
+0.392 and 0.208 dB at 100, 240 and 480 MHz compared with the original box.
+The runner now includes the independent port-window audit and marks this
+result `spectral_stability_ok: false` and
+`valid_for_diagnostic_sparams: false`. The box/grid change improved global
+energy decay, but a converged field alone has not stabilized the
+low-frequency reflection result. The full USB SI gate remains open. Reproduce
+the one-box change with `--boundary-margin-mm 1` and a separate output file.
+
 The [RP2040 datasheet](https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)
 specifies a full/low-speed host, not a 480 Mb/s high-speed host. The
 [USB-IF states that full-speed edges are typically 12–25 ns](https://www.usb.org/node/214).
@@ -128,6 +145,13 @@ Those measured paths are not substituted into the waveform model: branch
 topology, return planes and via parasitics need an electrical extraction first.
 On the provisional `main-routed.kicad_pcb`, J11/J12 SCK paths measure
 88.382/83.708 mm while J13–J16 are disconnected; R18-to-J2 clock is 73.518 mm.
+The later repaired `main.kicad_pcb` routes all six SCK pads. The audit now
+connects track layers through **every** same-net plated pad, including
+intermediate connector barrels. Its planar R36-to-slot SCK lengths on that
+board are 116.953, 79.805, 101.485, 133.137, 154.792 and 183.065 mm for
+J11–J16; R18-to-J2 CPU clock is 60.564 mm. Earlier false open reports for
+J11/J13–J16 came from omitting those intermediate pad bridges, not from
+missing routed copper.
 
 ```sh
 python3 hw/si/fetch_ice40_ibis.py
