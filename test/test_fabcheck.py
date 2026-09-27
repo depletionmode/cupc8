@@ -288,11 +288,12 @@ class FabCheckTests(unittest.TestCase):
             copper.write_text(prefix + region(99999) + 'M02*\n')
             with self.assertRaisesRegex(ValueError, 'isolated filled region width 0.099999 mm'):
                 gerberdrc.check_clearance([copper], .15, .1)
-            # The same-net stroke makes a connected shape whose minimum
-            # width needs a full union/neck analysis.
+            # A perpendicular same-net stroke cannot rescue the thin parts
+            # outside its outward bounding box.
             copper.write_text(prefix + region(99999) +
                               'X1500000Y900000D02*\nX1500000Y1200000D01*\nM02*\n')
-            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.099999 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
             # A different-net crossing is already a clearance violation; it
             # cannot excuse the isolated /GND region's own width failure.
             copper.write_text(prefix + region(99999) + '%TO.N,/VCC*%\n'
@@ -339,10 +340,12 @@ class FabCheckTests(unittest.TestCase):
             copper.write_text(copper_prefix + dumbbell(80000) + 'M02*\n')
             with self.assertRaisesRegex(ValueError, 'isolated filled region has a 0.080000 mm span below 0.100000 mm'):
                 gerberdrc.check_clearance([copper], .15, .1)
-            # A touching stroke can widen the union; the bounded proof defers it.
+            # The bounding-box superset of one touching stroke still leaves
+            # a provably narrow portion of the bridge.
             copper.write_text(copper_prefix + dumbbell(80000) +
                               'X1750000Y1300000D02*\nX1750000Y1700000D01*\nM02*\n')
-            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.080000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
             silk.write_text(silk_prefix + dumbbell(150000) + 'M02*\n')
             self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 1)
             silk.write_text(silk_prefix + dumbbell(100000) + 'M02*\n')
@@ -376,10 +379,11 @@ class FabCheckTests(unittest.TestCase):
                        rectangle(1000000,1090000,2000000,1180000))
             copper.write_text(copper_prefix + widened + 'M02*\n')
             self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
-            # A stroke touching either region may widen the overall ink union.
+            # One stroke's outward box cannot widen the full region union.
             copper.write_text(copper_prefix + narrow +
                               'X1250000Y900000D02*\nX1250000Y1200000D01*\nM02*\n')
-            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.080000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
             silk_narrow = (rectangle(1000000,1000000,1500000,1100000) +
                            rectangle(1500000,1000000,2000000,1100000))
             silk.write_text(silk_prefix + silk_narrow + 'M02*\n')
@@ -432,6 +436,33 @@ class FabCheckTests(unittest.TestCase):
             silk.write_text(plotted(silk_prefix, .149))
             with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.149000 mm span below 0.150000 mm'):
                 gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+
+    def test_bounded_stroke_and_nonrectangular_flash_witnesses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copper = Path(tmp) / 'sample-F_Cu.gtl'
+            prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                      '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                      '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                      '%ADD11O,0.400000X0.200000*%\nD10*\n%TO.N,/GND*%\n')
+            region = ('G36*\nX1000000Y1000000D02*\nX2000000Y1000000D01*\n'
+                      'X2000000Y1080000D01*\nX1000000Y1080000D01*\n'
+                      'X1000000Y1000000D01*\nG37*\n')
+            copper.write_text(prefix + region + 'X1500000Y1040000D03*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.080000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            copper.write_text(prefix + region + 'D11*\nX1500000Y1040000D03*\nM02*\n')
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.080000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # This centerline's 0.20 mm aperture spans the full region; a
+            # bounding-box witness must allow that widening.
+            copper.write_text(prefix + region +
+                              'X1000000Y1040000D02*\nX2000000Y1040000D01*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            # Two unsupported dark operations remain outside the one-object
+            # witness; the final incomplete-coverage gate retains that case.
+            copper.write_text(prefix + region +
+                              'X1400000Y1040000D03*\nX1600000Y1040000D03*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
 
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -586,11 +617,12 @@ class FabCheckTests(unittest.TestCase):
             silk.write_text(prefix + region(149999) + 'M02*\n')
             with self.assertRaisesRegex(ValueError, 'isolated filled region width 0.149999 mm'):
                 gerberdrc.check_silk_clearance(silk, mask, .15, .15)
-            # A touching stroke may make the union wide; this partial check
-            # must leave that case to the full filled-neck rule.
+            # The bounding-box superset still leaves thin ink outside this
+            # perpendicular stroke, so the partial check proves a failure.
             silk.write_text(prefix + region(149999) +
                             'X1500000Y900000D02*\nX1500000Y1200000D01*\nM02*\n')
-            self.assertEqual(gerberdrc.check_silk_clearance(silk, mask, .15, .15), 2)
+            with self.assertRaisesRegex(ValueError, 'connected filled region union has a 0.149999 mm span'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
 
     def test_excellon_hole_to_copper_and_edge_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:

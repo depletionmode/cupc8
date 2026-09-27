@@ -876,9 +876,10 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
     """Measure touching filled regions with exact rectangular flash widening.
 
     Every touching same-net region or R-aperture flash joins its component.
-    Its flash-only spans are exempt from the filled-region width test. Any
-    other touching operation might widen the union and is deferred to the
-    final incomplete-coverage gate.
+    Its flash-only spans are exempt from the filled-region width test. One
+    other touching operation can be included through an outward bounding box:
+    if even that guaranteed superset has a thin region span, the real ink
+    does too. More complex components remain at the final red gate.
     """
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('no positive filled-ink neck requirement')
@@ -919,8 +920,6 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
                 if other not in visited and touching(member, candidates[other]):
                     visited.add(other)
                     group.append(other)
-        if len(group) < 2:
-            continue  # the isolated-region check already covered it
         members = [candidates[index] for index in group]
         regions = [member for member in members if member[3] is not None]
         flashes = [member for member in members if member[3] is None]
@@ -928,11 +927,32 @@ def check_connected_filled_necks(path, geometry, objects, filled_regions, minimu
             continue
         member_shapes = {member[1] for member in members}
         net = members[0][0]
-        if any(other_net == net and other not in member_shapes and
-               any(touching(member, (other_net, other, bounds)) for member in members)
-               for other_net, other, bounds in objects):
+        unknown = [(other_net, other, bounds) for other_net, other, bounds in objects
+                   if other_net == net and other not in member_shapes and
+                   any(touching(member, (other_net, other, bounds)) for member in members)]
+        if len(unknown) > 1:
             continue
+        if unknown:
+            # A real connection through the unknown operation implies its
+            # bounding boxes overlap. Reject this bounded proof if any other
+            # dark object could join through it, including a second stroke.
+            _, extra, (x0, y0, x1, y1) = unknown[0]
+            if any(other_net == net and other not in member_shapes and other != extra and
+                   not (x1 < a0 or a1 < x0 or y1 < b0 or b1 < y0)
+                   for other_net, other, (a0, b0, a1, b1) in objects):
+                continue
+        elif len(group) < 2:
+            continue  # the isolated-region check already covered it
         contours = [member[4] for member in regions + flashes]
+        if unknown:
+            x0, y0, x1, y1 = unknown[0][2]
+            scale = 2000000
+            # One full micrometre outward beyond the parser's already
+            # conservative bounds covers float and half-grid rounding.
+            left, bottom = math.floor(x0*scale-2), math.floor(y0*scale-2)
+            right, top = math.ceil(x1*scale+2), math.ceil(y1*scale+2)
+            contours.append(((left/scale, bottom/scale), (right/scale, bottom/scale),
+                             (right/scale, top/scale), (left/scale, top/scale)))
         width_grid = orthogonal_regions_min_span(contours, len(regions))
         if width_grid is not None and width_grid < rule_grid:
             raise ValueError('%s:%d: connected filled region union has a %.6f mm span below %.6f mm' %

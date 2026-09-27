@@ -13,9 +13,11 @@ mask openings and JLC's 0.15 mm minimum line width. Isolated filled copper
 and silk regions whose entire bounding width is below the respective minimum
 fail independently. A touching union of orthogonal, hole-free filled polygons
 and rectangular flashes with an interior filled-region span below the rule
-also fails by an exact plotted-grid scanline check; strokes, nonrectangular
-flashes, and other neck forms still need connected-layer
-width analysis. It checks mask
+also fails by an exact plotted-grid scanline check. One touching stroke or
+nonrectangular flash may be bounded by an outward-rounded box; a thin span
+that survives this possible widening also fails. Multiple unsupported
+operations, holes, and other neck forms still need connected-layer width
+analysis. It checks mask
 webs if the KiCad project has a positive solder-mask minimum width. The board needs a
 recorded visual CPL review. The fab gate remains red because text height,
 filled ink necks, and other plotted-layer rules still lack independent

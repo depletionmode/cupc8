@@ -49,10 +49,13 @@ fail until their contract coverage exists:
   A span below the rule proves that the connected filled ink is locally too
   thin; synthetic copper and silk cases test narrow bridges, adjoining
   regions that stay narrow, and adjoining regions that widen each other.
-  Touching strokes, circular/obround/rounded/polygonal flashes, holes,
-  nonorthogonal boundaries, and components over the explicit complexity
-  limits (500 filled regions, 5000 eligible objects, 2000 contour vertices)
-  still need analysis, so the final incomplete-coverage gate remains in force.
+  A single touching stroke or nonrectangular flash can be bounded by its
+  outward-rounded plotted bounding box. A thin span that survives this
+  possible widening is a proven failure; a wider span is inconclusive.
+  Multiple such operations, holes, nonorthogonal boundaries, and components
+  over the explicit complexity limits (500 filled regions, 5000 eligible
+  objects, 2000 contour vertices) still need analysis, so the final
+  incomplete-coverage gate remains in force.
   To close it, the verifier needs a per-net, per-layer union of every dark
   Gerber operation (one union for all legend ink), including strokes and
   nonrectangular flashes, with region holes and curved boundaries represented
