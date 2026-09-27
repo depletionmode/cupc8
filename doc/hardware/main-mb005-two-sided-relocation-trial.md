@@ -13,11 +13,16 @@ The generated pre-route PCB
 `d29d7b76c63eaa45260e5ba0abe5ca7bf551d0feb310e6f2fbcece69e9565362`.
 KiCad's pre-route check reports **zero copper-clearance violations** and
 499 expected unconnected items, 199 dangling fanout vias and two dangling
-tracks. It has neither a completed route nor post-fill DRC. The source-owned
+tracks. The source-owned
 salt-9 DSN for a single no-optimizer route has SHA-256
 `c72cbe94baf2465d80f825bb9deb8949e7a77c568cab86e8e27be6c58cf54a53`.
-After Freerouting has saved `route-9.ses`, reproduce the diagnostic KiCad
-checks and corner scenarios with:
+Freerouting completed 20 passes in 1 h 07 min with its optimizer disabled.
+Its final router report had 12 incomplete connections and 14 fixed-rule
+violations. The saved `route-9.ses` SHA-256 is
+`0afda1eed4962fc27357b921878584712105a126445608e02e266b7d95ea92d2`;
+the route log SHA-256 is
+`6c8c9a0e1b42e218b638548adfc001a98aa4a809137a7ab02d13d64ada4b4a31`.
+Reproduce the diagnostic KiCad checks and corner scenarios with:
 
 ```sh
 python3 hw/power/main_mb005_route_review.py \
@@ -27,6 +32,27 @@ python3 hw/power/main_mb005_route_review.py \
 ```
 
 The review refuses a mismatched source PCB or DSN and creates no receipt.
+After SES import, source-side finishing and zone fill, KiCad reports **four
+opens, ten DRC violations and zero schematic parity findings**. The four
+opens are:
+
+| Net | Disconnected items |
+| --- | --- |
+| `/GND` | F.Cu and In1.Cu ground zones remain separate. |
+| `/+5V` | In3.Cu track at `(14.0,13.25)` to via at `(66.3182,8.8565)`. |
+| `/5V_SYS` | U2 F.Cu output stub at `(21.74,170.0)` to the C3 trunk at `(11.0,162.0)`. |
+| `/SLOT5_PROG_n` | J15.A18 at `(31.0,110.35)` to R605.2 at `(15.944,126.12)`. |
+
+The ten DRC findings are two `/CPU_A2` F.Cu tracks at `(90.05,51.75)`
+and `(91.0892,51.75)` that are 0.075 mm wide against a 0.100 mm minimum;
+three `/+5V` 7.5 mm wide south-edge taps at `(4.5,40.52)` on B.Cu,
+In2.Cu and In3.Cu with zero clearance against the 0.30 mm edge rule;
+two connection-width findings on those same `/CPU_A2` tracks near U7 pad 24;
+two dangling F.Cu stubs on `/5V_SYS` at `(21.74,170.0)` and `/PWR_EN`
+at `(22.91,170.9)`; and one dangling `/+5V` via at
+`(66.3182,8.8565)`. This is a red layout trial. No route repair is
+attempted after these findings because the fitted contact guarantee already
+prevents whole-loop certification.
 
 At 115 °C, 24.9/11.4 µm outer/inner copper, 80% effective drawn width,
 15 µm via wall and 1.76 mm board, the track/via sensitivity model gives:
@@ -46,10 +72,16 @@ assumes zero source-side contact imbalance and omits contact resistance.
 Neither solve bounds actual sharing. The A-side sum leaves **3.400 mΩ**,
 and even the ideal tied-pad sum leaves just **4.137 mΩ**
 for all GND copper, via/pad transitions, both mated contact groups and
-solder under the 20 mΩ loop requirement. The prior In1-only return *scenario*
-was about 3.46 mΩ at this corner before its via and pad contact, but U2 has
-moved much closer to J1, so that old number is not a bound for this trial.
-The new filled return must be extracted. Even an ideal zero-ohm return and
+solder under the 20 mΩ loop requirement. For this relocated board, an
+In1.Cu-only return mesh from the U2 GND via at `(19.89,169.77)` to the fixed
+J1 GND pads gives **2.671, 2.395, 2.284, 2.250 mΩ** at 0.5, 0.25, 0.125
+and 0.0625 mm mesh spacing, respectively, with 115 °C and 11.4 µm inner
+copper. The two finest meshes differ by 1.5%. This calculation excludes
+the GND zone open, via and pad resistance, thermal spokes, F.Cu/B.Cu pours
+and temperature coupling. It is a single-plane scenario, not a bound on the
+assembled return. The A-side positive sum plus this single-plane scenario
+is 18.850 mΩ, leaving only 1.150 mΩ for every omitted term under the
+20 mΩ limit. Even an ideal zero-ohm return and
 contacts would leave this trial above the proposed 15 mΩ design target; the
 20 mΩ limit has little unallocated budget. The local
 0.3 mm eFuse escape and the adjacent PWR_EN pad are binding: shortening the
@@ -81,5 +113,5 @@ unqualified.
 
 A complete routed candidate must pass source replay, KiCad DRC, zero opens,
 schematic parity, corner-aware filled-copper extraction and assembled loop
-qualification before MB-005 can change status. This pre-route experiment
-does not meet those gates.
+qualification before MB-005 can change status. This completed diagnostic
+replay does not meet those gates. The trial remains isolated and red.
