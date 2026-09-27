@@ -209,6 +209,8 @@ def simulate(board, directory, max_steps=120000, postprocess_only=False,
     pml_geometry_ok = (pml_inner_bounds[0][0] < xmin < xmax < pml_inner_bounds[0][1] and
                        pml_inner_bounds[1][0] < ymin < ymax < pml_inner_bounds[1][1] and
                        pml_inner_bounds[2][0] < -PREPREG_MM < 0 < pml_inner_bounds[2][1])
+    if not pml_geometry_ok and not (geometry_only or postprocess_only):
+        raise ValueError('GPU HDMI substrate/ground overlaps PML; use --pml-clearance-mm 1')
     substrate = csx.AddMaterial('JLC7628', epsilon=DIELECTRIC_ER)
     substrate.AddBox([xmin, ymin, -PREPREG_MM], [xmax, ymax, 0])
     ground = csx.AddMetal('L2_GND')

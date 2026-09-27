@@ -16,6 +16,10 @@ diagnostic S-parameter report does not close the full row 4.6 SI gate.
 `gpu-d0-boundary-comparison.json` recomputes both D0 spectra with the same
 9.8 ns Fourier cutoff on the same board and records the hashes of every raw
 port trace used.
+`gpu-four-pair-summary.json` links the completed D0, D1, D2 and CK reports
+on the PML-safe grid. Its `all_four_subset_pass` flag covers the separate
+routed-copper models only; it does not certify coupling or the full HDMI
+path.
 `usb-io-pml-mesh-090-fixed.json` is a completed coarser-grid run with the
 same IO board; `usb-io-mesh-comparison.json` records its exact S-parameter
 differences from the 0.075 mm report. Two grids quantify sensitivity but do

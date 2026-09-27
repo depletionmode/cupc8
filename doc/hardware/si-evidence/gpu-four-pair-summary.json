@@ -1,0 +1,84 @@
+{
+  "scope": "SI-003 four separate routed GPU HDMI copper pairs; not GC-007 or full row 4.6",
+  "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+  "all_four_subset_pass": true,
+  "valid_for_row_4_6": false,
+  "pairs": [
+    {
+      "pair": "d0",
+      "report_sha256": "95e3bdbacbedbbfada6203baa6539cbdd3be2cafc9ed188654816c08b7e5262c",
+      "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+      "xml_sha256": "6c60b4d3ed307a0034b710f4e3ac8a72e74d6f77877f79fdc695b093bb5c084c",
+      "run_log_sha256": "d79642368cf28b42ac4f1931e5ebc6c7150e1f5e6f9043a1008988d6997ce26c",
+      "solver_threads": 4,
+      "timesteps": 126000,
+      "simulated_ns": 12.0328866,
+      "energy_decay_db": -95.01,
+      "maximum_8_to_12_ns_drift_db": 2.2966886776527904e-05,
+      "at_1260_mhz": {
+        "s11_db": -20.615403872564812,
+        "s21_db": -0.03774985435166411,
+        "power_sum": 1.0000242416306968,
+        "passive_incident_ratio": 0.0003623195828583604
+      },
+      "valid_for_si_evidence": true
+    },
+    {
+      "pair": "d1",
+      "report_sha256": "8f808848524a249f82678a6380ecd28bb21aa4ed194ed159a988944421132202",
+      "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+      "xml_sha256": "d2a3695dbe9de5b44dd6deb1bc70d4851bfccc5ef7b175b81cc64369eddcda18",
+      "run_log_sha256": "57062694071fcd1a1dc7d531cc99af55ab4a50e0f869abd0873758a488481ea6",
+      "solver_threads": 1,
+      "timesteps": 126000,
+      "simulated_ns": 12.0328866,
+      "energy_decay_db": -95.24,
+      "maximum_8_to_12_ns_drift_db": 8.116965591794686e-05,
+      "at_1260_mhz": {
+        "s11_db": -20.603615462166964,
+        "s21_db": -0.03779246806497197,
+        "power_sum": 1.0000381040025204,
+        "passive_incident_ratio": 0.0003721661400159689
+      },
+      "valid_for_si_evidence": true
+    },
+    {
+      "pair": "d2",
+      "report_sha256": "06cf470a5544d8728d17be68285b9d3bc172a1687143db63fdfcce9a93c7bc0c",
+      "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+      "xml_sha256": "bd39b7d2e6f34d99494109551554a34193d09ec87025480480297adcf256a59a",
+      "run_log_sha256": "abfddcf110932c8b25248e72f6a301dd1400a3a0f3f114050b7ba48fa8d7edba",
+      "solver_threads": 1,
+      "timesteps": 126000,
+      "simulated_ns": 12.0328866,
+      "energy_decay_db": -96.08,
+      "maximum_8_to_12_ns_drift_db": 0.00012251016301172455,
+      "at_1260_mhz": {
+        "s11_db": -20.178455058505392,
+        "s21_db": -0.041687126094221,
+        "power_sum": 1.0000445259247943,
+        "passive_incident_ratio": 0.0003751979833605658
+      },
+      "valid_for_si_evidence": true
+    },
+    {
+      "pair": "ck",
+      "report_sha256": "27d845fb797ef69f72af401a4f35ddbd6577a87ad9fe4d861bc9c7272164318c",
+      "board_sha256": "2d36c983527678daf64f8d2ba2a773eee1eceaaebc4e85560348f39172822031",
+      "xml_sha256": "f00fbb0f3f5afe2c55b1069778d2f6126bea4febad5b7ad3491cbead75d43d79",
+      "run_log_sha256": "b854fd919f4efb237379b69e7b8f39a6250f512757c4e0b9c8c830fd1273a9e7",
+      "solver_threads": 1,
+      "timesteps": 126000,
+      "simulated_ns": 12.0328866,
+      "energy_decay_db": -96.3,
+      "maximum_8_to_12_ns_drift_db": 4.5205377966772204e-05,
+      "at_1260_mhz": {
+        "s11_db": -20.383248711863754,
+        "s21_db": -0.03982688820808982,
+        "power_sum": 1.000026794435884,
+        "passive_incident_ratio": 0.0003777807375273237
+      },
+      "valid_for_si_evidence": true
+    }
+  ]
+}
