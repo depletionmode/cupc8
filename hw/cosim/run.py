@@ -39,6 +39,8 @@ def main():
     if args.case == 'E2E-001':
         run([sys.executable, ROOT / 'test/hw/test_cosim_wiring.py', '--main-netlist', args.main_netlist])
         run([sys.executable, ROOT / 'test/hw/test_cosim_runtime.py', '--top', output])
+        run(['node', ROOT / 'test/hw/test_cosim_pixels.mjs'],
+            env=dict(os.environ, CUPC8_COSIM_TOP=str(output)))
     else:
         env = dict(os.environ, CUPC8_EMU='native', CUPC8_COSIM_TOP=str(output))
         run(['node', ROOT / 'test/emu/test_e2e.mjs', args.case], env=env)
