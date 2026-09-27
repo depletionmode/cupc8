@@ -1153,3 +1153,17 @@ fixed_in = "BUS-005 routed-evidence gate"
 revert = [["hw/timing/cpubus_budget.py", '''raise ValueError("BUS-005: routed trace lengths missing: " + path)''', '''return 150.0, 50.0, "nominal limits"''']]
 cmd = "python3 test/hw/test_bus_lengths.py"
 must_fail = ["FAIL: test_missing_layout_is_red"]
+
+[[bug]]
+name = "Connector gate accepted swapped main-board slot chip-select contacts"
+fixed_in = "connectorcheck initial implementation"
+revert = [["hw/tools/connectorcheck.py", "elif a[pin] != b[pin]:", "elif False:"]]
+cmd = "python3 test/hw/test_connectors.py ConnectorTests.test_swapped_main_slot_chip_selects"
+must_fail = ["FAIL: test_swapped_main_slot_chip_selects"]
+
+[[bug]]
+name = "Connector gate accepted a missing CPU clock contact"
+fixed_in = "connectorcheck initial implementation"
+revert = [["hw/tools/connectorcheck.py", "elif a[pin] != b[pin]:", "elif False:"]]
+cmd = "python3 test/hw/test_connectors.py ConnectorTests.test_missing_cpu_bus_wire"
+must_fail = ["FAIL: test_missing_cpu_bus_wire"]
