@@ -63,7 +63,12 @@ update it after every finding, commit, decision or agent result (David,
    a requirement; `rp2040_vreg.py` checks GPU against it; per-card DVI
    burn-in hw test (GC-1xx); TMDS series resistors raised so RP2040 IO current
    < 50 mA with valid DVI swing.
-3. **JLC do-not-trim order note** (David approved): add to
+3. **JLC order instructions** (David approved): tick JLC's "Confirm
+   Production File" option (review their post-CAM Gerbers vs ours before
+   production: fingers and notch unchanged), plus the do-not-trim note. Why:
+   JLC's CAM adjusts designs outside their rules (gold-finger setback
+   0.5-1.0 mm per their guidance; PCIe geometry is closer), sometimes via an
+   EQ email, sometimes silently. Note text: add to
    `kicadgen.order_spec` (hw/tools/kicadgen.py:2722) → `fab/order.json`.
    Queued until the main-board agent finishes (hw/tools edit breaks its builds).
 4. **MECH-101 criterion: done** (>= 0.10 mm measured notch-wall-to-
@@ -84,12 +89,12 @@ update it after every finding, commit, decision or agent result (David,
    - End to end on the netlist-generated machine: E2E-001, E2E-002, E2E-003,
      E2E-004.
    - MB-051 (item 1).
-   Agents for SI (high-speed USB/HDMI; slow buses), co-sim/E2E, CPU/main
-   thermal (iCE40 core current, HT7533 theta-JA) and an IO port-switch
-   replacement proposal were written but **not launched**: the permission
-   classifier returned no verdict for Agent launches (transient). Relaunch
-   them; prompts should carry the rules in this file (no board builds, no
-   hw/tools|lib|parts edits, give catalogue cmds instead of editing it).
+   Agents now running (launched after David added credits): SI high-speed
+   (GC/IC/YC-007), SI buses (MB/CC/SC/EC-007), co-sim + E2E (E2E-001..004,
+   MB-052, CC/SC/EC/YC-051), CPU/main thermal (CC-006, MB-006), IO port-switch
+   replacement proposal (IC-005). Main-board and GPU agents resumed. Rules for
+   all: no board builds, no hw/tools|lib|parts edits, catalogue cmds reported
+   to the root instead of edited.
 8. **Other red rows needing work:**
    - FAB-002 filled-region neck proof: complex/holed fills are deferred
      (`tools/fab_neck_coverage.py --require-complete`); needs a general
