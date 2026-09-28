@@ -95,6 +95,12 @@ SOCKETS = {
     "C19188869": {"width": "x4", "part": "SOFNG PCIE-64P11L", "height": 11.10, "depth": 7.60,
                   "slot_w": 1.78, "length": 39.00, "wide": 8.76, "rib_w": 1.75,
                   "ds": "hw/datasheets/C19188869_PCIE-64P11L.pdf: 11.10, 7.60 deep, 1.78 slot, 39.00 long, 8.76 wide",
+                  # rib_w is the EasyEDA solid's nominal. The SOFNG drawing gives no
+                  # toleranced key-rib width (its only width-wise dimension at the key,
+                  # 1.78, is undesignated; at the title block's .XX +/-0.15 it would
+                  # allow 1.93), so there is no "rib_plus" and the key cannot pass
+                  # key_position_check until the maker publishes one.
+                  "rib_src": "EasyEDA model nominal, no toleranced rib width on the SOFNG drawing",
                   "pads": ("1", "33")},    # JLC's pad numbers for A1 and B1 (hw/boards/sockets.py)
 }
 
@@ -102,6 +108,18 @@ SOCKETS = {
 def key_mating_margin(sock, notch_width, notch_minus):
     """Signed worst-case clearance on each side of a centered socket key."""
     return (notch_width - notch_minus - sock["rib_w"] - sock.get("rib_plus", 0)) / 2
+
+
+def key_position_check(sock, margin):
+    """(ok, reason) for the key's positional fit: the per-side gap at the
+    maker's maximum rib must exceed JLC's best routed-edge tolerance. A socket
+    whose drawing publishes no rib tolerance fails: a nominal proves nothing."""
+    if "rib_plus" not in sock:
+        return False, ("no published maximum key-rib width (rib %.2f mm: %s); needs the maker's toleranced "
+                       "rib and rib-to-contact registration" % (sock["rib_w"], sock.get("rib_src", "source unknown")))
+    return (margin > JLC_HIGH_PRECISION_EDGE_TOLERANCE,
+            "%.3f mm centered key/notch gap per side vs JLC best listed +/-%.2f mm routed-edge tolerance; "
+            "positional fit needs qualified routing and mating evidence" % (margin, JLC_HIGH_PRECISION_EDGE_TOLERANCE))
 
 
 # JLCPCB's published routed-edge dimensional tolerance is +/-0.20 mm
@@ -423,12 +441,10 @@ def check_fingers(b, res):
     res.add(cid, mating_margin > 0,
             "%s in %s: key notch min %.2f mm vs rib max %.2f mm; per-side worst-case gap %.3f mm%s"
             % (name, sock["part"], key_w - CEM["key_w"][1], rib_max, mating_margin,
-               " (UMAX drawing 318307001, page 1: key 1.78 +/-0.05)" if "rib_plus" in sock else ""))
-    if "rib_plus" in sock:
-        res.add(cid, mating_margin > JLC_HIGH_PRECISION_EDGE_TOLERANCE,
-                "%s in %s: %.3f mm centered key/notch gap per side vs JLC best listed +/-%.2f mm "
-                "routed-edge tolerance; positional fit needs qualified routing and mating evidence"
-                % (name, sock["part"], mating_margin, JLC_HIGH_PRECISION_EDGE_TOLERANCE))
+               " (UMAX drawing 318307001, page 1: key 1.78 +/-0.05)" if "rib_plus" in sock
+               else " (nominal rib only, no published tolerance)"))
+    ok, why = key_position_check(sock, mating_margin)
+    res.add(cid, ok, "%s in %s: %s" % (name, sock["part"], why))
     res.add(cid, b["thickness"] < sock["slot_w"] - 0.05,
             "%s in %s: card %.2f mm in slot min %.2f mm (nominal %.2f%s)" %
             (name, sock["part"], b["thickness"], sock["slot_w"] - .05,

@@ -152,8 +152,9 @@ def wifi_card(out):
     c.check('T4r', 'extra return resistance and buck/copper/contact thermal transfers bounded',
             0, 1, '>=', '', fmt='%d')
     c.check('T4c', 'measured or calibrated ESP-to-buck thermal transfer bound supplied', 0, 1, '>=', '', fmt='%d')
+    import wifi_parts   # Espressif publishes only a 25 C typical TX peak (wifi_parts.ESP32_C3)
     c.check('T4p', 'ESP and other 3V3 load power bounded at the 40 C full-TX corner',
-            0, 1, '>=', '', fmt='%d')
+            int(wifi_parts.load_envelope_bounded()), 1, '>=', '', fmt='%d')
     return c.done()
 
 
@@ -253,6 +254,11 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ['bind']:
         import thermal_bind
         sys.exit(thermal_bind.main(sys.argv[2:]))
+    if sys.argv[1:2] == ['rp2040']:
+        # a card's whole thermal row: THM-001, then its RP2040 package bound
+        import rp2040_thermal
+        global_rc = main()
+        sys.exit(rp2040_thermal.main(sys.argv[2:]) or global_rc)
     if len(sys.argv) != 1:
-        sys.exit('usage: thermal.py [wifi-card DIR | bind BOARD DIR [--binding-only]]')
+        sys.exit('usage: thermal.py [wifi-card DIR | bind BOARD DIR [--binding-only] | rp2040 BOARD DIR]')
     sys.exit(main())

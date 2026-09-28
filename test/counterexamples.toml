@@ -1294,3 +1294,10 @@ fixed_in = "sysctl VBUS receipt-bound route binding"
 revert = [["hw/cosim/gen_top.py", "manifest['runtime']['sysctl_usb_vbus_connected'] = all(vbus_contacts.values())", "manifest['runtime']['sysctl_usb_vbus_connected'] = True"]]
 cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && python3 test/hw/test_cosim_sysctl_vbus.py --main-netlist build/hw/main/main.net --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb --cpu-board build/hw/cpu/cpu.kicad_pcb --top doc/hardware/si-evidence/ibis-final-top.json"
 must_fail = ["AssertionError"]
+
+[[bug]]
+name = "MECH-001: a socket with only a nominal key-rib width skipped the positional key check and passed"
+fixed_in = "fit.py key_position_check"
+revert = [["hw/mech/fit.py", "    if \"rib_plus\" not in sock:\n        return False, (", "    if False:\n        return False, ("]]
+cmd = "python3 -m unittest test/test_key_mating.py"
+must_fail = ["test_socket_without_published_rib_tolerance_cannot_pass"]

@@ -26,6 +26,20 @@ class KeyMatingTests(unittest.TestCase):
         self.assertLess(fit.key_mating_margin(socket, 1.90, .06), 0)
         self.assertLess(fit.key_mating_margin(socket, 1.84, .06), 0)
 
+    def test_umax_key_position_fails_jlc_edge_tolerance(self):
+        socket = fit.SOCKETS['C404113']
+        ok, why = fit.key_position_check(socket, fit.key_mating_margin(socket, *fit.CEM['key_w']))
+        self.assertFalse(ok)
+        self.assertIn('0.005 mm', why)
+        self.assertTrue(fit.key_position_check(socket, .11)[0])
+
+    def test_socket_without_published_rib_tolerance_cannot_pass(self):
+        socket = fit.SOCKETS['C19188869']        # SOFNG x4: nominal rib only
+        self.assertNotIn('rib_plus', socket)
+        ok, why = fit.key_position_check(socket, 5.0)   # even a huge nominal gap
+        self.assertFalse(ok)
+        self.assertIn('no published maximum key-rib width', why)
+
 
 if __name__ == '__main__':
     unittest.main()
