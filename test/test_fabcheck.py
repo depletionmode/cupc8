@@ -797,6 +797,48 @@ class FabCheckTests(unittest.TestCase):
                                         'connected nonorthogonal filled region union has a 0.135000 mm'):
                 gerberdrc.check_silk_clearance(silk, mask, .15, .15)
 
+    def test_union_overlap_transition_neck_and_clear_polarity_defer(self):
+        # Two 0.080 mm tapered regions overlap to 0.140 mm at the slab
+        # midpoint, then converge to a 0.080 mm union by y=1.30. A member
+        # region alone is thin at the midpoint, so the previous per-member
+        # rule-crossing candidates miss the later 0.090 mm union slice.
+        a = [(1, 1), (2, 1), (2, 1.2), (1.48, 1.2),
+             (1.54, 1.3), (2, 1.3), (2, 1.6), (1, 1.6),
+             (1, 1.3), (1.46, 1.3), (1.4, 1.2), (1, 1.2)]
+        b = [(1, 1), (2, 1), (2, 1.2), (1.6, 1.2),
+             (1.54, 1.3), (2, 1.3), (2, 1.6), (1, 1.6),
+             (1, 1.3), (1.46, 1.3), (1.52, 1.2), (1, 1.2)]
+        def region(points):
+            lines = ['G36*']
+            for index, (x, y) in enumerate([*points, points[0]]):
+                lines.append('X%dY%dD0%d*' %
+                             (round(x*1000000), round(y*1000000),
+                              2 if index == 0 else 1))
+            return '\n'.join([*lines, 'G37*']) + '\n'
+        prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                  '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                  '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n%TO.N,/GND*%\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            copper = Path(tmp) / 'sample-F_Cu.gtl'
+            copper.write_text(prefix + region(a) + region(b) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError,
+                                        'connected nonorthogonal filled region union has a 0.090000 mm'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            copper.write_text(prefix + region(a) + region(b) +
+                              '%ADD11R,0.200000X0.200000*%\nD11*\n'
+                              'X1500000Y1250000D03*\nM02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
+            def at_limit(points):
+                return [(1.55 if x == 1.54 else 1.45 if x == 1.46 else x, y)
+                        for x, y in points]
+            copper.write_text(prefix + region(at_limit(a)) + region(at_limit(b)) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            # A clear exposure would subtract earlier dark ink. The parser
+            # must reject it until ordered polarity compositing is supported.
+            copper.write_text(prefix + region(a) + '%LPC*%\n' + region(b) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError, 'unsupported Gerber command %LPC'):
+                gerberdrc.check_clearance([copper], .15, .1)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)

@@ -55,18 +55,25 @@ fail until their contract coverage exists:
   near-vertex neck that the slab midpoint misses. The same rational witness
   now also measures connected nonorthogonal, hole-free region unions with
   rectangular flash widening and at most one conservatively boxed unknown
-  operation. It samples each member region's near-vertex rule crossing, then
-  measures the complete plotted union there so touching ink can widen it.
+  operation. It samples each member region's and the midpoint union boundary's
+  near-vertex rule crossings, then remeasures the complete plotted union at
+  each candidate. This catches a narrow overlap transition between two
+  tapered regions while allowing touching ink to widen it.
   It is a **failure witness**: an 80 µm neck in two touching
   regions is rejected for both copper and silk, while a flash that widens
   the entire span and an exact-rule-width span are accepted. Clear-polarity
   holes and multiple contours in one `G36` region are rejected at Gerber
   import; a parsed region with an interior hole defers the neck witness.
-  General hole support needs polarity-aware compositing with net provenance.
+  [Ucamco's Gerber specification, §§2.3.2 and 4.10.4.6](https://www.ucamco.com/files/downloads/file_en/554/gerber-layer-format-specification-revision-2026-05_en.pdf)
+  makes clear polarity order-dependent: a clear operation removes *earlier*
+  dark image, and later dark operations can refill it. Supporting those holes
+  requires ordered compositing and net/provenance updates for every copper,
+  mask, and silk consumer; interpreting `%LPC*%` as just one polygon hole would
+  be unsound. The parser rejects it until that full path exists.
   Unions that form holes, more than four touching unsupported operations,
   indirect touching through them, nonorthogonal unions with two or more
-  boxed operations, large unions, and minima created only by changing
-  overlaps between union members away from sampled slices remain outside
+  boxed operations, large unions, and minima away from all sampled union
+  slices remain outside
   complete coverage. The final incomplete-coverage gate stays
   red until all such ink and text-height rules are independently checked.
   The board generator now configures a 0.10 mm solder-mask web

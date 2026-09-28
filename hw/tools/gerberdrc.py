@@ -917,8 +917,9 @@ def connected_polygon_scanline_witness(contours, measured_count, minimum):
 
     Rational crossings at vertex-slab midpoints and near exact rule crossings
     avoid floating geometry errors. Candidate near-vertex samples come from
-    individual filled regions, but the complete union is measured there, so
-    touching flashes or conservative boxes can still widen them. Only a span
+    individual filled regions and the union's midpoint boundary edges; the
+    complete union is remeasured at every sample, so touching ink can widen
+    it and boundary switches cannot create a false failure. Only a span
     containing filled-region ink can be a witness. Wide neighboring spans
     exclude terminal tips. This remains a partial failure witness.
     """
@@ -956,25 +957,44 @@ def connected_polygon_scanline_witness(contours, measured_count, minimum):
             def merged_at(at):
                 intervals = []
                 for index, edges in enumerate(active):
-                    crossings = sorted(value(edge, at) for edge in edges)
-                    if len(crossings) % 2:
+                    edges_at = sorted((value(edge, at), edge) for edge in edges)
+                    if len(edges_at) % 2:
                         return None
-                    intervals.extend((start, end, index < measured_count)
-                                     for start, end in zip(crossings[::2], crossings[1::2]))
+                    intervals.extend((left, right, index < measured_count,
+                                      left_edge, right_edge)
+                                     for (left, left_edge), (right, right_edge)
+                                     in zip(edges_at[::2], edges_at[1::2]))
                 merged = []
-                for start, end, measured in sorted(intervals):
+                for start, end, measured, left_edge, right_edge in sorted(intervals):
                     if end <= start:
                         return None
                     if merged and start <= merged[-1][1]:
-                        merged[-1] = (merged[-1][0], max(end, merged[-1][1]),
-                                      merged[-1][2] or measured)
+                        old = merged[-1]
+                        merged[-1] = (old[0], max(end, old[1]), old[2] or measured,
+                                      old[3], right_edge if end > old[1] else old[4])
                     else:
-                        merged.append((start, end, measured))
+                        merged.append((start, end, measured, left_edge, right_edge))
                 return merged
             midpoint = merged_at(sample)
             if midpoint is None:
                 return None
             candidates = [midpoint]
+            for left, right, measured, left_edge, right_edge in midpoint:
+                if not measured or right-left < threshold:
+                    continue
+                for endpoint in (low, high):
+                    width_end = value(right_edge, endpoint)-value(left_edge, endpoint)
+                    if width_end >= threshold:
+                        continue
+                    crossing = endpoint + (sample-endpoint) * (
+                        threshold-width_end) / (right-left-width_end)
+                    interior = (Fraction(endpoint) + crossing) / 2
+                    if low < interior < high:
+                        candidates.append(merged_at(interior))
+                    if len(candidates) > 64:
+                        break
+                if len(candidates) > 64:
+                    break
             for edges in active[:measured_count]:
                 crossings = sorted((value(edge, sample), edge) for edge in edges)
                 for (left, left_edge), (right, right_edge) in zip(crossings[::2], crossings[1::2]):
@@ -1001,11 +1021,11 @@ def connected_polygon_scanline_witness(contours, measured_count, minimum):
             for current in candidates:
                 if current is None:
                     return None
-                for left, right, measured in current:
+                for left, right, measured, _, _ in current:
                     if not measured or not 0 < right-left < threshold:
                         continue
                     if all(any(start < right and left < end and end-start >= threshold
-                               for start, end, _ in neighbor)
+                               for start, end, _, _, _ in neighbor)
                            for neighbor in (previous, following)):
                         return (right-left) / 2000000
     return None
