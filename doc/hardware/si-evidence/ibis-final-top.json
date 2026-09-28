@@ -5098,27 +5098,9 @@
       "wifi:EN"
     ],
     "cpu_and_memory": [
-      "cpu:CPU_IRQ0",
-      "cpu:CPU_IRQ1",
-      "cpu:CPU_IRQ2",
-      "cpu:CPU_IRQ3",
-      "cpu:CPU_TMR_EXP0",
-      "cpu:CPU_TMR_EXP1",
-      "cpu:FPGA_TMR_EXP0",
-      "cpu:FPGA_TMR_EXP1",
       "main:CPU_CARD_ID0",
       "main:CPU_CARD_ID1",
-      "main:CPU_IRQ0",
-      "main:CPU_IRQ0_SRC",
-      "main:CPU_IRQ1",
-      "main:CPU_IRQ1_SRC",
-      "main:CPU_IRQ2",
-      "main:CPU_IRQ2_SRC",
-      "main:CPU_IRQ3",
-      "main:CPU_IRQ3_SRC",
-      "main:CPU_PRSNT2_n",
-      "main:CPU_TMR_EXP0",
-      "main:CPU_TMR_EXP1"
+      "main:CPU_PRSNT2_n"
     ],
     "external_io": [
       "eink:UART_TX",
@@ -8459,6 +8441,114 @@
       "to": "main.U7.130"
     },
     {
+      "from": "main.U7.1",
+      "route_mm": 13.545,
+      "runtime": "cpu_irq0_connected",
+      "to": "main.R29.1"
+    },
+    {
+      "from": "main.R29.2",
+      "route_mm": 51.504,
+      "runtime": "cpu_irq0_connected",
+      "to": "main.J2.B35"
+    },
+    {
+      "from": "cpu.J1.B35",
+      "route_mm": 33.857,
+      "runtime": "cpu_irq0_connected",
+      "to": "cpu.U1.47"
+    },
+    {
+      "from": "main.U7.141",
+      "route_mm": 4.537,
+      "runtime": "cpu_irq1_connected",
+      "to": "main.R30.1"
+    },
+    {
+      "from": "main.R30.2",
+      "route_mm": 57.659,
+      "runtime": "cpu_irq1_connected",
+      "to": "main.J2.B37"
+    },
+    {
+      "from": "cpu.J1.B37",
+      "route_mm": 30.77,
+      "runtime": "cpu_irq1_connected",
+      "to": "cpu.U1.48"
+    },
+    {
+      "from": "main.U7.2",
+      "route_mm": 17.238,
+      "runtime": "cpu_irq2_connected",
+      "to": "main.R31.1"
+    },
+    {
+      "from": "main.R31.2",
+      "route_mm": 38.088,
+      "runtime": "cpu_irq2_connected",
+      "to": "main.J2.B38"
+    },
+    {
+      "from": "cpu.J1.B38",
+      "route_mm": 35.126,
+      "runtime": "cpu_irq2_connected",
+      "to": "cpu.U1.49"
+    },
+    {
+      "from": "main.U7.142",
+      "route_mm": 9.439,
+      "runtime": "cpu_irq3_connected",
+      "to": "main.R32.1"
+    },
+    {
+      "from": "main.R32.2",
+      "route_mm": 52.632,
+      "runtime": "cpu_irq3_connected",
+      "to": "main.J2.B40"
+    },
+    {
+      "from": "cpu.J1.B40",
+      "route_mm": 43.442,
+      "runtime": "cpu_irq3_connected",
+      "to": "cpu.U1.52"
+    },
+    {
+      "from": "cpu.U1.55",
+      "route_mm": 10.644,
+      "runtime": "cpu_tmr_exp0_connected",
+      "to": "cpu.RN8.1"
+    },
+    {
+      "from": "cpu.RN8.8",
+      "route_mm": 32.844,
+      "runtime": "cpu_tmr_exp0_connected",
+      "to": "cpu.J1.B41"
+    },
+    {
+      "from": "main.J2.B41",
+      "route_mm": 55.1,
+      "runtime": "cpu_tmr_exp0_connected",
+      "to": "main.U7.136"
+    },
+    {
+      "from": "cpu.U1.56",
+      "route_mm": 14.394,
+      "runtime": "cpu_tmr_exp1_connected",
+      "to": "cpu.RN8.2"
+    },
+    {
+      "from": "cpu.RN8.7",
+      "route_mm": 32.92,
+      "runtime": "cpu_tmr_exp1_connected",
+      "to": "cpu.J1.B43"
+    },
+    {
+      "from": "main.J2.B43",
+      "route_mm": 56.502,
+      "runtime": "cpu_tmr_exp1_connected",
+      "to": "main.U7.129"
+    },
+    {
       "from": "system.U1.35",
       "route_mm": 44.378,
       "runtime": "sysctl_manual_reset_connected",
@@ -9024,6 +9114,12 @@
       true,
       true
     ],
+    "cpu_irq_connected": [
+      true,
+      true,
+      true,
+      true
+    ],
     "cpu_ready_connected": true,
     "cpu_reset_connected": true,
     "cpu_status_connected": {
@@ -9031,6 +9127,10 @@
       "waiting": true
     },
     "cpu_sync_connected": true,
+    "cpu_tmr_exp_connected": [
+      true,
+      true
+    ],
     "eink_panel_link": true,
     "gpo_led_connected": [
       true,
@@ -9232,8 +9332,14 @@
     "cpu:CPU_D6",
     "cpu:CPU_D7",
     "cpu:CPU_HALTED",
+    "cpu:CPU_IRQ0",
+    "cpu:CPU_IRQ1",
+    "cpu:CPU_IRQ2",
+    "cpu:CPU_IRQ3",
     "cpu:CPU_RW",
     "cpu:CPU_SYNC",
+    "cpu:CPU_TMR_EXP0",
+    "cpu:CPU_TMR_EXP1",
     "cpu:CPU_WAITING",
     "cpu:CPU_nRDY",
     "cpu:CPU_nRST",
@@ -9265,6 +9371,8 @@
     "cpu:FPGA_HALTED",
     "cpu:FPGA_RW",
     "cpu:FPGA_SYNC",
+    "cpu:FPGA_TMR_EXP0",
+    "cpu:FPGA_TMR_EXP1",
     "cpu:FPGA_WAITING",
     "cpu:FPGA_nSTB",
     "eink:CS_n",
@@ -9381,8 +9489,18 @@
     "main:CPU_D7",
     "main:CPU_D7_SRC",
     "main:CPU_HALTED",
+    "main:CPU_IRQ0",
+    "main:CPU_IRQ0_SRC",
+    "main:CPU_IRQ1",
+    "main:CPU_IRQ1_SRC",
+    "main:CPU_IRQ2",
+    "main:CPU_IRQ2_SRC",
+    "main:CPU_IRQ3",
+    "main:CPU_IRQ3_SRC",
     "main:CPU_RW",
     "main:CPU_SYNC",
+    "main:CPU_TMR_EXP0",
+    "main:CPU_TMR_EXP1",
     "main:CPU_WAITING",
     "main:CPU_nRDY",
     "main:CPU_nRDY_SRC",
@@ -9506,19 +9624,11 @@
   "structural_only_nets": [
     "cpu:3V3",
     "cpu:CDONE",
-    "cpu:CPU_IRQ0",
-    "cpu:CPU_IRQ1",
-    "cpu:CPU_IRQ2",
-    "cpu:CPU_IRQ3",
-    "cpu:CPU_TMR_EXP0",
-    "cpu:CPU_TMR_EXP1",
     "cpu:CRESET_n",
     "cpu:FL1_MISO",
     "cpu:FL1_MOSI",
     "cpu:FL1_SCK",
     "cpu:FL1_nCS",
-    "cpu:FPGA_TMR_EXP0",
-    "cpu:FPGA_TMR_EXP1",
     "cpu:GND",
     "cpu:PRSNT",
     "eink:+5V",
@@ -9550,10 +9660,6 @@
     "main:CPU_CARD_ID0",
     "main:CPU_CARD_ID1",
     "main:CPU_CDONE",
-    "main:CPU_IRQ0",
-    "main:CPU_IRQ1",
-    "main:CPU_IRQ2",
-    "main:CPU_IRQ3",
     "main:CPU_PRSNT2_n",
     "main:CPU_RSVD_A2",
     "main:CPU_RSVD_A3",
@@ -9563,8 +9669,6 @@
     "main:CPU_RSVD_A7",
     "main:CPU_RSVD_A8",
     "main:CPU_RSVD_B1",
-    "main:CPU_TMR_EXP0",
-    "main:CPU_TMR_EXP1",
     "main:FL0_MISO",
     "main:FL0_MOSI",
     "main:FL0_SCK",
@@ -9700,20 +9804,12 @@
     "cpu:1V2",
     "cpu:3V3",
     "cpu:CDONE",
-    "cpu:CPU_IRQ0",
-    "cpu:CPU_IRQ1",
-    "cpu:CPU_IRQ2",
-    "cpu:CPU_IRQ3",
-    "cpu:CPU_TMR_EXP0",
-    "cpu:CPU_TMR_EXP1",
     "cpu:CRESET_n",
     "cpu:FL1_MISO",
     "cpu:FL1_MOSI",
     "cpu:FL1_SCK",
     "cpu:FL1_WPHOLD",
     "cpu:FL1_nCS",
-    "cpu:FPGA_TMR_EXP0",
-    "cpu:FPGA_TMR_EXP1",
     "cpu:GND",
     "cpu:GNDPLL0",
     "cpu:GNDPLL1",
@@ -9807,17 +9903,7 @@
     "main:CPU_CARD_ID0",
     "main:CPU_CARD_ID1",
     "main:CPU_CDONE",
-    "main:CPU_IRQ0",
-    "main:CPU_IRQ0_SRC",
-    "main:CPU_IRQ1",
-    "main:CPU_IRQ1_SRC",
-    "main:CPU_IRQ2",
-    "main:CPU_IRQ2_SRC",
-    "main:CPU_IRQ3",
-    "main:CPU_IRQ3_SRC",
     "main:CPU_PRSNT2_n",
-    "main:CPU_TMR_EXP0",
-    "main:CPU_TMR_EXP1",
     "main:EFUSE_DVDT",
     "main:EFUSE_ILM",
     "main:EFUSE_OVLO",

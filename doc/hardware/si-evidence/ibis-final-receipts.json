@@ -1,5 +1,5 @@
 {
-  "scope": "current seven-card receipt binding for IBIS source-path audit",
+  "scope": "current eight-board receipt binding for IBIS source-path audit",
   "board_receipts": {
     "main": {
       "receipt_sha256": "2b29afec3aaee9794b7d805f2d82ad89d122e143ddde6119174030fc5e7c2605",
@@ -35,17 +35,22 @@
       "receipt_sha256": "620583436ca7ae5a92f67eb1d6a970d8c5a3f341eb1a62618e1ccf9dc1540abd",
       "board_sha256": "b662a07908e631960f9b7785712e241c57d6c66842f1364978c0473266ff7212",
       "netlist_sha256": "7c044e10f5049655004189945b53a44a3f7ce107138e68a8926d1364c88737db"
+    },
+    "system": {
+      "receipt_sha256": "f15e354539b360125490711e30b9e785ee14e3ccdcdb161b05dcbbf1d5796da4",
+      "board_sha256": "fcf846f8b75369df358706501b71e2a993c814251661b577a73d7ce32b48624b",
+      "netlist_sha256": "81180b28b1edfbe9d1b79d39c3e370f08b3c961214c1378f541ec129ad3232f5",
+      "routed_board_sha256": "22c1b1976eb318c004e8e68c4edb483987fa3c5dcf9435c6b47b8d921c01c9c0"
     }
   },
-  "system_route_snapshot_sha256": "92bb38d5e0b64fe02a3acab891cc0a9e08e56176c39563d263aabf678a4eb43c",
-  "top_generator_sha256": "75f071a9eb89434f26f8c030923f8df504035f850a4642e9aa79c97195e2fee9",
-  "top_sha256": "c057f966bd4b77cd874baf7cd8218a219021427761a09ca228083449c63f3c40",
-  "source_audit_sha256": "e6e533308bb79c152d1b51dd4325b5fba04df301d89405bf36e30d8aed2527a9",
+  "system_route_sha256": "22c1b1976eb318c004e8e68c4edb483987fa3c5dcf9435c6b47b8d921c01c9c0",
+  "top_generator_sha256": "55ca1d253586f476037a0fad01e9ff1e8bc983b3ed93986ec049641a9309f4cc",
+  "top_sha256": "8d79e8547d45649c7fc539192c430f7319c6e17de5be92650cf278c09f71434f",
+  "source_audit_sha256": "4a1c2030e2c6d56af384838f40d70f38a1dd14e376232d107c059138d9a95ad9",
   "routed_top": true,
-  "unmodeled_nets": 310,
+  "unmodeled_nets": 292,
   "valid_for_full_bus_si": false,
   "limits": [
-    "system route is a saved routed snapshot, not the in-progress canonical rebuild",
     "waveform diagnostics retain assumed line lengths and loads",
     "receiver IBIS, package assignment, return paths and branch extraction remain open"
   ]

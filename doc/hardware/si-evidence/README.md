@@ -80,8 +80,8 @@ physical bus SI.
 
 `ibis-final-top.json`, `ibis-final-source-audit.json` and
 `ibis-final-receipts.json` refresh the top and source copper audit against
-canonical main/CPU and all seven validated card receipts. They retain the
-saved routed system snapshot and do not rerun the earlier assumed-line
+canonical main/CPU, all seven card receipts and the canonical system routed
+board. They do not rerun the earlier assumed-line
 ngspice diagnostics. The source/path check is current; analog bus SI remains
 open.
 
