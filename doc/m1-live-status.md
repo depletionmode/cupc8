@@ -96,6 +96,11 @@ update it after every finding, commit, decision or agent result (David,
    - End to end on the netlist-generated machine: E2E-001, E2E-002, E2E-003,
      E2E-004.
    - MB-051 (item 1).
+   More agents (2026-09-28 late): card power data sourcing (CC/GC/SC/EC/
+   YC-005), BOM lifecycle/stock audit, JLC assembly DFM audit, connector
+   protection review, FAB-002 neck proof, first-article plan
+   (doc/hardware/first-article-plan.md), JLC order checklist
+   (doc/hardware/jlc-order-checklist.md), WIFI-003 investigation.
    Agents now running (launched after David added credits): SI high-speed
    (GC/IC/YC-007), SI buses (MB/CC/SC/EC-007), co-sim + E2E (E2E-001..004,
    MB-052, CC/SC/EC/YC-051), CPU/main thermal (CC-006, MB-006), IO port-switch
@@ -109,7 +114,12 @@ update it after every finding, commit, decision or agent result (David,
    - IC-005: SY6280 has no fault pin or guaranteed limit → replacement part
      proposal (needs David's approval to change the IO board).
    - CC-006 / MB-006: iCE40 core current bound, HT7533 theta-JA.
-   - WIFI-003 load flake (40 s TLS wait under -j 2).
+   - **WIFI-003: possible security bug, under investigation (agent).** The
+     failing loaded run saw WIFI_EV_CONNECTED (0x10) for socket 0 while
+     waiting for the self-signed-certificate refusal: either a TLS verify
+     bypass under slow timing (fw/wifi/port/esp32c3/main/netesp.c tls_step /
+     n_status) or a stale event from an earlier socket. Not a plain timeout.
+     The failing log was overwritten by the passing rerun.
 
 ### B. Needs outside data or measurement (cannot be closed by analysis)
 
