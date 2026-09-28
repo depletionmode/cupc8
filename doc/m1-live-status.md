@@ -50,6 +50,17 @@ update it after every finding, commit, decision or agent result (David,
   change the key notch. If your process requires any change, contact us
   before production."
 
+- **JLC order checklist (done):** doc/hardware/jlc-order-checklist.md (all
+  eight boards, click-by-click; gate, upload files, options, note, sequencing)
+  + tools/jlc_production_diff.py (HOST-004). Mismatches to resolve before
+  ordering (its section 0): M1 order.json lacks Confirm Production File and
+  the note; M2 no impedance-control field though verification.md wants
+  controlled impedance for the GPU; M3 no outline tolerance (MECH-101 assumes
+  JLC's +/-0.1 mm high-precision option); M4 whether JLC "gold fingers" is
+  hard gold (ask JLC); M5 main needs Standard PCBA (8 THT connectors); M6 no
+  material/TG; M7 13 vias in mask openings around Wi-Fi U1 (via-in-pad);
+  M8 no CPL reviews yet.
+
 ## Everything left before the boards can be ordered
 
 ### A. Engineering in progress or queued (Claude)

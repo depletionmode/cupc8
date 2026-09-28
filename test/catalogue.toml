@@ -1318,6 +1318,15 @@ method = "test/host/test_lockstep.py: lockstep.py --inject corrupts one DUT trac
 kind = "sim"
 vrow = "1.2"
 
+[[test]]
+id = "HOST-004"
+title = "JLC production-file diff tool self-test"
+checks = "our own Gerbers compare clean against themselves, and against a renamed, zipped, origin-shifted copy; trimmed gold fingers, a moved key notch and a dropped via are each reported; a 0.1 mm plating enlargement is not"
+method = "test/host/test_jlc_production_diff.py over tools/jlc_production_diff.py (used to check JLC's Confirm Production File Gerbers before production; doc/hardware/jlc-order-checklist.md)"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 test/host/test_jlc_production_diff.py"
+
 # ============================================================================
 # E2E: whole system (co-sim wired from the KiCad netlists)
 # ============================================================================
