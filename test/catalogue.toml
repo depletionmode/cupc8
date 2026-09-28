@@ -2681,6 +2681,15 @@ vrow = "3.1"
 cmd = "python3 hw/cosim/check_cpu.py"
 
 [[test]]
+id = "COSIM-003"
+title = "Receipt-bound routed digital co-simulation subset"
+checks = "all eight current board receipts and the routed top agree; main CPU data, IRQ, timer expiry and system USB paths respond to individual copper opens in the native machine; unmodeled nets remain red"
+method = "test/hw/test_cosim_routed_subset.py; this is a digital subset, not full E2E-001 or analog SI"
+kind = "sim"
+vrow = "3.1"
+cmd = "python3 test/hw/test_cosim_routed_subset.py"
+
+[[test]]
 id = "BUS-005A"
 title = "Routed bus length evidence is mandatory"
 checks = "missing, incomplete and invalid route lengths fail before timing can be declared green"
