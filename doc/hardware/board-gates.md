@@ -48,9 +48,11 @@ fail until their contract coverage exists:
   proven failure. Up to four directly touching unsupported operations are
   boxed for an orthogonal union; a fifth operation or another unmodeled
   same-net object whose bounds touch a box defers the proof. Exact rational
-  scanlines detect an interior neck in
-  an isolated nonorthogonal, hole-free polygon when wider spans overlap it on
-  both sides; this excludes a rounded terminal tip. The same rational witness
+  scanlines detect an interior neck in an isolated nonorthogonal, hole-free
+  polygon when wider spans overlap it on both sides; this excludes a rounded
+  terminal tip. For isolated simple polygons, affine edges permit an exact
+  rational slice between a vertex and a rule-width crossing, detecting a
+  near-vertex neck that the slab midpoint misses. The same rational witness
   now also measures connected nonorthogonal, hole-free region unions with
   rectangular flash widening and at most one conservatively boxed unknown
   operation. It is a **failure witness**: an 80 µm neck in two touching
@@ -61,7 +63,7 @@ fail until their contract coverage exists:
   General hole support needs polarity-aware compositing with net provenance.
   Unions that form holes, more than four touching unsupported operations,
   indirect touching through them, nonorthogonal unions with two or more
-  boxed operations, large unions, and non-midpoint minima remain outside
+  boxed operations, large unions, and non-midpoint minima in connected unions remain outside
   complete coverage. The final incomplete-coverage gate stays
   red until all such ink and text-height rules are independently checked.
   The board generator now configures a 0.10 mm solder-mask web

@@ -846,13 +846,13 @@ def orthogonal_region_min_span(points):
 
 
 def polygon_scanline_witness(points, minimum):
-    """Find an exact interior neck at vertex-slab midpoints of a polygon.
+    """Find an exact interior neck inside a simple, hole-free polygon.
 
-    Integer Gerber coordinates and rational edge intersections avoid a GEOS
-    approximation. A thin cross section must have overlapping wide sections
-    in the immediately preceding and following slabs. This excludes pointed
-    ends and rounded outline tips. Other dark ink and holes are excluded by
-    the caller; this remains a partial failure witness.
+    Cross-section width between polygon vertices is affine: a sub-rule span
+    missed at the slab midpoint must lie near an endpoint. Sample rationally
+    between that endpoint and the exact rule crossing. A thin section must
+    have overlapping wide sections in the neighboring slabs, excluding a
+    terminal tip. Other dark ink and holes are excluded by the caller.
     """
     vertices = [(round(x * 1000000), round(y * 1000000)) for x, y in points]
     if vertices[0] != vertices[-1]:
@@ -866,24 +866,49 @@ def polygon_scanline_witness(points, minimum):
         slabs = []
         for low, high in zip(levels, levels[1:]):
             sample = Fraction(low + high, 2)
-            crossings = []
-            for a, b in edges:
-                u0, u1 = a[axis], b[axis]
-                if min(u0, u1) < sample < max(u0, u1):
-                    v0, v1 = a[1-axis], b[1-axis]
-                    crossings.append(Fraction(v0) + Fraction((v1-v0) * (sample-u0), u1-u0))
-            crossings.sort()
-            if len(crossings) % 2:
+            active = [(a, b) for a, b in edges
+                      if min(a[axis], b[axis]) < sample < max(a[axis], b[axis])]
+            def value(edge, at):
+                a, b = edge
+                return Fraction(a[1-axis]) + Fraction(b[1-axis]-a[1-axis],
+                                                     b[axis]-a[axis]) * (at-a[axis])
+            def intervals(at):
+                crossings = sorted(value(edge, at) for edge in active)
+                if len(crossings) % 2:
+                    return None
+                return list(zip(crossings[::2], crossings[1::2]))
+            midpoint = intervals(sample)
+            if midpoint is None:
                 return None
-            slabs.append(list(zip(crossings[::2], crossings[1::2])))
-        for previous, current, following in zip(slabs, slabs[1:], slabs[2:]):
-            for left, right in current:
-                if not 0 < right-left < threshold:
-                    continue
-                if all(any(start < right and left < end and end-start >= threshold
-                           for start, end in neighbor)
-                       for neighbor in (previous, following)):
-                    return (right-left) / 1000000
+            candidates = [midpoint]
+            at_mid = sorted((value(edge, sample), edge) for edge in active)
+            for (left, left_edge), (right, right_edge) in zip(at_mid[::2], at_mid[1::2]):
+                width_mid = right-left
+                if width_mid < threshold:
+                    continue  # already covered by the midpoint candidate
+                for endpoint in (low, high):
+                    width_end = value(right_edge, endpoint)-value(left_edge, endpoint)
+                    if width_end >= threshold:
+                        continue
+                    # Width is affine on this open slab. The crossing of the
+                    # rule is exact even if it lies arbitrarily near a vertex.
+                    crossing = endpoint + (sample-endpoint) * (
+                        threshold-width_end) / (width_mid-width_end)
+                    interior = (Fraction(endpoint) + crossing) / 2
+                    if low < interior < high:
+                        candidates.append(intervals(interior))
+            slabs.append((midpoint, candidates))
+        for (previous, _), (_, candidates), (following, _) in zip(slabs, slabs[1:], slabs[2:]):
+            for current in candidates:
+                if current is None:
+                    return None
+                for left, right in current:
+                    if not 0 < right-left < threshold:
+                        continue
+                    if all(any(start < right and left < end and end-start >= threshold
+                               for start, end in neighbor)
+                           for neighbor in (previous, following)):
+                        return (right-left) / 1000000
     return None
 
 
