@@ -56,7 +56,9 @@ I_USB_VDD_MAX = 0.0020    # Table 637 max average USB_VDD, worst-case device
 USB_RPU_MIN = 873.0       # Table 626 RPU2 min, the strongest bus pull-up
 THETA_JA = 48.0           # Table 611 (5.1.1)
 TC_MAX = 85.0             # Table 624 case temperature max
-# USB 2.0 specification, chapter 7: full-speed cable one-way delay <= 26 ns,
+# USB 2.0 specification, chapter 7 (checked 2026-09-28: 26 ns cable delay
+# §7.1.19; 90 ohm +-15 % per USB-IF/Renesas R01AN0628EJ guidance; 20 pF
+# transceiver pin-to-GND as in FS transceiver datasheets, e.g. onsemi FUSB1500): full-speed cable one-way delay <= 26 ns,
 # 90 ohm +-15 % differential impedance (45 ohm per line), 20 pF transceiver
 # input capacitance at each end; 12 Mb/s NRZI is at most one edge per bit.
 FS_CABLE_DELAY = 26e-9

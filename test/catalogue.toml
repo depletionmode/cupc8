@@ -2323,7 +2323,7 @@ checks = "Current board build: thermal; missing coverage or stale evidence fails
 method = "hw/tools/boardcheck.py: content hashes and board checks"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py storage thermal"
+cmd = "python3 hw/power/thermal.py rp2040 storage build/hw/storage && python3 test/hw/test_rp2040_thermal.py"
 
 [[test]]
 id = "SC-008"
@@ -2420,7 +2420,7 @@ checks = "Current board build: thermal; missing coverage or stale evidence fails
 method = "hw/tools/boardcheck.py: content hashes and board checks"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py eink thermal"
+cmd = "python3 hw/power/thermal.py rp2040 eink build/hw/eink && python3 test/hw/test_rp2040_thermal.py"
 
 [[test]]
 id = "EC-008"
@@ -2517,7 +2517,7 @@ checks = "Current board build: thermal; missing coverage or stale evidence fails
 method = "hw/tools/boardcheck.py: content hashes and board checks"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py system thermal"
+cmd = "python3 hw/power/thermal.py rp2040 system build/hw/system && python3 test/hw/test_rp2040_thermal.py"
 
 [[test]]
 id = "YC-008"
@@ -2578,7 +2578,7 @@ checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
 method = "Board evidence plus hw/power/thermal.py"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py gpu thermal"
+cmd = "python3 hw/power/thermal.py rp2040 gpu build/hw/gpu && python3 test/hw/test_rp2040_thermal.py"
 
 [[test]]
 id = "IC-006"
@@ -2587,7 +2587,7 @@ checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
 method = "Board evidence plus hw/power/thermal.py"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py io thermal"
+cmd = "python3 hw/power/thermal.py rp2040 io build/hw/io && python3 test/hw/test_rp2040_thermal.py"
 
 [[test]]
 id = "WC-010"

@@ -73,10 +73,11 @@ update it after every finding, commit, decision or agent result (David,
    Queued until the main-board agent finishes (hw/tools edit breaks its builds).
 4. **MECH-101 criterion: done** (>= 0.10 mm measured notch-wall-to-
    finger gap): add to the MECH-101 checks text in test/catalogue.toml.
-5. **Card thermal rows** (David approved): verify the USB 2.0 full-speed
-   cable figures in `hw/power/rp2040_thermal.py` against the spec, then set
-   GC/IC/SC/EC/YC-006 cmd to `python3 hw/power/thermal.py rp2040 <board>
-   build/hw/<board>` (GPU passes only after item 2 + rebuild).
+5. **Card thermal rows: done.** USB figures verified (26 ns §7.1.19; 90 ohm
+   +-15 %; 20 pF transceiver pin-to-GND); GC/IC/SC/EC/YC-006 now run
+   `python3 hw/power/thermal.py rp2040 <board> build/hw/<board> && python3
+   test/hw/test_rp2040_thermal.py`. They pass for io/storage/eink/system once
+   boards are rebuilt (evidence is stale now); GPU needs the TMDS fix (A.2).
 6. **Coordinated rebuild** after 1-2 land: rebuild all eight boards into
    `build/hw` one at a time (never two Freerouting runs at once), re-pin
    `ibis-final-receipts.json` (and source audit/top if the main board changed:
