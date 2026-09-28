@@ -6,7 +6,8 @@ using the common framing in `slot.md`: one command per CS_n frame, and the
 status byte comes back during the opcode.
 
 **Hardware notes** (the board: `hw/boards/gpu.py`, `hw/boards/README.md`):
-TMDS through 270 Ω series resistors (PicoDVI's DC-coupled output) and
+TMDS through 360 Ω series resistors (PicoDVI's DC-coupled output; 270 Ω
+there, raised for the RP2040's IO current, `power.md`) and
 TPD4E05U06 ESD; the pairs are on GPIO10–17 with the pads inverted
 (`hw/pins.yaml`). The receptacle's +5V comes from a TPS61023 boost at 5.06 V
 (the IO card's circuit, `power.md`), because the slot's +5V can be 4.1 V at

@@ -272,6 +272,36 @@ slot +5V ── PTC SMD0805P020TF (C20976, 200 mA, 0.5–3.5 Ω)
 - Layout per TI (SLVSEU9D section 12): VIN and VOUT capacitors right at the
   pins over GND, the L1–L2 loop short, FB divider next to FB.
 
+### GPU card RP2040 overclock (requirement, David 2026-09-28)
+
+The GPU card's RP2040 runs **outside its datasheet, by requirement**:
+clk_sys = 252 MHz (the 640x480p60 TMDS bit clock, 25.2 MHz x 10) at VREG
+VSEL 1.20 V (`fw/rp2040/gpu/main.c`, `vreg_set_voltage(VREG_VOLTAGE_1_20)`
+then `set_sys_clock_khz(DVI_TIMING.bit_clk_khz)`). The RP2040 datasheet
+(build 2025-02-20) documents 133 MHz, or 200 MHz at DVDD 1.15 V, and DVDD
+1.05–1.16 V; 1.20 V ±3 % reaches 1.236 V.
+
+- **Why accepted:** PicoDVI serialises TMDS straight from PIO, so clk_sys
+  must equal the bit clock; 252 MHz at 1.20 V is PicoDVI's standard setting,
+  used on commercial boards (e.g. Adafruit Feather RP2040 DVI) and widely in
+  the field. No datasheet margin covers it, so each unit
+  is qualified instead.
+- **Only this point:** `hw/power/rp2040_vreg.py` (GC-005) passes the GPU card
+  at exactly VSEL 1.20 V and exactly the firmware's DVI bit clock; any other
+  voltage or clock on the GPU card fails, and every other RP2040 card keeps
+  the datasheet limits.
+- **Per-unit qualification:** GC-102, a 1 h DVI burn-in at ~40 °C ambient
+  (no glitches, dropouts or lockups), recorded in bringup.md. A unit that
+  fails is not used as a GPU card.
+- **TMDS drive:** the series resistors are 360 Ω (not PicoDVI's 270 Ω) so
+  the steady sink current stays under the RP2040's IIOVSS_MAX 50 mA: worst
+  case 4 x 3.465 V / (342 + 45) Ω = 35.8 mA on the TMDS lines, 41.5 mA in
+  all (`hw/power/rp2040_thermal.py` R3). The swing at the sink stays inside
+  DVI 1.0's 150–1200 mV receiver range over every corner (AVcc 3.3 V ±5 %,
+  RT 50 Ω ±10 %, ±5 % resistors, 0–200 Ω pad at PicoDVI's 2 mA drive):
+  |Vp−Vn| ≥ 215 mV, peak-to-peak ≤ 939 mV (R6/R7). Typical single-ended
+  swing is 3.3 V x 50 / 410 Ω = 402 mV (270 Ω gave 516 mV).
+
 ### Results (margins)
 
 | Test | Key numbers |

@@ -12,6 +12,8 @@ sys.path.insert(0, str(ROOT / 'hw/power'))
 sys.path.insert(0, str(ROOT / 'hw'))
 sys.path.insert(0, str(ROOT / 'hw/tools'))
 import rp2040_thermal as rt
+sys.path.insert(0, str(ROOT / 'hw/boards'))
+import gpu  # noqa: E402  (the declared TMDS resistors)
 from cosim.netlist import read
 
 BUILD = ROOT / 'build/hw'
@@ -68,13 +70,50 @@ class StaticIo(unittest.TestCase):
         worse, _, _, _ = rt.static_io(circuit('storage'), c)
         self.assertGreater(worse, base)
 
-    def test_gpu_tmds_sink_is_near_iovss_and_switching_is_open(self):
-        c = circuit('gpu')
+    def gpu_with_tmds(self, value):
+        """The built GPU netlist with RN1/RN2 set to `value` ohms."""
+        base = circuit('gpu')
+        resistors = tuple(dataclasses.replace(r, value=value) if r.ref.startswith('RN') else r
+                          for r in base.resistors)
+        return dataclasses.replace(base, resistors=resistors)
+
+    def test_gpu_tmds_sink_within_iovss_with_margin(self):
+        # the declared TMDS resistors (hw/boards/gpu.py) keep the steady sink
+        # current at least 10 % under IIOVSS_MAX; switching (R4) stays open
+        c = self.gpu_with_tmds(gpu.TMDS_R)
         _, sink, _, _ = rt.static_io(c, codes('gpu'))
-        tmds = 4 * rt.TMDS_AVCC_MAX / (270 * 0.95 + rt.TMDS_RT_MIN)
+        tmds = 4 * rt.TMDS_AVCC_MAX / (rt.ohms(gpu.TMDS_R) * 0.95 + rt.TMDS_RT_MIN)
         self.assertGreater(sink, tmds)
-        self.assertGreater(tmds, 0.9 * rt.I_IOVSS_MAX)
+        self.assertLess(sink, 0.9 * rt.I_IOVSS_MAX)
         self.assertEqual(len(rt.tmds_lines(c)), 8)
+
+    def test_picodvi_270_ohm_exceeds_iovss(self):
+        # mutation: PicoDVI's own 270 ohm sinks 46.0 mA on the TMDS lines alone
+        _, sink, _, _ = rt.static_io(self.gpu_with_tmds('270'), codes('gpu'))
+        self.assertGreater(sink, rt.I_IOVSS_MAX)
+
+    def test_gpu_build_has_the_declared_tmds_resistors(self):
+        self.assertEqual(rt.tmds_resistors(circuit('gpu')), [rt.ohms(gpu.TMDS_R)])
+
+
+class TmdsSwing(unittest.TestCase):
+    RAIL = (rt.d.V3V3_MIN, rt.d.buck_vout_range()[1])
+
+    def test_declared_resistors_within_dvi_swing(self):
+        lo, hi = rt.tmds_swing(rt.ohms(gpu.TMDS_R), *self.RAIL)
+        self.assertGreaterEqual(lo, rt.DVI_SWING_MIN)
+        self.assertLessEqual(2 * hi, rt.DVI_SWING_MAX)
+
+    def test_swing_mutations_fail(self):
+        # 1 kohm starves the sink under 150 mV; 150 ohm drives it past 1200 mV
+        self.assertLess(rt.tmds_swing(1000, *self.RAIL)[0], rt.DVI_SWING_MIN)
+        self.assertGreater(2 * rt.tmds_swing(150, *self.RAIL)[1], rt.DVI_SWING_MAX)
+
+    def test_swing_hand_value(self):
+        # weakest corner: AVcc 3.465 V, RT 45 ohm, 378 ohm, 200 ohm pad; the
+        # high pin at IOVDD 3.135 V still sinks (3.465 - 3.135) / 423 ohm
+        lo, _ = rt.tmds_swing(360, 3.135, 3.135)
+        self.assertAlmostEqual(lo, 45 * (3.465 / (200 + 378 + 45) - 0.33 / (378 + 45)), places=6)
 
 
 class Binding(unittest.TestCase):

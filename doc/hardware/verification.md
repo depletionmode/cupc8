@@ -69,8 +69,8 @@ Rules for the matrix:
 
 | Risk | Why not simulable | Mitigation |
 |---|---|---|
-| TMDS analog eye at 252 Mb/s per lane | Needs the monitor's receiver behaviour | Pico DVI Sock pin mapping and resistors copied exactly; openEMS on our route; 4-layer board with controlled impedance |
-| RP2040 at 252 MHz (per part) | Silicon margin varies | PicoDVI's standard 252 MHz with its core voltage bump (VREG 1.20 V), used widely on RP2040. Bring-up checks each unit for an hour with a soak test pattern. The spare boards cover a marginal part. |
+| TMDS analog eye at 252 Mb/s per lane | Needs the monitor's receiver behaviour | Pico DVI Sock pin mapping copied; series resistors 360 Ω instead of PicoDVI's 270 Ω (RP2040 IIOVSS_MAX), swing checked against DVI 1.0 over every corner (`power.md`, "GPU card RP2040 overclock"); openEMS on our route; 4-layer board with controlled impedance |
+| RP2040 at 252 MHz (per part) | Silicon margin varies | PicoDVI's standard 252 MHz with its core voltage bump (VREG 1.20 V), used widely on RP2040 (e.g. Adafruit Feather RP2040 DVI). Outside the RP2040 datasheet, so a declared requirement (`power.md`, "GPU card RP2040 overclock"; GC-005 accepts exactly this point). Bring-up GC-102 burns in each unit: 1 h of DVI output at ~40 °C ambient, no glitches, dropouts or lockups, recorded in bringup.md. The spare boards cover a marginal part. |
 | USB-host enumeration with real keyboards | rp2040js has no USB host | TinyUSB host HID is widely used; the HID parsing is tested on recorded reports from real keyboards; boot protocol forced |
 | ESP32-C3 SPI slave on silicon | QEMU doesn't model the GPSPI slave | Espressif's documented `spi_slave` driver; the core is tested through an SPI shim that follows the datasheet timing; the framing rules (READ frames, 20 µs re-arm gap) were chosen for this driver |
 | Wi-Fi RF | Radio isn't simulable | **Pre-certified module with an external antenna** (ESP32-C3-MINI-1U + MHF III lead to an SMA antenna), so our layout doesn't affect the radio |

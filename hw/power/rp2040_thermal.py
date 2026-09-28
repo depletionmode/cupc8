@@ -26,8 +26,10 @@ keeping within the rated IO totals. The steady currents are computed from
 the netlist here (LED, pull and TMDS resistors); switching current into pad
 and trace capacitance is not, because the datasheet gives no pad
 capacitance. The GPU card's TMDS lines carry most of IIOVSS_MAX before
-switching is counted, so that card fails until switching current is bounded
-or measured.
+switching is counted (35.8 mA with its 360 ohm series resistors, 46.0 mA with
+PicoDVI's 270), so that card fails until switching current is bounded or
+measured. Its TMDS swing at the sink is checked against DVI 1.0 as well,
+since raising the series resistors to cut that current lowers the swing.
 
 RP2040 datasheet build 2025-02-20 (3184e62-clean), cited by table.
 """
@@ -67,14 +69,23 @@ FS_C_TRANSCEIVER = 20e-12
 FS_FULL_CYCLES = 6e6
 ADC_AVDD_MAX = d.assume('RP2040 cards', 'RP2040 ADC_AVDD current <= 2 mA (the datasheet '
                         'gives no maximum; only +40 uA for the temperature sensor)', 2e-3)
-R_TOL = 0.05              # chip resistors: the BOM's widest (RN1/RN2 C425067 +-5 %)
+R_TOL = 0.05              # chip resistors: the BOM's widest (RN1/RN2 C182716 +-5 %)
 # LED forward voltage minimum by LCSC code, less 4 mV/K from 25 C to TC_MAX.
 # KT-0603G (C12624) DS: VF 2.6 V min at IF = 5 mA; more current raises VF.
 LED_VF_MIN = {'C12624': 2.6 - 0.004 * (TC_MAX - 25)}
 LED_VF_I = 0.005
 # DVI 1.0: TMDS sink AVcc 3.3 V +-5 %, termination RT 50 ohm +-10 %
-TMDS_AVCC_MAX = 3.3 * 1.05
-TMDS_RT_MIN = 50 * 0.9
+TMDS_AVCC_MIN, TMDS_AVCC_MAX = 3.3 * 0.95, 3.3 * 1.05
+TMDS_RT_MIN, TMDS_RT_MAX = 50 * 0.9, 50 * 1.1
+# DVI 1.0 (DDWG, 1999) 4.2, TMDS receiver: differential input swing
+# 150-1200 mV. Read both ways round: the minimum against |Vp - Vn| (the
+# single-ended swing), the maximum against the peak-to-peak 2 |Vp - Vn|.
+DVI_SWING_MIN, DVI_SWING_MAX = 0.150, 1.200
+# The pad's pull-down: PicoDVI sets the TMDS pads to 2 mA drive (libdvi
+# dvi_serialiser.c, DRIVE = 0); the RP2040 datasheet (5.5.3, IO electrical
+# characteristics) guarantees IOL 2 mA at VOL 0.4 V there, taken as a
+# 200 ohm resistor. 0 ohm is the strong corner.
+PAD_R_MAX = 0.4 / 0.002
 
 RAILS = {'/3V3': VIN_MAX, '/+3V3': VIN_MAX, '/GND': 0.0,
          '/VBUS': d.VBUS_MAX, '/HPD_5V': d.VBUS_MAX}
@@ -171,6 +182,30 @@ def static_io(circuit, codes):
     return source, sink + sum(pairs.values()), lines, unknown
 
 
+def tmds_swing(r_nominal, iovdd_min, iovdd_max):
+    """(min, max) of |Vp - Vn| at a DC-coupled TMDS sink, in volts, over the
+    corners: sink AVcc and termination, resistor tolerance, the pad's
+    pull-down (0 .. PAD_R_MAX) and the card's IOVDD. A low pin pulls the
+    line to AVcc - RT i; a high pin leaves it at AVcc - RT (AVcc - IOVDD) /
+    (R + RT), so the swing is RT times the difference of the two currents."""
+    swings = []
+    for avcc in (TMDS_AVCC_MIN, TMDS_AVCC_MAX):
+        for rt in (TMDS_RT_MIN, TMDS_RT_MAX):
+            for r in (r_nominal * (1 - R_TOL), r_nominal * (1 + R_TOL)):
+                for pad in (0.0, PAD_R_MAX):
+                    for iovdd in (iovdd_min, iovdd_max):
+                        low = avcc / (pad + r + rt)
+                        high = (avcc - iovdd) / (r + rt)
+                        swings.append(rt * (low - high))
+    return min(swings), max(swings)
+
+
+def tmds_resistors(circuit):
+    """Nominal ohms of the series resistors on the connector's TMDS lines."""
+    return sorted({ohms(r.value) for r in circuit.resistors
+                   if any(e.startswith('/HD_') and e[-1] in 'PN' for e in r.ends)})
+
+
 def tmds_lines(circuit):
     return sorted(net for (ref, pin), net in circuit.pins.items()
                   if ref == 'U1' and net.startswith('/TMDS_'))
@@ -218,6 +253,16 @@ def check_board(board, out):
         # datasheet gives no pad capacitance, so the switching current is open
         c.check('R4', '%d TMDS lines: switching current at 252 Mb/s bounded within the '
                 'IIOVDD/IIOVSS headroom' % len(tmds), 0, 1, '>=', '', fmt='%d')
+    values = tmds_resistors(circuit)
+    if values:
+        # IOVDD from the 3V3 rail's floor (socket drop included) to the buck's max
+        lo, _ = tmds_swing(max(values), d.V3V3_MIN, rail_max)
+        _, hi = tmds_swing(min(values), d.V3V3_MIN, rail_max)
+        c.check('R6', 'TMDS swing |Vp-Vn| at the sink, %s ohm series, worst corner, vs DVI 1.0 '
+                'minimum' % '/'.join('%g' % v for v in values), 1e3 * lo, 1e3 * DVI_SWING_MIN,
+                '>=', 'mV', fmt='%.0f')
+        c.check('R7', 'TMDS swing peak-to-peak 2|Vp-Vn| at the sink, best corner, vs DVI 1.0 '
+                'maximum', 2e3 * hi, 1e3 * DVI_SWING_MAX, '<=', 'mV', fmt='%.0f')
     p = package_w()
     c.info('package heat', 'VREG path %.0f + GPIO/QSPI %.0f + USB %.0f + ADC %.0f = %.0f mW' % (
         1e3 * vreg_path_w(), 1e3 * io_w(), 1e3 * usb_w(), 1e3 * VIN_MAX * ADC_AVDD_MAX, 1e3 * p))

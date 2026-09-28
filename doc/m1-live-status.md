@@ -59,10 +59,17 @@ update it after every finding, commit, decision or agent result (David,
    at 3.213 A), widen/pour J1->F1->U2, dual-rail reset supervisor with margin,
    simulations, rail_reset_window.py update. Deliverable includes the
    canonical rebuild command.
-2. **GPU card** (agent running, sources only, no builds): overclock recorded as
-   a requirement; `rp2040_vreg.py` checks GPU against it; per-card DVI
-   burn-in hw test (GC-1xx); TMDS series resistors raised so RP2040 IO current
-   < 50 mA with valid DVI swing.
+2. **GPU card: done except the rebuild.** Overclock recorded as a requirement
+   (doc/hardware/power.md); `rp2040_vreg.py` OVERCLOCK allows exactly VSEL
+   1.20 V + the DVI bit clock on the GPU only; GC-102 burn-in (hw) added. TMDS
+   series arrays RN1/RN2 270 -> 360 ohm (UNI-ROYAL 4D03WGJ0361T5E, C182716,
+   extended part, 4,617 in stock): IO 51.7 -> 41.5 mA vs 50 mA; worst DVI
+   swing 215..939 mV vs 150..1200 mV (DVI 1.0 §4.2 figures not re-read from
+   the spec text). **At the coordinated rebuild:** copy
+   `<scratchpad>/C182716.yaml` → `hw/parts/C182716.yaml` (copy of C425067.yaml
+   with the new datasheet URL; the scratchpad is session-local, so if it is
+   gone recreate it that way) before rebuilding gpu. GC-006 still red on R4
+   (TMDS switching current unbounded).
 3. **JLC order instructions** (David approved): tick JLC's "Confirm
    Production File" option (review their post-CAM Gerbers vs ours before
    production: fingers and notch unchanged), plus the do-not-trim note. Why:

@@ -15,6 +15,13 @@ build-version 3184e62-clean (datasheets.raspberrypi.com/rp2040/rp2040-datasheet.
   "If using 200MHz for clk_sys ... set DVDD to 1.15V".
 - Overview: up to 133 MHz, or 200 MHz at 1.15 V (2.15.3).
 
+The GPU card is the one exception, by requirement (David, 2026-09-28;
+doc/hardware/power.md, "GPU card RP2040 overclock"): PicoDVI's 640x480p60
+needs clk_sys at the 252 MHz TMDS bit clock, run at VSEL 1.20 V. Its V3/V5
+compare against exactly that declared point, qualified per unit by the GC-102
+DVI burn-in, instead of the data sheet; any other VSEL or clock on the GPU
+card fails, and every other card keeps the data-sheet limits.
+
 This is the DC operating point only. The data sheet publishes no load-step
 response, output impedance or loop bandwidth for the regulator and no
 maximum DVDD current at the card's clock and workload, so a droop bound
@@ -41,6 +48,9 @@ DEFAULT_CLK_KHZ = 125000        # pico-sdk SYS_CLK_KHZ default
 # PicoDVI timings the firmware may name: 640x480p60 is a 25.2 MHz pixel
 # clock x 10 bits (CEA-861 / PicoDVI dvi_timing.c)
 DVI_BIT_CLK_KHZ = {'dvi_timing_640x480p_60hz': 252000}
+# card -> (VSEL, clk_sys kHz, the per-unit qualification test): overclocks
+# accepted as requirements outside the data sheet (see the docstring)
+OVERCLOCK = {'gpu': (1.20, DVI_BIT_CLK_KHZ['dvi_timing_640x480p_60hz'], 'GC-102')}
 
 CARDS = {'gpu': ('gpu', '/3V3'), 'io': ('io', '/3V3'), 'storage': ('storage', '/3V3'),
          'eink': ('eink', '/3V3'), 'system': ('sysctl', '/+3V3')}
@@ -121,16 +131,29 @@ def check(card, out, c):
             '>=', 'uF', fmt='%.2f')
     c.check('V2', 'VREG_VIN: 3V3 maximum POW-001 holds the rail to (no socket drop) vs 3.63 V max',
             d.V3V3_MAX, VIN_MAX, '<=')
-    c.check('V3', 'DVDD high: VSEL %.2f V + 3 %% vs DVDD max 1.16 V' % vsel,
-            vsel * (1 + VREG_VAR), DVDD_MAX, '<=',
-            fix='the data sheet documents no DVDD above 1.16 V (1.15 V nominal for 200 MHz)')
+    if card in OVERCLOCK:
+        req_v, req_khz, test = OVERCLOCK[card]
+        c.info('overclock', 'declared requirement outside the data sheet: VSEL %.2f V (DVDD up to '
+               '%.3f V vs 1.16 V max), clk_sys %.0f MHz (vs 133 MHz), per unit %s DVI burn-in'
+               % (req_v, req_v * (1 + VREG_VAR), req_khz / 1e3, test))
+        c.check('V3', 'VSEL %.2f V vs the declared overclock VSEL %.2f V (exactly)' % (vsel, req_v),
+                abs(vsel - req_v), 0.0, '<=', fmt='%.2f',
+                fix='the overclock is accepted only at VSEL %.2f V (%s)' % (req_v, test))
+    else:
+        c.check('V3', 'DVDD high: VSEL %.2f V + 3 %% vs DVDD max 1.16 V' % vsel,
+                vsel * (1 + VREG_VAR), DVDD_MAX, '<=',
+                fix='the data sheet documents no DVDD above 1.16 V (1.15 V nominal for 200 MHz)')
     c.check('V4', 'DVDD low: VSEL %.2f V - 3 %% vs DVDD min 1.05 V' % vsel,
             vsel * (1 - VREG_VAR), DVDD_MIN, '>=')
-    limit = CLK_MAX_KHZ.get(vsel if vsel == 1.15 else None)
-    c.check('V5', 'clk_sys vs the data sheet maximum at VSEL %.2f V' % vsel, khz / 1e3, limit / 1e3,
-            '<=', 'MHz', fmt='%.0f',
-            fix='133 MHz, or 200 MHz at VSEL 1.15 V, are the only documented operating points')
-
+    if card in OVERCLOCK:
+        c.check('V5', 'clk_sys vs the declared overclock %.0f MHz, the DVI bit clock (exactly)'
+                % (req_khz / 1e3), abs(khz - req_khz) / 1e3, 0.0, '<=', 'MHz', fmt='%.0f',
+                fix='the overclock is accepted only at the 640x480p60 bit clock (%s)' % test)
+    else:
+        limit = CLK_MAX_KHZ.get(vsel if vsel == 1.15 else None)
+        c.check('V5', 'clk_sys vs the data sheet maximum at VSEL %.2f V' % vsel, khz / 1e3,
+                limit / 1e3, '<=', 'MHz', fmt='%.0f',
+                fix='133 MHz, or 200 MHz at VSEL 1.15 V, are the only documented operating points')
 
 def main():
     if len(sys.argv) != 3 or sys.argv[1] not in CARDS:

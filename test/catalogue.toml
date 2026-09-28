@@ -2093,6 +2093,14 @@ kind = "hw"
 vrow = "5"
 
 # ---------------------------------------------------------------- IO CARD
+
+[[test]]
+id = "GC-102"
+title = "Bring-up: GPU card DVI burn-in at the overclock"
+checks = "per card: 1 h continuous 640x480p60 DVI output (the firmware's 252 MHz / VREG 1.20 V, unchanged) to a monitor at ~40 C ambient (warm enclosure, measured by the card); a moving test pattern; no picture glitches, sparkles, dropouts, resyncs or lockups; a failed card is not used as a GPU card (doc/hardware/power.md, 'GPU card RP2040 overclock'; David, 2026-09-28)"
+method = "manual, recorded in bringup.md: card serial, ambient temperature log, monitor model, start/end time, observations"
+kind = "hw"
+vrow = "5"
 [[test]]
 id = "IC-001"
 title = "IO card ERC"

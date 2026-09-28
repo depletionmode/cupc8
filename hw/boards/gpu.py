@@ -32,6 +32,10 @@ HDMI_PINS = {1: "HD_D2P", 3: "HD_D2N", 4: "HD_D1P", 6: "HD_D1N", 7: "HD_D0P", 9:
              10: "HD_CKP", 12: "HD_CKN", 15: "DDC_SCL", 16: "DDC_SDA", 18: "HDMI_5V", 19: "HPD_5V"}
 HDMI_GND = (2, 5, 8, 11, 17, 20)           # TMDS shields, DDC/CEC ground, shell
 HDMI_NC = (13, 14)                          # CEC, utility
+# TMDS series resistors (RN1/RN2): UNI-ROYAL 4D03WGJ0361T5E, 4 x 360 ohm +-5 %,
+# the same 4D03 convex 0603 x 4 array as PicoDVI's 270 ohm C425067. Checked
+# by test/hw/test_rp2040_thermal.py (IIOVSS_MAX and the DVI swing).
+TMDS_R, TMDS_R_LCSC = "360", "C182716"
 
 
 def schematic(path, footprint_libs):
@@ -48,15 +52,19 @@ def schematic(path, footprint_libs):
     for pin in HDMI_NC:
         s.nc(j2, pin)
 
-    # ---- TMDS: 270 ohm in series with each GPIO, PicoDVI's DC-coupled
-    # "DVI PHY" (Wren6991/PicoDVI hardware/mini_board, R12-R19): with the
-    # sink's 50 ohm termination to its 3V3, a low GPIO sinks ~10 mA, as TMDS
-    # asks. Two 4 x 0603 arrays (0402 arrays have pads 0.15 mm apart, under
-    # the 0.2 mm clearance), in the connector's order.
+    # ---- TMDS: a series resistor on each GPIO, PicoDVI's DC-coupled
+    # "DVI PHY" (Wren6991/PicoDVI hardware/mini_board, R12-R19, 270 ohm):
+    # with the sink's 50 ohm termination to its 3V3, a low GPIO sinks the
+    # line current. 360 ohm, not PicoDVI's 270: at 270 the four sinking lines
+    # alone take 46.0 mA of the RP2040's 50 mA IIOVSS_MAX
+    # (hw/power/rp2040_thermal.py R3); at 360 ohm 35.8 mA, and the swing at
+    # the sink stays inside DVI 1.0's 150-1200 mV (TMDS_R below). Two
+    # 4 x 0603 arrays (0402 arrays have pads 0.15 mm apart, under the 0.2 mm
+    # clearance), in the connector's order.
     arrays = {"RN1": ("D2P", "D2N", "D1P", "D1N"), "RN2": ("D0P", "D0N", "CKP", "CKN")}
     for i, (ref, lines) in enumerate(arrays.items()):
-        rn = s.add("Device:R_Pack04", ref, "270", "Resistor_SMD:R_Array_Convex_4x0603",
-                   at=((188 + 16 * i) * G, 70 * G), fields={"LCSC": "C425067"})
+        rn = s.add("Device:R_Pack04", ref, TMDS_R, "Resistor_SMD:R_Array_Convex_4x0603",
+                   at=((188 + 16 * i) * G, 70 * G), fields={"LCSC": TMDS_R_LCSC})
         for k, line in enumerate(lines):
             s.connect(rn, k + 1, "TMDS_" + line)        # chip side
             s.connect(rn, 8 - k, "HD_" + line)          # connector side

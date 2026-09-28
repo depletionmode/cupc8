@@ -1332,3 +1332,10 @@ fixed_in = "gerberdrc.check_edge nanometre slack"
 revert = [["hw/tools/gerberdrc.py", "if distance < rule - 1e-9:", "if distance < rule:"]]
 cmd = "python3 -m unittest test.test_fabcheck.FabCheckTests.test_key_notch_fingers_alone_get_jlc_edge_minimum"
 must_fail = ["test_key_notch_fingers_alone_get_jlc_edge_minimum"]
+
+[[bug]]
+name = "GPU card: PicoDVI's 270 ohm TMDS series resistors let the four sinking lines take 46.0 mA of the RP2040's 50 mA IIOVSS_MAX (51.7 mA steady in all)"
+fixed_in = "gpu.py TMDS_R 360 ohm (C182716)"
+revert = [["hw/boards/gpu.py", 'TMDS_R, TMDS_R_LCSC = "360", "C182716"', 'TMDS_R, TMDS_R_LCSC = "270", "C425067"']]
+cmd = "python3 -m unittest test/hw/test_rp2040_thermal.py -k test_gpu_tmds_sink_within_iovss_with_margin"
+must_fail = ["test_gpu_tmds_sink_within_iovss_with_margin"]
