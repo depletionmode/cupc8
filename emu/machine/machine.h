@@ -219,6 +219,7 @@ class Machine {
     bool cpuSyncConnected = true;    // CPU SYNC reaches chipset through RN5
     bool cpuHaltedConnected = true;  // CPU HALTED reaches chipset through RN8
     bool cpuWaitingConnected = true; // CPU WAITING reaches chipset through RN8
+    std::array<uint8_t, 4> cpuIrqConnected{1, 1, 1, 1}; // chipset IRQ lines reach CPU FPGA
     bool sysctlResetConnected = true; // system GPIO23 reaches supervisor MR
     bool resetButtonConnected = true; // SW1 reaches supervisor MR
     bool resetButtonPressed = false;  // held physical reset switch

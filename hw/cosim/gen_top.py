@@ -417,6 +417,52 @@ def main_cpu_data_routes(main, board):
     return links, paths, missing
 
 
+def cpu_irq_routes(main, cpu, main_board, cpu_board):
+    """Bind all four IRQ outputs through main series parts and CPU pads."""
+    chipset_pads = ('1', '141', '2', '142')
+    fpga_pads = ('47', '48', '49', '52')
+    socket_pads = ('B35', 'B37', 'B38', 'B40')
+    geometry = {}
+    for board_name, board_path in (('main', main_board), ('cpu', cpu_board)):
+        if board_path is not None and Path(board_path).is_file():
+            geometry[board_name] = cpu_board_geometry(str(Path(board_path).resolve()))
+    links, paths, missing = [], [], []
+    for bit, (chipset_pad, fpga_pad, socket_pad) in enumerate(
+            zip(chipset_pads, fpga_pads, socket_pads)):
+        source_net, contact_net = f'/CPU_IRQ{bit}_SRC', f'/CPU_IRQ{bit}'
+        resistor = f'R{29 + bit}'
+        chipset, series_in = ('U7', chipset_pad), (resistor, '1')
+        series_out, main_socket = (resistor, '2'), ('J2', socket_pad)
+        cpu_socket, fpga = ('J1', socket_pad), ('U1', fpga_pad)
+        if main.components.get(resistor) != ('33', ('Device', 'R')) or \
+                set(main.nets.get(source_net, ())) != {chipset, series_in} or \
+                set(main.nets.get(contact_net, ())) != {series_out, main_socket} or \
+                set(cpu.nets.get(contact_net, ())) != {cpu_socket, fpga} or \
+                path(main, chipset, main_socket, '33') != resistor:
+            raise ValueError(f'CPU IRQ{bit}: wrong chipset, series part, socket or FPGA pad')
+        connected = True
+        for board_name, board_path, net, first, last in (
+                ('main', main_board, source_net, chipset, series_in),
+                ('main', main_board, contact_net, series_out, main_socket),
+                ('cpu', cpu_board, contact_net, cpu_socket, fpga)):
+            mm = None
+            if board_name in geometry:
+                sys.path.insert(0, str(ROOT / 'hw/si'))
+                from ibis_bus import routed_distances
+                loaded_board, parsed_tree = geometry[board_name]
+                mm = routed_distances(Path(board_path), net, first, [last],
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'{board_name}.{first[0]}.{first[1]}',
+                          'to': f'{board_name}.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'cpu_irq{bit}_connected'})
+            if mm is None:
+                connected = False
+                missing.append(f'{board_name}:{net.lstrip("/")}_cpu_irq{bit}_copper')
+        links.append(connected)
+    return links, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1199,6 +1245,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_status_connected'] = status_links
     manifest['runtime']['missing_routes'].extend(status_missing)
     manifest['runtime']['routed_top'] &= not status_missing
+    irq_links, irq_paths, irq_missing = cpu_irq_routes(main, cards['cpu'], pcb, cpu_board)
+    manifest['paths'].extend(irq_paths)
+    manifest['runtime']['cpu_irq_connected'] = irq_links
+    manifest['runtime']['missing_routes'].extend(irq_missing)
+    manifest['runtime']['routed_top'] &= not irq_missing
     manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
         main, cards['system'], pcb, system_board)
     manifest['paths'].extend(manual_reset_paths)
@@ -1307,6 +1358,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             runtime_net('cpu', source)
             runtime_net('cpu', contact)
             runtime_net('main', contact)
+    for i, connected in enumerate(irq_links):
+        if connected:
+            runtime_net('main', f'CPU_IRQ{i}_SRC')
+            runtime_net('main', f'CPU_IRQ{i}')
+            runtime_net('cpu', f'CPU_IRQ{i}')
     if manual_reset['sysctl']:
         runtime_net('system', 'SYS_nRST')
     if all(manual_reset.values()):

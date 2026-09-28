@@ -159,6 +159,18 @@ are intact. Copper-opening mutations at all 24 branch pads disable exactly
 their own bit; each of eight U7 source opens changes the 20 ms native PC and
 GPO. The 47 kΩ keeper is a source and route constraint here, not a model of
 analog voltage, rail availability, contact resistance, or signal timing.
+
+The chipset's four CPU IRQ outputs have an independent three-leg route each:
+U7 through main-board R29–R32 (33 Ω), across J2/J1, and into CPU FPGA U1.
+The four main source legs are 4.537–17.238 mm, main socket legs
+38.088–57.659 mm, and CPU card legs 30.770–43.442 mm on the pinned
+boards. The manifest drives a per-bit RTL receiver gate. An IRQ fixture
+stimulates line 0 with an IO-card keyboard report, lines 1 and 2 with CPU
+timers, and line 3 with the chipset's 50 ms tick. Each reaches its own
+handler and writes GPO `$A0`–`$A3`; opening any of the three copper legs
+disables that IRQ bit, and source-open probes leave the CPU parked at GPO
+`$11`. Low on an open receiver is a digital counterexample; the actual
+open-pad voltage, edge timing and contact behavior are not inferred.
 Each open restores three strict gaps. A changed RN8 value fails source
 binding. The open receiver is held low for a deterministic digital
 counterexample; voltage, propagation and metastability are unmodeled.
@@ -283,10 +295,10 @@ nets, three CPU reset nets, two chipset oscillator-branch nets and three
 system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
 six CPU `/STB`/`RW` nets, three CPU `/RDY` nets, three CPU `SYNC` nets,
 six CPU `HALTED`/`WAITING` nets and the two system manual-reset nets now affect
-execution; eight main-board CPU data source nets also affect execution; 310
-remain unmodeled.
+execution; eight main-board CPU data source nets and twelve CPU IRQ nets also
+affect execution; 298 remain unmodeled.
 The remaining groups are boot/programming (68),
-slot/control bus (32), CPU/memory (21),
+slot/control bus (32), CPU/memory (9),
 power/return (65), clock/reset (44), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

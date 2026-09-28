@@ -163,6 +163,11 @@ export class Machine {
     if (netlistTop && (typeof netlistTop.runtime.cpu_status_connected?.halted !== 'boolean' ||
                       typeof netlistTop.runtime.cpu_status_connected?.waiting !== 'boolean'))
       throw new Error('machinenative: invalid CPU status route model');
+    if (netlistTop && (!Array.isArray(netlistTop.runtime.cpu_irq_connected) ||
+                      netlistTop.runtime.cpu_irq_connected.length !== 4 ||
+                      netlistTop.runtime.cpu_irq_connected.some((connected) =>
+                        typeof connected !== 'boolean')))
+      throw new Error('machinenative: invalid CPU IRQ route model');
     if (netlistTop && typeof netlistTop.runtime.sysctl_manual_reset_connected !== 'boolean')
       throw new Error('machinenative: invalid system manual-reset route model');
     if (netlistTop && typeof netlistTop.runtime.button_manual_reset_connected !== 'boolean')
