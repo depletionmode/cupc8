@@ -145,6 +145,29 @@ python3 hw/si/audit_gpu_coupling.py --board build/hw/gpu/gpu.kicad_pcb \
   --out build/hw/si-current/gpu-coupled-d0-d1-audit.json
 ```
 
+### D2/CK direct-coupling diagnostic and 100 MHz spectral blocker
+
+Two [D2](si-evidence/gpu-coupled-d2-fixed.json) and
+[CK](si-evidence/gpu-coupled-ck-fixed.json) excitations used the same final
+GPU receipt as D0/D1, a common PML-safe 239×227×34 grid, four 100 Ω ports,
+and a 180,000-step (17.190 ns) fixed window with two threads. The
+[raw-file audit](si-evidence/gpu-coupled-d2-ck-audit.json) verifies the
+receipt, source, equal passive XML geometry, both solver logs and all 16 port
+traces. Final field energy was −108.10/−108.35 dB; passivity and passive-port
+checks pass. **Both runs fail the 0.05 dB spectral-stability gate** at 100 MHz:
+8–12 ns cross-port drift is 0.3208/0.3909 dB for D2/CK excitation, and
+12–16 ns drift is still 0.1288/0.1310 dB. Their reports and the audit mark
+the coupled subset invalid. At 480 MHz–1.26 GHz, 8–12 ns drift is at most
+0.0276 dB, but that does not waive the failing sampled frequency.
+
+The rejected diagnostic gives D2→CK source/load responses of −91.79/−95.44 dB
+at 1.26 GHz, with CK→D2 source at −91.76 dB. At 100 MHz the corresponding
+source terms are near −113 dB, so relative dB stability is sensitive to a
+very small absolute residual. A longer fixed window is needed to test this
+weak cross response. D0/D1 copper between D2 and CK is omitted, so even a
+stable direct-coupling subset will not describe mediation through all four
+TMDS pairs or close `GC-007` or row 4.6.
+
 ## IO card USB field model
 
 `hw/si/openems_usb_io.py` reads the completed IO card's actual F.Cu routes
