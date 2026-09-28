@@ -749,6 +749,54 @@ class FabCheckTests(unittest.TestCase):
                 path.write_text(prefix + region(at_limit) + region(attached) + 'M02*\n')
                 self.assertEqual(check(), 2)
 
+    def test_connected_nonorthogonal_near_vertex_union_mutations(self):
+        # The region is 0.140 mm wide at the slab midpoint and 0.080 mm
+        # at its vertex. A second region touches a wide lobe, so the
+        # isolated witness defers and the connected union must find it.
+        narrow = [(1, 1), (2, 1), (2, 1.2), (1.6, 1.2),
+                  (1.54, 1.3), (2, 1.4), (2, 1.6), (1, 1.6),
+                  (1, 1.4), (1.46, 1.3), (1.4, 1.2), (1, 1.2)]
+        attached = [(.8, 1), (1.2, 1), (1.2, 1.2), (.8, 1.2)]
+        def region(points):
+            lines = ['G36*']
+            for index, (x, y) in enumerate([*points, points[0]]):
+                lines.append('X%dY%dD0%d*' %
+                             (round(x*1000000), round(y*1000000),
+                              2 if index == 0 else 1))
+            return '\n'.join([*lines, 'G37*']) + '\n'
+        prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                  '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                  '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n%TO.N,/GND*%\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            copper = Path(tmp) / 'sample-F_Cu.gtl'
+            copper.write_text(prefix + region(narrow) + region(attached) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError,
+                                        'connected nonorthogonal filled region union has a 0.090000 mm'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            widened = ('%ADD11R,0.200000X0.200000*%\nD11*\n'
+                       'X1500000Y1300000D03*\n')
+            copper.write_text(prefix + region(narrow) + region(attached) + widened + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 3)
+            at_limit = [(1.55 if x == 1.54 else 1.45 if x == 1.46 else x, y)
+                        for x, y in narrow]
+            copper.write_text(prefix + region(at_limit) + region(attached) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 2)
+            silk_narrow = [(1.65 if x == 1.6 else 1.56 if x == 1.54 else
+                            1.44 if x == 1.46 else 1.35 if x == 1.4 else x, y)
+                           for x, y in narrow]
+            silk = Path(tmp) / 'sample-F_Silkscreen.gto'
+            mask = Path(tmp) / 'sample-F_Mask.gts'
+            silk.write_text(prefix.replace('Copper,L1,Top', 'Legend,Top')
+                            .replace('0.200000', '0.150000') +
+                            region(silk_narrow) + region(attached) + 'M02*\n')
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n'
+                            '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                            'D10*\nX9000000Y9000000D03*\nM02*\n')
+            with self.assertRaisesRegex(ValueError,
+                                        'connected nonorthogonal filled region union has a 0.135000 mm'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+
     def test_plotted_mask_web_and_via_annular_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             fab = Path(tmp)

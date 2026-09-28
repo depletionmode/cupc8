@@ -915,11 +915,12 @@ def polygon_scanline_witness(points, minimum):
 def connected_polygon_scanline_witness(contours, measured_count, minimum):
     """Prove a narrow interior span in a hole-free filled union.
 
-    Rational crossings at vertex-slab midpoints avoid floating geometry
-    errors. Non-region contours are widening flashes or conservative boxes;
-    only a span containing filled-region ink can be a witness. A neighboring
-    wide span on both sides excludes pointed terminal tips. This is a
-    failure witness, not complete minimum-width coverage.
+    Rational crossings at vertex-slab midpoints and near exact rule crossings
+    avoid floating geometry errors. Candidate near-vertex samples come from
+    individual filled regions, but the complete union is measured there, so
+    touching flashes or conservative boxes can still widen them. Only a span
+    containing filled-region ink can be a witness. Wide neighboring spans
+    exclude terminal tips. This remains a partial failure witness.
     """
     if sum(len(points) for points in contours) > 2000:
         return None
@@ -944,38 +945,69 @@ def connected_polygon_scanline_witness(contours, measured_count, minimum):
         slabs = []
         for low, high in zip(levels, levels[1:]):
             sample = Fraction(low + high, 2)
-            intervals = []
-            for index, edges in enumerate(outlines):
-                crossings = []
-                for a, b in edges:
-                    u0, u1 = a[axis], b[axis]
-                    if min(u0, u1) < sample < max(u0, u1):
-                        v0, v1 = a[1-axis], b[1-axis]
-                        crossings.append(Fraction(v0) + Fraction(v1-v0) *
-                                         (sample-u0) / (u1-u0))
-                crossings.sort()
-                if len(crossings) % 2:
+            active = [[edge for edge in edges
+                       if min(edge[0][axis], edge[1][axis]) < sample <
+                       max(edge[0][axis], edge[1][axis])]
+                      for edges in outlines]
+            def value(edge, at):
+                a, b = edge
+                return Fraction(a[1-axis]) + Fraction(b[1-axis]-a[1-axis],
+                                                     b[axis]-a[axis]) * (at-a[axis])
+            def merged_at(at):
+                intervals = []
+                for index, edges in enumerate(active):
+                    crossings = sorted(value(edge, at) for edge in edges)
+                    if len(crossings) % 2:
+                        return None
+                    intervals.extend((start, end, index < measured_count)
+                                     for start, end in zip(crossings[::2], crossings[1::2]))
+                merged = []
+                for start, end, measured in sorted(intervals):
+                    if end <= start:
+                        return None
+                    if merged and start <= merged[-1][1]:
+                        merged[-1] = (merged[-1][0], max(end, merged[-1][1]),
+                                      merged[-1][2] or measured)
+                    else:
+                        merged.append((start, end, measured))
+                return merged
+            midpoint = merged_at(sample)
+            if midpoint is None:
+                return None
+            candidates = [midpoint]
+            for edges in active[:measured_count]:
+                crossings = sorted((value(edge, sample), edge) for edge in edges)
+                for (left, left_edge), (right, right_edge) in zip(crossings[::2], crossings[1::2]):
+                    width_mid = right-left
+                    if width_mid < threshold:
+                        continue
+                    for endpoint in (low, high):
+                        width_end = value(right_edge, endpoint)-value(left_edge, endpoint)
+                        if width_end >= threshold:
+                            continue
+                        crossing = endpoint + (sample-endpoint) * (
+                            threshold-width_end) / (width_mid-width_end)
+                        interior = (Fraction(endpoint) + crossing) / 2
+                        if low < interior < high:
+                            candidates.append(merged_at(interior))
+                        if len(candidates) > 64:
+                            break  # bound rational union evaluations
+                    if len(candidates) > 64:
+                        break
+                if len(candidates) > 64:
+                    break
+            slabs.append((midpoint, candidates))
+        for (previous, _), (_, candidates), (following, _) in zip(slabs, slabs[1:], slabs[2:]):
+            for current in candidates:
+                if current is None:
                     return None
-                intervals.extend((start, end, index < measured_count)
-                                 for start, end in zip(crossings[::2], crossings[1::2]))
-            merged = []
-            for start, end, measured in sorted(intervals):
-                if end <= start:
-                    return None
-                if merged and start <= merged[-1][1]:
-                    merged[-1] = (merged[-1][0], max(end, merged[-1][1]),
-                                  merged[-1][2] or measured)
-                else:
-                    merged.append((start, end, measured))
-            slabs.append(merged)
-        for previous, current, following in zip(slabs, slabs[1:], slabs[2:]):
-            for left, right, measured in current:
-                if not measured or not 0 < right-left < threshold:
-                    continue
-                if all(any(start < right and left < end and end-start >= threshold
-                           for start, end, _ in neighbor)
-                       for neighbor in (previous, following)):
-                    return (right-left) / 2000000
+                for left, right, measured in current:
+                    if not measured or not 0 < right-left < threshold:
+                        continue
+                    if all(any(start < right and left < end and end-start >= threshold
+                               for start, end, _ in neighbor)
+                           for neighbor in (previous, following)):
+                        return (right-left) / 2000000
     return None
 
 

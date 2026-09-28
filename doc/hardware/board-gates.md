@@ -55,7 +55,9 @@ fail until their contract coverage exists:
   near-vertex neck that the slab midpoint misses. The same rational witness
   now also measures connected nonorthogonal, hole-free region unions with
   rectangular flash widening and at most one conservatively boxed unknown
-  operation. It is a **failure witness**: an 80 µm neck in two touching
+  operation. It samples each member region's near-vertex rule crossing, then
+  measures the complete plotted union there so touching ink can widen it.
+  It is a **failure witness**: an 80 µm neck in two touching
   regions is rejected for both copper and silk, while a flash that widens
   the entire span and an exact-rule-width span are accepted. Clear-polarity
   holes and multiple contours in one `G36` region are rejected at Gerber
@@ -63,7 +65,8 @@ fail until their contract coverage exists:
   General hole support needs polarity-aware compositing with net provenance.
   Unions that form holes, more than four touching unsupported operations,
   indirect touching through them, nonorthogonal unions with two or more
-  boxed operations, large unions, and non-midpoint minima in connected unions remain outside
+  boxed operations, large unions, and minima created only by changing
+  overlaps between union members away from sampled slices remain outside
   complete coverage. The final incomplete-coverage gate stays
   red until all such ink and text-height rules are independently checked.
   The board generator now configures a 0.10 mm solder-mask web
