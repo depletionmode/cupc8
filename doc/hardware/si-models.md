@@ -409,6 +409,24 @@ trace characteristic impedance. The 0.060 mm S11 values are −30.208,
 modeled routed-copper subset. Port placement, impedance sensitivity, pads,
 mask, ESD, connectors, source/sink and the complete path remain open.
 
+The [three-grid convergence diagnostic](si-evidence/usb-io-convergence-diagnostic.json)
+binds those magnitude and complex-port comparisons by their source report,
+field XML and run-log hashes. Equal 0.015 mm refinements reverse S11
+magnitude direction at all three frequencies: the first increment is −0.501
+to −0.519 dB, then the second is +0.307 to +0.310 dB. The complex S11
+increment turns 173.9–176.1 degrees. That reversal rules out a single
+leading `C*h^p` error term over these sampled meshes and makes a Richardson
+extrapolation unjustified. It does not prove divergence; finer mesh and port
+control runs are still needed. The diagnostic reports no continuum result or
+physical characteristic impedance. Regenerate it from the saved comparisons:
+
+```sh
+python3 hw/si/usb_convergence_diagnostic.py \
+  --magnitude doc/hardware/si-evidence/usb-io-three-mesh-comparison.json \
+  --complex-port doc/hardware/si-evidence/usb-io-three-mesh-complex-port.json \
+  --out doc/hardware/si-evidence/usb-io-convergence-diagnostic.json
+```
+
 Reproduce the receipt migration and three-grid comparison from retained
 field files and receipt-bound builds:
 

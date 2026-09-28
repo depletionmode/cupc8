@@ -1,0 +1,106 @@
+{
+  "scope": "three-grid USB copper-subset asymptotic-behavior diagnostic",
+  "magnitude_report_sha256": "e913b62f104ca4b8545f3bf68e954ef6909a9f4afbd6757e4bdbf7e93467400b",
+  "complex_port_report_sha256": "bd7a3a52ccb851c4ab477e5faaeb3e66521935ac58ef35324ea30dd774dc60b9",
+  "mesh_mm_descending": [
+    0.09,
+    0.075,
+    0.06
+  ],
+  "frequencies": [
+    {
+      "frequency_hz": 100000000,
+      "s11_db": {
+        "values_db": {
+          "0.090": -30.016345758284775,
+          "0.075": -30.517338103406146,
+          "0.060": -30.20795058741203
+        },
+        "coarse_to_middle_db": -0.5009923451213716,
+        "middle_to_fine_db": 0.30938751599411773,
+        "increment_sign_reversal": true,
+        "fine_to_coarse_increment_abs_ratio": 0.617549387743968,
+        "observed_span_db": 0.5009923451213716
+      },
+      "s21_db": {
+        "values_db": {
+          "0.090": -0.005255151079724935,
+          "0.075": -0.0054221572486030335,
+          "0.060": -0.00574204652163948
+        },
+        "coarse_to_middle_db": -0.00016700616887809806,
+        "middle_to_fine_db": -0.00031988927303644617,
+        "increment_sign_reversal": false,
+        "fine_to_coarse_increment_abs_ratio": 1.9154338740022308,
+        "observed_span_db": 0.00048689544191454423
+      },
+      "complex_s11_increment_turn_degrees": 176.06489469375805,
+      "complex_s11_fine_to_coarse_increment_abs_ratio": 0.6116136331558897
+    },
+    {
+      "frequency_hz": 240000000,
+      "s11_db": {
+        "values_db": {
+          "0.090": -22.482258190171052,
+          "0.075": -22.987522042200105,
+          "0.060": -22.677239548278685
+        },
+        "coarse_to_middle_db": -0.5052638520290529,
+        "middle_to_fine_db": 0.31028249392142015,
+        "increment_sign_reversal": true,
+        "fine_to_coarse_increment_abs_ratio": 0.6140999255643936,
+        "observed_span_db": 0.5052638520290529
+      },
+      "s21_db": {
+        "values_db": {
+          "0.090": -0.0252057261683792,
+          "0.075": -0.023177005617252246,
+          "0.060": -0.02467584284085424
+        },
+        "coarse_to_middle_db": 0.0020287205511269543,
+        "middle_to_fine_db": -0.001498837223601994,
+        "increment_sign_reversal": true,
+        "fine_to_coarse_increment_abs_ratio": 0.7388091094011887,
+        "observed_span_db": 0.0020287205511269543
+      },
+      "complex_s11_increment_turn_degrees": 176.07045376130316,
+      "complex_s11_fine_to_coarse_increment_abs_ratio": 0.6103616910249106
+    },
+    {
+      "frequency_hz": 480000000,
+      "s11_db": {
+        "values_db": {
+          "0.090": -16.586299745999092,
+          "0.075": -17.1055469782723,
+          "0.060": -16.798914025161306
+        },
+        "coarse_to_middle_db": -0.5192472322732087,
+        "middle_to_fine_db": 0.30663295311099503,
+        "increment_sign_reversal": true,
+        "fine_to_coarse_increment_abs_ratio": 0.590533630325941,
+        "observed_span_db": 0.5192472322732087
+      },
+      "s21_db": {
+        "values_db": {
+          "0.090": -0.0948647403827451,
+          "0.075": -0.08479894086794255,
+          "0.060": -0.09045840792034653
+        },
+        "coarse_to_middle_db": 0.010065799514802548,
+        "middle_to_fine_db": -0.005659467052403971,
+        "increment_sign_reversal": true,
+        "fine_to_coarse_increment_abs_ratio": 0.5622471462978456,
+        "observed_span_db": 0.010065799514802548
+      },
+      "complex_s11_increment_turn_degrees": 173.8886976095832,
+      "complex_s11_fine_to_coarse_increment_abs_ratio": 0.593376632540897
+    }
+  ],
+  "all_s11_magnitudes_monotone": false,
+  "single_leading_power_law_rejected_on_sampled_meshes": true,
+  "continuum_extrapolation_performed": false,
+  "characteristic_impedance_convergence_evaluated": false,
+  "full_row_4_6_closed": false,
+  "interpretation": "The equal 0.015 mm refinements reverse S11 magnitude direction at every sampled frequency. A single nonzero C*h^p leading error term would be monotone for real S11 dB, so these three samples cannot support a Richardson extrapolation. This does not prove divergence.",
+  "next_evidence": "Run an independent finer mesh with the same physical model and a fixed phase/port definition, then compare complex S parameters and launch-control sensitivity; model pads, ESD, connector and losses before judging physical impedance."
+}

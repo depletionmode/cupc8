@@ -81,6 +81,9 @@ physical bus SI.
 `usb-io-three-mesh-complex-port.json` checks the three runs against their
 raw port traces at 16 ns and quantifies complex reflection and loaded input
 impedance sensitivity. Loaded input impedance is not characteristic impedance.
+`usb-io-convergence-diagnostic.json` cross-binds those complex results to the
+three-mesh magnitude report. S11 reverses direction at every frequency, so
+the three meshes do not support a leading-order continuum extrapolation.
 
 `gpu-coupled-d0-fixed.json`, `gpu-coupled-d1-fixed.json` and
 `gpu-coupled-d0-d1-audit.json` bind two four-port adjacent HDMI D0/D1
