@@ -27,14 +27,14 @@
       "netlist_sha256": "1eedecb911e747efbe6934cc7aa045bf4a363b2a4284141fb6b498f016daea0f"
     },
     "wifi": {
-      "receipt_sha256": "cc88935f315496e750ccb1accd3dcde201cc55c8bea1749169d0f4932882790f",
-      "board_sha256": "d5f003080f472f9aacfb8755b72c1490bfc62e3513ad82c92ad66c87513ed267",
-      "netlist_sha256": "c5414b67a0adb7a9f9178b1fc02cca0c88eaddbd7b82d978e2246b23958eb979"
+      "receipt_sha256": "d697e1ff24eccb5f1c6df469de263078f18118503f8ff6fcfb431d25f20f11c3",
+      "board_sha256": "37fff345e92a7bb84f82230ff9c8886e2afacad612704474920075bc33cf70b5",
+      "netlist_sha256": "254b633a07ead82681895cbd59fcaa5b938923960a98d627072826215f22c77c"
     },
     "eink": {
-      "receipt_sha256": "620583436ca7ae5a92f67eb1d6a970d8c5a3f341eb1a62618e1ccf9dc1540abd",
-      "board_sha256": "b662a07908e631960f9b7785712e241c57d6c66842f1364978c0473266ff7212",
-      "netlist_sha256": "7c044e10f5049655004189945b53a44a3f7ce107138e68a8926d1364c88737db"
+      "receipt_sha256": "505c8611cc9a5323be0d588c9e99823dde00fa26e5530b8c2ab0c90435f1d0ae",
+      "board_sha256": "0b94659421a292fbb6490d0eea95ce85668da89085969e70e9aa731a50a6be73",
+      "netlist_sha256": "dc33c7b768a760acffab1e5831b88ef75578ff2643a5a2e6690794300f00422b"
     },
     "system": {
       "receipt_sha256": "f15e354539b360125490711e30b9e785ee14e3ccdcdb161b05dcbbf1d5796da4",
@@ -44,9 +44,9 @@
     }
   },
   "system_route_sha256": "22c1b1976eb318c004e8e68c4edb483987fa3c5dcf9435c6b47b8d921c01c9c0",
-  "top_generator_sha256": "70369a498862b1bece4f96f1951d3f701a23b287bf0c1aa4b4140abe2874cf4c",
-  "top_sha256": "dc4260220b5e348fa62065e7cb49c08f7fad455beeb3b0d551726127ca14e6c8",
-  "source_audit_sha256": "4b621b00cda076a4b7d56addbbd2748fcc6278d8fee8dbaa3ca35877434d6da5",
+  "top_generator_sha256": "a789a876ade7c58d94af1975c4c9fd0fa60ce827122f7a4883092a3b8e303745",
+  "top_sha256": "9a73bf9ce65a6dfa04e16f7baee7769e2c750354f04906d7b118eb1eabb559d1",
+  "source_audit_sha256": "4e6baaa4349c809c8ba236ab792565223bc200502eb71c57caab7435a537b00e",
   "routed_top": true,
   "unmodeled_nets": 288,
   "valid_for_full_bus_si": false,

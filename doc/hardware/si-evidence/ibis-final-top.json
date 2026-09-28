@@ -8061,17 +8061,51 @@
     },
     {
       "from": "io.U1.46",
-      "ohms": 27,
-      "runtime": "io_usb_host",
-      "series": "R14",
+      "route_mm": 10.396,
+      "runtime": "io_usb_host_source",
+      "to": "io.R14.1"
+    },
+    {
+      "from": "io.R14.2",
+      "route_mm": 20.101,
+      "runtime": "io_usb_host_contact",
       "to": "io.J2.2"
     },
     {
+      "from": "io.R14.2",
+      "route_mm": 24.909,
+      "runtime": "io_usb_host_esd",
+      "to": "io.U6.1"
+    },
+    {
+      "from": "io.R14.2",
+      "route_mm": 26.709,
+      "runtime": "io_usb_host_esd",
+      "to": "io.U6.6"
+    },
+    {
       "from": "io.U1.47",
-      "ohms": 27,
-      "runtime": "io_usb_host",
-      "series": "R15",
+      "route_mm": 10.957,
+      "runtime": "io_usb_host_source",
+      "to": "io.R15.1"
+    },
+    {
+      "from": "io.R15.2",
+      "route_mm": 9.407,
+      "runtime": "io_usb_host_contact",
       "to": "io.J2.3"
+    },
+    {
+      "from": "io.R15.2",
+      "route_mm": 3.768,
+      "runtime": "io_usb_host_esd",
+      "to": "io.U6.3"
+    },
+    {
+      "from": "io.R15.2",
+      "route_mm": 6.043,
+      "runtime": "io_usb_host_esd",
+      "to": "io.U6.4"
     },
     {
       "from": "storage.U1.30",

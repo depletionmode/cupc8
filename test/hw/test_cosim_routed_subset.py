@@ -31,7 +31,8 @@ def main():
         '--cpu-board', str(build / 'cpu/cpu.kicad_pcb'),
         '--top', str(top),
     ]
-    for name in ('main_cpu_data', 'cpu_irq', 'cpu_timer_exp', 'system_usb'):
+    for name in ('main_cpu_data', 'cpu_irq', 'cpu_timer_exp', 'system_usb',
+                 'io_usb_host'):
         print(name, flush=True)
         subprocess.run([sys.executable, str(ROOT / 'test/hw' /
                                             ('test_cosim_' + name + '.py')),
