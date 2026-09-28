@@ -411,6 +411,20 @@ cmd = "make -C fw test_wifi"
 must_fail = ["RXREADY for the echo reply"]
 
 [[bug]]
+name = "wifi host backend: a failed connect was CLOSED to the first status call only, so the card raised CONNECTED"
+fixed_in = "wifi backends: sticky connect failure (2026-09-28)"
+revert = [["fw/wifi/host/netposix.c", "\t\t\ts->connecting = false;\n\t\t\ts->failed = true;\n", "\t\t\ts->connecting = false;\n"]]
+cmd = "make -C fw test_wifi"
+must_fail = ["a refused connect raised no CONN_FAILED", "SOCK_STATUS of a refused connect"]
+
+[[bug]]
+name = "wifi firmware: a refused TLS certificate was CLOSED to the first status call only; when the status byte took it, the card raised CONNECTED"
+fixed_in = "wifi backends: sticky connect failure (2026-09-28)"
+revert = [["fw/wifi/port/esp32c3/main/netesp.c", "\tif (s->failed)\n\t\treturn WIFI_CLOSED;\n\tif (s->type == WIFI_TLS) {", "\tif (s->type == WIFI_TLS) {"]]
+cmd = "rm -rf build/esp32c3-qemu && tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
+must_fail = ["FAIL SOCK_STATUS after the refused certificate"]
+
+[[bug]]
 name = "wifi firmware: without LWIP_SO_RCVBUF, FIONREAD never counted received TCP data"
 fixed_in = "4d501f7"
 revert = [["fw/wifi/port/esp32c3/sdkconfig.defaults", "CONFIG_LWIP_SO_RCVBUF=y", "# CONFIG_LWIP_SO_RCVBUF is not set"]]

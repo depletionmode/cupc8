@@ -36,6 +36,7 @@ typedef struct {
 	uint8_t ip[4];
 	uint16_t port;
 	bool listening, connecting, peer_closed;
+	bool failed;                /* the connect failed: CLOSED from now on (see n_status) */
 } esock_t;
 
 static struct {
@@ -320,6 +321,18 @@ static int tls_step(esock_t *s)
 	return esp_tls_conn_new_async(s->host, (int)strlen(s->host), s->port, &cfg, s->tls);
 }
 
+/* the handshake failed (a refused certificate included): CLOSED from now on */
+static void tls_failed(esock_t *s)
+{
+	int code = 0, flags = 0;
+	esp_tls_error_handle_t e = NULL;
+	if (esp_tls_get_error_handle(s->tls, &e) == ESP_OK)
+		esp_tls_get_and_clear_last_error(e, &code, &flags);
+	ESP_LOGW(TAG, "TLS to %s failed: -0x%x, verify flags 0x%x", s->host, code, flags);
+	s->connecting = false;
+	s->failed = true;
+}
+
 static int n_connect(void *ctx, int h, const uint8_t ip[4], uint16_t port, const char *sni)
 {
 	esock_t *s = get(h);
@@ -335,8 +348,14 @@ static int n_connect(void *ctx, int h, const uint8_t ip[4], uint16_t port, const
 		else
 			snprintf(s->host, sizeof s->host, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 		s->tls = esp_tls_init();
-		if (!s->tls || tls_step(s) < 0)
+		if (!s->tls)
 			return -1;
+		/* on a slow machine the server's whole reply can already be in, so
+		 * this first step can be the one that refuses the certificate */
+		if (tls_step(s) < 0) {
+			tls_failed(s);
+			return -1;
+		}
 		s->connecting = true;
 		return 0;
 	}
@@ -347,6 +366,7 @@ static int n_connect(void *ctx, int h, const uint8_t ip[4], uint16_t port, const
 		s->connecting = s->type != WIFI_UDP && r != 0;
 		return 0;
 	}
+	s->failed = true;
 	return -1;
 }
 
@@ -369,6 +389,8 @@ static int n_send(void *ctx, int h, const uint8_t *data, int len)
 	esock_t *s = get(h);
 	if (!s)
 		return -1;
+	if (s->failed)
+		return -1;              /* TLS: esp-tls would re-enter the failed handshake */
 	if (s->type == WIFI_TLS) {
 		int n = (int)esp_tls_conn_write(s->tls, data, (size_t)len);
 		if (n == ESP_TLS_ERR_SSL_WANT_READ || n == ESP_TLS_ERR_SSL_WANT_WRITE)
@@ -385,6 +407,8 @@ static int n_recv(void *ctx, int h, uint8_t *data, int len)
 {
 	esock_t *s = get(h);
 	if (!s)
+		return -1;
+	if (s->failed)
 		return -1;
 	if (s->type == WIFI_TLS) {
 		int n = (int)esp_tls_conn_read(s->tls, data, (size_t)len);
@@ -461,19 +485,19 @@ static int n_status(void *ctx, int h, int *rx_avail, int *tx_free)
 	*tx_free = 1024;
 	if (!s)
 		return WIFI_CLOSED;
+	/* a failure is reported to every caller, not only the first: the status
+	 * byte asks too, and the core would take the next answer's OPEN for
+	 * CONNECTED (a refused certificate reported as a connection) */
+	if (s->failed)
+		return WIFI_CLOSED;
 	if (s->type == WIFI_TLS) {
 		if (!s->tls)
 			return WIFI_CLOSED;         /* not connected yet (CONNECT_HOST still resolving) */
 		if (s->connecting) {
 			int r = tls_step(s);
 			if (r < 0) {
-				int code = 0, flags = 0;
-				esp_tls_error_handle_t e = NULL;
-				if (esp_tls_get_error_handle(s->tls, &e) == ESP_OK)
-					esp_tls_get_and_clear_last_error(e, &code, &flags);
-				ESP_LOGW(TAG, "TLS to %s failed: -0x%x, verify flags 0x%x", s->host, -code, flags);
-				s->connecting = false;
-				return WIFI_CLOSED;     /* includes a failed certificate check */
+				tls_failed(s);
+				return WIFI_CLOSED;
 			}
 			if (r == 0)
 				return WIFI_CONNECTING;
@@ -513,6 +537,7 @@ static int n_status(void *ctx, int h, int *rx_avail, int *tx_free)
 		}
 		if (err != 0 && err != EINPROGRESS && err != EALREADY) {
 			s->connecting = false;
+			s->failed = true;
 			return WIFI_CLOSED;
 		}
 		return WIFI_CONNECTING;

@@ -209,6 +209,50 @@ static void test_sockets(void)
 	close(srv);
 }
 
+/* A failed connect is CONN_FAILED even when the status byte, not wifi_poll,
+ * is what first asks the backend (the card's main loop takes the status byte
+ * for every frame and after every poll). The backend reported the failure to
+ * that one call and OPEN ever after, so the card raised CONNECTED: in QEMU
+ * (WIFI-003, a loaded host) a TLS server whose certificate was refused. */
+static void test_refused(void)
+{
+	uint8_t r[1 + 2 * WIFI_EVENTS];
+
+	/* a loopback port with nothing listening: connect answers EINPROGRESS, then RST */
+	int tmp = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in sa = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+	socklen_t sl = sizeof sa;
+	bind(tmp, (struct sockaddr *)&sa, sizeof sa);
+	getsockname(tmp, (struct sockaddr *)&sa, &sl);
+	close(tmp);
+	uint16_t port = ntohs(sa.sin_port);
+
+	SEND(0x10, WIFI_TCP);
+	CHECK_EQ(read_resp(r, 1), 1);
+	uint8_t sock = r[0];
+	uint8_t conn[] = {0x11, sock, 127, 0, 0, 1, (uint8_t)port, (uint8_t)(port >> 8)};
+	card_frame(&w.card, conn, 0, sizeof conn);        /* no wifi_poll */
+	usleep(20000);                                     /* the RST is in */
+	status();                                          /* the status byte sees the failure first */
+
+	bool failed = false, connected = false;
+	for (int i = 0; i < 200 && !failed; i++) {
+		SEND(0x1F);
+		int n = read_resp(r, 1 + 2 * WIFI_EVENTS);
+		for (int e = 0; n >= 1 && e < r[0]; e++) {
+			failed |= r[1 + e * 2] == WIFI_EV_CONN_FAILED && r[2 + e * 2] == sock;
+			connected |= r[1 + e * 2] == WIFI_EV_CONNECTED;
+		}
+		usleep(200);
+	}
+	CHECK(failed, "a refused connect raised no CONN_FAILED");
+	CHECK(!connected, "a refused connect raised CONNECTED");
+	SEND(0x16, sock);                                  /* SOCK_STATUS */
+	CHECK_EQ(read_resp(r, 5), 5);
+	CHECK(r[0] == WIFI_CLOSED, "SOCK_STATUS of a refused connect: state %d, not CLOSED", r[0]);
+	SEND(0x17, sock);
+}
+
 /* the card loses power and comes back: only NVS survives. Rejoins. */
 static void power_cycle(void)
 {
@@ -526,6 +570,7 @@ int main(void)
 	wifi_init(&w, &spy_ops, netposix_new());
 	test_link();
 	test_sockets();
+	test_refused();
 	test_net_config();
 	test_udp();
 	test_icmp();

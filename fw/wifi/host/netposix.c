@@ -26,6 +26,7 @@ typedef struct {
 	bool listening;
 	bool connecting;
 	bool peer_closed;
+	bool failed;                          /* the connect failed: CLOSED from now on */
 	bool used;
 	bool bound;                           /* ICMP: the echo id is set (see h_sendto) */
 } hsock_t;
@@ -181,6 +182,7 @@ static int h_connect(void *ctx, int h, const uint8_t ip[4], uint16_t port, const
 		s->connecting = s->type != WIFI_UDP && r != 0;
 		return 0;
 	}
+	s->failed = true;
 	return -1;
 }
 
@@ -281,6 +283,9 @@ static int h_status(void *ctx, int h, int *rx_avail, int *tx_free)
 	*tx_free = 1024;
 	if (!s)
 		return WIFI_CLOSED;
+	/* every caller hears of a failure, not only the first (the status byte asks too) */
+	if (s->failed)
+		return WIFI_CLOSED;
 	int pending = 0;
 	if (ioctl(s->fd, FIONREAD, &pending) == 0)
 		*rx_avail = pending;
@@ -314,6 +319,7 @@ static int h_status(void *ctx, int h, int *rx_avail, int *tx_free)
 		}
 		if (err != 0 && err != EINPROGRESS && err != EALREADY) {
 			s->connecting = false;
+			s->failed = true;
 			return WIFI_CLOSED;
 		}
 		return WIFI_CONNECTING;

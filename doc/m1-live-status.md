@@ -209,12 +209,18 @@ update it after every finding, commit, decision or agent result (David,
      Power Calculator coefficients unpublished, iCEcube2 not installed): set
      ICE40_CORE_MAX from a worst-corner Power Calculator report or a
      first-article measurement; passes if < ~107 mA.
-   - **WIFI-003: possible security bug, under investigation (agent).** The
-     failing loaded run saw WIFI_EV_CONNECTED (0x10) for socket 0 while
-     waiting for the self-signed-certificate refusal: either a TLS verify
-     bypass under slow timing (fw/wifi/port/esp32c3/main/netesp.c tls_step /
-     n_status) or a stale event from an earlier socket. Not a plain timeout.
-     The failing log was overwritten by the passing rerun.
+   - **WIFI-003: fixed (not a verification bypass).** The certificate was
+     refused every time; the Wi-Fi card then falsely reported CONNECTED: the
+     backends' status() returned CLOSED for a failed connect only to its
+     first caller and OPEN afterwards, and the card polls status from three
+     places. Also a TLS refusal inside n_connect (slow QEMU) left the socket
+     OPEN, and SEND on a failed TLS socket re-entered the handshake. Fix: a
+     sticky `failed` flag in netesp.c and netposix.c (host/simulator too).
+     New host test test_refused, a SOCK_STATUS check in WIFI-003, two
+     counterexamples. Loaded stress variant: 1/6 fail before, 8/8 pass after.
+     Open (unchanged): events can be missed if CONNECTING/LISTENING goes to
+     PEER_CLOSED between polls; esp-tls CONNECTING select() can block up to
+     10 s; log prints verify flags 0x0.
 
 ### B. Needs outside data or measurement (cannot be closed by analysis)
 

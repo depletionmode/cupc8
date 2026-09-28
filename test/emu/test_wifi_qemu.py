@@ -296,6 +296,11 @@ def run(card, listen_port):
         t.join(5)
         expect(hello and hello[0][:1] == b"\x16", "the card started a TLS handshake: %r" % hello)
         expect(ev == tls, "a self-signed server certificate is refused: CONN_FAILED (%r)" % seen)
+        # and stays refused: the backend said OPEN to every status call after
+        # the first, so when the status byte took that first one the card
+        # raised CONNECTED for this server (WIFI-003 on a loaded host)
+        ss = card.cmd([0x16, tls])
+        expect(ss and ss[0] == 0, "SOCK_STATUS after the refused certificate: CLOSED: %r" % (ss and list(ss)))
         card.frame([0x17, tls])
         ts.close()
 
