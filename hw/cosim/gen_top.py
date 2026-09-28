@@ -337,6 +337,45 @@ def cpu_sync_route(main, cpu, main_board, cpu_board):
     return not missing, paths, missing
 
 
+def cpu_status_routes(main, cpu, main_board, cpu_board):
+    """Bind FPGA HALTED/WAITING through RN8 and the CPU socket to U7."""
+    channels = {
+        'halted': ('FPGA_HALTED', 'CPU_HALTED', ('U1', '60'), ('RN8', '3'),
+                   ('RN8', '6'), ('J1', 'B44'), ('J2', 'B44'), ('U7', '137'), 'RN8.3'),
+        'waiting': ('FPGA_WAITING', 'CPU_WAITING', ('U1', '61'), ('RN8', '4'),
+                    ('RN8', '5'), ('J1', 'B46'), ('J2', 'B46'), ('U7', '130'), 'RN8.4'),
+    }
+    if cpu.components.get('RN8') != ('33', ('Device', 'R_Pack04')):
+        raise ValueError('CPU status: missing 33-ohm isolated RN8 series pack')
+    links, paths, missing = {}, [], []
+    for signal, (source_net, contact_net, source, series_in, series_out,
+                 finger, socket, receiver, series_ref) in channels.items():
+        if set(cpu.nets.get(f'/{source_net}', ())) != {source, series_in} or \
+                set(cpu.nets.get(f'/{contact_net}', ())) != {series_out, finger} or \
+                set(main.nets.get(f'/{contact_net}', ())) != {socket, receiver} or \
+                path(cpu, source, finger, '33') != series_ref:
+            raise ValueError(f'CPU {signal}: wrong FPGA, RN8, socket or chipset pad')
+        connected = True
+        for board, pcb, net, first, last in (
+                ('cpu', cpu_board, source_net, source, series_in),
+                ('cpu', cpu_board, contact_net, series_out, finger),
+                ('main', main_board, contact_net, socket, receiver)):
+            mm = None
+            if pcb is not None and Path(pcb).is_file():
+                sys.path.insert(0, str(ROOT / 'hw/si'))
+                from ibis_bus import routed_distances
+                mm = routed_distances(Path(pcb), f'/{net}', first, [last])[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'{board}.{first[0]}.{first[1]}',
+                          'to': f'{board}.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'cpu_{signal}_connected'})
+            if mm is None:
+                connected = False
+                missing.append(f'{board}:{net}_cpu_{signal}_copper')
+        links[signal] = connected
+    return links, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1107,6 +1146,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_sync_connected'] = sync_connected
     manifest['runtime']['missing_routes'].extend(sync_missing)
     manifest['runtime']['routed_top'] &= not sync_missing
+    status_links, status_paths, status_missing = cpu_status_routes(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['paths'].extend(status_paths)
+    manifest['runtime']['cpu_status_connected'] = status_links
+    manifest['runtime']['missing_routes'].extend(status_missing)
+    manifest['runtime']['routed_top'] &= not status_missing
     manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
         main, cards['system'], pcb, system_board)
     manifest['paths'].extend(manual_reset_paths)
@@ -1207,6 +1252,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('cpu', 'FPGA_SYNC')
         runtime_net('cpu', 'CPU_SYNC')
         runtime_net('main', 'CPU_SYNC')
+    for signal, contact, source in (('halted', 'CPU_HALTED', 'FPGA_HALTED'),
+                                    ('waiting', 'CPU_WAITING', 'FPGA_WAITING')):
+        if status_links[signal]:
+            runtime_net('cpu', source)
+            runtime_net('cpu', contact)
+            runtime_net('main', contact)
     if manual_reset['sysctl']:
         runtime_net('system', 'SYS_nRST')
     if all(manual_reset.values()):

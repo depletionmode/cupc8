@@ -51,6 +51,8 @@ struct MainBoard {
 	bool cpuRwConnected = true;
 	bool cpuReadyConnected = true;
 	bool cpuSyncConnected = true;
+	bool cpuHaltedConnected = true;
+	bool cpuWaitingConnected = true;
 	bool chipsetClockConnected = true;
 
 	Vmachine_core *top = nullptr;
@@ -97,6 +99,8 @@ struct MainBoard {
 		top->cpu_rw_connected = cpuRwConnected;
 		top->cpu_rdy_connected = cpuReadyConnected;
 		top->cpu_sync_connected = cpuSyncConnected;
+		top->cpu_halted_connected = cpuHaltedConnected;
+		top->cpu_waiting_connected = cpuWaitingConnected;
 		top->chipset_clk_connected = chipsetClockConnected;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);

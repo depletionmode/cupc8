@@ -26,6 +26,8 @@ entity machine_core is
 		cpu_rw_connected:	in std_logic;
 		cpu_rdy_connected:	in std_logic;
 		cpu_sync_connected:	in std_logic;
+		cpu_halted_connected:	in std_logic;
+		cpu_waiting_connected:	in std_logic;
 		chipset_clk_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
@@ -64,6 +66,7 @@ architecture rtl of machine_core is
 	signal a_chip: std_logic_vector(15 downto 0);
 	signal cpu_doe, cs_doe, rw, n_stb, n_rdy, sync, halted, waiting, n_rst: std_logic;
 	signal rw_at_chipset, n_stb_at_chipset, n_rdy_at_cpu, sync_at_chipset: std_logic;
+	signal halted_at_chipset, waiting_at_chipset: std_logic;
 	signal irq: std_logic_vector(3 downto 0);
 	signal cpu_clk: std_logic;
 	signal chipset_clk: std_logic;
@@ -89,6 +92,10 @@ begin
 	-- An open SYNC pad has undefined voltage; low is a deterministic trace
 	-- counterexample and prevents false instruction-boundary reports.
 	sync_at_chipset <= sync when cpu_sync_connected = '1' else '0';
+	-- Open status inputs have undefined voltage. Low is a deterministic
+	-- counterexample for the chipset's bridge status register.
+	halted_at_chipset <= halted when cpu_halted_connected = '1' else '0';
+	waiting_at_chipset <= waiting when cpu_waiting_connected = '1' else '0';
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
@@ -116,7 +123,7 @@ begin
 		clk => chipset_clk, n_por => n_por,
 		cpu_a => a_chip, cpu_d_in => cs_din, cpu_d_out => cs_dout, cpu_d_oe => cs_doe, cpu_rw => rw_at_chipset,
 		cpu_n_stb => n_stb_at_chipset, cpu_n_rdy => n_rdy, cpu_sync => sync_at_chipset, cpu_irq => irq,
-		cpu_tmr_exp => tmr_exp, cpu_halted => halted, cpu_waiting => waiting, cpu_n_rst => n_rst,
+		cpu_tmr_exp => tmr_exp, cpu_halted => halted_at_chipset, cpu_waiting => waiting_at_chipset, cpu_n_rst => n_rst,
 		cpu_cdone => cpu_cdone,
 		mem_a => mem_a, mem_d_in => mem_d_in, mem_d_out => mem_d_out, mem_d_oe => mem_d_oe,
 		mem_n_oe => mem_n_oe, mem_n_we => mem_n_we, mem_n_ce_ram => mem_n_ce_ram, mem_n_ce_rom => mem_n_ce_rom,

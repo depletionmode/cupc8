@@ -403,6 +403,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     board->cpuRwConnected = o.cpuRwConnected;
     board->cpuReadyConnected = o.cpuReadyConnected;
     board->cpuSyncConnected = o.cpuSyncConnected;
+    board->cpuHaltedConnected = o.cpuHaltedConnected;
+    board->cpuWaitingConnected = o.cpuWaitingConnected;
     board->chipsetClockConnected = o.chipsetClockConnected;
     board->timedMemory = true;
     board->ramAccessNs = o.ramAccessNs;
