@@ -1,0 +1,52 @@
+{
+  "scope": "current seven-card receipt binding for IBIS source-path audit",
+  "board_receipts": {
+    "main": {
+      "receipt_sha256": "2b29afec3aaee9794b7d805f2d82ad89d122e143ddde6119174030fc5e7c2605",
+      "board_sha256": "ec18ea676bcc5dde18b7ee66412d29b94024f0acdf40ac458b825c331398e2f7",
+      "netlist_sha256": "30f294dd364913c357e1546647e410e5a448401633c299fc9f0181be5a3b58d8"
+    },
+    "cpu": {
+      "receipt_sha256": "b61feaf1b9c5538f430a9671d09feccf1bc57b6ac71c2934c38560ae4a586acb",
+      "board_sha256": "bd1e3bff3c9cb4ff3d79fc061d43a7ee6033a01dedfffdfd528ffdc64ff11cb9",
+      "netlist_sha256": "ffa02dbc7faf79b53689bfc6b509ab2afa09a0ded0084880525010a692aeaeaa"
+    },
+    "gpu": {
+      "receipt_sha256": "4f88e7226b555e706bccf60dea897a5270186030d8039b2549530beeeb6880d3",
+      "board_sha256": "bc3d30d31524493858a522ab926fb87264b5b5966c7bc05d10764d0ef3373be5",
+      "netlist_sha256": "353c5f96f8b42966907e5f3533d7e3a57581635dd902d1dbdd20214df2f99af3"
+    },
+    "io": {
+      "receipt_sha256": "9510660b8c6e4b755e7fc9d6c4bf0a06a39ebc8260510f37e273204fcee3b452",
+      "board_sha256": "1e27688d694a34ab098786113003a1fb2171885ad6f69f21a69b3b11c2f05bb9",
+      "netlist_sha256": "b0c9d7d489841f89ca7fd964c21e9c0b8bd9912f84deb37a21cd7e7b2687a1e8"
+    },
+    "storage": {
+      "receipt_sha256": "b8876c3ce6b9aebb9292cb846b3e1ce8c82854595119222e7419051087fdb1b1",
+      "board_sha256": "1b709e06b123490a721fe9ac5b3e5538842213369753c752baf8c3e3aaafc8ef",
+      "netlist_sha256": "1eedecb911e747efbe6934cc7aa045bf4a363b2a4284141fb6b498f016daea0f"
+    },
+    "wifi": {
+      "receipt_sha256": "cc88935f315496e750ccb1accd3dcde201cc55c8bea1749169d0f4932882790f",
+      "board_sha256": "d5f003080f472f9aacfb8755b72c1490bfc62e3513ad82c92ad66c87513ed267",
+      "netlist_sha256": "c5414b67a0adb7a9f9178b1fc02cca0c88eaddbd7b82d978e2246b23958eb979"
+    },
+    "eink": {
+      "receipt_sha256": "620583436ca7ae5a92f67eb1d6a970d8c5a3f341eb1a62618e1ccf9dc1540abd",
+      "board_sha256": "b662a07908e631960f9b7785712e241c57d6c66842f1364978c0473266ff7212",
+      "netlist_sha256": "7c044e10f5049655004189945b53a44a3f7ce107138e68a8926d1364c88737db"
+    }
+  },
+  "system_route_snapshot_sha256": "92bb38d5e0b64fe02a3acab891cc0a9e08e56176c39563d263aabf678a4eb43c",
+  "top_generator_sha256": "75f071a9eb89434f26f8c030923f8df504035f850a4642e9aa79c97195e2fee9",
+  "top_sha256": "c057f966bd4b77cd874baf7cd8218a219021427761a09ca228083449c63f3c40",
+  "source_audit_sha256": "e6e533308bb79c152d1b51dd4325b5fba04df301d89405bf36e30d8aed2527a9",
+  "routed_top": true,
+  "unmodeled_nets": 310,
+  "valid_for_full_bus_si": false,
+  "limits": [
+    "system route is a saved routed snapshot, not the in-progress canonical rebuild",
+    "waveform diagnostics retain assumed line lengths and loads",
+    "receiver IBIS, package assignment, return paths and branch extraction remain open"
+  ]
+}

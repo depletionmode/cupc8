@@ -1,0 +1,10011 @@
+{
+  "boards": [
+    "main",
+    "cpu",
+    "system",
+    "gpu",
+    "io",
+    "storage",
+    "wifi",
+    "eink"
+  ],
+  "contacts": [
+    [
+      "main.J2.A1",
+      "cpu.J1.A1"
+    ],
+    [
+      "main.J2.A10",
+      "cpu.J1.A10"
+    ],
+    [
+      "main.J2.A11",
+      "cpu.J1.A11"
+    ],
+    [
+      "main.J2.A12",
+      "cpu.J1.A12"
+    ],
+    [
+      "main.J2.A13",
+      "cpu.J1.A13"
+    ],
+    [
+      "main.J2.A14",
+      "cpu.J1.A14"
+    ],
+    [
+      "main.J2.A15",
+      "cpu.J1.A15"
+    ],
+    [
+      "main.J2.A16",
+      "cpu.J1.A16"
+    ],
+    [
+      "main.J2.A17",
+      "cpu.J1.A17"
+    ],
+    [
+      "main.J2.A18",
+      "cpu.J1.A18"
+    ],
+    [
+      "main.J2.A19",
+      "cpu.J1.A19"
+    ],
+    [
+      "main.J2.A2",
+      "cpu.J1.A2"
+    ],
+    [
+      "main.J2.A20",
+      "cpu.J1.A20"
+    ],
+    [
+      "main.J2.A21",
+      "cpu.J1.A21"
+    ],
+    [
+      "main.J2.A22",
+      "cpu.J1.A22"
+    ],
+    [
+      "main.J2.A23",
+      "cpu.J1.A23"
+    ],
+    [
+      "main.J2.A24",
+      "cpu.J1.A24"
+    ],
+    [
+      "main.J2.A25",
+      "cpu.J1.A25"
+    ],
+    [
+      "main.J2.A26",
+      "cpu.J1.A26"
+    ],
+    [
+      "main.J2.A27",
+      "cpu.J1.A27"
+    ],
+    [
+      "main.J2.A28",
+      "cpu.J1.A28"
+    ],
+    [
+      "main.J2.A29",
+      "cpu.J1.A29"
+    ],
+    [
+      "main.J2.A3",
+      "cpu.J1.A3"
+    ],
+    [
+      "main.J2.A30",
+      "cpu.J1.A30"
+    ],
+    [
+      "main.J2.A31",
+      "cpu.J1.A31"
+    ],
+    [
+      "main.J2.A32",
+      "cpu.J1.A32"
+    ],
+    [
+      "main.J2.A33",
+      "cpu.J1.A33"
+    ],
+    [
+      "main.J2.A34",
+      "cpu.J1.A34"
+    ],
+    [
+      "main.J2.A35",
+      "cpu.J1.A35"
+    ],
+    [
+      "main.J2.A36",
+      "cpu.J1.A36"
+    ],
+    [
+      "main.J2.A37",
+      "cpu.J1.A37"
+    ],
+    [
+      "main.J2.A38",
+      "cpu.J1.A38"
+    ],
+    [
+      "main.J2.A39",
+      "cpu.J1.A39"
+    ],
+    [
+      "main.J2.A4",
+      "cpu.J1.A4"
+    ],
+    [
+      "main.J2.A40",
+      "cpu.J1.A40"
+    ],
+    [
+      "main.J2.A41",
+      "cpu.J1.A41"
+    ],
+    [
+      "main.J2.A42",
+      "cpu.J1.A42"
+    ],
+    [
+      "main.J2.A43",
+      "cpu.J1.A43"
+    ],
+    [
+      "main.J2.A44",
+      "cpu.J1.A44"
+    ],
+    [
+      "main.J2.A45",
+      "cpu.J1.A45"
+    ],
+    [
+      "main.J2.A46",
+      "cpu.J1.A46"
+    ],
+    [
+      "main.J2.A47",
+      "cpu.J1.A47"
+    ],
+    [
+      "main.J2.A48",
+      "cpu.J1.A48"
+    ],
+    [
+      "main.J2.A49",
+      "cpu.J1.A49"
+    ],
+    [
+      "main.J2.A5",
+      "cpu.J1.A5"
+    ],
+    [
+      "main.J2.A6",
+      "cpu.J1.A6"
+    ],
+    [
+      "main.J2.A7",
+      "cpu.J1.A7"
+    ],
+    [
+      "main.J2.A8",
+      "cpu.J1.A8"
+    ],
+    [
+      "main.J2.A9",
+      "cpu.J1.A9"
+    ],
+    [
+      "main.J2.B1",
+      "cpu.J1.B1"
+    ],
+    [
+      "main.J2.B10",
+      "cpu.J1.B10"
+    ],
+    [
+      "main.J2.B11",
+      "cpu.J1.B11"
+    ],
+    [
+      "main.J2.B12",
+      "cpu.J1.B12"
+    ],
+    [
+      "main.J2.B13",
+      "cpu.J1.B13"
+    ],
+    [
+      "main.J2.B14",
+      "cpu.J1.B14"
+    ],
+    [
+      "main.J2.B15",
+      "cpu.J1.B15"
+    ],
+    [
+      "main.J2.B16",
+      "cpu.J1.B16"
+    ],
+    [
+      "main.J2.B17",
+      "cpu.J1.B17"
+    ],
+    [
+      "main.J2.B18",
+      "cpu.J1.B18"
+    ],
+    [
+      "main.J2.B19",
+      "cpu.J1.B19"
+    ],
+    [
+      "main.J2.B2",
+      "cpu.J1.B2"
+    ],
+    [
+      "main.J2.B20",
+      "cpu.J1.B20"
+    ],
+    [
+      "main.J2.B21",
+      "cpu.J1.B21"
+    ],
+    [
+      "main.J2.B22",
+      "cpu.J1.B22"
+    ],
+    [
+      "main.J2.B23",
+      "cpu.J1.B23"
+    ],
+    [
+      "main.J2.B24",
+      "cpu.J1.B24"
+    ],
+    [
+      "main.J2.B25",
+      "cpu.J1.B25"
+    ],
+    [
+      "main.J2.B26",
+      "cpu.J1.B26"
+    ],
+    [
+      "main.J2.B27",
+      "cpu.J1.B27"
+    ],
+    [
+      "main.J2.B28",
+      "cpu.J1.B28"
+    ],
+    [
+      "main.J2.B29",
+      "cpu.J1.B29"
+    ],
+    [
+      "main.J2.B3",
+      "cpu.J1.B3"
+    ],
+    [
+      "main.J2.B30",
+      "cpu.J1.B30"
+    ],
+    [
+      "main.J2.B31",
+      "cpu.J1.B31"
+    ],
+    [
+      "main.J2.B32",
+      "cpu.J1.B32"
+    ],
+    [
+      "main.J2.B33",
+      "cpu.J1.B33"
+    ],
+    [
+      "main.J2.B34",
+      "cpu.J1.B34"
+    ],
+    [
+      "main.J2.B35",
+      "cpu.J1.B35"
+    ],
+    [
+      "main.J2.B36",
+      "cpu.J1.B36"
+    ],
+    [
+      "main.J2.B37",
+      "cpu.J1.B37"
+    ],
+    [
+      "main.J2.B38",
+      "cpu.J1.B38"
+    ],
+    [
+      "main.J2.B39",
+      "cpu.J1.B39"
+    ],
+    [
+      "main.J2.B4",
+      "cpu.J1.B4"
+    ],
+    [
+      "main.J2.B40",
+      "cpu.J1.B40"
+    ],
+    [
+      "main.J2.B41",
+      "cpu.J1.B41"
+    ],
+    [
+      "main.J2.B42",
+      "cpu.J1.B42"
+    ],
+    [
+      "main.J2.B43",
+      "cpu.J1.B43"
+    ],
+    [
+      "main.J2.B44",
+      "cpu.J1.B44"
+    ],
+    [
+      "main.J2.B45",
+      "cpu.J1.B45"
+    ],
+    [
+      "main.J2.B46",
+      "cpu.J1.B46"
+    ],
+    [
+      "main.J2.B47",
+      "cpu.J1.B47"
+    ],
+    [
+      "main.J2.B48",
+      "cpu.J1.B48"
+    ],
+    [
+      "main.J2.B49",
+      "cpu.J1.B49"
+    ],
+    [
+      "main.J2.B5",
+      "cpu.J1.B5"
+    ],
+    [
+      "main.J2.B6",
+      "cpu.J1.B6"
+    ],
+    [
+      "main.J2.B7",
+      "cpu.J1.B7"
+    ],
+    [
+      "main.J2.B8",
+      "cpu.J1.B8"
+    ],
+    [
+      "main.J2.B9",
+      "cpu.J1.B9"
+    ],
+    [
+      "main.J3.1",
+      "system.J2.A1"
+    ],
+    [
+      "main.J3.10",
+      "system.J2.A10"
+    ],
+    [
+      "main.J3.11",
+      "system.J2.A11"
+    ],
+    [
+      "main.J3.12",
+      "system.J2.A12"
+    ],
+    [
+      "main.J3.13",
+      "system.J2.A13"
+    ],
+    [
+      "main.J3.14",
+      "system.J2.A14"
+    ],
+    [
+      "main.J3.15",
+      "system.J2.A15"
+    ],
+    [
+      "main.J3.16",
+      "system.J2.A16"
+    ],
+    [
+      "main.J3.17",
+      "system.J2.A17"
+    ],
+    [
+      "main.J3.18",
+      "system.J2.A18"
+    ],
+    [
+      "main.J3.19",
+      "system.J2.A19"
+    ],
+    [
+      "main.J3.2",
+      "system.J2.A2"
+    ],
+    [
+      "main.J3.20",
+      "system.J2.A20"
+    ],
+    [
+      "main.J3.21",
+      "system.J2.A21"
+    ],
+    [
+      "main.J3.22",
+      "system.J2.A22"
+    ],
+    [
+      "main.J3.23",
+      "system.J2.A23"
+    ],
+    [
+      "main.J3.24",
+      "system.J2.A24"
+    ],
+    [
+      "main.J3.25",
+      "system.J2.A25"
+    ],
+    [
+      "main.J3.26",
+      "system.J2.A26"
+    ],
+    [
+      "main.J3.27",
+      "system.J2.A27"
+    ],
+    [
+      "main.J3.28",
+      "system.J2.A28"
+    ],
+    [
+      "main.J3.29",
+      "system.J2.A29"
+    ],
+    [
+      "main.J3.3",
+      "system.J2.A3"
+    ],
+    [
+      "main.J3.30",
+      "system.J2.A30"
+    ],
+    [
+      "main.J3.31",
+      "system.J2.A31"
+    ],
+    [
+      "main.J3.32",
+      "system.J2.A32"
+    ],
+    [
+      "main.J3.4",
+      "system.J2.A4"
+    ],
+    [
+      "main.J3.5",
+      "system.J2.A5"
+    ],
+    [
+      "main.J3.6",
+      "system.J2.A6"
+    ],
+    [
+      "main.J3.7",
+      "system.J2.A7"
+    ],
+    [
+      "main.J3.8",
+      "system.J2.A8"
+    ],
+    [
+      "main.J3.9",
+      "system.J2.A9"
+    ],
+    [
+      "main.J3.33",
+      "system.J2.B1"
+    ],
+    [
+      "main.J3.42",
+      "system.J2.B10"
+    ],
+    [
+      "main.J3.43",
+      "system.J2.B11"
+    ],
+    [
+      "main.J3.44",
+      "system.J2.B12"
+    ],
+    [
+      "main.J3.45",
+      "system.J2.B13"
+    ],
+    [
+      "main.J3.46",
+      "system.J2.B14"
+    ],
+    [
+      "main.J3.47",
+      "system.J2.B15"
+    ],
+    [
+      "main.J3.48",
+      "system.J2.B16"
+    ],
+    [
+      "main.J3.49",
+      "system.J2.B17"
+    ],
+    [
+      "main.J3.50",
+      "system.J2.B18"
+    ],
+    [
+      "main.J3.51",
+      "system.J2.B19"
+    ],
+    [
+      "main.J3.34",
+      "system.J2.B2"
+    ],
+    [
+      "main.J3.52",
+      "system.J2.B20"
+    ],
+    [
+      "main.J3.53",
+      "system.J2.B21"
+    ],
+    [
+      "main.J3.54",
+      "system.J2.B22"
+    ],
+    [
+      "main.J3.55",
+      "system.J2.B23"
+    ],
+    [
+      "main.J3.56",
+      "system.J2.B24"
+    ],
+    [
+      "main.J3.57",
+      "system.J2.B25"
+    ],
+    [
+      "main.J3.58",
+      "system.J2.B26"
+    ],
+    [
+      "main.J3.59",
+      "system.J2.B27"
+    ],
+    [
+      "main.J3.60",
+      "system.J2.B28"
+    ],
+    [
+      "main.J3.61",
+      "system.J2.B29"
+    ],
+    [
+      "main.J3.35",
+      "system.J2.B3"
+    ],
+    [
+      "main.J3.62",
+      "system.J2.B30"
+    ],
+    [
+      "main.J3.63",
+      "system.J2.B31"
+    ],
+    [
+      "main.J3.64",
+      "system.J2.B32"
+    ],
+    [
+      "main.J3.36",
+      "system.J2.B4"
+    ],
+    [
+      "main.J3.37",
+      "system.J2.B5"
+    ],
+    [
+      "main.J3.38",
+      "system.J2.B6"
+    ],
+    [
+      "main.J3.39",
+      "system.J2.B7"
+    ],
+    [
+      "main.J3.40",
+      "system.J2.B8"
+    ],
+    [
+      "main.J3.41",
+      "system.J2.B9"
+    ],
+    [
+      "main.J11.A1",
+      "gpu.J1.A1"
+    ],
+    [
+      "main.J11.A10",
+      "gpu.J1.A10"
+    ],
+    [
+      "main.J11.A11",
+      "gpu.J1.A11"
+    ],
+    [
+      "main.J11.A12",
+      "gpu.J1.A12"
+    ],
+    [
+      "main.J11.A13",
+      "gpu.J1.A13"
+    ],
+    [
+      "main.J11.A14",
+      "gpu.J1.A14"
+    ],
+    [
+      "main.J11.A15",
+      "gpu.J1.A15"
+    ],
+    [
+      "main.J11.A16",
+      "gpu.J1.A16"
+    ],
+    [
+      "main.J11.A17",
+      "gpu.J1.A17"
+    ],
+    [
+      "main.J11.A18",
+      "gpu.J1.A18"
+    ],
+    [
+      "main.J11.A2",
+      "gpu.J1.A2"
+    ],
+    [
+      "main.J11.A3",
+      "gpu.J1.A3"
+    ],
+    [
+      "main.J11.A4",
+      "gpu.J1.A4"
+    ],
+    [
+      "main.J11.A5",
+      "gpu.J1.A5"
+    ],
+    [
+      "main.J11.A6",
+      "gpu.J1.A6"
+    ],
+    [
+      "main.J11.A7",
+      "gpu.J1.A7"
+    ],
+    [
+      "main.J11.A8",
+      "gpu.J1.A8"
+    ],
+    [
+      "main.J11.A9",
+      "gpu.J1.A9"
+    ],
+    [
+      "main.J11.B1",
+      "gpu.J1.B1"
+    ],
+    [
+      "main.J11.B10",
+      "gpu.J1.B10"
+    ],
+    [
+      "main.J11.B11",
+      "gpu.J1.B11"
+    ],
+    [
+      "main.J11.B12",
+      "gpu.J1.B12"
+    ],
+    [
+      "main.J11.B13",
+      "gpu.J1.B13"
+    ],
+    [
+      "main.J11.B14",
+      "gpu.J1.B14"
+    ],
+    [
+      "main.J11.B15",
+      "gpu.J1.B15"
+    ],
+    [
+      "main.J11.B16",
+      "gpu.J1.B16"
+    ],
+    [
+      "main.J11.B17",
+      "gpu.J1.B17"
+    ],
+    [
+      "main.J11.B18",
+      "gpu.J1.B18"
+    ],
+    [
+      "main.J11.B2",
+      "gpu.J1.B2"
+    ],
+    [
+      "main.J11.B3",
+      "gpu.J1.B3"
+    ],
+    [
+      "main.J11.B4",
+      "gpu.J1.B4"
+    ],
+    [
+      "main.J11.B5",
+      "gpu.J1.B5"
+    ],
+    [
+      "main.J11.B6",
+      "gpu.J1.B6"
+    ],
+    [
+      "main.J11.B7",
+      "gpu.J1.B7"
+    ],
+    [
+      "main.J11.B8",
+      "gpu.J1.B8"
+    ],
+    [
+      "main.J11.B9",
+      "gpu.J1.B9"
+    ],
+    [
+      "main.J11.A1",
+      "io.J1.A1"
+    ],
+    [
+      "main.J11.A10",
+      "io.J1.A10"
+    ],
+    [
+      "main.J11.A11",
+      "io.J1.A11"
+    ],
+    [
+      "main.J11.A12",
+      "io.J1.A12"
+    ],
+    [
+      "main.J11.A13",
+      "io.J1.A13"
+    ],
+    [
+      "main.J11.A14",
+      "io.J1.A14"
+    ],
+    [
+      "main.J11.A15",
+      "io.J1.A15"
+    ],
+    [
+      "main.J11.A16",
+      "io.J1.A16"
+    ],
+    [
+      "main.J11.A17",
+      "io.J1.A17"
+    ],
+    [
+      "main.J11.A18",
+      "io.J1.A18"
+    ],
+    [
+      "main.J11.A2",
+      "io.J1.A2"
+    ],
+    [
+      "main.J11.A3",
+      "io.J1.A3"
+    ],
+    [
+      "main.J11.A4",
+      "io.J1.A4"
+    ],
+    [
+      "main.J11.A5",
+      "io.J1.A5"
+    ],
+    [
+      "main.J11.A6",
+      "io.J1.A6"
+    ],
+    [
+      "main.J11.A7",
+      "io.J1.A7"
+    ],
+    [
+      "main.J11.A8",
+      "io.J1.A8"
+    ],
+    [
+      "main.J11.A9",
+      "io.J1.A9"
+    ],
+    [
+      "main.J11.B1",
+      "io.J1.B1"
+    ],
+    [
+      "main.J11.B10",
+      "io.J1.B10"
+    ],
+    [
+      "main.J11.B11",
+      "io.J1.B11"
+    ],
+    [
+      "main.J11.B12",
+      "io.J1.B12"
+    ],
+    [
+      "main.J11.B13",
+      "io.J1.B13"
+    ],
+    [
+      "main.J11.B14",
+      "io.J1.B14"
+    ],
+    [
+      "main.J11.B15",
+      "io.J1.B15"
+    ],
+    [
+      "main.J11.B16",
+      "io.J1.B16"
+    ],
+    [
+      "main.J11.B17",
+      "io.J1.B17"
+    ],
+    [
+      "main.J11.B18",
+      "io.J1.B18"
+    ],
+    [
+      "main.J11.B2",
+      "io.J1.B2"
+    ],
+    [
+      "main.J11.B3",
+      "io.J1.B3"
+    ],
+    [
+      "main.J11.B4",
+      "io.J1.B4"
+    ],
+    [
+      "main.J11.B5",
+      "io.J1.B5"
+    ],
+    [
+      "main.J11.B6",
+      "io.J1.B6"
+    ],
+    [
+      "main.J11.B7",
+      "io.J1.B7"
+    ],
+    [
+      "main.J11.B8",
+      "io.J1.B8"
+    ],
+    [
+      "main.J11.B9",
+      "io.J1.B9"
+    ],
+    [
+      "main.J11.A1",
+      "storage.J1.A1"
+    ],
+    [
+      "main.J11.A10",
+      "storage.J1.A10"
+    ],
+    [
+      "main.J11.A11",
+      "storage.J1.A11"
+    ],
+    [
+      "main.J11.A12",
+      "storage.J1.A12"
+    ],
+    [
+      "main.J11.A13",
+      "storage.J1.A13"
+    ],
+    [
+      "main.J11.A14",
+      "storage.J1.A14"
+    ],
+    [
+      "main.J11.A15",
+      "storage.J1.A15"
+    ],
+    [
+      "main.J11.A16",
+      "storage.J1.A16"
+    ],
+    [
+      "main.J11.A17",
+      "storage.J1.A17"
+    ],
+    [
+      "main.J11.A18",
+      "storage.J1.A18"
+    ],
+    [
+      "main.J11.A2",
+      "storage.J1.A2"
+    ],
+    [
+      "main.J11.A3",
+      "storage.J1.A3"
+    ],
+    [
+      "main.J11.A4",
+      "storage.J1.A4"
+    ],
+    [
+      "main.J11.A5",
+      "storage.J1.A5"
+    ],
+    [
+      "main.J11.A6",
+      "storage.J1.A6"
+    ],
+    [
+      "main.J11.A7",
+      "storage.J1.A7"
+    ],
+    [
+      "main.J11.A8",
+      "storage.J1.A8"
+    ],
+    [
+      "main.J11.A9",
+      "storage.J1.A9"
+    ],
+    [
+      "main.J11.B1",
+      "storage.J1.B1"
+    ],
+    [
+      "main.J11.B10",
+      "storage.J1.B10"
+    ],
+    [
+      "main.J11.B11",
+      "storage.J1.B11"
+    ],
+    [
+      "main.J11.B12",
+      "storage.J1.B12"
+    ],
+    [
+      "main.J11.B13",
+      "storage.J1.B13"
+    ],
+    [
+      "main.J11.B14",
+      "storage.J1.B14"
+    ],
+    [
+      "main.J11.B15",
+      "storage.J1.B15"
+    ],
+    [
+      "main.J11.B16",
+      "storage.J1.B16"
+    ],
+    [
+      "main.J11.B17",
+      "storage.J1.B17"
+    ],
+    [
+      "main.J11.B18",
+      "storage.J1.B18"
+    ],
+    [
+      "main.J11.B2",
+      "storage.J1.B2"
+    ],
+    [
+      "main.J11.B3",
+      "storage.J1.B3"
+    ],
+    [
+      "main.J11.B4",
+      "storage.J1.B4"
+    ],
+    [
+      "main.J11.B5",
+      "storage.J1.B5"
+    ],
+    [
+      "main.J11.B6",
+      "storage.J1.B6"
+    ],
+    [
+      "main.J11.B7",
+      "storage.J1.B7"
+    ],
+    [
+      "main.J11.B8",
+      "storage.J1.B8"
+    ],
+    [
+      "main.J11.B9",
+      "storage.J1.B9"
+    ],
+    [
+      "main.J11.A1",
+      "wifi.J1.A1"
+    ],
+    [
+      "main.J11.A10",
+      "wifi.J1.A10"
+    ],
+    [
+      "main.J11.A11",
+      "wifi.J1.A11"
+    ],
+    [
+      "main.J11.A12",
+      "wifi.J1.A12"
+    ],
+    [
+      "main.J11.A13",
+      "wifi.J1.A13"
+    ],
+    [
+      "main.J11.A14",
+      "wifi.J1.A14"
+    ],
+    [
+      "main.J11.A15",
+      "wifi.J1.A15"
+    ],
+    [
+      "main.J11.A16",
+      "wifi.J1.A16"
+    ],
+    [
+      "main.J11.A17",
+      "wifi.J1.A17"
+    ],
+    [
+      "main.J11.A18",
+      "wifi.J1.A18"
+    ],
+    [
+      "main.J11.A2",
+      "wifi.J1.A2"
+    ],
+    [
+      "main.J11.A3",
+      "wifi.J1.A3"
+    ],
+    [
+      "main.J11.A4",
+      "wifi.J1.A4"
+    ],
+    [
+      "main.J11.A5",
+      "wifi.J1.A5"
+    ],
+    [
+      "main.J11.A6",
+      "wifi.J1.A6"
+    ],
+    [
+      "main.J11.A7",
+      "wifi.J1.A7"
+    ],
+    [
+      "main.J11.A8",
+      "wifi.J1.A8"
+    ],
+    [
+      "main.J11.A9",
+      "wifi.J1.A9"
+    ],
+    [
+      "main.J11.B1",
+      "wifi.J1.B1"
+    ],
+    [
+      "main.J11.B10",
+      "wifi.J1.B10"
+    ],
+    [
+      "main.J11.B11",
+      "wifi.J1.B11"
+    ],
+    [
+      "main.J11.B12",
+      "wifi.J1.B12"
+    ],
+    [
+      "main.J11.B13",
+      "wifi.J1.B13"
+    ],
+    [
+      "main.J11.B14",
+      "wifi.J1.B14"
+    ],
+    [
+      "main.J11.B15",
+      "wifi.J1.B15"
+    ],
+    [
+      "main.J11.B16",
+      "wifi.J1.B16"
+    ],
+    [
+      "main.J11.B17",
+      "wifi.J1.B17"
+    ],
+    [
+      "main.J11.B18",
+      "wifi.J1.B18"
+    ],
+    [
+      "main.J11.B2",
+      "wifi.J1.B2"
+    ],
+    [
+      "main.J11.B3",
+      "wifi.J1.B3"
+    ],
+    [
+      "main.J11.B4",
+      "wifi.J1.B4"
+    ],
+    [
+      "main.J11.B5",
+      "wifi.J1.B5"
+    ],
+    [
+      "main.J11.B6",
+      "wifi.J1.B6"
+    ],
+    [
+      "main.J11.B7",
+      "wifi.J1.B7"
+    ],
+    [
+      "main.J11.B8",
+      "wifi.J1.B8"
+    ],
+    [
+      "main.J11.B9",
+      "wifi.J1.B9"
+    ],
+    [
+      "main.J11.A1",
+      "eink.J1.A1"
+    ],
+    [
+      "main.J11.A10",
+      "eink.J1.A10"
+    ],
+    [
+      "main.J11.A11",
+      "eink.J1.A11"
+    ],
+    [
+      "main.J11.A12",
+      "eink.J1.A12"
+    ],
+    [
+      "main.J11.A13",
+      "eink.J1.A13"
+    ],
+    [
+      "main.J11.A14",
+      "eink.J1.A14"
+    ],
+    [
+      "main.J11.A15",
+      "eink.J1.A15"
+    ],
+    [
+      "main.J11.A16",
+      "eink.J1.A16"
+    ],
+    [
+      "main.J11.A17",
+      "eink.J1.A17"
+    ],
+    [
+      "main.J11.A18",
+      "eink.J1.A18"
+    ],
+    [
+      "main.J11.A2",
+      "eink.J1.A2"
+    ],
+    [
+      "main.J11.A3",
+      "eink.J1.A3"
+    ],
+    [
+      "main.J11.A4",
+      "eink.J1.A4"
+    ],
+    [
+      "main.J11.A5",
+      "eink.J1.A5"
+    ],
+    [
+      "main.J11.A6",
+      "eink.J1.A6"
+    ],
+    [
+      "main.J11.A7",
+      "eink.J1.A7"
+    ],
+    [
+      "main.J11.A8",
+      "eink.J1.A8"
+    ],
+    [
+      "main.J11.A9",
+      "eink.J1.A9"
+    ],
+    [
+      "main.J11.B1",
+      "eink.J1.B1"
+    ],
+    [
+      "main.J11.B10",
+      "eink.J1.B10"
+    ],
+    [
+      "main.J11.B11",
+      "eink.J1.B11"
+    ],
+    [
+      "main.J11.B12",
+      "eink.J1.B12"
+    ],
+    [
+      "main.J11.B13",
+      "eink.J1.B13"
+    ],
+    [
+      "main.J11.B14",
+      "eink.J1.B14"
+    ],
+    [
+      "main.J11.B15",
+      "eink.J1.B15"
+    ],
+    [
+      "main.J11.B16",
+      "eink.J1.B16"
+    ],
+    [
+      "main.J11.B17",
+      "eink.J1.B17"
+    ],
+    [
+      "main.J11.B18",
+      "eink.J1.B18"
+    ],
+    [
+      "main.J11.B2",
+      "eink.J1.B2"
+    ],
+    [
+      "main.J11.B3",
+      "eink.J1.B3"
+    ],
+    [
+      "main.J11.B4",
+      "eink.J1.B4"
+    ],
+    [
+      "main.J11.B5",
+      "eink.J1.B5"
+    ],
+    [
+      "main.J11.B6",
+      "eink.J1.B6"
+    ],
+    [
+      "main.J11.B7",
+      "eink.J1.B7"
+    ],
+    [
+      "main.J11.B8",
+      "eink.J1.B8"
+    ],
+    [
+      "main.J11.B9",
+      "eink.J1.B9"
+    ],
+    [
+      "main.J12.A1",
+      "gpu.J1.A1"
+    ],
+    [
+      "main.J12.A10",
+      "gpu.J1.A10"
+    ],
+    [
+      "main.J12.A11",
+      "gpu.J1.A11"
+    ],
+    [
+      "main.J12.A12",
+      "gpu.J1.A12"
+    ],
+    [
+      "main.J12.A13",
+      "gpu.J1.A13"
+    ],
+    [
+      "main.J12.A14",
+      "gpu.J1.A14"
+    ],
+    [
+      "main.J12.A15",
+      "gpu.J1.A15"
+    ],
+    [
+      "main.J12.A16",
+      "gpu.J1.A16"
+    ],
+    [
+      "main.J12.A17",
+      "gpu.J1.A17"
+    ],
+    [
+      "main.J12.A18",
+      "gpu.J1.A18"
+    ],
+    [
+      "main.J12.A2",
+      "gpu.J1.A2"
+    ],
+    [
+      "main.J12.A3",
+      "gpu.J1.A3"
+    ],
+    [
+      "main.J12.A4",
+      "gpu.J1.A4"
+    ],
+    [
+      "main.J12.A5",
+      "gpu.J1.A5"
+    ],
+    [
+      "main.J12.A6",
+      "gpu.J1.A6"
+    ],
+    [
+      "main.J12.A7",
+      "gpu.J1.A7"
+    ],
+    [
+      "main.J12.A8",
+      "gpu.J1.A8"
+    ],
+    [
+      "main.J12.A9",
+      "gpu.J1.A9"
+    ],
+    [
+      "main.J12.B1",
+      "gpu.J1.B1"
+    ],
+    [
+      "main.J12.B10",
+      "gpu.J1.B10"
+    ],
+    [
+      "main.J12.B11",
+      "gpu.J1.B11"
+    ],
+    [
+      "main.J12.B12",
+      "gpu.J1.B12"
+    ],
+    [
+      "main.J12.B13",
+      "gpu.J1.B13"
+    ],
+    [
+      "main.J12.B14",
+      "gpu.J1.B14"
+    ],
+    [
+      "main.J12.B15",
+      "gpu.J1.B15"
+    ],
+    [
+      "main.J12.B16",
+      "gpu.J1.B16"
+    ],
+    [
+      "main.J12.B17",
+      "gpu.J1.B17"
+    ],
+    [
+      "main.J12.B18",
+      "gpu.J1.B18"
+    ],
+    [
+      "main.J12.B2",
+      "gpu.J1.B2"
+    ],
+    [
+      "main.J12.B3",
+      "gpu.J1.B3"
+    ],
+    [
+      "main.J12.B4",
+      "gpu.J1.B4"
+    ],
+    [
+      "main.J12.B5",
+      "gpu.J1.B5"
+    ],
+    [
+      "main.J12.B6",
+      "gpu.J1.B6"
+    ],
+    [
+      "main.J12.B7",
+      "gpu.J1.B7"
+    ],
+    [
+      "main.J12.B8",
+      "gpu.J1.B8"
+    ],
+    [
+      "main.J12.B9",
+      "gpu.J1.B9"
+    ],
+    [
+      "main.J12.A1",
+      "io.J1.A1"
+    ],
+    [
+      "main.J12.A10",
+      "io.J1.A10"
+    ],
+    [
+      "main.J12.A11",
+      "io.J1.A11"
+    ],
+    [
+      "main.J12.A12",
+      "io.J1.A12"
+    ],
+    [
+      "main.J12.A13",
+      "io.J1.A13"
+    ],
+    [
+      "main.J12.A14",
+      "io.J1.A14"
+    ],
+    [
+      "main.J12.A15",
+      "io.J1.A15"
+    ],
+    [
+      "main.J12.A16",
+      "io.J1.A16"
+    ],
+    [
+      "main.J12.A17",
+      "io.J1.A17"
+    ],
+    [
+      "main.J12.A18",
+      "io.J1.A18"
+    ],
+    [
+      "main.J12.A2",
+      "io.J1.A2"
+    ],
+    [
+      "main.J12.A3",
+      "io.J1.A3"
+    ],
+    [
+      "main.J12.A4",
+      "io.J1.A4"
+    ],
+    [
+      "main.J12.A5",
+      "io.J1.A5"
+    ],
+    [
+      "main.J12.A6",
+      "io.J1.A6"
+    ],
+    [
+      "main.J12.A7",
+      "io.J1.A7"
+    ],
+    [
+      "main.J12.A8",
+      "io.J1.A8"
+    ],
+    [
+      "main.J12.A9",
+      "io.J1.A9"
+    ],
+    [
+      "main.J12.B1",
+      "io.J1.B1"
+    ],
+    [
+      "main.J12.B10",
+      "io.J1.B10"
+    ],
+    [
+      "main.J12.B11",
+      "io.J1.B11"
+    ],
+    [
+      "main.J12.B12",
+      "io.J1.B12"
+    ],
+    [
+      "main.J12.B13",
+      "io.J1.B13"
+    ],
+    [
+      "main.J12.B14",
+      "io.J1.B14"
+    ],
+    [
+      "main.J12.B15",
+      "io.J1.B15"
+    ],
+    [
+      "main.J12.B16",
+      "io.J1.B16"
+    ],
+    [
+      "main.J12.B17",
+      "io.J1.B17"
+    ],
+    [
+      "main.J12.B18",
+      "io.J1.B18"
+    ],
+    [
+      "main.J12.B2",
+      "io.J1.B2"
+    ],
+    [
+      "main.J12.B3",
+      "io.J1.B3"
+    ],
+    [
+      "main.J12.B4",
+      "io.J1.B4"
+    ],
+    [
+      "main.J12.B5",
+      "io.J1.B5"
+    ],
+    [
+      "main.J12.B6",
+      "io.J1.B6"
+    ],
+    [
+      "main.J12.B7",
+      "io.J1.B7"
+    ],
+    [
+      "main.J12.B8",
+      "io.J1.B8"
+    ],
+    [
+      "main.J12.B9",
+      "io.J1.B9"
+    ],
+    [
+      "main.J12.A1",
+      "storage.J1.A1"
+    ],
+    [
+      "main.J12.A10",
+      "storage.J1.A10"
+    ],
+    [
+      "main.J12.A11",
+      "storage.J1.A11"
+    ],
+    [
+      "main.J12.A12",
+      "storage.J1.A12"
+    ],
+    [
+      "main.J12.A13",
+      "storage.J1.A13"
+    ],
+    [
+      "main.J12.A14",
+      "storage.J1.A14"
+    ],
+    [
+      "main.J12.A15",
+      "storage.J1.A15"
+    ],
+    [
+      "main.J12.A16",
+      "storage.J1.A16"
+    ],
+    [
+      "main.J12.A17",
+      "storage.J1.A17"
+    ],
+    [
+      "main.J12.A18",
+      "storage.J1.A18"
+    ],
+    [
+      "main.J12.A2",
+      "storage.J1.A2"
+    ],
+    [
+      "main.J12.A3",
+      "storage.J1.A3"
+    ],
+    [
+      "main.J12.A4",
+      "storage.J1.A4"
+    ],
+    [
+      "main.J12.A5",
+      "storage.J1.A5"
+    ],
+    [
+      "main.J12.A6",
+      "storage.J1.A6"
+    ],
+    [
+      "main.J12.A7",
+      "storage.J1.A7"
+    ],
+    [
+      "main.J12.A8",
+      "storage.J1.A8"
+    ],
+    [
+      "main.J12.A9",
+      "storage.J1.A9"
+    ],
+    [
+      "main.J12.B1",
+      "storage.J1.B1"
+    ],
+    [
+      "main.J12.B10",
+      "storage.J1.B10"
+    ],
+    [
+      "main.J12.B11",
+      "storage.J1.B11"
+    ],
+    [
+      "main.J12.B12",
+      "storage.J1.B12"
+    ],
+    [
+      "main.J12.B13",
+      "storage.J1.B13"
+    ],
+    [
+      "main.J12.B14",
+      "storage.J1.B14"
+    ],
+    [
+      "main.J12.B15",
+      "storage.J1.B15"
+    ],
+    [
+      "main.J12.B16",
+      "storage.J1.B16"
+    ],
+    [
+      "main.J12.B17",
+      "storage.J1.B17"
+    ],
+    [
+      "main.J12.B18",
+      "storage.J1.B18"
+    ],
+    [
+      "main.J12.B2",
+      "storage.J1.B2"
+    ],
+    [
+      "main.J12.B3",
+      "storage.J1.B3"
+    ],
+    [
+      "main.J12.B4",
+      "storage.J1.B4"
+    ],
+    [
+      "main.J12.B5",
+      "storage.J1.B5"
+    ],
+    [
+      "main.J12.B6",
+      "storage.J1.B6"
+    ],
+    [
+      "main.J12.B7",
+      "storage.J1.B7"
+    ],
+    [
+      "main.J12.B8",
+      "storage.J1.B8"
+    ],
+    [
+      "main.J12.B9",
+      "storage.J1.B9"
+    ],
+    [
+      "main.J12.A1",
+      "wifi.J1.A1"
+    ],
+    [
+      "main.J12.A10",
+      "wifi.J1.A10"
+    ],
+    [
+      "main.J12.A11",
+      "wifi.J1.A11"
+    ],
+    [
+      "main.J12.A12",
+      "wifi.J1.A12"
+    ],
+    [
+      "main.J12.A13",
+      "wifi.J1.A13"
+    ],
+    [
+      "main.J12.A14",
+      "wifi.J1.A14"
+    ],
+    [
+      "main.J12.A15",
+      "wifi.J1.A15"
+    ],
+    [
+      "main.J12.A16",
+      "wifi.J1.A16"
+    ],
+    [
+      "main.J12.A17",
+      "wifi.J1.A17"
+    ],
+    [
+      "main.J12.A18",
+      "wifi.J1.A18"
+    ],
+    [
+      "main.J12.A2",
+      "wifi.J1.A2"
+    ],
+    [
+      "main.J12.A3",
+      "wifi.J1.A3"
+    ],
+    [
+      "main.J12.A4",
+      "wifi.J1.A4"
+    ],
+    [
+      "main.J12.A5",
+      "wifi.J1.A5"
+    ],
+    [
+      "main.J12.A6",
+      "wifi.J1.A6"
+    ],
+    [
+      "main.J12.A7",
+      "wifi.J1.A7"
+    ],
+    [
+      "main.J12.A8",
+      "wifi.J1.A8"
+    ],
+    [
+      "main.J12.A9",
+      "wifi.J1.A9"
+    ],
+    [
+      "main.J12.B1",
+      "wifi.J1.B1"
+    ],
+    [
+      "main.J12.B10",
+      "wifi.J1.B10"
+    ],
+    [
+      "main.J12.B11",
+      "wifi.J1.B11"
+    ],
+    [
+      "main.J12.B12",
+      "wifi.J1.B12"
+    ],
+    [
+      "main.J12.B13",
+      "wifi.J1.B13"
+    ],
+    [
+      "main.J12.B14",
+      "wifi.J1.B14"
+    ],
+    [
+      "main.J12.B15",
+      "wifi.J1.B15"
+    ],
+    [
+      "main.J12.B16",
+      "wifi.J1.B16"
+    ],
+    [
+      "main.J12.B17",
+      "wifi.J1.B17"
+    ],
+    [
+      "main.J12.B18",
+      "wifi.J1.B18"
+    ],
+    [
+      "main.J12.B2",
+      "wifi.J1.B2"
+    ],
+    [
+      "main.J12.B3",
+      "wifi.J1.B3"
+    ],
+    [
+      "main.J12.B4",
+      "wifi.J1.B4"
+    ],
+    [
+      "main.J12.B5",
+      "wifi.J1.B5"
+    ],
+    [
+      "main.J12.B6",
+      "wifi.J1.B6"
+    ],
+    [
+      "main.J12.B7",
+      "wifi.J1.B7"
+    ],
+    [
+      "main.J12.B8",
+      "wifi.J1.B8"
+    ],
+    [
+      "main.J12.B9",
+      "wifi.J1.B9"
+    ],
+    [
+      "main.J12.A1",
+      "eink.J1.A1"
+    ],
+    [
+      "main.J12.A10",
+      "eink.J1.A10"
+    ],
+    [
+      "main.J12.A11",
+      "eink.J1.A11"
+    ],
+    [
+      "main.J12.A12",
+      "eink.J1.A12"
+    ],
+    [
+      "main.J12.A13",
+      "eink.J1.A13"
+    ],
+    [
+      "main.J12.A14",
+      "eink.J1.A14"
+    ],
+    [
+      "main.J12.A15",
+      "eink.J1.A15"
+    ],
+    [
+      "main.J12.A16",
+      "eink.J1.A16"
+    ],
+    [
+      "main.J12.A17",
+      "eink.J1.A17"
+    ],
+    [
+      "main.J12.A18",
+      "eink.J1.A18"
+    ],
+    [
+      "main.J12.A2",
+      "eink.J1.A2"
+    ],
+    [
+      "main.J12.A3",
+      "eink.J1.A3"
+    ],
+    [
+      "main.J12.A4",
+      "eink.J1.A4"
+    ],
+    [
+      "main.J12.A5",
+      "eink.J1.A5"
+    ],
+    [
+      "main.J12.A6",
+      "eink.J1.A6"
+    ],
+    [
+      "main.J12.A7",
+      "eink.J1.A7"
+    ],
+    [
+      "main.J12.A8",
+      "eink.J1.A8"
+    ],
+    [
+      "main.J12.A9",
+      "eink.J1.A9"
+    ],
+    [
+      "main.J12.B1",
+      "eink.J1.B1"
+    ],
+    [
+      "main.J12.B10",
+      "eink.J1.B10"
+    ],
+    [
+      "main.J12.B11",
+      "eink.J1.B11"
+    ],
+    [
+      "main.J12.B12",
+      "eink.J1.B12"
+    ],
+    [
+      "main.J12.B13",
+      "eink.J1.B13"
+    ],
+    [
+      "main.J12.B14",
+      "eink.J1.B14"
+    ],
+    [
+      "main.J12.B15",
+      "eink.J1.B15"
+    ],
+    [
+      "main.J12.B16",
+      "eink.J1.B16"
+    ],
+    [
+      "main.J12.B17",
+      "eink.J1.B17"
+    ],
+    [
+      "main.J12.B18",
+      "eink.J1.B18"
+    ],
+    [
+      "main.J12.B2",
+      "eink.J1.B2"
+    ],
+    [
+      "main.J12.B3",
+      "eink.J1.B3"
+    ],
+    [
+      "main.J12.B4",
+      "eink.J1.B4"
+    ],
+    [
+      "main.J12.B5",
+      "eink.J1.B5"
+    ],
+    [
+      "main.J12.B6",
+      "eink.J1.B6"
+    ],
+    [
+      "main.J12.B7",
+      "eink.J1.B7"
+    ],
+    [
+      "main.J12.B8",
+      "eink.J1.B8"
+    ],
+    [
+      "main.J12.B9",
+      "eink.J1.B9"
+    ],
+    [
+      "main.J13.A1",
+      "gpu.J1.A1"
+    ],
+    [
+      "main.J13.A10",
+      "gpu.J1.A10"
+    ],
+    [
+      "main.J13.A11",
+      "gpu.J1.A11"
+    ],
+    [
+      "main.J13.A12",
+      "gpu.J1.A12"
+    ],
+    [
+      "main.J13.A13",
+      "gpu.J1.A13"
+    ],
+    [
+      "main.J13.A14",
+      "gpu.J1.A14"
+    ],
+    [
+      "main.J13.A15",
+      "gpu.J1.A15"
+    ],
+    [
+      "main.J13.A16",
+      "gpu.J1.A16"
+    ],
+    [
+      "main.J13.A17",
+      "gpu.J1.A17"
+    ],
+    [
+      "main.J13.A18",
+      "gpu.J1.A18"
+    ],
+    [
+      "main.J13.A2",
+      "gpu.J1.A2"
+    ],
+    [
+      "main.J13.A3",
+      "gpu.J1.A3"
+    ],
+    [
+      "main.J13.A4",
+      "gpu.J1.A4"
+    ],
+    [
+      "main.J13.A5",
+      "gpu.J1.A5"
+    ],
+    [
+      "main.J13.A6",
+      "gpu.J1.A6"
+    ],
+    [
+      "main.J13.A7",
+      "gpu.J1.A7"
+    ],
+    [
+      "main.J13.A8",
+      "gpu.J1.A8"
+    ],
+    [
+      "main.J13.A9",
+      "gpu.J1.A9"
+    ],
+    [
+      "main.J13.B1",
+      "gpu.J1.B1"
+    ],
+    [
+      "main.J13.B10",
+      "gpu.J1.B10"
+    ],
+    [
+      "main.J13.B11",
+      "gpu.J1.B11"
+    ],
+    [
+      "main.J13.B12",
+      "gpu.J1.B12"
+    ],
+    [
+      "main.J13.B13",
+      "gpu.J1.B13"
+    ],
+    [
+      "main.J13.B14",
+      "gpu.J1.B14"
+    ],
+    [
+      "main.J13.B15",
+      "gpu.J1.B15"
+    ],
+    [
+      "main.J13.B16",
+      "gpu.J1.B16"
+    ],
+    [
+      "main.J13.B17",
+      "gpu.J1.B17"
+    ],
+    [
+      "main.J13.B18",
+      "gpu.J1.B18"
+    ],
+    [
+      "main.J13.B2",
+      "gpu.J1.B2"
+    ],
+    [
+      "main.J13.B3",
+      "gpu.J1.B3"
+    ],
+    [
+      "main.J13.B4",
+      "gpu.J1.B4"
+    ],
+    [
+      "main.J13.B5",
+      "gpu.J1.B5"
+    ],
+    [
+      "main.J13.B6",
+      "gpu.J1.B6"
+    ],
+    [
+      "main.J13.B7",
+      "gpu.J1.B7"
+    ],
+    [
+      "main.J13.B8",
+      "gpu.J1.B8"
+    ],
+    [
+      "main.J13.B9",
+      "gpu.J1.B9"
+    ],
+    [
+      "main.J13.A1",
+      "io.J1.A1"
+    ],
+    [
+      "main.J13.A10",
+      "io.J1.A10"
+    ],
+    [
+      "main.J13.A11",
+      "io.J1.A11"
+    ],
+    [
+      "main.J13.A12",
+      "io.J1.A12"
+    ],
+    [
+      "main.J13.A13",
+      "io.J1.A13"
+    ],
+    [
+      "main.J13.A14",
+      "io.J1.A14"
+    ],
+    [
+      "main.J13.A15",
+      "io.J1.A15"
+    ],
+    [
+      "main.J13.A16",
+      "io.J1.A16"
+    ],
+    [
+      "main.J13.A17",
+      "io.J1.A17"
+    ],
+    [
+      "main.J13.A18",
+      "io.J1.A18"
+    ],
+    [
+      "main.J13.A2",
+      "io.J1.A2"
+    ],
+    [
+      "main.J13.A3",
+      "io.J1.A3"
+    ],
+    [
+      "main.J13.A4",
+      "io.J1.A4"
+    ],
+    [
+      "main.J13.A5",
+      "io.J1.A5"
+    ],
+    [
+      "main.J13.A6",
+      "io.J1.A6"
+    ],
+    [
+      "main.J13.A7",
+      "io.J1.A7"
+    ],
+    [
+      "main.J13.A8",
+      "io.J1.A8"
+    ],
+    [
+      "main.J13.A9",
+      "io.J1.A9"
+    ],
+    [
+      "main.J13.B1",
+      "io.J1.B1"
+    ],
+    [
+      "main.J13.B10",
+      "io.J1.B10"
+    ],
+    [
+      "main.J13.B11",
+      "io.J1.B11"
+    ],
+    [
+      "main.J13.B12",
+      "io.J1.B12"
+    ],
+    [
+      "main.J13.B13",
+      "io.J1.B13"
+    ],
+    [
+      "main.J13.B14",
+      "io.J1.B14"
+    ],
+    [
+      "main.J13.B15",
+      "io.J1.B15"
+    ],
+    [
+      "main.J13.B16",
+      "io.J1.B16"
+    ],
+    [
+      "main.J13.B17",
+      "io.J1.B17"
+    ],
+    [
+      "main.J13.B18",
+      "io.J1.B18"
+    ],
+    [
+      "main.J13.B2",
+      "io.J1.B2"
+    ],
+    [
+      "main.J13.B3",
+      "io.J1.B3"
+    ],
+    [
+      "main.J13.B4",
+      "io.J1.B4"
+    ],
+    [
+      "main.J13.B5",
+      "io.J1.B5"
+    ],
+    [
+      "main.J13.B6",
+      "io.J1.B6"
+    ],
+    [
+      "main.J13.B7",
+      "io.J1.B7"
+    ],
+    [
+      "main.J13.B8",
+      "io.J1.B8"
+    ],
+    [
+      "main.J13.B9",
+      "io.J1.B9"
+    ],
+    [
+      "main.J13.A1",
+      "storage.J1.A1"
+    ],
+    [
+      "main.J13.A10",
+      "storage.J1.A10"
+    ],
+    [
+      "main.J13.A11",
+      "storage.J1.A11"
+    ],
+    [
+      "main.J13.A12",
+      "storage.J1.A12"
+    ],
+    [
+      "main.J13.A13",
+      "storage.J1.A13"
+    ],
+    [
+      "main.J13.A14",
+      "storage.J1.A14"
+    ],
+    [
+      "main.J13.A15",
+      "storage.J1.A15"
+    ],
+    [
+      "main.J13.A16",
+      "storage.J1.A16"
+    ],
+    [
+      "main.J13.A17",
+      "storage.J1.A17"
+    ],
+    [
+      "main.J13.A18",
+      "storage.J1.A18"
+    ],
+    [
+      "main.J13.A2",
+      "storage.J1.A2"
+    ],
+    [
+      "main.J13.A3",
+      "storage.J1.A3"
+    ],
+    [
+      "main.J13.A4",
+      "storage.J1.A4"
+    ],
+    [
+      "main.J13.A5",
+      "storage.J1.A5"
+    ],
+    [
+      "main.J13.A6",
+      "storage.J1.A6"
+    ],
+    [
+      "main.J13.A7",
+      "storage.J1.A7"
+    ],
+    [
+      "main.J13.A8",
+      "storage.J1.A8"
+    ],
+    [
+      "main.J13.A9",
+      "storage.J1.A9"
+    ],
+    [
+      "main.J13.B1",
+      "storage.J1.B1"
+    ],
+    [
+      "main.J13.B10",
+      "storage.J1.B10"
+    ],
+    [
+      "main.J13.B11",
+      "storage.J1.B11"
+    ],
+    [
+      "main.J13.B12",
+      "storage.J1.B12"
+    ],
+    [
+      "main.J13.B13",
+      "storage.J1.B13"
+    ],
+    [
+      "main.J13.B14",
+      "storage.J1.B14"
+    ],
+    [
+      "main.J13.B15",
+      "storage.J1.B15"
+    ],
+    [
+      "main.J13.B16",
+      "storage.J1.B16"
+    ],
+    [
+      "main.J13.B17",
+      "storage.J1.B17"
+    ],
+    [
+      "main.J13.B18",
+      "storage.J1.B18"
+    ],
+    [
+      "main.J13.B2",
+      "storage.J1.B2"
+    ],
+    [
+      "main.J13.B3",
+      "storage.J1.B3"
+    ],
+    [
+      "main.J13.B4",
+      "storage.J1.B4"
+    ],
+    [
+      "main.J13.B5",
+      "storage.J1.B5"
+    ],
+    [
+      "main.J13.B6",
+      "storage.J1.B6"
+    ],
+    [
+      "main.J13.B7",
+      "storage.J1.B7"
+    ],
+    [
+      "main.J13.B8",
+      "storage.J1.B8"
+    ],
+    [
+      "main.J13.B9",
+      "storage.J1.B9"
+    ],
+    [
+      "main.J13.A1",
+      "wifi.J1.A1"
+    ],
+    [
+      "main.J13.A10",
+      "wifi.J1.A10"
+    ],
+    [
+      "main.J13.A11",
+      "wifi.J1.A11"
+    ],
+    [
+      "main.J13.A12",
+      "wifi.J1.A12"
+    ],
+    [
+      "main.J13.A13",
+      "wifi.J1.A13"
+    ],
+    [
+      "main.J13.A14",
+      "wifi.J1.A14"
+    ],
+    [
+      "main.J13.A15",
+      "wifi.J1.A15"
+    ],
+    [
+      "main.J13.A16",
+      "wifi.J1.A16"
+    ],
+    [
+      "main.J13.A17",
+      "wifi.J1.A17"
+    ],
+    [
+      "main.J13.A18",
+      "wifi.J1.A18"
+    ],
+    [
+      "main.J13.A2",
+      "wifi.J1.A2"
+    ],
+    [
+      "main.J13.A3",
+      "wifi.J1.A3"
+    ],
+    [
+      "main.J13.A4",
+      "wifi.J1.A4"
+    ],
+    [
+      "main.J13.A5",
+      "wifi.J1.A5"
+    ],
+    [
+      "main.J13.A6",
+      "wifi.J1.A6"
+    ],
+    [
+      "main.J13.A7",
+      "wifi.J1.A7"
+    ],
+    [
+      "main.J13.A8",
+      "wifi.J1.A8"
+    ],
+    [
+      "main.J13.A9",
+      "wifi.J1.A9"
+    ],
+    [
+      "main.J13.B1",
+      "wifi.J1.B1"
+    ],
+    [
+      "main.J13.B10",
+      "wifi.J1.B10"
+    ],
+    [
+      "main.J13.B11",
+      "wifi.J1.B11"
+    ],
+    [
+      "main.J13.B12",
+      "wifi.J1.B12"
+    ],
+    [
+      "main.J13.B13",
+      "wifi.J1.B13"
+    ],
+    [
+      "main.J13.B14",
+      "wifi.J1.B14"
+    ],
+    [
+      "main.J13.B15",
+      "wifi.J1.B15"
+    ],
+    [
+      "main.J13.B16",
+      "wifi.J1.B16"
+    ],
+    [
+      "main.J13.B17",
+      "wifi.J1.B17"
+    ],
+    [
+      "main.J13.B18",
+      "wifi.J1.B18"
+    ],
+    [
+      "main.J13.B2",
+      "wifi.J1.B2"
+    ],
+    [
+      "main.J13.B3",
+      "wifi.J1.B3"
+    ],
+    [
+      "main.J13.B4",
+      "wifi.J1.B4"
+    ],
+    [
+      "main.J13.B5",
+      "wifi.J1.B5"
+    ],
+    [
+      "main.J13.B6",
+      "wifi.J1.B6"
+    ],
+    [
+      "main.J13.B7",
+      "wifi.J1.B7"
+    ],
+    [
+      "main.J13.B8",
+      "wifi.J1.B8"
+    ],
+    [
+      "main.J13.B9",
+      "wifi.J1.B9"
+    ],
+    [
+      "main.J13.A1",
+      "eink.J1.A1"
+    ],
+    [
+      "main.J13.A10",
+      "eink.J1.A10"
+    ],
+    [
+      "main.J13.A11",
+      "eink.J1.A11"
+    ],
+    [
+      "main.J13.A12",
+      "eink.J1.A12"
+    ],
+    [
+      "main.J13.A13",
+      "eink.J1.A13"
+    ],
+    [
+      "main.J13.A14",
+      "eink.J1.A14"
+    ],
+    [
+      "main.J13.A15",
+      "eink.J1.A15"
+    ],
+    [
+      "main.J13.A16",
+      "eink.J1.A16"
+    ],
+    [
+      "main.J13.A17",
+      "eink.J1.A17"
+    ],
+    [
+      "main.J13.A18",
+      "eink.J1.A18"
+    ],
+    [
+      "main.J13.A2",
+      "eink.J1.A2"
+    ],
+    [
+      "main.J13.A3",
+      "eink.J1.A3"
+    ],
+    [
+      "main.J13.A4",
+      "eink.J1.A4"
+    ],
+    [
+      "main.J13.A5",
+      "eink.J1.A5"
+    ],
+    [
+      "main.J13.A6",
+      "eink.J1.A6"
+    ],
+    [
+      "main.J13.A7",
+      "eink.J1.A7"
+    ],
+    [
+      "main.J13.A8",
+      "eink.J1.A8"
+    ],
+    [
+      "main.J13.A9",
+      "eink.J1.A9"
+    ],
+    [
+      "main.J13.B1",
+      "eink.J1.B1"
+    ],
+    [
+      "main.J13.B10",
+      "eink.J1.B10"
+    ],
+    [
+      "main.J13.B11",
+      "eink.J1.B11"
+    ],
+    [
+      "main.J13.B12",
+      "eink.J1.B12"
+    ],
+    [
+      "main.J13.B13",
+      "eink.J1.B13"
+    ],
+    [
+      "main.J13.B14",
+      "eink.J1.B14"
+    ],
+    [
+      "main.J13.B15",
+      "eink.J1.B15"
+    ],
+    [
+      "main.J13.B16",
+      "eink.J1.B16"
+    ],
+    [
+      "main.J13.B17",
+      "eink.J1.B17"
+    ],
+    [
+      "main.J13.B18",
+      "eink.J1.B18"
+    ],
+    [
+      "main.J13.B2",
+      "eink.J1.B2"
+    ],
+    [
+      "main.J13.B3",
+      "eink.J1.B3"
+    ],
+    [
+      "main.J13.B4",
+      "eink.J1.B4"
+    ],
+    [
+      "main.J13.B5",
+      "eink.J1.B5"
+    ],
+    [
+      "main.J13.B6",
+      "eink.J1.B6"
+    ],
+    [
+      "main.J13.B7",
+      "eink.J1.B7"
+    ],
+    [
+      "main.J13.B8",
+      "eink.J1.B8"
+    ],
+    [
+      "main.J13.B9",
+      "eink.J1.B9"
+    ],
+    [
+      "main.J14.A1",
+      "gpu.J1.A1"
+    ],
+    [
+      "main.J14.A10",
+      "gpu.J1.A10"
+    ],
+    [
+      "main.J14.A11",
+      "gpu.J1.A11"
+    ],
+    [
+      "main.J14.A12",
+      "gpu.J1.A12"
+    ],
+    [
+      "main.J14.A13",
+      "gpu.J1.A13"
+    ],
+    [
+      "main.J14.A14",
+      "gpu.J1.A14"
+    ],
+    [
+      "main.J14.A15",
+      "gpu.J1.A15"
+    ],
+    [
+      "main.J14.A16",
+      "gpu.J1.A16"
+    ],
+    [
+      "main.J14.A17",
+      "gpu.J1.A17"
+    ],
+    [
+      "main.J14.A18",
+      "gpu.J1.A18"
+    ],
+    [
+      "main.J14.A2",
+      "gpu.J1.A2"
+    ],
+    [
+      "main.J14.A3",
+      "gpu.J1.A3"
+    ],
+    [
+      "main.J14.A4",
+      "gpu.J1.A4"
+    ],
+    [
+      "main.J14.A5",
+      "gpu.J1.A5"
+    ],
+    [
+      "main.J14.A6",
+      "gpu.J1.A6"
+    ],
+    [
+      "main.J14.A7",
+      "gpu.J1.A7"
+    ],
+    [
+      "main.J14.A8",
+      "gpu.J1.A8"
+    ],
+    [
+      "main.J14.A9",
+      "gpu.J1.A9"
+    ],
+    [
+      "main.J14.B1",
+      "gpu.J1.B1"
+    ],
+    [
+      "main.J14.B10",
+      "gpu.J1.B10"
+    ],
+    [
+      "main.J14.B11",
+      "gpu.J1.B11"
+    ],
+    [
+      "main.J14.B12",
+      "gpu.J1.B12"
+    ],
+    [
+      "main.J14.B13",
+      "gpu.J1.B13"
+    ],
+    [
+      "main.J14.B14",
+      "gpu.J1.B14"
+    ],
+    [
+      "main.J14.B15",
+      "gpu.J1.B15"
+    ],
+    [
+      "main.J14.B16",
+      "gpu.J1.B16"
+    ],
+    [
+      "main.J14.B17",
+      "gpu.J1.B17"
+    ],
+    [
+      "main.J14.B18",
+      "gpu.J1.B18"
+    ],
+    [
+      "main.J14.B2",
+      "gpu.J1.B2"
+    ],
+    [
+      "main.J14.B3",
+      "gpu.J1.B3"
+    ],
+    [
+      "main.J14.B4",
+      "gpu.J1.B4"
+    ],
+    [
+      "main.J14.B5",
+      "gpu.J1.B5"
+    ],
+    [
+      "main.J14.B6",
+      "gpu.J1.B6"
+    ],
+    [
+      "main.J14.B7",
+      "gpu.J1.B7"
+    ],
+    [
+      "main.J14.B8",
+      "gpu.J1.B8"
+    ],
+    [
+      "main.J14.B9",
+      "gpu.J1.B9"
+    ],
+    [
+      "main.J14.A1",
+      "io.J1.A1"
+    ],
+    [
+      "main.J14.A10",
+      "io.J1.A10"
+    ],
+    [
+      "main.J14.A11",
+      "io.J1.A11"
+    ],
+    [
+      "main.J14.A12",
+      "io.J1.A12"
+    ],
+    [
+      "main.J14.A13",
+      "io.J1.A13"
+    ],
+    [
+      "main.J14.A14",
+      "io.J1.A14"
+    ],
+    [
+      "main.J14.A15",
+      "io.J1.A15"
+    ],
+    [
+      "main.J14.A16",
+      "io.J1.A16"
+    ],
+    [
+      "main.J14.A17",
+      "io.J1.A17"
+    ],
+    [
+      "main.J14.A18",
+      "io.J1.A18"
+    ],
+    [
+      "main.J14.A2",
+      "io.J1.A2"
+    ],
+    [
+      "main.J14.A3",
+      "io.J1.A3"
+    ],
+    [
+      "main.J14.A4",
+      "io.J1.A4"
+    ],
+    [
+      "main.J14.A5",
+      "io.J1.A5"
+    ],
+    [
+      "main.J14.A6",
+      "io.J1.A6"
+    ],
+    [
+      "main.J14.A7",
+      "io.J1.A7"
+    ],
+    [
+      "main.J14.A8",
+      "io.J1.A8"
+    ],
+    [
+      "main.J14.A9",
+      "io.J1.A9"
+    ],
+    [
+      "main.J14.B1",
+      "io.J1.B1"
+    ],
+    [
+      "main.J14.B10",
+      "io.J1.B10"
+    ],
+    [
+      "main.J14.B11",
+      "io.J1.B11"
+    ],
+    [
+      "main.J14.B12",
+      "io.J1.B12"
+    ],
+    [
+      "main.J14.B13",
+      "io.J1.B13"
+    ],
+    [
+      "main.J14.B14",
+      "io.J1.B14"
+    ],
+    [
+      "main.J14.B15",
+      "io.J1.B15"
+    ],
+    [
+      "main.J14.B16",
+      "io.J1.B16"
+    ],
+    [
+      "main.J14.B17",
+      "io.J1.B17"
+    ],
+    [
+      "main.J14.B18",
+      "io.J1.B18"
+    ],
+    [
+      "main.J14.B2",
+      "io.J1.B2"
+    ],
+    [
+      "main.J14.B3",
+      "io.J1.B3"
+    ],
+    [
+      "main.J14.B4",
+      "io.J1.B4"
+    ],
+    [
+      "main.J14.B5",
+      "io.J1.B5"
+    ],
+    [
+      "main.J14.B6",
+      "io.J1.B6"
+    ],
+    [
+      "main.J14.B7",
+      "io.J1.B7"
+    ],
+    [
+      "main.J14.B8",
+      "io.J1.B8"
+    ],
+    [
+      "main.J14.B9",
+      "io.J1.B9"
+    ],
+    [
+      "main.J14.A1",
+      "storage.J1.A1"
+    ],
+    [
+      "main.J14.A10",
+      "storage.J1.A10"
+    ],
+    [
+      "main.J14.A11",
+      "storage.J1.A11"
+    ],
+    [
+      "main.J14.A12",
+      "storage.J1.A12"
+    ],
+    [
+      "main.J14.A13",
+      "storage.J1.A13"
+    ],
+    [
+      "main.J14.A14",
+      "storage.J1.A14"
+    ],
+    [
+      "main.J14.A15",
+      "storage.J1.A15"
+    ],
+    [
+      "main.J14.A16",
+      "storage.J1.A16"
+    ],
+    [
+      "main.J14.A17",
+      "storage.J1.A17"
+    ],
+    [
+      "main.J14.A18",
+      "storage.J1.A18"
+    ],
+    [
+      "main.J14.A2",
+      "storage.J1.A2"
+    ],
+    [
+      "main.J14.A3",
+      "storage.J1.A3"
+    ],
+    [
+      "main.J14.A4",
+      "storage.J1.A4"
+    ],
+    [
+      "main.J14.A5",
+      "storage.J1.A5"
+    ],
+    [
+      "main.J14.A6",
+      "storage.J1.A6"
+    ],
+    [
+      "main.J14.A7",
+      "storage.J1.A7"
+    ],
+    [
+      "main.J14.A8",
+      "storage.J1.A8"
+    ],
+    [
+      "main.J14.A9",
+      "storage.J1.A9"
+    ],
+    [
+      "main.J14.B1",
+      "storage.J1.B1"
+    ],
+    [
+      "main.J14.B10",
+      "storage.J1.B10"
+    ],
+    [
+      "main.J14.B11",
+      "storage.J1.B11"
+    ],
+    [
+      "main.J14.B12",
+      "storage.J1.B12"
+    ],
+    [
+      "main.J14.B13",
+      "storage.J1.B13"
+    ],
+    [
+      "main.J14.B14",
+      "storage.J1.B14"
+    ],
+    [
+      "main.J14.B15",
+      "storage.J1.B15"
+    ],
+    [
+      "main.J14.B16",
+      "storage.J1.B16"
+    ],
+    [
+      "main.J14.B17",
+      "storage.J1.B17"
+    ],
+    [
+      "main.J14.B18",
+      "storage.J1.B18"
+    ],
+    [
+      "main.J14.B2",
+      "storage.J1.B2"
+    ],
+    [
+      "main.J14.B3",
+      "storage.J1.B3"
+    ],
+    [
+      "main.J14.B4",
+      "storage.J1.B4"
+    ],
+    [
+      "main.J14.B5",
+      "storage.J1.B5"
+    ],
+    [
+      "main.J14.B6",
+      "storage.J1.B6"
+    ],
+    [
+      "main.J14.B7",
+      "storage.J1.B7"
+    ],
+    [
+      "main.J14.B8",
+      "storage.J1.B8"
+    ],
+    [
+      "main.J14.B9",
+      "storage.J1.B9"
+    ],
+    [
+      "main.J14.A1",
+      "wifi.J1.A1"
+    ],
+    [
+      "main.J14.A10",
+      "wifi.J1.A10"
+    ],
+    [
+      "main.J14.A11",
+      "wifi.J1.A11"
+    ],
+    [
+      "main.J14.A12",
+      "wifi.J1.A12"
+    ],
+    [
+      "main.J14.A13",
+      "wifi.J1.A13"
+    ],
+    [
+      "main.J14.A14",
+      "wifi.J1.A14"
+    ],
+    [
+      "main.J14.A15",
+      "wifi.J1.A15"
+    ],
+    [
+      "main.J14.A16",
+      "wifi.J1.A16"
+    ],
+    [
+      "main.J14.A17",
+      "wifi.J1.A17"
+    ],
+    [
+      "main.J14.A18",
+      "wifi.J1.A18"
+    ],
+    [
+      "main.J14.A2",
+      "wifi.J1.A2"
+    ],
+    [
+      "main.J14.A3",
+      "wifi.J1.A3"
+    ],
+    [
+      "main.J14.A4",
+      "wifi.J1.A4"
+    ],
+    [
+      "main.J14.A5",
+      "wifi.J1.A5"
+    ],
+    [
+      "main.J14.A6",
+      "wifi.J1.A6"
+    ],
+    [
+      "main.J14.A7",
+      "wifi.J1.A7"
+    ],
+    [
+      "main.J14.A8",
+      "wifi.J1.A8"
+    ],
+    [
+      "main.J14.A9",
+      "wifi.J1.A9"
+    ],
+    [
+      "main.J14.B1",
+      "wifi.J1.B1"
+    ],
+    [
+      "main.J14.B10",
+      "wifi.J1.B10"
+    ],
+    [
+      "main.J14.B11",
+      "wifi.J1.B11"
+    ],
+    [
+      "main.J14.B12",
+      "wifi.J1.B12"
+    ],
+    [
+      "main.J14.B13",
+      "wifi.J1.B13"
+    ],
+    [
+      "main.J14.B14",
+      "wifi.J1.B14"
+    ],
+    [
+      "main.J14.B15",
+      "wifi.J1.B15"
+    ],
+    [
+      "main.J14.B16",
+      "wifi.J1.B16"
+    ],
+    [
+      "main.J14.B17",
+      "wifi.J1.B17"
+    ],
+    [
+      "main.J14.B18",
+      "wifi.J1.B18"
+    ],
+    [
+      "main.J14.B2",
+      "wifi.J1.B2"
+    ],
+    [
+      "main.J14.B3",
+      "wifi.J1.B3"
+    ],
+    [
+      "main.J14.B4",
+      "wifi.J1.B4"
+    ],
+    [
+      "main.J14.B5",
+      "wifi.J1.B5"
+    ],
+    [
+      "main.J14.B6",
+      "wifi.J1.B6"
+    ],
+    [
+      "main.J14.B7",
+      "wifi.J1.B7"
+    ],
+    [
+      "main.J14.B8",
+      "wifi.J1.B8"
+    ],
+    [
+      "main.J14.B9",
+      "wifi.J1.B9"
+    ],
+    [
+      "main.J14.A1",
+      "eink.J1.A1"
+    ],
+    [
+      "main.J14.A10",
+      "eink.J1.A10"
+    ],
+    [
+      "main.J14.A11",
+      "eink.J1.A11"
+    ],
+    [
+      "main.J14.A12",
+      "eink.J1.A12"
+    ],
+    [
+      "main.J14.A13",
+      "eink.J1.A13"
+    ],
+    [
+      "main.J14.A14",
+      "eink.J1.A14"
+    ],
+    [
+      "main.J14.A15",
+      "eink.J1.A15"
+    ],
+    [
+      "main.J14.A16",
+      "eink.J1.A16"
+    ],
+    [
+      "main.J14.A17",
+      "eink.J1.A17"
+    ],
+    [
+      "main.J14.A18",
+      "eink.J1.A18"
+    ],
+    [
+      "main.J14.A2",
+      "eink.J1.A2"
+    ],
+    [
+      "main.J14.A3",
+      "eink.J1.A3"
+    ],
+    [
+      "main.J14.A4",
+      "eink.J1.A4"
+    ],
+    [
+      "main.J14.A5",
+      "eink.J1.A5"
+    ],
+    [
+      "main.J14.A6",
+      "eink.J1.A6"
+    ],
+    [
+      "main.J14.A7",
+      "eink.J1.A7"
+    ],
+    [
+      "main.J14.A8",
+      "eink.J1.A8"
+    ],
+    [
+      "main.J14.A9",
+      "eink.J1.A9"
+    ],
+    [
+      "main.J14.B1",
+      "eink.J1.B1"
+    ],
+    [
+      "main.J14.B10",
+      "eink.J1.B10"
+    ],
+    [
+      "main.J14.B11",
+      "eink.J1.B11"
+    ],
+    [
+      "main.J14.B12",
+      "eink.J1.B12"
+    ],
+    [
+      "main.J14.B13",
+      "eink.J1.B13"
+    ],
+    [
+      "main.J14.B14",
+      "eink.J1.B14"
+    ],
+    [
+      "main.J14.B15",
+      "eink.J1.B15"
+    ],
+    [
+      "main.J14.B16",
+      "eink.J1.B16"
+    ],
+    [
+      "main.J14.B17",
+      "eink.J1.B17"
+    ],
+    [
+      "main.J14.B18",
+      "eink.J1.B18"
+    ],
+    [
+      "main.J14.B2",
+      "eink.J1.B2"
+    ],
+    [
+      "main.J14.B3",
+      "eink.J1.B3"
+    ],
+    [
+      "main.J14.B4",
+      "eink.J1.B4"
+    ],
+    [
+      "main.J14.B5",
+      "eink.J1.B5"
+    ],
+    [
+      "main.J14.B6",
+      "eink.J1.B6"
+    ],
+    [
+      "main.J14.B7",
+      "eink.J1.B7"
+    ],
+    [
+      "main.J14.B8",
+      "eink.J1.B8"
+    ],
+    [
+      "main.J14.B9",
+      "eink.J1.B9"
+    ],
+    [
+      "main.J15.A1",
+      "gpu.J1.A1"
+    ],
+    [
+      "main.J15.A10",
+      "gpu.J1.A10"
+    ],
+    [
+      "main.J15.A11",
+      "gpu.J1.A11"
+    ],
+    [
+      "main.J15.A12",
+      "gpu.J1.A12"
+    ],
+    [
+      "main.J15.A13",
+      "gpu.J1.A13"
+    ],
+    [
+      "main.J15.A14",
+      "gpu.J1.A14"
+    ],
+    [
+      "main.J15.A15",
+      "gpu.J1.A15"
+    ],
+    [
+      "main.J15.A16",
+      "gpu.J1.A16"
+    ],
+    [
+      "main.J15.A17",
+      "gpu.J1.A17"
+    ],
+    [
+      "main.J15.A18",
+      "gpu.J1.A18"
+    ],
+    [
+      "main.J15.A2",
+      "gpu.J1.A2"
+    ],
+    [
+      "main.J15.A3",
+      "gpu.J1.A3"
+    ],
+    [
+      "main.J15.A4",
+      "gpu.J1.A4"
+    ],
+    [
+      "main.J15.A5",
+      "gpu.J1.A5"
+    ],
+    [
+      "main.J15.A6",
+      "gpu.J1.A6"
+    ],
+    [
+      "main.J15.A7",
+      "gpu.J1.A7"
+    ],
+    [
+      "main.J15.A8",
+      "gpu.J1.A8"
+    ],
+    [
+      "main.J15.A9",
+      "gpu.J1.A9"
+    ],
+    [
+      "main.J15.B1",
+      "gpu.J1.B1"
+    ],
+    [
+      "main.J15.B10",
+      "gpu.J1.B10"
+    ],
+    [
+      "main.J15.B11",
+      "gpu.J1.B11"
+    ],
+    [
+      "main.J15.B12",
+      "gpu.J1.B12"
+    ],
+    [
+      "main.J15.B13",
+      "gpu.J1.B13"
+    ],
+    [
+      "main.J15.B14",
+      "gpu.J1.B14"
+    ],
+    [
+      "main.J15.B15",
+      "gpu.J1.B15"
+    ],
+    [
+      "main.J15.B16",
+      "gpu.J1.B16"
+    ],
+    [
+      "main.J15.B17",
+      "gpu.J1.B17"
+    ],
+    [
+      "main.J15.B18",
+      "gpu.J1.B18"
+    ],
+    [
+      "main.J15.B2",
+      "gpu.J1.B2"
+    ],
+    [
+      "main.J15.B3",
+      "gpu.J1.B3"
+    ],
+    [
+      "main.J15.B4",
+      "gpu.J1.B4"
+    ],
+    [
+      "main.J15.B5",
+      "gpu.J1.B5"
+    ],
+    [
+      "main.J15.B6",
+      "gpu.J1.B6"
+    ],
+    [
+      "main.J15.B7",
+      "gpu.J1.B7"
+    ],
+    [
+      "main.J15.B8",
+      "gpu.J1.B8"
+    ],
+    [
+      "main.J15.B9",
+      "gpu.J1.B9"
+    ],
+    [
+      "main.J15.A1",
+      "io.J1.A1"
+    ],
+    [
+      "main.J15.A10",
+      "io.J1.A10"
+    ],
+    [
+      "main.J15.A11",
+      "io.J1.A11"
+    ],
+    [
+      "main.J15.A12",
+      "io.J1.A12"
+    ],
+    [
+      "main.J15.A13",
+      "io.J1.A13"
+    ],
+    [
+      "main.J15.A14",
+      "io.J1.A14"
+    ],
+    [
+      "main.J15.A15",
+      "io.J1.A15"
+    ],
+    [
+      "main.J15.A16",
+      "io.J1.A16"
+    ],
+    [
+      "main.J15.A17",
+      "io.J1.A17"
+    ],
+    [
+      "main.J15.A18",
+      "io.J1.A18"
+    ],
+    [
+      "main.J15.A2",
+      "io.J1.A2"
+    ],
+    [
+      "main.J15.A3",
+      "io.J1.A3"
+    ],
+    [
+      "main.J15.A4",
+      "io.J1.A4"
+    ],
+    [
+      "main.J15.A5",
+      "io.J1.A5"
+    ],
+    [
+      "main.J15.A6",
+      "io.J1.A6"
+    ],
+    [
+      "main.J15.A7",
+      "io.J1.A7"
+    ],
+    [
+      "main.J15.A8",
+      "io.J1.A8"
+    ],
+    [
+      "main.J15.A9",
+      "io.J1.A9"
+    ],
+    [
+      "main.J15.B1",
+      "io.J1.B1"
+    ],
+    [
+      "main.J15.B10",
+      "io.J1.B10"
+    ],
+    [
+      "main.J15.B11",
+      "io.J1.B11"
+    ],
+    [
+      "main.J15.B12",
+      "io.J1.B12"
+    ],
+    [
+      "main.J15.B13",
+      "io.J1.B13"
+    ],
+    [
+      "main.J15.B14",
+      "io.J1.B14"
+    ],
+    [
+      "main.J15.B15",
+      "io.J1.B15"
+    ],
+    [
+      "main.J15.B16",
+      "io.J1.B16"
+    ],
+    [
+      "main.J15.B17",
+      "io.J1.B17"
+    ],
+    [
+      "main.J15.B18",
+      "io.J1.B18"
+    ],
+    [
+      "main.J15.B2",
+      "io.J1.B2"
+    ],
+    [
+      "main.J15.B3",
+      "io.J1.B3"
+    ],
+    [
+      "main.J15.B4",
+      "io.J1.B4"
+    ],
+    [
+      "main.J15.B5",
+      "io.J1.B5"
+    ],
+    [
+      "main.J15.B6",
+      "io.J1.B6"
+    ],
+    [
+      "main.J15.B7",
+      "io.J1.B7"
+    ],
+    [
+      "main.J15.B8",
+      "io.J1.B8"
+    ],
+    [
+      "main.J15.B9",
+      "io.J1.B9"
+    ],
+    [
+      "main.J15.A1",
+      "storage.J1.A1"
+    ],
+    [
+      "main.J15.A10",
+      "storage.J1.A10"
+    ],
+    [
+      "main.J15.A11",
+      "storage.J1.A11"
+    ],
+    [
+      "main.J15.A12",
+      "storage.J1.A12"
+    ],
+    [
+      "main.J15.A13",
+      "storage.J1.A13"
+    ],
+    [
+      "main.J15.A14",
+      "storage.J1.A14"
+    ],
+    [
+      "main.J15.A15",
+      "storage.J1.A15"
+    ],
+    [
+      "main.J15.A16",
+      "storage.J1.A16"
+    ],
+    [
+      "main.J15.A17",
+      "storage.J1.A17"
+    ],
+    [
+      "main.J15.A18",
+      "storage.J1.A18"
+    ],
+    [
+      "main.J15.A2",
+      "storage.J1.A2"
+    ],
+    [
+      "main.J15.A3",
+      "storage.J1.A3"
+    ],
+    [
+      "main.J15.A4",
+      "storage.J1.A4"
+    ],
+    [
+      "main.J15.A5",
+      "storage.J1.A5"
+    ],
+    [
+      "main.J15.A6",
+      "storage.J1.A6"
+    ],
+    [
+      "main.J15.A7",
+      "storage.J1.A7"
+    ],
+    [
+      "main.J15.A8",
+      "storage.J1.A8"
+    ],
+    [
+      "main.J15.A9",
+      "storage.J1.A9"
+    ],
+    [
+      "main.J15.B1",
+      "storage.J1.B1"
+    ],
+    [
+      "main.J15.B10",
+      "storage.J1.B10"
+    ],
+    [
+      "main.J15.B11",
+      "storage.J1.B11"
+    ],
+    [
+      "main.J15.B12",
+      "storage.J1.B12"
+    ],
+    [
+      "main.J15.B13",
+      "storage.J1.B13"
+    ],
+    [
+      "main.J15.B14",
+      "storage.J1.B14"
+    ],
+    [
+      "main.J15.B15",
+      "storage.J1.B15"
+    ],
+    [
+      "main.J15.B16",
+      "storage.J1.B16"
+    ],
+    [
+      "main.J15.B17",
+      "storage.J1.B17"
+    ],
+    [
+      "main.J15.B18",
+      "storage.J1.B18"
+    ],
+    [
+      "main.J15.B2",
+      "storage.J1.B2"
+    ],
+    [
+      "main.J15.B3",
+      "storage.J1.B3"
+    ],
+    [
+      "main.J15.B4",
+      "storage.J1.B4"
+    ],
+    [
+      "main.J15.B5",
+      "storage.J1.B5"
+    ],
+    [
+      "main.J15.B6",
+      "storage.J1.B6"
+    ],
+    [
+      "main.J15.B7",
+      "storage.J1.B7"
+    ],
+    [
+      "main.J15.B8",
+      "storage.J1.B8"
+    ],
+    [
+      "main.J15.B9",
+      "storage.J1.B9"
+    ],
+    [
+      "main.J15.A1",
+      "wifi.J1.A1"
+    ],
+    [
+      "main.J15.A10",
+      "wifi.J1.A10"
+    ],
+    [
+      "main.J15.A11",
+      "wifi.J1.A11"
+    ],
+    [
+      "main.J15.A12",
+      "wifi.J1.A12"
+    ],
+    [
+      "main.J15.A13",
+      "wifi.J1.A13"
+    ],
+    [
+      "main.J15.A14",
+      "wifi.J1.A14"
+    ],
+    [
+      "main.J15.A15",
+      "wifi.J1.A15"
+    ],
+    [
+      "main.J15.A16",
+      "wifi.J1.A16"
+    ],
+    [
+      "main.J15.A17",
+      "wifi.J1.A17"
+    ],
+    [
+      "main.J15.A18",
+      "wifi.J1.A18"
+    ],
+    [
+      "main.J15.A2",
+      "wifi.J1.A2"
+    ],
+    [
+      "main.J15.A3",
+      "wifi.J1.A3"
+    ],
+    [
+      "main.J15.A4",
+      "wifi.J1.A4"
+    ],
+    [
+      "main.J15.A5",
+      "wifi.J1.A5"
+    ],
+    [
+      "main.J15.A6",
+      "wifi.J1.A6"
+    ],
+    [
+      "main.J15.A7",
+      "wifi.J1.A7"
+    ],
+    [
+      "main.J15.A8",
+      "wifi.J1.A8"
+    ],
+    [
+      "main.J15.A9",
+      "wifi.J1.A9"
+    ],
+    [
+      "main.J15.B1",
+      "wifi.J1.B1"
+    ],
+    [
+      "main.J15.B10",
+      "wifi.J1.B10"
+    ],
+    [
+      "main.J15.B11",
+      "wifi.J1.B11"
+    ],
+    [
+      "main.J15.B12",
+      "wifi.J1.B12"
+    ],
+    [
+      "main.J15.B13",
+      "wifi.J1.B13"
+    ],
+    [
+      "main.J15.B14",
+      "wifi.J1.B14"
+    ],
+    [
+      "main.J15.B15",
+      "wifi.J1.B15"
+    ],
+    [
+      "main.J15.B16",
+      "wifi.J1.B16"
+    ],
+    [
+      "main.J15.B17",
+      "wifi.J1.B17"
+    ],
+    [
+      "main.J15.B18",
+      "wifi.J1.B18"
+    ],
+    [
+      "main.J15.B2",
+      "wifi.J1.B2"
+    ],
+    [
+      "main.J15.B3",
+      "wifi.J1.B3"
+    ],
+    [
+      "main.J15.B4",
+      "wifi.J1.B4"
+    ],
+    [
+      "main.J15.B5",
+      "wifi.J1.B5"
+    ],
+    [
+      "main.J15.B6",
+      "wifi.J1.B6"
+    ],
+    [
+      "main.J15.B7",
+      "wifi.J1.B7"
+    ],
+    [
+      "main.J15.B8",
+      "wifi.J1.B8"
+    ],
+    [
+      "main.J15.B9",
+      "wifi.J1.B9"
+    ],
+    [
+      "main.J15.A1",
+      "eink.J1.A1"
+    ],
+    [
+      "main.J15.A10",
+      "eink.J1.A10"
+    ],
+    [
+      "main.J15.A11",
+      "eink.J1.A11"
+    ],
+    [
+      "main.J15.A12",
+      "eink.J1.A12"
+    ],
+    [
+      "main.J15.A13",
+      "eink.J1.A13"
+    ],
+    [
+      "main.J15.A14",
+      "eink.J1.A14"
+    ],
+    [
+      "main.J15.A15",
+      "eink.J1.A15"
+    ],
+    [
+      "main.J15.A16",
+      "eink.J1.A16"
+    ],
+    [
+      "main.J15.A17",
+      "eink.J1.A17"
+    ],
+    [
+      "main.J15.A18",
+      "eink.J1.A18"
+    ],
+    [
+      "main.J15.A2",
+      "eink.J1.A2"
+    ],
+    [
+      "main.J15.A3",
+      "eink.J1.A3"
+    ],
+    [
+      "main.J15.A4",
+      "eink.J1.A4"
+    ],
+    [
+      "main.J15.A5",
+      "eink.J1.A5"
+    ],
+    [
+      "main.J15.A6",
+      "eink.J1.A6"
+    ],
+    [
+      "main.J15.A7",
+      "eink.J1.A7"
+    ],
+    [
+      "main.J15.A8",
+      "eink.J1.A8"
+    ],
+    [
+      "main.J15.A9",
+      "eink.J1.A9"
+    ],
+    [
+      "main.J15.B1",
+      "eink.J1.B1"
+    ],
+    [
+      "main.J15.B10",
+      "eink.J1.B10"
+    ],
+    [
+      "main.J15.B11",
+      "eink.J1.B11"
+    ],
+    [
+      "main.J15.B12",
+      "eink.J1.B12"
+    ],
+    [
+      "main.J15.B13",
+      "eink.J1.B13"
+    ],
+    [
+      "main.J15.B14",
+      "eink.J1.B14"
+    ],
+    [
+      "main.J15.B15",
+      "eink.J1.B15"
+    ],
+    [
+      "main.J15.B16",
+      "eink.J1.B16"
+    ],
+    [
+      "main.J15.B17",
+      "eink.J1.B17"
+    ],
+    [
+      "main.J15.B18",
+      "eink.J1.B18"
+    ],
+    [
+      "main.J15.B2",
+      "eink.J1.B2"
+    ],
+    [
+      "main.J15.B3",
+      "eink.J1.B3"
+    ],
+    [
+      "main.J15.B4",
+      "eink.J1.B4"
+    ],
+    [
+      "main.J15.B5",
+      "eink.J1.B5"
+    ],
+    [
+      "main.J15.B6",
+      "eink.J1.B6"
+    ],
+    [
+      "main.J15.B7",
+      "eink.J1.B7"
+    ],
+    [
+      "main.J15.B8",
+      "eink.J1.B8"
+    ],
+    [
+      "main.J15.B9",
+      "eink.J1.B9"
+    ],
+    [
+      "main.J16.A1",
+      "gpu.J1.A1"
+    ],
+    [
+      "main.J16.A10",
+      "gpu.J1.A10"
+    ],
+    [
+      "main.J16.A11",
+      "gpu.J1.A11"
+    ],
+    [
+      "main.J16.A12",
+      "gpu.J1.A12"
+    ],
+    [
+      "main.J16.A13",
+      "gpu.J1.A13"
+    ],
+    [
+      "main.J16.A14",
+      "gpu.J1.A14"
+    ],
+    [
+      "main.J16.A15",
+      "gpu.J1.A15"
+    ],
+    [
+      "main.J16.A16",
+      "gpu.J1.A16"
+    ],
+    [
+      "main.J16.A17",
+      "gpu.J1.A17"
+    ],
+    [
+      "main.J16.A18",
+      "gpu.J1.A18"
+    ],
+    [
+      "main.J16.A2",
+      "gpu.J1.A2"
+    ],
+    [
+      "main.J16.A3",
+      "gpu.J1.A3"
+    ],
+    [
+      "main.J16.A4",
+      "gpu.J1.A4"
+    ],
+    [
+      "main.J16.A5",
+      "gpu.J1.A5"
+    ],
+    [
+      "main.J16.A6",
+      "gpu.J1.A6"
+    ],
+    [
+      "main.J16.A7",
+      "gpu.J1.A7"
+    ],
+    [
+      "main.J16.A8",
+      "gpu.J1.A8"
+    ],
+    [
+      "main.J16.A9",
+      "gpu.J1.A9"
+    ],
+    [
+      "main.J16.B1",
+      "gpu.J1.B1"
+    ],
+    [
+      "main.J16.B10",
+      "gpu.J1.B10"
+    ],
+    [
+      "main.J16.B11",
+      "gpu.J1.B11"
+    ],
+    [
+      "main.J16.B12",
+      "gpu.J1.B12"
+    ],
+    [
+      "main.J16.B13",
+      "gpu.J1.B13"
+    ],
+    [
+      "main.J16.B14",
+      "gpu.J1.B14"
+    ],
+    [
+      "main.J16.B15",
+      "gpu.J1.B15"
+    ],
+    [
+      "main.J16.B16",
+      "gpu.J1.B16"
+    ],
+    [
+      "main.J16.B17",
+      "gpu.J1.B17"
+    ],
+    [
+      "main.J16.B18",
+      "gpu.J1.B18"
+    ],
+    [
+      "main.J16.B2",
+      "gpu.J1.B2"
+    ],
+    [
+      "main.J16.B3",
+      "gpu.J1.B3"
+    ],
+    [
+      "main.J16.B4",
+      "gpu.J1.B4"
+    ],
+    [
+      "main.J16.B5",
+      "gpu.J1.B5"
+    ],
+    [
+      "main.J16.B6",
+      "gpu.J1.B6"
+    ],
+    [
+      "main.J16.B7",
+      "gpu.J1.B7"
+    ],
+    [
+      "main.J16.B8",
+      "gpu.J1.B8"
+    ],
+    [
+      "main.J16.B9",
+      "gpu.J1.B9"
+    ],
+    [
+      "main.J16.A1",
+      "io.J1.A1"
+    ],
+    [
+      "main.J16.A10",
+      "io.J1.A10"
+    ],
+    [
+      "main.J16.A11",
+      "io.J1.A11"
+    ],
+    [
+      "main.J16.A12",
+      "io.J1.A12"
+    ],
+    [
+      "main.J16.A13",
+      "io.J1.A13"
+    ],
+    [
+      "main.J16.A14",
+      "io.J1.A14"
+    ],
+    [
+      "main.J16.A15",
+      "io.J1.A15"
+    ],
+    [
+      "main.J16.A16",
+      "io.J1.A16"
+    ],
+    [
+      "main.J16.A17",
+      "io.J1.A17"
+    ],
+    [
+      "main.J16.A18",
+      "io.J1.A18"
+    ],
+    [
+      "main.J16.A2",
+      "io.J1.A2"
+    ],
+    [
+      "main.J16.A3",
+      "io.J1.A3"
+    ],
+    [
+      "main.J16.A4",
+      "io.J1.A4"
+    ],
+    [
+      "main.J16.A5",
+      "io.J1.A5"
+    ],
+    [
+      "main.J16.A6",
+      "io.J1.A6"
+    ],
+    [
+      "main.J16.A7",
+      "io.J1.A7"
+    ],
+    [
+      "main.J16.A8",
+      "io.J1.A8"
+    ],
+    [
+      "main.J16.A9",
+      "io.J1.A9"
+    ],
+    [
+      "main.J16.B1",
+      "io.J1.B1"
+    ],
+    [
+      "main.J16.B10",
+      "io.J1.B10"
+    ],
+    [
+      "main.J16.B11",
+      "io.J1.B11"
+    ],
+    [
+      "main.J16.B12",
+      "io.J1.B12"
+    ],
+    [
+      "main.J16.B13",
+      "io.J1.B13"
+    ],
+    [
+      "main.J16.B14",
+      "io.J1.B14"
+    ],
+    [
+      "main.J16.B15",
+      "io.J1.B15"
+    ],
+    [
+      "main.J16.B16",
+      "io.J1.B16"
+    ],
+    [
+      "main.J16.B17",
+      "io.J1.B17"
+    ],
+    [
+      "main.J16.B18",
+      "io.J1.B18"
+    ],
+    [
+      "main.J16.B2",
+      "io.J1.B2"
+    ],
+    [
+      "main.J16.B3",
+      "io.J1.B3"
+    ],
+    [
+      "main.J16.B4",
+      "io.J1.B4"
+    ],
+    [
+      "main.J16.B5",
+      "io.J1.B5"
+    ],
+    [
+      "main.J16.B6",
+      "io.J1.B6"
+    ],
+    [
+      "main.J16.B7",
+      "io.J1.B7"
+    ],
+    [
+      "main.J16.B8",
+      "io.J1.B8"
+    ],
+    [
+      "main.J16.B9",
+      "io.J1.B9"
+    ],
+    [
+      "main.J16.A1",
+      "storage.J1.A1"
+    ],
+    [
+      "main.J16.A10",
+      "storage.J1.A10"
+    ],
+    [
+      "main.J16.A11",
+      "storage.J1.A11"
+    ],
+    [
+      "main.J16.A12",
+      "storage.J1.A12"
+    ],
+    [
+      "main.J16.A13",
+      "storage.J1.A13"
+    ],
+    [
+      "main.J16.A14",
+      "storage.J1.A14"
+    ],
+    [
+      "main.J16.A15",
+      "storage.J1.A15"
+    ],
+    [
+      "main.J16.A16",
+      "storage.J1.A16"
+    ],
+    [
+      "main.J16.A17",
+      "storage.J1.A17"
+    ],
+    [
+      "main.J16.A18",
+      "storage.J1.A18"
+    ],
+    [
+      "main.J16.A2",
+      "storage.J1.A2"
+    ],
+    [
+      "main.J16.A3",
+      "storage.J1.A3"
+    ],
+    [
+      "main.J16.A4",
+      "storage.J1.A4"
+    ],
+    [
+      "main.J16.A5",
+      "storage.J1.A5"
+    ],
+    [
+      "main.J16.A6",
+      "storage.J1.A6"
+    ],
+    [
+      "main.J16.A7",
+      "storage.J1.A7"
+    ],
+    [
+      "main.J16.A8",
+      "storage.J1.A8"
+    ],
+    [
+      "main.J16.A9",
+      "storage.J1.A9"
+    ],
+    [
+      "main.J16.B1",
+      "storage.J1.B1"
+    ],
+    [
+      "main.J16.B10",
+      "storage.J1.B10"
+    ],
+    [
+      "main.J16.B11",
+      "storage.J1.B11"
+    ],
+    [
+      "main.J16.B12",
+      "storage.J1.B12"
+    ],
+    [
+      "main.J16.B13",
+      "storage.J1.B13"
+    ],
+    [
+      "main.J16.B14",
+      "storage.J1.B14"
+    ],
+    [
+      "main.J16.B15",
+      "storage.J1.B15"
+    ],
+    [
+      "main.J16.B16",
+      "storage.J1.B16"
+    ],
+    [
+      "main.J16.B17",
+      "storage.J1.B17"
+    ],
+    [
+      "main.J16.B18",
+      "storage.J1.B18"
+    ],
+    [
+      "main.J16.B2",
+      "storage.J1.B2"
+    ],
+    [
+      "main.J16.B3",
+      "storage.J1.B3"
+    ],
+    [
+      "main.J16.B4",
+      "storage.J1.B4"
+    ],
+    [
+      "main.J16.B5",
+      "storage.J1.B5"
+    ],
+    [
+      "main.J16.B6",
+      "storage.J1.B6"
+    ],
+    [
+      "main.J16.B7",
+      "storage.J1.B7"
+    ],
+    [
+      "main.J16.B8",
+      "storage.J1.B8"
+    ],
+    [
+      "main.J16.B9",
+      "storage.J1.B9"
+    ],
+    [
+      "main.J16.A1",
+      "wifi.J1.A1"
+    ],
+    [
+      "main.J16.A10",
+      "wifi.J1.A10"
+    ],
+    [
+      "main.J16.A11",
+      "wifi.J1.A11"
+    ],
+    [
+      "main.J16.A12",
+      "wifi.J1.A12"
+    ],
+    [
+      "main.J16.A13",
+      "wifi.J1.A13"
+    ],
+    [
+      "main.J16.A14",
+      "wifi.J1.A14"
+    ],
+    [
+      "main.J16.A15",
+      "wifi.J1.A15"
+    ],
+    [
+      "main.J16.A16",
+      "wifi.J1.A16"
+    ],
+    [
+      "main.J16.A17",
+      "wifi.J1.A17"
+    ],
+    [
+      "main.J16.A18",
+      "wifi.J1.A18"
+    ],
+    [
+      "main.J16.A2",
+      "wifi.J1.A2"
+    ],
+    [
+      "main.J16.A3",
+      "wifi.J1.A3"
+    ],
+    [
+      "main.J16.A4",
+      "wifi.J1.A4"
+    ],
+    [
+      "main.J16.A5",
+      "wifi.J1.A5"
+    ],
+    [
+      "main.J16.A6",
+      "wifi.J1.A6"
+    ],
+    [
+      "main.J16.A7",
+      "wifi.J1.A7"
+    ],
+    [
+      "main.J16.A8",
+      "wifi.J1.A8"
+    ],
+    [
+      "main.J16.A9",
+      "wifi.J1.A9"
+    ],
+    [
+      "main.J16.B1",
+      "wifi.J1.B1"
+    ],
+    [
+      "main.J16.B10",
+      "wifi.J1.B10"
+    ],
+    [
+      "main.J16.B11",
+      "wifi.J1.B11"
+    ],
+    [
+      "main.J16.B12",
+      "wifi.J1.B12"
+    ],
+    [
+      "main.J16.B13",
+      "wifi.J1.B13"
+    ],
+    [
+      "main.J16.B14",
+      "wifi.J1.B14"
+    ],
+    [
+      "main.J16.B15",
+      "wifi.J1.B15"
+    ],
+    [
+      "main.J16.B16",
+      "wifi.J1.B16"
+    ],
+    [
+      "main.J16.B17",
+      "wifi.J1.B17"
+    ],
+    [
+      "main.J16.B18",
+      "wifi.J1.B18"
+    ],
+    [
+      "main.J16.B2",
+      "wifi.J1.B2"
+    ],
+    [
+      "main.J16.B3",
+      "wifi.J1.B3"
+    ],
+    [
+      "main.J16.B4",
+      "wifi.J1.B4"
+    ],
+    [
+      "main.J16.B5",
+      "wifi.J1.B5"
+    ],
+    [
+      "main.J16.B6",
+      "wifi.J1.B6"
+    ],
+    [
+      "main.J16.B7",
+      "wifi.J1.B7"
+    ],
+    [
+      "main.J16.B8",
+      "wifi.J1.B8"
+    ],
+    [
+      "main.J16.B9",
+      "wifi.J1.B9"
+    ],
+    [
+      "main.J16.A1",
+      "eink.J1.A1"
+    ],
+    [
+      "main.J16.A10",
+      "eink.J1.A10"
+    ],
+    [
+      "main.J16.A11",
+      "eink.J1.A11"
+    ],
+    [
+      "main.J16.A12",
+      "eink.J1.A12"
+    ],
+    [
+      "main.J16.A13",
+      "eink.J1.A13"
+    ],
+    [
+      "main.J16.A14",
+      "eink.J1.A14"
+    ],
+    [
+      "main.J16.A15",
+      "eink.J1.A15"
+    ],
+    [
+      "main.J16.A16",
+      "eink.J1.A16"
+    ],
+    [
+      "main.J16.A17",
+      "eink.J1.A17"
+    ],
+    [
+      "main.J16.A18",
+      "eink.J1.A18"
+    ],
+    [
+      "main.J16.A2",
+      "eink.J1.A2"
+    ],
+    [
+      "main.J16.A3",
+      "eink.J1.A3"
+    ],
+    [
+      "main.J16.A4",
+      "eink.J1.A4"
+    ],
+    [
+      "main.J16.A5",
+      "eink.J1.A5"
+    ],
+    [
+      "main.J16.A6",
+      "eink.J1.A6"
+    ],
+    [
+      "main.J16.A7",
+      "eink.J1.A7"
+    ],
+    [
+      "main.J16.A8",
+      "eink.J1.A8"
+    ],
+    [
+      "main.J16.A9",
+      "eink.J1.A9"
+    ],
+    [
+      "main.J16.B1",
+      "eink.J1.B1"
+    ],
+    [
+      "main.J16.B10",
+      "eink.J1.B10"
+    ],
+    [
+      "main.J16.B11",
+      "eink.J1.B11"
+    ],
+    [
+      "main.J16.B12",
+      "eink.J1.B12"
+    ],
+    [
+      "main.J16.B13",
+      "eink.J1.B13"
+    ],
+    [
+      "main.J16.B14",
+      "eink.J1.B14"
+    ],
+    [
+      "main.J16.B15",
+      "eink.J1.B15"
+    ],
+    [
+      "main.J16.B16",
+      "eink.J1.B16"
+    ],
+    [
+      "main.J16.B17",
+      "eink.J1.B17"
+    ],
+    [
+      "main.J16.B18",
+      "eink.J1.B18"
+    ],
+    [
+      "main.J16.B2",
+      "eink.J1.B2"
+    ],
+    [
+      "main.J16.B3",
+      "eink.J1.B3"
+    ],
+    [
+      "main.J16.B4",
+      "eink.J1.B4"
+    ],
+    [
+      "main.J16.B5",
+      "eink.J1.B5"
+    ],
+    [
+      "main.J16.B6",
+      "eink.J1.B6"
+    ],
+    [
+      "main.J16.B7",
+      "eink.J1.B7"
+    ],
+    [
+      "main.J16.B8",
+      "eink.J1.B8"
+    ],
+    [
+      "main.J16.B9",
+      "eink.J1.B9"
+    ]
+  ],
+  "coverage_complete": false,
+  "coverage_families": {
+    "boot_and_programming": [
+      "cpu:CDONE",
+      "cpu:CRESET_n",
+      "cpu:FL1_MISO",
+      "cpu:FL1_MOSI",
+      "cpu:FL1_SCK",
+      "cpu:FL1_WPHOLD",
+      "cpu:FL1_nCS",
+      "eink:BOOTSEL",
+      "eink:SWDIO",
+      "gpu:BOOTSEL",
+      "gpu:SWDIO",
+      "io:BOOTSEL",
+      "io:SWDIO",
+      "main:CHIPSET_CDONE",
+      "main:CHIPSET_nCRESET",
+      "main:CPUCARD_nCRESET",
+      "main:CPU_CDONE",
+      "main:FL0_MISO",
+      "main:FL0_MOSI",
+      "main:FL0_SCK",
+      "main:FL0_nCS",
+      "main:FL1_MISO",
+      "main:FL1_MOSI",
+      "main:FL1_SCK",
+      "main:FL1_nCS",
+      "main:LED_CDONE_A",
+      "main:LED_CDONE_K",
+      "main:PROG_CLK",
+      "main:PROG_IO",
+      "main:SLOT1_PROG_n",
+      "main:SLOT1_SWDIO",
+      "main:SLOT2_PROG_n",
+      "main:SLOT2_SWDIO",
+      "main:SLOT3_PROG_n",
+      "main:SLOT3_SWDIO",
+      "main:SLOT4_PROG_n",
+      "main:SLOT4_SWDIO",
+      "main:SLOT5_PROG_n",
+      "main:SLOT5_SWDIO",
+      "main:SLOT6_PROG_n",
+      "main:SLOT6_SWDIO",
+      "storage:BOOTSEL",
+      "storage:SWDIO",
+      "system:BOOTSEL",
+      "system:CHIPSET_CDONE",
+      "system:CHIPSET_nCRESET",
+      "system:CPUCARD_CDONE",
+      "system:CPUCARD_nCRESET",
+      "system:FL0_MISO",
+      "system:FL0_MOSI",
+      "system:FL0_MOSI_MCU",
+      "system:FL0_SCK",
+      "system:FL0_SCK_MCU",
+      "system:FL0_nCS",
+      "system:FL0_nCS_MCU",
+      "system:FL1_MISO",
+      "system:FL1_MOSI",
+      "system:FL1_MOSI_MCU",
+      "system:FL1_SCK",
+      "system:FL1_SCK_MCU",
+      "system:FL1_nCS",
+      "system:FL1_nCS_MCU",
+      "system:PROG_CLK",
+      "system:PROG_IO",
+      "system:SWDIO",
+      "wifi:BOOT",
+      "wifi:STRAP2",
+      "wifi:STRAP8"
+    ],
+    "clock_and_reset": [
+      "eink:RUN",
+      "eink:SWCLK",
+      "eink:XIN",
+      "eink:XOUT",
+      "eink:XTAL_OUT",
+      "gpu:RUN",
+      "gpu:SWCLK",
+      "gpu:XIN",
+      "gpu:XOUT",
+      "gpu:XTAL_OUT",
+      "io:RUN",
+      "io:SWCLK",
+      "io:XIN",
+      "io:XOUT",
+      "io:XTAL_OUT",
+      "main:MUX_CLK1",
+      "main:MUX_CLK2",
+      "main:MUX_CLK3",
+      "main:MUX_CLK4",
+      "main:MUX_CLK5",
+      "main:MUX_CLK6",
+      "main:SLOT1_RST_n",
+      "main:SLOT1_SWCLK",
+      "main:SLOT2_RST_n",
+      "main:SLOT2_SWCLK",
+      "main:SLOT3_RST_n",
+      "main:SLOT3_SWCLK",
+      "main:SLOT4_RST_n",
+      "main:SLOT4_SWCLK",
+      "main:SLOT5_RST_n",
+      "main:SLOT5_SWCLK",
+      "main:SLOT6_RST_n",
+      "main:SLOT6_SWCLK",
+      "storage:RUN",
+      "storage:SWCLK",
+      "storage:XIN",
+      "storage:XOUT",
+      "storage:XTAL_OUT",
+      "system:RUN",
+      "system:SWCLK",
+      "system:XIN",
+      "system:XOUT",
+      "system:XOUT_X",
+      "wifi:EN"
+    ],
+    "cpu_and_memory": [
+      "cpu:CPU_IRQ0",
+      "cpu:CPU_IRQ1",
+      "cpu:CPU_IRQ2",
+      "cpu:CPU_IRQ3",
+      "cpu:CPU_TMR_EXP0",
+      "cpu:CPU_TMR_EXP1",
+      "cpu:FPGA_TMR_EXP0",
+      "cpu:FPGA_TMR_EXP1",
+      "main:CPU_CARD_ID0",
+      "main:CPU_CARD_ID1",
+      "main:CPU_IRQ0",
+      "main:CPU_IRQ0_SRC",
+      "main:CPU_IRQ1",
+      "main:CPU_IRQ1_SRC",
+      "main:CPU_IRQ2",
+      "main:CPU_IRQ2_SRC",
+      "main:CPU_IRQ3",
+      "main:CPU_IRQ3_SRC",
+      "main:CPU_PRSNT2_n",
+      "main:CPU_TMR_EXP0",
+      "main:CPU_TMR_EXP1"
+    ],
+    "external_io": [
+      "eink:UART_TX",
+      "gpu:DDC_SCL",
+      "gpu:DDC_SDA",
+      "gpu:HDMI_5V",
+      "gpu:HDMI_5V_F",
+      "gpu:HDMI_HPD",
+      "gpu:HDMI_SCL",
+      "gpu:HDMI_SDA",
+      "gpu:HPD_5V",
+      "gpu:UART_TX",
+      "io:UART_TX",
+      "storage:UART_TX",
+      "system:CC1",
+      "system:CC2",
+      "system:USB_CC1",
+      "system:USB_CC2",
+      "system:USB_DM",
+      "system:USB_DM_MCU",
+      "system:USB_DP",
+      "system:USB_DP_MCU",
+      "system:USB_VBUS",
+      "system:USB_nVBUS",
+      "wifi:U0RXD",
+      "wifi:U0TXD",
+      "wifi:USB_DN",
+      "wifi:USB_DP"
+    ],
+    "indicators": [
+      "cpu:LED_A",
+      "cpu:LED_B",
+      "cpu:LED_K",
+      "cpu:PWR_LED_A",
+      "eink:LED_PWR",
+      "eink:LED_REFRESH",
+      "eink:LED_REFRESH_A",
+      "gpu:LED_PWR",
+      "io:ISET",
+      "io:LED_KBD",
+      "io:LED_KBD_A",
+      "io:LED_KEY",
+      "io:LED_KEY_A",
+      "io:LED_PWR",
+      "main:LED_1V2_A",
+      "main:LED_1V2_K",
+      "main:LED_3V3",
+      "main:LED_5V",
+      "main:LED_PWR",
+      "storage:LED_ACT",
+      "storage:LED_ACT_A",
+      "storage:LED_CARD",
+      "storage:LED_CARD_A",
+      "storage:LED_PWR",
+      "system:LED_PWR",
+      "system:LED_RX",
+      "system:LED_TX",
+      "system:LED_USB_RX",
+      "system:LED_USB_TX",
+      "wifi:LED_LINK",
+      "wifi:LED_LINK_A",
+      "wifi:LED_PWR",
+      "wifi:LED_RX",
+      "wifi:LED_RX_A",
+      "wifi:LED_TX",
+      "wifi:LED_TX_A"
+    ],
+    "power_and_return": [
+      "cpu:1V2",
+      "cpu:3V3",
+      "cpu:GND",
+      "cpu:GNDPLL0",
+      "cpu:GNDPLL1",
+      "cpu:VCCPLL0",
+      "cpu:VCCPLL1",
+      "eink:+5V",
+      "eink:1V1",
+      "eink:3V3",
+      "eink:EPD_VCC",
+      "eink:GND",
+      "gpu:+5V",
+      "gpu:1V1",
+      "gpu:3V3",
+      "gpu:GND",
+      "io:+5V",
+      "io:1V1",
+      "io:3V3",
+      "io:GND",
+      "io:VBOOST",
+      "io:VBUS",
+      "io:VBUS_EN",
+      "io:VBUS_nFAULT",
+      "main:+1V2",
+      "main:+3V3",
+      "main:+5V",
+      "main:1V2_LDO",
+      "main:3V3_BUCK",
+      "main:3V3_STBY",
+      "main:5V_SYS",
+      "main:GND",
+      "main:SLOT1_5V",
+      "main:SLOT1_5V_F",
+      "main:SLOT1_5V_L",
+      "main:SLOT2_5V",
+      "main:SLOT2_5V_F",
+      "main:SLOT2_5V_L",
+      "main:SLOT3_5V",
+      "main:SLOT3_5V_F",
+      "main:SLOT3_5V_L",
+      "main:SLOT4_5V",
+      "main:SLOT4_5V_F",
+      "main:SLOT4_5V_L",
+      "main:SLOT5_5V",
+      "main:SLOT5_5V_F",
+      "main:SLOT5_5V_L",
+      "main:SLOT6_5V",
+      "main:SLOT6_5V_F",
+      "main:SLOT6_5V_L",
+      "main:VBUS",
+      "main:VBUS_F",
+      "main:VCCPLL0",
+      "main:VCCPLL1",
+      "storage:+5V",
+      "storage:1V1",
+      "storage:3V3",
+      "storage:GND",
+      "system:+3V3",
+      "system:1V1",
+      "system:GND",
+      "system:VBUS_GATE",
+      "wifi:+5V",
+      "wifi:3V3",
+      "wifi:GND"
+    ],
+    "power_policy": [
+      "gpu:BB_FB",
+      "gpu:BB_L1",
+      "gpu:BB_L2",
+      "io:BOOST_FB",
+      "io:BOOST_SW",
+      "main:BUCK_FB",
+      "main:BUCK_SW",
+      "main:EFUSE_DVDT",
+      "main:EFUSE_ILM",
+      "main:EFUSE_OVLO",
+      "main:PWR_BTN",
+      "main:PWR_EN",
+      "main:Q1_B",
+      "main:Q2_B",
+      "main:V1V2_SENSE",
+      "system:V1V2_SENSE",
+      "wifi:FB",
+      "wifi:SW"
+    ],
+    "slot_and_control_bus": [
+      "cpu:PRSNT",
+      "eink:PRSNT",
+      "gpu:PRSNT",
+      "io:PRSNT",
+      "main:AUX_CS_n",
+      "main:I2C_SCL",
+      "main:I2C_SDA",
+      "main:MUX_IO1",
+      "main:MUX_IO2",
+      "main:MUX_IO3",
+      "main:MUX_IO4",
+      "main:MUX_IO5",
+      "main:MUX_IO6",
+      "main:MUX_SEL0",
+      "main:MUX_SEL1",
+      "main:MUX_SEL2",
+      "main:SLOT1_PRSNT2_n",
+      "main:SLOT2_PRSNT2_n",
+      "main:SLOT3_PRSNT2_n",
+      "main:SLOT4_PRSNT2_n",
+      "main:SLOT5_PRSNT2_n",
+      "main:SLOT6_PRSNT2_n",
+      "main:SPI_nCS6_SRC",
+      "main:SYS_PRSNT2_n",
+      "storage:PRSNT",
+      "system:I2C_SCL",
+      "system:I2C_SDA",
+      "system:MUX_SEL0",
+      "system:MUX_SEL1",
+      "system:MUX_SEL2",
+      "system:PRSNT",
+      "wifi:PRSNT"
+    ]
+  },
+  "paths": [
+    {
+      "from": "gpu.J1.B13",
+      "net": "SCK",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "io.J1.B13",
+      "net": "SCK",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "storage.J1.B13",
+      "net": "SCK",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "net": "SCK",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "eink.J1.B13",
+      "net": "SCK",
+      "to": "eink.U1.4"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J11.B13",
+      "net": "SPI_SCK",
+      "slot": 1
+    },
+    {
+      "from": "gpu.J1.B15",
+      "net": "MOSI",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "io.J1.B15",
+      "net": "MOSI",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "storage.J1.B15",
+      "net": "MOSI",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "net": "MOSI",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "eink.J1.B15",
+      "net": "MOSI",
+      "to": "eink.U1.5"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J11.B15",
+      "net": "SPI_MOSI",
+      "slot": 1
+    },
+    {
+      "from": "gpu.J1.B16",
+      "net": "MISO",
+      "to": "gpu.U1.6"
+    },
+    {
+      "from": "io.J1.B16",
+      "net": "MISO",
+      "to": "io.U1.6"
+    },
+    {
+      "from": "storage.J1.B16",
+      "net": "MISO",
+      "to": "storage.U1.6"
+    },
+    {
+      "from": "wifi.J1.B16",
+      "net": "MISO",
+      "to": "wifi.U1.19"
+    },
+    {
+      "from": "eink.J1.B16",
+      "net": "MISO",
+      "to": "eink.U1.6"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J11.B16",
+      "net": "SPI_MISO",
+      "slot": 1
+    },
+    {
+      "from": "gpu.J1.A14",
+      "net": "CS_n",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "io.J1.A14",
+      "net": "CS_n",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "storage.J1.A14",
+      "net": "CS_n",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "net": "CS_n",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "net": "CS_n",
+      "to": "eink.U1.7"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J11.A14",
+      "net": "SLOT1_CS_n",
+      "slot": 1
+    },
+    {
+      "from": "gpu.J1.B10",
+      "net": "IRQ_n",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "io.J1.B10",
+      "net": "IRQ_n",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "storage.J1.B10",
+      "net": "IRQ_n",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "net": "IRQ_n",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "eink.J1.B10",
+      "net": "IRQ_n",
+      "to": "eink.U1.8"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J11.B10",
+      "net": "SLOT_nIRQ0",
+      "slot": 1
+    },
+    {
+      "from": "main.U7.43",
+      "ohms": 33,
+      "series": "R36",
+      "to": "main.J11.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "ohms": 33,
+      "series": "R35",
+      "to": "main.J11.B15"
+    },
+    {
+      "from": "main.U7.34",
+      "ohms": 33,
+      "series": "R37",
+      "to": "main.J11.A14"
+    },
+    {
+      "from": "gpu.J1.B13",
+      "net": "SCK",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "io.J1.B13",
+      "net": "SCK",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "storage.J1.B13",
+      "net": "SCK",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "net": "SCK",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "eink.J1.B13",
+      "net": "SCK",
+      "to": "eink.U1.4"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J12.B13",
+      "net": "SPI_SCK",
+      "slot": 2
+    },
+    {
+      "from": "gpu.J1.B15",
+      "net": "MOSI",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "io.J1.B15",
+      "net": "MOSI",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "storage.J1.B15",
+      "net": "MOSI",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "net": "MOSI",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "eink.J1.B15",
+      "net": "MOSI",
+      "to": "eink.U1.5"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J12.B15",
+      "net": "SPI_MOSI",
+      "slot": 2
+    },
+    {
+      "from": "gpu.J1.B16",
+      "net": "MISO",
+      "to": "gpu.U1.6"
+    },
+    {
+      "from": "io.J1.B16",
+      "net": "MISO",
+      "to": "io.U1.6"
+    },
+    {
+      "from": "storage.J1.B16",
+      "net": "MISO",
+      "to": "storage.U1.6"
+    },
+    {
+      "from": "wifi.J1.B16",
+      "net": "MISO",
+      "to": "wifi.U1.19"
+    },
+    {
+      "from": "eink.J1.B16",
+      "net": "MISO",
+      "to": "eink.U1.6"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J12.B16",
+      "net": "SPI_MISO",
+      "slot": 2
+    },
+    {
+      "from": "gpu.J1.A14",
+      "net": "CS_n",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "io.J1.A14",
+      "net": "CS_n",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "storage.J1.A14",
+      "net": "CS_n",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "net": "CS_n",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "net": "CS_n",
+      "to": "eink.U1.7"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J12.A14",
+      "net": "SLOT2_CS_n",
+      "slot": 2
+    },
+    {
+      "from": "gpu.J1.B10",
+      "net": "IRQ_n",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "io.J1.B10",
+      "net": "IRQ_n",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "storage.J1.B10",
+      "net": "IRQ_n",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "net": "IRQ_n",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "eink.J1.B10",
+      "net": "IRQ_n",
+      "to": "eink.U1.8"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J12.B10",
+      "net": "SLOT_nIRQ1",
+      "slot": 2
+    },
+    {
+      "from": "main.U7.43",
+      "ohms": 33,
+      "series": "R36",
+      "to": "main.J12.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "ohms": 33,
+      "series": "R35",
+      "to": "main.J12.B15"
+    },
+    {
+      "from": "main.U7.38",
+      "ohms": 33,
+      "series": "R38",
+      "to": "main.J12.A14"
+    },
+    {
+      "from": "gpu.J1.B13",
+      "net": "SCK",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "io.J1.B13",
+      "net": "SCK",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "storage.J1.B13",
+      "net": "SCK",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "net": "SCK",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "eink.J1.B13",
+      "net": "SCK",
+      "to": "eink.U1.4"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J13.B13",
+      "net": "SPI_SCK",
+      "slot": 3
+    },
+    {
+      "from": "gpu.J1.B15",
+      "net": "MOSI",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "io.J1.B15",
+      "net": "MOSI",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "storage.J1.B15",
+      "net": "MOSI",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "net": "MOSI",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "eink.J1.B15",
+      "net": "MOSI",
+      "to": "eink.U1.5"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J13.B15",
+      "net": "SPI_MOSI",
+      "slot": 3
+    },
+    {
+      "from": "gpu.J1.B16",
+      "net": "MISO",
+      "to": "gpu.U1.6"
+    },
+    {
+      "from": "io.J1.B16",
+      "net": "MISO",
+      "to": "io.U1.6"
+    },
+    {
+      "from": "storage.J1.B16",
+      "net": "MISO",
+      "to": "storage.U1.6"
+    },
+    {
+      "from": "wifi.J1.B16",
+      "net": "MISO",
+      "to": "wifi.U1.19"
+    },
+    {
+      "from": "eink.J1.B16",
+      "net": "MISO",
+      "to": "eink.U1.6"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J13.B16",
+      "net": "SPI_MISO",
+      "slot": 3
+    },
+    {
+      "from": "gpu.J1.A14",
+      "net": "CS_n",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "io.J1.A14",
+      "net": "CS_n",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "storage.J1.A14",
+      "net": "CS_n",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "net": "CS_n",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "net": "CS_n",
+      "to": "eink.U1.7"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J13.A14",
+      "net": "SLOT3_CS_n",
+      "slot": 3
+    },
+    {
+      "from": "gpu.J1.B10",
+      "net": "IRQ_n",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "io.J1.B10",
+      "net": "IRQ_n",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "storage.J1.B10",
+      "net": "IRQ_n",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "net": "IRQ_n",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "eink.J1.B10",
+      "net": "IRQ_n",
+      "to": "eink.U1.8"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J13.B10",
+      "net": "SLOT_nIRQ2",
+      "slot": 3
+    },
+    {
+      "from": "main.U7.43",
+      "ohms": 33,
+      "series": "R36",
+      "to": "main.J13.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "ohms": 33,
+      "series": "R35",
+      "to": "main.J13.B15"
+    },
+    {
+      "from": "main.U7.39",
+      "ohms": 33,
+      "series": "R39",
+      "to": "main.J13.A14"
+    },
+    {
+      "from": "gpu.J1.B13",
+      "net": "SCK",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "io.J1.B13",
+      "net": "SCK",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "storage.J1.B13",
+      "net": "SCK",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "net": "SCK",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "eink.J1.B13",
+      "net": "SCK",
+      "to": "eink.U1.4"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J14.B13",
+      "net": "SPI_SCK",
+      "slot": 4
+    },
+    {
+      "from": "gpu.J1.B15",
+      "net": "MOSI",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "io.J1.B15",
+      "net": "MOSI",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "storage.J1.B15",
+      "net": "MOSI",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "net": "MOSI",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "eink.J1.B15",
+      "net": "MOSI",
+      "to": "eink.U1.5"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J14.B15",
+      "net": "SPI_MOSI",
+      "slot": 4
+    },
+    {
+      "from": "gpu.J1.B16",
+      "net": "MISO",
+      "to": "gpu.U1.6"
+    },
+    {
+      "from": "io.J1.B16",
+      "net": "MISO",
+      "to": "io.U1.6"
+    },
+    {
+      "from": "storage.J1.B16",
+      "net": "MISO",
+      "to": "storage.U1.6"
+    },
+    {
+      "from": "wifi.J1.B16",
+      "net": "MISO",
+      "to": "wifi.U1.19"
+    },
+    {
+      "from": "eink.J1.B16",
+      "net": "MISO",
+      "to": "eink.U1.6"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J14.B16",
+      "net": "SPI_MISO",
+      "slot": 4
+    },
+    {
+      "from": "gpu.J1.A14",
+      "net": "CS_n",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "io.J1.A14",
+      "net": "CS_n",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "storage.J1.A14",
+      "net": "CS_n",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "net": "CS_n",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "net": "CS_n",
+      "to": "eink.U1.7"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J14.A14",
+      "net": "SLOT4_CS_n",
+      "slot": 4
+    },
+    {
+      "from": "gpu.J1.B10",
+      "net": "IRQ_n",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "io.J1.B10",
+      "net": "IRQ_n",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "storage.J1.B10",
+      "net": "IRQ_n",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "net": "IRQ_n",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "eink.J1.B10",
+      "net": "IRQ_n",
+      "to": "eink.U1.8"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J14.B10",
+      "net": "SLOT_nIRQ3",
+      "slot": 4
+    },
+    {
+      "from": "main.U7.43",
+      "ohms": 33,
+      "series": "R36",
+      "to": "main.J14.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "ohms": 33,
+      "series": "R35",
+      "to": "main.J14.B15"
+    },
+    {
+      "from": "main.U7.47",
+      "ohms": 33,
+      "series": "R40",
+      "to": "main.J14.A14"
+    },
+    {
+      "from": "gpu.J1.B13",
+      "net": "SCK",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "io.J1.B13",
+      "net": "SCK",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "storage.J1.B13",
+      "net": "SCK",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "net": "SCK",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "eink.J1.B13",
+      "net": "SCK",
+      "to": "eink.U1.4"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J15.B13",
+      "net": "SPI_SCK",
+      "slot": 5
+    },
+    {
+      "from": "gpu.J1.B15",
+      "net": "MOSI",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "io.J1.B15",
+      "net": "MOSI",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "storage.J1.B15",
+      "net": "MOSI",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "net": "MOSI",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "eink.J1.B15",
+      "net": "MOSI",
+      "to": "eink.U1.5"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J15.B15",
+      "net": "SPI_MOSI",
+      "slot": 5
+    },
+    {
+      "from": "gpu.J1.B16",
+      "net": "MISO",
+      "to": "gpu.U1.6"
+    },
+    {
+      "from": "io.J1.B16",
+      "net": "MISO",
+      "to": "io.U1.6"
+    },
+    {
+      "from": "storage.J1.B16",
+      "net": "MISO",
+      "to": "storage.U1.6"
+    },
+    {
+      "from": "wifi.J1.B16",
+      "net": "MISO",
+      "to": "wifi.U1.19"
+    },
+    {
+      "from": "eink.J1.B16",
+      "net": "MISO",
+      "to": "eink.U1.6"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J15.B16",
+      "net": "SPI_MISO",
+      "slot": 5
+    },
+    {
+      "from": "gpu.J1.A14",
+      "net": "CS_n",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "io.J1.A14",
+      "net": "CS_n",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "storage.J1.A14",
+      "net": "CS_n",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "net": "CS_n",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "net": "CS_n",
+      "to": "eink.U1.7"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J15.A14",
+      "net": "SLOT5_CS_n",
+      "slot": 5
+    },
+    {
+      "from": "gpu.J1.B10",
+      "net": "IRQ_n",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "io.J1.B10",
+      "net": "IRQ_n",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "storage.J1.B10",
+      "net": "IRQ_n",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "net": "IRQ_n",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "eink.J1.B10",
+      "net": "IRQ_n",
+      "to": "eink.U1.8"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J15.B10",
+      "net": "SLOT_nIRQ4",
+      "slot": 5
+    },
+    {
+      "from": "main.U7.43",
+      "ohms": 33,
+      "series": "R36",
+      "to": "main.J15.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "ohms": 33,
+      "series": "R35",
+      "to": "main.J15.B15"
+    },
+    {
+      "from": "main.U7.52",
+      "ohms": 33,
+      "series": "R41",
+      "to": "main.J15.A14"
+    },
+    {
+      "from": "gpu.J1.B13",
+      "net": "SCK",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "io.J1.B13",
+      "net": "SCK",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "storage.J1.B13",
+      "net": "SCK",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "net": "SCK",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "eink.J1.B13",
+      "net": "SCK",
+      "to": "eink.U1.4"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J16.B13",
+      "net": "SPI_SCK",
+      "slot": 6
+    },
+    {
+      "from": "gpu.J1.B15",
+      "net": "MOSI",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "io.J1.B15",
+      "net": "MOSI",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "storage.J1.B15",
+      "net": "MOSI",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "net": "MOSI",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "eink.J1.B15",
+      "net": "MOSI",
+      "to": "eink.U1.5"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J16.B15",
+      "net": "SPI_MOSI",
+      "slot": 6
+    },
+    {
+      "from": "gpu.J1.B16",
+      "net": "MISO",
+      "to": "gpu.U1.6"
+    },
+    {
+      "from": "io.J1.B16",
+      "net": "MISO",
+      "to": "io.U1.6"
+    },
+    {
+      "from": "storage.J1.B16",
+      "net": "MISO",
+      "to": "storage.U1.6"
+    },
+    {
+      "from": "wifi.J1.B16",
+      "net": "MISO",
+      "to": "wifi.U1.19"
+    },
+    {
+      "from": "eink.J1.B16",
+      "net": "MISO",
+      "to": "eink.U1.6"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J16.B16",
+      "net": "SPI_MISO",
+      "slot": 6
+    },
+    {
+      "from": "gpu.J1.A14",
+      "net": "CS_n",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "io.J1.A14",
+      "net": "CS_n",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "storage.J1.A14",
+      "net": "CS_n",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "net": "CS_n",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "net": "CS_n",
+      "to": "eink.U1.7"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J16.A14",
+      "net": "SLOT6_CS_n",
+      "slot": 6
+    },
+    {
+      "from": "gpu.J1.B10",
+      "net": "IRQ_n",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "io.J1.B10",
+      "net": "IRQ_n",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "storage.J1.B10",
+      "net": "IRQ_n",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "net": "IRQ_n",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "eink.J1.B10",
+      "net": "IRQ_n",
+      "to": "eink.U1.8"
+    },
+    {
+      "cards": "slot",
+      "from": "main.J16.B10",
+      "net": "SLOT_nIRQ5",
+      "slot": 6
+    },
+    {
+      "from": "main.U7.43",
+      "ohms": 33,
+      "series": "R36",
+      "to": "main.J16.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "ohms": 33,
+      "series": "R35",
+      "to": "main.J16.B15"
+    },
+    {
+      "from": "main.U7.56",
+      "ohms": 33,
+      "series": "R42",
+      "to": "main.J16.A14"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.118",
+      "net": "MEM_A0",
+      "to": "main.U9.20"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.118",
+      "net": "MEM_A0",
+      "to": "main.U10.12"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.117",
+      "net": "MEM_A1",
+      "to": "main.U9.19"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.117",
+      "net": "MEM_A1",
+      "to": "main.U10.11"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.90",
+      "net": "MEM_A2",
+      "to": "main.U9.18"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.90",
+      "net": "MEM_A2",
+      "to": "main.U10.10"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.113",
+      "net": "MEM_A3",
+      "to": "main.U9.17"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.113",
+      "net": "MEM_A3",
+      "to": "main.U10.9"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.121",
+      "net": "MEM_A4",
+      "to": "main.U9.16"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.121",
+      "net": "MEM_A4",
+      "to": "main.U10.8"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.120",
+      "net": "MEM_A5",
+      "to": "main.U9.15"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.120",
+      "net": "MEM_A5",
+      "to": "main.U10.7"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.79",
+      "net": "MEM_A6",
+      "to": "main.U9.14"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.79",
+      "net": "MEM_A6",
+      "to": "main.U10.6"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.80",
+      "net": "MEM_A7",
+      "to": "main.U9.13"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.80",
+      "net": "MEM_A7",
+      "to": "main.U10.5"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.93",
+      "net": "MEM_A8",
+      "to": "main.U9.3"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.93",
+      "net": "MEM_A8",
+      "to": "main.U10.27"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.115",
+      "net": "MEM_A9",
+      "to": "main.U9.2"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.115",
+      "net": "MEM_A9",
+      "to": "main.U10.26"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.98",
+      "net": "MEM_A10",
+      "to": "main.U9.31"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.98",
+      "net": "MEM_A10",
+      "to": "main.U10.23"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.85",
+      "net": "MEM_A11",
+      "to": "main.U9.1"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.85",
+      "net": "MEM_A11",
+      "to": "main.U10.25"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.84",
+      "net": "MEM_A12",
+      "to": "main.U9.12"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.84",
+      "net": "MEM_A12",
+      "to": "main.U10.4"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.96",
+      "net": "MEM_A13",
+      "to": "main.U9.4"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.96",
+      "net": "MEM_A13",
+      "to": "main.U10.28"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.101",
+      "net": "MEM_A14",
+      "to": "main.U9.11"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.101",
+      "net": "MEM_A14",
+      "to": "main.U10.29"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.81",
+      "net": "MEM_A15",
+      "to": "main.U9.7"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.81",
+      "net": "MEM_A15",
+      "to": "main.U10.3"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.88",
+      "net": "MEM_A16",
+      "to": "main.U9.10"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.88",
+      "net": "MEM_A16",
+      "to": "main.U10.2"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.110",
+      "net": "MEM_A17",
+      "to": "main.U9.9"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.110",
+      "net": "MEM_A17",
+      "to": "main.U10.30"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.87",
+      "net": "MEM_A18",
+      "to": "main.U9.6"
+    },
+    {
+      "delay_ns": 0,
+      "from": "main.U7.87",
+      "net": "MEM_A18",
+      "to": "main.U10.1"
+    },
+    {
+      "from": "main.U10.13",
+      "net": "MEM_D0",
+      "to": "main.U7.119"
+    },
+    {
+      "from": "main.U10.13",
+      "net": "MEM_D0",
+      "to": "main.U9.21"
+    },
+    {
+      "from": "main.U10.14",
+      "net": "MEM_D1",
+      "to": "main.U7.82"
+    },
+    {
+      "from": "main.U10.14",
+      "net": "MEM_D1",
+      "to": "main.U9.22"
+    },
+    {
+      "from": "main.U10.15",
+      "net": "MEM_D2",
+      "to": "main.U7.83"
+    },
+    {
+      "from": "main.U10.15",
+      "net": "MEM_D2",
+      "to": "main.U9.23"
+    },
+    {
+      "from": "main.U10.17",
+      "net": "MEM_D3",
+      "to": "main.U7.116"
+    },
+    {
+      "from": "main.U10.17",
+      "net": "MEM_D3",
+      "to": "main.U9.25"
+    },
+    {
+      "from": "main.U10.18",
+      "net": "MEM_D4",
+      "to": "main.U7.91"
+    },
+    {
+      "from": "main.U10.18",
+      "net": "MEM_D4",
+      "to": "main.U9.26"
+    },
+    {
+      "from": "main.U10.19",
+      "net": "MEM_D5",
+      "to": "main.U7.94"
+    },
+    {
+      "from": "main.U10.19",
+      "net": "MEM_D5",
+      "to": "main.U9.27"
+    },
+    {
+      "from": "main.U10.20",
+      "net": "MEM_D6",
+      "to": "main.U7.95"
+    },
+    {
+      "from": "main.U10.20",
+      "net": "MEM_D6",
+      "to": "main.U9.28"
+    },
+    {
+      "from": "main.U10.21",
+      "net": "MEM_D7",
+      "to": "main.U7.97"
+    },
+    {
+      "from": "main.U10.21",
+      "net": "MEM_D7",
+      "to": "main.U9.29"
+    },
+    {
+      "from": "main.U7.99",
+      "net": "MEM_nOE",
+      "to": "main.U9.32"
+    },
+    {
+      "from": "main.U7.99",
+      "net": "MEM_nOE",
+      "to": "main.U10.24"
+    },
+    {
+      "from": "main.U7.114",
+      "net": "MEM_nWE",
+      "to": "main.U9.5"
+    },
+    {
+      "from": "main.U7.114",
+      "net": "MEM_nWE",
+      "to": "main.U10.31"
+    },
+    {
+      "from": "main.U7.105",
+      "net": "MEM_nCE_RAM",
+      "to": "main.U9.30"
+    },
+    {
+      "from": "main.U7.124",
+      "net": "MEM_nCE_ROM",
+      "to": "main.U10.22"
+    },
+    {
+      "from": "main.U6.2",
+      "route_mm": 94.505,
+      "runtime": "por_connected",
+      "to": "main.U7.61"
+    },
+    {
+      "from": "main.U7.114",
+      "route_mm": 5.837,
+      "runtime": "ram_write_connected",
+      "to": "main.U9.5"
+    },
+    {
+      "from": "main.U7.114",
+      "route_mm": 31.929,
+      "runtime": "rom_write_connected",
+      "to": "main.U10.31"
+    },
+    {
+      "from": "main.U10.13",
+      "route_mm": 24.581,
+      "runtime": "rom_read_d0_connected",
+      "to": "main.U7.119"
+    },
+    {
+      "from": "main.U7.34",
+      "route_mm": 14.596,
+      "runtime": "slot1_select_connected",
+      "to": "main.R37.1"
+    },
+    {
+      "from": "main.R37.2",
+      "route_mm": 64.15,
+      "runtime": "slot1_select_connected",
+      "to": "main.J11.A14"
+    },
+    {
+      "from": "main.U7.38",
+      "route_mm": 19.38,
+      "runtime": "slot2_select_connected",
+      "to": "main.R38.1"
+    },
+    {
+      "from": "main.R38.2",
+      "route_mm": 76.285,
+      "runtime": "slot2_select_connected",
+      "to": "main.J12.A14"
+    },
+    {
+      "from": "main.U7.39",
+      "route_mm": 17.554,
+      "runtime": "slot3_select_connected",
+      "to": "main.R39.1"
+    },
+    {
+      "from": "main.R39.2",
+      "route_mm": 78.832,
+      "runtime": "slot3_select_connected",
+      "to": "main.J13.A14"
+    },
+    {
+      "from": "main.U7.47",
+      "route_mm": 14.333,
+      "runtime": "slot4_select_connected",
+      "to": "main.R40.1"
+    },
+    {
+      "from": "main.R40.2",
+      "route_mm": 80.014,
+      "runtime": "slot4_select_connected",
+      "to": "main.J14.A14"
+    },
+    {
+      "from": "main.U7.52",
+      "route_mm": 10.208,
+      "runtime": "slot5_select_connected",
+      "to": "main.R41.1"
+    },
+    {
+      "from": "main.R41.2",
+      "route_mm": 97.647,
+      "runtime": "slot5_select_connected",
+      "to": "main.J15.A14"
+    },
+    {
+      "from": "main.U7.56",
+      "route_mm": 12.92,
+      "runtime": "slot6_select_connected",
+      "to": "main.R42.1"
+    },
+    {
+      "from": "main.R42.2",
+      "route_mm": 109.498,
+      "runtime": "slot6_select_connected",
+      "to": "main.J16.A14"
+    },
+    {
+      "from": "main.U7.43",
+      "route_mm": 11.414,
+      "runtime": "slot_sck_source_connected",
+      "to": "main.R36.1"
+    },
+    {
+      "from": "main.R36.2",
+      "route_mm": 119.039,
+      "runtime": "slot1_sck_connected",
+      "to": "main.J11.B13"
+    },
+    {
+      "from": "main.R36.2",
+      "route_mm": 74.716,
+      "runtime": "slot2_sck_connected",
+      "to": "main.J12.B13"
+    },
+    {
+      "from": "main.R36.2",
+      "route_mm": 104.16,
+      "runtime": "slot3_sck_connected",
+      "to": "main.J13.B13"
+    },
+    {
+      "from": "main.R36.2",
+      "route_mm": 123.14,
+      "runtime": "slot4_sck_connected",
+      "to": "main.J14.B13"
+    },
+    {
+      "from": "main.R36.2",
+      "route_mm": 151.422,
+      "runtime": "slot5_sck_connected",
+      "to": "main.J15.B13"
+    },
+    {
+      "from": "main.R36.2",
+      "route_mm": 173.331,
+      "runtime": "slot6_sck_connected",
+      "to": "main.J16.B13"
+    },
+    {
+      "from": "main.U7.44",
+      "route_mm": 11.614,
+      "runtime": "slot_mosi_source_connected",
+      "to": "main.R35.1"
+    },
+    {
+      "from": "main.R35.2",
+      "route_mm": 123.93,
+      "runtime": "slot1_mosi_connected",
+      "to": "main.J11.B15"
+    },
+    {
+      "from": "main.R35.2",
+      "route_mm": 102.825,
+      "runtime": "slot2_mosi_connected",
+      "to": "main.J12.B15"
+    },
+    {
+      "from": "main.R35.2",
+      "route_mm": 81.718,
+      "runtime": "slot3_mosi_connected",
+      "to": "main.J13.B15"
+    },
+    {
+      "from": "main.R35.2",
+      "route_mm": 102.825,
+      "runtime": "slot4_mosi_connected",
+      "to": "main.J14.B15"
+    },
+    {
+      "from": "main.R35.2",
+      "route_mm": 123.923,
+      "runtime": "slot5_mosi_connected",
+      "to": "main.J15.B15"
+    },
+    {
+      "from": "main.R35.2",
+      "route_mm": 145.019,
+      "runtime": "slot6_mosi_connected",
+      "to": "main.J16.B15"
+    },
+    {
+      "from": "main.U7.48",
+      "route_mm": 206.895,
+      "runtime": "slot1_miso_connected",
+      "to": "main.J11.B16"
+    },
+    {
+      "from": "main.U7.48",
+      "route_mm": 185.866,
+      "runtime": "slot2_miso_connected",
+      "to": "main.J12.B16"
+    },
+    {
+      "from": "main.U7.48",
+      "route_mm": 164.823,
+      "runtime": "slot3_miso_connected",
+      "to": "main.J13.B16"
+    },
+    {
+      "from": "main.U7.48",
+      "route_mm": 143.787,
+      "runtime": "slot4_miso_connected",
+      "to": "main.J14.B16"
+    },
+    {
+      "from": "main.U7.48",
+      "route_mm": 127.362,
+      "runtime": "slot5_miso_connected",
+      "to": "main.J15.B16"
+    },
+    {
+      "from": "main.U7.48",
+      "route_mm": 148.388,
+      "runtime": "slot6_miso_connected",
+      "to": "main.J16.B16"
+    },
+    {
+      "from": "main.U7.41",
+      "route_mm": 100.308,
+      "runtime": "slot1_irq_connected",
+      "to": "main.J11.B10"
+    },
+    {
+      "from": "main.U7.37",
+      "route_mm": 75.36,
+      "runtime": "slot2_irq_connected",
+      "to": "main.J12.B10"
+    },
+    {
+      "from": "main.U7.42",
+      "route_mm": 87.44,
+      "runtime": "slot3_irq_connected",
+      "to": "main.J13.B10"
+    },
+    {
+      "from": "main.U7.45",
+      "route_mm": 97.774,
+      "runtime": "slot4_irq_connected",
+      "to": "main.J14.B10"
+    },
+    {
+      "from": "main.U7.49",
+      "route_mm": 114.072,
+      "runtime": "slot5_irq_connected",
+      "to": "main.J15.B10"
+    },
+    {
+      "from": "main.U7.55",
+      "route_mm": 163.064,
+      "runtime": "slot6_irq_connected",
+      "to": "main.J16.B10"
+    },
+    {
+      "from": "gpu.J1.B13",
+      "route_mm": 29.288,
+      "runtime": "gpu_sck_connected",
+      "to": "gpu.U1.4"
+    },
+    {
+      "from": "gpu.J1.B15",
+      "route_mm": 24.553,
+      "runtime": "gpu_mosi_connected",
+      "to": "gpu.U1.5"
+    },
+    {
+      "from": "gpu.J1.A14",
+      "route_mm": 27.559,
+      "runtime": "gpu_cs_connected",
+      "to": "gpu.U1.7"
+    },
+    {
+      "from": "gpu.J1.B10",
+      "route_mm": 32.409,
+      "runtime": "gpu_irq_connected",
+      "to": "gpu.U1.8"
+    },
+    {
+      "from": "gpu.U1.6",
+      "route_mm": 22.363,
+      "runtime": "gpu_miso_connected",
+      "to": "gpu.U4.2"
+    },
+    {
+      "from": "gpu.U4.4",
+      "route_mm": 16.689,
+      "runtime": "gpu_miso_connected",
+      "to": "gpu.J1.B16"
+    },
+    {
+      "from": "gpu.J1.A14",
+      "route_mm": 13.772,
+      "runtime": "gpu_miso_connected",
+      "to": "gpu.U4.1"
+    },
+    {
+      "from": "io.J1.B13",
+      "route_mm": 30.227,
+      "runtime": "io_sck_connected",
+      "to": "io.U1.4"
+    },
+    {
+      "from": "io.J1.B15",
+      "route_mm": 29.621,
+      "runtime": "io_mosi_connected",
+      "to": "io.U1.5"
+    },
+    {
+      "from": "io.J1.A14",
+      "route_mm": 26.461,
+      "runtime": "io_cs_connected",
+      "to": "io.U1.7"
+    },
+    {
+      "from": "io.J1.B10",
+      "route_mm": 27.099,
+      "runtime": "io_irq_connected",
+      "to": "io.U1.8"
+    },
+    {
+      "from": "io.U1.6",
+      "route_mm": 7.285,
+      "runtime": "io_miso_connected",
+      "to": "io.U4.2"
+    },
+    {
+      "from": "io.U4.4",
+      "route_mm": 21.205,
+      "runtime": "io_miso_connected",
+      "to": "io.J1.B16"
+    },
+    {
+      "from": "io.J1.A14",
+      "route_mm": 22.43,
+      "runtime": "io_miso_connected",
+      "to": "io.U4.1"
+    },
+    {
+      "from": "storage.J1.B13",
+      "route_mm": 29.284,
+      "runtime": "storage_sck_connected",
+      "to": "storage.U1.4"
+    },
+    {
+      "from": "storage.J1.B15",
+      "route_mm": 31.582,
+      "runtime": "storage_mosi_connected",
+      "to": "storage.U1.5"
+    },
+    {
+      "from": "storage.J1.A14",
+      "route_mm": 31.736,
+      "runtime": "storage_cs_connected",
+      "to": "storage.U1.7"
+    },
+    {
+      "from": "storage.J1.B10",
+      "route_mm": 31.826,
+      "runtime": "storage_irq_connected",
+      "to": "storage.U1.8"
+    },
+    {
+      "from": "storage.U1.6",
+      "route_mm": 17.797,
+      "runtime": "storage_miso_connected",
+      "to": "storage.U4.2"
+    },
+    {
+      "from": "storage.U4.4",
+      "route_mm": 16.432,
+      "runtime": "storage_miso_connected",
+      "to": "storage.J1.B16"
+    },
+    {
+      "from": "storage.J1.A14",
+      "route_mm": 12.267,
+      "runtime": "storage_miso_connected",
+      "to": "storage.U4.1"
+    },
+    {
+      "from": "wifi.J1.B13",
+      "route_mm": 46.343,
+      "runtime": "wifi_sck_connected",
+      "to": "wifi.U1.20"
+    },
+    {
+      "from": "wifi.J1.B15",
+      "route_mm": 51.841,
+      "runtime": "wifi_mosi_connected",
+      "to": "wifi.U1.21"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "route_mm": 63.999,
+      "runtime": "wifi_cs_connected",
+      "to": "wifi.U1.16"
+    },
+    {
+      "from": "wifi.J1.B10",
+      "route_mm": 43.633,
+      "runtime": "wifi_irq_connected",
+      "to": "wifi.U1.6"
+    },
+    {
+      "from": "wifi.U1.19",
+      "route_mm": 18.942,
+      "runtime": "wifi_miso_connected",
+      "to": "wifi.U3.2"
+    },
+    {
+      "from": "wifi.U3.4",
+      "route_mm": 21.125,
+      "runtime": "wifi_miso_connected",
+      "to": "wifi.J1.B16"
+    },
+    {
+      "from": "wifi.J1.A14",
+      "route_mm": 52.22,
+      "runtime": "wifi_miso_connected",
+      "to": "wifi.U3.1"
+    },
+    {
+      "from": "eink.J1.B13",
+      "route_mm": 30.672,
+      "runtime": "eink_sck_connected",
+      "to": "eink.U1.4"
+    },
+    {
+      "from": "eink.J1.B15",
+      "route_mm": 29.724,
+      "runtime": "eink_mosi_connected",
+      "to": "eink.U1.5"
+    },
+    {
+      "from": "eink.J1.A14",
+      "route_mm": 33.87,
+      "runtime": "eink_cs_connected",
+      "to": "eink.U1.7"
+    },
+    {
+      "from": "eink.J1.B10",
+      "route_mm": 32.13,
+      "runtime": "eink_irq_connected",
+      "to": "eink.U1.8"
+    },
+    {
+      "from": "eink.U1.6",
+      "route_mm": 17.771,
+      "runtime": "eink_miso_connected",
+      "to": "eink.U4.2"
+    },
+    {
+      "from": "eink.U4.4",
+      "route_mm": 15.636,
+      "runtime": "eink_miso_connected",
+      "to": "eink.J1.B16"
+    },
+    {
+      "from": "eink.J1.A14",
+      "route_mm": 12.263,
+      "runtime": "eink_miso_connected",
+      "to": "eink.U4.1"
+    },
+    {
+      "from": "system.U1.52",
+      "route_mm": 14.489,
+      "runtime": "system_qspi_boot_connected",
+      "to": "system.U2.6"
+    },
+    {
+      "from": "system.U1.53",
+      "route_mm": 12.642,
+      "runtime": "system_qspi_boot_connected",
+      "to": "system.U2.5"
+    },
+    {
+      "from": "system.U1.55",
+      "route_mm": 19.315,
+      "runtime": "system_qspi_boot_connected",
+      "to": "system.U2.2"
+    },
+    {
+      "from": "system.U1.54",
+      "route_mm": 24.893,
+      "runtime": "system_qspi_boot_connected",
+      "to": "system.U2.3"
+    },
+    {
+      "from": "system.U1.51",
+      "route_mm": 16.404,
+      "runtime": "system_qspi_boot_connected",
+      "to": "system.U2.7"
+    },
+    {
+      "from": "system.U1.56",
+      "route_mm": 23.408,
+      "runtime": "system_qspi_boot_connected",
+      "to": "system.U2.1"
+    },
+    {
+      "from": "gpu.U1.52",
+      "route_mm": 13.947,
+      "runtime": "gpu_qspi_boot_connected",
+      "to": "gpu.U3.6"
+    },
+    {
+      "from": "gpu.U1.53",
+      "route_mm": 13.829,
+      "runtime": "gpu_qspi_boot_connected",
+      "to": "gpu.U3.5"
+    },
+    {
+      "from": "gpu.U1.55",
+      "route_mm": 4.771,
+      "runtime": "gpu_qspi_boot_connected",
+      "to": "gpu.U3.2"
+    },
+    {
+      "from": "gpu.U1.54",
+      "route_mm": 5.713,
+      "runtime": "gpu_qspi_boot_connected",
+      "to": "gpu.U3.3"
+    },
+    {
+      "from": "gpu.U1.51",
+      "route_mm": 13.974,
+      "runtime": "gpu_qspi_boot_connected",
+      "to": "gpu.U3.7"
+    },
+    {
+      "from": "gpu.U1.56",
+      "route_mm": 3.585,
+      "runtime": "gpu_qspi_boot_connected",
+      "to": "gpu.U3.1"
+    },
+    {
+      "from": "io.U1.52",
+      "route_mm": 15.055,
+      "runtime": "io_qspi_boot_connected",
+      "to": "io.U3.6"
+    },
+    {
+      "from": "io.U1.53",
+      "route_mm": 12.185,
+      "runtime": "io_qspi_boot_connected",
+      "to": "io.U3.5"
+    },
+    {
+      "from": "io.U1.55",
+      "route_mm": 6.992,
+      "runtime": "io_qspi_boot_connected",
+      "to": "io.U3.2"
+    },
+    {
+      "from": "io.U1.54",
+      "route_mm": 6.209,
+      "runtime": "io_qspi_boot_connected",
+      "to": "io.U3.3"
+    },
+    {
+      "from": "io.U1.51",
+      "route_mm": 16.884,
+      "runtime": "io_qspi_boot_connected",
+      "to": "io.U3.7"
+    },
+    {
+      "from": "io.U1.56",
+      "route_mm": 7.614,
+      "runtime": "io_qspi_boot_connected",
+      "to": "io.U3.1"
+    },
+    {
+      "from": "storage.U1.52",
+      "route_mm": 13.314,
+      "runtime": "storage_qspi_boot_connected",
+      "to": "storage.U3.6"
+    },
+    {
+      "from": "storage.U1.53",
+      "route_mm": 15.66,
+      "runtime": "storage_qspi_boot_connected",
+      "to": "storage.U3.5"
+    },
+    {
+      "from": "storage.U1.55",
+      "route_mm": 10.905,
+      "runtime": "storage_qspi_boot_connected",
+      "to": "storage.U3.2"
+    },
+    {
+      "from": "storage.U1.54",
+      "route_mm": 10.156,
+      "runtime": "storage_qspi_boot_connected",
+      "to": "storage.U3.3"
+    },
+    {
+      "from": "storage.U1.51",
+      "route_mm": 9.851,
+      "runtime": "storage_qspi_boot_connected",
+      "to": "storage.U3.7"
+    },
+    {
+      "from": "storage.U1.56",
+      "route_mm": 8.583,
+      "runtime": "storage_qspi_boot_connected",
+      "to": "storage.U3.1"
+    },
+    {
+      "from": "eink.U1.52",
+      "route_mm": 13.466,
+      "runtime": "eink_qspi_boot_connected",
+      "to": "eink.U3.6"
+    },
+    {
+      "from": "eink.U1.53",
+      "route_mm": 11.439,
+      "runtime": "eink_qspi_boot_connected",
+      "to": "eink.U3.5"
+    },
+    {
+      "from": "eink.U1.55",
+      "route_mm": 9.986,
+      "runtime": "eink_qspi_boot_connected",
+      "to": "eink.U3.2"
+    },
+    {
+      "from": "eink.U1.54",
+      "route_mm": 10.709,
+      "runtime": "eink_qspi_boot_connected",
+      "to": "eink.U3.3"
+    },
+    {
+      "from": "eink.U1.51",
+      "route_mm": 11.369,
+      "runtime": "eink_qspi_boot_connected",
+      "to": "eink.U3.7"
+    },
+    {
+      "from": "eink.U1.56",
+      "route_mm": 10.586,
+      "runtime": "eink_qspi_boot_connected",
+      "to": "eink.U3.1"
+    },
+    {
+      "from": "cpu.U1.1",
+      "ohms": 33,
+      "series": "RN1.1",
+      "to": "cpu.J1.A14"
+    },
+    {
+      "from": "cpu.U1.2",
+      "ohms": 33,
+      "series": "RN1.2",
+      "to": "cpu.J1.A16"
+    },
+    {
+      "from": "cpu.U1.3",
+      "ohms": 33,
+      "series": "RN1.3",
+      "to": "cpu.J1.A17"
+    },
+    {
+      "from": "cpu.U1.4",
+      "ohms": 33,
+      "series": "RN1.4",
+      "to": "cpu.J1.A19"
+    },
+    {
+      "from": "cpu.U1.7",
+      "ohms": 33,
+      "series": "RN2.1",
+      "to": "cpu.J1.A20"
+    },
+    {
+      "from": "cpu.U1.8",
+      "ohms": 33,
+      "series": "RN2.2",
+      "to": "cpu.J1.A22"
+    },
+    {
+      "from": "cpu.U1.9",
+      "ohms": 33,
+      "series": "RN2.3",
+      "to": "cpu.J1.A23"
+    },
+    {
+      "from": "cpu.U1.10",
+      "ohms": 33,
+      "series": "RN2.4",
+      "to": "cpu.J1.A25"
+    },
+    {
+      "from": "cpu.U1.11",
+      "ohms": 33,
+      "series": "RN3.1",
+      "to": "cpu.J1.A26"
+    },
+    {
+      "from": "cpu.U1.12",
+      "ohms": 33,
+      "series": "RN3.2",
+      "to": "cpu.J1.A28"
+    },
+    {
+      "from": "cpu.U1.15",
+      "ohms": 33,
+      "series": "RN3.3",
+      "to": "cpu.J1.A29"
+    },
+    {
+      "from": "cpu.U1.16",
+      "ohms": 33,
+      "series": "RN3.4",
+      "to": "cpu.J1.A31"
+    },
+    {
+      "from": "cpu.U1.17",
+      "ohms": 33,
+      "series": "RN4.1",
+      "to": "cpu.J1.A32"
+    },
+    {
+      "from": "cpu.U1.18",
+      "ohms": 33,
+      "series": "RN4.2",
+      "to": "cpu.J1.A34"
+    },
+    {
+      "from": "cpu.U1.19",
+      "ohms": 33,
+      "series": "RN4.3",
+      "to": "cpu.J1.A35"
+    },
+    {
+      "from": "cpu.U1.20",
+      "ohms": 33,
+      "series": "RN4.4",
+      "to": "cpu.J1.A37"
+    },
+    {
+      "from": "cpu.U1.37",
+      "ohms": 33,
+      "series": "RN6.1",
+      "to": "cpu.J1.B23"
+    },
+    {
+      "from": "cpu.U1.38",
+      "ohms": 33,
+      "series": "RN6.2",
+      "to": "cpu.J1.B25"
+    },
+    {
+      "from": "cpu.U1.39",
+      "ohms": 33,
+      "series": "RN6.3",
+      "to": "cpu.J1.B26"
+    },
+    {
+      "from": "cpu.U1.41",
+      "ohms": 33,
+      "series": "RN6.4",
+      "to": "cpu.J1.B28"
+    },
+    {
+      "from": "cpu.U1.42",
+      "ohms": 33,
+      "series": "RN7.1",
+      "to": "cpu.J1.B29"
+    },
+    {
+      "from": "cpu.U1.43",
+      "ohms": 33,
+      "series": "RN7.2",
+      "to": "cpu.J1.B31"
+    },
+    {
+      "from": "cpu.U1.44",
+      "ohms": 33,
+      "series": "RN7.3",
+      "to": "cpu.J1.B32"
+    },
+    {
+      "from": "cpu.U1.45",
+      "ohms": 33,
+      "series": "RN7.4",
+      "to": "cpu.J1.B34"
+    },
+    {
+      "from": "cpu.U1.25",
+      "ohms": 33,
+      "series": "RN5.2",
+      "to": "cpu.J1.B20"
+    },
+    {
+      "from": "cpu.U1.23",
+      "ohms": 33,
+      "series": "RN5.1",
+      "to": "cpu.J1.B17"
+    },
+    {
+      "from": "cpu.U1.26",
+      "ohms": 33,
+      "series": "RN5.3",
+      "to": "cpu.J1.B22"
+    },
+    {
+      "from": "cpu.U1.55",
+      "ohms": 33,
+      "series": "RN8.1",
+      "to": "cpu.J1.B41"
+    },
+    {
+      "from": "cpu.U1.56",
+      "ohms": 33,
+      "series": "RN8.2",
+      "to": "cpu.J1.B43"
+    },
+    {
+      "from": "cpu.U1.60",
+      "ohms": 33,
+      "series": "RN8.3",
+      "to": "cpu.J1.B44"
+    },
+    {
+      "from": "cpu.U1.61",
+      "ohms": 33,
+      "series": "RN8.4",
+      "to": "cpu.J1.B46"
+    },
+    {
+      "from": "cpu.U1.1",
+      "route_mm": 3.72,
+      "runtime": "cpu_address0_connected",
+      "to": "cpu.RN1.1"
+    },
+    {
+      "from": "cpu.RN1.8",
+      "route_mm": 17.105,
+      "runtime": "cpu_address0_connected",
+      "to": "cpu.J1.A14"
+    },
+    {
+      "from": "cpu.U1.2",
+      "route_mm": 3.72,
+      "runtime": "cpu_address1_connected",
+      "to": "cpu.RN1.2"
+    },
+    {
+      "from": "cpu.RN1.7",
+      "route_mm": 17.648,
+      "runtime": "cpu_address1_connected",
+      "to": "cpu.J1.A16"
+    },
+    {
+      "from": "cpu.U1.3",
+      "route_mm": 3.72,
+      "runtime": "cpu_address2_connected",
+      "to": "cpu.RN1.3"
+    },
+    {
+      "from": "cpu.RN1.6",
+      "route_mm": 16.627,
+      "runtime": "cpu_address2_connected",
+      "to": "cpu.J1.A17"
+    },
+    {
+      "from": "cpu.U1.4",
+      "route_mm": 3.72,
+      "runtime": "cpu_address3_connected",
+      "to": "cpu.RN1.4"
+    },
+    {
+      "from": "cpu.RN1.5",
+      "route_mm": 16.909,
+      "runtime": "cpu_address3_connected",
+      "to": "cpu.J1.A19"
+    },
+    {
+      "from": "cpu.U1.7",
+      "route_mm": 3.72,
+      "runtime": "cpu_address4_connected",
+      "to": "cpu.RN2.1"
+    },
+    {
+      "from": "cpu.RN2.8",
+      "route_mm": 23.171,
+      "runtime": "cpu_address4_connected",
+      "to": "cpu.J1.A20"
+    },
+    {
+      "from": "cpu.U1.8",
+      "route_mm": 3.72,
+      "runtime": "cpu_address5_connected",
+      "to": "cpu.RN2.2"
+    },
+    {
+      "from": "cpu.RN2.7",
+      "route_mm": 17.466,
+      "runtime": "cpu_address5_connected",
+      "to": "cpu.J1.A22"
+    },
+    {
+      "from": "cpu.U1.9",
+      "route_mm": 3.72,
+      "runtime": "cpu_address6_connected",
+      "to": "cpu.RN2.3"
+    },
+    {
+      "from": "cpu.RN2.6",
+      "route_mm": 17.53,
+      "runtime": "cpu_address6_connected",
+      "to": "cpu.J1.A23"
+    },
+    {
+      "from": "cpu.U1.10",
+      "route_mm": 3.72,
+      "runtime": "cpu_address7_connected",
+      "to": "cpu.RN2.4"
+    },
+    {
+      "from": "cpu.RN2.5",
+      "route_mm": 18.491,
+      "runtime": "cpu_address7_connected",
+      "to": "cpu.J1.A25"
+    },
+    {
+      "from": "cpu.U1.11",
+      "route_mm": 4.031,
+      "runtime": "cpu_address8_connected",
+      "to": "cpu.RN3.1"
+    },
+    {
+      "from": "cpu.RN3.8",
+      "route_mm": 18.378,
+      "runtime": "cpu_address8_connected",
+      "to": "cpu.J1.A26"
+    },
+    {
+      "from": "cpu.U1.12",
+      "route_mm": 4.134,
+      "runtime": "cpu_address9_connected",
+      "to": "cpu.RN3.2"
+    },
+    {
+      "from": "cpu.RN3.7",
+      "route_mm": 20.625,
+      "runtime": "cpu_address9_connected",
+      "to": "cpu.J1.A28"
+    },
+    {
+      "from": "cpu.U1.15",
+      "route_mm": 3.824,
+      "runtime": "cpu_address10_connected",
+      "to": "cpu.RN3.3"
+    },
+    {
+      "from": "cpu.RN3.6",
+      "route_mm": 19.63,
+      "runtime": "cpu_address10_connected",
+      "to": "cpu.J1.A29"
+    },
+    {
+      "from": "cpu.U1.16",
+      "route_mm": 3.824,
+      "runtime": "cpu_address11_connected",
+      "to": "cpu.RN3.4"
+    },
+    {
+      "from": "cpu.RN3.5",
+      "route_mm": 20.68,
+      "runtime": "cpu_address11_connected",
+      "to": "cpu.J1.A31"
+    },
+    {
+      "from": "cpu.U1.17",
+      "route_mm": 3.72,
+      "runtime": "cpu_address12_connected",
+      "to": "cpu.RN4.1"
+    },
+    {
+      "from": "cpu.RN4.8",
+      "route_mm": 23.043,
+      "runtime": "cpu_address12_connected",
+      "to": "cpu.J1.A32"
+    },
+    {
+      "from": "cpu.U1.18",
+      "route_mm": 3.72,
+      "runtime": "cpu_address13_connected",
+      "to": "cpu.RN4.2"
+    },
+    {
+      "from": "cpu.RN4.7",
+      "route_mm": 26.293,
+      "runtime": "cpu_address13_connected",
+      "to": "cpu.J1.A34"
+    },
+    {
+      "from": "cpu.U1.19",
+      "route_mm": 3.72,
+      "runtime": "cpu_address14_connected",
+      "to": "cpu.RN4.3"
+    },
+    {
+      "from": "cpu.RN4.6",
+      "route_mm": 23.412,
+      "runtime": "cpu_address14_connected",
+      "to": "cpu.J1.A35"
+    },
+    {
+      "from": "cpu.U1.20",
+      "route_mm": 3.72,
+      "runtime": "cpu_address15_connected",
+      "to": "cpu.RN4.4"
+    },
+    {
+      "from": "cpu.RN4.5",
+      "route_mm": 23.457,
+      "runtime": "cpu_address15_connected",
+      "to": "cpu.J1.A37"
+    },
+    {
+      "from": "cpu.U1.37",
+      "route_mm": 11.553,
+      "runtime": "cpu_data0_connected",
+      "to": "cpu.RN6.1"
+    },
+    {
+      "from": "cpu.RN6.8",
+      "route_mm": 23.777,
+      "runtime": "cpu_data0_connected",
+      "to": "cpu.J1.B23"
+    },
+    {
+      "from": "cpu.U1.38",
+      "route_mm": 12.663,
+      "runtime": "cpu_data1_connected",
+      "to": "cpu.RN6.2"
+    },
+    {
+      "from": "cpu.RN6.7",
+      "route_mm": 21.73,
+      "runtime": "cpu_data1_connected",
+      "to": "cpu.J1.B25"
+    },
+    {
+      "from": "cpu.U1.39",
+      "route_mm": 10.742,
+      "runtime": "cpu_data2_connected",
+      "to": "cpu.RN6.3"
+    },
+    {
+      "from": "cpu.RN6.6",
+      "route_mm": 22.426,
+      "runtime": "cpu_data2_connected",
+      "to": "cpu.J1.B26"
+    },
+    {
+      "from": "cpu.U1.41",
+      "route_mm": 15.286,
+      "runtime": "cpu_data3_connected",
+      "to": "cpu.RN6.4"
+    },
+    {
+      "from": "cpu.RN6.5",
+      "route_mm": 23.621,
+      "runtime": "cpu_data3_connected",
+      "to": "cpu.J1.B28"
+    },
+    {
+      "from": "cpu.U1.42",
+      "route_mm": 12.758,
+      "runtime": "cpu_data4_connected",
+      "to": "cpu.RN7.1"
+    },
+    {
+      "from": "cpu.RN7.8",
+      "route_mm": 22.472,
+      "runtime": "cpu_data4_connected",
+      "to": "cpu.J1.B29"
+    },
+    {
+      "from": "cpu.U1.43",
+      "route_mm": 16.22,
+      "runtime": "cpu_data5_connected",
+      "to": "cpu.RN7.2"
+    },
+    {
+      "from": "cpu.RN7.7",
+      "route_mm": 21.017,
+      "runtime": "cpu_data5_connected",
+      "to": "cpu.J1.B31"
+    },
+    {
+      "from": "cpu.U1.44",
+      "route_mm": 15.573,
+      "runtime": "cpu_data6_connected",
+      "to": "cpu.RN7.3"
+    },
+    {
+      "from": "cpu.RN7.6",
+      "route_mm": 20.063,
+      "runtime": "cpu_data6_connected",
+      "to": "cpu.J1.B32"
+    },
+    {
+      "from": "cpu.U1.45",
+      "route_mm": 15.839,
+      "runtime": "cpu_data7_connected",
+      "to": "cpu.RN7.4"
+    },
+    {
+      "from": "cpu.RN7.5",
+      "route_mm": 17.962,
+      "runtime": "cpu_data7_connected",
+      "to": "cpu.J1.B34"
+    },
+    {
+      "from": "main.U7.20",
+      "route_mm": 9.906,
+      "runtime": "main_cpu_data0_connected",
+      "to": "main.R21.1"
+    },
+    {
+      "from": "main.R21.2",
+      "route_mm": 71.88,
+      "runtime": "main_cpu_data0_connected",
+      "to": "main.J2.B23"
+    },
+    {
+      "from": "main.R90.2",
+      "route_mm": 18.375,
+      "runtime": "main_cpu_data0_connected",
+      "to": "main.J2.B23"
+    },
+    {
+      "from": "main.U7.18",
+      "route_mm": 10.786,
+      "runtime": "main_cpu_data1_connected",
+      "to": "main.R22.1"
+    },
+    {
+      "from": "main.R22.2",
+      "route_mm": 66.092,
+      "runtime": "main_cpu_data1_connected",
+      "to": "main.J2.B25"
+    },
+    {
+      "from": "main.R91.2",
+      "route_mm": 21.565,
+      "runtime": "main_cpu_data1_connected",
+      "to": "main.J2.B25"
+    },
+    {
+      "from": "main.U7.19",
+      "route_mm": 16.389,
+      "runtime": "main_cpu_data2_connected",
+      "to": "main.R23.1"
+    },
+    {
+      "from": "main.R23.2",
+      "route_mm": 68.417,
+      "runtime": "main_cpu_data2_connected",
+      "to": "main.J2.B26"
+    },
+    {
+      "from": "main.R92.2",
+      "route_mm": 28.124,
+      "runtime": "main_cpu_data2_connected",
+      "to": "main.J2.B26"
+    },
+    {
+      "from": "main.U7.17",
+      "route_mm": 12.681,
+      "runtime": "main_cpu_data3_connected",
+      "to": "main.R24.1"
+    },
+    {
+      "from": "main.R24.2",
+      "route_mm": 60.168,
+      "runtime": "main_cpu_data3_connected",
+      "to": "main.J2.B28"
+    },
+    {
+      "from": "main.R93.2",
+      "route_mm": 26.821,
+      "runtime": "main_cpu_data3_connected",
+      "to": "main.J2.B28"
+    },
+    {
+      "from": "main.U7.9",
+      "route_mm": 7.775,
+      "runtime": "main_cpu_data4_connected",
+      "to": "main.R25.1"
+    },
+    {
+      "from": "main.R25.2",
+      "route_mm": 72.251,
+      "runtime": "main_cpu_data4_connected",
+      "to": "main.J2.B29"
+    },
+    {
+      "from": "main.R94.2",
+      "route_mm": 52.216,
+      "runtime": "main_cpu_data4_connected",
+      "to": "main.J2.B29"
+    },
+    {
+      "from": "main.U7.7",
+      "route_mm": 11.31,
+      "runtime": "main_cpu_data5_connected",
+      "to": "main.R26.1"
+    },
+    {
+      "from": "main.R26.2",
+      "route_mm": 59.128,
+      "runtime": "main_cpu_data5_connected",
+      "to": "main.J2.B31"
+    },
+    {
+      "from": "main.R95.2",
+      "route_mm": 32.172,
+      "runtime": "main_cpu_data5_connected",
+      "to": "main.J2.B31"
+    },
+    {
+      "from": "main.U7.10",
+      "route_mm": 13.021,
+      "runtime": "main_cpu_data6_connected",
+      "to": "main.R27.1"
+    },
+    {
+      "from": "main.R27.2",
+      "route_mm": 60.716,
+      "runtime": "main_cpu_data6_connected",
+      "to": "main.J2.B32"
+    },
+    {
+      "from": "main.R96.2",
+      "route_mm": 32.857,
+      "runtime": "main_cpu_data6_connected",
+      "to": "main.J2.B32"
+    },
+    {
+      "from": "main.U7.8",
+      "route_mm": 19.017,
+      "runtime": "main_cpu_data7_connected",
+      "to": "main.R28.1"
+    },
+    {
+      "from": "main.R28.2",
+      "route_mm": 74.437,
+      "runtime": "main_cpu_data7_connected",
+      "to": "main.J2.B34"
+    },
+    {
+      "from": "main.R97.2",
+      "route_mm": 43.864,
+      "runtime": "main_cpu_data7_connected",
+      "to": "main.J2.B34"
+    },
+    {
+      "from": "main.Y1.3",
+      "route_mm": 5.937,
+      "runtime": "cpu_clock_connected",
+      "to": "main.R18.1"
+    },
+    {
+      "from": "main.R18.2",
+      "route_mm": 76.098,
+      "runtime": "cpu_clock_connected",
+      "to": "main.J2.B13"
+    },
+    {
+      "from": "cpu.J1.B13",
+      "route_mm": 31.218,
+      "runtime": "cpu_clock_connected",
+      "to": "cpu.U1.21"
+    },
+    {
+      "from": "main.U7.32",
+      "route_mm": 14.452,
+      "runtime": "cpu_reset_connected",
+      "to": "main.R34.1"
+    },
+    {
+      "from": "main.R34.2",
+      "route_mm": 114.036,
+      "runtime": "cpu_reset_connected",
+      "to": "main.J2.B16"
+    },
+    {
+      "from": "cpu.J1.B16",
+      "route_mm": 27.014,
+      "runtime": "cpu_reset_connected",
+      "to": "cpu.U1.22"
+    },
+    {
+      "from": "main.Y1.3",
+      "route_mm": 14.604,
+      "runtime": "chipset_clock_connected",
+      "to": "main.R17.1"
+    },
+    {
+      "from": "main.R17.2",
+      "route_mm": 19.921,
+      "runtime": "chipset_clock_connected",
+      "to": "main.U7.21"
+    },
+    {
+      "from": "system.U1.4",
+      "ohms": 33,
+      "series": "R11",
+      "to": "system.J2.B13"
+    },
+    {
+      "from": "system.U1.5",
+      "ohms": 33,
+      "series": "R12",
+      "to": "system.J2.A14"
+    },
+    {
+      "from": "system.U1.7",
+      "ohms": 33,
+      "series": "R13",
+      "to": "system.J2.A15"
+    },
+    {
+      "from": "main.U7.73",
+      "ohms": 33,
+      "series": "R20",
+      "to": "main.J3.47"
+    },
+    {
+      "from": "main.U7.73",
+      "route_mm": 8.1,
+      "runtime": "bridge_miso_connected",
+      "to": "main.R20.1"
+    },
+    {
+      "from": "main.R20.2",
+      "route_mm": 151.073,
+      "runtime": "bridge_miso_connected",
+      "to": "main.J3.47"
+    },
+    {
+      "from": "system.U1.4",
+      "route_mm": 22.999,
+      "runtime": "bridge_sck_connected",
+      "to": "system.R11.1"
+    },
+    {
+      "from": "system.R11.2",
+      "route_mm": 25.853,
+      "runtime": "bridge_sck_connected",
+      "to": "system.J2.B13"
+    },
+    {
+      "from": "system.U1.5",
+      "route_mm": 18.676,
+      "runtime": "bridge_mosi_connected",
+      "to": "system.R12.1"
+    },
+    {
+      "from": "system.R12.2",
+      "route_mm": 24.44,
+      "runtime": "bridge_mosi_connected",
+      "to": "system.J2.A14"
+    },
+    {
+      "from": "system.U1.7",
+      "route_mm": 19.684,
+      "runtime": "bridge_ncs_connected",
+      "to": "system.R13.1"
+    },
+    {
+      "from": "system.R13.2",
+      "route_mm": 23.668,
+      "runtime": "bridge_ncs_connected",
+      "to": "system.J2.A15"
+    },
+    {
+      "from": "system.J2.B15",
+      "route_mm": 40.593,
+      "runtime": "bridge_miso_connected",
+      "to": "system.U1.6"
+    },
+    {
+      "from": "main.U5.OUT",
+      "net": "PWR_HI",
+      "to": "main.U7.60"
+    },
+    {
+      "from": "main.U6.~{RESET}",
+      "net": "nPOR",
+      "to": "main.U7.61"
+    },
+    {
+      "from": "io.U1.46",
+      "ohms": 27,
+      "runtime": "io_usb_host",
+      "series": "R14",
+      "to": "io.J2.2"
+    },
+    {
+      "from": "io.U1.47",
+      "ohms": 27,
+      "runtime": "io_usb_host",
+      "series": "R15",
+      "to": "io.J2.3"
+    },
+    {
+      "from": "storage.U1.30",
+      "net": "SD_DAT2",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.1"
+    },
+    {
+      "from": "storage.U1.16",
+      "net": "SD_nCS",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.2"
+    },
+    {
+      "from": "storage.U1.18",
+      "net": "SD_MOSI",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.3"
+    },
+    {
+      "from": "storage.U1.17",
+      "net": "SD_SCK",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.5"
+    },
+    {
+      "from": "storage.U1.15",
+      "net": "SD_MISO",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.7"
+    },
+    {
+      "from": "storage.U1.29",
+      "net": "SD_DAT1",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.8"
+    },
+    {
+      "from": "storage.U1.28",
+      "net": "SD_nDETECT",
+      "runtime": "storage_sd_socket",
+      "to": "storage.J2.9"
+    },
+    {
+      "from": "gpu.U1.28",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN1.1",
+      "to": "gpu.J2.1"
+    },
+    {
+      "from": "gpu.U1.27",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN1.2",
+      "to": "gpu.J2.3"
+    },
+    {
+      "from": "gpu.U1.18",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN1.3",
+      "to": "gpu.J2.4"
+    },
+    {
+      "from": "gpu.U1.17",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN1.4",
+      "to": "gpu.J2.6"
+    },
+    {
+      "from": "gpu.U1.16",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN2.1",
+      "to": "gpu.J2.7"
+    },
+    {
+      "from": "gpu.U1.15",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN2.2",
+      "to": "gpu.J2.9"
+    },
+    {
+      "from": "gpu.U1.14",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN2.3",
+      "to": "gpu.J2.10"
+    },
+    {
+      "from": "gpu.U1.13",
+      "ohms": 270,
+      "runtime": "gpu_hdmi_link",
+      "series": "RN2.4",
+      "to": "gpu.J2.12"
+    },
+    {
+      "from": "eink.U1.14",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R10",
+      "to": "eink.J2.3"
+    },
+    {
+      "from": "eink.U1.13",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R11",
+      "to": "eink.J2.4"
+    },
+    {
+      "from": "eink.U1.12",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R12",
+      "to": "eink.J2.5"
+    },
+    {
+      "from": "eink.U1.15",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R13",
+      "to": "eink.J2.6"
+    },
+    {
+      "from": "eink.U1.16",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R14",
+      "to": "eink.J2.7"
+    },
+    {
+      "from": "eink.U1.17",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R15",
+      "to": "eink.J2.8"
+    },
+    {
+      "from": "eink.U1.18",
+      "ohms": 33,
+      "runtime": "eink_panel_link",
+      "series": "R16",
+      "to": "eink.J2.9"
+    },
+    {
+      "from": "main.Y1.3",
+      "ohms": 33,
+      "series": "R17",
+      "to": "main.U7.21"
+    },
+    {
+      "from": "main.Y1.3",
+      "ohms": 33,
+      "series": "R18",
+      "to": "main.J2.B13"
+    },
+    {
+      "from": "main.U7.107",
+      "route_mm": 36.962,
+      "runtime": "gpo_led_0",
+      "to": "main.R60.1"
+    },
+    {
+      "from": "main.R60.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_0",
+      "to": "main.D11.2"
+    },
+    {
+      "from": "main.U7.106",
+      "route_mm": 36.031,
+      "runtime": "gpo_led_1",
+      "to": "main.R61.1"
+    },
+    {
+      "from": "main.R61.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_1",
+      "to": "main.D12.2"
+    },
+    {
+      "from": "main.U7.104",
+      "route_mm": 38.352,
+      "runtime": "gpo_led_2",
+      "to": "main.R62.1"
+    },
+    {
+      "from": "main.R62.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_2",
+      "to": "main.D13.2"
+    },
+    {
+      "from": "main.U7.102",
+      "route_mm": 43.741,
+      "runtime": "gpo_led_3",
+      "to": "main.R63.1"
+    },
+    {
+      "from": "main.R63.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_3",
+      "to": "main.D14.2"
+    },
+    {
+      "from": "main.U7.112",
+      "route_mm": 36.083,
+      "runtime": "gpo_led_4",
+      "to": "main.R64.1"
+    },
+    {
+      "from": "main.R64.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_4",
+      "to": "main.D15.2"
+    },
+    {
+      "from": "main.U7.122",
+      "route_mm": 34.803,
+      "runtime": "gpo_led_5",
+      "to": "main.R65.1"
+    },
+    {
+      "from": "main.R65.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_5",
+      "to": "main.D16.2"
+    },
+    {
+      "from": "main.U7.125",
+      "route_mm": 39.424,
+      "runtime": "gpo_led_6",
+      "to": "main.R66.1"
+    },
+    {
+      "from": "main.R66.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_6",
+      "to": "main.D17.2"
+    },
+    {
+      "from": "main.U7.128",
+      "route_mm": 43.158,
+      "runtime": "gpo_led_7",
+      "to": "main.R67.1"
+    },
+    {
+      "from": "main.R67.2",
+      "route_mm": 4.401,
+      "runtime": "gpo_led_7",
+      "to": "main.D18.2"
+    },
+    {
+      "from": "cpu.U1.23",
+      "route_mm": 3.904,
+      "runtime": "cpu_strobe_connected",
+      "to": "cpu.RN5.1"
+    },
+    {
+      "from": "cpu.RN5.8",
+      "route_mm": 19.871,
+      "runtime": "cpu_strobe_connected",
+      "to": "cpu.J1.B17"
+    },
+    {
+      "from": "main.J2.B17",
+      "route_mm": 84.93,
+      "runtime": "cpu_strobe_connected",
+      "to": "main.U7.31"
+    },
+    {
+      "from": "cpu.U1.25",
+      "route_mm": 3.87,
+      "runtime": "cpu_rw_connected",
+      "to": "cpu.RN5.2"
+    },
+    {
+      "from": "cpu.RN5.7",
+      "route_mm": 19.102,
+      "runtime": "cpu_rw_connected",
+      "to": "cpu.J1.B20"
+    },
+    {
+      "from": "main.J2.B20",
+      "route_mm": 80.87,
+      "runtime": "cpu_rw_connected",
+      "to": "main.U7.29"
+    },
+    {
+      "from": "main.U7.28",
+      "route_mm": 8.306,
+      "runtime": "cpu_ready_connected",
+      "to": "main.R33.1"
+    },
+    {
+      "from": "main.R33.2",
+      "route_mm": 76.769,
+      "runtime": "cpu_ready_connected",
+      "to": "main.J2.B19"
+    },
+    {
+      "from": "cpu.J1.B19",
+      "route_mm": 24.103,
+      "runtime": "cpu_ready_connected",
+      "to": "cpu.U1.24"
+    },
+    {
+      "from": "cpu.U1.26",
+      "route_mm": 3.824,
+      "runtime": "cpu_sync_connected",
+      "to": "cpu.RN5.3"
+    },
+    {
+      "from": "cpu.RN5.6",
+      "route_mm": 19.265,
+      "runtime": "cpu_sync_connected",
+      "to": "cpu.J1.B22"
+    },
+    {
+      "from": "main.J2.B22",
+      "route_mm": 74.037,
+      "runtime": "cpu_sync_connected",
+      "to": "main.U7.26"
+    },
+    {
+      "from": "cpu.U1.60",
+      "route_mm": 10.873,
+      "runtime": "cpu_halted_connected",
+      "to": "cpu.RN8.3"
+    },
+    {
+      "from": "cpu.RN8.6",
+      "route_mm": 35.321,
+      "runtime": "cpu_halted_connected",
+      "to": "cpu.J1.B44"
+    },
+    {
+      "from": "main.J2.B44",
+      "route_mm": 49.898,
+      "runtime": "cpu_halted_connected",
+      "to": "main.U7.137"
+    },
+    {
+      "from": "cpu.U1.61",
+      "route_mm": 10.873,
+      "runtime": "cpu_waiting_connected",
+      "to": "cpu.RN8.4"
+    },
+    {
+      "from": "cpu.RN8.5",
+      "route_mm": 36.65,
+      "runtime": "cpu_waiting_connected",
+      "to": "cpu.J1.B46"
+    },
+    {
+      "from": "main.J2.B46",
+      "route_mm": 51.677,
+      "runtime": "cpu_waiting_connected",
+      "to": "main.U7.130"
+    },
+    {
+      "from": "system.U1.35",
+      "route_mm": 44.378,
+      "runtime": "sysctl_manual_reset_connected",
+      "to": "system.J2.B4"
+    },
+    {
+      "from": "main.J3.36",
+      "route_mm": 56.853,
+      "runtime": "sysctl_manual_reset_connected",
+      "to": "main.U6.3"
+    },
+    {
+      "from": "main.SW1.1",
+      "route_mm": 82.12,
+      "runtime": "button_manual_reset_connected",
+      "to": "main.U6.3"
+    }
+  ],
+  "pulls": [
+    {
+      "idle": 1,
+      "net": "SPI_MISO",
+      "rail": "+3V3",
+      "resistors": [
+        [
+          "R107",
+          "47k"
+        ]
+      ],
+      "strength": "weak"
+    }
+  ],
+  "reviewed_waivers": {
+    "main:CPU_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A40",
+      "pins": [
+        "J2.A40",
+        "TP33.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A41",
+      "pins": [
+        "J2.A41",
+        "TP34.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A43",
+      "pins": [
+        "J2.A43",
+        "TP35.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A44",
+      "pins": [
+        "J2.A44",
+        "TP36.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_A6": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A46",
+      "pins": [
+        "J2.A46",
+        "TP37.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_A7": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A47",
+      "pins": [
+        "J2.A47",
+        "TP38.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_A8": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.A49",
+      "pins": [
+        "J2.A49",
+        "TP39.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:CPU_RSVD_B1": {
+      "family": "reserved_contact",
+      "mating_nc": "cpu.J1.B47",
+      "pins": [
+        "J2.B47",
+        "TP40.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT1_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J11.A6",
+        "TP60.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT1_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J11.A7",
+        "TP61.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT1_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J11.A9",
+        "TP62.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT1_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J11.A10",
+        "TP63.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT1_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J11.A16",
+        "TP64.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT2_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J12.A6",
+        "TP68.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT2_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J12.A7",
+        "TP69.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT2_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J12.A9",
+        "TP70.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT2_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J12.A10",
+        "TP71.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT2_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J12.A16",
+        "TP72.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT3_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J13.A6",
+        "TP76.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT3_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J13.A7",
+        "TP77.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT3_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J13.A9",
+        "TP78.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT3_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J13.A10",
+        "TP79.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT3_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J13.A16",
+        "TP80.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT4_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J14.A6",
+        "TP84.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT4_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J14.A7",
+        "TP85.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT4_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J14.A9",
+        "TP86.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT4_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J14.A10",
+        "TP87.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT4_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J14.A16",
+        "TP88.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT5_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J15.A6",
+        "TP92.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT5_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J15.A7",
+        "TP93.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT5_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J15.A9",
+        "TP94.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT5_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J15.A10",
+        "TP95.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT5_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J15.A16",
+        "TP96.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT6_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J16.A6",
+        "TP100.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT6_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J16.A7",
+        "TP101.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT6_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J16.A9",
+        "TP102.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT6_RSVD_A4": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J16.A10",
+        "TP103.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SLOT6_RSVD_A5": {
+      "family": "reserved_contact",
+      "mating_nc": "all five slot-card J1 contacts",
+      "pins": [
+        "J16.A16",
+        "TP104.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SYS_RSVD_A1": {
+      "family": "reserved_contact",
+      "mating_nc": "system.J2.A29",
+      "pins": [
+        "J3.29",
+        "TP49.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SYS_RSVD_A2": {
+      "family": "reserved_contact",
+      "mating_nc": "system.J2.A30",
+      "pins": [
+        "J3.30",
+        "TP50.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SYS_RSVD_A3": {
+      "family": "reserved_contact",
+      "mating_nc": "system.J2.A32",
+      "pins": [
+        "J3.32",
+        "TP51.1"
+      ],
+      "reason": "Only a passive test point is attached; the mating contact is KiCad NC."
+    },
+    "main:SYS_RSVD_B1": {
+      "family": "reserved_contact",
+      "mating_nc": "system.J2.B29: passive reserved contact",
+      "pins": [
+        "J3.61",
+        "TP52.1"
+      ],
+      "reason": "Only passive test points on both sides of this reserved contact."
+    },
+    "main:SYS_RSVD_B2": {
+      "family": "reserved_contact",
+      "mating_nc": "system.J2.B30: passive reserved contact",
+      "pins": [
+        "J3.62",
+        "TP53.1"
+      ],
+      "reason": "Only passive test points on both sides of this reserved contact."
+    },
+    "system:RSVD_B1": {
+      "family": "reserved_contact",
+      "mating_nc": "main.J3.61: passive reserved contact",
+      "pins": [
+        "J2.B29",
+        "TP8.1"
+      ],
+      "reason": "Only passive test points on both sides of this reserved contact."
+    },
+    "system:RSVD_B2": {
+      "family": "reserved_contact",
+      "mating_nc": "main.J3.62: passive reserved contact",
+      "pins": [
+        "J2.B30",
+        "TP9.1"
+      ],
+      "reason": "Only passive test points on both sides of this reserved contact."
+    }
+  },
+  "runtime": {
+    "bridge": {
+      "miso": true,
+      "mosi": 1,
+      "ncs": 2,
+      "sck": 0
+    },
+    "bridge_source_links": {
+      "mosi": true,
+      "ncs": true,
+      "sck": true
+    },
+    "button_manual_reset_connected": true,
+    "card_slot_links": {
+      "eink": {
+        "cs": true,
+        "irq": true,
+        "miso": true,
+        "mosi": true,
+        "sck": true
+      },
+      "gpu": {
+        "cs": true,
+        "irq": true,
+        "miso": true,
+        "mosi": true,
+        "sck": true
+      },
+      "io": {
+        "cs": true,
+        "irq": true,
+        "miso": true,
+        "mosi": true,
+        "sck": true
+      },
+      "storage": {
+        "cs": true,
+        "irq": true,
+        "miso": true,
+        "mosi": true,
+        "sck": true
+      },
+      "wifi": {
+        "cs": true,
+        "irq": true,
+        "miso": true,
+        "mosi": true,
+        "sck": true
+      }
+    },
+    "cc_trip_volts": [
+      1.289062,
+      1.289062
+    ],
+    "chipset_clock_connected": true,
+    "cpu_address": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "cpu_address_links": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "cpu_clock_connected": true,
+    "cpu_control_connected": {
+      "rw": true,
+      "strobe": true
+    },
+    "cpu_data": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "cpu_data_links": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "cpu_data_main_links": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "cpu_ready_connected": true,
+    "cpu_reset_connected": true,
+    "cpu_status_connected": {
+      "halted": true,
+      "waiting": true
+    },
+    "cpu_sync_connected": true,
+    "eink_panel_link": true,
+    "gpo_led_connected": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "gpu_hdmi_link": true,
+    "io_usb_host": true,
+    "memory_timing_ns": {
+      "ram": 46.352,
+      "rom": 71.148
+    },
+    "memory_write_links": {
+      "ram": true,
+      "rom": true
+    },
+    "miso_idle": 1,
+    "missing_routes": [],
+    "por_connected": true,
+    "qspi_boot_connected": {
+      "eink": true,
+      "gpu": true,
+      "io": true,
+      "storage": true,
+      "system": true
+    },
+    "ram_address": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "ram_data": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "rom_address": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "rom_data": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "rom_read_d0_connected": true,
+    "routed_timing": true,
+    "routed_top": true,
+    "series_delay_ns": 1.089,
+    "slots": [
+      {
+        "cs": 2,
+        "cs_connected": true,
+        "irq": 0,
+        "irq_connected": true,
+        "miso": true,
+        "miso_connected": true,
+        "mosi": 1,
+        "mosi_connected": true,
+        "sck": 0,
+        "sck_connected": true
+      },
+      {
+        "cs": 3,
+        "cs_connected": true,
+        "irq": 1,
+        "irq_connected": true,
+        "miso": true,
+        "miso_connected": true,
+        "mosi": 1,
+        "mosi_connected": true,
+        "sck": 0,
+        "sck_connected": true
+      },
+      {
+        "cs": 4,
+        "cs_connected": true,
+        "irq": 2,
+        "irq_connected": true,
+        "miso": true,
+        "miso_connected": true,
+        "mosi": 1,
+        "mosi_connected": true,
+        "sck": 0,
+        "sck_connected": true
+      },
+      {
+        "cs": 5,
+        "cs_connected": true,
+        "irq": 3,
+        "irq_connected": true,
+        "miso": true,
+        "miso_connected": true,
+        "mosi": 1,
+        "mosi_connected": true,
+        "sck": 0,
+        "sck_connected": true
+      },
+      {
+        "cs": 6,
+        "cs_connected": true,
+        "irq": 4,
+        "irq_connected": true,
+        "miso": true,
+        "miso_connected": true,
+        "mosi": 1,
+        "mosi_connected": true,
+        "sck": 0,
+        "sck_connected": true
+      },
+      {
+        "cs": 7,
+        "cs_connected": true,
+        "irq": 5,
+        "irq_connected": true,
+        "miso": true,
+        "miso_connected": true,
+        "mosi": 1,
+        "mosi_connected": true,
+        "sck": 0,
+        "sck_connected": true
+      }
+    ],
+    "storage_sd_socket": true,
+    "sysctl_manual_reset_connected": true
+  },
+  "runtime_nets": [
+    "cpu:CPU_A0",
+    "cpu:CPU_A1",
+    "cpu:CPU_A10",
+    "cpu:CPU_A11",
+    "cpu:CPU_A12",
+    "cpu:CPU_A13",
+    "cpu:CPU_A14",
+    "cpu:CPU_A15",
+    "cpu:CPU_A2",
+    "cpu:CPU_A3",
+    "cpu:CPU_A4",
+    "cpu:CPU_A5",
+    "cpu:CPU_A6",
+    "cpu:CPU_A7",
+    "cpu:CPU_A8",
+    "cpu:CPU_A9",
+    "cpu:CPU_CLK",
+    "cpu:CPU_D0",
+    "cpu:CPU_D1",
+    "cpu:CPU_D2",
+    "cpu:CPU_D3",
+    "cpu:CPU_D4",
+    "cpu:CPU_D5",
+    "cpu:CPU_D6",
+    "cpu:CPU_D7",
+    "cpu:CPU_HALTED",
+    "cpu:CPU_RW",
+    "cpu:CPU_SYNC",
+    "cpu:CPU_WAITING",
+    "cpu:CPU_nRDY",
+    "cpu:CPU_nRST",
+    "cpu:CPU_nSTB",
+    "cpu:FPGA_A0",
+    "cpu:FPGA_A1",
+    "cpu:FPGA_A10",
+    "cpu:FPGA_A11",
+    "cpu:FPGA_A12",
+    "cpu:FPGA_A13",
+    "cpu:FPGA_A14",
+    "cpu:FPGA_A15",
+    "cpu:FPGA_A2",
+    "cpu:FPGA_A3",
+    "cpu:FPGA_A4",
+    "cpu:FPGA_A5",
+    "cpu:FPGA_A6",
+    "cpu:FPGA_A7",
+    "cpu:FPGA_A8",
+    "cpu:FPGA_A9",
+    "cpu:FPGA_D0",
+    "cpu:FPGA_D1",
+    "cpu:FPGA_D2",
+    "cpu:FPGA_D3",
+    "cpu:FPGA_D4",
+    "cpu:FPGA_D5",
+    "cpu:FPGA_D6",
+    "cpu:FPGA_D7",
+    "cpu:FPGA_HALTED",
+    "cpu:FPGA_RW",
+    "cpu:FPGA_SYNC",
+    "cpu:FPGA_WAITING",
+    "cpu:FPGA_nSTB",
+    "eink:CS_n",
+    "eink:EPD_BUSY",
+    "eink:EPD_BUSY_J",
+    "eink:EPD_CLK",
+    "eink:EPD_CLK_J",
+    "eink:EPD_DC",
+    "eink:EPD_DC_J",
+    "eink:EPD_DIN",
+    "eink:EPD_DIN_J",
+    "eink:EPD_PWR",
+    "eink:EPD_PWR_J",
+    "eink:EPD_nCS",
+    "eink:EPD_nCS_J",
+    "eink:EPD_nRST",
+    "eink:EPD_nRST_J",
+    "eink:IRQ_n",
+    "eink:MISO",
+    "eink:MISO_OUT",
+    "eink:MOSI",
+    "eink:QSPI_SCLK",
+    "eink:QSPI_SD0",
+    "eink:QSPI_SD1",
+    "eink:QSPI_SD2",
+    "eink:QSPI_SD3",
+    "eink:QSPI_SS",
+    "eink:SCK",
+    "gpu:CS_n",
+    "gpu:HD_CKN",
+    "gpu:HD_CKP",
+    "gpu:HD_D0N",
+    "gpu:HD_D0P",
+    "gpu:HD_D1N",
+    "gpu:HD_D1P",
+    "gpu:HD_D2N",
+    "gpu:HD_D2P",
+    "gpu:IRQ_n",
+    "gpu:MISO",
+    "gpu:MISO_OUT",
+    "gpu:MOSI",
+    "gpu:QSPI_SCLK",
+    "gpu:QSPI_SD0",
+    "gpu:QSPI_SD1",
+    "gpu:QSPI_SD2",
+    "gpu:QSPI_SD3",
+    "gpu:QSPI_SS",
+    "gpu:SCK",
+    "gpu:TMDS_CKN",
+    "gpu:TMDS_CKP",
+    "gpu:TMDS_D0N",
+    "gpu:TMDS_D0P",
+    "gpu:TMDS_D1N",
+    "gpu:TMDS_D1P",
+    "gpu:TMDS_D2N",
+    "gpu:TMDS_D2P",
+    "io:CS_n",
+    "io:IRQ_n",
+    "io:MISO",
+    "io:MISO_OUT",
+    "io:MOSI",
+    "io:QSPI_SCLK",
+    "io:QSPI_SD0",
+    "io:QSPI_SD1",
+    "io:QSPI_SD2",
+    "io:QSPI_SD3",
+    "io:QSPI_SS",
+    "io:SCK",
+    "io:USB_CONN_DM",
+    "io:USB_CONN_DP",
+    "io:USB_DM",
+    "io:USB_DP",
+    "main:BR_MISO",
+    "main:BR_MISO_SRC",
+    "main:BR_MOSI",
+    "main:BR_SCK",
+    "main:BR_nCS",
+    "main:CC1",
+    "main:CC2",
+    "main:CC_AVG",
+    "main:CC_REF",
+    "main:CLK12",
+    "main:CPU_A0",
+    "main:CPU_A1",
+    "main:CPU_A10",
+    "main:CPU_A11",
+    "main:CPU_A12",
+    "main:CPU_A13",
+    "main:CPU_A14",
+    "main:CPU_A15",
+    "main:CPU_A2",
+    "main:CPU_A3",
+    "main:CPU_A4",
+    "main:CPU_A5",
+    "main:CPU_A6",
+    "main:CPU_A7",
+    "main:CPU_A8",
+    "main:CPU_A9",
+    "main:CPU_CLK",
+    "main:CPU_D0",
+    "main:CPU_D0_SRC",
+    "main:CPU_D1",
+    "main:CPU_D1_SRC",
+    "main:CPU_D2",
+    "main:CPU_D2_SRC",
+    "main:CPU_D3",
+    "main:CPU_D3_SRC",
+    "main:CPU_D4",
+    "main:CPU_D4_SRC",
+    "main:CPU_D5",
+    "main:CPU_D5_SRC",
+    "main:CPU_D6",
+    "main:CPU_D6_SRC",
+    "main:CPU_D7",
+    "main:CPU_D7_SRC",
+    "main:CPU_HALTED",
+    "main:CPU_RW",
+    "main:CPU_SYNC",
+    "main:CPU_WAITING",
+    "main:CPU_nRDY",
+    "main:CPU_nRDY_SRC",
+    "main:CPU_nRST",
+    "main:CPU_nRST_SRC",
+    "main:CPU_nSTB",
+    "main:GPO0",
+    "main:GPO1",
+    "main:GPO2",
+    "main:GPO3",
+    "main:GPO4",
+    "main:GPO5",
+    "main:GPO6",
+    "main:GPO7",
+    "main:LED_GPO0",
+    "main:LED_GPO1",
+    "main:LED_GPO2",
+    "main:LED_GPO3",
+    "main:LED_GPO4",
+    "main:LED_GPO5",
+    "main:LED_GPO6",
+    "main:LED_GPO7",
+    "main:MEM_A0",
+    "main:MEM_A1",
+    "main:MEM_A10",
+    "main:MEM_A11",
+    "main:MEM_A12",
+    "main:MEM_A13",
+    "main:MEM_A14",
+    "main:MEM_A15",
+    "main:MEM_A16",
+    "main:MEM_A17",
+    "main:MEM_A18",
+    "main:MEM_A2",
+    "main:MEM_A3",
+    "main:MEM_A4",
+    "main:MEM_A5",
+    "main:MEM_A6",
+    "main:MEM_A7",
+    "main:MEM_A8",
+    "main:MEM_A9",
+    "main:MEM_D0",
+    "main:MEM_D1",
+    "main:MEM_D2",
+    "main:MEM_D3",
+    "main:MEM_D4",
+    "main:MEM_D5",
+    "main:MEM_D6",
+    "main:MEM_D7",
+    "main:MEM_nCE_RAM",
+    "main:MEM_nCE_ROM",
+    "main:MEM_nOE",
+    "main:MEM_nWE",
+    "main:OSC_OUT",
+    "main:PWR_HI",
+    "main:SLOT1_CS_n",
+    "main:SLOT2_CS_n",
+    "main:SLOT3_CS_n",
+    "main:SLOT4_CS_n",
+    "main:SLOT5_CS_n",
+    "main:SLOT6_CS_n",
+    "main:SLOT_nIRQ0",
+    "main:SLOT_nIRQ1",
+    "main:SLOT_nIRQ2",
+    "main:SLOT_nIRQ3",
+    "main:SLOT_nIRQ4",
+    "main:SLOT_nIRQ5",
+    "main:SPI_MISO",
+    "main:SPI_MOSI",
+    "main:SPI_MOSI_SRC",
+    "main:SPI_SCK",
+    "main:SPI_SCK_SRC",
+    "main:SPI_nCS0_SRC",
+    "main:SPI_nCS1_SRC",
+    "main:SPI_nCS2_SRC",
+    "main:SPI_nCS3_SRC",
+    "main:SPI_nCS4_SRC",
+    "main:SPI_nCS5_SRC",
+    "main:nMR",
+    "main:nPOR",
+    "storage:CS_n",
+    "storage:IRQ_n",
+    "storage:MISO",
+    "storage:MISO_OUT",
+    "storage:MOSI",
+    "storage:QSPI_SCLK",
+    "storage:QSPI_SD0",
+    "storage:QSPI_SD1",
+    "storage:QSPI_SD2",
+    "storage:QSPI_SD3",
+    "storage:QSPI_SS",
+    "storage:SCK",
+    "storage:SD_DAT1",
+    "storage:SD_DAT2",
+    "storage:SD_MISO",
+    "storage:SD_MOSI",
+    "storage:SD_SCK",
+    "storage:SD_nCS",
+    "storage:SD_nDETECT",
+    "system:BR_MISO",
+    "system:BR_MOSI",
+    "system:BR_MOSI_MCU",
+    "system:BR_SCK",
+    "system:BR_SCK_MCU",
+    "system:BR_nCS",
+    "system:BR_nCS_MCU",
+    "system:QSPI_SCLK",
+    "system:QSPI_SD0",
+    "system:QSPI_SD1",
+    "system:QSPI_SD2",
+    "system:QSPI_SD3",
+    "system:QSPI_nSS",
+    "system:SYS_nRST",
+    "wifi:CS_n",
+    "wifi:IRQ_n",
+    "wifi:MISO",
+    "wifi:MISO_INT",
+    "wifi:MOSI",
+    "wifi:SCK"
+  ],
+  "structural_only_nets": [
+    "cpu:3V3",
+    "cpu:CDONE",
+    "cpu:CPU_IRQ0",
+    "cpu:CPU_IRQ1",
+    "cpu:CPU_IRQ2",
+    "cpu:CPU_IRQ3",
+    "cpu:CPU_TMR_EXP0",
+    "cpu:CPU_TMR_EXP1",
+    "cpu:CRESET_n",
+    "cpu:FL1_MISO",
+    "cpu:FL1_MOSI",
+    "cpu:FL1_SCK",
+    "cpu:FL1_nCS",
+    "cpu:FPGA_TMR_EXP0",
+    "cpu:FPGA_TMR_EXP1",
+    "cpu:GND",
+    "cpu:PRSNT",
+    "eink:+5V",
+    "eink:3V3",
+    "eink:GND",
+    "eink:PRSNT",
+    "eink:RUN",
+    "eink:SWCLK",
+    "eink:SWDIO",
+    "gpu:+5V",
+    "gpu:3V3",
+    "gpu:GND",
+    "gpu:PRSNT",
+    "gpu:RUN",
+    "gpu:SWCLK",
+    "gpu:SWDIO",
+    "io:+5V",
+    "io:3V3",
+    "io:GND",
+    "io:PRSNT",
+    "io:RUN",
+    "io:SWCLK",
+    "io:SWDIO",
+    "main:+3V3",
+    "main:+5V",
+    "main:CHIPSET_CDONE",
+    "main:CHIPSET_nCRESET",
+    "main:CPUCARD_nCRESET",
+    "main:CPU_CARD_ID0",
+    "main:CPU_CARD_ID1",
+    "main:CPU_CDONE",
+    "main:CPU_IRQ0",
+    "main:CPU_IRQ1",
+    "main:CPU_IRQ2",
+    "main:CPU_IRQ3",
+    "main:CPU_PRSNT2_n",
+    "main:CPU_RSVD_A2",
+    "main:CPU_RSVD_A3",
+    "main:CPU_RSVD_A4",
+    "main:CPU_RSVD_A5",
+    "main:CPU_RSVD_A6",
+    "main:CPU_RSVD_A7",
+    "main:CPU_RSVD_A8",
+    "main:CPU_RSVD_B1",
+    "main:CPU_TMR_EXP0",
+    "main:CPU_TMR_EXP1",
+    "main:FL0_MISO",
+    "main:FL0_MOSI",
+    "main:FL0_SCK",
+    "main:FL0_nCS",
+    "main:FL1_MISO",
+    "main:FL1_MOSI",
+    "main:FL1_SCK",
+    "main:FL1_nCS",
+    "main:GND",
+    "main:I2C_SCL",
+    "main:I2C_SDA",
+    "main:MUX_SEL0",
+    "main:MUX_SEL1",
+    "main:MUX_SEL2",
+    "main:PROG_CLK",
+    "main:PROG_IO",
+    "main:SLOT1_5V",
+    "main:SLOT1_PROG_n",
+    "main:SLOT1_PRSNT2_n",
+    "main:SLOT1_RST_n",
+    "main:SLOT1_RSVD_A1",
+    "main:SLOT1_RSVD_A2",
+    "main:SLOT1_RSVD_A3",
+    "main:SLOT1_RSVD_A4",
+    "main:SLOT1_RSVD_A5",
+    "main:SLOT1_SWCLK",
+    "main:SLOT1_SWDIO",
+    "main:SLOT2_5V",
+    "main:SLOT2_PROG_n",
+    "main:SLOT2_PRSNT2_n",
+    "main:SLOT2_RST_n",
+    "main:SLOT2_RSVD_A1",
+    "main:SLOT2_RSVD_A2",
+    "main:SLOT2_RSVD_A3",
+    "main:SLOT2_RSVD_A4",
+    "main:SLOT2_RSVD_A5",
+    "main:SLOT2_SWCLK",
+    "main:SLOT2_SWDIO",
+    "main:SLOT3_5V",
+    "main:SLOT3_PROG_n",
+    "main:SLOT3_PRSNT2_n",
+    "main:SLOT3_RST_n",
+    "main:SLOT3_RSVD_A1",
+    "main:SLOT3_RSVD_A2",
+    "main:SLOT3_RSVD_A3",
+    "main:SLOT3_RSVD_A4",
+    "main:SLOT3_RSVD_A5",
+    "main:SLOT3_SWCLK",
+    "main:SLOT3_SWDIO",
+    "main:SLOT4_5V",
+    "main:SLOT4_PROG_n",
+    "main:SLOT4_PRSNT2_n",
+    "main:SLOT4_RST_n",
+    "main:SLOT4_RSVD_A1",
+    "main:SLOT4_RSVD_A2",
+    "main:SLOT4_RSVD_A3",
+    "main:SLOT4_RSVD_A4",
+    "main:SLOT4_RSVD_A5",
+    "main:SLOT4_SWCLK",
+    "main:SLOT4_SWDIO",
+    "main:SLOT5_5V",
+    "main:SLOT5_PROG_n",
+    "main:SLOT5_PRSNT2_n",
+    "main:SLOT5_RST_n",
+    "main:SLOT5_RSVD_A1",
+    "main:SLOT5_RSVD_A2",
+    "main:SLOT5_RSVD_A3",
+    "main:SLOT5_RSVD_A4",
+    "main:SLOT5_RSVD_A5",
+    "main:SLOT5_SWCLK",
+    "main:SLOT5_SWDIO",
+    "main:SLOT6_5V",
+    "main:SLOT6_PROG_n",
+    "main:SLOT6_PRSNT2_n",
+    "main:SLOT6_RST_n",
+    "main:SLOT6_RSVD_A1",
+    "main:SLOT6_RSVD_A2",
+    "main:SLOT6_RSVD_A3",
+    "main:SLOT6_RSVD_A4",
+    "main:SLOT6_RSVD_A5",
+    "main:SLOT6_SWCLK",
+    "main:SLOT6_SWDIO",
+    "main:SYS_PRSNT2_n",
+    "main:SYS_RSVD_A1",
+    "main:SYS_RSVD_A2",
+    "main:SYS_RSVD_A3",
+    "main:SYS_RSVD_B1",
+    "main:SYS_RSVD_B2",
+    "main:V1V2_SENSE",
+    "storage:+5V",
+    "storage:3V3",
+    "storage:GND",
+    "storage:PRSNT",
+    "storage:RUN",
+    "storage:SWCLK",
+    "storage:SWDIO",
+    "system:+3V3",
+    "system:CC1",
+    "system:CC2",
+    "system:CHIPSET_CDONE",
+    "system:CHIPSET_nCRESET",
+    "system:CPUCARD_CDONE",
+    "system:CPUCARD_nCRESET",
+    "system:FL0_MISO",
+    "system:FL0_MOSI",
+    "system:FL0_SCK",
+    "system:FL0_nCS",
+    "system:FL1_MISO",
+    "system:FL1_MOSI",
+    "system:FL1_SCK",
+    "system:FL1_nCS",
+    "system:GND",
+    "system:I2C_SCL",
+    "system:I2C_SDA",
+    "system:MUX_SEL0",
+    "system:MUX_SEL1",
+    "system:MUX_SEL2",
+    "system:PROG_CLK",
+    "system:PROG_IO",
+    "system:PRSNT",
+    "system:RSVD_B1",
+    "system:RSVD_B2",
+    "system:V1V2_SENSE",
+    "wifi:+5V",
+    "wifi:BOOT",
+    "wifi:EN",
+    "wifi:GND",
+    "wifi:PRSNT",
+    "wifi:U0RXD",
+    "wifi:U0TXD"
+  ],
+  "unmodeled_nets": [
+    "cpu:1V2",
+    "cpu:3V3",
+    "cpu:CDONE",
+    "cpu:CPU_IRQ0",
+    "cpu:CPU_IRQ1",
+    "cpu:CPU_IRQ2",
+    "cpu:CPU_IRQ3",
+    "cpu:CPU_TMR_EXP0",
+    "cpu:CPU_TMR_EXP1",
+    "cpu:CRESET_n",
+    "cpu:FL1_MISO",
+    "cpu:FL1_MOSI",
+    "cpu:FL1_SCK",
+    "cpu:FL1_WPHOLD",
+    "cpu:FL1_nCS",
+    "cpu:FPGA_TMR_EXP0",
+    "cpu:FPGA_TMR_EXP1",
+    "cpu:GND",
+    "cpu:GNDPLL0",
+    "cpu:GNDPLL1",
+    "cpu:LED_A",
+    "cpu:LED_B",
+    "cpu:LED_K",
+    "cpu:PRSNT",
+    "cpu:PWR_LED_A",
+    "cpu:VCCPLL0",
+    "cpu:VCCPLL1",
+    "eink:+5V",
+    "eink:1V1",
+    "eink:3V3",
+    "eink:BOOTSEL",
+    "eink:EPD_VCC",
+    "eink:GND",
+    "eink:LED_PWR",
+    "eink:LED_REFRESH",
+    "eink:LED_REFRESH_A",
+    "eink:PRSNT",
+    "eink:RUN",
+    "eink:SWCLK",
+    "eink:SWDIO",
+    "eink:UART_TX",
+    "eink:XIN",
+    "eink:XOUT",
+    "eink:XTAL_OUT",
+    "gpu:+5V",
+    "gpu:1V1",
+    "gpu:3V3",
+    "gpu:BB_FB",
+    "gpu:BB_L1",
+    "gpu:BB_L2",
+    "gpu:BOOTSEL",
+    "gpu:DDC_SCL",
+    "gpu:DDC_SDA",
+    "gpu:GND",
+    "gpu:HDMI_5V",
+    "gpu:HDMI_5V_F",
+    "gpu:HDMI_HPD",
+    "gpu:HDMI_SCL",
+    "gpu:HDMI_SDA",
+    "gpu:HPD_5V",
+    "gpu:LED_PWR",
+    "gpu:PRSNT",
+    "gpu:RUN",
+    "gpu:SWCLK",
+    "gpu:SWDIO",
+    "gpu:UART_TX",
+    "gpu:XIN",
+    "gpu:XOUT",
+    "gpu:XTAL_OUT",
+    "io:+5V",
+    "io:1V1",
+    "io:3V3",
+    "io:BOOST_FB",
+    "io:BOOST_SW",
+    "io:BOOTSEL",
+    "io:GND",
+    "io:ISET",
+    "io:LED_KBD",
+    "io:LED_KBD_A",
+    "io:LED_KEY",
+    "io:LED_KEY_A",
+    "io:LED_PWR",
+    "io:PRSNT",
+    "io:RUN",
+    "io:SWCLK",
+    "io:SWDIO",
+    "io:UART_TX",
+    "io:VBOOST",
+    "io:VBUS",
+    "io:VBUS_EN",
+    "io:VBUS_nFAULT",
+    "io:XIN",
+    "io:XOUT",
+    "io:XTAL_OUT",
+    "main:+1V2",
+    "main:+3V3",
+    "main:+5V",
+    "main:1V2_LDO",
+    "main:3V3_BUCK",
+    "main:3V3_STBY",
+    "main:5V_SYS",
+    "main:AUX_CS_n",
+    "main:BUCK_FB",
+    "main:BUCK_SW",
+    "main:CHIPSET_CDONE",
+    "main:CHIPSET_nCRESET",
+    "main:CPUCARD_nCRESET",
+    "main:CPU_CARD_ID0",
+    "main:CPU_CARD_ID1",
+    "main:CPU_CDONE",
+    "main:CPU_IRQ0",
+    "main:CPU_IRQ0_SRC",
+    "main:CPU_IRQ1",
+    "main:CPU_IRQ1_SRC",
+    "main:CPU_IRQ2",
+    "main:CPU_IRQ2_SRC",
+    "main:CPU_IRQ3",
+    "main:CPU_IRQ3_SRC",
+    "main:CPU_PRSNT2_n",
+    "main:CPU_TMR_EXP0",
+    "main:CPU_TMR_EXP1",
+    "main:EFUSE_DVDT",
+    "main:EFUSE_ILM",
+    "main:EFUSE_OVLO",
+    "main:FL0_MISO",
+    "main:FL0_MOSI",
+    "main:FL0_SCK",
+    "main:FL0_nCS",
+    "main:FL1_MISO",
+    "main:FL1_MOSI",
+    "main:FL1_SCK",
+    "main:FL1_nCS",
+    "main:GND",
+    "main:I2C_SCL",
+    "main:I2C_SDA",
+    "main:LED_1V2_A",
+    "main:LED_1V2_K",
+    "main:LED_3V3",
+    "main:LED_5V",
+    "main:LED_CDONE_A",
+    "main:LED_CDONE_K",
+    "main:LED_PWR",
+    "main:MUX_CLK1",
+    "main:MUX_CLK2",
+    "main:MUX_CLK3",
+    "main:MUX_CLK4",
+    "main:MUX_CLK5",
+    "main:MUX_CLK6",
+    "main:MUX_IO1",
+    "main:MUX_IO2",
+    "main:MUX_IO3",
+    "main:MUX_IO4",
+    "main:MUX_IO5",
+    "main:MUX_IO6",
+    "main:MUX_SEL0",
+    "main:MUX_SEL1",
+    "main:MUX_SEL2",
+    "main:PROG_CLK",
+    "main:PROG_IO",
+    "main:PWR_BTN",
+    "main:PWR_EN",
+    "main:Q1_B",
+    "main:Q2_B",
+    "main:SLOT1_5V",
+    "main:SLOT1_5V_F",
+    "main:SLOT1_5V_L",
+    "main:SLOT1_PROG_n",
+    "main:SLOT1_PRSNT2_n",
+    "main:SLOT1_RST_n",
+    "main:SLOT1_SWCLK",
+    "main:SLOT1_SWDIO",
+    "main:SLOT2_5V",
+    "main:SLOT2_5V_F",
+    "main:SLOT2_5V_L",
+    "main:SLOT2_PROG_n",
+    "main:SLOT2_PRSNT2_n",
+    "main:SLOT2_RST_n",
+    "main:SLOT2_SWCLK",
+    "main:SLOT2_SWDIO",
+    "main:SLOT3_5V",
+    "main:SLOT3_5V_F",
+    "main:SLOT3_5V_L",
+    "main:SLOT3_PROG_n",
+    "main:SLOT3_PRSNT2_n",
+    "main:SLOT3_RST_n",
+    "main:SLOT3_SWCLK",
+    "main:SLOT3_SWDIO",
+    "main:SLOT4_5V",
+    "main:SLOT4_5V_F",
+    "main:SLOT4_5V_L",
+    "main:SLOT4_PROG_n",
+    "main:SLOT4_PRSNT2_n",
+    "main:SLOT4_RST_n",
+    "main:SLOT4_SWCLK",
+    "main:SLOT4_SWDIO",
+    "main:SLOT5_5V",
+    "main:SLOT5_5V_F",
+    "main:SLOT5_5V_L",
+    "main:SLOT5_PROG_n",
+    "main:SLOT5_PRSNT2_n",
+    "main:SLOT5_RST_n",
+    "main:SLOT5_SWCLK",
+    "main:SLOT5_SWDIO",
+    "main:SLOT6_5V",
+    "main:SLOT6_5V_F",
+    "main:SLOT6_5V_L",
+    "main:SLOT6_PROG_n",
+    "main:SLOT6_PRSNT2_n",
+    "main:SLOT6_RST_n",
+    "main:SLOT6_SWCLK",
+    "main:SLOT6_SWDIO",
+    "main:SPI_nCS6_SRC",
+    "main:SYS_PRSNT2_n",
+    "main:V1V2_SENSE",
+    "main:VBUS",
+    "main:VBUS_F",
+    "main:VCCPLL0",
+    "main:VCCPLL1",
+    "storage:+5V",
+    "storage:1V1",
+    "storage:3V3",
+    "storage:BOOTSEL",
+    "storage:GND",
+    "storage:LED_ACT",
+    "storage:LED_ACT_A",
+    "storage:LED_CARD",
+    "storage:LED_CARD_A",
+    "storage:LED_PWR",
+    "storage:PRSNT",
+    "storage:RUN",
+    "storage:SWCLK",
+    "storage:SWDIO",
+    "storage:UART_TX",
+    "storage:XIN",
+    "storage:XOUT",
+    "storage:XTAL_OUT",
+    "system:+3V3",
+    "system:1V1",
+    "system:BOOTSEL",
+    "system:CC1",
+    "system:CC2",
+    "system:CHIPSET_CDONE",
+    "system:CHIPSET_nCRESET",
+    "system:CPUCARD_CDONE",
+    "system:CPUCARD_nCRESET",
+    "system:FL0_MISO",
+    "system:FL0_MOSI",
+    "system:FL0_MOSI_MCU",
+    "system:FL0_SCK",
+    "system:FL0_SCK_MCU",
+    "system:FL0_nCS",
+    "system:FL0_nCS_MCU",
+    "system:FL1_MISO",
+    "system:FL1_MOSI",
+    "system:FL1_MOSI_MCU",
+    "system:FL1_SCK",
+    "system:FL1_SCK_MCU",
+    "system:FL1_nCS",
+    "system:FL1_nCS_MCU",
+    "system:GND",
+    "system:I2C_SCL",
+    "system:I2C_SDA",
+    "system:LED_PWR",
+    "system:LED_RX",
+    "system:LED_TX",
+    "system:LED_USB_RX",
+    "system:LED_USB_TX",
+    "system:MUX_SEL0",
+    "system:MUX_SEL1",
+    "system:MUX_SEL2",
+    "system:PROG_CLK",
+    "system:PROG_IO",
+    "system:PRSNT",
+    "system:RUN",
+    "system:SWCLK",
+    "system:SWDIO",
+    "system:USB_CC1",
+    "system:USB_CC2",
+    "system:USB_DM",
+    "system:USB_DM_MCU",
+    "system:USB_DP",
+    "system:USB_DP_MCU",
+    "system:USB_VBUS",
+    "system:USB_nVBUS",
+    "system:V1V2_SENSE",
+    "system:VBUS_GATE",
+    "system:XIN",
+    "system:XOUT",
+    "system:XOUT_X",
+    "wifi:+5V",
+    "wifi:3V3",
+    "wifi:BOOT",
+    "wifi:EN",
+    "wifi:FB",
+    "wifi:GND",
+    "wifi:LED_LINK",
+    "wifi:LED_LINK_A",
+    "wifi:LED_PWR",
+    "wifi:LED_RX",
+    "wifi:LED_RX_A",
+    "wifi:LED_TX",
+    "wifi:LED_TX_A",
+    "wifi:PRSNT",
+    "wifi:STRAP2",
+    "wifi:STRAP8",
+    "wifi:SW",
+    "wifi:U0RXD",
+    "wifi:U0TXD",
+    "wifi:USB_DN",
+    "wifi:USB_DP"
+  ]
+}

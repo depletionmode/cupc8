@@ -540,21 +540,62 @@ the archived CPU card are 16.627–36.650 mm. The main-board R18-to-J2
 not the CPU FPGA output path represented by `cpu_socket` in the waveform
 diagnostic.
 
-A [current-route source audit](si-evidence/ibis-current-route-source-audit.json)
+A [prior current-route source audit](si-evidence/ibis-current-route-source-audit.json)
 repeats receipt, netlist, TQ144 pin/bank, 33 Ω source and planar-copper checks
-on final main and CPU builds. It binds the [current top](si-evidence/ibis-current-route-top.json),
+on the earlier main and CPU builds. It binds the [earlier top](si-evidence/ibis-current-route-top.json),
 [original-package diagnostic](si-evidence/ibis-current-route-original.json)
 and [vendor-package diagnostic](si-evidence/ibis-current-route-vendor-package.json)
-by SHA-256. The current main receipt is
+by SHA-256. That main receipt is
 `1128563ddeb2a437ccc9268cf27fedfabfd9f9c4d90cbfcc0f00ff5f876425da`;
 its PCB is `74e76faa9ab34d76aeecfc6ad8368269648f84c26a60b993b1169fe2a18f57a2`.
 The six R36-to-slot SCK planar paths measure 119.039, 74.716, 104.160,
 123.140, 151.422 and 173.331 mm. The separate R18-to-J2 clock path is
 76.098 mm. All 31 CPU FPGA series-output paths are present, with 16.627–
-36.650 mm planar lengths. The co-simulation top uses the current seven card
+36.650 mm planar lengths. That co-simulation top uses the then-current seven card
 boards and main netlist; its system routing input remains the saved routed
 snapshot. The modeled 120/180 mm diagnostic lines and loads are still
 assumptions; measured branch geometry is not substituted into ngspice.
+
+The [final source audit](si-evidence/ibis-final-source-audit.json) refreshes
+the vendor IBIS contract, TQ144 pin/bank mapping, 33 Ω sources and all main/CPU
+FPGA output copper paths against canonical main receipt
+`2b29afec3aaee9794b7d805f2d82ad89d122e143ddde6119174030fc5e7c2605`
+and CPU receipt
+`b61feaf1b9c5538f430a9671d09feccf1bc57b6ac71c2934c38560ae4a586acb`.
+The six SCK and 31 CPU output lengths are identical to the earlier audit.
+The [refreshed routed top](si-evidence/ibis-final-top.json) uses the final
+root `gen_top.py`, current main netlist and seven validated card builds,
+with the saved system routed snapshot. The [receipt bundle](si-evidence/ibis-final-receipts.json)
+records every card receipt/board/netlist hash, the top generator and top
+hashes, source-audit hash and system snapshot hash. Its 310 unmodeled nets are
+the co-simulation coverage count, not a bus SI pass. The two saved 96-case
+ngspice diagnostics above remain bound to the earlier top and assumed line
+models; this refresh does not rerun them. Receiver IBIS, package assignment,
+return paths, routed branch extraction and the canonical system route still
+prevent a physical bus SI claim.
+
+From the canonical root checkout, regenerate this receipt-bound source subset:
+
+```sh
+python3 hw/cosim/gen_top.py --main-netlist build/hw/main/main.net \
+  --card-board-dir build/hw \
+  --system-board build/hw-baseline-c429827/system/system-routed.kicad_pcb \
+  --cpu-board build/hw/cpu/cpu.kicad_pcb --require-route \
+  --output doc/hardware/si-evidence/ibis-final-top.json
+python3 hw/si/ibis_source_audit.py \
+  --ibis build/hw/si/FPGA-MD-02034-2-5-iCE40-IO.ibs \
+  --main-build build/hw/main --cpu-build build/hw/cpu \
+  --top doc/hardware/si-evidence/ibis-final-top.json \
+  --source-root . --current-route \
+  --out doc/hardware/si-evidence/ibis-final-source-audit.json
+python3 hw/si/ibis_route_receipts.py --source-root . \
+  --board-dir build/hw \
+  --system-board build/hw-baseline-c429827/system/system-routed.kicad_pcb \
+  --top doc/hardware/si-evidence/ibis-final-top.json \
+  --source-audit doc/hardware/si-evidence/ibis-final-source-audit.json \
+  --top-generator hw/cosim/gen_top.py \
+  --out doc/hardware/si-evidence/ibis-final-receipts.json
+```
 
 The original diagnostic used 1.55 pF package capacitance and no package
 series resistance with the two commented TQ144 inductances. Neither vendor
