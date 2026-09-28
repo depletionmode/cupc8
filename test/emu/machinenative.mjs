@@ -168,6 +168,11 @@ export class Machine {
                       netlistTop.runtime.cpu_irq_connected.some((connected) =>
                         typeof connected !== 'boolean')))
       throw new Error('machinenative: invalid CPU IRQ route model');
+    if (netlistTop && (!Array.isArray(netlistTop.runtime.cpu_tmr_exp_connected) ||
+                      netlistTop.runtime.cpu_tmr_exp_connected.length !== 2 ||
+                      netlistTop.runtime.cpu_tmr_exp_connected.some((connected) =>
+                        typeof connected !== 'boolean')))
+      throw new Error('machinenative: invalid CPU timer expiry route model');
     if (netlistTop && typeof netlistTop.runtime.sysctl_manual_reset_connected !== 'boolean')
       throw new Error('machinenative: invalid system manual-reset route model');
     if (netlistTop && typeof netlistTop.runtime.button_manual_reset_connected !== 'boolean')

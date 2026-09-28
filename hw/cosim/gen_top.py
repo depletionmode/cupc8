@@ -463,6 +463,49 @@ def cpu_irq_routes(main, cpu, main_board, cpu_board):
     return links, paths, missing
 
 
+def cpu_timer_exp_routes(main, cpu, main_board, cpu_board):
+    """Bind both CPU timer pulses through RN8, the socket, and chipset pads."""
+    geometry = {}
+    for board_name, board_path in (('main', main_board), ('cpu', cpu_board)):
+        if board_path is not None and Path(board_path).is_file():
+            geometry[board_name] = cpu_board_geometry(str(Path(board_path).resolve()))
+    if cpu.components.get('RN8') != ('33', ('Device', 'R_Pack04')):
+        raise ValueError('CPU timer expiry: wrong RN8 series pack')
+    links, paths, missing = [], [], []
+    for bit, (fpga_pad, in_pad, out_pad, socket_pad, chipset_pad) in enumerate(
+            (('55', '1', '8', 'B41', '136'),
+             ('56', '2', '7', 'B43', '129'))):
+        source_net, contact_net = f'/FPGA_TMR_EXP{bit}', f'/CPU_TMR_EXP{bit}'
+        fpga, series_in = ('U1', fpga_pad), ('RN8', in_pad)
+        series_out, cpu_socket = ('RN8', out_pad), ('J1', socket_pad)
+        main_socket, chipset = ('J2', socket_pad), ('U7', chipset_pad)
+        if set(cpu.nets.get(source_net, ())) != {fpga, series_in} or \
+                set(cpu.nets.get(contact_net, ())) != {series_out, cpu_socket} or \
+                set(main.nets.get(contact_net, ())) != {main_socket, chipset}:
+            raise ValueError(f'CPU timer expiry {bit}: wrong FPGA, RN8, socket or chipset pad')
+        connected = True
+        for board_name, board_path, net, first, last in (
+                ('cpu', cpu_board, source_net, fpga, series_in),
+                ('cpu', cpu_board, contact_net, series_out, cpu_socket),
+                ('main', main_board, contact_net, main_socket, chipset)):
+            mm = None
+            if board_name in geometry:
+                sys.path.insert(0, str(ROOT / 'hw/si'))
+                from ibis_bus import routed_distances
+                loaded_board, parsed_tree = geometry[board_name]
+                mm = routed_distances(Path(board_path), net, first, [last],
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'{board_name}.{first[0]}.{first[1]}',
+                          'to': f'{board_name}.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'cpu_tmr_exp{bit}_connected'})
+            if mm is None:
+                connected = False
+                missing.append(f'{board_name}:{net.lstrip("/")}_cpu_tmr_exp{bit}_copper')
+        links.append(connected)
+    return links, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1250,6 +1293,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_irq_connected'] = irq_links
     manifest['runtime']['missing_routes'].extend(irq_missing)
     manifest['runtime']['routed_top'] &= not irq_missing
+    timer_links, timer_paths, timer_missing = cpu_timer_exp_routes(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['paths'].extend(timer_paths)
+    manifest['runtime']['cpu_tmr_exp_connected'] = timer_links
+    manifest['runtime']['missing_routes'].extend(timer_missing)
+    manifest['runtime']['routed_top'] &= not timer_missing
     manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
         main, cards['system'], pcb, system_board)
     manifest['paths'].extend(manual_reset_paths)
@@ -1363,6 +1412,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             runtime_net('main', f'CPU_IRQ{i}_SRC')
             runtime_net('main', f'CPU_IRQ{i}')
             runtime_net('cpu', f'CPU_IRQ{i}')
+    for i, connected in enumerate(timer_links):
+        if connected:
+            runtime_net('cpu', f'FPGA_TMR_EXP{i}')
+            runtime_net('cpu', f'CPU_TMR_EXP{i}')
+            runtime_net('main', f'CPU_TMR_EXP{i}')
     if manual_reset['sysctl']:
         runtime_net('system', 'SYS_nRST')
     if all(manual_reset.values()):
