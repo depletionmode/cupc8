@@ -74,9 +74,16 @@ row 4.6.
 
 `ibis-current-route-top.json`, the two `ibis-current-route-*.json` diagnostic
 sweeps and `ibis-current-route-source-audit.json` bind the pinned vendor model
-and source-pin copper paths to the final main/CPU receipts. The waveform line
+and source-pin copper paths to earlier main/CPU receipts. The waveform line
 models still use assumed lengths and loads, so the audit does not certify
 physical bus SI.
+
+`ibis-final-top.json`, `ibis-final-source-audit.json` and
+`ibis-final-receipts.json` refresh the top and source copper audit against
+canonical main/CPU and all seven validated card receipts. They retain the
+saved routed system snapshot and do not rerun the earlier assumed-line
+ngspice diagnostics. The source/path check is current; analog bus SI remains
+open.
 
 `usb-io-three-mesh-complex-port.json` checks the three runs against their
 raw port traces at 16 ns and quantifies complex reflection and loaded input
