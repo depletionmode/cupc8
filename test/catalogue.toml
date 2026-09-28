@@ -2651,7 +2651,7 @@ checks = "on a provenance-checked GPU board, all four TMDS pairs use PML-safe gr
 method = "hw/si/openems_gpu_d0.py --pair d0|d1|d2|ck --pml-clearance-mm 1 --fixed-window; four separate routed-copper models, with full 4.6 analog coverage remaining in GC-007"
 kind = "sim"
 vrow = "4.6"
-cmd = "for pair in d0 d1 d2 ck; do python3 hw/si/openems_gpu_d0.py --pair \"$pair\" --board build/hw/gpu/gpu.kicad_pcb --out \"build/hw/si/gpu-$pair-pml-fixed.json\" --pml-clearance-mm 1 --fixed-window --max-steps 126000 --threads 1 --require-evidence || exit; done"
+cmd = "python3 test/hw/run_openems_gpu_pairs.py"
 
 [[test]]
 id = "SI-004"
