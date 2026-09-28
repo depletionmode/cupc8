@@ -1,0 +1,154 @@
+{
+  "scope": "GPU coupled HDMI field-input migration after board rebuild",
+  "saved_receipt": {
+    "receipt_sha256": "5c7808f1f5294b09e289feb08b5f138583fd5bf411bca826e8ef9410fde42575",
+    "board_sha256": "0b4ccc5861ee22a050c72747555633ff95e548da51758083b5db74868112f5b4",
+    "netlist_sha256": "a5d759a8edf3655366abd3faf92954ec8f15517621a477c8bb8014058305ce78"
+  },
+  "rebuilt_receipt": {
+    "receipt_sha256": "4f88e7226b555e706bccf60dea897a5270186030d8039b2549530beeeb6880d3",
+    "board_sha256": "bc3d30d31524493858a522ab926fb87264b5b5966c7bc05d10764d0ef3373be5",
+    "netlist_sha256": "353c5f96f8b42966907e5f3533d7e3a57581635dd902d1dbdd20214df2f99af3"
+  },
+  "route_fingerprints": {
+    "saved": "dfd1a96ad95ebe101e905b2cb509ef3b4d45ca80206b48fad618a60a3cefb94b",
+    "rebuilt": "dfd1a96ad95ebe101e905b2cb509ef3b4d45ca80206b48fad618a60a3cefb94b"
+  },
+  "raw_physical_fingerprints": {
+    "saved": "3be1936c79b46cdb0bb1bc7e106c914c8ba47771798f9d8acb399fb7bf12555a",
+    "rebuilt": "3be1936c79b46cdb0bb1bc7e106c914c8ba47771798f9d8acb399fb7bf12555a"
+  },
+  "normalized_physical_fingerprints": {
+    "saved": "f377e88983b83478e113e97e3f914a3ea3e7fb5072f7ed6e8ee6408efc26a2dc",
+    "rebuilt": "f377e88983b83478e113e97e3f914a3ea3e7fb5072f7ed6e8ee6408efc26a2dc"
+  },
+  "normalized_3d_model_file_sha256": {
+    "hw/lib/jlc.3dshapes/IND-SMD_L4.2-W4.4-H2.0.wrl": "479f1c215c0c2e95e5c0b77df8884b95dc87aa70189ddf3c1aa2e5056f82961e",
+    "hw/lib/jlc.3dshapes/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.wrl": "6d478e1984c481a5e741c4d24ba06067b1d2eb026a8e1695bba5689f4d123dfd",
+    "hw/lib/jlc.3dshapes/VSON-10_L3.0-W2.0-P0.50-TL.wrl": "5239ee6927982eaa17558413b5f5250b21a03fce03a5e50d92ed0ff171a7fe0d",
+    "hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.wrl": "24acb14ffb37129dfa47b6ff7b466bc277db03baa3cf519f7d0edc7acd7d689d"
+  },
+  "models": {
+    "d0": {
+      "saved_report_sha256": "f1322213dcf748bf9a047c87920d90e1d2ed7861e413be9f384e168b948156d8",
+      "model_source_sha256": "1b69ececd9e3e0566fd455f90fae5b9c4631ed42183c7368cc9b4d477958fca8",
+      "saved_xml_sha256": "6d047fb161c6ca19ec43ca0ebd75aa87acf756defe34df6adfeba3363a517d70",
+      "saved_run_log_sha256": "f8f9362852c38176b7390263eddb2256011983b9377f85fb03632e1d2f428bbb",
+      "raw_port_sha256": {
+        "port_ut_1": "91149e4a26ff119e1b23bccea9323f8cb4fad3d158292a90c56be61a2a9a0cc2",
+        "port_it_1": "c61f762a91b883af15a70f4ce8a9f4ed44b17de9c40cf81600b906dbd3eb339e",
+        "port_ut_2": "08d8a665e947d08aa52f1557d84d2dc8656808516a4e41c08384e9c49d832c7b",
+        "port_it_2": "2b46c2fde2e60a3a5d1f86669eec707b96a598ac719b794da0314076f3edd745",
+        "port_ut_3": "108e207cb30afa67fbaa0fa3bbce40ec1155e1e2a496a82a1e56d37668d5f05a",
+        "port_it_3": "647b503365d17f547a3bc32fb8d8f9643a3dc2a0eb6cd7e11e25a32b79aa376a",
+        "port_ut_4": "2307df7e0168a42f736a9a3900a22ddbacbe51f0dffd93a31fe5d68596ec0580",
+        "port_it_4": "477ca25862c12bd53d365a5e33594db83893b2e8d8ed6a6c06c992b9b8a335db"
+      },
+      "solver_xml_fingerprint": "f6d35ee811889bfde1ee3d015e1a715b2528caab26773a6adfa4f57f43b131e6",
+      "saved_subset_gate": true,
+      "modeled_input_equivalent": true
+    },
+    "d1": {
+      "saved_report_sha256": "0ebc0864057434d15062131824c1dca8b970778397a1693e4d3cc95af227cba8",
+      "model_source_sha256": "1b69ececd9e3e0566fd455f90fae5b9c4631ed42183c7368cc9b4d477958fca8",
+      "saved_xml_sha256": "555889aecbf0f0dd7bc5095e703b00cd6392056f661b9a2bad9ace2090b8a06b",
+      "saved_run_log_sha256": "f99cfa59d1579c29ab458ee229920877f5345a30c33e7eadba5137af6c0def0a",
+      "raw_port_sha256": {
+        "port_ut_1": "4276f49e8d0742ec7993909929d31d3ba5169f9428563b7febb03b498f7df1ff",
+        "port_it_1": "daed70759ff70853cebf2fd766a91e5dc721099f9472a2be6f9cca1ccd71688c",
+        "port_ut_2": "79cfeb403190657f644d5423e6ac6329cc6c93e50bf3b305cf9485f88feacc3c",
+        "port_it_2": "4dba4a1f338efe6b383eca376e7b71d1572392126fcd7497e4cdaf41e9a4e834",
+        "port_ut_3": "5b06190067d8b3246b2a68d52f019af80c60a4c3515ba5119054fdcbd63c9865",
+        "port_it_3": "084c4b8c764c9a8c4d455ff49a0b545870672d8c7c177b0b8bc6854123610487",
+        "port_ut_4": "843051d1da8608fc2cbf423be844553aad9a3e59055554b5a181f239fc185789",
+        "port_it_4": "81d28936c5dd09ab52ea65b7c0410fcb4b599c405a5d9df5267272fd6d92c948"
+      },
+      "solver_xml_fingerprint": "1b6d2e7fe89d31d36687da48c0229b2f62b34afc279d9bdbb2a61032a9ddf2b7",
+      "saved_subset_gate": true,
+      "modeled_input_equivalent": true
+    },
+    "d2": {
+      "saved_report_sha256": "def2ccfcb39b6fdf74ec7c555ff2667578a80582fe3a89e296649f5a72940a0d",
+      "model_source_sha256": "7fefbfdb1ab2c8fa638a6165f58a4b908ddd48e04d3fed408ad4bb3addfea064",
+      "saved_xml_sha256": "d7b534bfcfb3c91ed238befc4772757f9cbfe2744e17d24ee779bff93334c810",
+      "saved_run_log_sha256": "6d7090263369ace2834a77d54d25e6d946bec483513731eeed603831b043c9b8",
+      "raw_port_sha256": {
+        "port_ut_1": "dbbf03b39dea79733355610ecffa1b785f1dcc7d738328c93fe597247f09f30c",
+        "port_it_1": "f15249ab8128d0156b338b2a5f4f1793509731a73febc7a2991af899d9831678",
+        "port_ut_2": "c74caffedd65b65286c3ebe09fe17c2b9eb6aaf8131992e00ed455949f72d929",
+        "port_it_2": "f73e3105d962d3acd74f47348106f147401174ee5ee905221b94d5684016b59a",
+        "port_ut_3": "4a998833d56b2ddd0631562e222bc050a10c0754af990f599c000c41f03e9883",
+        "port_it_3": "39415daa12b96613cf8ce2714ea48fbaa99022f945ee82edea9594e045ce8dda",
+        "port_ut_4": "a3e0b2eeea05a881a0bab766f93965ba045b26eed3c1ee8f17c5d5be5ef4ab19",
+        "port_it_4": "edc475584ba653baec44c5e9db9cf6cc96f75a3f8228eddfab7345d58328e991"
+      },
+      "solver_xml_fingerprint": "496ba42e9a4120b7222cfcab8e36f26ba57443d6b1d1fa63bd2fcf86db7cc8e3",
+      "saved_subset_gate": false,
+      "modeled_input_equivalent": true
+    },
+    "ck": {
+      "saved_report_sha256": "fc26c7341ed504b6e0ea20af45bcbe38784371ea4fae1f422d3984884d59eb18",
+      "model_source_sha256": "7fefbfdb1ab2c8fa638a6165f58a4b908ddd48e04d3fed408ad4bb3addfea064",
+      "saved_xml_sha256": "688d6a43b6e5a9129bbb70e1837380966a483711ab7d7423cbb85a0fb6040974",
+      "saved_run_log_sha256": "d00343f70dc70013a27b5f16dd032d4c9947adc61b96229c25f942f306d74175",
+      "raw_port_sha256": {
+        "port_ut_1": "053af5097cba5c193d736246931fdbd56b6ab3dda91c66ce580ecbb245673fcf",
+        "port_it_1": "0fe97d792420301bd3207c6bb0f6074d981ab8854d846ce115a28e1d2ad878ee",
+        "port_ut_2": "ff1685520911fd6acc4e531e3943be169407c39988e0a81ce32980213c7c8253",
+        "port_it_2": "83002a28db11b0bc92353a9e26c2a788dd78cacc645157e40ec13f1151b19553",
+        "port_ut_3": "a3819f3f5bc151cbc5e94d950116c239e1a57175bd6bf60e47a3c004fee8d51a",
+        "port_it_3": "f4727a8c2fa7e92c19dd0d0f98fda7f952ad0e8b7566051b20334590a5d3689c",
+        "port_ut_4": "35e05f1e40292282c99c80acffc470374ec4422726aebf26b4dabd3a06b575c7",
+        "port_it_4": "3663a19d1d0cffc1e7fb4469ea3e5bebc0c0aba39d381fc278da14ced532a08d"
+      },
+      "solver_xml_fingerprint": "a926496ae1075f238d66d645fb88207793b1ca9d4c915c6b0b94e079fd66a5ef",
+      "saved_subset_gate": false,
+      "modeled_input_equivalent": true
+    },
+    "d2-long": {
+      "saved_report_sha256": "078895c5354a0257f008b5705749685be20bff5deca85df50e6c72a8ac6f0a55",
+      "model_source_sha256": "40e24755cfe0c35dfce2d556a46c1290a1f93165df5dcb99fb162352ecc9a175",
+      "saved_xml_sha256": "d7b534bfcfb3c91ed238befc4772757f9cbfe2744e17d24ee779bff93334c810",
+      "saved_run_log_sha256": "abc5bf5ece65bd63d3b9f17d7fd10f5a61e6830e353eefd09946dd28515059a9",
+      "raw_port_sha256": {
+        "port_ut_1": "495f7bfa0a850b6fd54593c8eaf47012554cf65c7385b27599f0388e195c2d88",
+        "port_it_1": "3c4ca2c222bd1c97801c7840a5468f1853cb126d97f375000cfb3ad97a43f2b2",
+        "port_ut_2": "660d14079681c5da178947b13c1aed67a56b4e729a4a75c7b660881af468da56",
+        "port_it_2": "1f9bb9008961c64dcc0acf1250953d8124319cace59810e586c1b01da01c2702",
+        "port_ut_3": "352e4ffa7ef27fbfc0ca1c353d001e580f9a943bd40e1b5f642d1d0fef515767",
+        "port_it_3": "8f75771b24fd11ae039794c8aef5cea1cbc79da82f5e0b5920321370ef2132e8",
+        "port_ut_4": "76fcbd3250e6b34437070d5c934731bbe0ea08a7e37e9a8885b54ea62bf5ab5e",
+        "port_it_4": "902aca1bb2e5056aa1249d2755470f21cbab6f1ec69ba7b4891d41ff26f2c916"
+      },
+      "solver_xml_fingerprint": "496ba42e9a4120b7222cfcab8e36f26ba57443d6b1d1fa63bd2fcf86db7cc8e3",
+      "saved_subset_gate": true,
+      "modeled_input_equivalent": true
+    },
+    "ck-long": {
+      "saved_report_sha256": "587b3883330ec748dc7079b8388c1dcf4509589d9f32dacb21fe7001af7d9708",
+      "model_source_sha256": "40e24755cfe0c35dfce2d556a46c1290a1f93165df5dcb99fb162352ecc9a175",
+      "saved_xml_sha256": "688d6a43b6e5a9129bbb70e1837380966a483711ab7d7423cbb85a0fb6040974",
+      "saved_run_log_sha256": "082eb8b64f9fecb7c1b085b0e721eabccef37f93ef2a098f395eb543c6c6f2dd",
+      "raw_port_sha256": {
+        "port_ut_1": "8fc51d487db53598711dc2eff098bd96a07716d6c613f392e1f73d1ada009092",
+        "port_it_1": "757b7bd9add12ba590d71e0230e908fd315b8d588c258def0343994d10c91b99",
+        "port_ut_2": "556d66961cd0287dd76474e2073de6591511d591e1e70870c4dff283a8fdde52",
+        "port_it_2": "71d31fa5674dc9e1d84ca1d8ba3d706cb3bb798d051bfe8b13efbf4fa7ec377a",
+        "port_ut_3": "e01a7ee10683f8cd23489b1504fdfc90d1e19254065e48e5bc546069dd56bc90",
+        "port_it_3": "c71e7beb760df39c0fa3473c63f98ff3c196aea7eca765fed6a027fb4af05da7",
+        "port_ut_4": "7028172ee5943b0c052d4cde04046c4ba50fe2af07e80ab5171cf46baae0834e",
+        "port_it_4": "89f73721bde2714ebd5fc68cdfa7f23df46811daf06c884c508ed2dd70ace091"
+      },
+      "solver_xml_fingerprint": "a926496ae1075f238d66d645fb88207793b1ca9d4c915c6b0b94e079fd66a5ef",
+      "saved_subset_gate": true,
+      "modeled_input_equivalent": true
+    }
+  },
+  "all_modeled_inputs_equivalent": true,
+  "full_row_4_6_closed": false,
+  "limits": [
+    "saved field runs used earlier PCB bytes; this proves identical modeled inputs",
+    "a passing saved subset gate is required separately from migration",
+    "pads, connector, mask, losses, all-pair coupling and source/sink remain open"
+  ]
+}

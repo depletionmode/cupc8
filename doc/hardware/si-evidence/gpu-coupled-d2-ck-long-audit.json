@@ -1,0 +1,377 @@
+{
+  "scope": "GPU HDMI D2/CK long-window four-port copper-subset field audit",
+  "gpu_receipt_sha256": "5c7808f1f5294b09e289feb08b5f138583fd5bf411bca826e8ef9410fde42575",
+  "board_sha256": "0b4ccc5861ee22a050c72747555633ff95e548da51758083b5db74868112f5b4",
+  "model_source_sha256": "40e24755cfe0c35dfce2d556a46c1290a1f93165df5dcb99fb162352ecc9a175",
+  "excitation_runs": {
+    "d2": {
+      "report_sha256": "078895c5354a0257f008b5705749685be20bff5deca85df50e6c72a8ac6f0a55",
+      "xml_sha256": "d7b534bfcfb3c91ed238befc4772757f9cbfe2744e17d24ee779bff93334c810",
+      "short_run_report_sha256": "def2ccfcb39b6fdf74ec7c555ff2667578a80582fe3a89e296649f5a72940a0d",
+      "short_run_xml_sha256": "d7b534bfcfb3c91ed238befc4772757f9cbfe2744e17d24ee779bff93334c810",
+      "physical_input_identical_to_short_run": true,
+      "run_log_sha256": "abc5bf5ece65bd63d3b9f17d7fd10f5a61e6830e353eefd09946dd28515059a9",
+      "raw_port_sha256": {
+        "port_ut_1": "495f7bfa0a850b6fd54593c8eaf47012554cf65c7385b27599f0388e195c2d88",
+        "port_it_1": "3c4ca2c222bd1c97801c7840a5468f1853cb126d97f375000cfb3ad97a43f2b2",
+        "port_ut_2": "660d14079681c5da178947b13c1aed67a56b4e729a4a75c7b660881af468da56",
+        "port_it_2": "1f9bb9008961c64dcc0acf1250953d8124319cace59810e586c1b01da01c2702",
+        "port_ut_3": "352e4ffa7ef27fbfc0ca1c353d001e580f9a943bd40e1b5f642d1d0fef515767",
+        "port_it_3": "8f75771b24fd11ae039794c8aef5cea1cbc79da82f5e0b5920321370ef2132e8",
+        "port_ut_4": "76fcbd3250e6b34437070d5c934731bbe0ea08a7e37e9a8885b54ea62bf5ab5e",
+        "port_it_4": "902aca1bb2e5056aa1249d2755470f21cbab6f1ec69ba7b4891d41ff26f2c916"
+      },
+      "passive_geometry_fingerprint": "785ec46c8accc6930100215f668c66df1f23bfa54c7a4f35f5e0a8a46acb6a56",
+      "converged": true,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true,
+      "valid_for_coupled_subset": true,
+      "maximum_20_to_24ns_drift_db": 0.007173975364628436
+    },
+    "ck": {
+      "report_sha256": "587b3883330ec748dc7079b8388c1dcf4509589d9f32dacb21fe7001af7d9708",
+      "xml_sha256": "688d6a43b6e5a9129bbb70e1837380966a483711ab7d7423cbb85a0fb6040974",
+      "short_run_report_sha256": "fc26c7341ed504b6e0ea20af45bcbe38784371ea4fae1f422d3984884d59eb18",
+      "short_run_xml_sha256": "688d6a43b6e5a9129bbb70e1837380966a483711ab7d7423cbb85a0fb6040974",
+      "physical_input_identical_to_short_run": true,
+      "run_log_sha256": "082eb8b64f9fecb7c1b085b0e721eabccef37f93ef2a098f395eb543c6c6f2dd",
+      "raw_port_sha256": {
+        "port_ut_1": "8fc51d487db53598711dc2eff098bd96a07716d6c613f392e1f73d1ada009092",
+        "port_it_1": "757b7bd9add12ba590d71e0230e908fd315b8d588c258def0343994d10c91b99",
+        "port_ut_2": "556d66961cd0287dd76474e2073de6591511d591e1e70870c4dff283a8fdde52",
+        "port_it_2": "71d31fa5674dc9e1d84ca1d8ba3d706cb3bb798d051bfe8b13efbf4fa7ec377a",
+        "port_ut_3": "e01a7ee10683f8cd23489b1504fdfc90d1e19254065e48e5bc546069dd56bc90",
+        "port_it_3": "c71e7beb760df39c0fa3473c63f98ff3c196aea7eca765fed6a027fb4af05da7",
+        "port_ut_4": "7028172ee5943b0c052d4cde04046c4ba50fe2af07e80ab5171cf46baae0834e",
+        "port_it_4": "89f73721bde2714ebd5fc68cdfa7f23df46811daf06c884c508ed2dd70ace091"
+      },
+      "passive_geometry_fingerprint": "785ec46c8accc6930100215f668c66df1f23bfa54c7a4f35f5e0a8a46acb6a56",
+      "converged": true,
+      "passivity_ok": true,
+      "port_consistency_ok": true,
+      "spectral_stability_ok": true,
+      "valid_for_coupled_subset": true,
+      "maximum_20_to_24ns_drift_db": 0.004801192385607282
+    }
+  },
+  "s_parameters_24ns": {
+    "d2": [
+      {
+        "frequency_hz": 100000000,
+        "s_complex": {
+          "d2_source": [
+            0.00027416738322439885,
+            0.008048009383674034
+          ],
+          "d2_load": [
+            0.999383777338728,
+            -0.031659655862013004
+          ],
+          "ck_source": [
+            -1.9606916410857027e-07,
+            -2.2898376487612707e-06
+          ],
+          "ck_load": [
+            1.3345088191661826e-06,
+            1.6950793731072199e-06
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 3.4961457547455906e-06,
+            "d2_load": 2.3592736243023586e-08,
+            "ck_source": 0.019325705961196166,
+            "ck_load": 0.010077554439998176
+          },
+          "20_to_24ns": {
+            "d2_source": 1.4085538355598175e-06,
+            "d2_load": 2.655920231572562e-08,
+            "ck_source": 0.007173975364628436,
+            "ck_load": 0.0002184448904288063
+          }
+        }
+      },
+      {
+        "frequency_hz": 480000000,
+        "s_complex": {
+          "d2_source": [
+            0.005983999669001386,
+            0.037936503967682875
+          ],
+          "d2_load": [
+            0.9877382229622588,
+            -0.1512037726587978
+          ],
+          "ck_source": [
+            -9.272770716595049e-06,
+            -5.633679104212473e-06
+          ],
+          "ck_load": [
+            6.2824182389342075e-06,
+            3.865377417899782e-06
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 5.22309545531107e-08,
+            "d2_load": 1.4841217635583244e-08,
+            "ck_source": 0.0002501217161699079,
+            "ck_load": 9.195950192611926e-05
+          },
+          "20_to_24ns": {
+            "d2_source": 2.0519885585264884e-09,
+            "d2_load": 5.566615018251412e-09,
+            "ck_source": 0.00016993375018459932,
+            "ck_load": 0.0005188071104129117
+          }
+        }
+      },
+      {
+        "frequency_hz": 800000000,
+        "s_complex": {
+          "d2_source": [
+            0.016300362249802424,
+            0.06131845494253109
+          ],
+          "d2_load": [
+            0.9662543043181743,
+            -0.2497663846550897
+          ],
+          "ck_source": [
+            4.503652016029016e-06,
+            -1.368958774541413e-05
+          ],
+          "ck_load": [
+            -3.5517146655389556e-06,
+            1.0708452678369376e-05
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 8.006699441633718e-08,
+            "d2_load": 1.3165012063993048e-08,
+            "ck_source": 0.0002518700530932615,
+            "ck_load": 0.0013937717229581985
+          },
+          "20_to_24ns": {
+            "d2_source": 8.175654240971827e-08,
+            "d2_load": 2.2417375414659697e-08,
+            "ck_source": 0.0006708213439984283,
+            "ck_load": 0.0005990212327294386
+          }
+        }
+      },
+      {
+        "frequency_hz": 1260000000,
+        "s_complex": {
+          "d2_source": [
+            0.03887397889309844,
+            0.08991600939566327
+          ],
+          "d2_load": [
+            0.9175744911625461,
+            -0.38536601392087716
+          ],
+          "ck_source": [
+            -2.1914302539597345e-05,
+            -1.3470700095595042e-05
+          ],
+          "ck_load": [
+            1.438629931379118e-05,
+            8.877034940258972e-06
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 8.441953543227309e-08,
+            "d2_load": 1.4217627565759946e-08,
+            "ck_source": 0.000371138745602948,
+            "ck_load": 0.0003564735038766732
+          },
+          "20_to_24ns": {
+            "d2_source": 1.1844078230864956e-08,
+            "d2_load": 1.1723811173830376e-09,
+            "ck_source": 0.00017718946527100685,
+            "ck_load": 9.153224359079958e-05
+          }
+        }
+      }
+    ],
+    "ck": [
+      {
+        "frequency_hz": 100000000,
+        "s_complex": {
+          "d2_source": [
+            -1.5017946669704735e-07,
+            -2.1451930819056053e-06
+          ],
+          "d2_load": [
+            1.6445419987269482e-06,
+            1.5071200124758126e-06
+          ],
+          "ck_source": [
+            0.00026014182537747825,
+            0.007835537431134038
+          ],
+          "ck_load": [
+            0.9994146919657718,
+            -0.030678004309620123
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 0.01507090429622377,
+            "d2_load": 0.0041790112492695415,
+            "ck_source": 3.0914462512376795e-06,
+            "ck_load": 3.213122152335202e-08
+          },
+          "20_to_24ns": {
+            "d2_source": 0.004801192385607282,
+            "d2_load": 0.0004106659768365651,
+            "ck_source": 3.529815801647101e-06,
+            "ck_load": 1.4917528736719756e-09
+          }
+        }
+      },
+      {
+        "frequency_hz": 480000000,
+        "s_complex": {
+          "d2_source": [
+            -9.073905131674268e-06,
+            -5.3386115954661695e-06
+          ],
+          "d2_load": [
+            6.128731999995344e-06,
+            3.3349646272019305e-06
+          ],
+          "ck_source": [
+            0.005692258861868362,
+            0.03698658559355579
+          ],
+          "ck_load": [
+            0.9884752753863383,
+            -0.14656797672305968
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 0.0007397014398958957,
+            "d2_load": 0.001011771252022022,
+            "ck_source": 6.311277309373534e-07,
+            "ck_load": 5.025625200749871e-08
+          },
+          "20_to_24ns": {
+            "d2_source": 0.0008246229569283443,
+            "d2_load": 0.0003518116453941931,
+            "ck_source": 1.7048153547335283e-07,
+            "ck_load": 3.770034372362035e-09
+          }
+        }
+      },
+      {
+        "frequency_hz": 800000000,
+        "s_complex": {
+          "d2_source": [
+            4.47633462127629e-06,
+            -1.360796567916085e-05
+          ],
+          "d2_load": [
+            -3.9238935896449616e-06,
+            1.0425823387525546e-05
+          ],
+          "ck_source": [
+            0.01554845751858364,
+            0.05989597209205167
+          ],
+          "ck_load": [
+            0.9682653095200069,
+            -0.2422512961872845
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 0.00010468932015647224,
+            "d2_load": 0.000263416268812904,
+            "ck_source": 3.362181900834396e-08,
+            "ck_load": 2.0440933229071947e-08
+          },
+          "20_to_24ns": {
+            "d2_source": 0.00020819137289715005,
+            "d2_load": 0.0003212802681653845,
+            "ck_source": 4.650333803428224e-08,
+            "ck_load": 1.6805701205687231e-09
+          }
+        }
+      },
+      {
+        "frequency_hz": 1260000000,
+        "s_complex": {
+          "d2_source": [
+            -2.2062214246725643e-05,
+            -1.3416417881944195e-05
+          ],
+          "d2_load": [
+            1.4156410178956386e-05,
+            9.295136532274335e-06
+          ],
+          "ck_source": [
+            0.03718766739257172,
+            0.08815647620788598
+          ],
+          "ck_load": [
+            0.9224101776787474,
+            -0.37420986148552526
+          ]
+        },
+        "magnitude_drift_db": {
+          "16_to_20ns": {
+            "d2_source": 8.299479329909529e-05,
+            "d2_load": 1.5751180074873285e-05,
+            "ck_source": 3.373771381147989e-08,
+            "ck_load": 1.834601473546961e-08
+          },
+          "20_to_24ns": {
+            "d2_source": 0.00010390946828765077,
+            "d2_load": 0.00012015559987154108,
+            "ck_source": 3.572396415891173e-08,
+            "ck_load": 8.491713377658504e-10
+          }
+        }
+      }
+    ]
+  },
+  "reciprocity_s31_vs_s13": [
+    {
+      "frequency_hz": 100000000,
+      "s31_abs": 2.298216607458657e-06,
+      "s13_abs": 2.1504434963218814e-06,
+      "s31_minus_s13_abs": 1.5174951416523284e-07
+    },
+    {
+      "frequency_hz": 480000000,
+      "s31_abs": 1.085000539224672e-05,
+      "s13_abs": 1.0527892861625752e-05,
+      "s31_minus_s13_abs": 3.5582629973574716e-07
+    },
+    {
+      "frequency_hz": 800000000,
+      "s31_abs": 1.441137377632247e-05,
+      "s13_abs": 1.4325302843809493e-05,
+      "s31_minus_s13_abs": 8.607207302912554e-08
+    },
+    {
+      "frequency_hz": 1260000000,
+      "s31_abs": 2.5723460437166436e-05,
+      "s13_abs": 2.582133935820092e-05,
+      "s31_minus_s13_abs": 1.5755770950494132e-07
+    }
+  ],
+  "both_subset_gates_pass": true,
+  "full_row_4_6_closed": false,
+  "limits": [
+    "only D2/CK routed copper with four ideal differential ports",
+    "D0/D1 interaction, pads, connector, mask, finite losses and source/sink remain open",
+    "two-source excitation does not determine the full four-port S matrix"
+  ]
+}

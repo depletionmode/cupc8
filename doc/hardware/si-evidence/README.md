@@ -97,3 +97,13 @@ field runs on the final GPU receipt. Their 100 MHz weak cross-port spectrum
 fails the 0.05 dB stability gate in both 8–12 and 12–16 ns comparisons, so
 these are rejected diagnostics. The audit hashes both XML/log files and all
 16 raw port traces; it does not mark the coupled subset valid.
+
+`gpu-coupled-d2-long-fixed.json`, `gpu-coupled-ck-long-fixed.json` and
+`gpu-coupled-d2-ck-long-audit.json` extend the same physical D2/CK XML to a
+26.740 ns fixed window. Both copper-subset numerical gates pass; the audit
+independently checks raw traces, spectral drift and reciprocal response.
+`gpu-coupled-final-receipt-migration.json` validates all six coupled field
+runs against the canonical GPU receipt by full physical fingerprint and
+regenerated solver-input equality. These records omit the full four-pair
+interaction and the actual HDMI launch, loss and source/sink models; row 4.6
+remains open.
