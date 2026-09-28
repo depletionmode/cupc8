@@ -654,6 +654,50 @@ class FabCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'isolated nonorthogonal filled region has a 0.080000 mm span'):
                 gerberdrc.check_silk_clearance(silk, mask, .15, .15)
 
+    def test_near_vertex_nonorthogonal_neck_without_midpoint_failure(self):
+        # The 1.20-1.30 mm slab is 0.140 mm wide at its midpoint and
+        # 0.080 mm wide at the top vertex. A rational interior slice is
+        # 0.090 mm; midpoint-only witnesses miss this real plotted neck.
+        points = [(1, 1), (2, 1), (2, 1.2), (1.6, 1.2),
+                  (1.54, 1.3), (2, 1.4), (2, 1.6), (1, 1.6),
+                  (1, 1.4), (1.46, 1.3), (1.4, 1.2), (1, 1.2)]
+        def region(vertices):
+            commands = ['G36*']
+            for index, (x, y) in enumerate([*vertices, vertices[0]]):
+                commands.append('X%dY%dD0%d*' %
+                                (round(x*1000000), round(y*1000000),
+                                 2 if index == 0 else 1))
+            return '\n'.join([*commands, 'G37*']) + '\n'
+        prefix = ('%TF.FileFunction,Copper,L1,Top*%\n'
+                  '%TF.FilePolarity,Positive*%\n%FSLAX46Y46*%\n'
+                  '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\nD10*\n%TO.N,/GND*%\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            copper = Path(tmp) / 'sample-F_Cu.gtl'
+            copper.write_text(prefix + region(points) + 'M02*\n')
+            with self.assertRaisesRegex(ValueError,
+                                        'isolated nonorthogonal filled region has a 0.090000 mm span'):
+                gerberdrc.check_clearance([copper], .15, .1)
+            # The exact 0.100 mm limiting vertex has no sub-rule slice.
+            at_limit = [(1.55 if x == 1.54 else 1.45 if x == 1.46 else x, y)
+                        for x, y in points]
+            copper.write_text(prefix + region(at_limit) + 'M02*\n')
+            self.assertEqual(gerberdrc.check_clearance([copper], .15, .1), 1)
+            # The same non-midpoint witness applies to plotted legend ink.
+            silk_points = [(1.65 if x == 1.6 else 1.56 if x == 1.54 else
+                            1.44 if x == 1.46 else 1.35 if x == 1.4 else x, y)
+                           for x, y in points]
+            silk = Path(tmp) / 'sample-F_Silkscreen.gto'
+            mask = Path(tmp) / 'sample-F_Mask.gts'
+            silk.write_text(prefix.replace('Copper,L1,Top', 'Legend,Top')
+                            .replace('0.200000', '0.150000') + region(silk_points) + 'M02*\n')
+            mask.write_text('%TF.FileFunction,Soldermask,Top*%\n'
+                            '%TF.FilePolarity,Negative*%\n%FSLAX46Y46*%\n'
+                            '%MOMM*%\n%LPD*%\n%ADD10C,0.200000*%\n'
+                            'D10*\nX9000000Y9000000D03*\nM02*\n')
+            with self.assertRaisesRegex(ValueError,
+                                        'isolated nonorthogonal filled region has a 0.135000 mm span'):
+                gerberdrc.check_silk_clearance(silk, mask, .15, .15)
+
     def test_connected_nonorthogonal_neck_witness_on_copper_and_silk(self):
         # A second filled region touches a wide lobe. The isolated witness
         # must defer, while the connected union still has an 80 um neck.
