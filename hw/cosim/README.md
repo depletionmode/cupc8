@@ -146,6 +146,19 @@ The routed three-leg lengths are 10.873/35.321/49.898 mm for `HALTED` and
 bridge status bit `$02` observable; a `STI; WAI` ROM makes bit `$04`
 observable. Opening any one of the six real launch tracks on a private PCB
 copy removes its status bit while the CPU itself remains in the same state.
+
+The main-board CPU data source is now checked independently of the CPU-card
+data link. Each U7 data output must reach its exact R21–R28 33 Ω input pad;
+each resistor output must reach its matching J2 socket pad, and its R90–R97
+47 kΩ keeper must reach the same socket net with the other keeper pad on
+`+3V3`. All 24 routed legs are present on the pinned main board. Their
+length ranges are 7.775–19.017 mm from U7 to resistor, 59.128–74.437 mm
+from resistor to socket, and 18.375–52.216 mm from keeper to socket.
+The native RTL data input is enabled only when both main and CPU-card links
+are intact. Copper-opening mutations at all 24 branch pads disable exactly
+their own bit; each of eight U7 source opens changes the 20 ms native PC and
+GPO. The 47 kΩ keeper is a source and route constraint here, not a model of
+analog voltage, rail availability, contact resistance, or signal timing.
 Each open restores three strict gaps. A changed RN8 value fails source
 binding. The open receiver is held low for a deterministic digital
 counterexample; voltage, propagation and metastability are unmodeled.
@@ -270,9 +283,10 @@ nets, three CPU reset nets, two chipset oscillator-branch nets and three
 system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
 six CPU `/STB`/`RW` nets, three CPU `/RDY` nets, three CPU `SYNC` nets,
 six CPU `HALTED`/`WAITING` nets and the two system manual-reset nets now affect
-execution; 318 remain unmodeled.
+execution; eight main-board CPU data source nets also affect execution; 310
+remain unmodeled.
 The remaining groups are boot/programming (68),
-slot/control bus (32), CPU/memory (29),
+slot/control bus (32), CPU/memory (21),
 power/return (65), clock/reset (44), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
