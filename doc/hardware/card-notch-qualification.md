@@ -88,6 +88,45 @@ notch-to-copper distance and rib-to-notch registration, including route and
 etch errors, on both faces. A smaller or better located socket rib could
 improve mating margin, but does not cure the finger-pitch inequality.
 
+## Release decision and supplier tolerance stack
+
+**Keep the seven card packages blocked at the normal 0.30 mm plotted
+copper-to-edge gate.** The fixed-center pattern cannot reach 0.30 mm even
+at the CEM minimum finished notch and finger widths:
+`(3.00 - 1.84 - 0.65)/2 = 0.255 mm` per side. A tighter process cannot
+rescue that pattern under this rule. The 0.65 mm / 0.08 mm shift example
+has only 0.005 mm nominal margin and fails the present pitch and
+socket-center checks. It is a supplier question, not a release footprint.
+
+The next decision is whether the exact x1, x4, and x8 socket revisions
+accept a shifted contact pattern while the fabricator guarantees the
+finished card geometry. Request controlled drawings or written guarantees
+giving these worst-case values, in millimetres, for **each** mating pair:
+
+| Bound | Meaning and required inequality |
+|---|---|
+| `Nmin`, `Nmax` | Finished notch width throughout the adjacent pads' y span, inside CEM's 1.84–1.96 range. |
+| `Gmin`, `Wmin`, `Wmax`, `e_route` | Minimum finished center gap between adjacent pads, finished pad-width limits, and worst notch-center offset from their midpoint, including etch and routing registration. Require `0.65 <= Wmin <= Wmax <= 0.75` and, for equal maximum pad widths, `Gmin >= Nmax + Wmax + 0.60 + 2e_route`. Measure both actual pad-edge-to-wall clearances as well; each must be at least 0.30. |
+| `Rmax`, `e_mate` | Maximum molded rib width and worst rib-to-notch offset at contact engagement, including rib-to-contact location, card registration, and assembly freedom. Require `(Nmin - Rmax)/2 - e_mate > 0` plus the socket maker's insertion allowance. |
+| `c`, `e_contact`, `s` | Maximum contact-tip/wipe width, contact-center uncertainty, and intended finger shift. Require `abs(s) + e_contact + c/2 <= Wmin/2`, full longitudinal wipe containment, and retained electrical and durability ratings. |
+
+At the selected UMAX `Rmax=1.83`, a finished 1.84 mm notch permits
+`e_mate < 0.005 mm` before insertion allowance. A generic
+1.90±0.06 mm card notch, 1.78±0.05 mm rib, or ±0.10 mm board-outline
+quote cannot close that stack. If the selected sockets do not accept
+the shifted pads, select an orderable replacement and requalify its
+board footprint and assembly. A local 0.20 mm project-rule exception
+would require a separate design approval **and** a guarantee of finished
+copper clearance and rib fit; JLCPCB's published 0.20 mm capability
+alone does not provide either guarantee.
+
+After supplier acceptance, choose drawing targets with margin against
+these filled-in worst cases, update the shared x1/x4/x8 card footprints
+and all seven generated boards together, and keep the normal 0.30 mm
+plotted check. Update `MECH-001` and socket-center checks to encode the
+accepted tolerances. Independently measure both faces and notch walls
+on fresh plots and mate measured first articles from the approved lots.
+
 ## Evidence and acceptance limits
 
 | Owner | Required evidence | Acceptance limit |
