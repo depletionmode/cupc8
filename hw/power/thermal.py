@@ -48,6 +48,8 @@ def wifi_thermal_terms(r5, r3, rgnd):
     ibuck = iout * d.wifi_vout_range()[1] / vin
     copper_w = iout ** 2 * (r3 + rgnd) + ibuck ** 2 * r5
     internal_w = buck_loss(vin, iout)
+    # Espressif's 350 mA TX entry is measured at 25 C. It is a diagnostic
+    # operating point, not a guaranteed current maximum at this 40 C corner.
     esp_w = d.ESP32_VDD_MAX * d.ESP32_I_TX
     rise_budget_c = d.TJ_LIMIT_C - d.AMBIENT_C
     return internal_w, copper_w, esp_w, iout ** 2, rise_budget_c
@@ -65,7 +67,7 @@ def wifi_external_allowance(terms, r_contact, theta_buck, theta_copper, theta_co
 def wifi_coupling_budget(r5, r3, rgnd):
     """Legacy conditional scenario: external copper transfers as buck theta_JA.
 
-    The ESP's full TX electrical input is counted as local heat. All estimated
+    The ESP's 25 C TX electrical input is counted as local heat. All estimated
     copper I²R loss is assigned the buck's JEDEC self-heating coefficient.
     This is a sensitivity point, not a board thermal upper bound.
     """
@@ -97,7 +99,7 @@ def wifi_card(out):
     c.info('GND mesh', '0.25/0.125 mm %.1f/%.1f mOhm; discrepancy %.0f%%' %
            (1e3 * coarse[0], 1e3 * fine[0], 100 * discrepancy))
     c.info('coupling budget', 'buck + allocated copper %.0f mW (of which copper %.0f mW); '
-           'ESP TX heat <= %.0f mW; conditional ESP-to-buck transfer <= %.1f C/W '
+           'ESP TX heat scenario %.0f mW; conditional ESP-to-buck transfer <= %.1f C/W '
            'if external copper uses buck theta_JA' %
            (1e3 * buck_w, 1e3 * copper_w, 1e3 * esp_w, allowance))
     c.info('thermal balance', '%.1f mW x theta_buck + %.1f mW x theta_copper '
@@ -124,6 +126,8 @@ def wifi_card(out):
     c.check('T4r', 'extra return resistance and buck/copper/contact thermal transfers bounded',
             0, 1, '>=', '', fmt='%d')
     c.check('T4c', 'measured or calibrated ESP-to-buck thermal transfer bound supplied', 0, 1, '>=', '', fmt='%d')
+    c.check('T4p', 'ESP and other 3V3 load power bounded at the 40 C full-TX corner',
+            0, 1, '>=', '', fmt='%d')
     return c.done()
 
 

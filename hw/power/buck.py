@@ -175,8 +175,8 @@ def wifi_card(out=None):
     c.info('GND mesh', '0.25 mm %.1f mOhm (%d/%d cells); 0.125 mm %.1f mOhm (%d/%d cells); '
            'discrepancy %.0f%%' %
            (1e3 * coarse[0], *coarse[2], 1e3 * fine[0], *fine[2], 100 * discrepancy))
-    c.info('capacitors', 'C1/C2/C3 each %.0f mOhm ESR sensitivity scenario; manufacturer maximum unverified' %
-           (1e3 * WIFI_CAP_ESR_SCENARIO))
+    c.info('capacitors', 'C1/C2/C3 each %.0f mOhm ESR sensitivity scenario; C1/C2 at 60%% nominal '
+           'capacitance; fitted-part limits unverified' % (1e3 * WIFI_CAP_ESR_SCENARIO))
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
         res = dict(zip(("typical", "worst"), pool.map(lambda corner: run_wifi(corner, r_board5, r_board3, r_ground),
                                                        ("typical", "worst"))))
@@ -204,6 +204,10 @@ def wifi_card(out=None):
     c.check('F4', 'GND mesh discrepancy <= 10%', discrepancy, 0.10, '<=', '', fmt='%.3f')
     c.check('F5', 'C1/C2/C3 guaranteed ESR maximum available for the fitted parts', 0, 1, '>=', '', fmt='%d')
     c.check('F6', 'routed GND pad/spoke/contact resistance validated', 0, 1, '>=', '', fmt='%d')
+    c.check('F7', 'C1/C2/C3 minimum effective capacitance at bias, temperature and age validated',
+            0, 1, '>=', '', fmt='%d')
+    c.check('F8', 'ESP32 and other 3V3 load-current envelope validated over operating corners',
+            0, 1, '>=', '', fmt='%d')
     return c.done()
 
 
