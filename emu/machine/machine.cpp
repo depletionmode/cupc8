@@ -399,6 +399,8 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     board->wiring.cpuDataConnected = o.cpuDataConnected;
     board->cpuClockConnected = o.cpuClockConnected;
     board->cpuResetConnected = o.cpuResetConnected;
+    board->cpuStrobeConnected = o.cpuStrobeConnected;
+    board->cpuRwConnected = o.cpuRwConnected;
     board->chipsetClockConnected = o.chipsetClockConnected;
     board->timedMemory = true;
     board->ramAccessNs = o.ramAccessNs;

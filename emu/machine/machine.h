@@ -213,6 +213,8 @@ class Machine {
     bool porConnected = true;        // supervisor nPOR copper reaches the chipset
     bool cpuClockConnected = true;   // CPU socket/card clock copper reaches the FPGA
     bool cpuResetConnected = true;   // CPU socket/card reset copper reaches the FPGA
+    bool cpuStrobeConnected = true;  // CPU strobe reaches the chipset through RN5
+    bool cpuRwConnected = true;      // CPU read/write reaches the chipset through RN5
     bool chipsetClockConnected = true; // oscillator's R17 branch reaches chipset clock pad
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes

@@ -47,6 +47,8 @@ struct MainBoard {
 	bool romD0Connected = true;
 	bool cpuClockConnected = true;
 	bool cpuResetConnected = true;
+	bool cpuStrobeConnected = true;
+	bool cpuRwConnected = true;
 	bool chipsetClockConnected = true;
 
 	Vmachine_core *top = nullptr;
@@ -89,6 +91,8 @@ struct MainBoard {
 		top->cpu_d_connected = dataConnected;
 		top->cpu_clk_connected = cpuClockConnected;
 		top->cpu_rst_connected = cpuResetConnected;
+		top->cpu_stb_connected = cpuStrobeConnected;
+		top->cpu_rw_connected = cpuRwConnected;
 		top->chipset_clk_connected = chipsetClockConnected;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);
