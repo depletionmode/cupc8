@@ -36,6 +36,25 @@ source-backed manufacturing acceptance route, not an independent plotted
 height certificate. A fab may accept that evidence explicitly; the automated
 Gerber completeness gate still reports its gap.
 
+`hw/tools/silktextaudit.py` implements the source inventory and produces a
+pending review JSON outside the receipt-owned board package. For example,
+after rebuilding `build/hw/wifi` with current sources:
+
+```sh
+python3 hw/tools/silktextaudit.py build/hw/wifi \
+  --output /tmp/wifi-silk-text-review.json
+```
+
+It first validates `evidence.json`, freshly replots and compares every Gerber
+layer, then records visible text IDs, literals, expanded strings, layers,
+nominal dimensions, the receipt and PCB hashes, both silkscreen hashes, and
+the parity layer count. Any stale receipt, changed plot, duplicate text ID,
+unsupported text-like object, or sub-rule nominal height prevents a report.
+The JSON's `review_status` remains `pending` for the separate CAM review. A
+source edit to this tool changes the board pipeline input hash, so existing
+receipts must be rebuilt before reports can be generated; old receipts must
+not be relabeled.
+
 To make an independent machine check possible in a later exporter, emit a
 sidecar tied to the Gerber hash. It must map *every* text object ID and nominal
 height to its plotted operations and identify all non-text operations. A
