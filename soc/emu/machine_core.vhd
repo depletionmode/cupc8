@@ -29,6 +29,7 @@ entity machine_core is
 		cpu_halted_connected:	in std_logic;
 		cpu_waiting_connected:	in std_logic;
 		cpu_irq_connected:	in std_logic_vector(3 downto 0);
+		cpu_tmr_exp_connected:	in std_logic_vector(1 downto 0);
 		chipset_clk_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
@@ -74,6 +75,7 @@ architecture rtl of machine_core is
 	signal chipset_clk: std_logic;
 	signal cpu_rst_at_pad: std_logic;
 	signal tmr_exp: std_logic_vector(1 downto 0);
+	signal tmr_exp_at_chipset: std_logic_vector(1 downto 0);
 	signal fl: std_logic_vector(1 downto 0);
 begin
 	cpu_clk <= clk when cpu_clk_connected = '1' else '0';
@@ -101,6 +103,9 @@ begin
 	-- An open IRQ receiver is undefined in hardware. Low is a deterministic
 	-- counterexample that prevents this interrupt from reaching the CPU.
 	irq_at_cpu <= irq and cpu_irq_connected;
+	-- An open timer pulse receiver is undefined. Low supplies a deterministic
+	-- counterexample to IRQ_PEND latching without asserting an analog level.
+	tmr_exp_at_chipset <= tmr_exp and cpu_tmr_exp_connected;
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
@@ -128,7 +133,7 @@ begin
 		clk => chipset_clk, n_por => n_por,
 		cpu_a => a_chip, cpu_d_in => cs_din, cpu_d_out => cs_dout, cpu_d_oe => cs_doe, cpu_rw => rw_at_chipset,
 		cpu_n_stb => n_stb_at_chipset, cpu_n_rdy => n_rdy, cpu_sync => sync_at_chipset, cpu_irq => irq,
-		cpu_tmr_exp => tmr_exp, cpu_halted => halted_at_chipset, cpu_waiting => waiting_at_chipset, cpu_n_rst => n_rst,
+		cpu_tmr_exp => tmr_exp_at_chipset, cpu_halted => halted_at_chipset, cpu_waiting => waiting_at_chipset, cpu_n_rst => n_rst,
 		cpu_cdone => cpu_cdone,
 		mem_a => mem_a, mem_d_in => mem_d_in, mem_d_out => mem_d_out, mem_d_oe => mem_d_oe,
 		mem_n_oe => mem_n_oe, mem_n_we => mem_n_we, mem_n_ce_ram => mem_n_ce_ram, mem_n_ce_rom => mem_n_ce_rom,

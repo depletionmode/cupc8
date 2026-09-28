@@ -171,6 +171,14 @@ handler and writes GPO `$A0`–`$A3`; opening any of the three copper legs
 disables that IRQ bit, and source-open probes leave the CPU parked at GPO
 `$11`. Low on an open receiver is a digital counterexample; the actual
 open-pad voltage, edge timing and contact behavior are not inferred.
+
+The CPU timer-expiry pulses are also checked separately from their IRQ
+returns. FPGA U1.55/56 reaches RN8's two 33 Ω channels, CPU J1.B41/B43,
+main J2.B41/B43, and chipset U7.136/129. The routed legs measure
+10.644/32.844/55.100 mm for timer 0 and 14.394/32.920/56.502 mm for timer 1.
+An open on any of the six legs prevents that timer's pulse from reaching
+the chipset's `IRQ_PEND` latch in the digital counterexample. Timer 0/1
+handler probes then stay at GPO `$11` instead of `$A1`/`$A2`.
 Each open restores three strict gaps. A changed RN8 value fails source
 binding. The open receiver is held low for a deterministic digital
 counterexample; voltage, propagation and metastability are unmodeled.
@@ -296,9 +304,10 @@ system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
 six CPU `/STB`/`RW` nets, three CPU `/RDY` nets, three CPU `SYNC` nets,
 six CPU `HALTED`/`WAITING` nets and the two system manual-reset nets now affect
 execution; eight main-board CPU data source nets and twelve CPU IRQ nets also
-affect execution; 298 remain unmodeled.
+affect execution; six CPU timer-expiry nets also affect execution; 292 remain
+unmodeled.
 The remaining groups are boot/programming (68),
-slot/control bus (32), CPU/memory (9),
+slot/control bus (32), CPU/memory (3),
 power/return (65), clock/reset (44), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

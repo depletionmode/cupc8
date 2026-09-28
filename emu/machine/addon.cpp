@@ -213,6 +213,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       links("cpu_address_links", opt.cpuAddressConnected);
       links("cpu_data_links", opt.cpuDataConnected);
       links("cpu_irq_connected", opt.cpuIrqConnected);
+      links("cpu_tmr_exp_connected", opt.cpuTmrExpConnected);
       napi_value timing = prop(env, wiring, "memory_timing_ns");
       if (!isType(env, timing, napi_object)) throw std::runtime_error("netlist wiring: missing memory timing");
       auto delay = [&](const char *key) {
