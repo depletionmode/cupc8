@@ -205,6 +205,7 @@ class Machine {
     std::map<int, std::string> slots;  // slot -> gpu | eink | eink750 | io | storage | wifi
     std::vector<uint8_t> rom;
     bool sysctl = false;
+    bool sysctlHostVbus = true;      // USB host VBUS reaches sysctl GPIO29 through Q1
     bool pwrHi = true;               // USB-C source advertises 3 A (chipset PWR_HI input)
     bool ioUsbHost = true;           // receptacle D+/D- physically reach the IO MCU
     bool storageSdSocket = true;     // seven microSD contacts reach storage MCU

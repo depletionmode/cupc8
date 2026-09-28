@@ -105,7 +105,7 @@ def edges(t, v, a, b, level):
 
 
 def wifi_deck(corner, r_board5, r_board3, r_ground, esr=WIFI_CAP_ESR_SCENARIO,
-              r_contact=0.0):
+              r_contact=0.0, r_board_return=0.0):
     """POW-003: hw/boards/wifi.py as built. The source, the input path and the
     other loads feed 5V_SYS; the card hangs off it through the slot's feed
     (PTC, link, sense, contacts), so the slot's +5V sags with the burst as it
@@ -121,18 +121,19 @@ Cbulk v5 0 {cbulk}
 Iother v5 0 PWL(0 0 {ton} {iother})
 Rslot v5 card {rslot}
 Rboard5 card vin {rboard5}
+Rboardreturn buck_gnd 0 {rboardreturn:.9g}
 Rcesr1 vin c1term {esr}
-C1 c1term 0 {cin}
-X1 vin fb sw vin 0 TLV62569_TRANS
+C1 c1term buck_gnd {cin}
+X1 vin fb sw vin buck_gnd TLV62569_TRANS
 L1 sw buck {l}
 Rcesr2 buck c2term {esr}
-C2 c2term 0 {cout}
+C2 c2term buck_gnd {cout}
 Rboard3 buck out {rboard3}
 Rcesr3 out c3term {esr}
 C3 c3term return {chf}
-Rground return 0 {rground}
+Rground return buck_gnd {rground}
 R9 buck fb {r1}
-R10 fb 0 {r2}
+R10 fb buck_gnd {r2}
 Iesp out return PWL(0 {i0} {t1} {i0} {t1e} {i1} {t2} {i1} {t2e} {i0})
 .options method=gear reltol=1e-3
 .tran 20n {tend} 0 20n
@@ -142,16 +143,17 @@ wrdata {{name}}.dat v(out,return) v(sw) v(card)
 .endc
 """.format(vbus=ch["vbus"], ton=T_APPLY, rin=r_in, cbulk=dict(d.C_5VSYS)["main 5V_SYS bulk"] + d.BUCK_CIN,
            iother=ch["itot"] - ch["iwifi"], rslot=ch["r_slot"], rboard5=r_board5,
-           rboard3=r_board3, rground=r_ground + r_contact, esr=esr,
+           rboard3=r_board3, rground=r_ground, rboardreturn=r_board_return + r_contact, esr=esr,
            cin=d.WIFI_CIN * d.CERAMIC_DERATE,
            l=d.WIFI_BUCK_L, cout=d.WIFI_COUT * d.CERAMIC_DERATE, chf=d.WIFI_COUT_HF, r1=d.WIFI_BUCK_R1,
            r2=d.WIFI_BUCK_R2, i0=i0, i1=i1, t1=T_STEP, t1e=T_STEP + 1e-6, t2=T_REL, t2e=T_REL + 1e-6, tend=T_END)
 
 
 def run_wifi(corner, r_board5, r_board3, r_ground, *, esr=WIFI_CAP_ESR_SCENARIO,
-             r_contact=0.0, tag=''):
+             r_contact=0.0, r_board_return=0.0, tag=''):
     name = "pow003_" + corner + tag
-    spice.run(name, wifi_deck(corner, r_board5, r_board3, r_ground, esr, r_contact).replace("{name}", name),
+    spice.run(name, wifi_deck(corner, r_board5, r_board3, r_ground, esr, r_contact,
+                              r_board_return).replace("{name}", name),
               libs=("TLV62569_TRANS.lib",))
     return spice.wave(name)
 
@@ -166,19 +168,32 @@ def wifi_card(out=None):
     c.check("F0", "Wi-Fi card regulator parts in hw/boards/wifi.py that differ from the model", len(bad), 0, "<=",
             "", fmt="%d")
     out = Path(out) if out else Path(spice.ROOT) / 'build/hw/wifi'
+    import boardevidence
+    from boardcheck import check_report
+    import json
+    boardevidence.validate('wifi', out)
+    check_report(json.loads((out / 'drc.json').read_text()), 'drc')
     circuit = wifi_board.topology(out / 'wifi.net')
     r_board5, r_board3 = wifi_board.routes(out / 'wifi.kicad_pcb', out / 'fab/order.json', circuit)
     r_ground, coarse, fine, discrepancy = wifi_ground.compare(out / 'wifi.kicad_pcb')
+    edge, _, _, edge_errors = wifi_ground.compare_card_edge(out / 'wifi.kicad_pcb')
+    r_board_return = max(edge['buck_to_J1_A'], edge['buck_to_J1_B'])
     c.info('routed board', '2-layer 1.6 mm, +5V %.1f mOhm, 3V3 %.1f mOhm, GND return %.1f mOhm; '
            '%d GND vias' %
            (1e3 * r_board5, 1e3 * r_board3, 1e3 * r_ground, coarse[1]))
     c.info('GND mesh', '0.25 mm %.1f mOhm (%d/%d cells); 0.125 mm %.1f mOhm (%d/%d cells); '
            'discrepancy %.0f%%' %
            (1e3 * coarse[0], *coarse[2], 1e3 * fine[0], *fine[2], 100 * discrepancy))
+    c.info('J1 return sensitivity', 'U2.2 to J1 GND %.1f mOhm worst of two face/path scenarios; '
+           'U1.1 to J1 GND %.1f/%.1f mOhm A/B; maximum mesh discrepancy %.1f%%. '
+           'Contact and shared-plane resistance are unbounded' %
+           (1e3 * r_board_return, 1e3 * edge['esp_to_J1_A'],
+            1e3 * edge['esp_to_J1_B'], 100 * max(edge_errors.values())))
     c.info('capacitors', 'C1/C2/C3 each %.0f mOhm ESR sensitivity scenario; C1/C2 at 60%% nominal '
            'capacitance; fitted-part limits unverified' % (1e3 * WIFI_CAP_ESR_SCENARIO))
     with concurrent.futures.ThreadPoolExecutor(2) as pool:
-        res = dict(zip(("typical", "worst"), pool.map(lambda corner: run_wifi(corner, r_board5, r_board3, r_ground),
+        res = dict(zip(("typical", "worst"), pool.map(lambda corner: run_wifi(
+            corner, r_board5, r_board3, r_ground, r_board_return=r_board_return),
                                                        ("typical", "worst"))))
     vnom = d.buck_vout(d.WIFI_BUCK_R1, d.WIFI_BUCK_R2)
     lo_dc, hi_dc = d.wifi_vout_range()
@@ -202,6 +217,8 @@ def wifi_card(out=None):
     # resistance. The vendor's published capacitor data has no maximum ESR;
     # neither pad/contact resistance nor local thermal coupling is calibrated.
     c.check('F4', 'GND mesh discrepancy <= 10%', discrepancy, 0.10, '<=', '', fmt='%.3f')
+    c.check('F4e', 'J1 return mesh discrepancy <= 10%',
+            max(edge_errors.values()), 0.10, '<=', '', fmt='%.3f')
     c.check('F5', 'C1/C2/C3 guaranteed ESR maximum available for the fitted parts', 0, 1, '>=', '', fmt='%d')
     c.check('F6', 'routed GND pad/spoke/contact resistance validated', 0, 1, '>=', '', fmt='%d')
     c.check('F7', 'C1/C2/C3 minimum effective capacitance at bias, temperature and age validated',

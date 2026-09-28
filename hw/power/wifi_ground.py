@@ -19,6 +19,10 @@ from wifi_board import child, find, find1, pad_nodes, parse, point, COPPER_OHM_M
 DEFAULT_PITCH_MM = 0.25
 PATH_WIDTH_MM = 0.25
 LAYERS = ('F.Cu', 'B.Cu')
+CARD_EDGE_GND = {
+    'A': ('A3', 'A5', 'A8', 'A11', 'A12', 'A13', 'A15', 'A17'),
+    'B': ('B3', 'B5', 'B8', 'B11', 'B12', 'B14', 'B17'),
+}
 # The extractor's COPPER_OHM_MM is per millimetre of a 1 mm-wide strip,
 # after the hot-copper factor.
 SHEET_OHM = COPPER_OHM_MM / 1000
@@ -173,3 +177,39 @@ def compare(board):
         raise ValueError('GND via contact changes between 0.25 and 0.125 mm meshes')
     discrepancy = abs(fine[0] - coarse[0]) / max(fine[0], coarse[0])
     return max(coarse[0], fine[0]), coarse, fine, discrepancy
+
+
+def card_edge_returns(board, pitch=DEFAULT_PITCH_MM):
+    """Path scenarios from fitted U1/U2 GND pads to each J1 GND face.
+
+    A shortest fixed-width corridor is not an effective plane resistance or
+    a bound on parallel current spreading, pad entry and mated contacts.
+    """
+    if pitch <= 0 or pitch > 0.5:
+        raise ValueError('GND raster pitch must be in (0, 0.5] mm')
+    tree = parse(Path(board).read_text())
+    if tree[0] != 'kicad_pcb':
+        raise ValueError('expected KiCad PCB')
+    xs, ys, mask = raster(polygons(tree), pitch)
+    pads = pad_nodes(tree)
+    links, via_count = via_links(tree, xs, ys, mask, pitch)
+    sinks = {face: pad_cells(pads, xs, ys, mask,
+                             [('J1', pin) for pin in pins], pitch)
+             for face, pins in CARD_EDGE_GND.items()}
+    result = {}
+    for name, pin in (('esp', ('U1', '1')), ('buck', ('U2', '2'))):
+        starts = pad_cells(pads, xs, ys, mask, [pin], pitch)
+        for face, targets in sinks.items():
+            result[f'{name}_to_J1_{face}'] = shortest(mask, links, starts, targets, pitch)
+    return result, via_count
+
+
+def compare_card_edge(board):
+    """Report both mesh pitches and reject a changed via bridge count."""
+    coarse, coarse_vias = card_edge_returns(board, 0.25)
+    fine, fine_vias = card_edge_returns(board, 0.125)
+    if coarse_vias != fine_vias:
+        raise ValueError('GND via contact changes between card-edge meshes')
+    result = {name: max(coarse[name], fine[name]) for name in coarse}
+    errors = {name: abs(coarse[name] - fine[name]) / result[name] for name in result}
+    return result, coarse, fine, errors

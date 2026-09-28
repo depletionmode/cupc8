@@ -31,6 +31,12 @@ def main():
             subprocess.run(["git", "worktree", "remove", "--force", wt], cwd=ROOT, capture_output=True)
             shutil.rmtree(wt, ignore_errors=True)
         git("worktree", "add", "--detach", wt, "HEAD")
+        # build/ is ignored, so the worktree has no routed boards; the
+        # receipt-bound board tests read (never write) the checkout's builds.
+        boards = os.path.join(ROOT, "build", "hw")
+        if os.path.isdir(boards):
+            os.makedirs(os.path.join(wt, "build"), exist_ok=True)
+            os.symlink(boards, os.path.join(wt, "build", "hw"))
         try:
             if "files" in bug:
                 git("checkout", bug["before"], "--", *bug["files"], cwd=wt)

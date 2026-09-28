@@ -1,6 +1,6 @@
 // Exercise each chipset-to-CPU IRQ input with a real firmware stimulus.
 // The fixture is assembled into the ROM's fixed $e000 window at run time.
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +9,15 @@ import { kernelRom, ROOT } from './romimage.mjs';
 
 const bit = Number(process.argv[2]);
 if (!Number.isInteger(bit) || bit < 0 || bit > 3) throw new Error('expected IRQ bit 0..3');
+
+function run(file, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, args, { stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('close', (code) => code === 0 ? resolve() :
+      reject(new Error(`${file} exited ${code}`)));
+  });
+}
 
 const spiEnable = `
 card_boot_wait:
@@ -64,9 +73,10 @@ try {
   const source = path.join(dir, 'probe.s');
   const image = path.join(dir, 'probe.bin');
   fs.writeFileSync(source, assembly);
-  execFileSync('python3', [path.join(ROOT, 'tools/as.py'), source, image,
-    '0xe000,0xe600,0x0f00'], { stdio: 'pipe' });
-  const rom = kernelRom();
+  await run('python3', [path.join(ROOT, 'tools/as.py'), source, image,
+    '0xe000,0xe600,0x0f00']);
+  const rom = process.env.CUPC8_TEST_ROM
+    ? fs.readFileSync(process.env.CUPC8_TEST_ROM) : kernelRom();
   const fixture = fs.readFileSync(image);
   if (fixture.length > 2048) throw new Error('IRQ fixture exceeds fixed ROM window');
   rom.set(fixture, 0);

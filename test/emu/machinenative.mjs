@@ -120,11 +120,17 @@ export class Machine {
   // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53'];
   // pcap: a file for the Wi-Fi card's network traffic
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false, pwrHi = true,
+    hostVbus = true, hostPort = true,
     resetButtonPressed = false,
     usbOrientation = 'A',
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
     const m = new Machine();
-    m.rom = rom ?? kernelRom();
+    // Co-simulation suites can build the ROM in their Python harness and
+    // provide it here. This also avoids Node's synchronous subprocess
+    // restriction in sandboxed verification environments.
+    const suppliedRom = process.env.CUPC8_TEST_ROM &&
+      fs.readFileSync(process.env.CUPC8_TEST_ROM);
+    m.rom = rom ?? suppliedRom ?? kernelRom();
     const wifi = Object.entries(slots).filter(([, k]) => k === 'wifi');
     if (wifi.length > 1) throw new Error('machinenative: one Wi-Fi card at most');
     if (forward.length && !wifi.length) throw new Error('machinenative: forward needs a Wi-Fi card');
@@ -184,6 +190,15 @@ export class Machine {
                       typeof netlistTop.runtime.system_usb_connected?.B !== 'boolean' ||
                       typeof netlistTop.runtime.system_usb_complete !== 'boolean'))
       throw new Error('machinenative: invalid system USB route model');
+    if (netlistTop && typeof netlistTop.runtime.sysctl_usb_vbus_connected !== 'boolean')
+      throw new Error('machinenative: invalid system USB VBUS sense route model');
+    if (netlistTop && (typeof netlistTop.runtime.sysctl_usb_vbus_contacts?.A !== 'boolean' ||
+                      typeof netlistTop.runtime.sysctl_usb_vbus_contacts?.B !== 'boolean'))
+      throw new Error('machinenative: invalid system USB VBUS contact model');
+    if (typeof hostVbus !== 'boolean')
+      throw new Error('machinenative: hostVbus must be boolean');
+    if (typeof hostPort !== 'boolean')
+      throw new Error('machinenative: hostPort must be boolean');
     if (typeof resetButtonPressed !== 'boolean')
       throw new Error('machinenative: resetButtonPressed must be boolean');
     const gpoLedLinks = netlistTop?.runtime.gpo_led_connected ?? Array(8).fill(true);
@@ -222,6 +237,7 @@ export class Machine {
       memoryWiring = { ...netlistTop.runtime, slots: slotWiring };
     }
     m.h = native.create({ slots: activeSlots, rom: m.rom, sysctl: activeSysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
+      sysctlHostVbus: hostVbus && (netlistTop?.runtime.sysctl_usb_vbus_contacts[usbOrientation] ?? true),
       ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
       storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
@@ -242,7 +258,7 @@ export class Machine {
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...activeSlots };
-    if (activeSysctl && (netlistTop?.runtime.system_usb_connected[usbOrientation] ?? true)) {
+    if (hostPort && activeSysctl && (netlistTop?.runtime.system_usb_connected[usbOrientation] ?? true)) {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
     }

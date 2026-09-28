@@ -145,6 +145,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       return i;
     };
     opt.sysctl = flag("sysctl", false);
+    opt.sysctlHostVbus = flag("sysctlHostVbus", true);
     opt.pwrHi = flag("pwrHi", true);
     opt.ioUsbHost = flag("ioUsbHost", true);
     opt.storageSdSocket = flag("storageSdSocket", true);

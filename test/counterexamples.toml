@@ -1266,3 +1266,31 @@ fixed_in = "connectorcheck initial implementation"
 revert = [["hw/tools/connectorcheck.py", "elif a[pin] != b[pin]:", "elif False:"]]
 cmd = "python3 test/hw/test_connectors.py ConnectorTests.test_missing_cpu_bus_wire"
 must_fail = ["FAIL: test_missing_cpu_bus_wire"]
+
+[[bug]]
+name = "COSIM-005: an open e-ink panel supply remained modeled as connected"
+fixed_in = "COSIM-005 routed panel continuity integration"
+revert = [["hw/cosim/gen_top.py", "if eink_panel_connected:\n            runtime_net('eink', 'EPD_VCC')", "if False:\n            runtime_net('eink', 'EPD_VCC')"]]
+cmd = "python3 test/hw/test_cosim_eink_panel.py"
+must_fail = ["AssertionError"]
+
+[[bug]]
+name = "MB-052 subset: open ROM DQ0 copper remained connected in the native board top"
+fixed_in = "MB-052 receipt-bound memory subset"
+revert = [["hw/cosim/main_memory.py", "top['runtime']['rom_read_d0_connected'] = by_target['MEM_D0', 'U10.13']", "top['runtime']['rom_read_d0_connected'] = True"]]
+cmd = "python3 test/hw/test_cosim_main_board_subset.py --cpu-only"
+must_fail = ["open ROM DQ0 remained connected in the native top"]
+
+[[bug]]
+name = "Fabrication: plotted copper outside the board profile was accepted"
+fixed_in = "plotted Gerber profile containment check"
+revert = [["tools/fab_profile_containment.py", "if not engine.covers(profile, shape):", "if False:"]]
+cmd = "python3 test/hw/test_fab_profile_containment.py"
+must_fail = ["plotted copper outside board profile was accepted"]
+
+[[bug]]
+name = "COSIM-003 subset: open system-card VBUS sense copper left sysctl USB enabled"
+fixed_in = "sysctl VBUS receipt-bound route binding"
+revert = [["hw/cosim/gen_top.py", "manifest['runtime']['sysctl_usb_vbus_connected'] = all(vbus_contacts.values())", "manifest['runtime']['sysctl_usb_vbus_connected'] = True"]]
+cmd = "python3 test/hw/test_cosim_sysctl_vbus.py --main-netlist build/hw/main/main.net --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb --cpu-board build/hw/cpu/cpu.kicad_pcb --top doc/hardware/si-evidence/ibis-final-top.json"
+must_fail = ["AssertionError"]

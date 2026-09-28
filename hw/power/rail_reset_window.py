@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
-"""MB-051 screening model for an autonomous two-rail reset redesign.
+"""MB-051 receipt-bound diagnosis of the fitted reset circuit.
 
-This is a threshold/timing and netlist diagnostic, not a circuit simulation
-or a claim that the proposed hardware has been built or routed.
+The printed states are counterexamples to the required sequencing contract,
+not a simulation of an unfitted redesign. A valid board receipt and connected
+reset copper cannot make the fitted one-rail supervisor qualify both rails.
 """
 
+import argparse
 from itertools import product
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'hw'))
+sys.path.insert(0, str(ROOT / 'hw/tools'))
+sys.path.insert(0, str(ROOT / 'hw/si'))
 from cosim.netlist import read
+import boardevidence
+from boardcheck import check_report
+from ibis_bus import routed_distances
+import json
 
 THREEV3_MIN = 3.3 * 0.95
 ONEV2_MIN = 1.2 * 0.95
@@ -29,6 +38,8 @@ def rising_max(nominal, accuracy, hysteresis_max):
 
 def netlist_gap(path):
     circuit = read(path)
+    if circuit.components.get('U6', (None,))[0] != 'MAX811TEUS':
+        raise ValueError('fitted supervisor changed; reassess thresholds and reset ownership')
     for pin, expected in ((('U6', '4'), '/+3V3'), (('U6', '2'), '/nPOR'),
                           (('U6', '3'), '/nMR'), (('U7', '61'), '/nPOR')):
         if circuit.net(*pin) != expected:
@@ -39,23 +50,67 @@ def netlist_gap(path):
         raise ValueError('unexpected 1V2 input at fitted 3V3 supervisor')
     for n in range(1, 7):
         net = f'/SLOT{n}_RST_n'
-        if not any(ref == 'U13' for ref, _ in circuit.nets[net]):
-            raise ValueError(f'{net}: expected TCA9555 control absent')
-        if not any(ref.startswith('R') and circuit.components[ref][0] == '10k'
-                   for ref, _ in circuit.nets[net]):
-            raise ValueError(f'{net}: expected pull-up absent')
+        nodes = circuit.nets[net]
+        pulls = [ref for ref, _ in nodes if ref.startswith('R') and
+                 circuit.components[ref][0] == '10k' and any(
+                     r.ref == ref and set(r.ends) == {net, '/+3V3'}
+                     for r in circuit.resistors)]
+        expected = {(f'J{n + 10}', 'B9'), ('U13', str(n + 3))}
+        if len(pulls) != 1 or set(nodes) != expected | {(pulls[0], '2')}:
+            raise ValueError(f'{net}: fitted pull-up/control topology changed; reassess MB-051')
     return circuit
 
 
+def routed_reset_paths(out):
+    """Bind the existing control routes to a content-valid, clean main PCB."""
+    boardevidence.validate('main', out)
+    check_report(json.loads((out / 'drc.json').read_text()), 'drc')
+    circuit = netlist_gap(out / 'main.net')
+    pcb = out / 'main.kicad_pcb'
+    paths = [('nPOR', ('U6', '2'), [('U7', '61')])]
+    for slot in range(1, 7):
+        paths.append((f'SLOT{slot}_RST_n', ('U13', str(slot + 3)),
+                      [(f'J{slot + 10}', 'B9')]))
+    measured = {}
+    for net, source, targets in paths:
+        full_name = '/' + net
+        if circuit.net(*source) != full_name or any(
+                circuit.net(*target) != full_name for target in targets):
+            raise ValueError(f'{net}: reset pins differ from the exported netlist')
+        distances = routed_distances(pcb, full_name, source, targets)
+        for target in targets:
+            length = distances.get(f'{target[0]}.{target[1]}')
+            if length is None:
+                raise ValueError(f'{net}: open copper to {target[0]}.{target[1]}')
+            measured[net] = length
+    return measured
+
+
 def main():
-    path = Path(sys.argv[1] if len(sys.argv) > 1 else 'build/hw/main/main.net')
-    netlist_gap(path)
-    print(f'BASELINE BIND: {path}: MAX811T U6 monitors +3V3 only; '
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('out', nargs='?', type=Path, default=ROOT / 'build/hw/main',
+                        help='completed main-board receipt directory')
+    args = parser.parse_args()
+    try:
+        lengths = routed_reset_paths(args.out.resolve())
+    except (OSError, ValueError, KeyError) as error:
+        print(f'MB-051 FAIL: board receipt or reset topology: {error}')
+        return 1
+    print(f'BASELINE BIND: {args.out}: MAX811T U6 monitors +3V3 only; '
           'six slot resets have independent 10k pull-ups and TCA9555 controls')
+    print('ROUTED RESET COPPER (mm): ' + ', '.join(
+        f'{name}={lengths[name]:.3f}' for name in sorted(lengths)))
     print('3V3 ±5%% floor %.3f V; MAX811T cold/hot falling threshold 3.00..3.15 V' % THREEV3_MIN)
     if 3.00 < THREEV3_MIN:
         print('FAIL: MAX811T can release below the 3V3 valid floor by %.0f mV' %
               (1000 * (THREEV3_MIN - 3.00)))
+    print('COUNTEREXAMPLE 1: +3V3=3.100 V, +1V2=1.200 V, supervisor '
+          'threshold=3.000 V, manual reset released, hold timer expired: '
+          'nPOR may release while +3V3 is below 3.135 V.')
+    print('COUNTEREXAMPLE 2: +3V3=3.300 V, +1V2=0 V, sysctl absent: '
+          'U6 sees its good rail; U13 powers up with reset outputs as inputs '
+          'and each slot reset has a 10k pull-up. Slots can leave reset '
+          'before +1V2 is good.')
     # TI TPS3890 fixed 3.17 V: ±1% falling accuracy, ≤0.825% hysteresis.
     lo3, hi3 = falling_min(3.17, .01), rising_max(3.17, .01, .00825)
     print('TPS389033 screen: falling >= %.4f V; rising <= %.4f V; '
@@ -83,8 +138,8 @@ def main():
         assert not (cpu or slot) if not (power and g3 and g1 and manual) else True
     print('LOGIC SCREEN: all 64 desired-state combinations keep CPU/slot reset '
           'asserted until both rails, power and manual reset permit release')
-    print('MB-051 OPEN: no fitted dual-rail circuit, cold-off clamps, remote-rail '
-          'bounds or routed DRC evidence')
+    print('MB-051 OPEN: the routed board has no fitted dual-rail qualifier, '
+          'cold-off clamps or remote-rail bounds')
     return 1
 
 

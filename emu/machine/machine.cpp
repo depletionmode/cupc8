@@ -420,7 +420,12 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
   sysctlResetConnected = o.sysctlResetConnected;
   resetButtonConnected = o.resetButtonConnected;
   resetButtonPressed = o.resetButtonPressed;
-  if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
+  if (o.sysctl) {
+    sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
+    // GPIO29 is pulled high when the host's VBUS is absent or its sense
+    // copper is open. The fitted Q1 pulls it low only with host VBUS.
+    sysctl->e.mcu->gpio[29].setInputValue(!o.sysctlHostVbus);
+  }
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {
       auto c = std::make_unique<EspCard>(o.espTx, o.espRx);

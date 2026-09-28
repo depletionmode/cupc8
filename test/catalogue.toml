@@ -2683,11 +2683,65 @@ cmd = "python3 hw/cosim/check_cpu.py"
 [[test]]
 id = "COSIM-003"
 title = "Receipt-bound routed digital co-simulation subset"
-checks = "all eight current board receipts and the routed top agree; main CPU data, IRQ, timer expiry, system USB and IO USB host paths respond to individual copper opens in the native machine; unmodeled nets remain red"
+checks = "all eight current board receipts and the routed top agree; main CPU data, IRQ, timer expiry, system USB, sysctl host-VBUS sense and IO USB host paths respond to individual copper opens in the native machine; unmodeled nets remain red"
 method = "test/hw/test_cosim_routed_subset.py; this is a digital subset, not full E2E-001 or analog SI"
 kind = "sim"
 vrow = "3.1"
 cmd = "python3 test/hw/test_cosim_routed_subset.py"
+
+[[test]]
+id = "COSIM-004"
+title = "Receipt-bound routed storage microSD socket subset"
+checks = "all eight board receipts and the pinned top agree; seven RP2040-to-TF-01A signal paths and their ESD and pull-up branches are traced on the storage board; opening any of the 20 copper branches is detected, and opening any MCU-to-socket path detaches the native SD socket while retaining the card; whole-machine unmodeled nets remain red"
+method = "test/hw/test_cosim_storage_sd.py; digital storage socket continuity only, not SD signal integrity, power return or full SC-051"
+kind = "sim"
+vrow = "3.1"
+cmd = "python3 test/hw/test_cosim_storage_sd.py"
+
+[[test]]
+id = "COSIM-005"
+title = "Receipt-bound e-ink panel supply and signal continuity subset"
+checks = "all eight board receipts validate; the generated top binds routed 3V3-to-panel PTC/fuse output and seven 33-ohm MCU-to-header paths; opening a required supply or signal path detaches the native panel while retaining the card, and opening a TVS branch is detected without detaching the panel; rail voltage, load, return, thermal and EMI gates remain open"
+method = "test/hw/test_cosim_eink_panel.py; canonical top binds binary panel continuity, not full EC-051 or analog EPD rail qualification"
+kind = "sim"
+vrow = "3.1"
+cmd = "python3 test/hw/test_cosim_eink_panel.py"
+
+[[test]]
+id = "COSIM-006"
+title = "Receipt-bound main-board SRAM and ROM route subset"
+checks = "all 60 chipset-to-SRAM/ROM address, data and control paths are traced to package pads; the CPU-card model boots on the routed top; opening the ROM DQ0 copper launch changes execution; this digital subset does not close MB-052"
+method = "test/hw/test_cosim_main_board_subset.py --cpu-only; separate BRG-001/002 tests cover chipset bridge RTL"
+kind = "sim"
+vrow = "3.1"
+cmd = "python3 test/hw/test_cosim_main_board_subset.py --cpu-only"
+
+[[test]]
+id = "FAB-001"
+title = "Plotted Gerber profile contains copper and drill cuts"
+checks = "all eight receipt-bound board fab packages have copper and Excellon round/slot cuts within a closed plotted board profile; synthetic outside copper, round/slot cuts, and open profiles fail"
+method = "tools/fab_profile_containment.py plus synthetic regressions in test/hw/test_fab_profile_containment.py"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 tools/fab_profile_containment.py && python3 test/hw/test_fab_profile_containment.py"
+
+[[test]]
+id = "FAB-002"
+title = "Plotted filled copper and silk regions meet minimum neck width"
+checks = "every filled region on all eight receipt-bound boards' copper and silkscreen Gerbers has a conclusive minimum-neck proof; synthetic 80 um copper/silk necks fail, an exact orthogonal region passes, and a sloped region is deferred rather than passed; any deferred region keeps the gate red"
+method = "tools/fab_neck_coverage.py --require-complete plus synthetic regressions in test/hw/test_fab_neck_coverage.py; complex and holed fills are currently deferred (doc/hardware/filled-neck-and-silk-text-audit-20260928.md)"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 test/hw/test_fab_neck_coverage.py && python3 tools/fab_neck_coverage.py --require-complete"
+
+[[test]]
+id = "SI-005"
+title = "Routed six-slot SPI SCK topology extraction"
+checks = "the main board's /SPI_SCK copper from U7.43 through R36 reaches all six slot receivers with five vias and at least six branch nodes; board and netlist hashes are recorded; an opened J16 copper leg and a wrong R36 value are rejected; the report stays marked invalid for row 4.6 until IBIS analog SI runs"
+method = "test/hw/test_ibis_sck_topology.py over hw/si/ibis_sck_topology.py; topology diagnostic only, not the ngspice/IBIS bus simulation"
+kind = "sim"
+vrow = "4.6"
+cmd = "python3 test/hw/test_ibis_sck_topology.py"
 
 [[test]]
 id = "BUS-005A"

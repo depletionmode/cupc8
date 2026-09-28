@@ -27,11 +27,14 @@ class WifiLimits(unittest.TestCase):
                     self.assertEqual(hashlib.sha256(member.read()).hexdigest(), digest)
 
     def test_esr_and_contact_reach_the_spice_elements(self):
-        deck = buck.wifi_deck('worst', 0.038, 0.135, 0.123, esr=0.5, r_contact=0.4)
+        deck = buck.wifi_deck('worst', 0.038, 0.135, 0.123, esr=0.5,
+                              r_contact=0.4, r_board_return=0.07)
         for name in ('Rcesr1', 'Rcesr2', 'Rcesr3'):
             self.assertIn(name + ' ', deck)
             self.assertRegex(deck, r'(?m)^' + name + r' .* 0\.5$')
-        self.assertRegex(deck, r'(?m)^Rground return 0 0\.523$')
+        self.assertRegex(deck, r'(?m)^Rground return buck_gnd 0\.123$')
+        self.assertRegex(deck, r'(?m)^Rboardreturn buck_gnd 0 0\.47$')
+        self.assertIn('X1 vin fb sw vin buck_gnd', deck)
 
     def test_rail_extrema_use_burst_low_and_startup_high_corners(self):
         time = [0, buck.T_STEP, (buck.T_STEP + buck.T_REL) / 2, buck.T_REL, buck.T_END]

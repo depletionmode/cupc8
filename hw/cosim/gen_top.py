@@ -551,6 +551,57 @@ def system_usb_routes(system, board):
     return orientation, paths, missing
 
 
+def system_usb_vbus_routes(system, board):
+    """Bind the host-VBUS sense switch to the sysctl GPIO29 input."""
+    expected_parts = {'R10': '10k', 'R22': '100k', 'R23': '10k'}
+    for ref, value in expected_parts.items():
+        if system.components.get(ref) != (value, ('Device', 'R')):
+            raise ValueError(f'system USB VBUS: {ref} must be {value}')
+    if system.components.get('Q1') != ('2N7002', ('Transistor_FET', '2N7002')):
+        raise ValueError('system USB VBUS: Q1 must be a 2N7002')
+    expected_nets = {
+        '/USB_VBUS': {('J1', 'A4B9'), ('J1', 'B4A9'), ('R10', '1')},
+        '/VBUS_GATE': {('R10', '2'), ('R22', '1'), ('Q1', '1')},
+        '/USB_nVBUS': {('Q1', '3'), ('R23', '2'), ('U1', '41')},
+    }
+    for net, pins in expected_nets.items():
+        if set(system.nets.get(net, ())) != pins:
+            raise ValueError(f'system USB VBUS: wrong pins on {net}')
+    if node(system, 'R22', '2') != '/GND' or node(system, 'Q1', '2') != '/GND' or \
+            node(system, 'R23', '1') != '/+3V3':
+        raise ValueError('system USB VBUS: sense switch return or pull-up is missing')
+    legs = (
+        ('/USB_VBUS', ('J1', 'A4B9'), ('R10', '1')),
+        ('/USB_VBUS', ('J1', 'B4A9'), ('R10', '1')),
+        ('/VBUS_GATE', ('R10', '2'), ('Q1', '1')),
+        ('/VBUS_GATE', ('R10', '2'), ('R22', '1')),
+        ('/USB_nVBUS', ('Q1', '3'), ('U1', '41')),
+        ('/USB_nVBUS', ('R23', '2'), ('U1', '41')),
+    )
+    loaded_board = parsed_tree = None
+    if board is not None and Path(board).is_file():
+        loaded_board, parsed_tree = cpu_board_geometry(str(Path(board).resolve()))
+    paths, missing = [], []
+    route_lengths = []
+    for net, first, last in legs:
+        mm = None
+        if loaded_board is not None:
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            mm = routed_distances(Path(board), net, first, [last],
+                                  loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                f'{last[0]}.{last[1]}']
+        paths.append({'from': f'system.{first[0]}.{first[1]}',
+                      'to': f'system.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': 'sysctl_usb_vbus_connected'})
+        route_lengths.append(mm)
+        if mm is None:
+            missing.append(f'system:{net.lstrip("/")}_{first[0]}.{first[1]}_to_{last[0]}.{last[1]}_copper')
+    common = all(mm is not None for mm in route_lengths[2:])
+    return {'A': common and route_lengths[0] is not None,
+            'B': common and route_lengths[1] is not None}, paths, missing
+
+
 def io_usb_host_routes(io, board):
     """Bind the keyboard host PHY, series parts, receptacle, and ESD copper."""
     loaded_board = parsed_tree = None
@@ -1394,6 +1445,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['system_usb_complete'] = not usb_missing
     manifest['runtime']['missing_routes'].extend(usb_missing)
     manifest['runtime']['routed_top'] &= not usb_missing
+    vbus_contacts, vbus_paths, vbus_missing = system_usb_vbus_routes(cards['system'], system_board)
+    manifest['paths'].extend(vbus_paths)
+    manifest['runtime']['sysctl_usb_vbus_contacts'] = vbus_contacts
+    manifest['runtime']['sysctl_usb_vbus_connected'] = all(vbus_contacts.values())
+    manifest['runtime']['missing_routes'].extend(vbus_missing)
+    manifest['runtime']['routed_top'] &= not vbus_missing
     circuits = {'main': main, **cards}
     structural = set()
     for connection in manifest['contacts']:
@@ -1454,6 +1511,38 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     for name in epd_contacts:
         runtime_net('eink', name)
         runtime_net('eink', f'{name}_J')
+    # The panel attachment is usable only when its fitted 3V3→PTC→EPD_VCC
+    # feed and the routed signal legs reach the header. This remains a binary
+    # continuity model; it does not claim rail voltage, load, return, thermal,
+    # or signal-integrity qualification.
+    eink_board = card_boards.get('eink') if card_boards else None
+    eink_panel_connected = None
+    if eink_board is not None and Path(eink_board).is_file():
+        from eink_panel import routes as eink_panel_routes
+        eink_panel_connected, eink_panel_paths, eink_panel_missing = eink_panel_routes(
+            cards['eink'], eink_board)
+        manifest['eink_panel_copper'] = {
+            'scope': 'binary panel/header continuity',
+            'paths': eink_panel_paths,
+            'missing': eink_panel_missing,
+        }
+        manifest['paths'].extend({**row, 'runtime': 'eink_panel_link'}
+                                 for row in eink_panel_paths)
+        manifest['runtime']['eink_panel_link'] = eink_panel_connected
+        manifest['runtime']['eink_panel_copper_connected'] = eink_panel_connected
+        manifest['runtime']['missing_routes'].extend(
+            f'eink:{item}' for item in eink_panel_missing)
+        manifest['runtime']['routed_top'] &= not eink_panel_missing
+        if eink_panel_connected:
+            runtime_net('eink', 'EPD_VCC')
+        else:
+            for name in ('EPD_DIN', 'EPD_CLK', 'EPD_nCS', 'EPD_DC',
+                         'EPD_nRST', 'EPD_BUSY', 'EPD_PWR', 'EPD_VCC'):
+                executed.discard(('eink', '/' + name))
+                executed.discard(('eink', '/' + name + '_J'))
+    elif eink_board is not None:
+        manifest['runtime']['eink_panel_link'] = False
+        manifest['runtime']['eink_panel_copper_connected'] = False
     for card in ('gpu', 'io', 'storage', 'wifi', 'eink'):
         for name in ('SCK', 'MOSI', 'CS_n', 'IRQ_n', 'MISO',
                      'MISO_INT' if card == 'wifi' else 'MISO_OUT'):
@@ -1512,6 +1601,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('main', 'nMR')
     if not usb_missing:
         for name in ('USB_DM', 'USB_DM_MCU', 'USB_DP', 'USB_DP_MCU'):
+            runtime_net('system', name)
+    if all(vbus_contacts.values()):
+        for name in ('USB_VBUS', 'VBUS_GATE', 'USB_nVBUS'):
             runtime_net('system', name)
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)

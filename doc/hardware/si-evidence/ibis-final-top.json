@@ -5119,8 +5119,6 @@
       "system:CC2",
       "system:USB_CC1",
       "system:USB_CC2",
-      "system:USB_VBUS",
-      "system:USB_nVBUS",
       "wifi:U0RXD",
       "wifi:U0TXD",
       "wifi:USB_DN",
@@ -5175,7 +5173,6 @@
       "eink:+5V",
       "eink:1V1",
       "eink:3V3",
-      "eink:EPD_VCC",
       "eink:GND",
       "gpu:+5V",
       "gpu:1V1",
@@ -5226,7 +5223,6 @@
       "system:+3V3",
       "system:1V1",
       "system:GND",
-      "system:VBUS_GATE",
       "wifi:+5V",
       "wifi:3V3",
       "wifi:GND"
@@ -5285,6 +5281,201 @@
       "system:PRSNT",
       "wifi:PRSNT"
     ]
+  },
+  "eink_panel_copper": {
+    "missing": [],
+    "paths": [
+      {
+        "from": "J1.A4",
+        "function": "supply",
+        "net": "3V3",
+        "route_mm": 67.76,
+        "to": "F1.1"
+      },
+      {
+        "from": "J1.B4",
+        "function": "supply",
+        "net": "3V3",
+        "route_mm": 67.76,
+        "to": "F1.1"
+      },
+      {
+        "from": "F1.2",
+        "function": "panel-power",
+        "net": "EPD_VCC",
+        "route_mm": 6.718,
+        "to": "J2.1"
+      },
+      {
+        "from": "F1.2",
+        "function": "power-branch",
+        "net": "EPD_VCC",
+        "route_mm": 11.378,
+        "to": "U5.1"
+      },
+      {
+        "from": "F1.2",
+        "function": "power-branch",
+        "net": "EPD_VCC",
+        "route_mm": 5.113,
+        "to": "C20.1"
+      },
+      {
+        "from": "F1.2",
+        "function": "power-branch",
+        "net": "EPD_VCC",
+        "route_mm": 4.933,
+        "to": "C21.1"
+      },
+      {
+        "from": "U1.14",
+        "function": "source",
+        "net": "EPD_DIN",
+        "route_mm": 10.639,
+        "to": "R10.1"
+      },
+      {
+        "from": "R10.2",
+        "function": "header",
+        "net": "EPD_DIN_J",
+        "route_mm": 17.376,
+        "to": "J2.3"
+      },
+      {
+        "from": "R10.2",
+        "function": "tvs-branch",
+        "net": "EPD_DIN_J",
+        "route_mm": 11.426,
+        "to": "U5.2"
+      },
+      {
+        "from": "U1.13",
+        "function": "source",
+        "net": "EPD_CLK",
+        "route_mm": 15.964,
+        "to": "R11.1"
+      },
+      {
+        "from": "R11.2",
+        "function": "header",
+        "net": "EPD_CLK_J",
+        "route_mm": 11.914,
+        "to": "J2.4"
+      },
+      {
+        "from": "R11.2",
+        "function": "tvs-branch",
+        "net": "EPD_CLK_J",
+        "route_mm": 4.384,
+        "to": "U5.4"
+      },
+      {
+        "from": "U1.12",
+        "function": "source",
+        "net": "EPD_nCS",
+        "route_mm": 16.118,
+        "to": "R12.1"
+      },
+      {
+        "from": "R12.2",
+        "function": "header",
+        "net": "EPD_nCS_J",
+        "route_mm": 17.254,
+        "to": "J2.5"
+      },
+      {
+        "from": "R12.2",
+        "function": "tvs-branch",
+        "net": "EPD_nCS_J",
+        "route_mm": 7.318,
+        "to": "U5.5"
+      },
+      {
+        "from": "U1.15",
+        "function": "source",
+        "net": "EPD_DC",
+        "route_mm": 12.334,
+        "to": "R13.1"
+      },
+      {
+        "from": "R13.2",
+        "function": "header",
+        "net": "EPD_DC_J",
+        "route_mm": 12.097,
+        "to": "J2.6"
+      },
+      {
+        "from": "R13.2",
+        "function": "tvs-branch",
+        "net": "EPD_DC_J",
+        "route_mm": 19.839,
+        "to": "U6.1"
+      },
+      {
+        "from": "U1.16",
+        "function": "source",
+        "net": "EPD_nRST",
+        "route_mm": 7.092,
+        "to": "R14.1"
+      },
+      {
+        "from": "R14.2",
+        "function": "header",
+        "net": "EPD_nRST_J",
+        "route_mm": 17.773,
+        "to": "J2.7"
+      },
+      {
+        "from": "R14.2",
+        "function": "tvs-branch",
+        "net": "EPD_nRST_J",
+        "route_mm": 25.721,
+        "to": "U6.2"
+      },
+      {
+        "from": "U1.17",
+        "function": "source",
+        "net": "EPD_BUSY",
+        "route_mm": 10.23,
+        "to": "R15.1"
+      },
+      {
+        "from": "R15.2",
+        "function": "header",
+        "net": "EPD_BUSY_J",
+        "route_mm": 13.529,
+        "to": "J2.8"
+      },
+      {
+        "from": "R15.2",
+        "function": "tvs-branch",
+        "net": "EPD_BUSY_J",
+        "route_mm": 5.45,
+        "to": "U6.4"
+      },
+      {
+        "from": "U1.18",
+        "function": "source",
+        "net": "EPD_PWR",
+        "route_mm": 5.726,
+        "to": "R16.1"
+      },
+      {
+        "from": "R16.2",
+        "function": "header",
+        "net": "EPD_PWR_J",
+        "route_mm": 16.244,
+        "to": "J2.9"
+      },
+      {
+        "from": "R16.2",
+        "function": "tvs-branch",
+        "net": "EPD_PWR_J",
+        "route_mm": 7.796,
+        "to": "U6.5"
+      }
+    ],
+    "scope": "binary panel/header continuity"
   },
   "paths": [
     {
@@ -8655,6 +8846,258 @@
       "route_mm": 9.688,
       "runtime": "system_usb_esd",
       "to": "system.U3.6"
+    },
+    {
+      "from": "system.J1.A4B9",
+      "route_mm": 33.43,
+      "runtime": "sysctl_usb_vbus_connected",
+      "to": "system.R10.1"
+    },
+    {
+      "from": "system.J1.B4A9",
+      "route_mm": 36.801,
+      "runtime": "sysctl_usb_vbus_connected",
+      "to": "system.R10.1"
+    },
+    {
+      "from": "system.R10.2",
+      "route_mm": 5.089,
+      "runtime": "sysctl_usb_vbus_connected",
+      "to": "system.Q1.1"
+    },
+    {
+      "from": "system.R10.2",
+      "route_mm": 3.183,
+      "runtime": "sysctl_usb_vbus_connected",
+      "to": "system.R22.1"
+    },
+    {
+      "from": "system.Q1.3",
+      "route_mm": 35.263,
+      "runtime": "sysctl_usb_vbus_connected",
+      "to": "system.U1.41"
+    },
+    {
+      "from": "system.R23.2",
+      "route_mm": 32.216,
+      "runtime": "sysctl_usb_vbus_connected",
+      "to": "system.U1.41"
+    },
+    {
+      "from": "J1.A4",
+      "function": "supply",
+      "net": "3V3",
+      "route_mm": 67.76,
+      "runtime": "eink_panel_link",
+      "to": "F1.1"
+    },
+    {
+      "from": "J1.B4",
+      "function": "supply",
+      "net": "3V3",
+      "route_mm": 67.76,
+      "runtime": "eink_panel_link",
+      "to": "F1.1"
+    },
+    {
+      "from": "F1.2",
+      "function": "panel-power",
+      "net": "EPD_VCC",
+      "route_mm": 6.718,
+      "runtime": "eink_panel_link",
+      "to": "J2.1"
+    },
+    {
+      "from": "F1.2",
+      "function": "power-branch",
+      "net": "EPD_VCC",
+      "route_mm": 11.378,
+      "runtime": "eink_panel_link",
+      "to": "U5.1"
+    },
+    {
+      "from": "F1.2",
+      "function": "power-branch",
+      "net": "EPD_VCC",
+      "route_mm": 5.113,
+      "runtime": "eink_panel_link",
+      "to": "C20.1"
+    },
+    {
+      "from": "F1.2",
+      "function": "power-branch",
+      "net": "EPD_VCC",
+      "route_mm": 4.933,
+      "runtime": "eink_panel_link",
+      "to": "C21.1"
+    },
+    {
+      "from": "U1.14",
+      "function": "source",
+      "net": "EPD_DIN",
+      "route_mm": 10.639,
+      "runtime": "eink_panel_link",
+      "to": "R10.1"
+    },
+    {
+      "from": "R10.2",
+      "function": "header",
+      "net": "EPD_DIN_J",
+      "route_mm": 17.376,
+      "runtime": "eink_panel_link",
+      "to": "J2.3"
+    },
+    {
+      "from": "R10.2",
+      "function": "tvs-branch",
+      "net": "EPD_DIN_J",
+      "route_mm": 11.426,
+      "runtime": "eink_panel_link",
+      "to": "U5.2"
+    },
+    {
+      "from": "U1.13",
+      "function": "source",
+      "net": "EPD_CLK",
+      "route_mm": 15.964,
+      "runtime": "eink_panel_link",
+      "to": "R11.1"
+    },
+    {
+      "from": "R11.2",
+      "function": "header",
+      "net": "EPD_CLK_J",
+      "route_mm": 11.914,
+      "runtime": "eink_panel_link",
+      "to": "J2.4"
+    },
+    {
+      "from": "R11.2",
+      "function": "tvs-branch",
+      "net": "EPD_CLK_J",
+      "route_mm": 4.384,
+      "runtime": "eink_panel_link",
+      "to": "U5.4"
+    },
+    {
+      "from": "U1.12",
+      "function": "source",
+      "net": "EPD_nCS",
+      "route_mm": 16.118,
+      "runtime": "eink_panel_link",
+      "to": "R12.1"
+    },
+    {
+      "from": "R12.2",
+      "function": "header",
+      "net": "EPD_nCS_J",
+      "route_mm": 17.254,
+      "runtime": "eink_panel_link",
+      "to": "J2.5"
+    },
+    {
+      "from": "R12.2",
+      "function": "tvs-branch",
+      "net": "EPD_nCS_J",
+      "route_mm": 7.318,
+      "runtime": "eink_panel_link",
+      "to": "U5.5"
+    },
+    {
+      "from": "U1.15",
+      "function": "source",
+      "net": "EPD_DC",
+      "route_mm": 12.334,
+      "runtime": "eink_panel_link",
+      "to": "R13.1"
+    },
+    {
+      "from": "R13.2",
+      "function": "header",
+      "net": "EPD_DC_J",
+      "route_mm": 12.097,
+      "runtime": "eink_panel_link",
+      "to": "J2.6"
+    },
+    {
+      "from": "R13.2",
+      "function": "tvs-branch",
+      "net": "EPD_DC_J",
+      "route_mm": 19.839,
+      "runtime": "eink_panel_link",
+      "to": "U6.1"
+    },
+    {
+      "from": "U1.16",
+      "function": "source",
+      "net": "EPD_nRST",
+      "route_mm": 7.092,
+      "runtime": "eink_panel_link",
+      "to": "R14.1"
+    },
+    {
+      "from": "R14.2",
+      "function": "header",
+      "net": "EPD_nRST_J",
+      "route_mm": 17.773,
+      "runtime": "eink_panel_link",
+      "to": "J2.7"
+    },
+    {
+      "from": "R14.2",
+      "function": "tvs-branch",
+      "net": "EPD_nRST_J",
+      "route_mm": 25.721,
+      "runtime": "eink_panel_link",
+      "to": "U6.2"
+    },
+    {
+      "from": "U1.17",
+      "function": "source",
+      "net": "EPD_BUSY",
+      "route_mm": 10.23,
+      "runtime": "eink_panel_link",
+      "to": "R15.1"
+    },
+    {
+      "from": "R15.2",
+      "function": "header",
+      "net": "EPD_BUSY_J",
+      "route_mm": 13.529,
+      "runtime": "eink_panel_link",
+      "to": "J2.8"
+    },
+    {
+      "from": "R15.2",
+      "function": "tvs-branch",
+      "net": "EPD_BUSY_J",
+      "route_mm": 5.45,
+      "runtime": "eink_panel_link",
+      "to": "U6.4"
+    },
+    {
+      "from": "U1.18",
+      "function": "source",
+      "net": "EPD_PWR",
+      "route_mm": 5.726,
+      "runtime": "eink_panel_link",
+      "to": "R16.1"
+    },
+    {
+      "from": "R16.2",
+      "function": "header",
+      "net": "EPD_PWR_J",
+      "route_mm": 16.244,
+      "runtime": "eink_panel_link",
+      "to": "J2.9"
+    },
+    {
+      "from": "R16.2",
+      "function": "tvs-branch",
+      "net": "EPD_PWR_J",
+      "route_mm": 7.796,
+      "runtime": "eink_panel_link",
+      "to": "U6.5"
     }
   ],
   "pulls": [
@@ -9221,6 +9664,7 @@
       true,
       true
     ],
+    "eink_panel_copper_connected": true,
     "eink_panel_link": true,
     "gpo_led_connected": [
       true,
@@ -9394,6 +9838,11 @@
     ],
     "storage_sd_socket": true,
     "sysctl_manual_reset_connected": true,
+    "sysctl_usb_vbus_connected": true,
+    "sysctl_usb_vbus_contacts": {
+      "A": true,
+      "B": true
+    },
     "system_usb_complete": true,
     "system_usb_connected": {
       "A": true,
@@ -9481,6 +9930,7 @@
     "eink:EPD_DIN_J",
     "eink:EPD_PWR",
     "eink:EPD_PWR_J",
+    "eink:EPD_VCC",
     "eink:EPD_nCS",
     "eink:EPD_nCS_J",
     "eink:EPD_nRST",
@@ -9713,6 +10163,9 @@
     "system:USB_DM_MCU",
     "system:USB_DP",
     "system:USB_DP_MCU",
+    "system:USB_VBUS",
+    "system:USB_nVBUS",
+    "system:VBUS_GATE",
     "wifi:CS_n",
     "wifi:IRQ_n",
     "wifi:MISO",
@@ -9923,7 +10376,6 @@
     "eink:1V1",
     "eink:3V3",
     "eink:BOOTSEL",
-    "eink:EPD_VCC",
     "eink:GND",
     "eink:LED_PWR",
     "eink:LED_REFRESH",
@@ -10160,10 +10612,7 @@
     "system:SWDIO",
     "system:USB_CC1",
     "system:USB_CC2",
-    "system:USB_VBUS",
-    "system:USB_nVBUS",
     "system:V1V2_SENSE",
-    "system:VBUS_GATE",
     "system:XIN",
     "system:XOUT",
     "system:XOUT_X",

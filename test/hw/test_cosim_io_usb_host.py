@@ -39,7 +39,7 @@ def main():
     assert connected and not missing and len(paths) == 8
     assert all(path['route_mm'] is not None for path in paths)
     assert top['runtime']['io_usb_host'] is True
-    assert len(top['unmodeled_nets']) == 288
+    assert len(top['unmodeled_nets']) == 284
 
     for ref in ('R14', 'R15'):
         wrong = copy.deepcopy(io)
@@ -74,7 +74,7 @@ def main():
                            args.system_board, args.cpu_board)
             assert mutant['runtime']['io_usb_host'] is (not active)
             assert mutant['runtime']['routed_top'] is False
-            assert len(mutant['unmodeled_nets']) == 292
+            assert len(mutant['unmodeled_nets']) == 288
             for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
                 assert f'io:{name}' in mutant['unmodeled_nets']
             if active:

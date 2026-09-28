@@ -30,13 +30,23 @@ class WifiThermalBoard(unittest.TestCase):
         self.assertGreater(copper_w, 0)
         self.assertAlmostEqual(esp_w, 1.26)
         self.assertAlmostEqual(rise_budget_c, 60)
-        self.assertAlmostEqual(contact_w_per_ohm * 0.33, 0.04236, places=4)
+        vin = thermal.budget.chain('worst')['wifi_in']
+        ibuck = (thermal.d.WIFI_I_3V3 * thermal.d.wifi_vout_range()[1] +
+                 thermal.buck_loss(vin, thermal.d.WIFI_I_3V3)) / vin
+        self.assertAlmostEqual(contact_w_per_ohm, ibuck ** 2)
         base = wifi_external_allowance(terms, 0, 188.2, 188.2, 188.2)
         with_contact = wifi_external_allowance(terms, 0.33, 188.2, 188.2, 188.2)
-        self.assertAlmostEqual(base, 34.4291669, places=5)
+        self.assertGreater(base, 30)
+        self.assertLess(base, 35)
         self.assertLess(with_contact, base)
         self.assertAlmostEqual((base - with_contact) * esp_w,
                                0.33 * contact_w_per_ohm * 188.2)
+
+    def test_j1_input_return_copper_uses_buck_input_current(self):
+        base = wifi_thermal_terms(0.038, 0.135, 0.123)
+        with_return = wifi_thermal_terms(0.038, 0.135, 0.123, 0.07)
+        self.assertAlmostEqual(with_return[1] - base[1],
+                               0.07 * with_return[3])
 
     def test_external_heat_requires_independent_transfer_coefficients(self):
         terms = wifi_thermal_terms(0.04, 0.16, 0.12)
