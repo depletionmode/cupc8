@@ -277,6 +277,38 @@ def cpu_control_routes(main, cpu, main_board, cpu_board):
     return links, paths, missing
 
 
+def sysctl_manual_reset_route(main, system, main_board, system_board):
+    """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
+    system_nodes = {('U1', '35'), ('J2', 'B4')}
+    main_nodes = {('J3', '36'), ('SW1', '1'), ('TP14', '1'), ('U6', '3')}
+    if set(system.nets.get('/SYS_nRST', ())) != system_nodes or \
+            set(main.nets.get('/nMR', ())) != main_nodes or \
+            system.pin_names.get(('U1', '35')) != 'GPIO23' or \
+            main.pin_names.get(('U6', '3')) != '~{MR}' or \
+            system.net('J2', 'B4') != '/SYS_nRST' or \
+            main.net('J3', '36') != '/nMR' or \
+            main.net('SW1', '4') != '/GND':
+        raise ValueError('system reset: wrong GPIO23, mating contact, switch or supervisor MR')
+    links, paths, missing = {'sysctl': True, 'button': True}, [], []
+    for kind, board, pcb, net, first, last in (
+            ('sysctl', 'system', system_board, 'SYS_nRST', ('U1', '35'), ('J2', 'B4')),
+            ('sysctl', 'main', main_board, 'nMR', ('J3', '36'), ('U6', '3')),
+            ('button', 'main', main_board, 'nMR', ('SW1', '1'), ('U6', '3'))):
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            mm = routed_distances(Path(pcb), f'/{net}', first, [last])[
+                f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}',
+                      'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': f'{kind}_manual_reset_connected'})
+        if mm is None:
+            links[kind] = False
+            missing.append(f'{board}:{net}_{kind}_reset_copper')
+    return links, paths, missing
+
+
 @lru_cache(maxsize=2)
 def cpu_board_geometry(path):
     """Reuse CPU copper geometry across each route mutation in one audit."""
@@ -1003,6 +1035,13 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_control_connected'] = cpu_controls
     manifest['runtime']['missing_routes'].extend(control_missing)
     manifest['runtime']['routed_top'] &= not control_missing
+    manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
+        main, cards['system'], pcb, system_board)
+    manifest['paths'].extend(manual_reset_paths)
+    manifest['runtime']['sysctl_manual_reset_connected'] = manual_reset['sysctl']
+    manifest['runtime']['button_manual_reset_connected'] = manual_reset['button']
+    manifest['runtime']['missing_routes'].extend(manual_reset_missing)
+    manifest['runtime']['routed_top'] &= not manual_reset_missing
     circuits = {'main': main, **cards}
     structural = set()
     for connection in manifest['contacts']:
@@ -1088,6 +1127,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             runtime_net('main', contact)
             runtime_net('cpu', contact)
             runtime_net('cpu', source)
+    if manual_reset['sysctl']:
+        runtime_net('system', 'SYS_nRST')
+    if all(manual_reset.values()):
+        runtime_net('main', 'nMR')
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest

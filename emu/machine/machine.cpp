@@ -411,6 +411,9 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
   }
   pwrHi = o.pwrHi;
   porConnected = o.porConnected;
+  sysctlResetConnected = o.sysctlResetConnected;
+  resetButtonConnected = o.resetButtonConnected;
+  resetButtonPressed = o.resetButtonPressed;
   if (o.sysctl) sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {
@@ -465,7 +468,8 @@ uint32_t Machine::inputs(bool por) {
     if (slot <= 6 && slotWiring[slot - 1].irqConnected && card->irq())
       nirq &= ~(1u << slotWiring[slot - 1].irq);
   }
-  const bool reset = sysctl && sysctl->sysReset();
+  const bool reset = (sysctl && sysctlResetConnected && sysctl->sysReset()) ||
+                     (resetButtonConnected && resetButtonPressed);
   // Open source pads have undefined voltage; fixed idle levels expose the
   // disconnected digital path without predicting the physical voltage.
   const uint32_t bridge = (bridgeSourceConnected[0] ? br.sck : 0) |

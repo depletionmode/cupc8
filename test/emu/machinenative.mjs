@@ -120,6 +120,7 @@ export class Machine {
   // forward: port forwards to the Wi-Fi card, ['tcp:8080:80', 'udp:5353:53'];
   // pcap: a file for the Wi-Fi card's network traffic
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false, pwrHi = true,
+    resetButtonPressed = false,
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
@@ -155,6 +156,12 @@ export class Machine {
     if (netlistTop && (typeof netlistTop.runtime.cpu_control_connected?.strobe !== 'boolean' ||
                       typeof netlistTop.runtime.cpu_control_connected?.rw !== 'boolean'))
       throw new Error('machinenative: invalid CPU control route model');
+    if (netlistTop && typeof netlistTop.runtime.sysctl_manual_reset_connected !== 'boolean')
+      throw new Error('machinenative: invalid system manual-reset route model');
+    if (netlistTop && typeof netlistTop.runtime.button_manual_reset_connected !== 'boolean')
+      throw new Error('machinenative: invalid reset-button route model');
+    if (typeof resetButtonPressed !== 'boolean')
+      throw new Error('machinenative: resetButtonPressed must be boolean');
     const gpoLedLinks = netlistTop?.runtime.gpo_led_connected ?? Array(8).fill(true);
     if (!Array.isArray(gpoLedLinks) || gpoLedLinks.length !== 8 ||
         gpoLedLinks.some((connected) => typeof connected !== 'boolean'))
@@ -200,6 +207,9 @@ export class Machine {
       cpuResetConnected: netlistTop?.runtime.cpu_reset_connected ?? true,
       cpuStrobeConnected: netlistTop?.runtime.cpu_control_connected.strobe ?? true,
       cpuRwConnected: netlistTop?.runtime.cpu_control_connected.rw ?? true,
+      sysctlResetConnected: netlistTop?.runtime.sysctl_manual_reset_connected ?? true,
+      resetButtonConnected: netlistTop?.runtime.button_manual_reset_connected ?? true,
+      resetButtonPressed,
       chipsetClockConnected: netlistTop?.runtime.chipset_clock_connected ?? true,
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });

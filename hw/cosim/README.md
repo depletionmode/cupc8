@@ -65,6 +65,21 @@ passes `por_connected` to the native machine's reset input. On the routed
 snapshot the shortest planar path is 88.152 mm; removing the supervisor
 launch track makes `por_connected` false, and the native CPU stays at reset
 PC `$E000` instead of reaching `$E2B9` in the 20 ms probe.
+The system card's manual-reset GPIO23 has its own path from U1.35 to J2.B4,
+then main J3.36 to supervisor U6.3 (`nMR`). The pinned routed receipts measure
+44.378 mm and 56.853 mm for those legs. The local SW1.1 to U6.3 branch
+measures 82.120 mm. The model also checks the mating contact translation,
+reset switch ground and supervisor MR pin.
+With both legs connected, a real sysctl `reset` command produces a low native
+`nRST` interval and clears GPO. Removing either launch track on a private PCB
+copy lets the command complete while `nRST` stays high and GPO stays `$02`;
+each removal restores two strict gaps. A changed RP2040 GPIO pad fails source
+binding. Holding the physical reset button keeps native `nRST` low and GPO
+at `$00`; removing SW1.1's launch leaves the chipset running and restores
+the main `nMR` gap. Both command and button paths are digital; switch bounce, supervisor threshold,
+reset pulse analog timing and the unresolved rail return are outside it.
+`test/hw/test_cosim_sysctl_reset.py` repeats both copper mutations and the
+native command probe.
 The chipset's MEM_nWE pad U7.114 must also connect by KiCad net and routed
 copper to SRAM U9.5 and ROM U10.31. The two independent branch flags gate
 native memory writes. On the routed snapshot the shortest planar branches
@@ -218,10 +233,11 @@ previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
 nets, three CPU reset nets, two chipset oscillator-branch nets and three
-system bridge source nets, the bridge MISO source, 16 main GPO indicator nets
-and six CPU `/STB`/`RW` nets now affect execution; 332 remain unmodeled.
+system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
+six CPU `/STB`/`RW` nets and the two system manual-reset nets now affect
+execution; 330 remain unmodeled.
 The remaining groups are boot/programming (68),
 slot/control bus (32), CPU/memory (41),
-power/return (65), clock/reset (46), indicators (36), external IO (26),
+power/return (65), clock/reset (44), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
