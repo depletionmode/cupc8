@@ -15,9 +15,88 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hw' / 'tools'))
 import fabcheck
 import boardevidence
 import gerberdrc
+import silktextaudit
 
 
 class FabCheckTests(unittest.TestCase):
+    def test_source_silk_text_inventory_and_receipt_binding(self):
+        pcbnew = fabcheck.pcbnew
+        mm = pcbnew.FromMM
+        board = pcbnew.BOARD()
+        board.GetDesignSettings().m_MinSilkTextHeight = mm(.8)
+        word = pcbnew.PCB_TEXT(board)
+        word.SetText('REV')
+        word.SetLayer(pcbnew.F_SilkS)
+        word.SetTextSize(pcbnew.VECTOR2I(mm(.8), mm(.8)))
+        board.Add(word)
+        hidden = pcbnew.PCB_TEXT(board)
+        hidden.SetText('HIDDEN')
+        hidden.SetLayer(pcbnew.F_SilkS)
+        hidden.SetTextSize(pcbnew.VECTOR2I(mm(.4), mm(.4)))
+        hidden.SetVisible(False)
+        board.Add(hidden)
+        fp = pcbnew.FOOTPRINT(board)
+        fp.SetReference('U1')
+        fp.Reference().SetLayer(pcbnew.F_SilkS)
+        fp.Reference().SetTextSize(pcbnew.VECTOR2I(mm(.8), mm(.8)))
+        fp.Value().SetText('PART')
+        fp.Value().SetLayer(pcbnew.B_SilkS)
+        fp.Value().SetVisible(True)
+        fp.Value().SetTextSize(pcbnew.VECTOR2I(mm(1), mm(1)))
+        extra = pcbnew.PCB_TEXT(fp)
+        extra.SetText('MARK')
+        extra.SetLayer(pcbnew.B_SilkS)
+        extra.SetTextSize(pcbnew.VECTOR2I(mm(.8), mm(.8)))
+        fp.Add(extra)
+        board.Add(fp)
+        minimum, entries = silktextaudit.inventory(board)
+        self.assertEqual(minimum, .8)
+        self.assertEqual({item['literal'] for item in entries}, {'REV', 'U1', 'PART', 'MARK'})
+        self.assertEqual({item['kind'] for item in entries},
+                         {'board_text', 'reference', 'value', 'footprint_text'})
+        self.assertEqual({item['layer'] for item in entries}, {'F.Silkscreen', 'B.Silkscreen'})
+        self.assertEqual(len({item['uuid'] for item in entries}), 4)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'card'
+            fab = out / 'fab'
+            fab.mkdir(parents=True)
+            for name in ('evidence.json', 'card.kicad_pcb'):
+                (out / name).write_text(name)
+            for name in ('card-F_Silkscreen.gto', 'card-B_Silkscreen.gbo'):
+                (fab / name).write_text(name)
+            report = Path(tmp) / 'text-review.json'
+            with patch.object(silktextaudit.boardevidence, 'validate', return_value={'version': 1}), \
+                 patch.object(silktextaudit.fabcheck, 'export_parity', return_value=(board, 9)):
+                payload = silktextaudit.audit(out, report)
+            self.assertEqual(payload['count'], 4)
+            self.assertEqual(payload['review_status'], 'pending')
+            self.assertEqual(payload['binding']['receipt_sha256'],
+                             boardevidence.digest(out / 'evidence.json'))
+            self.assertEqual(payload['binding']['parity_layer_count'], 9)
+            with self.assertRaisesRegex(ValueError, 'outside receipt-owned'):
+                silktextaudit.audit(out, fab / 'text-review.json')
+            report.unlink()
+            fp.Value().SetTextSize(pcbnew.VECTOR2I(mm(.799999), mm(.799999)))
+            with patch.object(silktextaudit.boardevidence, 'validate', return_value={'version': 1}), \
+                 patch.object(silktextaudit.fabcheck, 'export_parity', return_value=(board, 9)):
+                with self.assertRaisesRegex(ValueError, 'nominal silk text height'):
+                    silktextaudit.audit(out, report)
+            self.assertFalse(report.exists())
+            fp.Value().SetTextSize(pcbnew.VECTOR2I(mm(1), mm(1)))
+            with patch.object(silktextaudit.boardevidence, 'validate',
+                              side_effect=ValueError('stale board evidence')):
+                with self.assertRaisesRegex(ValueError, 'stale board evidence'):
+                    silktextaudit.audit(out, report)
+            with patch.object(silktextaudit.boardevidence, 'validate', return_value={'version': 1}), \
+                 patch.object(silktextaudit.fabcheck, 'export_parity',
+                              side_effect=ValueError('Gerber geometry differs')):
+                with self.assertRaisesRegex(ValueError, 'Gerber geometry differs'):
+                    silktextaudit.audit(out, report)
+            self.assertFalse(report.exists())
+            board.GetDesignSettings().m_MinSilkTextHeight = mm(.7)
+            with self.assertRaisesRegex(ValueError, 'below 0.800 mm fab rule'):
+                silktextaudit.inventory(board)
+
     def test_gerber_geometry_detects_mutated_coordinate(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'sample-F_Cu.gtl'
