@@ -216,6 +216,7 @@ class Machine {
     bool cpuStrobeConnected = true;  // CPU strobe reaches the chipset through RN5
     bool cpuRwConnected = true;      // CPU read/write reaches the chipset through RN5
     bool cpuReadyConnected = true;   // chipset /RDY reaches CPU through R33
+    bool cpuSyncConnected = true;    // CPU SYNC reaches chipset through RN5
     bool sysctlResetConnected = true; // system GPIO23 reaches supervisor MR
     bool resetButtonConnected = true; // SW1 reaches supervisor MR
     bool resetButtonPressed = false;  // held physical reset switch
