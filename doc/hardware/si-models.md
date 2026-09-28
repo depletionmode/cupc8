@@ -564,22 +564,22 @@ and CPU receipt
 `b61feaf1b9c5538f430a9671d09feccf1bc57b6ac71c2934c38560ae4a586acb`.
 The six SCK and 31 CPU output lengths are identical to the earlier audit.
 The [refreshed routed top](si-evidence/ibis-final-top.json) uses the final
-root `gen_top.py`, current main netlist and seven validated card builds,
-with the saved system routed snapshot. The [receipt bundle](si-evidence/ibis-final-receipts.json)
-records every card receipt/board/netlist hash, the top generator and top
-hashes, source-audit hash and system snapshot hash. Its 310 unmodeled nets are
+root `gen_top.py`, current main netlist, seven validated card builds and the
+canonical receipt-bound system route. The [receipt bundle](si-evidence/ibis-final-receipts.json)
+records all eight board receipt/board/netlist hashes, the system routed-board
+hash, top generator and top hashes, and source-audit hash. Its 292 unmodeled nets are
 the co-simulation coverage count, not a bus SI pass. The two saved 96-case
 ngspice diagnostics above remain bound to the earlier top and assumed line
 models; this refresh does not rerun them. Receiver IBIS, package assignment,
-return paths, routed branch extraction and the canonical system route still
-prevent a physical bus SI claim.
+return paths and routed branch extraction still prevent a physical bus SI
+claim.
 
 From the canonical root checkout, regenerate this receipt-bound source subset:
 
 ```sh
 python3 hw/cosim/gen_top.py --main-netlist build/hw/main/main.net \
   --card-board-dir build/hw \
-  --system-board build/hw-baseline-c429827/system/system-routed.kicad_pcb \
+  --system-board build/hw/system/system-routed.kicad_pcb \
   --cpu-board build/hw/cpu/cpu.kicad_pcb --require-route \
   --output doc/hardware/si-evidence/ibis-final-top.json
 python3 hw/si/ibis_source_audit.py \
@@ -590,7 +590,7 @@ python3 hw/si/ibis_source_audit.py \
   --out doc/hardware/si-evidence/ibis-final-source-audit.json
 python3 hw/si/ibis_route_receipts.py --source-root . \
   --board-dir build/hw \
-  --system-board build/hw-baseline-c429827/system/system-routed.kicad_pcb \
+  --system-board build/hw/system/system-routed.kicad_pcb \
   --top doc/hardware/si-evidence/ibis-final-top.json \
   --source-audit doc/hardware/si-evidence/ibis-final-source-audit.json \
   --top-generator hw/cosim/gen_top.py \

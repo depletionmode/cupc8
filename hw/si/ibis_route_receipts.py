@@ -6,7 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 
-BOARDS = ('main', 'cpu', 'gpu', 'io', 'storage', 'wifi', 'eink')
+BOARDS = ('main', 'cpu', 'gpu', 'io', 'storage', 'wifi', 'eink', 'system')
 
 
 def sha(path):
@@ -28,6 +28,12 @@ def audit(source_root, board_dir, system_board, top_path, source_audit_path,
             'board_sha256': receipt['artifacts'][f'{name}.kicad_pcb'],
             'netlist_sha256': receipt['artifacts'][f'{name}.net'],
         }
+        if name == 'system':
+            routed = build / 'system-routed.kicad_pcb'
+            if (system_board.resolve() != routed.resolve() or
+                receipt['artifacts'].get('system-routed.kicad_pcb') != sha(routed)):
+                raise ValueError('system route is not the receipt-bound canonical artifact')
+            receipts[name]['routed_board_sha256'] = sha(routed)
     source = json.loads(source_audit_path.read_text())
     top = json.loads(top_path.read_text())
     if (source['top_sha256'] != sha(top_path) or
@@ -41,9 +47,9 @@ def audit(source_root, board_dir, system_board, top_path, source_audit_path,
     if not system_board.is_file():
         raise FileNotFoundError(system_board)
     return {
-        'scope': 'current seven-card receipt binding for IBIS source-path audit',
+        'scope': 'current eight-board receipt binding for IBIS source-path audit',
         'board_receipts': receipts,
-        'system_route_snapshot_sha256': sha(system_board),
+        'system_route_sha256': sha(system_board),
         'top_generator_sha256': sha(top_generator),
         'top_sha256': sha(top_path),
         'source_audit_sha256': sha(source_audit_path),
@@ -51,7 +57,6 @@ def audit(source_root, board_dir, system_board, top_path, source_audit_path,
         'unmodeled_nets': len(top['unmodeled_nets']),
         'valid_for_full_bus_si': False,
         'limits': [
-            'system route is a saved routed snapshot, not the in-progress canonical rebuild',
             'waveform diagnostics retain assumed line lengths and loads',
             'receiver IBIS, package assignment, return paths and branch extraction remain open',
         ],
