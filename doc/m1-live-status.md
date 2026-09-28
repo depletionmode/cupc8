@@ -107,6 +107,23 @@ update it after every finding, commit, decision or agent result (David,
   review list); main has 328 THT joints (~$5.7 + $3.5 labour per board, +1
   day). Unconfirmed: 2.5 mm part-to-edge, stencil thickness.
 
+- **David (2026-09-28): ENIG gold fingers accepted** (JLC lists gold fingers
+  only via ENIG; no hard-gold option). At the rebuild: order_spec
+  `finger_finish` "hard gold" -> ENIG, `check_order`, doc/milestone-1.md and
+  the checklist's M4 updated to match; cards mostly stay seated, so tens of
+  insertions is the design life. Revisit hard gold in a later revision.
+- **Panel plan (David agreed direction; implement at the rebuild):** ONE card
+  per panel, not 2-up: JLC's PCBA minimum (2) counts panels, so 2-up would
+  assemble 4 cards. Each card: breakaway frame on the three non-finger sides
+  (fingers stay on the outer edge for the bevel), 5 mm side rails (about 7 mm
+  for the 56 mm system card) and a top frame to reach >= 70 x 70 mm (JLC
+  Standard PCBA) and >= 50 mm (gold fingers, +/-0.1 mm high-precision outline),
+  3 tooling holes (1.5+ mm) + fiducials on the rails, mouse-bite tabs away from
+  the finger edge and the socket-contact sides, no parts near tabs, cut-outs
+  for connectors overhanging the top edge (eink header 6.1, HDMI 1.2, USB-A
+  0.85, USB-C 0.5 mm). Order 2 panels per card type. The panel's Gerbers get
+  the same fab checks as the boards.
+
 ## Everything left before the boards can be ordered
 
 ### A. Engineering in progress or queued (Claude)
