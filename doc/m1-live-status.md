@@ -90,6 +90,23 @@ update it after every finding, commit, decision or agent result (David,
   Special equipment: NanoVNA or LCR with DC bias, uV DMM, 40 C box, HDMI
   capture, USB microscope, thermocouples, 5 A USB-C breakout, >= 4 A load.
 
+- **JLC assembly DFM audit (done):** doc/hardware/jlc-assembly-dfm-audit-20260928.md,
+  `tools/jlc_dfm.py` (test/hw/test_jlc_dfm.py, 7 tests). **Blocks ordering:**
+  (M1) gold fingers need JLC Standard PCBA, min 70x70 mm board/panel, fingers
+  need >= 50 mm both ways: the six 62.0x47.45 mm cards and the 56x56.4 mm
+  system card are too small -> panelize (2 cards side by side, fingers on the
+  outer edge, 5 mm rails with fiducials/tooling holes, a top frame with slots
+  for connectors overhanging the top edge: eink 6.1, gpu HDMI 1.2, io USB-A
+  0.85, system USB-C 0.5 mm). David decision + hw/tools work. (M2) JLC lists
+  gold fingers only via ENIG, no hard-gold option: quote hard gold or accept
+  ENIG (then change the requirement and check_order). Also: Confirm
+  Production File, keep-stencil note, green mask, main-board rails.
+  Issues: solid pour connections -> tombstoning risk on 0402/0603 (77 on main,
+  ~20/card; fix: thermal reliefs); open vias in pads (wifi ESP32 15 GND pads,
+  system Y1 x2, RP2040 EP); io U7 SOT-563 lost its pin-1 silk mark (CPL
+  review list); main has 328 THT joints (~$5.7 + $3.5 labour per board, +1
+  day). Unconfirmed: 2.5 mm part-to-edge, stencil thickness.
+
 ## Everything left before the boards can be ordered
 
 ### A. Engineering in progress or queued (Claude)
