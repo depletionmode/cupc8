@@ -168,6 +168,37 @@ weak cross response. D0/D1 copper between D2 and CK is omitted, so even a
 stable direct-coupling subset will not describe mediation through all four
 TMDS pairs or close `GC-007` or row 4.6.
 
+The [long-window D2](si-evidence/gpu-coupled-d2-long-fixed.json) and
+[CK](si-evidence/gpu-coupled-ck-long-fixed.json) runs retain the same solver
+XML byte-for-byte and use 280,000 steps (26.739748 ns) with two threads.
+Both reached the fixed endpoint with field energy −117.91/−117.90 dB. The
+[independent raw-port audit](si-evidence/gpu-coupled-d2-ck-long-audit.json)
+checks the pinned receipt, model source, solver XML/log, all 16 port files,
+equal passive geometry, passivity and reciprocal cross response. Its maximum
+20–24 ns magnitude drift over four ports and 100 MHz, 480 MHz, 800 MHz and
+1.26 GHz is 0.007174/0.004801 dB, below the 0.05 dB criterion. The maximum
+complex reciprocal difference |S31−S13| is 3.56×10⁻⁷; the largest sampled
+power sum is 1.0000563, below the 1.001 tolerance. These two **D2/CK direct
+copper-coupling subsets pass** their configured numerical gates. The earlier
+180,000-step D2/CK reports remain rejected diagnostics because their 100 MHz
+spectrum had not stabilized.
+
+The [six-model receipt migration](si-evidence/gpu-coupled-final-receipt-migration.json)
+validates the old pinned and final canonical GPU receipts. The PCB bytes
+changed, but the full normalized physical board fingerprint and HDMI routed
+geometry match. Only worktree-absolute 3-D model path prefixes are normalized,
+after checking the referenced model bytes against both receipt sources. For
+all six D0/D1/D2/CK field runs, the checker regenerates the solver XML from
+each board and matches the saved solver-input fingerprint, preserving mesh,
+dielectric, ground, copper, ports and excitation. The final GPU receipt SHA-256
+is `4f88e7226b555e706bccf60dea897a5270186030d8039b2549530beeeb6880d3`;
+its PCB SHA-256 is `bc3d30d31524493858a522ab926fb87264b5b5966c7bc05d10764d0ef3373be5`.
+The saved reports retain the pinned board SHA, and the migration explicitly
+binds their identical modeled inputs to the final receipt. D2/CK copper omits
+D0/D1 pair interaction, pads, mask, connector metal, finite loss and
+source/sink behavior; only two of the four-port excitation columns are
+solved. Full HDMI SI and row 4.6 remain open.
+
 ## IO card USB field model
 
 `hw/si/openems_usb_io.py` reads the completed IO card's actual F.Cu routes

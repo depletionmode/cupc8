@@ -1,0 +1,160 @@
+{
+  "scope": "GPU HDMI D2/CK four-port routed-copper coupling diagnostic",
+  "board_sha256": "0b4ccc5861ee22a050c72747555633ff95e548da51758083b5db74868112f5b4",
+  "gpu_receipt_sha256": "5c7808f1f5294b09e289feb08b5f138583fd5bf411bca826e8ef9410fde42575",
+  "model_source_sha256": "40e24755cfe0c35dfce2d556a46c1290a1f93165df5dcb99fb162352ecc9a175",
+  "excite_pair": "ck",
+  "max_steps": 280000,
+  "solver_threads": 2,
+  "fixed_window": true,
+  "stackup": "JLC04161H-7628",
+  "prepreg_mm": 0.2104,
+  "dielectric_er": 4.4,
+  "material_bounds_mm": [
+    20.7,
+    30.6,
+    -35.5,
+    -26.2
+  ],
+  "pml_inner_bounds_mm": {
+    "x": [
+      20.1,
+      31.2
+    ],
+    "y": [
+      -36.1,
+      -25.6
+    ],
+    "z": [
+      -1,
+      1.5
+    ]
+  },
+  "pml_geometry_ok": true,
+  "grid_lines": {
+    "x": 239,
+    "y": 227,
+    "z": 34
+  },
+  "port_order": [
+    "d2_source",
+    "d2_load",
+    "ck_source",
+    "ck_load"
+  ],
+  "port_ohms": 100,
+  "xml_sha256": "688d6a43b6e5a9129bbb70e1837380966a483711ab7d7423cbb85a0fb6040974",
+  "routes": {
+    "d2": {
+      "/HD_D2P": {
+        "segments": 7,
+        "length_mm_sum": 6.0471
+      },
+      "/HD_D2N": {
+        "segments": 13,
+        "length_mm_sum": 6.666
+      }
+    },
+    "ck": {
+      "/HD_CKP": {
+        "segments": 10,
+        "length_mm_sum": 6.3533
+      },
+      "/HD_CKN": {
+        "segments": 5,
+        "length_mm_sum": 5.9228
+      }
+    }
+  },
+  "geometry_only": false,
+  "full_row_4_6_closed": false,
+  "run_log_sha256": "082eb8b64f9fecb7c1b085b0e721eabccef37f93ef2a098f395eb543c6c6f2dd",
+  "solver_version": "v0.37.0-rc3-1-g65f8771",
+  "simulated_ns": 26.739748,
+  "energy_decay_db": -117.9,
+  "converged": true,
+  "results": [
+    {
+      "frequency_hz": 100000000,
+      "s_reflection_db": {
+        "d2_source": -113.34997806798314,
+        "d2_load": -113.031176101607,
+        "ck_source": -42.11384028827811,
+        "ck_load": -0.0009952397693735564
+      },
+      "power_sum": 0.9998323271533541,
+      "passive_port_incident_ratio": {
+        "d2_source": 2.614275918597085e-07,
+        "d2_load": 6.836753030097665e-08,
+        "ck_load": 3.0594018392797273e-05
+      }
+    },
+    {
+      "frequency_hz": 480000000,
+      "s_reflection_db": {
+        "d2_source": -99.55292962419637,
+        "d2_load": -103.12551846410352,
+        "ck_source": -28.53745002116284,
+        "ck_load": -0.0062342387468030894
+      },
+      "power_sum": 0.9999659527946558,
+      "passive_port_incident_ratio": {
+        "d2_source": 7.044455321895816e-08,
+        "d2_load": 1.4698358804612447e-07,
+        "ck_load": 0.00014530819865736253
+      }
+    },
+    {
+      "frequency_hz": 800000000,
+      "s_reflection_db": {
+        "d2_source": -96.87799095772118,
+        "d2_load": -99.06233367331828,
+        "ck_source": -24.168826551542043,
+        "ck_load": -0.016432610838058803
+      },
+      "power_sum": 1.0000526831620924,
+      "passive_port_incident_ratio": {
+        "d2_source": 2.5649134886996473e-07,
+        "d2_load": 1.1314921629385093e-07,
+        "ck_load": 0.00024053034418275663
+      }
+    },
+    {
+      "frequency_hz": 1260000000,
+      "s_reflection_db": {
+        "d2_source": -91.76051263626746,
+        "d2_load": -95.42418583031619,
+        "ck_source": -20.38365993561485,
+        "ck_load": -0.0398176153504752
+      },
+      "power_sum": 1.0000280441961915,
+      "passive_port_incident_ratio": {
+        "d2_source": 1.0329743082251104e-07,
+        "d2_load": 3.144473291493307e-08,
+        "ck_load": 0.0003777197700312632
+      }
+    }
+  ],
+  "port_window_audit": [
+    {
+      "frequency_hz": 100000000,
+      "maximum_20_to_24ns_magnitude_drift_db": 0.004801192385607282
+    },
+    {
+      "frequency_hz": 480000000,
+      "maximum_20_to_24ns_magnitude_drift_db": 0.0008246229569283443
+    },
+    {
+      "frequency_hz": 800000000,
+      "maximum_20_to_24ns_magnitude_drift_db": 0.0003212802681653845
+    },
+    {
+      "frequency_hz": 1260000000,
+      "maximum_20_to_24ns_magnitude_drift_db": 0.00012015559987154108
+    }
+  ],
+  "passivity_ok": true,
+  "port_consistency_ok": true,
+  "spectral_stability_ok": true,
+  "valid_for_coupled_subset": true
+}
