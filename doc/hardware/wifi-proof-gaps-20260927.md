@@ -25,6 +25,21 @@ is a sensitivity assumption. At `0.18 Ω` with zero extra contact the modeled
 high corner reaches 3.595 V, only 5 mV below the 3.6 V limit; at `0.30 Ω`
 it reaches 3.665 V. A guarantee or bounded assembled impedance is needed.
 
+The deck also sets C1 and C2 to 60% of nominal, or 13.2 µF each. Neither
+the fitted Samsung part's published typical bias curves nor Yageo's C3
+simulation establishes a minimum effective capacitance after DC bias,
+temperature, tolerance, and aging. `POW-003` now records this separately as
+`F7`; passing voltage waveforms at the assumed capacitance do not establish
+the production corner. The input and output capacitor bounds must be applied
+together with ESR and the routed resistance in a new transient run. C3 is
+modeled at its nominal 100 nF; its minimum in circuit needs the same bound.
+
+[Espressif's module datasheet](https://documentation.espressif.com/esp32-c3-mini-1_datasheet_en.html)
+also gives the 350 mA TX figure from 3.3 V, 25 °C measurements at 100% TX
+duty, without a maximum over temperature and production variation. The deck's
+358.3 mA total load combines that figure with estimated LEDs and pull-ups.
+`POW-003` records the missing maximum load-current envelope as `F8`.
+
 ## Ground return in the saved receipt
 
 The filled GND zones specify 0.25 mm minimum fill feature width, 0.5 mm thermal gap,
@@ -91,12 +106,18 @@ PY
 ## Thermal transfer
 
 `thermal.py wifi-card` computes 88.306 mW buck-plus-assigned-copper heat,
-including 36.739 mW copper, and at most 1.26 W ESP TX electrical input as
-heat. With its assumed JEDEC DBV `θJA = 188.2 °C/W`, the buck-only junction
-is 56.62 °C at 40 °C ambient. The remaining 43.38 °C permits at most
-`43.38/1.26 = 34.429 °C/W` ESP-to-buck transfer. This is a *required upper
-bound*, not a computed property of the card. For reference, 40 °C/W transfer
-would add 50.4 °C and bring that model to 107.0 °C. TI reports different
+including 36.739 mW copper, and a 1.26 W ESP TX electrical-input scenario
+assigned wholly to heat. [Espressif's module datasheet](https://documentation.espressif.com/esp32-c3-mini-1_datasheet_en.html)
+reports 350 mA TX peak at 100% duty from measurements at 3.3 V and 25 °C;
+it does not state a guaranteed maximum at the 40 °C board corner. The
+LED and pull-up load estimate is also unqualified. `WC-010` now records the
+missing full-TX power bound as `T4p`. With its assumed JEDEC DBV
+`θJA = 188.2 °C/W`, the buck-only junction is 56.62 °C at 40 °C ambient.
+The remaining 43.38 °C permits at most
+`43.38/1.26 = 34.429 °C/W` ESP-to-buck transfer for that power scenario.
+This is a *conditional required upper bound*, not a computed property of the
+card. For reference, 40 °C/W transfer would add 50.4 °C and bring that model
+to 107.0 °C. TI reports different
 TLV62569 thermal resistances for its JEDEC board and EVM in the
 [EVM guide, table 3](https://www.ti.com/lit/ug/slvuay6/slvuay6.pdf), showing
 that the package `θJA` cannot establish this board's thermal path. A simple
@@ -109,11 +130,16 @@ ESR, contact, and copper heat are bounded. WC-010 therefore remains red.
 ## Closure evidence required
 
 1. Manufacturer production maximum or qualified assembled C1–C3 impedance
-   over the relevant transient spectrum and voltage/temperature/age corners.
+   over the relevant transient spectrum and voltage/temperature/age corners,
+   plus C1/C2/C3 minimum effective capacitance over bias, temperature, tolerance,
+   and age.
 2. Minimum manufactured copper/via properties and a validated extraction or
    four-terminal measurement bounding each pad, finger/socket, and full GND
    return path; then rerun the complete input/rail transient at that bound.
-3. A calibrated board-and-enclosure thermal model or sustained full-TX
+3. A bounded ESP and other card-load power at the final full-TX 40 °C corner,
+   including the conducted current waveform or a conservative RMS envelope.
+   Espressif's 25 °C peak table is a useful operating scenario, not this bound.
+4. A calibrated board-and-enclosure thermal model or sustained full-TX
    measurement that upper-bounds ESP-to-buck transfer and buck self-heating
    in the final stack at 40 °C ambient. The model must include neighboring
    cards and final airflow.

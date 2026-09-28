@@ -236,7 +236,9 @@ fail until their contract coverage exists:
   deck uses 100 mΩ ESR per capacitor as a sensitivity scenario. The path
   scenario is distinct from a solved effective plane resistance. WC-005 keeps
   separate failing checks for a guaranteed ESR maximum and validated pad,
-  spoke and contact resistance. WC-010 owns the thermal transfer gap.
+  spoke and contact resistance. POW-003 also keeps separate failing checks
+  for the assumed C1/C2/C3 effective capacitance and load-current envelope.
+  WC-010 owns the thermal transfer gap.
 - Wi-Fi thermal: WC-010 binds the same routed copper and adds its I²R heat to
   the buck's loss. It computes the maximum permitted ESP32-to-buck thermal
   transfer at 40 C ambient, and remains red until a calibrated board thermal
@@ -258,7 +260,8 @@ fixed-corridor scenario with 152 represented GND vias; the 0.25/0.125 mm
 meshes differ by 1.4%. `wifi_coupling_budget` then allows at most
 34.4 °C/W of ESP32-to-buck transfer at the 40 °C, full-TX corner. A
 calibrated thermal model or a powered-board temperature measurement still
-has to establish a smaller transfer for this layout.
+has to establish a smaller transfer for this layout. That number assumes
+the 25 °C datasheet TX current; a 40 °C full-TX power bound is also needed.
 
 `python3 hw/power/wifi_limits.py build/hw/wifi` reruns the TI transient model
 on that routed board while varying one unknown at a time. The minimum is
@@ -313,15 +316,18 @@ design data. Samsung's [component library terms](https://weblib.samsungsem.com/m
 likewise say its SPICE model is for reference, not a product warranty.
 No guaranteed transient ESR maximum was found for the fitted part. The
 remaining electrical evidence is a manufacturer ESR limit or a controlled
-qualification of the assembled parts, plus a bound for the pad and return
+qualification of the assembled parts, a minimum effective C1/C2/C3
+capacitance over the operating corners, plus a bound for the pad and return
 contacts from calibrated extraction or measurement. Until then WC-005 and
 WC-010 remain red. For WC-010, a **conditional scenario** permits at most
 34.429 °C/W of ESP32-to-buck transfer when the external copper heat is
 assigned the buck's JEDEC θJA. It assigns 88.3 mW to the buck and adjacent
-copper and 1.26 W upper-bounded ESP32 TX heat. The missing input is a
-calibrated board-and-enclosure thermal solution or a powered-board
-measurement at 40 °C ambient and sustained 350 mA TX, including neighboring
-cards and the final airflow. TI's [TLV62569 datasheet](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
+copper and 1.26 W ESP32 TX heat from the 25 °C datasheet current scenario.
+That heat is not a guaranteed maximum at 40 °C. The missing inputs are
+bounded full-TX power and a calibrated board-and-enclosure thermal solution
+or powered-board measurement at 40 °C ambient and the qualified sustained
+TX load, including neighboring cards and final airflow. TI's
+[TLV62569 datasheet](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
 provides DBV θJA 188.2 °C/W and ψJT 31.4 °C/W; these package parameters
 alone do not bound heat transfer from the ESP32 on this board.
 
@@ -367,7 +373,8 @@ The 0.33 Ω electrical scenario already falls below the ESP32's 3.0 V supply
 minimum. The table shows how that same unresolved return path also spends
 thermal headroom. WC-010 now fails separately for the missing return
 resistance and buck/copper/contact transfer bounds (`T4r`) and for the
-missing ESP transfer bound (`T4c`). A qualified four-terminal return
+missing ESP transfer bound (`T4c`) and 40 °C load-power bound (`T4p`).
+A qualified four-terminal return
 measurement or calibrated pad/spoke/via extraction, plus board-and-enclosure
 thermal measurement or calibration at sustained TX, must supply these bounds.
 The [TI TLV62569 thermal metrics](https://www.ti.com/lit/ds/symlink/tlv62569.pdf)
