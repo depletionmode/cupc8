@@ -1278,7 +1278,7 @@ must_fail = ["AssertionError"]
 name = "MB-052 subset: open ROM DQ0 copper remained connected in the native board top"
 fixed_in = "MB-052 receipt-bound memory subset"
 revert = [["hw/cosim/main_memory.py", "top['runtime']['rom_read_d0_connected'] = by_target['MEM_D0', 'U10.13']", "top['runtime']['rom_read_d0_connected'] = True"]]
-cmd = "python3 test/hw/test_cosim_main_board_subset.py --cpu-only"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && python3 test/hw/test_cosim_main_board_subset.py --cpu-only"
 must_fail = ["open ROM DQ0 remained connected in the native top"]
 
 [[bug]]
@@ -1292,5 +1292,5 @@ must_fail = ["plotted copper outside board profile was accepted"]
 name = "COSIM-003 subset: open system-card VBUS sense copper left sysctl USB enabled"
 fixed_in = "sysctl VBUS receipt-bound route binding"
 revert = [["hw/cosim/gen_top.py", "manifest['runtime']['sysctl_usb_vbus_connected'] = all(vbus_contacts.values())", "manifest['runtime']['sysctl_usb_vbus_connected'] = True"]]
-cmd = "python3 test/hw/test_cosim_sysctl_vbus.py --main-netlist build/hw/main/main.net --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb --cpu-board build/hw/cpu/cpu.kicad_pcb --top doc/hardware/si-evidence/ibis-final-top.json"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && python3 test/hw/test_cosim_sysctl_vbus.py --main-netlist build/hw/main/main.net --main-board build/hw/main/main.kicad_pcb --card-board-dir build/hw --system-board build/hw/system/system-routed.kicad_pcb --cpu-board build/hw/cpu/cpu.kicad_pcb --top doc/hardware/si-evidence/ibis-final-top.json"
 must_fail = ["AssertionError"]
