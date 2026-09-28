@@ -152,6 +152,11 @@ export class Machine {
       throw new Error('machinenative: invalid CPU reset path');
     if (netlistTop && typeof netlistTop.runtime.chipset_clock_connected !== 'boolean')
       throw new Error('machinenative: invalid chipset clock path');
+    const gpoLedLinks = netlistTop?.runtime.gpo_led_connected ?? Array(8).fill(true);
+    if (!Array.isArray(gpoLedLinks) || gpoLedLinks.length !== 8 ||
+        gpoLedLinks.some((connected) => typeof connected !== 'boolean'))
+      throw new Error('machinenative: invalid GPO LED route model');
+    m.gpoLedLinks = gpoLedLinks;
     const boardKind = { hdmi: 'gpu', io: 'io', storage: 'storage', wifi: 'wifi',
       eink: 'eink', eink750: 'eink' };
     const boot = netlistTop?.runtime.qspi_boot_connected;
@@ -287,7 +292,10 @@ export class Machine {
   }
 
   state() {
-    return native.state(this.h);
+    const state = native.state(this.h);
+    state.gpoLeds = this.gpoLedLinks.map((connected, bit) =>
+      connected && Boolean(state.gpo & (1 << bit)));
+    return state;
   }
 
   // a whole frame from the GPU's TMDS output: { rgb: Uint32Array(640*480) } or { error }

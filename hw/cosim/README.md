@@ -46,6 +46,19 @@ The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
 reference network before it reaches the chipset's `PWR_HI` pin. The nominal
 trip is 1.289 V on the active CC line; the test drives the 3 A minimum or
 1.5 A maximum CC voltage, so a bad resistor network changes the class.
+The eight main-board GPO indicators have a separate executed digital model.
+For each bit, the generator binds the chipset pad, exact 1 kΩ series part,
+LED anode and grounded cathode to the schematic, then measures both routed
+signal legs. On the current main receipt these measure 34.803–43.741 mm
+from chipset to resistor and 4.401 mm from resistor to LED.
+`Machine.state().gpoLeds[bit]` is high only when that bit of the
+native GPO register is high and both signal legs are connected. Opening a
+GPO1 launch on a private board copy restores two strict coverage gaps and
+turns off only LED 1 in the native 20 ms probe. A changed resistor value
+fails source binding. This models digital indication, not LED current,
+brightness, supply integrity, or the still-unmodeled GND return.
+The focused `test/hw/test_cosim_gpo_led.py` probe checks the source, copper
+and native state mutations against the same routed board and generated top.
 The main-board supervisor U6 reset output must connect to chipset U7's nPOR
 input in the KiCad netlist **and** over measured routed copper. The manifest
 passes `por_connected` to the native machine's reset input. On the routed
@@ -193,9 +206,9 @@ previously uncovered named nets, 45
 reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
 nets, three CPU reset nets, two chipset oscillator-branch nets and three
-system bridge source nets and the bridge MISO source now affect execution;
-354 remain unmodeled. The remaining groups are boot/programming (68),
+system bridge source nets, the bridge MISO source and 16 main GPO indicator
+nets now affect execution; 338 remain unmodeled. The remaining groups are boot/programming (68),
 slot/control bus (32), CPU/memory (47),
-power/return (65), clock/reset (46), indicators (52), external IO (26),
+power/return (65), clock/reset (46), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.

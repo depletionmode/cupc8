@@ -195,6 +195,41 @@ def system_bridge_source_routes(system, board):
     return links, paths, missing
 
 
+def gpo_indicator_routes(main, board):
+    """Bind each native GPO bit to its resistor and grounded LED copper."""
+    routed = board is not None and Path(board).is_file()
+    if routed:
+        sys.path.insert(0, str(ROOT / 'hw/si'))
+        from ibis_bus import routed_distances
+    links, paths, missing = [], [], []
+    for bit in range(8):
+        source_net, led_net = f'/GPO{bit}', f'/LED_GPO{bit}'
+        source = [(ref, pin) for (ref, pin), net in main.pins.items()
+                  if ref == 'U7' and net == source_net]
+        resistor, diode = f'R{60 + bit}', f'D{11 + bit}'
+        if len(source) != 1 or main.components.get(resistor) != ('1k', ('Device', 'R')) or \
+                main.components.get(diode, (None, None))[1] != ('Device', 'LED') or \
+                set(main.nets.get(source_net, ())) != {source[0], (resistor, '1')} or \
+                set(main.nets.get(led_net, ())) != {(resistor, '2'), (diode, '2')} or \
+                main.net(diode, '1') != '/GND':
+            raise ValueError(f'GPO{bit}: expected chipset → 1k resistor → LED anode → GND')
+        connected = True
+        for net, first, last in ((source_net, source[0], (resistor, '1')),
+                                 (led_net, (resistor, '2'), (diode, '2'))):
+            mm = None
+            if routed:
+                mm = routed_distances(Path(board), net, first, [last])[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'main.{first[0]}.{first[1]}',
+                          'to': f'main.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'gpo_led_{bit}'})
+            if mm is None:
+                connected = False
+                missing.append(f'main:{net.lstrip("/")}_gpo_led_copper')
+        links.append(connected)
+    return links, paths, missing
+
+
 @lru_cache(maxsize=2)
 def cpu_board_geometry(path):
     """Reuse CPU copper geometry across each route mutation in one audit."""
@@ -910,6 +945,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         if not any(value == '47k' for _, value in
                    ((r.ref, r.value) for r, other in main.pulls('/+3V3') if other == net)):
             raise ValueError(f'CPU_D{i}: missing weak keeper')
+    gpo_led_links, gpo_led_paths, gpo_led_missing = gpo_indicator_routes(main, pcb)
+    manifest['paths'].extend(gpo_led_paths)
+    manifest['runtime']['gpo_led_connected'] = gpo_led_links
+    manifest['runtime']['missing_routes'].extend(gpo_led_missing)
+    manifest['runtime']['routed_top'] &= not gpo_led_missing
     circuits = {'main': main, **cards}
     structural = set()
     for connection in manifest['contacts']:
@@ -985,6 +1025,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     runtime_net('cpu', 'CPU_nRST')
     runtime_net('main', 'OSC_OUT')
     runtime_net('main', 'CLK12')
+    for bit, connected in enumerate(gpo_led_links):
+        if connected:
+            runtime_net('main', f'GPO{bit}')
+            runtime_net('main', f'LED_GPO{bit}')
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest
