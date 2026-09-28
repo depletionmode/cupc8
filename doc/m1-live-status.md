@@ -24,6 +24,32 @@ update it after every finding, commit, decision or agent result (David,
   explicit step followed by re-pinning `doc/hardware/si-evidence/` (command in
   `doc/hardware/si-models.md`, "ibis_route_receipts.py").
 
+### Interrupted by the weekly API limit (resets Oct 1, 5 pm Asia/Jerusalem)
+
+- **Main-board agent (MB-005 + MB-051), partial, uncommitted, unreviewed:**
+  - `hw/power/design.py`: R_RECEPTACLE assumption now <= 60 mOhm board-side
+    loop + 20 C rise (David's decision) — the downstream power suite has NOT
+    been rerun with it.
+  - `hw/power/reset_supervisor.py`: proposed dual-rail qualifier: REF3425
+    2.500 V reference (U17), OPA2333 as two comparators with resistor
+    hysteresis (U18) on 3V3 and 1V2, BAT54A OR into the MAX811T ~MR, and an
+    SN74LVC07A (U19, on 3V3_STBY) driving the six SLOTn_RST_n from nPOR.
+    Not yet simulated or reviewed (an op-amp used as a comparator needs its
+    output swing/speed checked; LCSC stock unchecked).
+  - `hw/power/copper_mesh.py`: multi-layer rasterized DC resistance of one
+    net's routed copper (for the input path).
+  - `hw/boards/main_seed.py` + `hw/boards/main-route-seed.json`: lock the
+    proven main route (the main board takes Freerouting ~3 h per ordering and
+    completed once, salt 9) outside the areas being re-laid.
+  Resume: review these, finish the input-path copper and the supervisor
+  simulations, then the scratch build.
+- **GPU agent:** stopped before editing anything; relaunch with the same brief
+  (Everything left, A.2).
+- **JLC note text agreed with David:** "Gold fingers follow PCIe CEM r3.0
+  geometry. Do not trim, narrow, shorten or shift any gold finger, and do not
+  change the key notch. If your process requires any change, contact us
+  before production."
+
 ## Everything left before the boards can be ordered
 
 ### A. Engineering in progress or queued (Claude)
