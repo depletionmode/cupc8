@@ -96,9 +96,11 @@ update it after every finding, commit, decision or agent result (David,
    - End to end on the netlist-generated machine: E2E-001, E2E-002, E2E-003,
      E2E-004.
    - MB-051 (item 1).
-   More agents (2026-09-28 late): card power data sourcing (CC/GC/SC/EC/
-   YC-005), BOM lifecycle/stock audit, JLC assembly DFM audit, connector
-   protection review, FAB-002 neck proof, first-article plan
+   PAUSED by David (2026-09-28, no files written yet; relaunch later with
+   the same briefs): card power data sourcing (CC/GC/SC/EC/YC-005),
+   connector protection review, FAB-002 neck proof.
+   More agents (2026-09-28 late): BOM lifecycle/stock audit, JLC assembly DFM
+   audit, first-article plan
    (doc/hardware/first-article-plan.md), JLC order checklist
    (doc/hardware/jlc-order-checklist.md), WIFI-003 investigation.
    Agents now running (launched after David added credits): SI high-speed
