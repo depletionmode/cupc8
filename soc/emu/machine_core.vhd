@@ -28,6 +28,7 @@ entity machine_core is
 		cpu_sync_connected:	in std_logic;
 		cpu_halted_connected:	in std_logic;
 		cpu_waiting_connected:	in std_logic;
+		cpu_irq_connected:	in std_logic_vector(3 downto 0);
 		chipset_clk_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
@@ -68,6 +69,7 @@ architecture rtl of machine_core is
 	signal rw_at_chipset, n_stb_at_chipset, n_rdy_at_cpu, sync_at_chipset: std_logic;
 	signal halted_at_chipset, waiting_at_chipset: std_logic;
 	signal irq: std_logic_vector(3 downto 0);
+	signal irq_at_cpu: std_logic_vector(3 downto 0);
 	signal cpu_clk: std_logic;
 	signal chipset_clk: std_logic;
 	signal cpu_rst_at_pad: std_logic;
@@ -96,6 +98,9 @@ begin
 	-- counterexample for the chipset's bridge status register.
 	halted_at_chipset <= halted when cpu_halted_connected = '1' else '0';
 	waiting_at_chipset <= waiting when cpu_waiting_connected = '1' else '0';
+	-- An open IRQ receiver is undefined in hardware. Low is a deterministic
+	-- counterexample that prevents this interrupt from reaching the CPU.
+	irq_at_cpu <= irq and cpu_irq_connected;
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
@@ -115,7 +120,7 @@ begin
 
 	cpu0: entity work.cpu port map(
 		clk => cpu_clk, n_rst => cpu_rst_at_pad, a => a, d_in => cpu_din, d_out => cpu_dout, d_oe => cpu_doe,
-		rw => rw, n_stb => n_stb, n_rdy => n_rdy_at_cpu, sync => sync, irq => irq, tmr_exp => tmr_exp,
+		rw => rw, n_stb => n_stb, n_rdy => n_rdy_at_cpu, sync => sync, irq => irq_at_cpu, tmr_exp => tmr_exp,
 		halted => halted, waiting => waiting,
 		dbg_pc => dbg_pc, dbg_sp => dbg_sp, dbg_r0 => dbg_r0, dbg_r1 => dbg_r1, dbg_f => fl);
 

@@ -53,6 +53,7 @@ struct MainBoard {
 	bool cpuSyncConnected = true;
 	bool cpuHaltedConnected = true;
 	bool cpuWaitingConnected = true;
+	std::array<uint8_t, 4> cpuIrqConnected{1, 1, 1, 1};
 	bool chipsetClockConnected = true;
 
 	Vmachine_core *top = nullptr;
@@ -101,6 +102,9 @@ struct MainBoard {
 		top->cpu_sync_connected = cpuSyncConnected;
 		top->cpu_halted_connected = cpuHaltedConnected;
 		top->cpu_waiting_connected = cpuWaitingConnected;
+		uint8_t irqConnected = 0;
+		for (unsigned i = 0; i < 4; ++i) irqConnected |= uint8_t(cpuIrqConnected[i] != 0) << i;
+		top->cpu_irq_connected = irqConnected;
 		top->chipset_clk_connected = chipsetClockConnected;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);
