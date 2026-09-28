@@ -83,6 +83,31 @@ Agents, each owning disjoint files; none may rebuild boards in build/hw:
 - Wi-Fi: datasheet data for POW-003/WC-005/WC-010 F5-F8 and a droop-fix proposal
   (doc/hardware/wifi-droop-fix-proposal.md), not applied until boards are deterministic.
 
+- MB-005 requirement: deriving the real input-loop resistance limit from the
+  downstream power checks (doc/hardware/mb005-loop-requirement-derivation.md).
+  David questioned the 20 mΩ assumption (USB-IF allows 50 mΩ per mated
+  contact); the check stays at 20 mΩ until he decides.
+- All five analysis agents hit the weekly API limit once and were resumed
+  (no partial edits were left behind).
+
+### Agent results
+
+- **Card power (done).** No row turned green; all six fail only on their
+  declared `GAPS['power']` in hw/tools/boardcheck.py. New
+  `hw/power/rp2040_vreg.py` + `test/hw/test_rp2040_vreg.py` bind each RP2040
+  card's VREG pins, caps, firmware voltage and clock to the RP2040 datasheet
+  (build 2025-02-20): io/storage/eink/system pass; **gpu fails**: firmware
+  (`fw/rp2040/gpu/main.c:191-193`) sets VREG 1.20 V (1.164-1.236 V at +/-3%)
+  vs DVDD max 1.16 V, and 252 MHz vs 133 MHz documented. Wired into
+  GC/IC/SC/EC/YC-005 cmds. **New David decision:** accept the out-of-datasheet
+  GPU overclock (PicoDVI practice; requirement change + per-unit soak) or
+  change the design. Remaining red needs external data: RP2040 DVDD load-step
+  data, slot contact resistance max, SY6280 fault/limit data (IC-005; part
+  change or requirement rewrite), CPU card items in
+  doc/hardware/cpu-power-proof-gaps-20260928.md.
+- Note: any edit under hw/tools/ changes every board's evidence hash and makes
+  all boards "stale"; such edits must be paired with re-pinning evidence.
+
 ### Next steps
 
 1. Resolve board-build determinism; then re-pin receipts and regenerate the

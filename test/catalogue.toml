@@ -2039,7 +2039,7 @@ checks = "RP2040 at 252 MHz with the VREG bump: rail droop within spec"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
-cmd = "python3 hw/tools/boardcheck.py gpu power"
+cmd = "python3 hw/tools/boardcheck.py gpu power && python3 hw/power/rp2040_vreg.py gpu build/hw/gpu && python3 test/hw/test_rp2040_vreg.py"
 
 [[test]]
 id = "GC-007"
@@ -2128,7 +2128,7 @@ checks = "SY6280 current limit set to ≤ 500 mA; soft start; fault flag on shor
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
-cmd = "python3 hw/tools/boardcheck.py io power"
+cmd = "python3 hw/tools/boardcheck.py io power && python3 hw/power/rp2040_vreg.py io build/hw/io && python3 test/hw/test_rp2040_vreg.py"
 
 [[test]]
 id = "IC-007"
@@ -2306,7 +2306,7 @@ checks = "Current board build: power; missing coverage or stale evidence fails"
 method = "hw/tools/boardcheck.py: content hashes and board checks"
 kind = "static"
 vrow = "4.4"
-cmd = "python3 hw/tools/boardcheck.py storage power"
+cmd = "python3 hw/tools/boardcheck.py storage power && python3 hw/power/rp2040_vreg.py storage build/hw/storage && python3 test/hw/test_rp2040_vreg.py"
 
 [[test]]
 id = "SC-006"
@@ -2403,7 +2403,7 @@ checks = "Current board build: power; missing coverage or stale evidence fails"
 method = "hw/tools/boardcheck.py: content hashes and board checks"
 kind = "static"
 vrow = "4.4"
-cmd = "python3 hw/tools/boardcheck.py eink power"
+cmd = "python3 hw/tools/boardcheck.py eink power && python3 hw/power/rp2040_vreg.py eink build/hw/eink && python3 test/hw/test_rp2040_vreg.py"
 
 [[test]]
 id = "EC-006"
@@ -2500,7 +2500,7 @@ checks = "Current board build: power; missing coverage or stale evidence fails"
 method = "hw/tools/boardcheck.py: content hashes and board checks"
 kind = "static"
 vrow = "4.4"
-cmd = "python3 hw/tools/boardcheck.py system power"
+cmd = "python3 hw/tools/boardcheck.py system power && python3 hw/power/rp2040_vreg.py system build/hw/system && python3 test/hw/test_rp2040_vreg.py"
 
 [[test]]
 id = "YC-006"
