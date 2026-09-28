@@ -25,6 +25,15 @@ SOURCES = {
         'Samsung Electro-Mechanics SpecSheet_CL21A226MAQNNN, issued MAY.09.2024 '
         '(POST /part/download.do, type=specsheet)',
         'https://product.samsungsem.com/mlcc/CL21A226MAQNNN.do'),
+    'samsung-cl21a226maynnn': (
+        'Samsung Electro-Mechanics CL21A226MAYNNN# product page ("Mass Production"), embedded '
+        'characteristic data (DC bias, TCC, |Z|/R; "Precise" model, 25 C, typical)',
+        'https://product.samsungsem.com/mlcc/CL21A226MAYNNN.do'),
+    'samsung-cl21a226maynnn-spec': (
+        'Samsung Electro-Mechanics SpecSheet CL21A226MAYNNNE ("SPECIFICATION (Reference Sheet)"), '
+        'issued NOV.13.2025, section C (POST /part/download.do, masterKey=CL21A226MAYNNN, '
+        'type=specsheet)',
+        'https://product.samsungsem.com/mlcc/CL21A226MAYNNN.do'),
     'yageo-cc0603krx7r9bb104': (
         'YAGEO CC0603KRX7R9BB104 part specsheet (ESR plots are simulation, '
         '"unspecified variations of ESR")',
@@ -46,8 +55,8 @@ SOURCES = {
 }
 
 # ref -> LCSC number this data describes (hw/boards/wifi.py LCSC fields)
-FITTED = {'U1': 'C2911374', 'U2': 'C141836', 'L1': 'C167747', 'C1': 'C45783',
-          'C2': 'C45783', 'C3': 'C14663', 'R9': 'C861412', 'R10': 'C122538'}
+FITTED = {'U1': 'C2911374', 'U2': 'C141836', 'L1': 'C167747', 'C1': 'C602037',
+          'C2': 'C602037', 'C3': 'C14663', 'R9': 'C861412', 'R10': 'C122538'}
 
 CAPACITORS = {
     'C45783': dict(
@@ -66,6 +75,24 @@ CAPACITORS = {
         esr_typ={1e4: 0.0222, 1e5: 0.00434, 5e5: 0.00268, 1.5e6: 0.00388,
                  1e7: 0.0119, 1e8: 0.0446},
         acv_small_signal_typ=-0.2301),        # at 10 mVrms vs the 0.5 Vrms test level
+    # Samsung's named successor, fitted on the Wi-Fi card only (David, 2026-09-28);
+    # the other boards keep C45783 for now
+    'C602037': dict(
+        mpn='CL21A226MAYNNNE', source='samsung-cl21a226maynnn-spec', nominal=22e-6,
+        # guaranteed by the spec sheet
+        tolerance=0.20, tcc=0.15,             # X5R, -55..85 C, no bias
+        df_max_120hz=0.10,                    # 120 Hz, 0.5 Vrms
+        life_c_change=0.125, life_df_max=0.20,  # high-temperature resistance test
+        status='Mass Production',             # L/W/T 2.00/1.25/1.25 +-0.20 mm (MAQ: +-0.15)
+        # as for the MAQ: no maximum ESR and no minimum capacitance under bias
+        esr_max=None, min_effective_c=None,
+        # typical curves from the product page data (volts: fractional change);
+        # more bias loss than the MAQ, lower ESR
+        dcbias_typ={3.0: -0.3263, 3.3: -0.3701, 3.44: -0.3896, 3.6: -0.4109,
+                    4.0: -0.4592, 5.0: -0.5604, 5.25: -0.5813, 5.5: -0.6012},
+        esr_typ={1e4: 0.0182, 1e5: 0.00345, 5e5: 0.00203, 1.5e6: 0.00343,
+                 1e7: 0.0125, 1e8: 0.0352},
+        acv_small_signal_typ=-0.2237),        # at 10 mVrms vs the 0.5 Vrms test level
     'C14663': dict(
         mpn='CC0603KRX7R9BB104', source='yageo-cc0603krx7r9bb104', nominal=100e-9,
         tolerance=0.10, tcc=0.15, df_max=0.035,

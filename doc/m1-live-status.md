@@ -132,7 +132,14 @@ update it after every finding, commit, decision or agent result (David,
   >= 1 uF survives 0402 DC bias): hw/boards/cpu.py, cpu_board.py,
   thermal_bind.py updated; test_board_thermal's core-current test fails until
   the CPU rebuild (built netlist still 1u). Wi-Fi C1/C2 C45783 -> C602037
-  (Wi-Fi only; agent running). Panel: one card per panel (see above).
+  (Wi-Fi only; done, uncommitted until now): Samsung spec sheet NOV.13.2025
+  guarantees match the MAQ (+/-20 %, X5R, 25 V, DF <= 0.1); its typical DC-bias
+  loss is larger (-41.1 % at 3.6 V vs -36.3 %). With the 0.1 % divider:
+  burst min 3.066 V (+66 mV), max 3.580 V (**+20 mV**, was +33 mV with the
+  MAQ). Passes, but the overshoot margin is thin; option: the proposal's
+  optional second 22 uF on 3V3. JLC 79,508 in stock (extended).
+  test_wifi_parts: 11/12; the fixture-netlist test fails until the Wi-Fi
+  rebuild (built netlist still lists C45783/C25818/C25803). Panel: one card per panel (see above).
 
 ## Everything left before the boards can be ordered
 

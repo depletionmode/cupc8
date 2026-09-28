@@ -42,8 +42,8 @@ def schematic(path, footprint_libs):
     def passive(kind, ref, val, fp, lcsc, at, rot=90):
         return s.add("Device:" + kind, ref, val, fp, at=at, rot=rot, fields={"LCSC": lcsc})
 
-    c1 = passive("C", "C1", "22u", C0805, "C45783", (60 * G, 26 * G))      # buck in
-    c2 = passive("C", "C2", "22u", C0805, "C45783", (86 * G, 26 * G))      # buck out / module bulk
+    c1 = passive("C", "C1", "22u", C0805, "C602037", (60 * G, 26 * G))     # buck in (CL21A226MAYNNNE; MAQ C45783 is NRND)
+    c2 = passive("C", "C2", "22u", C0805, "C602037", (86 * G, 26 * G))     # buck out / module bulk
     c3 = passive("C", "C3", "100n", C0603, "C14663", (100 * G, 26 * G))    # at the module's 3V3 pin
     c4 = passive("C", "C4", "100n", C0603, "C14663", (80 * G, 90 * G))     # buffer VCC
     c5 = passive("C", "C5", "1u", C0603, "C15849", (90 * G, 70 * G))       # EN delay (Espressif: 10k/1u)

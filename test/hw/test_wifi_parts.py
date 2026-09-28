@@ -33,11 +33,20 @@ class WifiParts(unittest.TestCase):
             path = fixture_netlist(tmp)
             text = path.read_text()
             # C2 swapped for another 22 uF part: its data no longer applies
-            swapped = re.sub(r'(\(ref "C2"\)(?:(?!\(comp).)*?\(name "LCSC"\) ")C45783"',
-                             r'\1C602037"', text, count=1, flags=re.S)
+            swapped = re.sub(r'(\(ref "C2"\)(?:(?!\(comp).)*?\(name "LCSC"\) ")C\d+"',
+                             r'\1C99999"', text, count=1, flags=re.S)
             self.assertNotEqual(swapped, text)
             path.write_text(swapped)
-            self.assertEqual(wp.binding_errors(path), [('C2', 'C45783', 'C602037')])
+            self.assertIn(('C2', wp.FITTED['C2'], 'C99999'), wp.binding_errors(path))
+
+    def test_wifi_card_fits_the_samsung_successor(self):
+        # David, 2026-09-28: CL21A226MAYNNNE replaces the NRND MAQ on the Wi-Fi card
+        for ref in ('C1', 'C2'):
+            self.assertEqual(wp.FITTED[ref], 'C602037')
+        self.assertEqual(wp.CAPACITORS['C602037']['mpn'], 'CL21A226MAYNNNE')
+        board = (ROOT / 'hw/boards/wifi.py').read_text()
+        for ref in ('C1', 'C2'):
+            self.assertRegex(board, r'passive\("C", "%s", "22u", C0805, "C602037"' % ref)
 
     def test_every_part_cites_a_source(self):
         for part in list(wp.CAPACITORS.values()) + [wp.TLV62569, wp.ESP32_C3]:
@@ -53,18 +62,30 @@ class WifiParts(unittest.TestCase):
         self.assertFalse(wp.load_envelope_bounded())
 
     def test_vout_range_includes_tolerance_tcr_and_vfb_temperature(self):
-        lo, hi = wp.vout_range()
+        lo, hi = wp.vout_range('C25818', 'C25803')  # the old 1 % divider
         t = 0.01 + 100e-6 * 75                      # 1 %, 100 ppm/C, 25 -> 100 C
         self.assertAlmostEqual(lo, 0.588 * 0.997 * (1 + 4.53 * (1 - t) / (1 + t)))
         self.assertAlmostEqual(hi, 0.612 * 1.003 * (1 + 4.53 * (1 + t) / (1 - t)))
         plo, phi = wp.vout_range('C861412', 'C122538')
+        t = 0.001 + 25e-6 * 75                      # 0.1 %, 25 ppm/C
+        self.assertAlmostEqual(plo, 0.588 * 0.997 * (1 + 4.53 * (1 - t) / (1 + t)))
+        self.assertAlmostEqual(phi, 0.612 * 1.003 * (1 + 4.53 * (1 + t) / (1 - t)))
         self.assertGreater(plo, lo)
         self.assertLess(phi, hi)
+        self.assertEqual(wp.vout_range(), (plo, phi))   # fitted: the 0.1 % divider
 
     def test_stress_capacitance_uses_the_next_tabulated_bias(self):
         c = wp.stress_capacitance('C45783', 3.45)   # -> the 3.6 V point
         self.assertAlmostEqual(c, 22e-6 * 0.8 * (1 - 0.3625) * 0.85 * 0.875)
         self.assertLess(wp.stress_capacitance('C45783', 5.5), c)
+        may = wp.CAPACITORS['C602037']
+        self.assertAlmostEqual(wp.stress_capacitance('C602037', 3.45),
+                               22e-6 * 0.8 * (1 - 0.4109) * 0.85 * (1 - may['life_c_change']))
+
+    def test_typical_only_successor_data_stays_typical(self):
+        may = wp.CAPACITORS['C602037']
+        self.assertIsNone(may['esr_max'])
+        self.assertIsNone(may['min_effective_c'])
 
 
 class TiModelGround(unittest.TestCase):
