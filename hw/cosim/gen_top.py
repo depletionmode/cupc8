@@ -277,6 +277,36 @@ def cpu_control_routes(main, cpu, main_board, cpu_board):
     return links, paths, missing
 
 
+def cpu_ready_route(main, cpu, main_board, cpu_board):
+    """Bind chipset /RDY through R33 and both boards to the CPU FPGA pad."""
+    source, series_in = ('U7', '28'), ('R33', '1')
+    series_out, socket = ('R33', '2'), ('J2', 'B19')
+    finger, receiver = ('J1', 'B19'), ('U1', '24')
+    if main.components.get('R33') != ('33', ('Device', 'R')) or \
+            set(main.nets.get('/CPU_nRDY_SRC', ())) != {source, series_in} or \
+            set(main.nets.get('/CPU_nRDY', ())) != {series_out, socket} or \
+            set(cpu.nets.get('/CPU_nRDY', ())) != {finger, receiver} or \
+            path(main, source, socket, '33') != 'R33':
+        raise ValueError('CPU /RDY: wrong chipset source, R33, socket or CPU pad')
+    paths, missing = [], []
+    for board, pcb, net, first, last in (
+            ('main', main_board, 'CPU_nRDY_SRC', source, series_in),
+            ('main', main_board, 'CPU_nRDY', series_out, socket),
+            ('cpu', cpu_board, 'CPU_nRDY', finger, receiver)):
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            mm = routed_distances(Path(pcb), f'/{net}', first, [last])[
+                f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}',
+                      'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': 'cpu_ready_connected'})
+        if mm is None:
+            missing.append(f'{board}:{net}_cpu_ready_copper')
+    return not missing, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1035,6 +1065,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_control_connected'] = cpu_controls
     manifest['runtime']['missing_routes'].extend(control_missing)
     manifest['runtime']['routed_top'] &= not control_missing
+    ready_connected, ready_paths, ready_missing = cpu_ready_route(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['paths'].extend(ready_paths)
+    manifest['runtime']['cpu_ready_connected'] = ready_connected
+    manifest['runtime']['missing_routes'].extend(ready_missing)
+    manifest['runtime']['routed_top'] &= not ready_missing
     manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
         main, cards['system'], pcb, system_board)
     manifest['paths'].extend(manual_reset_paths)
@@ -1127,6 +1163,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             runtime_net('main', contact)
             runtime_net('cpu', contact)
             runtime_net('cpu', source)
+    if ready_connected:
+        runtime_net('main', 'CPU_nRDY_SRC')
+        runtime_net('main', 'CPU_nRDY')
+        runtime_net('cpu', 'CPU_nRDY')
     if manual_reset['sysctl']:
         runtime_net('system', 'SYS_nRST')
     if all(manual_reset.values()):

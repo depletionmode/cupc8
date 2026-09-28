@@ -116,6 +116,17 @@ as a deterministic digital counterexample; the physical open-pad voltage,
 edge timing and resistor/trace analog margin remain unmodeled. The focused
 `test/hw/test_cosim_cpu_controls.py` probe checks source value, copper and
 native execution mutations.
+The CPU `/RDY` return is a separate three-leg input path: chipset U7.28 to
+R33.1, R33.2 to main J2.B19, then CPU J1.B19 to FPGA U1.24. On the pinned
+main and CPU boards those legs measure 8.306, 76.769 and 24.103 mm.
+The generator checks the exact 33 Ω series part and both connector contacts;
+the native RTL consumes the complete-route flag at the FPGA input. Removing
+each leg in turn on a private board copy restores all three strict gaps and
+stalls the native CPU at `$E000`/GPO `$00` instead of `$E2B9`/`$02`.
+Changing R33's source value also fails binding. The open-input logic high is
+a deterministic counterexample: open-pad voltage, `/RDY` propagation delay and
+signal edge quality remain outside this digital model. The focused probe is
+`test/hw/test_cosim_cpu_ready.py`.
 The CPU clock follows Y1.3 to R18.1 (5.937 mm), the routed 33 Ω output
 to socket J2.B13 (60.564 mm), then the CPU card's J1.B13 to FPGA U1.21
 (31.218 mm). Opening the FPGA clock launch holds the native CPU
@@ -234,10 +245,10 @@ reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
 nets, three CPU reset nets, two chipset oscillator-branch nets and three
 system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
-six CPU `/STB`/`RW` nets and the two system manual-reset nets now affect
-execution; 330 remain unmodeled.
+six CPU `/STB`/`RW` nets, three CPU `/RDY` nets and the two system manual-reset
+nets now affect execution; 327 remain unmodeled.
 The remaining groups are boot/programming (68),
-slot/control bus (32), CPU/memory (41),
+slot/control bus (32), CPU/memory (38),
 power/return (65), clock/reset (44), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
