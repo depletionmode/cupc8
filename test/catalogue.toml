@@ -1317,6 +1317,7 @@ checks = "an injected divergence is detected and reported at the right line"
 method = "test/host/test_lockstep.py: lockstep.py --inject corrupts one DUT trace line (a state line and a write line); the report must name that line"
 kind = "sim"
 vrow = "1.2"
+cmd = "python3 test/host/test_lockstep.py"
 
 [[test]]
 id = "HOST-004"
@@ -1330,7 +1331,6 @@ cmd = "python3 test/host/test_jlc_production_diff.py"
 # ============================================================================
 # E2E: whole system (co-sim wired from the KiCad netlists)
 # ============================================================================
-cmd = "python3 test/host/test_lockstep.py"
 
 [[test]]
 id = "E2E-001"
