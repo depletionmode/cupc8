@@ -2,7 +2,7 @@
   "scope": "pinned vendor IBIS source and current main/CPU FPGA source-path audit",
   "ibis_sha256": "8acc5bf6bc90d6956b80d5e688b7bc47a48386b127533702c8d5f328a57390c9",
   "pinout_sha256": "f93acd663a6e62441cae3fe552c0fbe25e34fe9923ee475e84108f9645fbd71e",
-  "top_sha256": "8d79e8547d45649c7fc539192c430f7319c6e17de5be92650cf278c09f71434f",
+  "top_sha256": "dc4260220b5e348fa62065e7cb49c08f7fad455beeb3b0d551726127ca14e6c8",
   "receipts": {
     "main": {
       "receipt_sha256": "2b29afec3aaee9794b7d805f2d82ad89d122e143ddde6119174030fc5e7c2605",
