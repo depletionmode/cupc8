@@ -80,6 +80,19 @@ the main `nMR` gap. Both command and button paths are digital; switch bounce, su
 reset pulse analog timing and the unresolved rail return are outside it.
 `test/hw/test_cosim_sysctl_reset.py` repeats both copper mutations and the
 native command probe.
+
+The system card's USB CDC PHY reaches both Type-C orientations through two
+27 Ω series resistors. U1.46/R3 carries D− to J1.A7/B7; U1.47/R2 carries
+D+ to J1.A6/B6. U3's four ESD pads are checked as separate routed branches.
+All ten copper legs are present on the pinned board (6.302–15.012 mm).
+A native sysctl `ping` succeeds through either orientation. Removing either
+PHY launch or a contact launch disables the affected orientation's host
+port while leaving the sysctl firmware and CPU running. The opposite
+orientation still works after a single contact open. A missing ESD branch
+restores strict coverage gaps because protection routing is incomplete;
+it does not itself disable the host port. This model covers USB continuity,
+not eye quality, surge behavior or connector contact resistance.
+
 The chipset's MEM_nWE pad U7.114 must also connect by KiCad net and routed
 copper to SRAM U9.5 and ROM U10.31. The two independent branch flags gate
 native memory writes. On the routed snapshot the shortest planar branches
@@ -146,6 +159,10 @@ The routed three-leg lengths are 10.873/35.321/49.898 mm for `HALTED` and
 bridge status bit `$02` observable; a `STI; WAI` ROM makes bit `$04`
 observable. Opening any one of the six real launch tracks on a private PCB
 copy removes its status bit while the CPU itself remains in the same state.
+Each open restores three strict gaps. A changed RN8 value fails source
+binding. The open receiver is held low for a deterministic digital
+counterexample; voltage, propagation and metastability are unmodeled.
+`test/hw/test_cosim_cpu_status.py` checks both source and runtime mutations.
 
 The main-board CPU data source is now checked independently of the CPU-card
 data link. Each U7 data output must reach its exact R21–R28 33 Ω input pad;
@@ -179,10 +196,6 @@ main J2.B41/B43, and chipset U7.136/129. The routed legs measure
 An open on any of the six legs prevents that timer's pulse from reaching
 the chipset's `IRQ_PEND` latch in the digital counterexample. Timer 0/1
 handler probes then stay at GPO `$11` instead of `$A1`/`$A2`.
-Each open restores three strict gaps. A changed RN8 value fails source
-binding. The open receiver is held low for a deterministic digital
-counterexample; voltage, propagation and metastability are unmodeled.
-`test/hw/test_cosim_cpu_status.py` checks both source and runtime mutations.
 The CPU clock follows Y1.3 to R18.1 (5.937 mm), the routed 33 Ω output
 to socket J2.B13 (60.564 mm), then the CPU card's J1.B13 to FPGA U1.21
 (31.218 mm). Opening the FPGA clock launch holds the native CPU
@@ -304,10 +317,10 @@ system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
 six CPU `/STB`/`RW` nets, three CPU `/RDY` nets, three CPU `SYNC` nets,
 six CPU `HALTED`/`WAITING` nets and the two system manual-reset nets now affect
 execution; eight main-board CPU data source nets and twelve CPU IRQ nets also
-affect execution; six CPU timer-expiry nets also affect execution; 292 remain
+affect execution; six CPU timer-expiry nets and four system USB nets also affect execution; 288 remain
 unmodeled.
 The remaining groups are boot/programming (68),
 slot/control bus (32), CPU/memory (3),
-power/return (65), clock/reset (44), indicators (36), external IO (26),
+power/return (65), clock/reset (44), indicators (36), external IO (22),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
