@@ -47,7 +47,7 @@ SOURCES = {
 
 # ref -> LCSC number this data describes (hw/boards/wifi.py LCSC fields)
 FITTED = {'U1': 'C2911374', 'U2': 'C141836', 'L1': 'C167747', 'C1': 'C45783',
-          'C2': 'C45783', 'C3': 'C14663', 'R9': 'C25818', 'R10': 'C25803'}
+          'C2': 'C45783', 'C3': 'C14663', 'R9': 'C861412', 'R10': 'C122538'}
 
 CAPACITORS = {
     'C45783': dict(

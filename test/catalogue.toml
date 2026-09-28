@@ -1526,6 +1526,14 @@ vrow = "4.7"
 cmd = "python3 -m unittest test/test_key_mating.py && python3 hw/mech/fit.py --check MECH-001"
 
 [[test]]
+id = "MECH-101"
+title = "First article: card key and fingers in the real sockets"
+checks = "before the full run, on first-article cards of every type: each card inserts fully in its socket type (x1 UMAX C404113, x8 UMAX C404111, x4 SOFNG C19188869) by hand, without force, key rib in the notch; reversed insertion is blocked by the key; continuity from A11/A12/B11/B12 to the socket's matching contacts; no finger trimmed or lifted, and no copper or gold exposed at the notch walls under magnification; measured notch width and notch-wall-to-finger gap on both faces"
+method = "manual, recorded in bringup.md: calipers or optical measurement, 10x+ loupe or microscope, meter on the socket's solder tails"
+kind = "hw"
+vrow = "5"
+
+[[test]]
 id = "MECH-002"
 title = "Finger bevel and card thickness vs PCIe CEM"
 checks = "each card's fab/order.json: thickness in 1.57 +/- 0.13, hard gold, bevel in CEM's 20 +/- 5 deg"
@@ -1651,7 +1659,7 @@ cmd = "python3 hw/power/ldo.py 1v2"
 [[test]]
 id = "POW-003"
 title = "Wi-Fi card TLV62569 buck: ESP32-C3 TX burst, dropout"
-checks = "with the card as built (U2 TLV62569, L1 2.2 uH, 22 uF in, 22 uF + 100 nF out, R9/R10 453k/100k at 1 %) at the typical and worst-case slot +5V: ESP32-C3 supply >= 3.0 V through a 350 mA TX burst at the DC low corner, <= 3.6 V through start-up, light load and the burst's release at the DC high corner, and the card's +5V in the burst covers VOUT + I x (RDS(on) hot + DCR)"
+checks = "with the card as built (U2 TLV62569, L1 2.2 uH, 22 uF in, 22 uF + 100 nF out, R9/R10 453k/100k at 0.1 %, 25 ppm/C) at the typical and worst-case slot +5V: ESP32-C3 supply >= 3.0 V through a 350 mA TX burst at the DC low corner, <= 3.6 V through start-up, light load and the burst's release at the DC high corner, and the card's +5V in the burst covers VOUT + I x (RDS(on) hot + DCR)"
 method = "hw/power/buck.py wifi-card: TI's TLV62569 model fed through the whole source-to-card chain"
 kind = "sim"
 vrow = "4.4"

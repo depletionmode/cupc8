@@ -47,8 +47,8 @@ def schematic(path, footprint_libs):
     c3 = passive("C", "C3", "100n", C0603, "C14663", (100 * G, 26 * G))    # at the module's 3V3 pin
     c4 = passive("C", "C4", "100n", C0603, "C14663", (80 * G, 90 * G))     # buffer VCC
     c5 = passive("C", "C5", "1u", C0603, "C15849", (90 * G, 70 * G))       # EN delay (Espressif: 10k/1u)
-    r9 = passive("R", "R9", "453k", R0603, "C25818", (60 * G, 38 * G))     # feedback: 0.6 V x (1 + 453/100) = 3.32 V
-    r10 = passive("R", "R10", "100k", R0603, "C25803", (60 * G, 46 * G))
+    r9 = passive("R", "R9", "453k", R0603, "C861412", (60 * G, 38 * G))     # feedback: 0.6 V x (1 + 453/100) = 3.32 V
+    r10 = passive("R", "R10", "100k", R0603, "C122538", (60 * G, 46 * G))
     r1 = passive("R", "R1", "10k", R0603, "C25804", (90 * G, 60 * G))      # EN pull-up
     r2 = passive("R", "R2", "10k", R0603, "C25804", (136 * G, 14 * G), rot=0)     # GPIO9 boot strap: normal boot
     r3 = passive("R", "R3", "10k", R0603, "C25804", (136 * G, 30 * G), rot=0)     # GPIO8 strap high

@@ -397,6 +397,51 @@ class FabCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'trace width'):
                 gerberdrc.check_clearance([copper], .15, .1)
 
+    def test_key_notch_fingers_alone_get_jlc_edge_minimum(self):
+        # A CEM-like tab: card edge at y=0, key notch walls at x=2 and x=4.
+        # A11 left of the notch, A12 right of it (0.70 x 4.30 ConnectorPad).
+        with tempfile.TemporaryDirectory() as tmp:
+            fab = Path(tmp)
+            copper = fab / 'card-B_Cu.gbl'
+            edge = fab / 'card-Edge_Cuts.gm1'
+            edge.write_text('%TF.FileFunction,Profile,NP*%\n%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                            '%ADD10C,0.100000*%\nD10*\n'
+                            'X-3000000Y0D02*\nX2000000Y0D01*\nX2000000Y8000000D01*\n'
+                            'X4000000Y8000000D01*\nX4000000Y0D01*\nX9000000Y0D01*\nM02*\n')
+
+            def board(a11_gap=.20, row_y=3.45, extra=''):
+                a11 = round((2 - .35 - a11_gap) * 1e6)
+                return ('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                        '%TA.AperFunction,ConnectorPad*%\n%ADD10R,0.700000X4.300000*%\n%TD*%\n'
+                        '%TA.AperFunction,SMDPad,CuDef*%\n%ADD11R,0.200000X0.200000*%\n%TD*%\n'
+                        'D10*\n'
+                        f'%TO.P,J1,A11*%\n%TO.N,/GND*%\nX{a11}Y{round(row_y * 1e6)}D03*\n'
+                        f'%TO.P,J1,A12*%\n%TO.N,/A12*%\nX4550000Y{round(row_y * 1e6)}D03*\n%TD*%\n'
+                        + extra + 'M02*\n')
+            copper.write_text(board())                       # both fingers 0.20 from the notch
+            self.assertEqual(gerberdrc.check_edge([copper], edge, .3), 2)
+            copper.write_text(board(a11_gap=.19))
+            with self.assertRaisesRegex(ValueError, r'0\.190000 mm < 0\.200000 mm \(key-notch finger A11\)'):
+                gerberdrc.check_edge([copper], edge, .3)
+            # a finger 0.25 from a cut that is not the notch (the card edge)
+            copper.write_text(board(a11_gap=.5, row_y=2.40))
+            with self.assertRaisesRegex(ValueError, r'/GND copper-to-edge lower bound 0\.250000 mm < 0\.300000 mm$'):
+                gerberdrc.check_edge([copper], edge, .3)
+            # non-finger copper 0.25 from the notch wall: an SMD pad, even one named A11
+            # (the named pair J2 A11/A12 straddles the notch like the fingers do)
+            partner = '%TO.P,J2,A12*%\n%TO.N,/Y*%\nX5000000Y6000000D03*\n%TD*%\n'
+            for label, attributes, more in (('SMD pad', '', ''),
+                                            ('SMD pads named A11/A12', '%TO.P,J2,A11*%\n', partner)):
+                with self.subTest(label):
+                    copper.write_text(board(extra='D11*\n' + attributes +
+                                            '%TO.N,/X*%\nX1650000Y6000000D03*\n%TD*%\n' + more))
+                    with self.assertRaisesRegex(ValueError, r'/X copper-to-edge lower bound 0\.250000 mm < 0\.300000 mm$'):
+                        gerberdrc.check_edge([copper], edge, .3)
+            # without its A12 partner a lone A11 finger has no notch, so no exemption
+            copper.write_text(board().replace('%TO.P,J1,A12*%', '%TO.P,J1,A13*%'))
+            with self.assertRaisesRegex(ValueError, r'0\.200000 mm < 0\.300000 mm$'):
+                gerberdrc.check_edge([copper], edge, .3)
+
     def test_isolated_filled_copper_width_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
             copper = Path(tmp) / 'sample-F_Cu.gtl'

@@ -197,9 +197,9 @@ WIFI_BUCK_L = 2.2e-6        # BOARD wifi.py L1, FNR3015S2R2MT (C167747, CJiang, 
 WIFI_BUCK_DCR = assume("Wi-Fi", "buck inductor L1 (FNR3015S2R2MT): DCR 78 mOhm, Isat 2 A (LCSC listing; "
                        "CJiang datasheet not yet read)", 0.078)
 WIFI_BUCK_R1, WIFI_BUCK_R2 = 453e3, 100e3       # BOARD wifi.py R9 / R10 (VOUT = 3.318 V)
-# R10 C25803 is UNI-ROYAL 0603WAF1003T5E (the WAF series is +-1 %). R9 C25818
-# is assumed to be the same series (0603WAF4533T5E): not yet confirmed
-WIFI_BUCK_RES_TOL = assume("Wi-Fi", "buck feedback R9 (C25818) 1 %, as R10 (C25803, UNI-ROYAL 0603WAF, 1 %)", 0.01)
+# R9 C861412 / R10 C122538 are YAGEO RT0603BRD07453KL / RT0603BRD07100KL,
+# 0.1 %, 25 ppm/C (doc/hardware/wifi-droop-fix-proposal.md; wifi_parts.py)
+WIFI_BUCK_RES_TOL = 0.001
 WIFI_CIN = 22e-6            # BOARD wifi.py C1
 WIFI_COUT = 22e-6           # BOARD wifi.py C2 (0805 22 uF, derated below)
 WIFI_COUT_HF = 100e-9       # BOARD wifi.py C3

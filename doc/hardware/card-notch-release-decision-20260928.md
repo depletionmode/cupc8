@@ -1,5 +1,7 @@
 # Seven-card key-notch release decision (2026-09-28)
 
+> **Superseded the same day:** David accepted the CEM geometry with JLC's 0.20 mm routed-edge minimum for the notch fingers only, and first-article fitting for the key position. See [the decision applied](card-notch-decision-applied-20260928.md).
+
 **Disposition: hold all seven card fabrication packages at the existing 0.30 mm copper-to-edge gate.** No published socket drawing reviewed here qualifies a replacement or a shifted finger pattern. Do not change the shared card footprint, board outlines, `MECH-001`, or the plotted Gerber rule on the present evidence.
 
 ## Independent check of current routed cards

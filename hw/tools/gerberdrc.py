@@ -195,13 +195,17 @@ def arc_points(start, target, offsets, mode):
 
 
 def plotted_copper(path, geometry, minimum_track=None, require_net=True, features=None,
-                   extra_function=None, allow_empty=False, filled_regions=None):
-    """Return (net, GEOS shape, bounds) for every supported dark operation."""
+                   extra_function=None, allow_empty=False, filled_regions=None, pads=None):
+    """Return (net, GEOS shape, bounds) for every supported dark operation.
+
+    pads, if given, maps each flashed shape to (ref, pin, aperture function, center)
+    from the X2 %TO.P attribute in force when it was flashed."""
     lines = path.read_text().splitlines()
     apertures = {}
     current = None
     position = None
     net = None
+    pad = None
     region = None
     result = []
     seen_format = seen_units = seen_end = False
@@ -287,10 +291,15 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
             net = line[6:-2]
             if not net:
                 raise ValueError('%s:%d: empty net attribute' % (path.name, number))
+        elif line.startswith('%TO.P,') and line.endswith('*%'):
+            pad = tuple(line[6:-2].split(',')[:2])
+        elif line == '%TD.P*%':
+            pad = None
         elif line == '%TD*%' or line == '%TD.N*%':
             net = None
             if line == '%TD*%':
                 aperture_function = None
+                pad = None
         elif line == '%TD.AperFunction*%':
             aperture_function = None
         elif line == '%LPD*%':
@@ -426,6 +435,8 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                                                'FreePoly' if kind.startswith('FreePoly') else kind,
                                                definition)
                 add(shape, bounds, function if operation == '03' else None, target)
+                if pads is not None and operation == '03' and pad is not None:
+                    pads[shape] = (*pad, function, target)
             position = target
         elif line == 'M02*':
             seen_end = True
@@ -1234,23 +1245,80 @@ def profile_segments(path, geometry):
     return segments
 
 
-def check_edge(paths, outline, minimum):
-    """Check plotted copper shapes against plotted board cut centerlines."""
+# David's decision (doc/hardware/card-notch-decision-applied-20260928.md):
+# the PCIe CEM key notch sits 0.20 mm nominal from the gold fingers either
+# side of it. Those fingers, and only against the notch, may come to JLCPCB's
+# published routed-edge copper minimum (jlcpcb.com/capabilities/pcb-capabilities:
+# "Copper clearance from routed board edges: >=0.2 mm"). Everything else keeps
+# the board's own rule. The fingers are the ConnectorPad flashes A11/B11
+# (before the notch) and A12/B12 (after it) of one footprint; the notch walls
+# are the cut segments lying wholly between that footprint's pin-11 and
+# pin-12 centers on the same face.
+KEY_NOTCH_PINS = (('A11', 'A12'), ('B11', 'B12'))
+KEY_NOTCH_EDGE_MINIMUM = 0.20
+
+
+def key_notch_spans(pads):
+    """{shape: (lo, hi, axis)} for each notch-adjacent finger flash: the
+    interval along the finger row between its pin-11 and pin-12 centers."""
+    fingers = defaultdict(list)
+    for shape, (ref, pin, function, at) in pads.items():
+        if function == 'ConnectorPad':
+            fingers[ref, pin].append((shape, at))
+    spans = {}
+    for ref in {ref for ref, _ in fingers}:
+        for before, after in KEY_NOTCH_PINS:
+            if not fingers[ref, before] or not fingers[ref, after]:
+                continue
+            if len(fingers[ref, before]) != 1 or len(fingers[ref, after]) != 1:
+                raise ValueError('%s: key-notch finger %s/%s flashed more than once' % (ref, before, after))
+            (b, (bx, by)), (a, (ax, ay)) = fingers[ref, before][0], fingers[ref, after][0]
+            if by == ay and bx != ax:
+                span = (min(bx, ax), max(bx, ax), 0)
+            elif bx == ax and by != ay:
+                span = (min(by, ay), max(by, ay), 1)
+            else:
+                raise ValueError('%s: key-notch fingers %s/%s not on one axis' % (ref, before, after))
+            spans[b] = spans[a] = span
+    return spans
+
+
+def check_edge(paths, outline, minimum, key_notch_minimum=KEY_NOTCH_EDGE_MINIMUM):
+    """Check plotted copper shapes against plotted board cut centerlines.
+
+    A finger next to the key notch (KEY_NOTCH_PINS) is held to
+    key_notch_minimum against the notch walls only; against any other cut,
+    and all other copper everywhere, the board's minimum applies."""
     if not math.isfinite(minimum) or minimum <= 0:
         raise ValueError('board has no positive copper-to-edge rule')
+    if not math.isfinite(key_notch_minimum) or not 0 < key_notch_minimum <= minimum:
+        raise ValueError('key-notch copper-to-edge rule must be positive and <= the board rule')
     engine = Geometry()
     try:
         edges = profile_segments(outline, engine)
         count = 0
         for path in paths:
-            for net, shape, (x0,y0,x1,y1) in plotted_copper(Path(path), engine):
+            pads = {}
+            objects = plotted_copper(Path(path), engine, pads=pads)
+            spans = key_notch_spans(pads)
+            for net, shape, (x0,y0,x1,y1) in objects:
                 for edge, (a0,b0,a1,b1) in edges:
                     if x0-a1 >= minimum or a0-x1 >= minimum or y0-b1 >= minimum or b0-y1 >= minimum:
                         continue
                     distance = engine.distance(shape, edge)
                     if distance < minimum:
-                        raise ValueError('%s: %s copper-to-edge lower bound %.6f mm < %.6f mm' %
-                                         (Path(path).name, net, distance, minimum))
+                        rule, where = minimum, ''
+                        if shape in spans:
+                            lo, hi, axis = spans[shape]
+                            e0, e1 = (a0, a1) if axis == 0 else (b0, b1)
+                            if lo < e0 and e1 < hi:
+                                rule, where = key_notch_minimum, ' (key-notch finger %s)' % pads[shape][1]
+                        # Plotted coordinates are whole nanometres; a GEOS
+                        # float result a picometre under a rule the geometry
+                        # meets exactly (0.30 at the tab ends) is rounding.
+                        if distance < rule - 1e-9:
+                            raise ValueError('%s: %s copper-to-edge lower bound %.6f mm < %.6f mm%s' %
+                                             (Path(path).name, net, distance, rule, where))
                 count += 1
         return count
     finally:

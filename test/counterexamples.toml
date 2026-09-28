@@ -1296,11 +1296,14 @@ cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && python3 test/hw/test_
 must_fail = ["AssertionError"]
 
 [[bug]]
-name = "MECH-001: a socket with only a nominal key-rib width skipped the positional key check and passed"
-fixed_in = "fit.py key_position_check"
-revert = [["hw/mech/fit.py", "    if \"rib_plus\" not in sock:\n        return False, (", "    if False:\n        return False, ("]]
+# The positional key fit is information plus the first-article test MECH-101
+# (David, 2026-09-28); what must not come back is a nominal-only rib quoted
+# as a margin, hiding that the SOFNG x4 drawing publishes no rib tolerance.
+name = "MECH-001: a socket with only a nominal key-rib width was reported with its nominal margin, hiding the missing rib tolerance"
+fixed_in = "fit.py key_position_note"
+revert = [["hw/mech/fit.py", "    if \"rib_plus\" not in sock:\n        why = (", "    if False:\n        why = ("]]
 cmd = "python3 -m unittest test/test_key_mating.py"
-must_fail = ["test_socket_without_published_rib_tolerance_cannot_pass"]
+must_fail = ["test_socket_without_published_rib_tolerance_is_still_reported"]
 
 [[bug]]
 name = "POW-003: the Wi-Fi buck deck lifted U2's GND above node 0, which TI's TLV62569 model uses as its reference (J1 return drop multiplied by 1+R9/R10)"
@@ -1308,3 +1311,24 @@ fixed_in = "wifi_deck ground reference fix"
 revert = [["hw/power/buck.py", "C1 c1term 0 {cin}\nX1 vin fb sw vin 0 TLV62569_TRANS", "C1 c1term buck_gnd {cin}\nX1 vin fb sw vin buck_gnd TLV62569_TRANS"]]
 cmd = "python3 test/hw/test_wifi_limits.py"
 must_fail = ["test_esr_and_contact_reach_the_spice_elements"]
+
+[[bug]]
+name = "Fabrication: the key-notch copper-to-edge exemption reached cuts that are not the notch walls"
+fixed_in = "gerberdrc.check_edge key-notch span"
+revert = [["hw/tools/gerberdrc.py", "if lo < e0 and e1 < hi:", "if True:"]]
+cmd = "python3 -m unittest test.test_fabcheck.FabCheckTests.test_key_notch_fingers_alone_get_jlc_edge_minimum"
+must_fail = ["test_key_notch_fingers_alone_get_jlc_edge_minimum"]
+
+[[bug]]
+name = "Fabrication: the key-notch copper-to-edge exemption reached non-finger pads named A11/A12"
+fixed_in = "gerberdrc.key_notch_spans ConnectorPad only"
+revert = [["hw/tools/gerberdrc.py", "if function == 'ConnectorPad':", "if True:"]]
+cmd = "python3 -m unittest test.test_fabcheck.FabCheckTests.test_key_notch_fingers_alone_get_jlc_edge_minimum"
+must_fail = ["test_key_notch_fingers_alone_get_jlc_edge_minimum"]
+
+[[bug]]
+name = "Fabrication: copper exactly at the copper-to-edge rule failed on a GEOS float rounding (0.300000 < 0.300000 at the tab ends)"
+fixed_in = "gerberdrc.check_edge nanometre slack"
+revert = [["hw/tools/gerberdrc.py", "if distance < rule - 1e-9:", "if distance < rule:"]]
+cmd = "python3 -m unittest test.test_fabcheck.FabCheckTests.test_key_notch_fingers_alone_get_jlc_edge_minimum"
+must_fail = ["test_key_notch_fingers_alone_get_jlc_edge_minimum"]

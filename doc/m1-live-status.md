@@ -99,6 +99,43 @@ Agents, each owning disjoint files; none may rebuild boards in build/hw:
 - All five analysis agents hit the weekly API limit once and were resumed
   (no partial edits were left behind).
 
+### David's decisions (2026-09-28)
+
+- **MB-005:** replace the 20 mOhm assumption with a board-side input loop
+  <= 60 mOhm at the hot corner (USB-C contacts inside the cable's Type-C
+  R2.0 §4.4.1 IR-drop budget) plus a <= 20 C trace-rise rule at 3.213 A.
+  Widen/pour J1->F1->U2. (Derivation: doc/hardware/mb005-loop-requirement-derivation.md;
+  current inner F1-U2 trace models up to 562 C rise at the fault current.)
+- **Card notch:** accept standard PCIe CEM geometry; JLC's copper-to-edge
+  minimum only for the gold fingers at the key notch (0.30 mm elsewhere);
+  positional key fit qualified by first-article test-fit in the real sockets.
+- **MB-051:** redesign reset supervision for both rails with real margin.
+- **GPU overclock:** David asked whether 252 MHz / 1.20 V is OK; answered,
+  awaiting his choice.
+- In progress (agents, scratch builds only): main board (MB-005 + MB-051),
+  card notch rule/MECH-001. One coordinated canonical rebuild of all
+  boards + evidence re-pin follows, only after both agents finish (a build
+  racing their source edits fails with "board inputs changed during pipeline").
+- **Card notch decision applied.** hw/tools/gerberdrc.py: only
+  ConnectorPad flashes A11/A12/B11/B12 (with their pin-11/12 partner) against
+  Edge.Cuts between those pad centres get JLC's 0.20 mm (capabilities page,
+  "Copper clearance from routed board edges: >=0.2 mm", read 2026-09-28);
+  everything else keeps 0.30 mm; 1 nm float slack at the rule. test_fabcheck
+  (30 OK), 3 counterexamples. MECH-001 now passes (static CEM checks kept;
+  positional fit is info + new hw test MECH-101 first-article fit).
+  **Open with JLC:** their gold-finger pages mention a 0.5-1.0 mm finger-to-
+  outline "safety distance" and engineer "optimization"; put a note in the
+  order asking them not to trim fingers, and check at first article.
+  MECH-101's >= 0.10 mm measured-gap acceptance needs David's OK.
+  Card fab rows now stop at the CPL review blocker. Every board reads stale
+  (hw/tools changed) until the coordinated rebuild.
+- **Wi-Fi divider swap applied:** R9 C25818 -> C861412, R10
+  C25803 -> C122538 (YAGEO RT0603BRD07 0.1 %, 25 ppm/C) in hw/boards/wifi.py;
+  wifi_parts FITTED, design.WIFI_BUCK_RES_TOL = 0.001, POW-003 text updated.
+  wifi_proposal.py: worst min 3.074 V, max 3.537 V (limits 3.0/3.6). Scratch
+  build passed every step incl. BOM and JLC stock; POW-003 must be rerun on
+  the canonical rebuild.
+
 ### Agent results
 
 - **Card power (done).** No row turned green; all six fail only on their
