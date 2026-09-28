@@ -215,6 +215,9 @@ class Machine {
     bool cpuResetConnected = true;   // CPU socket/card reset copper reaches the FPGA
     bool cpuStrobeConnected = true;  // CPU strobe reaches the chipset through RN5
     bool cpuRwConnected = true;      // CPU read/write reaches the chipset through RN5
+    bool sysctlResetConnected = true; // system GPIO23 reaches supervisor MR
+    bool resetButtonConnected = true; // SW1 reaches supervisor MR
+    bool resetButtonPressed = false;  // held physical reset switch
     bool chipsetClockConnected = true; // oscillator's R17 branch reaches chipset clock pad
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
@@ -284,6 +287,9 @@ class Machine {
   bool threaded_;
   bool pwrHi = true;
   bool porConnected = true;
+  bool sysctlResetConnected = true;
+  bool resetButtonConnected = true;
+  bool resetButtonPressed = false;
   std::array<Options::SlotWiring, 6> slotWiring{};
   uint8_t misoIdle = 1;
   double seriesDelayNs = 0;
