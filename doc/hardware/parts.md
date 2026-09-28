@@ -13,8 +13,11 @@ None of the key ICs are basic parts. Passives will be chosen from basic parts
 during schematic capture.
 
 **Build quantity: 2 systems.** JLC fabricates 5 bare PCBs of each design;
-we assemble **3 main boards** (one spare, since there is no prototype) and
-**2 of each card** (CPU, system, GPU, IO, Wi-Fi) (JLC's minimum for assembly).
+we assemble **2 main boards** and **2 of each card** (CPU, system, GPU, IO,
+Wi-Fi, storage, e-ink) (JLC's minimum for assembly; David, 2026-09-28: 2 of
+each board in the first run, no spare main board). The per-part "Qty" below
+and the pipeline's stock check still use 3 main boards: a stricter margin,
+kept on purpose.
 "Qty" is parts placed across all assembled boards, before JLC's attrition
 extras. Stock checked 2026-09-23 (the power parts: 2026-09-24).
 

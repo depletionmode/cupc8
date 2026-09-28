@@ -63,8 +63,9 @@ update it after every finding, commit, decision or agent result (David,
 
 - **BOM risk audit (done):** doc/hardware/bom-risk-audit-20260928.md,
   data doc/hardware/bom-risk-20260928.json, `tools/bom_risk.py --pending`.
-  Must-fix: reserve SST39VF040 C645939 (11 in stock) and iCE40HX4K C1521989
-  (51 JLC / 24 LCSC) before the first article (David action). Before a
+  Must-fix: reserve 3 x SST39VF040 C645939 (11 in stock) and 5 x iCE40HX4K
+  C1521989 (51 JLC / 24 LCSC) before the first article (David action; first
+  run is 2 of each board). Before a
   production run: RT9013-12GB C58464 obsolete -> TLV75512PDBVR C2877864
   (rerun RT9013 checks); W25Q16JVSSIQ C131025 and W25Q32JVSSIQ C179173 EOL ->
   GD25Q16ESIGR C2922792 / GD25Q32ESIGR C2832998 (boot2 check on hardware).

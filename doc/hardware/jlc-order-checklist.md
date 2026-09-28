@@ -31,10 +31,12 @@ thickness), `parts.md` (quantities, stock risks), `fab-readiness.md` /
   once the SI rows confirm our trace geometry hits the targets on it.
 - **Confirm Production File:** Yes, then run `tools/jlc_production_diff.py`
   on JLC's files (section 4).
-- **Reserve scarce parts early** (bom-risk-audit-20260928.md): the main
-  board's SST39VF040 ROM C645939 (11 in stock) and the iCE40HX4K C1521989 (51
-  at JLC): reserve them in JLC's parts inventory before the first-article
-  order.
+- **First run: 2 assembled boards of each type** (David, 2026-09-28).
+- **Reserve scarce parts early** (bom-risk-audit-20260928.md), in JLC's
+  Parts Manager (private inventory), before the first-article order: the
+  main board's SST39VF040 ROM C645939 (11 in stock): **3** (2 + 1 spare);
+  the iCE40HX4K C1521989 (51 at JLC; main + CPU card): **5** (4 + 1 spare).
+  At PCBA time, check both BOM lines draw from your inventory.
 
 ## 0. Mismatches and gaps found while writing this (resolve before ordering)
 
@@ -203,7 +205,7 @@ not, stop: the zip is wrong.
 |---|---|---|
 | PCBA type | **Standard** | the main board has THT parts and 6 layers, the cards have gold fingers and ENIG, and several parts are extended. Economic PCBA does not cover all of that, and one type for every board keeps them alike |
 | Assembly side | **Top side** | every CPL row is `Top` (`order.json` `assembly`) |
-| PCBA qty | section 5 (main 3, cards 2 in the M1 build; JLC's minimum is 2) | `parts.md`, Build quantity; the build-time stock check assumed these |
+| PCBA qty | **2 of every board** (David, 2026-09-28; JLC's minimum is 2) | `parts.md`, Build quantity; the build-time stock check assumed these |
 | Tooling holes / edge rails | **Added by JLCPCB**, on rails only | our cards have no room for tooling holes. If the form or an EQ proposes holes or rails **on the board** or on the **finger edge**, refuse and ask for another way |
 | Confirm parts placement | **Yes** | JLC's engineers send placement images to approve. This is a second check after our CPL review, not a replacement for it |
 | Everything else (bake, cleaning, photo confirmation, packaging) | defaults | |
@@ -320,12 +322,13 @@ alongside theirs:
 
 ## 5. Order sequencing
 
-M1 builds only two machines (`parts.md`: 5 bare PCBs of each design, 3 main
-boards and 2 of each card assembled). The first order is therefore the
+M1 builds only two machines (`parts.md`: 5 bare PCBs of each design, 2 of
+every board assembled; David, 2026-09-28). The first order is therefore the
 first article. What matters is what gates the *next* order. Recommended:
 
-1. **Reserve the risky parts** in the JLC parts inventory: 3-4 x ROM C645939
-   (or fallback C632851), and the FPGAs, 5 x C1521989 (`parts.md`, Risks).
+1. **Reserve the risky parts** in the JLC parts inventory: 3 x ROM C645939
+   (2 + 1 spare; fallback C632851), and 5 x FPGA C1521989 (2 main + 2 CPU +
+   1 spare) (`parts.md`, Risks).
    Paid by David, and possible before the gate passes.
 2. **Optional, cheap, early: a bare-PCB fit order.** 5 bare PCBs (no
    assembly) each of **io** (x1 notch), **cpu** (x8) and **system** (x4),
