@@ -215,6 +215,7 @@ class Machine {
     bool cpuResetConnected = true;   // CPU socket/card reset copper reaches the FPGA
     bool cpuStrobeConnected = true;  // CPU strobe reaches the chipset through RN5
     bool cpuRwConnected = true;      // CPU read/write reaches the chipset through RN5
+    bool cpuReadyConnected = true;   // chipset /RDY reaches CPU through R33
     bool sysctlResetConnected = true; // system GPIO23 reaches supervisor MR
     bool resetButtonConnected = true; // SW1 reaches supervisor MR
     bool resetButtonPressed = false;  // held physical reset switch

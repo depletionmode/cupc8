@@ -24,6 +24,7 @@ entity machine_core is
 		cpu_rst_connected:	in std_logic;
 		cpu_stb_connected:	in std_logic;
 		cpu_rw_connected:	in std_logic;
+		cpu_rdy_connected:	in std_logic;
 		chipset_clk_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
@@ -61,7 +62,7 @@ architecture rtl of machine_core is
 	signal cpu_din, cs_din, cpu_dout, cs_dout: std_logic_vector(7 downto 0);
 	signal a_chip: std_logic_vector(15 downto 0);
 	signal cpu_doe, cs_doe, rw, n_stb, n_rdy, sync, halted, waiting, n_rst: std_logic;
-	signal rw_at_chipset, n_stb_at_chipset: std_logic;
+	signal rw_at_chipset, n_stb_at_chipset, n_rdy_at_cpu: std_logic;
 	signal irq: std_logic_vector(3 downto 0);
 	signal cpu_clk: std_logic;
 	signal chipset_clk: std_logic;
@@ -81,6 +82,9 @@ begin
 	-- pulling it high when the CPU card leg is open.
 	n_stb_at_chipset <= n_stb when cpu_stb_connected = '1' else '1';
 	rw_at_chipset <= rw when cpu_rw_connected = '1' else '1';
+	-- /RDY is active low. An open receiver has undefined voltage; high is a
+	-- deterministic stalled-CPU counterexample, not a physical voltage claim.
+	n_rdy_at_cpu <= n_rdy when cpu_rdy_connected = '1' else '1';
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
@@ -100,7 +104,7 @@ begin
 
 	cpu0: entity work.cpu port map(
 		clk => cpu_clk, n_rst => cpu_rst_at_pad, a => a, d_in => cpu_din, d_out => cpu_dout, d_oe => cpu_doe,
-		rw => rw, n_stb => n_stb, n_rdy => n_rdy, sync => sync, irq => irq, tmr_exp => tmr_exp,
+		rw => rw, n_stb => n_stb, n_rdy => n_rdy_at_cpu, sync => sync, irq => irq, tmr_exp => tmr_exp,
 		halted => halted, waiting => waiting,
 		dbg_pc => dbg_pc, dbg_sp => dbg_sp, dbg_r0 => dbg_r0, dbg_r1 => dbg_r1, dbg_f => fl);
 
