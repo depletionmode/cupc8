@@ -13,6 +13,9 @@ from pathlib import Path
 
 MESHES = ('0.090', '0.075', '0.060')
 QUANTITIES = ('s11_db', 's21_db')
+SOURCE_REPORTS = {'0.090': 'usb-io-pml-mesh-090-fixed.json',
+                  '0.075': 'usb-io-pml-fixed.json',
+                  '0.060': 'usb-io-pml-mesh-060-fixed.json'}
 
 
 def sha(path):
@@ -30,6 +33,15 @@ def analyze(magnitude_path, complex_path):
             complex_port['fine_mesh_migration_report_sha256']):
         raise ValueError('USB mesh evidence scope or migration differs')
     for mesh in MESHES:
+        if not math.isclose(magnitude['sources'][mesh]['mesh_mm'], float(mesh),
+                            rel_tol=0, abs_tol=1e-9):
+            raise ValueError(f'{mesh}: source mesh spacing differs')
+        source_path = magnitude_path.parent / SOURCE_REPORTS[mesh]
+        source_report = json.loads(source_path.read_text())
+        if (sha(source_path) != magnitude['sources'][mesh]['report_sha256'] or
+            source_report['port_window_audit']['port_file_sha256'] !=
+                complex_port['sources'][mesh]['port_file_sha256']):
+            raise ValueError(f'{mesh}: saved port-trace hashes differ from source report')
         if (magnitude['sources'][mesh]['report_sha256'] !=
                 complex_port['sources'][mesh]['report_sha256'] or
             magnitude['sources'][mesh]['xml_sha256'] !=
@@ -43,6 +55,8 @@ def analyze(magnitude_path, complex_path):
                    ('passivity_ok', 'port_consistency_ok', 'spectral_stability_ok')):
             raise ValueError(f'{mesh}: numerical/port gate failed')
     frequencies = [row['frequency_hz'] for row in complex_port['results']['0.090']]
+    if not frequencies or frequencies != sorted(set(frequencies)):
+        raise ValueError('complex-port frequencies must be unique and increasing')
     if any([row['frequency_hz'] for row in complex_port['results'][mesh]] != frequencies
            for mesh in MESHES):
         raise ValueError('complex-port frequencies differ')
@@ -68,15 +82,18 @@ def analyze(magnitude_path, complex_path):
                 'fine_to_coarse_increment_abs_ratio': abs(second / first) if first else None,
                 'observed_span_db': max(values) - min(values),
             }
+        for quantity, complex_key in (('s11_db', 's11_complex'),
+                                      ('s21_db', 's21_complex')):
+            for mesh in MESHES:
+                response = complex(*complex_port['results'][mesh][index][complex_key])
+                if (not math.isfinite(response.real) or
+                    not math.isfinite(response.imag) or response == 0 or
+                    abs(20 * math.log10(abs(response)) -
+                        metrics[quantity]['values_db'][mesh]) > .0001):
+                    raise ValueError(f'{mesh}: complex and magnitude {quantity} differ')
         s = [complex(*complex_port['results'][mesh][index]['s11_complex'])
              for mesh in MESHES]
         first, second = s[1] - s[0], s[2] - s[1]
-        if not all(math.isfinite(part) for value in s for part in (value.real, value.imag)):
-            raise ValueError('nonfinite complex reflection')
-        for mesh, reflection in zip(MESHES, s):
-            if reflection == 0 or abs(20 * math.log10(abs(reflection)) -
-                                      metrics['s11_db']['values_db'][mesh]) > .0001:
-                raise ValueError(f'{mesh}: complex and magnitude S11 differ')
         turn = math.degrees(math.acos(max(-1.0, min(1.0,
             (first.conjugate() * second).real / (abs(first) * abs(second)))))) if first and second else None
         rows.append({'frequency_hz': frequency, **metrics,
