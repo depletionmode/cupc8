@@ -87,3 +87,10 @@ impedance sensitivity. Loaded input impedance is not characteristic impedance.
 excitations to the final GPU receipt and every saved raw port trace. This
 quantifies copper-subset cross response and reciprocal consistency; it does
 not close the physical TMDS path or row 4.6.
+
+`gpu-coupled-d2-fixed.json`, `gpu-coupled-ck-fixed.json` and
+`gpu-coupled-d2-ck-audit.json` preserve two PML-safe reciprocal D2/CK
+field runs on the final GPU receipt. Their 100 MHz weak cross-port spectrum
+fails the 0.05 dB stability gate in both 8–12 and 12–16 ns comparisons, so
+these are rejected diagnostics. The audit hashes both XML/log files and all
+16 raw port traces; it does not mark the coupled subset valid.
