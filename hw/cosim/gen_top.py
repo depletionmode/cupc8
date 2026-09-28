@@ -376,6 +376,47 @@ def cpu_status_routes(main, cpu, main_board, cpu_board):
     return links, paths, missing
 
 
+def main_cpu_data_routes(main, board):
+    """Bind chipset data pads, eight 33-ohm channels and weak keepers."""
+    chipset_pads = ('20', '18', '19', '17', '9', '7', '10', '8')
+    socket_pads = ('B23', 'B25', 'B26', 'B28', 'B29', 'B31', 'B32', 'B34')
+    loaded_board = parsed_tree = None
+    if board is not None and Path(board).is_file():
+        sys.path.insert(0, str(ROOT / 'hw/si'))
+        from ibis_bus import routed_distances
+        loaded_board, parsed_tree = cpu_board_geometry(str(Path(board).resolve()))
+    links, paths, missing = [], [], []
+    for bit, (chipset_pad, socket_pad) in enumerate(zip(chipset_pads, socket_pads)):
+        source_net, contact_net = f'/CPU_D{bit}_SRC', f'/CPU_D{bit}'
+        source, series_in = ('U7', chipset_pad), (f'R{21 + bit}', '1')
+        series_out, keeper, socket = (f'R{21 + bit}', '2'), \
+            (f'R{90 + bit}', '2'), ('J2', socket_pad)
+        if main.components.get(series_in[0]) != ('33', ('Device', 'R')) or \
+                main.components.get(keeper[0]) != ('47k', ('Device', 'R')) or \
+                main.net(keeper[0], '1') != '/+3V3' or \
+                set(main.nets.get(source_net, ())) != {source, series_in} or \
+                set(main.nets.get(contact_net, ())) != {series_out, keeper, socket} or \
+                path(main, source, socket, '33') != series_in[0]:
+            raise ValueError(f'CPU D{bit}: wrong chipset pad, series part, keeper or socket')
+        connected = True
+        for net, first, last in ((source_net, source, series_in),
+                                 (contact_net, series_out, socket),
+                                 (contact_net, keeper, socket)):
+            mm = None
+            if loaded_board is not None:
+                mm = routed_distances(Path(board), net, first, [last],
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'main.{first[0]}.{first[1]}',
+                          'to': f'main.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'main_cpu_data{bit}_connected'})
+            if mm is None:
+                connected = False
+                missing.append(f'main:{net.lstrip("/")}_cpu_data{bit}_copper')
+        links.append(connected)
+    return links, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -930,10 +971,16 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_data'] = cpu_map('D', 8)
     cpu_links, cpu_paths, cpu_missing = cpu_bus_routes(
         cards['cpu'], cpu_board, manifest['runtime']['cpu_address'], manifest['runtime']['cpu_data'])
+    main_data_links, main_data_paths, main_data_missing = main_cpu_data_routes(main, pcb)
     manifest['runtime']['cpu_address_links'] = cpu_links['address']
-    manifest['runtime']['cpu_data_links'] = cpu_links['data']
+    manifest['runtime']['cpu_data_main_links'] = main_data_links
+    manifest['runtime']['cpu_data_links'] = [card and source for card, source in
+                                            zip(cpu_links['data'], main_data_links)]
     manifest['paths'].extend(cpu_paths)
+    manifest['paths'].extend(main_data_paths)
     manifest['runtime']['missing_routes'].extend(cpu_missing)
+    manifest['runtime']['missing_routes'].extend(main_data_missing)
+    manifest['runtime']['routed_top'] &= not main_data_missing
     clock_connected, clock_paths, clock_missing = cpu_clock_route(
         main, cards['cpu'], pcb, cpu_board)
     manifest['runtime']['cpu_clock_connected'] = clock_connected
@@ -1188,6 +1235,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('main', f'MEM_D{i}')
         runtime_net('main', f'CPU_D{i}')
         runtime_net('cpu', f'CPU_D{i}')
+        if main_data_links[i]:
+            runtime_net('main', f'CPU_D{i}_SRC')
     for i in range(16):
         runtime_net('main', f'CPU_A{i}')
         runtime_net('cpu', f'CPU_A{i}')
