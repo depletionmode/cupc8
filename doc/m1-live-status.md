@@ -124,6 +124,16 @@ update it after every finding, commit, decision or agent result (David,
   0.85, USB-C 0.5 mm). Order 2 panels per card type. The panel's Gerbers get
   the same fab checks as the boards.
 
+- **David (2026-09-28), more decisions:** first-article limits all accepted.
+  EOL parts (RT9013 C58464, W25Q16 C131025, W25Q32 C179173) kept for this
+  2-board run; David reserves 4 / 10 / 4 (stock 16,181 / 13,371 / 21,299);
+  replace before any larger run. CPU card C21 (RT9013 input) 1u -> 4.7u
+  (C23733, already on the board; David approved 2.2 uF, 4.7 uF chosen so
+  >= 1 uF survives 0402 DC bias): hw/boards/cpu.py, cpu_board.py,
+  thermal_bind.py updated; test_board_thermal's core-current test fails until
+  the CPU rebuild (built netlist still 1u). Wi-Fi C1/C2 C45783 -> C602037
+  (Wi-Fi only; agent running). Panel: one card per panel (see above).
+
 ## Everything left before the boards can be ordered
 
 ### A. Engineering in progress or queued (Claude)

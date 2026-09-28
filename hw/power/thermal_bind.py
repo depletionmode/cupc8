@@ -73,7 +73,7 @@ SPECS = {
     },
     'cpu': {
         'parts': {'U3': ('RT9013-12GB', ('jlc', 'RT9013-12GB')),
-                  'C21': ('1u', ('Device', 'C')),
+                  'C21': ('4.7u', ('Device', 'C')),
                   'C22': ('4.7u', ('Device', 'C')),
                   **{f'C{n}': ('100n', ('Device', 'C')) for n in range(1, 5)}},
         'footprints': {'U3': 'jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR'},

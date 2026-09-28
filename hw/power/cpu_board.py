@@ -29,7 +29,7 @@ EXPECTED = {
     **{('U1', str(n)): NET for n in (27, 40, 92, 111)},
 }
 VALUES = {'U3': ('RT9013-12GB', ('jlc', 'RT9013-12GB')),
-          'C21': ('1u', ('Device', 'C')), 'C22': ('4.7u', ('Device', 'C')),
+          'C21': ('4.7u', ('Device', 'C')), 'C22': ('4.7u', ('Device', 'C')),
           **{'C%d' % n: ('100n', ('Device', 'C')) for n in range(1, 5)}}
 SINKS = [('C22', '1')] + [('C%d' % n, '1') for n in range(1, 5)] + [
     ('U1', str(n)) for n in (27, 40, 92, 111)]

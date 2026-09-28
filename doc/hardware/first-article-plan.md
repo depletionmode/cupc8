@@ -1,5 +1,7 @@
 # First-article measurement plan (M1)
 
+> **Accepted by David (2026-09-28):** the four limits marked "proposed" below (>= 10 ohm rail short screen, 5 C top-to-junction allowance, x1.25 iCE40 core-current margin, 30 mVpp rail ripple) are accepted as written.
+
 **Status: proposal, 2026-09-28.** Nothing here is in `test/catalogue.toml`
 yet; the proposed entries are at the end. It closes the gates that analysis
 cannot (`doc/m1-live-status.md`, "B. Needs outside data or measurement";

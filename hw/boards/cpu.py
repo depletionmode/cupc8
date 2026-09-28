@@ -203,7 +203,7 @@ def schematic(path, footprint_libs):
         cap("C%d" % (17 + 2 * i), "4.7u", "VCCPLL" + k, "GNDPLL" + k, at=((60 + 20 * i) * G, row * G))
         cap("C%d" % (18 + 2 * i), "100n", "VCCPLL" + k, "GNDPLL" + k, at=((66 + 20 * i) * G, row * G))
     # LDO in/out, flash
-    cap("C21", "1u", "3V3", "GND", at=(96 * G, row * G))
+    cap("C21", "4.7u", "3V3", "GND", at=(96 * G, row * G))   # RT9013 input: 4.7 uF so >= 1 uF survives 0402 DC bias (David, 2026-09-28)
     cap("C22", "4.7u", "1V2", "GND", at=(102 * G, row * G))
     cap("C23", "100n", "3V3", "GND", at=(114 * G, row * G))
     for i, (ref, (net, val, _)) in enumerate(DECOUPLING.items()):
