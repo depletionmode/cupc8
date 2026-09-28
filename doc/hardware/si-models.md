@@ -567,7 +567,7 @@ The [refreshed routed top](si-evidence/ibis-final-top.json) uses the final
 root `gen_top.py`, current main netlist, seven validated card builds and the
 canonical receipt-bound system route. The [receipt bundle](si-evidence/ibis-final-receipts.json)
 records all eight board receipt/board/netlist hashes, the system routed-board
-hash, top generator and top hashes, and source-audit hash. Its 292 unmodeled nets are
+hash, top generator and top hashes, and source-audit hash. Its 288 unmodeled nets are
 the co-simulation coverage count, not a bus SI pass. The two saved 96-case
 ngspice diagnostics above remain bound to the earlier top and assumed line
 models; this refresh does not rerun them. Receiver IBIS, package assignment,

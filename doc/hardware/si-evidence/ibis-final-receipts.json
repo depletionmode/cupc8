@@ -44,11 +44,11 @@
     }
   },
   "system_route_sha256": "22c1b1976eb318c004e8e68c4edb483987fa3c5dcf9435c6b47b8d921c01c9c0",
-  "top_generator_sha256": "55ca1d253586f476037a0fad01e9ff1e8bc983b3ed93986ec049641a9309f4cc",
-  "top_sha256": "8d79e8547d45649c7fc539192c430f7319c6e17de5be92650cf278c09f71434f",
-  "source_audit_sha256": "4a1c2030e2c6d56af384838f40d70f38a1dd14e376232d107c059138d9a95ad9",
+  "top_generator_sha256": "70369a498862b1bece4f96f1951d3f701a23b287bf0c1aa4b4140abe2874cf4c",
+  "top_sha256": "dc4260220b5e348fa62065e7cb49c08f7fad455beeb3b0d551726127ca14e6c8",
+  "source_audit_sha256": "4b621b00cda076a4b7d56addbbd2748fcc6278d8fee8dbaa3ca35877434d6da5",
   "routed_top": true,
-  "unmodeled_nets": 292,
+  "unmodeled_nets": 288,
   "valid_for_full_bus_si": false,
   "limits": [
     "waveform diagnostics retain assumed line lengths and loads",
