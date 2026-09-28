@@ -43,16 +43,23 @@ definition; this file records what changed after it.
   runner uses a worktree of HEAD. Resolution: commit, then run the new
   entries (`python3 tools/counterexamples.py COSIM`, `... MB-052`,
   `... Fabrication`), then MUT-002 alone.
-- **COSIM-003, COSIM-004: new, caused by board rebuilds during verify.**
-  WIFI-004 (`hw/boards/wifi.py`) and EINK-001 (`hw/boards/eink.py`) rebuild
-  their boards in place in `build/hw/`. The netlists differ only by a
-  timestamp, but **the autorouter is not deterministic**: a second wifi
-  rebuild produced different copper (e.g. an `/EN` track). The pinned
-  `doc/hardware/si-evidence/ibis-final-receipts.json` hashes therefore no
-  longer match, and the pinned wifi/eink boards no longer exist anywhere on
-  disk. Every full verify will repeat this. Under investigation (agent
-  `board-determinism`); decision needed on the fix (deterministic routing vs.
-  suite rebuilding into scratch and comparing vs. committed canonical boards).
+- **COSIM-003, COSIM-004: caused by in-place board rebuilds, now fixed.**
+  WIFI-004/EINK-001 rebuilt wifi/eink into build/hw during verify. The
+  routing is deterministic (agent-verified: identical route.ses and
+  identical `sesreplay.preroute_digest` boards across rebuilds; an earlier
+  note here claiming otherwise was a raw-diff misread caused by pcbnew item
+  reordering). Raw bytes change every build (UUIDs, item order, netlist date,
+  PNGs), and the receipts pin raw sha256, so any rebuild broke them; under
+  -j the rebuild also deleted evidence.json mid-run. Fix: WIFI-004/EINK-001
+  now run `tools/board_reproduce.py <board>`, which builds into a temp dir
+  and requires identical normalized boards and route.ses vs build/hw.
+  `ibis-final-receipts.json` re-pinned to the current wifi/eink builds (only
+  those six hashes changed). Canonical rebuilds are now an explicit step
+  followed by re-pinning (command in doc/hardware/si-models.md). Verified:
+  each scratch rebuild matches alone; COSIM-003..006 pass on the re-pinned
+  receipts. Two scratch builds failed while run concurrently with another
+  board build / COSIM (error not captured; suspect Freerouting per-user state
+  when two instances start together). Watch WIFI-004/EINK-001 logs under -j 2.
 - **WIFI-003: load flake.** The self-signed-certificate refusal event did
   not arrive inside the 40 s `wait_event` (test/emu/test_wifi_qemu.py:296)
   while MUT-002 ran in parallel (63 s vs 24 s). Rerun alone: pass, 42 checks,
@@ -79,7 +86,9 @@ Agents, each owning disjoint files; none may rebuild boards in build/hw:
 - card thermal: RP2040 regulator dissipation (GC/IC/SC/EC/YC-006), CPU/main
   regulator binding (CC-006, MB-006). Owns hw/power/thermal.py.
 - card power: GC-005 VREG droop, IC-005 SY6280 fault, CC-005 items, SC/EC/YC-005.
-- mechanical: the *-008 rows ("smoke not yet designed") vs. the MECH-001 notch issue.
+- mechanical (done): all eight *-008 rows run the same `hw/mech/fit.py` and fail only on
+  MECH-001 key/notch fit. "smoke ... not yet designed: none" in their logs is
+  informational (HW-000 pipeline test board excluded; no board undesigned).
 - Wi-Fi: datasheet data for POW-003/WC-005/WC-010 F5-F8 and a droop-fix proposal
   (doc/hardware/wifi-droop-fix-proposal.md), not applied until boards are deterministic.
 
@@ -105,6 +114,30 @@ Agents, each owning disjoint files; none may rebuild boards in build/hw:
   data, slot contact resistance max, SY6280 fault/limit data (IC-005; part
   change or requirement rewrite), CPU card items in
   doc/hardware/cpu-power-proof-gaps-20260928.md.
+- **Card thermal (done).** New `hw/power/rp2040_thermal.py` (+ `thermal.py
+  rp2040 BOARD DIR`, 8 tests incl. 3 mutations) bounds RP2040 package heat
+  from datasheet rated maxima (VREG 3.63 V x 100 mA, IIOVDD/IIOVSS 50 mA,
+  USB, ADC) and binds the netlist: 910 mW x 48 C/W -> 83.7 C vs 85 C case
+  limit (1.3 C margin). io/storage/eink/system pass, gpu fails (TMDS sinks
+  46 mA; steady IO 51.7 mA > 50 mA IIOVSS_MAX). **Not wired into
+  GC/IC/SC/EC/YC-006 yet** (would need cmd `python3 hw/power/thermal.py
+  rp2040 <board> build/hw/<board>`): the passes rest on assumptions David
+  must accept: ADC_AVDD <= 2 mA (no datasheet max), IO switching current
+  unbounded beyond the rated-total headroom (19.4 mA on storage/system),
+  USB 2.0 cable figures quoted from memory; also 100-ohm green LEDs draw
+  13.4 mA vs the 12 mA drive setting. CC-006/MB-006 need an iCE40 core
+  current bound (iCEcube2 estimate or measurement; ceiling ~100 mA); main
+  also lacks HT7533 standby LDO theta-JA.
+- **Mechanical (done).** Bug fixed in hw/mech/fit.py: the system card's
+  SOFNG x4 socket skipped the positional key check and passed on the EasyEDA
+  model's nominal 1.75 mm rib; the SOFNG drawing has no toleranced rib width
+  (its undesignated 1.78 at the title block's +/-0.15 allows 1.93 mm > the
+  1.84 mm minimum notch). `key_position_check` now fails any socket without a
+  published maximum rib. test/test_key_mating.py (4 tests) now runs under
+  MECH-001; counterexample added. MECH-001 fails 6 UMAX lines (0.005 mm/side vs
+  JLC +/-0.10 mm) + the SOFNG line; MECH-002..008 pass. Unblock: UMAX rib-to-
+  contact registration / tolerance data (C404113, C404111), a toleranced SOFNG
+  drawing (C19188869; also sources slot_w=1.78), or a socket/interconnect change.
 - Note: any edit under hw/tools/ changes every board's evidence hash and makes
   all boards "stale"; such edits must be paired with re-pinning evidence.
 

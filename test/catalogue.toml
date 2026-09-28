@@ -1191,7 +1191,7 @@ id = "WIFI-004"
 title = "Wi-Fi card board, ready for JLC"
 checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, card order spec (1.6 mm, hard-gold 30 degree fingers), the board's name and revision on the top silkscreen and in the title block"
 method = "hw/boards/wifi.py through kicadgen.pipeline: Freerouting, GND fingers tied, presence link pre-routed, GND pads fanned out, stitched pours"
-cmd = "python3 hw/boards/wifi.py"
+cmd = "python3 tools/board_reproduce.py wifi"
 kind = "static"
 vrow = "3.4"
 
@@ -1200,7 +1200,7 @@ id = "EINK-001"
 title = "E-ink card board, ready for JLC"
 checks = "schematic layout rules (no touching stubs of two nets), ERC, DRC with schematic parity and JLC's rules (0 violations, 0 unconnected), silkscreen 0.15 mm from pads, 3D models on their footprints, every placed part with an LCSC number and in stock for 2 boards, the standard I/O card outline, M3 hole and power LED, card order spec (1.6 mm, hard-gold 30 degree fingers), the board's name and revision on the top silkscreen and in the title block"
 method = "hw/boards/eink.py (the rp2040card.py core, the panel module's 9-pin header with TVS on the top edge) through kicadgen.pipeline: Freerouting, GND fingers tied, presence link pre-routed, GND pads fanned out, stitched pours"
-cmd = "python3 hw/boards/eink.py"
+cmd = "python3 tools/board_reproduce.py eink"
 kind = "static"
 vrow = "3.4"
 
@@ -1523,7 +1523,7 @@ checks = "every card's finger tab against PCIe CEM r3.0 Fig. 6-3 (tab >= 8.40, k
 method = "hw/mech/fit.py: pads and outline from pcbnew; the tab in a datasheet socket solid in FreeCAD"
 kind = "static"
 vrow = "4.7"
-cmd = "python3 hw/mech/fit.py --check MECH-001"
+cmd = "python3 -m unittest test/test_key_mating.py && python3 hw/mech/fit.py --check MECH-001"
 
 [[test]]
 id = "MECH-002"

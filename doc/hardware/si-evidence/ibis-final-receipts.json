@@ -27,14 +27,14 @@
       "netlist_sha256": "1eedecb911e747efbe6934cc7aa045bf4a363b2a4284141fb6b498f016daea0f"
     },
     "wifi": {
-      "receipt_sha256": "d697e1ff24eccb5f1c6df469de263078f18118503f8ff6fcfb431d25f20f11c3",
-      "board_sha256": "37fff345e92a7bb84f82230ff9c8886e2afacad612704474920075bc33cf70b5",
-      "netlist_sha256": "254b633a07ead82681895cbd59fcaa5b938923960a98d627072826215f22c77c"
+      "receipt_sha256": "c63edb0ed83f1f453cd4cb1e2dfe74491d1abee2ef5eae21685d9f828e43a939",
+      "board_sha256": "1e0a90942955c9d8e109e5804ac8bdcd0acc41176e055b567f2390a5478b4847",
+      "netlist_sha256": "2f5253cb6505ee155df4ecb1a35cbf37d24417308c22387b0f618c552cde3f89"
     },
     "eink": {
-      "receipt_sha256": "505c8611cc9a5323be0d588c9e99823dde00fa26e5530b8c2ab0c90435f1d0ae",
-      "board_sha256": "0b94659421a292fbb6490d0eea95ce85668da89085969e70e9aa731a50a6be73",
-      "netlist_sha256": "dc33c7b768a760acffab1e5831b88ef75578ff2643a5a2e6690794300f00422b"
+      "receipt_sha256": "21954c60112185c7abff316ab170cdfc070e269c0dfd74d06cf4c34256471a79",
+      "board_sha256": "c67020fff90478bbb896b2c54f8f6a65b330266854296b673ad2ed0466baa7de",
+      "netlist_sha256": "2a065449a7f40cd1fda18d8cbe1397fc022ed53ab53eee54df051872db9c5224"
     },
     "system": {
       "receipt_sha256": "f15e354539b360125490711e30b9e785ee14e3ccdcdb161b05dcbbf1d5796da4",
