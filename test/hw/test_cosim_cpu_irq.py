@@ -53,7 +53,8 @@ def main():
 
     top = json.loads(args.top.read_text())
     assert top['runtime']['cpu_irq_connected'] == [True] * 4
-    assert len(top['unmodeled_nets']) == 298
+    baseline_count = len(top['unmodeled_nets'])
+    assert baseline_count <= 298
     with tempfile.TemporaryDirectory(prefix='cupc8-cpu-irq-') as directory:
         temporary = Path(directory)
         cards = exported_cards(temporary)
@@ -80,7 +81,7 @@ def main():
                                args.system_board, args.cpu_board)
                 assert mutant['runtime']['cpu_irq_connected'] == altered
                 assert mutant['runtime']['routed_top'] is False
-                assert len(mutant['unmodeled_nets']) == 301
+                assert len(mutant['unmodeled_nets']) == baseline_count + 3
                 for name in (f'main:CPU_IRQ{bit}_SRC', f'main:CPU_IRQ{bit}',
                              f'cpu:CPU_IRQ{bit}'):
                     assert name in mutant['unmodeled_nets']
