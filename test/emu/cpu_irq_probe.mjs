@@ -76,7 +76,7 @@ try {
     machine.powerOn();
     machine.runFor(bit === 0 ? 1e9 : bit === 3 ? 80e6 : 2e6);
     if (bit === 0) {
-      machine.type('x');
+      if (machine.keyboard) machine.type('x');
       machine.runFor(100e6);
     }
     console.log(JSON.stringify({ bit, state: machine.state() }));

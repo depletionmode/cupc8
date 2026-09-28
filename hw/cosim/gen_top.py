@@ -551,6 +551,47 @@ def system_usb_routes(system, board):
     return orientation, paths, missing
 
 
+def io_usb_host_routes(io, board):
+    """Bind the keyboard host PHY, series parts, receptacle, and ESD copper."""
+    loaded_board = parsed_tree = None
+    if board is not None and Path(board).is_file():
+        loaded_board, parsed_tree = cpu_board_geometry(str(Path(board).resolve()))
+    if io.components.get('U6') != ('USBLC6-2SC6', ('Power_Protection', 'USBLC6-2SC6')):
+        raise ValueError('IO USB host: wrong ESD array')
+    paths, missing = [], []
+    host_connected = True
+    for signal, mcu_pad, resistor, contact, esd_pads in (
+            ('DM', '46', 'R14', '2', ('1', '6')),
+            ('DP', '47', 'R15', '3', ('3', '4'))):
+        source_net, contact_net = f'/USB_{signal}', f'/USB_CONN_{signal}'
+        source, series_in, series_out = ('U1', mcu_pad), (resistor, '1'), (resistor, '2')
+        socket, esd = ('J2', contact), [('U6', pin) for pin in esd_pads]
+        if io.components.get(resistor) != ('27R', ('Device', 'R')) or \
+                set(io.nets.get(source_net, ())) != {source, series_in} or \
+                set(io.nets.get(contact_net, ())) != {series_out, socket, *esd} or \
+                path(io, source, socket, '27R') != resistor:
+            raise ValueError(f'IO USB host {signal}: wrong PHY, series part, contact or ESD pads')
+        for net, first, last, branch in (
+                (source_net, source, series_in, 'source'),
+                (contact_net, series_out, socket, 'contact'),
+                *((contact_net, series_out, pad, 'esd') for pad in esd)):
+            mm = None
+            if loaded_board is not None:
+                sys.path.insert(0, str(ROOT / 'hw/si'))
+                from ibis_bus import routed_distances
+                mm = routed_distances(Path(board), net, first, [last],
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'io.{first[0]}.{first[1]}',
+                          'to': f'io.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'io_usb_host_{branch}'})
+            if mm is None:
+                missing.append(f'io:{net.lstrip("/")}_{branch}_copper')
+                if branch != 'esd':
+                    host_connected = False
+    return host_connected, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1236,16 +1277,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     fractions = (ohms(r_cc2.value) / (ohms(r_cc1.value) + ohms(r_cc2.value)),
                  ohms(r_cc1.value) / (ohms(r_cc1.value) + ohms(r_cc2.value)))
     manifest['runtime']['cc_trip_volts'] = [round(reference / f, 6) for f in fractions]
-    # The USB host lives on the IO card. Its two RP2040 PHY pads must reach
-    # the actual receptacle contacts through the fitted 27 ohm series parts.
-    for signal, connector_pin in (('DM', '2'), ('DP', '3')):
-        source = named_pin(cards['io'], 'U1', f'USB_{signal}')
-        resistor = path(cards['io'], source, ('J2', connector_pin), '27R')
-        manifest['paths'].append({'from': f'io.U1.{source[1]}',
-                                  'to': f'io.J2.{connector_pin}',
-                                  'series': resistor, 'ohms': 27,
-                                  'runtime': 'io_usb_host'})
-    manifest['runtime']['io_usb_host'] = True
+    io_usb_board = (card_boards or {}).get('io')
+    io_usb_host, io_usb_paths, io_usb_missing = io_usb_host_routes(cards['io'], io_usb_board)
+    manifest['paths'].extend(io_usb_paths)
+    manifest['runtime']['io_usb_host'] = io_usb_host
+    manifest['runtime']['missing_routes'].extend(io_usb_missing)
+    manifest['runtime']['routed_top'] &= not io_usb_missing
     # The microSD socket is a direct seven-wire attachment to the storage
     # RP2040. An absent or swapped contact removes that socket from co-sim.
     sd_contacts = {'SD_DAT2': '1', 'SD_nCS': '2', 'SD_MOSI': '3',
@@ -1406,8 +1443,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('system', name)
     for name in ('BR_SCK_MCU', 'BR_MOSI_MCU', 'BR_nCS_MCU'):
         runtime_net('system', name)
-    for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
-        runtime_net('io', name)
+    if not io_usb_missing:
+        for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
+            runtime_net('io', name)
     for name in sd_contacts:
         runtime_net('storage', name)
     for name in hdmi_contacts:

@@ -81,6 +81,21 @@ reset pulse analog timing and the unresolved rail return are outside it.
 `test/hw/test_cosim_sysctl_reset.py` repeats both copper mutations and the
 native command probe.
 
+The IO card's USB keyboard host pair runs from RP2040 U1.46/47 through the
+27 Ω R14/R15 resistors to receptacle J2.2/3. The model checks both USBLC6
+ESD branches on each connector net. All eight copper legs are routed on the
+current IO receipt: 10.396–10.957 mm from PHY to resistor, 9.407–20.101 mm
+from resistor to receptacle, and 3.768–26.709 mm to ESD pads. The native
+keyboard is attached only when both data paths reach the receptacle. Opening
+either PHY or contact launch on a private PCB copy removes keyboard input,
+so the keyboard IRQ fixture remains at GPO `$11` instead of reaching its
+handler at `$A0`. An open ESD branch preserves keyboard operation but fails
+the complete route requirement. Any open restores all four IO USB signal
+nets as strict coverage gaps. This is a digital continuity model; it does not
+establish USB eye quality, ESD performance, connector resistance or VBUS
+power behavior. `test/hw/test_cosim_io_usb_host.py` checks source values,
+copper mutations and the native keyboard IRQ.
+
 The system card's USB CDC PHY reaches both Type-C orientations through two
 27 Ω series resistors. U1.46/R3 carries D− to J1.A7/B7; U1.47/R2 carries
 D+ to J1.A6/B6. U3's four ESD pads are checked as separate routed branches.
