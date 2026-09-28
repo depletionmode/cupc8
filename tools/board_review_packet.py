@@ -2,8 +2,10 @@
 """Make an unsigned, printable visual review packet from verified board builds."""
 
 import argparse
+import csv
 import hashlib
 import importlib.util
+import io
 from pathlib import Path
 import sys
 
@@ -13,10 +15,70 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 BOARDS = ('main', 'cpu', 'gpu', 'eink', 'io', 'storage', 'wifi', 'system')
 PAGE = (1654, 2339)  # A4 portrait, 200 dpi
 MARGIN = 95
+CHECKLIST_FIELDS = ('board', 'designator', 'value', 'footprint', 'lcsc_part',
+                    'side', 'mid_x', 'mid_y', 'rotation', 'receipt_sha256',
+                    'bom_sha256', 'cpl_sha256', 'pin_1_review',
+                    'polarity_review', 'rotation_review')
 
 
 def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def checklist_rows(board, board_dir):
+    """Join one BOM component per CPL placement, with exact designator coverage."""
+    bom = board_dir / 'fab/bom.csv'
+    cpl = board_dir / 'fab/cpl.csv'
+    with bom.open(newline='') as stream:
+        bom_rows = list(csv.DictReader(stream))
+    with cpl.open(newline='') as stream:
+        cpl_rows = list(csv.DictReader(stream))
+    if not bom_rows or not cpl_rows:
+        raise ValueError(f'{board}: empty BOM or CPL')
+    if not {'Comment', 'Designator', 'Footprint', 'LCSC Part #'} <= bom_rows[0].keys():
+        raise ValueError(f'{board}: unexpected BOM columns')
+    if not {'Designator', 'Mid X', 'Mid Y', 'Layer', 'Rotation'} <= cpl_rows[0].keys():
+        raise ValueError(f'{board}: unexpected CPL columns')
+
+    bom_by_ref = {}
+    for item in bom_rows:
+        for ref in (part.strip() for part in item['Designator'].split(',')):
+            if not ref or ref in bom_by_ref:
+                raise ValueError(f'{board}: empty or duplicate BOM designator: {ref!r}')
+            bom_by_ref[ref] = item
+    cpl_by_ref = {}
+    for item in cpl_rows:
+        ref = item['Designator'].strip()
+        if not ref or ref in cpl_by_ref:
+            raise ValueError(f'{board}: empty or duplicate CPL designator: {ref!r}')
+        cpl_by_ref[ref] = item
+    if bom_by_ref.keys() != cpl_by_ref.keys():
+        missing_cpl = sorted(bom_by_ref.keys() - cpl_by_ref.keys())
+        missing_bom = sorted(cpl_by_ref.keys() - bom_by_ref.keys())
+        raise ValueError(f'{board}: BOM/CPL coverage differs; missing CPL={missing_cpl}, '
+                         f'missing BOM={missing_bom}')
+
+    receipt_hash = sha256(board_dir / 'evidence.json')
+    bom_hash, cpl_hash = sha256(bom), sha256(cpl)
+    rows = []
+    for ref, placement in cpl_by_ref.items():
+        part = bom_by_ref[ref]
+        rows.append(dict(board=board, designator=ref, value=part['Comment'],
+                         footprint=part['Footprint'], lcsc_part=part['LCSC Part #'],
+                         side=placement['Layer'], mid_x=placement['Mid X'],
+                         mid_y=placement['Mid Y'], rotation=placement['Rotation'],
+                         receipt_sha256=receipt_hash, bom_sha256=bom_hash,
+                         cpl_sha256=cpl_hash, pin_1_review='', polarity_review='',
+                         rotation_review=''))
+    return rows
+
+
+def write_checklist(path, rows):
+    buffer = io.StringIO(newline='')
+    writer = csv.DictWriter(buffer, fieldnames=CHECKLIST_FIELDS)
+    writer.writeheader()
+    writer.writerows(rows)
+    path.write_text(buffer.getvalue())
 
 
 def load_module(name, path):
@@ -88,6 +150,8 @@ def render_pages(board, board_dir, overlay, receipt, number, total):
 def create(repo_root, build_root, output, boards):
     if output.is_relative_to(build_root / 'hw'):
         raise ValueError('packet output must be outside receipt-bound build/hw')
+    if len(set(boards)) != len(boards):
+        raise ValueError('duplicate board in requested list')
     boardevidence = load_module('boardevidence', repo_root / 'hw/tools/boardevidence.py')
     # Validate every requested board before creating any output. This includes all
     # receipt input and artifact hashes and the mandatory render and fab files.
@@ -99,6 +163,8 @@ def create(repo_root, build_root, output, boards):
 
     for board in boards:
         validate(board)
+    rows = [row for board in boards
+            for row in checklist_rows(board, build_root / 'hw' / board)]
 
     sys.path.insert(0, str(repo_root / 'hw/tools'))
     cploverlay = load_module('cploverlay', repo_root / 'hw/tools/cploverlay.py')
@@ -115,10 +181,17 @@ def create(repo_root, build_root, output, boards):
     for board in boards:
         validate(board)
     first, *rest = pages
-    first.save(output, 'PDF', save_all=True, append_images=rest,
+    temp_pdf = output.with_name(output.stem + '.tmp.pdf')
+    checklist = output.with_name(output.stem + '-checklist.csv')
+    temp_csv = checklist.with_name(checklist.stem + '.tmp.csv')
+    first.save(temp_pdf, 'PDF', save_all=True, append_images=rest,
                resolution=200.0, title='CUPC8 board visual review packet',
                author='CUPC8 build tooling')
+    write_checklist(temp_csv, rows)
+    temp_pdf.replace(output)
+    temp_csv.replace(checklist)
     print(f'{output} ({len(pages)} pages; review pending)')
+    print(f'{checklist} ({len(rows)} unsigned review rows)')
 
 
 def main():
