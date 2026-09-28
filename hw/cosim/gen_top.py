@@ -506,6 +506,51 @@ def cpu_timer_exp_routes(main, cpu, main_board, cpu_board):
     return links, paths, missing
 
 
+def system_usb_routes(system, board):
+    """Bind the system MCU CDC PHY through series, Type-C, and ESD branches."""
+    loaded_board = parsed_tree = None
+    if board is not None and Path(board).is_file():
+        loaded_board, parsed_tree = cpu_board_geometry(str(Path(board).resolve()))
+    orientation = {'A': True, 'B': True}
+    paths, missing = [], []
+    if system.components.get('U3') != ('USBLC6-2SC6', ('Power_Protection', 'USBLC6-2SC6')):
+        raise ValueError('system USB: wrong Type-C ESD array')
+    for signal, mcu_pad, resistor, contacts, esd_pads in (
+            ('DM', '46', 'R3', ('A7', 'B7'), ('3', '4')),
+            ('DP', '47', 'R2', ('A6', 'B6'), ('1', '6'))):
+        source_net, contact_net = f'/USB_{signal}_MCU', f'/USB_{signal}'
+        source, series_in, series_out = ('U1', mcu_pad), (resistor, '1'), (resistor, '2')
+        contacts_at_j1 = [('J1', pin) for pin in contacts]
+        esd = [('U3', pin) for pin in esd_pads]
+        if system.components.get(resistor) != ('27', ('Device', 'R')) or \
+                set(system.nets.get(source_net, ())) != {source, series_in} or \
+                set(system.nets.get(contact_net, ())) != {series_out, *contacts_at_j1, *esd} or \
+                path(system, source, contacts_at_j1[0], '27') != resistor:
+            raise ValueError(f'system USB {signal}: wrong PHY, series part, contacts or ESD pads')
+        for net, first, last, branch in (
+                (source_net, source, series_in, 'source'),
+                *((contact_net, series_out, target, f'contact_{kind}')
+                  for kind, target in zip(('A', 'B'), contacts_at_j1)),
+                *((contact_net, series_out, target, 'esd') for target in esd)):
+            mm = None
+            if loaded_board is not None:
+                sys.path.insert(0, str(ROOT / 'hw/si'))
+                from ibis_bus import routed_distances
+                mm = routed_distances(Path(board), net, first, [last],
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree)[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'system.{first[0]}.{first[1]}',
+                          'to': f'system.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'system_usb_{branch}'})
+            if mm is None:
+                missing.append(f'system:{net.lstrip("/")}_{branch}_copper')
+                if branch == 'source':
+                    orientation = {'A': False, 'B': False}
+                elif branch.startswith('contact_'):
+                    orientation[branch[-1]] = False
+    return orientation, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1306,6 +1351,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['button_manual_reset_connected'] = manual_reset['button']
     manifest['runtime']['missing_routes'].extend(manual_reset_missing)
     manifest['runtime']['routed_top'] &= not manual_reset_missing
+    usb_links, usb_paths, usb_missing = system_usb_routes(cards['system'], system_board)
+    manifest['paths'].extend(usb_paths)
+    manifest['runtime']['system_usb_connected'] = usb_links
+    manifest['runtime']['system_usb_complete'] = not usb_missing
+    manifest['runtime']['missing_routes'].extend(usb_missing)
+    manifest['runtime']['routed_top'] &= not usb_missing
     circuits = {'main': main, **cards}
     structural = set()
     for connection in manifest['contacts']:
@@ -1421,6 +1472,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('system', 'SYS_nRST')
     if all(manual_reset.values()):
         runtime_net('main', 'nMR')
+    if not usb_missing:
+        for name in ('USB_DM', 'USB_DM_MCU', 'USB_DP', 'USB_DP_MCU'):
+            runtime_net('system', name)
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest

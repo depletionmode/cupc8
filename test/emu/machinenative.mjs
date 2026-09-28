@@ -121,6 +121,7 @@ export class Machine {
   // pcap: a file for the Wi-Fi card's network traffic
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false, pwrHi = true,
     resetButtonPressed = false,
+    usbOrientation = 'A',
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
     const m = new Machine();
     m.rom = rom ?? kernelRom();
@@ -130,6 +131,8 @@ export class Machine {
     hostfwd(forward);                    // a bad entry throws before QEMU starts
     if (wifi.length) m.esp = startEsp(path.join(ROOT, 'build/esp32c3-qemu/flash.bin'), forward, pcap);
     const netlistTop = process.env.CUPC8_COSIM_TOP && JSON.parse(fs.readFileSync(process.env.CUPC8_COSIM_TOP, 'utf8'));
+    if (!['A', 'B'].includes(usbOrientation))
+      throw new Error('machinenative: USB orientation must be A or B');
     if (netlistTop && (!netlistTop.runtime || !netlistTop.boards?.includes('main')))
       throw new Error('machinenative: invalid schematic-derived top');
     const trips = netlistTop?.runtime.cc_trip_volts;
@@ -177,6 +180,10 @@ export class Machine {
       throw new Error('machinenative: invalid system manual-reset route model');
     if (netlistTop && typeof netlistTop.runtime.button_manual_reset_connected !== 'boolean')
       throw new Error('machinenative: invalid reset-button route model');
+    if (netlistTop && (typeof netlistTop.runtime.system_usb_connected?.A !== 'boolean' ||
+                      typeof netlistTop.runtime.system_usb_connected?.B !== 'boolean' ||
+                      typeof netlistTop.runtime.system_usb_complete !== 'boolean'))
+      throw new Error('machinenative: invalid system USB route model');
     if (typeof resetButtonPressed !== 'boolean')
       throw new Error('machinenative: resetButtonPressed must be boolean');
     const gpoLedLinks = netlistTop?.runtime.gpo_led_connected ?? Array(8).fill(true);
@@ -235,7 +242,7 @@ export class Machine {
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...activeSlots };
-    if (activeSysctl) {
+    if (activeSysctl && (netlistTop?.runtime.system_usb_connected[usbOrientation] ?? true)) {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
     }
