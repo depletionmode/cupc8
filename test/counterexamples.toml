@@ -1072,9 +1072,11 @@ must_fail = ["network:"]
 [[bug]]
 name = "lockstep QEMU: the settle after a guest packet did not wake the main loop, so a TCP connect's new host socket was not polled and the SYN-ACK reached the guest 0.44 ms of guest time late, whenever the main loop went round"
 fixed_in = "c069a31"
+# Other QEMU events can wake the main loop during this workload, hiding the
+# regression. Check the required unlock/notify/wait ordering explicitly too.
 revert = [["tools/patches/qemu-esp-lockstep.patch", "+    qemu_notify_event();", "+    (void)0;"]]
-cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
-must_fail = ["not when it asked"]
+cmd = "python3 test/emu/test_lockstep_wakeup.py && tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
+must_fail = ["FAIL: net_settle must wake QEMU's main loop"]
 
 [[bug]]
 name = "kernel: a BASIC.PRG too big for $7000-$bfff was loaded (20 KB, over a second at boot) before it was refused"
