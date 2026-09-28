@@ -113,7 +113,16 @@ update it after every finding, commit, decision or agent result (David,
      polygon min-width proof.
    - IC-005: SY6280 has no fault pin or guaranteed limit → replacement part
      proposal (needs David's approval to change the IO board).
-   - CC-006 / MB-006: iCE40 core current bound, HT7533 theta-JA.
+   - CC-006 / MB-006: now run `python3 hw/power/thermal.py board <main|cpu>
+     build/hw/<board>` (hw/power/board_thermal.py, 10 tests). HT7533 closed
+     (Holtek HT75xx-2 Rev 1.30: 500 C/W; 169 uA of 3V3_STBY load, 42.0 C at
+     24 V; four MAX16054-related loads are d.assume values, datasheet not
+     downloaded; the new reset-qualifier parts must be added as loads when
+     they land). iCE40HX4K power-up peak bound passes (F1). **F2 red:** no
+     published iCE40 maximum operating current (DS1040 v3.2 typical only;
+     Power Calculator coefficients unpublished, iCEcube2 not installed): set
+     ICE40_CORE_MAX from a worst-corner Power Calculator report or a
+     first-article measurement; passes if < ~107 mA.
    - **WIFI-003: possible security bug, under investigation (agent).** The
      failing loaded run saw WIFI_EV_CONNECTED (0x10) for socket 0 while
      waiting for the self-signed-certificate refusal: either a TLS verify

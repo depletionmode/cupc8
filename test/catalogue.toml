@@ -1787,7 +1787,7 @@ checks = "all regulators Tj ≤ 100 °C at 40 °C ambient"
 method = "hw/power/budget.py"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py main thermal"
+cmd = "python3 hw/power/thermal.py board main build/hw/main && python3 test/hw/test_board_thermal.py"
 
 [[test]]
 id = "MB-007"
@@ -2577,7 +2577,7 @@ checks = "All regulators at 40 C ambient: Tj <= 100 C; missing models fail"
 method = "Board evidence plus hw/power/thermal.py"
 kind = "static"
 vrow = "4.5"
-cmd = "python3 hw/tools/boardcheck.py cpu thermal"
+cmd = "python3 hw/power/thermal.py board cpu build/hw/cpu && python3 test/hw/test_board_thermal.py"
 
 [[test]]
 id = "GC-006"

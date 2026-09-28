@@ -259,6 +259,13 @@ if __name__ == "__main__":
         import rp2040_thermal
         global_rc = main()
         sys.exit(rp2040_thermal.main(sys.argv[2:]) or global_rc)
+    if sys.argv[1:2] == ['board']:
+        # the main board's or CPU card's whole thermal row: THM-001, then the
+        # iCE40 1V2 and (main) HT7533 standby rows
+        import board_thermal
+        global_rc = main()
+        sys.exit(board_thermal.main(sys.argv[2:]) or global_rc)
     if len(sys.argv) != 1:
-        sys.exit('usage: thermal.py [wifi-card DIR | bind BOARD DIR [--binding-only] | rp2040 BOARD DIR]')
+        sys.exit('usage: thermal.py [wifi-card DIR | bind BOARD DIR [--binding-only] | rp2040 BOARD DIR'
+                 ' | board main|cpu DIR]')
     sys.exit(main())
