@@ -67,15 +67,14 @@ survives a lost session. Newest first within each section. Specs live in
 | Work | State |
 |---|---|
 | Main board | Salt-9 is replayed into the canonical `build/hw/main` under the strengthened checker: valid receipt, KiCad DRC zero, zero opens and zero schematic parity errors. All ten implemented independent plotted Gerber subchecks pass. The positive J1→F1→U2 hot/min-copper path alone is 73.060 mΩ against the 20 mΩ assembled-loop requirement, with 754 mW modeled instantaneous copper heat at the 3.213 A eFuse limit. MB-005 and board thermal remain red. A relocation trial has four opens/ten DRC findings and only 1.150 mΩ total contact budget left in its ideal-copper sensitivity scenario; the selected connector's published limit is much looser. See `hardware/main-mb005-two-sided-relocation-trial.md`. |
-| Cards and fabrication | Canonical CPU, GPU, IO, storage, and Wi-Fi rebuilds have valid receipts, zero pipeline DRC/parity errors, and nine of ten implemented independent Gerber checks pass; the remaining check finds 0.20 mm copper-to-notch against 0.30 mm. At the fixed 3.00 mm pad gap the geometric maximum is 0.255 mm per side at CEM minimum dimensions. E-ink and system canonical rebuilds are paused temporarily for the SI runtime margin. The main board CPL and all other human placement reviews remain unsigned; no manufacturing release. See `hardware/card-notch-qualification.md` and `build/fab-overlays/current` after its final refresh. |
-| Power, SI, and co-simulation | Wi-Fi's rebuilt 3V3 sensitivity scenarios pass but fitted capacitor ESR/effective capacitance, return pad/contact resistance, load envelope, and board thermal transfers remain unbounded; WC-005/WC-010 stay red. CPU ideal 3V3 feed is 14.78 mΩ, but CC-005 still lacks fitted contact/load/capacitor and thermal proof. HDMI coupled D0/D1 source-bound diagnostic passes; longer D2/CK runs are in progress on pinned fields. USB three-mesh S11 reverses direction and cannot support continuum extrapolation. Strict E2E route coverage has zero missing paths but still 310 unmodeled nets after routed LED, control, reset, ready, sync and status families; analog behavior remains outside those digital checks. |
-| Final gate | The last **completed** full `make verify` recorded 217 pass, 42 fail and 17 pending. A pre-integration run finished its other tests and counterexamples but was intentionally stopped during the duplicate sequential HDMI sweep; its partial output is not a new full result. The canonical board rebuild, long coupled SI, and final integrated full run are pending. Physical power, thermal, notch, Gerber-only completeness, CPL, and strict E2E gates prevent a green release. No manufacturing upload or order. |
+| Cards and fabrication | All eight canonical boards have valid receipts, zero pipeline DRC/parity errors and live JLC stock at twice the assembled quantity. Main passes all ten implemented independent plotted Gerber subchecks; each card passes nine of ten, failing the shared 0.20 mm copper-to-notch distance against 0.30 mm. At the fixed 3.00 mm pad gap the geometric maximum is 0.255 mm per side at CEM minimum dimensions. A 16-page unsigned PDF, 547-row CPL checklist, PNG renders and zoomable overlays are in `build/review-packet` and `build/fab-overlays/current`. All human placement reviews remain unsigned; no manufacturing release. See `hardware/card-notch-qualification.md`. |
+| Power, SI, and co-simulation | Wi-Fi's rebuilt 3V3 sensitivity scenarios pass but fitted capacitor ESR/effective capacitance, return pad/contact resistance, load envelope, and board thermal transfers remain unbounded; WC-005/WC-010 stay red. CPU ideal 3V3 feed is 14.78 mΩ, but CC-005 still lacks fitted contact/load/capacitor and thermal proof. HDMI coupled D0/D1 and long-window D2/CK copper subsets pass independent raw-trace/receipt audits; full four-pair launch/connector/loss/source/sink SI remains open. USB three-mesh S11 reverses direction and cannot support continuum extrapolation. The canonical eight-board IBIS source/path audit reproduces, but physical bus analog SI remains open. Strict E2E has zero missing routes among modeled nets and 288 unmodeled nets after IRQ, timer and system USB CDC families; focused native copper-open probes pass, while analog behavior remains outside the digital model. |
+| Final gate | The last **completed** full `make verify` recorded 217 pass, 42 fail and 17 pending. A pre-integration run finished its other tests and counterexamples but was intentionally stopped during the duplicate sequential HDMI sweep; its partial output is not a new full result. The canonical board rebuild and long coupled SI are complete. The final integrated full `make verify JOBS=2` is running. Physical power, thermal, notch, Gerber-only completeness, CPL and strict E2E gates prevent a green release. No manufacturing upload or order. |
 
 ## Done (recent)
 
-- Seven card boards regenerated after the Gerber precision checks and passed
-  ERC, board DRC and schematic parity; their current receipts validate. The
-  main-board rebuild is still routing.
+- All eight canonical board builds passed ERC, board DRC, schematic parity and
+  stock checks; current receipts validate. The shared card-notch gate remains red.
 - BASIC follow-ups are integrated: packed ROM image, approved dead-code
   removals, run/hook handshake, isolated Nim cache and assembler comment
   parsing. Focused simulator/host checks, nine counterexamples, native
@@ -103,6 +102,8 @@ survives a lost session. Newest first within each section. Specs live in
 
 ## Left before ordering
 
-- E2E-001 (co-sim from the netlists);
-  E2E-002/003/004 green on the native emulator; SI (4.6); the fab-readiness
-  hand checks; David's sign-off; the final design critique.
+- Complete routed and analog board co-simulation, signal integrity, power and
+  thermal proof; resolve the card notch and independent Gerber gaps; obtain
+  the supplier guarantees in the linked hardware notes. Finish the full
+  verification suite, inspect every CPL placement and fabrication option,
+  record David's sign-off and the final design critique.
