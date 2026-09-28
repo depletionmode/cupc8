@@ -15,6 +15,27 @@ thickness), `parts.md` (quantities, stock risks), `fab-readiness.md` /
 `fab-waivers.md` (the gate and the hand checks), the card-notch decision
 (`card-notch-decision-applied-20260928.md`) and `m1-live-status.md`.
 
+## Before you order: David's notes (2026-09-28)
+
+- **Board outline tolerance:** on all seven cards pick **±0.1 mm (high
+  precision)**, not the regular ±0.2 mm. At ±0.2 mm the 0.20 mm gap between
+  the key-notch walls and the nearest gold fingers can shrink to zero, and
+  MECH-101's >= 0.10 mm first-article gap assumes ±0.1 mm. Check the price
+  delta on the form when you order (not verified here). The main board can
+  stay at ±0.2 mm.
+- **Gold fingers:** confirm with JLC (chat before ordering) that "Gold
+  fingers: Yes" means electroplated hard gold, and its thickness. ENIG's
+  immersion gold is very thin and wears through after repeated insertions.
+- **Impedance control:** Yes on every 4- and 6-layer board, with the stackup
+  named in each board's `fab/order.json` (JLC04161H-7628 / JLC06161H-3313),
+  once the SI rows confirm our trace geometry hits the targets on it.
+- **Confirm Production File:** Yes, then run `tools/jlc_production_diff.py`
+  on JLC's files (section 4).
+- **Reserve scarce parts early** (bom-risk-audit-20260928.md): the main
+  board's SST39VF040 ROM C645939 (11 in stock) and the iCE40HX4K C1521989 (51
+  at JLC): reserve them in JLC's parts inventory before the first-article
+  order.
+
 ## 0. Mismatches and gaps found while writing this (resolve before ordering)
 
 | # | What | Where | Proposed resolution |

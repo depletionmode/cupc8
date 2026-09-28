@@ -32,7 +32,7 @@ update it after every finding, commit, decision or agent result (David,
     been rerun with it.
   - `hw/power/reset_supervisor.py`: proposed dual-rail qualifier: REF3425
     2.500 V reference (U17), OPA2333 as two comparators with resistor
-    hysteresis (U18) on 3V3 and 1V2, BAT54A OR into the MAX811T ~MR, and an
+    hysteresis (U18; the design now uses an OPA376 per the BOM audit) on 3V3 and 1V2, BAT54A OR into the MAX811T ~MR, and an
     SN74LVC07A (U19, on 3V3_STBY) driving the six SLOTn_RST_n from nPOR.
     Not yet simulated or reviewed (an op-amp used as a comparator needs its
     output swing/speed checked; LCSC stock unchecked).
@@ -60,6 +60,20 @@ update it after every finding, commit, decision or agent result (David,
   hard gold (ask JLC); M5 main needs Standard PCBA (8 THT connectors); M6 no
   material/TG; M7 13 vias in mask openings around Wi-Fi U1 (via-in-pad);
   M8 no CPL reviews yet.
+
+- **BOM risk audit (done):** doc/hardware/bom-risk-audit-20260928.md,
+  data doc/hardware/bom-risk-20260928.json, `tools/bom_risk.py --pending`.
+  Must-fix: reserve SST39VF040 C645939 (11 in stock) and iCE40HX4K C1521989
+  (51 JLC / 24 LCSC) before the first article (David action). Before a
+  production run: RT9013-12GB C58464 obsolete -> TLV75512PDBVR C2877864
+  (rerun RT9013 checks); W25Q16JVSSIQ C131025 and W25Q32JVSSIQ C179173 EOL ->
+  GD25Q16ESIGR C2922792 / GD25Q32ESIGR C2832998 (boot2 check on hardware).
+  Watch: C45783 NRND (-> C602037), ESP32-C3-MINI-1U-N4 NRND (N4X no JLC
+  stock), thin stock x4 socket/SRAM/F1. Parts cost: 2 of each board $501
+  (pending parts incl.), 10 of each $1,220.
+- **Wi-Fi via-in-pad (checklist M7), David: fix in the design, don't accept:**
+  move/tent the 13 vias in mask openings around U1 at the coordinated rebuild
+  (hw/boards/wifi.py or kicadgen; hashed, so queued with the rebuild).
 
 ## Everything left before the boards can be ordered
 

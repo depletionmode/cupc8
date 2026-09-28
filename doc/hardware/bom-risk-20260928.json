@@ -1,0 +1,5092 @@
+{
+ "fetched": "2026-09-28 (JLC selectSmtComponentList + LCSC wmsc product detail)",
+ "jlc": {
+  "C107055": {
+   "attrition": 10,
+   "brand": "YAGEO",
+   "describe": "50V 680pF NP0 \u00b15% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 1113200,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "CC0603JRNPO9BN681",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0061
+    ],
+    [
+     1000,
+     0.0051
+    ],
+    [
+     4000,
+     0.0046
+    ],
+    [
+     8000,
+     0.0043
+    ],
+    [
+     48000,
+     0.004
+    ],
+    [
+     100000,
+     0.0039
+    ]
+   ],
+   "stock": 1124634
+  },
+  "C112455": {
+   "attrition": 1,
+   "brand": "SOFNG",
+   "describe": "-35\u2103~+75\u2103 1 13.9mm 24V 250mA 4P Female Surface Mount, Right Angle Type-A USB 2.0 SMD USB Connectors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 3777,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "USB-302S-T",
+   "package": "SMD",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1769
+    ],
+    [
+     10,
+     0.14
+    ],
+    [
+     30,
+     0.1243
+    ],
+    [
+     100,
+     0.1046
+    ],
+    [
+     500,
+     0.0959
+    ],
+    [
+     1000,
+     0.0905
+    ]
+   ],
+   "stock": 3777
+  },
+  "C11702": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 1k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 0,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF1001TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0023
+    ],
+    [
+     1000,
+     0.0018
+    ],
+    [
+     3000,
+     0.0015
+    ],
+    [
+     10000,
+     0.0013
+    ],
+    [
+     50000,
+     0.0011
+    ],
+    [
+     50200,
+     0.0011
+    ]
+   ],
+   "stock": 8246998
+  },
+  "C122538": {
+   "attrition": 8,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100k\u03a9 100mW 75V Thin Film Resistor \u00b10.1% \u00b125ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 1041200,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRD07100KL",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.032
+    ],
+    [
+     200,
+     0.0272
+    ],
+    [
+     600,
+     0.0251
+    ],
+    [
+     5000,
+     0.0226
+    ],
+    [
+     10000,
+     0.022
+    ],
+    [
+     20000,
+     0.0215
+    ]
+   ],
+   "stock": 1228110
+  },
+  "C12624": {
+   "attrition": 12,
+   "brand": "Hubei KENTO Elec",
+   "describe": "-40\u2103~+85\u2103 1.6mm x 0.8mm square LED 100mW 120\u00b0 3.1V 430mcd 513nm~528nm 525nm 5mA Discrete Diode Emerald Green Water Clear 0603 LED Indication - Discrete ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 336150,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "KT-0603G",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0122
+    ],
+    [
+     500,
+     0.0097
+    ],
+    [
+     1500,
+     0.0083
+    ],
+    [
+     4000,
+     0.0075
+    ],
+    [
+     24000,
+     0.0068
+    ],
+    [
+     48000,
+     0.0064
+    ]
+   ],
+   "stock": 345532
+  },
+  "C127691": {
+   "attrition": 4,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 200V 333mW 50m\u03a9 Thick Film Resistor \u00b11% \u00b1800ppm/\u2103 1206 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 78900,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "1206W3F500MT5E",
+   "package": "1206",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0109
+    ],
+    [
+     500,
+     0.0088
+    ],
+    [
+     1500,
+     0.0077
+    ],
+    [
+     5000,
+     0.007
+    ],
+    [
+     25000,
+     0.0064
+    ],
+    [
+     50000,
+     0.0061
+    ]
+   ],
+   "stock": 83036
+  },
+  "C131025": {
+   "attrition": 0,
+   "brand": "Winbond Elec",
+   "describe": "-40\u2103~+85\u2103 100,000 cycles 10uA 133MHz 16Mbit 2.7V~3.6V 20 Years 3ms SPI SOIC-8-208mil NOR FLASH ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 12178,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "W25Q16JVSSIQ",
+   "package": "SOIC-8-208mil",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     1.2034
+    ],
+    [
+     10,
+     1.0589
+    ],
+    [
+     30,
+     0.9224
+    ],
+    [
+     100,
+     0.8218
+    ],
+    [
+     500,
+     0.7795
+    ],
+    [
+     1000,
+     0.6821
+    ]
+   ],
+   "stock": 13371
+  },
+  "C1348955": {
+   "attrition": 0,
+   "brand": "ISSI(Integrated Silicon Solution)",
+   "describe": "-40\u2103~+85\u2103 10uA 2.2V~3.6V 22mA 45ns 4Mbit Auto power-down function STSOP-32-11.8mm SRAM ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 224,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "IS62WV5128EBLL-45HLI",
+   "package": "STSOP-32-11.8mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     7.7413
+    ],
+    [
+     10,
+     6.6371
+    ],
+    [
+     30,
+     5.9631
+    ],
+    [
+     100,
+     5.398
+    ],
+    [
+     102,
+     5.398
+    ],
+    [
+     104,
+     5.398
+    ]
+   ],
+   "stock": 224
+  },
+  "C138714": {
+   "attrition": 4,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103 0.5pF 10nA 14V 2.5A@8/20us 40W@8/20us 5.5V 6.5V ESD Four channels IEC 61000-4-2\u3001IEC 61000-4-5\u3001IEC 61000-4-4 Unidirectional USON-10(1x2.5) ESD and Surge Protection (TVS/ESD) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 162720,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TPD4E05U06DQAR",
+   "package": "USON-10(1x2.5)",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0837
+    ],
+    [
+     50,
+     0.0663
+    ],
+    [
+     150,
+     0.0572
+    ],
+    [
+     500,
+     0.0499
+    ],
+    [
+     3000,
+     0.0473
+    ],
+    [
+     6000,
+     0.0455
+    ]
+   ],
+   "stock": 166122
+  },
+  "C141836": {
+   "attrition": 4,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103@(TJ) 1 1.5MHz 2.5V~5.5V 2A 600mV~5.5V Adjustable Buck Buck Built-in Yes SOT-23-5 DC-DC Converters ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 237265,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TLV62569DBVR",
+   "package": "SOT-23-5",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0761
+    ],
+    [
+     50,
+     0.0611
+    ],
+    [
+     150,
+     0.0535
+    ],
+    [
+     500,
+     0.0471
+    ],
+    [
+     3000,
+     0.0452
+    ],
+    [
+     6000,
+     0.0437
+    ]
+   ],
+   "stock": 237268
+  },
+  "C143975": {
+   "attrition": 2,
+   "brand": "PTTC(Polytronics Tech)",
+   "describe": "-40\u2103~+85\u2103 0.6mm 1.1A 1.8mm 100A 100ms 2.2A 210m\u03a9 3.4mm 40m\u03a9 800mW 8V 1206 Resettable Fuses ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 1440,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SMD1206P110TFT",
+   "package": "1206",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0596
+    ],
+    [
+     100,
+     0.0478
+    ],
+    [
+     300,
+     0.0419
+    ],
+    [
+     1000,
+     0.0376
+    ],
+    [
+     4000,
+     0.0335
+    ],
+    [
+     8000,
+     0.0317
+    ]
+   ],
+   "stock": 1442
+  },
+  "C14663": {
+   "attrition": 10,
+   "brand": "YAGEO",
+   "describe": "100nF 50V X7R \u00b110% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 10853850,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CC0603KRX7R9BB104",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0122
+    ],
+    [
+     500,
+     0.0088
+    ],
+    [
+     1500,
+     0.0073
+    ],
+    [
+     4000,
+     0.0058
+    ],
+    [
+     24000,
+     0.0054
+    ],
+    [
+     48000,
+     0.0051
+    ]
+   ],
+   "stock": 57465769
+  },
+  "C15008": {
+   "attrition": 4,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "100uF 6.3V X5R \u00b120% 1206 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 1551940,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL31A107MQHNNNE",
+   "package": "1206",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1253
+    ],
+    [
+     100,
+     0.0907
+    ],
+    [
+     300,
+     0.0738
+    ],
+    [
+     2000,
+     0.0587
+    ],
+    [
+     4000,
+     0.0545
+    ],
+    [
+     10000,
+     0.052
+    ]
+   ],
+   "stock": 2045425
+  },
+  "C1521989": {
+   "attrition": 0,
+   "brand": "Lattice",
+   "describe": "-40\u2103~+100\u2103 3520 440 81920bit TQFP-144(20x20) Programmable Logic Device (CPLDs/FPGAs) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 24,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "ICE40HX4K-TQ144",
+   "package": "TQFP-144(20x20)",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     17.4021
+    ],
+    [
+     10,
+     16.5463
+    ],
+    [
+     30,
+     15.0637
+    ],
+    [
+     100,
+     13.771
+    ],
+    [
+     102,
+     13.771
+    ],
+    [
+     104,
+     13.771
+    ]
+   ],
+   "stock": 51
+  },
+  "C1525": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "100nF 16V X7R \u00b110% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 2178700,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL05B104KO5NNNC",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0045
+    ],
+    [
+     1000,
+     0.0034
+    ],
+    [
+     3000,
+     0.0029
+    ],
+    [
+     10000,
+     0.0025
+    ],
+    [
+     50000,
+     0.0024
+    ],
+    [
+     100000,
+     0.0023
+    ]
+   ],
+   "stock": 23742564
+  },
+  "C1562": {
+   "attrition": 10,
+   "brand": "FH (Guangdong Fenghua Advanced Tech)",
+   "describe": "33pF 50V C0G \u00b15% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 315700,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402CG330J500NT",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0039
+    ],
+    [
+     1000,
+     0.0029
+    ],
+    [
+     3000,
+     0.0024
+    ],
+    [
+     10000,
+     0.002
+    ],
+    [
+     50000,
+     0.0017
+    ],
+    [
+     50200,
+     0.0017
+    ]
+   ],
+   "stock": 1084076
+  },
+  "C15849": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "1uF 50V X5R \u00b110% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 0,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL10A105KB8NNNC",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0171
+    ],
+    [
+     500,
+     0.0135
+    ],
+    [
+     1500,
+     0.0118
+    ],
+    [
+     4000,
+     0.0106
+    ],
+    [
+     24000,
+     0.0101
+    ],
+    [
+     48000,
+     0.0098
+    ]
+   ],
+   "stock": 6621857
+  },
+  "C15850": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "10uF 25V X5R \u00b110% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 878280,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL21A106KAYNNNE",
+   "package": "0805",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0788
+    ],
+    [
+     200,
+     0.0609
+    ],
+    [
+     600,
+     0.0519
+    ],
+    [
+     2000,
+     0.0442
+    ],
+    [
+     10000,
+     0.0416
+    ],
+    [
+     20000,
+     0.0398
+    ]
+   ],
+   "stock": 5353625
+  },
+  "C160457": {
+   "attrition": 0,
+   "brand": "HELE(Harmony Elec)",
+   "describe": "-40\u2103~+85\u2103 12MHz 3.3V 7mA CMOS \u00b150ppm SMD3225-4P Crystal Oscillators ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 3053,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "HSO321S 12MHZ 3.3V -40~+85\u2103",
+   "package": "SMD3225-4P",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     1.0166
+    ],
+    [
+     10,
+     0.8153
+    ],
+    [
+     30,
+     0.7146
+    ],
+    [
+     100,
+     0.6139
+    ],
+    [
+     500,
+     0.5538
+    ],
+    [
+     1000,
+     0.523
+    ]
+   ],
+   "stock": 3076
+  },
+  "C165948": {
+   "attrition": 0,
+   "brand": "Korean Hroparts Elec",
+   "describe": "-30\u2103~+80\u2103 1 10,000 cycles 16P 20V 5A 7.35mm Female Surface Mount, Right Angle Type-C SMD USB Connectors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 430745,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TYPE-C-31-M-12",
+   "package": "SMD",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1855
+    ],
+    [
+     50,
+     0.1465
+    ],
+    [
+     150,
+     0.1274
+    ],
+    [
+     1000,
+     0.1033
+    ],
+    [
+     2000,
+     0.0986
+    ],
+    [
+     5000,
+     0.0959
+    ]
+   ],
+   "stock": 446368
+  },
+  "C1663": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "33pF 50V C0G \u00b15% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 330400,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL10C330JB8NNNC",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0061
+    ],
+    [
+     1000,
+     0.0047
+    ],
+    [
+     4000,
+     0.004
+    ],
+    [
+     8000,
+     0.0035
+    ],
+    [
+     48000,
+     0.0033
+    ],
+    [
+     100000,
+     0.0032
+    ]
+   ],
+   "stock": 1015271
+  },
+  "C167200": {
+   "attrition": 2,
+   "brand": "cjiang (Changjiang Microelectronics Tech)",
+   "describe": "14m\u03a9 470nH 7.5A 9.5A Molded Inductor \u00b120% SMD,4.4x4.2mm Molding Power Inductors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 9430,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "FXL0420-R47-M",
+   "package": "SMD,4.4x4.2mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1792
+    ],
+    [
+     50,
+     0.1392
+    ],
+    [
+     150,
+     0.1222
+    ],
+    [
+     500,
+     0.1007
+    ],
+    [
+     3000,
+     0.085
+    ],
+    [
+     6000,
+     0.0791
+    ]
+   ],
+   "stock": 9433
+  },
+  "C167203": {
+   "attrition": 2,
+   "brand": "cjiang (Changjiang Microelectronics Tech)",
+   "describe": "1uH 27m\u03a9 6A 7A Molded Inductor \u00b120% SMD,4.4x4.2mm Molding Power Inductors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 112185,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "FXL0420-1R0-M",
+   "package": "SMD,4.4x4.2mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1196
+    ],
+    [
+     50,
+     0.0972
+    ],
+    [
+     150,
+     0.0855
+    ],
+    [
+     500,
+     0.0761
+    ],
+    [
+     3000,
+     0.0603
+    ],
+    [
+     6000,
+     0.058
+    ]
+   ],
+   "stock": 112188
+  },
+  "C167747": {
+   "attrition": 4,
+   "brand": "cjiang (Changjiang Microelectronics Tech)",
+   "describe": "2.2uH 2A 2A 78m\u03a9 Magnetic Shielded Inductor \u00b120% SMD,3x3mm Power Inductors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 50420,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "FNR3015S2R2MT",
+   "package": "SMD,3x3mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0431
+    ],
+    [
+     200,
+     0.0345
+    ],
+    [
+     600,
+     0.0301
+    ],
+    [
+     2000,
+     0.0249
+    ],
+    [
+     10000,
+     0.0225
+    ],
+    [
+     20000,
+     0.0212
+    ]
+   ],
+   "stock": 50427
+  },
+  "C17477": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 0\u03a9 125mW 150V Thick Film Resistor \u00b11% \u00b1800ppm/\u2103 0805 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 5138600,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0805W8F0000T5E",
+   "package": "0805",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0044
+    ],
+    [
+     1000,
+     0.0035
+    ],
+    [
+     5000,
+     0.003
+    ],
+    [
+     10000,
+     0.0027
+    ],
+    [
+     50000,
+     0.0026
+    ],
+    [
+     100000,
+     0.0025
+    ]
+   ],
+   "stock": 7002586
+  },
+  "C17888": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 0\u03a9 200V 250mW Thick Film Resistor \u00b11% \u00b1800ppm/\u2103 1206 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 1818000,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "1206W4F0000T5E",
+   "package": "1206",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0085
+    ],
+    [
+     1000,
+     0.0069
+    ],
+    [
+     5000,
+     0.0054
+    ],
+    [
+     10000,
+     0.0048
+    ],
+    [
+     50000,
+     0.0046
+    ],
+    [
+     100000,
+     0.0045
+    ]
+   ],
+   "stock": 2712605
+  },
+  "C179173": {
+   "attrition": 0,
+   "brand": "Winbond Elec",
+   "describe": "-40\u2103~+85\u2103 100,000 cycles 133MHz 1uA 2.7V~3.6V 20 Years 32Mbit 3ms SPI SOIC-8-208mil NOR FLASH ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 19557,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "W25Q32JVSSIQ",
+   "package": "SOIC-8-208mil",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     1.4941
+    ],
+    [
+     10,
+     1.2976
+    ],
+    [
+     30,
+     1.1595
+    ],
+    [
+     100,
+     1.0345
+    ],
+    [
+     500,
+     0.976
+    ],
+    [
+     1000,
+     0.9517
+    ]
+   ],
+   "stock": 21299
+  },
+  "C182716": {
+   "attrition": 0,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "360\u03a9 4 62.5mW 8 \u00b1200ppm/\u2103 \u00b15% 0603x4 Resistor Networks, Arrays ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 4600,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "4D03WGJ0361T5E",
+   "package": "0603x4",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0056
+    ],
+    [
+     1000,
+     0.0044
+    ],
+    [
+     5000,
+     0.0037
+    ],
+    [
+     10000,
+     0.0033
+    ],
+    [
+     50000,
+     0.0029
+    ],
+    [
+     100000,
+     0.0027
+    ]
+   ],
+   "stock": 4617
+  },
+  "C187836": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103 10mA 2.55V~12V 2.5V 24uVrms 6ppm/\u2103 95uA Fixed Series \u00b10.05% SOT-23-6 Voltage Reference ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 25930,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "REF3425IDBVR",
+   "package": "SOT-23-6",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     1.0686
+    ],
+    [
+     10,
+     0.8689
+    ],
+    [
+     30,
+     0.7698
+    ],
+    [
+     100,
+     0.6691
+    ],
+    [
+     500,
+     0.6106
+    ],
+    [
+     1000,
+     0.5798
+    ]
+   ],
+   "stock": 26040
+  },
+  "C19188869": {
+   "attrition": 0,
+   "brand": "SOFNG",
+   "describe": "-40\u2103~+85\u2103 11.1mm 42P 64P PCI-E x4 Surface Mount,Vertical With post SMD PCI / PCIe Connector ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 151,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "PCIE-64P11L",
+   "package": "SMD",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     2.5155
+    ],
+    [
+     10,
+     2.1306
+    ],
+    [
+     30,
+     1.8887
+    ],
+    [
+     250,
+     1.6418
+    ],
+    [
+     500,
+     1.5298
+    ],
+    [
+     1000,
+     1.4827
+    ]
+   ],
+   "stock": 151
+  },
+  "C193402": {
+   "attrition": 8,
+   "brand": "MDD(Microdiode Semiconductor)",
+   "describe": "-55\u2103~+150\u2103 200W@10/1000us 21.7A@10/1000us 400uA 5V 7V 9.2V TVS Unidirectional SOD-123FL ESD and Surge Protection (TVS/ESD) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 577860,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SMF5.0A",
+   "package": "SOD-123FL",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0281
+    ],
+    [
+     200,
+     0.0216
+    ],
+    [
+     600,
+     0.0189
+    ],
+    [
+     3000,
+     0.0158
+    ],
+    [
+     9000,
+     0.0149
+    ],
+    [
+     21000,
+     0.0144
+    ]
+   ],
+   "stock": 577860
+  },
+  "C19702": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "10V 10uF X5R \u00b110% 0603 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 4255160,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL10A106KP8NNNC",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0319
+    ],
+    [
+     200,
+     0.0249
+    ],
+    [
+     600,
+     0.0213
+    ],
+    [
+     4000,
+     0.0184
+    ],
+    [
+     8000,
+     0.0173
+    ],
+    [
+     20000,
+     0.0166
+    ]
+   ],
+   "stock": 10912270
+  },
+  "C2040": {
+   "attrition": 0,
+   "brand": "Raspberry Pi",
+   "describe": "12bit 133MHz 30 LQFN-56(7x7) Microcontrollers (MCU/MPU/SOC) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 66150,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RP2040",
+   "package": "LQFN-56(7x7)",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.9874
+    ],
+    [
+     10,
+     0.8997
+    ],
+    [
+     30,
+     0.8169
+    ],
+    [
+     100,
+     0.7568
+    ],
+    [
+     500,
+     0.7308
+    ],
+    [
+     1000,
+     0.7195
+    ]
+   ],
+   "stock": 71492
+  },
+  "C20526": {
+   "attrition": 5,
+   "brand": "Jiangsu Changjing Electronics Technology Co., Ltd.",
+   "describe": "-55\u2103~+150\u2103 1 NPN 100 100nA 200mA 200mW 300MHz 300mV 40V 6V NPN SOT-23 Bipolar (BJT) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 0,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "MMBT3904(RANGE:100-300)",
+   "package": "SOT-23",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0115
+    ],
+    [
+     500,
+     0.0092
+    ],
+    [
+     3000,
+     0.0081
+    ],
+    [
+     6000,
+     0.0073
+    ],
+    [
+     24000,
+     0.007
+    ],
+    [
+     51000,
+     0.0068
+    ]
+   ],
+   "stock": 284386
+  },
+  "C20975": {
+   "attrition": 4,
+   "brand": "RUILON(Shenzhen Ruilongyuan Elec)",
+   "describe": "-40\u2103~+85\u2103 1.5mm 1.5s 100mA 15V 1mm 2.2mm 300mA 30A 500mW 750m\u03a9 9\u03a9 0805 Resettable Fuses ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 46510,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SMD0805P010TF",
+   "package": "0805",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0881
+    ],
+    [
+     100,
+     0.071
+    ],
+    [
+     300,
+     0.0624
+    ],
+    [
+     1000,
+     0.0561
+    ],
+    [
+     5000,
+     0.0418
+    ],
+    [
+     10000,
+     0.0393
+    ]
+   ],
+   "stock": 47481
+  },
+  "C20976": {
+   "attrition": 4,
+   "brand": "RUILON(Shenzhen Ruilongyuan Elec)",
+   "describe": "-40\u2103~+85\u2103 0.9mm 1.5mm 2.2mm 200mA 20ms 3.5\u03a9 30A 500mA 500mW 500m\u03a9 9V 0805 Resettable Fuses ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 15740,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SMD0805P020TF",
+   "package": "0805",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.072
+    ],
+    [
+     100,
+     0.0558
+    ],
+    [
+     300,
+     0.0478
+    ],
+    [
+     1000,
+     0.0416
+    ],
+    [
+     5000,
+     0.0369
+    ],
+    [
+     10000,
+     0.0345
+    ]
+   ],
+   "stock": 15876
+  },
+  "C21189": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 0\u03a9 100mW 75V Thick Film Resistor \u00b11% 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 17380800,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF0000T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0023
+    ],
+    [
+     1000,
+     0.0018
+    ],
+    [
+     5000,
+     0.0016
+    ],
+    [
+     10000,
+     0.0013
+    ],
+    [
+     50000,
+     0.0012
+    ],
+    [
+     50200,
+     0.0012
+    ]
+   ],
+   "stock": 23866966
+  },
+  "C21190": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 1k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 5200600,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF1001T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0026
+    ],
+    [
+     1000,
+     0.002
+    ],
+    [
+     5000,
+     0.0018
+    ],
+    [
+     10000,
+     0.0014
+    ],
+    [
+     50000,
+     0.0013
+    ],
+    [
+     50200,
+     0.0013
+    ]
+   ],
+   "stock": 22836246
+  },
+  "C22775": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 100\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 6318800,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF1000T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0031
+    ],
+    [
+     1000,
+     0.0025
+    ],
+    [
+     5000,
+     0.0022
+    ],
+    [
+     10000,
+     0.0018
+    ],
+    [
+     50000,
+     0.0016
+    ],
+    [
+     50200,
+     0.0016
+    ]
+   ],
+   "stock": 12047811
+  },
+  "C22833": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 1.13k\u03a9 100mW 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 3300,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF1131T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0015
+    ],
+    [
+     1000,
+     0.0012
+    ],
+    [
+     5000,
+     0.001
+    ],
+    [
+     10000,
+     0.0009
+    ],
+    [
+     50000,
+     0.0008
+    ],
+    [
+     50200,
+     0.0008
+    ]
+   ],
+   "stock": 7645
+  },
+  "C2286": {
+   "attrition": 10,
+   "brand": "Hubei KENTO Elec",
+   "describe": "-40\u2103~+85\u2103 1.6mm x 0.8mm square LED 1.8V~2.4V 120\u00b0 20mA 300mcd 40mW 615nm~630nm 645nm Discrete Diode Red Water Clear 0603 LED Indication - Discrete ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 2140500,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "KT-0603R",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0075
+    ],
+    [
+     1000,
+     0.0058
+    ],
+    [
+     4000,
+     0.0045
+    ],
+    [
+     8000,
+     0.0039
+    ],
+    [
+     48000,
+     0.0037
+    ],
+    [
+     100000,
+     0.0035
+    ]
+   ],
+   "stock": 3866603
+  },
+  "C22935": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 1M\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 4662000,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF1004T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0019
+    ],
+    [
+     1000,
+     0.0015
+    ],
+    [
+     5000,
+     0.0013
+    ],
+    [
+     10000,
+     0.0011
+    ],
+    [
+     50000,
+     0.001
+    ],
+    [
+     50200,
+     0.001
+    ]
+   ],
+   "stock": 6754418
+  },
+  "C23024": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 300k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 311800,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF3003T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0054
+    ],
+    [
+     1000,
+     0.0044
+    ],
+    [
+     5000,
+     0.0038
+    ],
+    [
+     10000,
+     0.003
+    ],
+    [
+     50000,
+     0.0027
+    ],
+    [
+     100000,
+     0.0026
+    ]
+   ],
+   "stock": 586533
+  },
+  "C23140": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 33\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 4199900,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF330JT5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0025
+    ],
+    [
+     1000,
+     0.0019
+    ],
+    [
+     5000,
+     0.0017
+    ],
+    [
+     10000,
+     0.0015
+    ],
+    [
+     50000,
+     0.0013
+    ],
+    [
+     50200,
+     0.0013
+    ]
+   ],
+   "stock": 5724795
+  },
+  "C23162": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 4.7k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 14127200,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF4701T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0028
+    ],
+    [
+     1000,
+     0.0022
+    ],
+    [
+     5000,
+     0.0019
+    ],
+    [
+     10000,
+     0.0016
+    ],
+    [
+     50000,
+     0.0015
+    ],
+    [
+     50200,
+     0.0015
+    ]
+   ],
+   "stock": 22982411
+  },
+  "C23166": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 41.2k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 12360,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF4122T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0025
+    ],
+    [
+     100,
+     0.0019
+    ],
+    [
+     300,
+     0.0016
+    ],
+    [
+     1000,
+     0.0015
+    ],
+    [
+     5000,
+     0.0013
+    ],
+    [
+     5020,
+     0.0013
+    ]
+   ],
+   "stock": 12369
+  },
+  "C23186": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 5.1k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 22292600,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF5101T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0015
+    ],
+    [
+     1000,
+     0.0012
+    ],
+    [
+     5000,
+     0.001
+    ],
+    [
+     10000,
+     0.0008
+    ],
+    [
+     50000,
+     0.0007
+    ],
+    [
+     50200,
+     0.0007
+    ]
+   ],
+   "stock": 25815276
+  },
+  "C23213": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 6.8M\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 28000,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF6804T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0023
+    ],
+    [
+     1000,
+     0.0018
+    ],
+    [
+     5000,
+     0.0015
+    ],
+    [
+     10000,
+     0.0013
+    ],
+    [
+     50000,
+     0.0012
+    ],
+    [
+     50200,
+     0.0012
+    ]
+   ],
+   "stock": 29637
+  },
+  "C23240": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 750k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 293900,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF7503T5E",
+   "package": "0603",
+   "preferred": true,
+   "prices": [
+    [
+     1,
+     0.0027
+    ],
+    [
+     1000,
+     0.0021
+    ],
+    [
+     5000,
+     0.0018
+    ],
+    [
+     10000,
+     0.0015
+    ],
+    [
+     50000,
+     0.0013
+    ],
+    [
+     50200,
+     0.0013
+    ]
+   ],
+   "stock": 311778
+  },
+  "C23733": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "10V 4.7uF X5R \u00b120% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 785050,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL05A475MP5NRNC",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0166
+    ],
+    [
+     500,
+     0.0128
+    ],
+    [
+     1500,
+     0.0112
+    ],
+    [
+     10000,
+     0.009
+    ],
+    [
+     20000,
+     0.0085
+    ],
+    [
+     50000,
+     0.0082
+    ]
+   ],
+   "stock": 2529551
+  },
+  "C25076": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 985200,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF1000TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0012
+    ],
+    [
+     1000,
+     0.001
+    ],
+    [
+     3000,
+     0.0009
+    ],
+    [
+     10000,
+     0.0008
+    ],
+    [
+     50000,
+     0.0007
+    ],
+    [
+     50200,
+     0.0007
+    ]
+   ],
+   "stock": 4433259
+  },
+  "C25100": {
+   "attrition": 12,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 27\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 0,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0402WGF270JTCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0019
+    ],
+    [
+     1000,
+     0.0015
+    ],
+    [
+     3000,
+     0.0013
+    ],
+    [
+     10000,
+     0.0012
+    ],
+    [
+     50000,
+     0.001
+    ],
+    [
+     50200,
+     0.001
+    ]
+   ],
+   "stock": 58089
+  },
+  "C25190": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 27\u03a9 75V Thick Film Resistor \u00b11% \u00b1200ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 26600,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF270JT5E",
+   "package": "0603",
+   "preferred": true,
+   "prices": [
+    [
+     1,
+     0.0021
+    ],
+    [
+     1000,
+     0.0017
+    ],
+    [
+     5000,
+     0.0014
+    ],
+    [
+     10000,
+     0.0012
+    ],
+    [
+     50000,
+     0.0011
+    ],
+    [
+     50200,
+     0.0011
+    ]
+   ],
+   "stock": 113206
+  },
+  "C25501": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "33\u03a9 4 62.5mW 8 \u00b1200ppm/\u2103 \u00b15% 0402x4 Resistor Networks, Arrays ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 419250,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "4D02WGJ0330TCE",
+   "package": "0402x4",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0083
+    ],
+    [
+     500,
+     0.0066
+    ],
+    [
+     1500,
+     0.0056
+    ],
+    [
+     10000,
+     0.0049
+    ],
+    [
+     20000,
+     0.0044
+    ],
+    [
+     50000,
+     0.0041
+    ]
+   ],
+   "stock": 424328
+  },
+  "C25741": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 4654900,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF1003TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0025
+    ],
+    [
+     1000,
+     0.0019
+    ],
+    [
+     3000,
+     0.0016
+    ],
+    [
+     10000,
+     0.0014
+    ],
+    [
+     50000,
+     0.0013
+    ],
+    [
+     50200,
+     0.0013
+    ]
+   ],
+   "stock": 9424591
+  },
+  "C25744": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 10k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 9056400,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF1002TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0034
+    ],
+    [
+     1000,
+     0.0026
+    ],
+    [
+     3000,
+     0.0023
+    ],
+    [
+     10000,
+     0.0021
+    ],
+    [
+     50000,
+     0.0017
+    ],
+    [
+     50200,
+     0.0017
+    ]
+   ],
+   "stock": 22915369
+  },
+  "C25752": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 12k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 784100,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF1202TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0018
+    ],
+    [
+     1000,
+     0.0014
+    ],
+    [
+     3000,
+     0.0012
+    ],
+    [
+     10000,
+     0.0011
+    ],
+    [
+     50000,
+     0.0009
+    ],
+    [
+     50200,
+     0.0009
+    ]
+   ],
+   "stock": 1151183
+  },
+  "C25756": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 15k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 570500,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF1502TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0016
+    ],
+    [
+     1000,
+     0.0012
+    ],
+    [
+     3000,
+     0.001
+    ],
+    [
+     10000,
+     0.001
+    ],
+    [
+     50000,
+     0.0008
+    ],
+    [
+     50200,
+     0.0008
+    ]
+   ],
+   "stock": 1207933
+  },
+  "C25768": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 22k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 403100,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF2202TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0024
+    ],
+    [
+     1000,
+     0.0019
+    ],
+    [
+     3000,
+     0.0017
+    ],
+    [
+     10000,
+     0.0015
+    ],
+    [
+     50000,
+     0.0012
+    ],
+    [
+     50200,
+     0.0012
+    ]
+   ],
+   "stock": 876199
+  },
+  "C25779": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 33k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 776300,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF3302TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0058
+    ],
+    [
+     1000,
+     0.0046
+    ],
+    [
+     3000,
+     0.0039
+    ],
+    [
+     10000,
+     0.0035
+    ],
+    [
+     50000,
+     0.0031
+    ],
+    [
+     100000,
+     0.0029
+    ]
+   ],
+   "stock": 1253161
+  },
+  "C25803": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100k\u03a9 100mW 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 16206900,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF1003T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0031
+    ],
+    [
+     1000,
+     0.0024
+    ],
+    [
+     5000,
+     0.0021
+    ],
+    [
+     10000,
+     0.0017
+    ],
+    [
+     50000,
+     0.0016
+    ],
+    [
+     50200,
+     0.0016
+    ]
+   ],
+   "stock": 22562923
+  },
+  "C25804": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 10k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 8600,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF1002T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0018
+    ],
+    [
+     1000,
+     0.0015
+    ],
+    [
+     5000,
+     0.0013
+    ],
+    [
+     10000,
+     0.0013
+    ],
+    [
+     50000,
+     0.0012
+    ],
+    [
+     50200,
+     0.0012
+    ]
+   ],
+   "stock": 22069577
+  },
+  "C25818": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 453k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 183400,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF4533T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0016
+    ],
+    [
+     1000,
+     0.0013
+    ],
+    [
+     5000,
+     0.0011
+    ],
+    [
+     10000,
+     0.0009
+    ],
+    [
+     50000,
+     0.0008
+    ],
+    [
+     50200,
+     0.0008
+    ]
+   ],
+   "stock": 189738
+  },
+  "C25819": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 47k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 0,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF4702T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0037
+    ],
+    [
+     1000,
+     0.0028
+    ],
+    [
+     5000,
+     0.0024
+    ],
+    [
+     10000,
+     0.002
+    ],
+    [
+     50000,
+     0.0018
+    ],
+    [
+     50200,
+     0.0018
+    ]
+   ],
+   "stock": 1780897
+  },
+  "C25879": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 2.2k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 1196900,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF2201TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0053
+    ],
+    [
+     1000,
+     0.0042
+    ],
+    [
+     3000,
+     0.0036
+    ],
+    [
+     10000,
+     0.0033
+    ],
+    [
+     50000,
+     0.0028
+    ],
+    [
+     100000,
+     0.0026
+    ]
+   ],
+   "stock": 2425061
+  },
+  "C25900": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 4.7k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 10828000,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0402WGF4701TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0027
+    ],
+    [
+     1000,
+     0.0021
+    ],
+    [
+     3000,
+     0.0017
+    ],
+    [
+     10000,
+     0.0016
+    ],
+    [
+     50000,
+     0.0013
+    ],
+    [
+     50200,
+     0.0013
+    ]
+   ],
+   "stock": 15885507
+  },
+  "C26095": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 2.7M\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 14400,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0603WAF2704T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.003
+    ],
+    [
+     1000,
+     0.0024
+    ],
+    [
+     5000,
+     0.002
+    ],
+    [
+     10000,
+     0.0018
+    ],
+    [
+     50000,
+     0.0016
+    ],
+    [
+     50200,
+     0.0016
+    ]
+   ],
+   "stock": 14421
+  },
+  "C2845237": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103@(TJ) 1 1.3V~5.5V 1.4MHz\u30011.6MHz\u30012.1MHz 1.8V~5.2V 11uA 2A Adjustable Buck-Boost Buck-Boost Built-in Yes VSON-10(2x3) DC-DC Converters ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 17815,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TPS63802DLAR",
+   "package": "VSON-10(2x3)",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.9988
+    ],
+    [
+     10,
+     0.8445
+    ],
+    [
+     30,
+     0.7357
+    ],
+    [
+     100,
+     0.6464
+    ],
+    [
+     500,
+     0.6188
+    ],
+    [
+     1000,
+     0.6009
+    ]
+   ],
+   "stock": 17825
+  },
+  "C2858275": {
+   "attrition": 1,
+   "brand": "SHOU HAN",
+   "describe": "-55\u2103~+85\u2103 19P 300mA 40V Female HDMI-A Surface Mount, Right Angle SMD HDMI Connectors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 66260,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "HDMI 19PIN 043",
+   "package": "SMD",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1308
+    ],
+    [
+     50,
+     0.1032
+    ],
+    [
+     150,
+     0.0894
+    ],
+    [
+     500,
+     0.0769
+    ],
+    [
+     2500,
+     0.0686
+    ],
+    [
+     5000,
+     0.0645
+    ]
+   ],
+   "stock": 66262
+  },
+  "C2911374": {
+   "attrition": 0,
+   "brand": "Espressif Systems",
+   "describe": "-104dBm -40\u2103~+85\u2103 2.4GHz 20.5dBm 350mA 3V~3.6V 82mA Bluetooth5.0 ESP32-C3FN4 UART\u3001SPI\u3001I2C\u3001I2S\u3001USB SMD,13.2x12.5mm WiFi Modules ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 1973,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "ESP32-C3-MINI-1U-N4",
+   "package": "SMD,13.2x12.5mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     3.1277
+    ],
+    [
+     10,
+     2.7916
+    ],
+    [
+     30,
+     2.5902
+    ],
+    [
+     100,
+     2.4246
+    ],
+    [
+     650,
+     2.3125
+    ],
+    [
+     1300,
+     2.2622
+    ]
+   ],
+   "stock": 2206
+  },
+  "C2912578": {
+   "attrition": 4,
+   "brand": "Milliohm",
+   "describe": "-55\u2103~+155\u2103 100k\u03a9 100mW 75V Ceramic Resistor \u00b10.1% \u00b125ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 6540,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "HoAR0603-1/10W-100KR-0.1%-TCR25",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0738
+    ],
+    [
+     100,
+     0.0621
+    ],
+    [
+     300,
+     0.0562
+    ],
+    [
+     1000,
+     0.0519
+    ],
+    [
+     5000,
+     0.0403
+    ],
+    [
+     10000,
+     0.0385
+    ]
+   ],
+   "stock": 6544
+  },
+  "C29718": {
+   "attrition": 2,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "10k\u03a9 4 62.5mW 8 \u00b1200ppm/\u2103 \u00b15% 0603x4 Resistor Networks, Arrays ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 1804500,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "4D03WGJ0103T5E",
+   "package": "0603x4",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0075
+    ],
+    [
+     1000,
+     0.006
+    ],
+    [
+     5000,
+     0.0049
+    ],
+    [
+     10000,
+     0.0045
+    ],
+    [
+     50000,
+     0.0043
+    ],
+    [
+     100000,
+     0.0041
+    ]
+   ],
+   "stock": 2241144
+  },
+  "C318884": {
+   "attrition": 5,
+   "brand": "XKB Connection",
+   "describe": "-30\u2103~+85\u2103 1.5mm 1.6N 100,000 cycles 12V 5.1mm 5.1mm 50mA Gold No Round Button SPST Surface Mount,Vertical Without Bracket SMD-4P,5.1x5.1mm Tactile Switches ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 377640,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "TS-1187A-B-A-B",
+   "package": "SMD-4P,5.1x5.1mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0205
+    ],
+    [
+     200,
+     0.0158
+    ],
+    [
+     600,
+     0.0138
+    ],
+    [
+     4000,
+     0.012
+    ],
+    [
+     8000,
+     0.0114
+    ],
+    [
+     20000,
+     0.011
+    ]
+   ],
+   "stock": 550241
+  },
+  "C326727": {
+   "attrition": 8,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 37.4k\u03a9 75V Thin Film Resistor \u00b10.1% \u00b125ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 12060,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRD0737K4L",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0455
+    ],
+    [
+     200,
+     0.0384
+    ],
+    [
+     600,
+     0.0345
+    ],
+    [
+     5000,
+     0.0322
+    ],
+    [
+     10000,
+     0.0303
+    ],
+    [
+     20000,
+     0.0291
+    ]
+   ],
+   "stock": 12072
+  },
+  "C352826": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-55\u2103~+125\u2103 12ns@4.5V,50pF 2V~6V 74HC 8/1 8uA Break-before-make function Dual Supply TSSOP-16 Signal Switches, Multiplexers, Decoders ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 25900,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "CD74HC4051PWR",
+   "package": "TSSOP-16",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.3174
+    ],
+    [
+     50,
+     0.2479
+    ],
+    [
+     150,
+     0.218
+    ],
+    [
+     500,
+     0.1808
+    ],
+    [
+     2000,
+     0.1642
+    ],
+    [
+     4000,
+     0.1543
+    ]
+   ],
+   "stock": 25908
+  },
+  "C357060": {
+   "attrition": 2,
+   "brand": "TAI-TECH",
+   "describe": "2.2uH 32m\u03a9 3A 4.1A \u00b120% SMD,5x5mm Power Inductors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 2500,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "HPC5020NF-2R2M",
+   "package": "SMD,5x5mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0842
+    ],
+    [
+     50,
+     0.067
+    ],
+    [
+     150,
+     0.0583
+    ],
+    [
+     500,
+     0.052
+    ],
+    [
+     2500,
+     0.0468
+    ],
+    [
+     5000,
+     0.0442
+    ]
+   ],
+   "stock": 2505
+  },
+  "C3662799": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103 1 1mm 2.7V~23V 28.3m\u03a9 2mm 2mm Integrated FET Surface Mount QFN-10(2x2) Surge Protection Devices (SPDs) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 2684,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TPS259470ARPWR",
+   "package": "QFN-10(2x2)",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     1.2765
+    ],
+    [
+     10,
+     1.054
+    ],
+    [
+     30,
+     0.9338
+    ],
+    [
+     100,
+     0.7958
+    ],
+    [
+     500,
+     0.7341
+    ],
+    [
+     1000,
+     0.7065
+    ]
+   ],
+   "stock": 2684
+  },
+  "C393098": {
+   "attrition": 4,
+   "brand": "TA-I Tech",
+   "describe": "1W 1m\u03a9 Current Sense Resistor SMD \u00b11% \u00b1200ppm/\u2103 1206 Current Sense Resistors / Shunt Resistors ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 29050,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RLM12FTCMR001",
+   "package": "1206",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0483
+    ],
+    [
+     100,
+     0.039
+    ],
+    [
+     300,
+     0.0343
+    ],
+    [
+     1000,
+     0.0307
+    ],
+    [
+     5000,
+     0.028
+    ],
+    [
+     10000,
+     0.0265
+    ]
+   ],
+   "stock": 29296
+  },
+  "C398365": {
+   "attrition": 4,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103@(TJ) 1 1.5MHz 2.5V~5.5V 2A 600mV~5.5V Adjustable Buck Buck Built-in Yes SOT-23-THIN-6 DC-DC Converters ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 14840,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TLV62569PDDCR",
+   "package": "SOT-23-THIN-6",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.2331
+    ],
+    [
+     50,
+     0.1849
+    ],
+    [
+     150,
+     0.1643
+    ],
+    [
+     500,
+     0.1386
+    ],
+    [
+     3000,
+     0.1131
+    ],
+    [
+     6000,
+     0.1063
+    ]
+   ],
+   "stock": 14842
+  },
+  "C404111": {
+   "attrition": 0,
+   "brand": "UMAX",
+   "describe": "-40\u2103~+85\u2103 11.25mm 42P 98P PCI-E 3.0 Through Hole With column Plugin,P=1mm PCI / PCIe Connector ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 398,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "3183-10112P1T",
+   "package": "Plugin,P=1mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     1.166
+    ],
+    [
+     10,
+     0.9647
+    ],
+    [
+     40,
+     0.8542
+    ],
+    [
+     80,
+     0.7276
+    ],
+    [
+     480,
+     0.6724
+    ],
+    [
+     1000,
+     0.648
+    ]
+   ],
+   "stock": 398
+  },
+  "C404113": {
+   "attrition": 0,
+   "brand": "UMAX",
+   "describe": "-40\u2103~+85\u2103 11.25mm 142P 36P PCI-E 3.0 Through Hole With column Plugin,P=1mm PCI / PCIe Connector ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 2250,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "3183-10200P1T",
+   "package": "Plugin,P=1mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.5912
+    ],
+    [
+     10,
+     0.4726
+    ],
+    [
+     30,
+     0.4223
+    ],
+    [
+     70,
+     0.3508
+    ],
+    [
+     490,
+     0.3232
+    ],
+    [
+     980,
+     0.3053
+    ]
+   ],
+   "stock": 2250
+  },
+  "C408766": {
+   "attrition": 2,
+   "brand": "Viking Tech",
+   "describe": "-55\u2103~+155\u2103 20k\u03a9 50V 62.5mW Thin Film Resistor \u00b10.1% \u00b110ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 10780,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "AR03BTB2002",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1579
+    ],
+    [
+     50,
+     0.1264
+    ],
+    [
+     150,
+     0.1106
+    ],
+    [
+     500,
+     0.0988
+    ],
+    [
+     2500,
+     0.0866
+    ],
+    [
+     5000,
+     0.0819
+    ]
+   ],
+   "stock": 12375
+  },
+  "C4190": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 2.2k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 6013400,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF2201T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0018
+    ],
+    [
+     1000,
+     0.0014
+    ],
+    [
+     5000,
+     0.0012
+    ],
+    [
+     10000,
+     0.0011
+    ],
+    [
+     50000,
+     0.0009
+    ],
+    [
+     50200,
+     0.0009
+    ]
+   ],
+   "stock": 7775468
+  },
+  "C42134": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103 0.2pA 0.2pA 1 2.2V~5.5V 260nV/\u2103 2V/us 30mA 5.5MHz 5uV 7.5nV/\u221aHz@1kHz 760uA 76dB Rail-to-Rail Input, Rail-to-Rail Output SOT-23-5 Precision Op Amps ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 22815,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "OPA376AIDBVR",
+   "package": "SOT-23-5",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     2.2378
+    ],
+    [
+     10,
+     1.965
+    ],
+    [
+     30,
+     1.7718
+    ],
+    [
+     100,
+     1.5964
+    ],
+    [
+     500,
+     1.4632
+    ],
+    [
+     1000,
+     1.4291
+    ]
+   ],
+   "stock": 23282
+  },
+  "C4216": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 100mW 33k\u03a9 75V Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 2680600,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "0603WAF3302T5E",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0022
+    ],
+    [
+     1000,
+     0.0017
+    ],
+    [
+     5000,
+     0.0014
+    ],
+    [
+     10000,
+     0.0013
+    ],
+    [
+     50000,
+     0.0011
+    ],
+    [
+     50200,
+     0.0011
+    ]
+   ],
+   "stock": 3287136
+  },
+  "C42431818": {
+   "attrition": 0,
+   "brand": "JXTCONN",
+   "describe": "-40\u2103~+105\u2103 10P 1kV 2 2.54mm 2.54mm 2.5mm 2x5P 3A 3mm 6mm Black Brass Gold Pin Header Through Hole \u63d2\u4ef6,P=2.54mm Pin Headers ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 36530,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "PZ2.54-2X5P-H25",
+   "package": "Plugin,P=2.54mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0528
+    ],
+    [
+     100,
+     0.0419
+    ],
+    [
+     300,
+     0.0366
+    ],
+    [
+     1000,
+     0.0325
+    ],
+    [
+     5000,
+     0.0298
+    ],
+    [
+     10000,
+     0.0281
+    ]
+   ],
+   "stock": 37507
+  },
+  "C425067": {
+   "attrition": 0,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "270\u03a9 4 62.5mW 8 \u00b1200ppm/\u2103 \u00b15% 0603x4 Resistor Networks, Arrays ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 3550,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "4D03WGJ0271T5E",
+   "package": "0603x4",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0072
+    ],
+    [
+     500,
+     0.0056
+    ],
+    [
+     1500,
+     0.0047
+    ],
+    [
+     5000,
+     0.0041
+    ],
+    [
+     25000,
+     0.0037
+    ],
+    [
+     50000,
+     0.0034
+    ]
+   ],
+   "stock": 3961
+  },
+  "C45783": {
+   "attrition": 0,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "22uF 25V X5R \u00b120% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 1596100,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL21A226MAQNNNE",
+   "package": "0805",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.2199
+    ],
+    [
+     200,
+     0.1636
+    ],
+    [
+     600,
+     0.1361
+    ],
+    [
+     2000,
+     0.1116
+    ],
+    [
+     10000,
+     0.1048
+    ],
+    [
+     20000,
+     0.1007
+    ]
+   ],
+   "stock": 4151070
+  },
+  "C465732": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+85\u2103 1.65V~5.5V 10mA 16 25mA 3.5uA 400kHz 4V 500mV 8 I2C\u3001SMBus Interrupt Output Push-Pull Reset function\u3001Cascading and address extension\u3001Built-in LED driver TSSOP-24 I/O Expanders ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 39165,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TCA9555PWR",
+   "package": "TSSOP-24",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.7292
+    ],
+    [
+     10,
+     0.5879
+    ],
+    [
+     30,
+     0.5181
+    ],
+    [
+     100,
+     0.4466
+    ],
+    [
+     500,
+     0.3784
+    ],
+    [
+     1000,
+     0.3557
+    ]
+   ],
+   "stock": 39363
+  },
+  "C46970911": {
+   "attrition": 0,
+   "brand": "RUILON(Shenzhen Ruilongyuan Elec)",
+   "describe": "-40\u2103~+85\u2103 1.5mm 16V 2W 3.41mm 3.5A 30m\u03a9 35A 4.73mm 4s 6A 8m\u03a9 1812 Resettable Fuses ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 307,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SMD1812P350TF/16",
+   "package": "1812",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.3979
+    ],
+    [
+     10,
+     0.3151
+    ],
+    [
+     30,
+     0.2794
+    ],
+    [
+     100,
+     0.2355
+    ],
+    [
+     500,
+     0.216
+    ],
+    [
+     1500,
+     0.2047
+    ]
+   ],
+   "stock": 310
+  },
+  "C492417": {
+   "attrition": 0,
+   "brand": "XFCN",
+   "describe": "-40\u2103~+105\u2103 1 1x9P 2.54mm 2.5mm 250V 3A 6mm 9P Black Brass Pin Header Right Angle \u5f2f\u63d2,P=2.54mm Pin Headers ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 2280,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "PZ254R-11-09P",
+   "package": "Push-Pull,P=2.54mm",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0687
+    ],
+    [
+     100,
+     0.0551
+    ],
+    [
+     300,
+     0.0484
+    ],
+    [
+     1000,
+     0.0432
+    ],
+    [
+     5000,
+     0.0392
+    ],
+    [
+     10000,
+     0.0372
+    ]
+   ],
+   "stock": 2287
+  },
+  "C52140430": {
+   "attrition": 2,
+   "brand": "MDD(Microdiode Semiconductor)",
+   "describe": "-40\u2103~+125\u2103 1 1 1.65V~5.5V 2.6ns@5V,50pF 24mA 24mA 4uA 74LVC Power-off isolation\u3001Output enable\u3001Level shifting Schmitt trigger Tri-State Unidirectional SOT-353 Buffers, Drivers, Receivers, Transceivers ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 8202,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "74LVC1G125GW",
+   "package": "SOT-353",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0944
+    ],
+    [
+     10,
+     0.0744
+    ],
+    [
+     30,
+     0.0645
+    ],
+    [
+     100,
+     0.0569
+    ],
+    [
+     500,
+     0.051
+    ],
+    [
+     1000,
+     0.048
+    ]
+   ],
+   "stock": 8988
+  },
+  "C52923": {
+   "attrition": 10,
+   "brand": "Samsung Electro-Mechanics",
+   "describe": "1uF 25V X5R \u00b110% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 44350,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "CL05A105KA5NQNC",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0099
+    ],
+    [
+     500,
+     0.0074
+    ],
+    [
+     1500,
+     0.0063
+    ],
+    [
+     10000,
+     0.0047
+    ],
+    [
+     20000,
+     0.0043
+    ],
+    [
+     50000,
+     0.0041
+    ]
+   ],
+   "stock": 6175940
+  },
+  "C55136": {
+   "attrition": 2,
+   "brand": "Silergy Corp",
+   "describe": "-40\u2103~+125\u2103 1 2.4V~5.5V 80m\u03a9 Active High High Side Switch Overcurrent Protection(OCP)\u3001Over Temperature Protection SOT-23-5 Power Distribution Switches ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 133005,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SY6280AAC",
+   "package": "SOT-23-5",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0921
+    ],
+    [
+     50,
+     0.0731
+    ],
+    [
+     150,
+     0.0634
+    ],
+    [
+     500,
+     0.0553
+    ],
+    [
+     3000,
+     0.0525
+    ],
+    [
+     6000,
+     0.0507
+    ]
+   ],
+   "stock": 137219
+  },
+  "C58464": {
+   "attrition": 2,
+   "brand": "Richtek Tech",
+   "describe": "-40\u2103~+125\u2103@(Tj) 1 1.2V 25uA 30uVrms 400mV@(500mA) 5.5V 500mA 50dB@(10kHz) Fixed Over Current Protection\u3001Over Temperature Protection\u3001Enable Positive SOT-23-5 Voltage Regulators - Linear, Low Drop Out (LDO) Regulators ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 16180,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT9013-12GB",
+   "package": "SOT-23-5",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1404
+    ],
+    [
+     50,
+     0.1123
+    ],
+    [
+     150,
+     0.0981
+    ],
+    [
+     500,
+     0.0876
+    ],
+    [
+     3000,
+     0.0773
+    ],
+    [
+     6000,
+     0.0731
+    ]
+   ],
+   "stock": 16181
+  },
+  "C645939": {
+   "attrition": 0,
+   "brand": "Microchip Tech",
+   "describe": "-40\u2103~+85\u2103 100 Years 100,000 cycles 15uA 18ms 2.7V~3.6V 4Mbit Hardware write protection\u3001Software write protection PLCC-32(11.4x14) NOR FLASH ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 11,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SST39VF040-70-4I-NHE",
+   "package": "PLCC-32(11.4x14)",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     5.7877
+    ],
+    [
+     10,
+     4.979
+    ],
+    [
+     30,
+     4.5
+    ],
+    [
+     100,
+     4.0128
+    ],
+    [
+     500,
+     3.7887
+    ],
+    [
+     1000,
+     3.688
+    ]
+   ],
+   "stock": 11
+  },
+  "C702117": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103 1 1.6V~5.5V 1pA 260ns 4.2mV 500uV 5ns 5pA 5uA 6V 78dB CMOS Push-pull Rail-to-rail input SOT-23-5 Comparators ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 5806,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TLV7011DBVR",
+   "package": "SOT-23-5",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.5132
+    ],
+    [
+     10,
+     0.4336
+    ],
+    [
+     30,
+     0.3784
+    ],
+    [
+     100,
+     0.333
+    ],
+    [
+     500,
+     0.3183
+    ],
+    [
+     1000,
+     0.3086
+    ]
+   ],
+   "stock": 6136
+  },
+  "C7272": {
+   "attrition": 0,
+   "brand": "Analog Devices Inc./Maxim Integrated",
+   "describe": "-40\u2103~+85\u2103 1 140ms 1V~5.5V 2.7uA 3.08V Active Low No Push-pull Voltage Monitor Yes SOT-143 Supervisor and Reset ICs ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 13525,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "MAX811TEUS+T",
+   "package": "SOT-143",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.6009
+    ],
+    [
+     10,
+     0.4791
+    ],
+    [
+     30,
+     0.4271
+    ],
+    [
+     100,
+     0.3622
+    ],
+    [
+     500,
+     0.333
+    ],
+    [
+     1000,
+     0.3167
+    ]
+   ],
+   "stock": 13525
+  },
+  "C7519": {
+   "attrition": 2,
+   "brand": "STMicroelectronics",
+   "describe": "-40\u2103~+125\u2103 150nA 17V 2 3.5pF 5.25V 5A 6V ESD IEC 61000-4-2 Unidirectional SOT-23-6L ESD and Surge Protection (TVS/ESD) ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 42025,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "USBLC6-2SC6",
+   "package": "SOT-23-6L",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1765
+    ],
+    [
+     50,
+     0.1358
+    ],
+    [
+     150,
+     0.116
+    ],
+    [
+     500,
+     0.0983
+    ],
+    [
+     3000,
+     0.0934
+    ],
+    [
+     6000,
+     0.0905
+    ]
+   ],
+   "stock": 44473
+  },
+  "C7809": {
+   "attrition": 1,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103 1 1.65V~5.5V 10uA 2.6ns@5V,50pF 24mA 6 74LVC Open-drain Unidirectional TSSOP-14 Buffers, Drivers, Receivers, Transceivers ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 14755,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "SN74LVC07APWR",
+   "package": "TSSOP-14",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.4114
+    ],
+    [
+     50,
+     0.3317
+    ],
+    [
+     150,
+     0.2976
+    ],
+    [
+     500,
+     0.255
+    ],
+    [
+     2000,
+     0.236
+    ],
+    [
+     4000,
+     0.2246
+    ]
+   ],
+   "stock": 14757
+  },
+  "C79401": {
+   "attrition": 0,
+   "brand": "Analog Devices",
+   "describe": "-40\u2103~+125\u2103 2.7V~5.5V TSOT-23-6 Interface - Specialized ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 1,
+   "lcsc_stock": 1925,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "MAX16054AZT+T",
+   "package": "TSOT-23-6",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     3.5743
+    ],
+    [
+     10,
+     3.0027
+    ],
+    [
+     30,
+     2.6454
+    ],
+    [
+     100,
+     2.2784
+    ],
+    [
+     500,
+     1.8595
+    ],
+    [
+     1000,
+     1.788
+    ]
+   ],
+   "stock": 1925
+  },
+  "C82217": {
+   "attrition": 2,
+   "brand": "Holtek Semicon",
+   "describe": "-40\u2103~+85\u2103 1 100mA 2.5uA 25mV@(1mA) 3.3V 30V Fixed Positive SOT-23-5 Voltage Regulators - Linear, Low Drop Out (LDO) Regulators ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 14430,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "HT7533-2",
+   "package": "SOT-23-5",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1651
+    ],
+    [
+     50,
+     0.1308
+    ],
+    [
+     150,
+     0.116
+    ],
+    [
+     500,
+     0.0976
+    ],
+    [
+     3000,
+     0.0773
+    ],
+    [
+     6000,
+     0.0723
+    ]
+   ],
+   "stock": 15188
+  },
+  "C8545": {
+   "attrition": 5,
+   "brand": "Jiangsu Changjing Electronics Technology Co., Ltd.",
+   "describe": "1 N-channel 115mA 2.5V 225mW 25pF 50pF 5pF 5\u03a9@10V 60V N-Channel \u00b120V SOT-23 MOSFETs ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 50,
+   "lcsc_stock": 1304900,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "2N7002",
+   "package": "SOT-23",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0178
+    ],
+    [
+     500,
+     0.0141
+    ],
+    [
+     3000,
+     0.0125
+    ],
+    [
+     6000,
+     0.0113
+    ],
+    [
+     24000,
+     0.0108
+    ],
+    [
+     51000,
+     0.0105
+    ]
+   ],
+   "stock": 1704908
+  },
+  "C860067": {
+   "attrition": 2,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 10k\u03a9 75V Thin Film Resistor \u00b10.1% \u00b110ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 113330,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRB0710KL",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.178
+    ],
+    [
+     50,
+     0.1561
+    ],
+    [
+     150,
+     0.1449
+    ],
+    [
+     500,
+     0.1356
+    ],
+    [
+     2500,
+     0.1324
+    ],
+    [
+     5000,
+     0.1303
+    ]
+   ],
+   "stock": 151672
+  },
+  "C860320": {
+   "attrition": 2,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 30k\u03a9 75V Thin Film Resistor \u00b10.1% \u00b110ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 17500,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRB0730KL",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1905
+    ],
+    [
+     50,
+     0.1625
+    ],
+    [
+     150,
+     0.1485
+    ],
+    [
+     500,
+     0.1381
+    ],
+    [
+     2500,
+     0.1296
+    ],
+    [
+     5000,
+     0.1254
+    ]
+   ],
+   "stock": 17501
+  },
+  "C860392": {
+   "attrition": 2,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 43k\u03a9 75V Thin Film Resistor \u00b10.1% \u00b110ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 1985,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRB0743KL",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1883
+    ],
+    [
+     50,
+     0.1633
+    ],
+    [
+     150,
+     0.1509
+    ],
+    [
+     500,
+     0.1415
+    ],
+    [
+     2500,
+     0.134
+    ],
+    [
+     5000,
+     0.1303
+    ]
+   ],
+   "stock": 2337
+  },
+  "C861412": {
+   "attrition": 6,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 453k\u03a9 75V Thin Film Resistor \u00b10.1% \u00b125ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 10,
+   "lcsc_stock": 7450,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRD07453KL",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0574
+    ],
+    [
+     100,
+     0.0468
+    ],
+    [
+     300,
+     0.0416
+    ],
+    [
+     1000,
+     0.0376
+    ],
+    [
+     5000,
+     0.0345
+    ],
+    [
+     10000,
+     0.0329
+    ]
+   ],
+   "stock": 7451
+  },
+  "C861593": {
+   "attrition": 8,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 75V 8.87k\u03a9 Thin Film Resistor \u00b10.1% \u00b125ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 2560,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRD078K87L",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0353
+    ],
+    [
+     200,
+     0.0301
+    ],
+    [
+     600,
+     0.0272
+    ],
+    [
+     5000,
+     0.0254
+    ],
+    [
+     10000,
+     0.0239
+    ],
+    [
+     20000,
+     0.0231
+    ]
+   ],
+   "stock": 2567
+  },
+  "C9002": {
+   "attrition": 2,
+   "brand": "YXC Crystal Oscillators",
+   "describe": "-40\u2103~+85\u2103 12MHz 20pF 80\u03a9 Crystal Oscillator \u00b110ppm \u00b120ppm SMD3225-4P Crystals ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 32875,
+   "library": "basic",
+   "min_buy": 1,
+   "mpn": "X322512MSB4SI",
+   "package": "SMD3225-4P",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0947
+    ],
+    [
+     50,
+     0.0759
+    ],
+    [
+     150,
+     0.0661
+    ],
+    [
+     500,
+     0.0582
+    ],
+    [
+     3000,
+     0.0496
+    ],
+    [
+     6000,
+     0.0476
+    ]
+   ],
+   "stock": 144325
+  },
+  "C91145": {
+   "attrition": 0,
+   "brand": "Korean Hroparts Elec",
+   "describe": "1.85mm Connector and Ejector MicroSD Card (TF Card) Push-Push With Locating Pins SMD SD Card / Memory Card Connector ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 201535,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TF-01A",
+   "package": "SMD",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.1917
+    ],
+    [
+     50,
+     0.1527
+    ],
+    [
+     150,
+     0.1335
+    ],
+    [
+     1000,
+     0.1121
+    ],
+    [
+     2000,
+     0.1074
+    ],
+    [
+     5000,
+     0.1045
+    ]
+   ],
+   "stock": 204074
+  },
+  "C919459": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+125\u2103@(TJ) 1 1MHz 2.2V~5.5V 3A 3uA 500mV~5.5V Adjustable Boost Boost Built-in Overcurrent Protection\u3001Light load efficient mode\u3001Load disconnect Yes SOT-563 DC-DC Converters ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 44845,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TPS61023DRLR",
+   "package": "SOT-563",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.2485
+    ],
+    [
+     50,
+     0.1954
+    ],
+    [
+     150,
+     0.1695
+    ],
+    [
+     500,
+     0.1464
+    ],
+    [
+     2500,
+     0.1272
+    ],
+    [
+     4000,
+     0.1233
+    ]
+   ],
+   "stock": 46748
+  },
+  "C92068": {
+   "attrition": 4,
+   "brand": "onsemi",
+   "describe": "-55\u2103~+150\u2103 1 Pair Common Anode 100mA 2uA@25V 30V 600mA 800mV@100mA SOT-23 Schottky Diodes ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 41060,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "BAT54ALT1G",
+   "package": "SOT-23",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0314
+    ],
+    [
+     200,
+     0.0247
+    ],
+    [
+     600,
+     0.021
+    ],
+    [
+     3000,
+     0.0173
+    ],
+    [
+     9000,
+     0.0153
+    ],
+    [
+     21000,
+     0.0143
+    ]
+   ],
+   "stock": 41062
+  },
+  "C95204": {
+   "attrition": 8,
+   "brand": "YAGEO",
+   "describe": "-55\u2103~+155\u2103 100mW 10k\u03a9 75V Thin Film Resistor \u00b10.1% \u00b125ppm/\u2103 0603 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 20,
+   "lcsc_stock": 395040,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "RT0603BRD0710KL",
+   "package": "0603",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0327
+    ],
+    [
+     200,
+     0.0278
+    ],
+    [
+     600,
+     0.0257
+    ],
+    [
+     5000,
+     0.0238
+    ],
+    [
+     10000,
+     0.0231
+    ],
+    [
+     20000,
+     0.0226
+    ]
+   ],
+   "stock": 1786611
+  }
+ },
+ "notes": {
+  "C107055": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C112455": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C11702": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C122538": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": ""
+  },
+  "C12624": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C127691": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C131025": {
+   "lifecycle": "EOL: last order 2026-04-30, last ship 2026-07-30 (Winbond)",
+   "risk": "MUST-FIX pre-run: GD25Q16ESIGR C2922792 / W25Q16RV"
+  },
+  "C1348955": {
+   "lifecycle": "Active (distributors; issi.com not read)",
+   "risk": "WATCH: 224, no equal drop-in"
+  },
+  "C138714": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C141836": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C143975": {
+   "lifecycle": "Active (no notice found)",
+   "risk": "WATCH: 6/set; C20801 not equal"
+  },
+  "C14663": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C15008": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C1521989": {
+   "lifecycle": "Active (Lattice)",
+   "risk": "MUST-FIX: 51 JLC / 24 LCSC; reserve"
+  },
+  "C1525": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C1562": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C15849": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C15850": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C160457": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C165948": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C1663": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C167200": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C167203": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C167747": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C17477": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C17888": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C179173": {
+   "lifecycle": "EOL: last order 2026-07-30, last ship 2027-01-30 (Winbond)",
+   "risk": "MUST-FIX pre-run: GD25Q32ESIGR C2832998 / W25Q32RVCSJQ C54442318"
+  },
+  "C182716": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C187836": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C19188869": {
+   "lifecycle": "Active (no notice found)",
+   "risk": "WATCH: 151, single source"
+  },
+  "C193402": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C19702": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C2040": {
+   "lifecycle": "Active (RPi: available to >= Jan 2041)",
+   "risk": ""
+  },
+  "C20526": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C20975": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C20976": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C21189": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C21190": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C22775": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C22833": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C2286": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C22935": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23024": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23140": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23162": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23166": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23186": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23213": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23240": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C23733": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C25076": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25100": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25190": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25501": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25741": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25744": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25752": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25756": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25768": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25779": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25803": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25804": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25818": {
+   "lifecycle": "Active",
+   "risk": "replaced by C861412 (pending)"
+  },
+  "C25819": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25879": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C25900": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C26095": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C2845237": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C2858275": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C2911374": {
+   "lifecycle": "NRND (Espressif)",
+   "risk": "WATCH: ESP32-C3-MINI-1U-N4X C49230958 (0 at JLC today)"
+  },
+  "C2912578": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C29718": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C318884": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C326727": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": ""
+  },
+  "C352826": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C357060": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C3662799": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C393098": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C398365": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C404111": {
+   "lifecycle": "Active (no notice found)",
+   "risk": "WATCH: 398, single source"
+  },
+  "C404113": {
+   "lifecycle": "Active (no notice found)",
+   "risk": "WATCH: 6/set, single source"
+  },
+  "C408766": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C4190": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C42134": {
+   "lifecycle": "Active (TI; status field not read directly)",
+   "risk": ""
+  },
+  "C4216": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C42431818": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C425067": {
+   "lifecycle": "Active",
+   "risk": "replaced by C182716 (pending)"
+  },
+  "C45783": {
+   "lifecycle": "NRND (Samsung)",
+   "risk": "WATCH: CL21A226MAYNNNE C602037"
+  },
+  "C465732": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C46970911": {
+   "lifecycle": "Active (no notice found)",
+   "risk": "WATCH: 310; C20815 is 6 V (not equal)"
+  },
+  "C492417": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C52140430": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C52923": {
+   "lifecycle": "Mass production (Samsung)",
+   "risk": ""
+  },
+  "C55136": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C58464": {
+   "lifecycle": "Obsolete (Richtek EOL; DigiKey)",
+   "risk": "MUST-FIX pre-run: TLV75512PDBVR C2877864"
+  },
+  "C645939": {
+   "lifecycle": "Active (Microchip)",
+   "risk": "MUST-FIX: 11 in stock; reserve in JLC inventory"
+  },
+  "C702117": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C7272": {
+   "lifecycle": "Active (ADI, via Octopart)",
+   "risk": ""
+  },
+  "C7519": {
+   "lifecycle": "Active (ST)",
+   "risk": ""
+  },
+  "C7809": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C79401": {
+   "lifecycle": "Active (ADI, via Octopart)",
+   "risk": ""
+  },
+  "C82217": {
+   "lifecycle": "Active (Holtek 2002 EOL notice covers suffix-less HT7533 only)",
+   "risk": ""
+  },
+  "C8545": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C860067": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": ""
+  },
+  "C860320": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": ""
+  },
+  "C860392": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": "WATCH: 2,337; few 10 ppm alternates"
+  },
+  "C861412": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": ""
+  },
+  "C861593": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": "option: PTFR0603B8K87N9 C19680060, 10 ppm"
+  },
+  "C9002": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C91145": {
+   "lifecycle": "Active (no notice found)",
+   "risk": ""
+  },
+  "C919459": {
+   "lifecycle": "Active (TI)",
+   "risk": ""
+  },
+  "C92068": {
+   "lifecycle": "Active (onsemi)",
+   "risk": ""
+  },
+  "C95204": {
+   "lifecycle": "Active (YAGEO RT)",
+   "risk": ""
+  }
+ }
+}
