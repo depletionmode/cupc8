@@ -75,6 +75,20 @@ update it after every finding, commit, decision or agent result (David,
   move/tent the 13 vias in mask openings around U1 at the coordinated rebuild
   (hw/boards/wifi.py or kicadgen; hashed, so queued with the rebuild).
 
+- **First-article plan (done):** doc/hardware/first-article-plan.md (7
+  stages: loose parts, inspection incl. MECH-101, first power with short
+  screen, fit + four-terminal R, bring-up, power under load, heat/burn-in);
+  results JSON under doc/hardware/fa-results/<ID>/, limits in
+  `tools/fa_results.py` (11 tests). 29 proposed hw catalogue rows (MB-107..114,
+  CC-102..105, GC-102..104, IC-102..104, WC-102..106, SC/EC/YC-101..102) not
+  yet added. Four limits marked proposed for David (>= 10 ohm short screen,
+  5 C top-to-junction allowance, x1.25 iCE40 margin, 30 mVpp ripple).
+  **Design item:** CPU card C21 (RT9013 output) can be 0.90 uF at tolerance vs
+  the recommended 1 uF: change to 2.2 uF before ordering (queue with the
+  rebuild; note the RT9013 itself is obsolete per the BOM audit).
+  Special equipment: NanoVNA or LCR with DC bias, uV DMM, 40 C box, HDMI
+  capture, USB microscope, thermocouples, 5 A USB-C breakout, >= 4 A load.
+
 ## Everything left before the boards can be ordered
 
 ### A. Engineering in progress or queued (Claude)
