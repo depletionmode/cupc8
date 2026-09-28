@@ -153,6 +153,8 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.porConnected = flag("porConnected", true);
     opt.cpuClockConnected = flag("cpuClockConnected", true);
     opt.cpuResetConnected = flag("cpuResetConnected", true);
+    opt.cpuStrobeConnected = flag("cpuStrobeConnected", true);
+    opt.cpuRwConnected = flag("cpuRwConnected", true);
     opt.chipsetClockConnected = flag("chipsetClockConnected", true);
     opt.threaded = flag("threaded", true);
     opt.spiLog = flag("spiLog", false);

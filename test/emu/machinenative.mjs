@@ -152,6 +152,9 @@ export class Machine {
       throw new Error('machinenative: invalid CPU reset path');
     if (netlistTop && typeof netlistTop.runtime.chipset_clock_connected !== 'boolean')
       throw new Error('machinenative: invalid chipset clock path');
+    if (netlistTop && (typeof netlistTop.runtime.cpu_control_connected?.strobe !== 'boolean' ||
+                      typeof netlistTop.runtime.cpu_control_connected?.rw !== 'boolean'))
+      throw new Error('machinenative: invalid CPU control route model');
     const gpoLedLinks = netlistTop?.runtime.gpo_led_connected ?? Array(8).fill(true);
     if (!Array.isArray(gpoLedLinks) || gpoLedLinks.length !== 8 ||
         gpoLedLinks.some((connected) => typeof connected !== 'boolean'))
@@ -195,6 +198,8 @@ export class Machine {
       porConnected: netlistTop?.runtime.por_connected ?? true,
       cpuClockConnected: netlistTop?.runtime.cpu_clock_connected ?? true,
       cpuResetConnected: netlistTop?.runtime.cpu_reset_connected ?? true,
+      cpuStrobeConnected: netlistTop?.runtime.cpu_control_connected.strobe ?? true,
+      cpuRwConnected: netlistTop?.runtime.cpu_control_connected.rw ?? true,
       chipsetClockConnected: netlistTop?.runtime.chipset_clock_connected ?? true,
       memoryWiring,
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });

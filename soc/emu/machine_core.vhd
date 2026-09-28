@@ -22,6 +22,8 @@ entity machine_core is
 		cpu_d_connected:	in std_logic_vector(7 downto 0);
 		cpu_clk_connected:	in std_logic;
 		cpu_rst_connected:	in std_logic;
+		cpu_stb_connected:	in std_logic;
+		cpu_rw_connected:	in std_logic;
 		chipset_clk_connected:	in std_logic;
 
 		mem_a:			out std_logic_vector(18 downto 0);
@@ -59,6 +61,7 @@ architecture rtl of machine_core is
 	signal cpu_din, cs_din, cpu_dout, cs_dout: std_logic_vector(7 downto 0);
 	signal a_chip: std_logic_vector(15 downto 0);
 	signal cpu_doe, cs_doe, rw, n_stb, n_rdy, sync, halted, waiting, n_rst: std_logic;
+	signal rw_at_chipset, n_stb_at_chipset: std_logic;
 	signal irq: std_logic_vector(3 downto 0);
 	signal cpu_clk: std_logic;
 	signal chipset_clk: std_logic;
@@ -73,6 +76,11 @@ begin
 	-- An open FPGA reset pad has undefined voltage. Holding it low is a
 	-- deterministic digital counterexample, not a prediction of that voltage.
 	cpu_rst_at_pad <= n_rst when cpu_rst_connected = '1' else '0';
+	-- An opened output leaves its receiving pad undefined. High is a
+	-- deterministic digital counterexample; the main strobe also has R80
+	-- pulling it high when the CPU card leg is open.
+	n_stb_at_chipset <= n_stb when cpu_stb_connected = '1' else '1';
+	rw_at_chipset <= rw when cpu_rw_connected = '1' else '1';
 	-- Contact order comes from both KiCad connector netlists. The data bus
 	-- has separate views for each receiver, preserving driver enable rules.
 	address_wires: for i in 0 to 15 generate
@@ -98,8 +106,8 @@ begin
 
 	cs0: entity work.chipset port map(
 		clk => chipset_clk, n_por => n_por,
-		cpu_a => a_chip, cpu_d_in => cs_din, cpu_d_out => cs_dout, cpu_d_oe => cs_doe, cpu_rw => rw,
-		cpu_n_stb => n_stb, cpu_n_rdy => n_rdy, cpu_sync => sync, cpu_irq => irq,
+		cpu_a => a_chip, cpu_d_in => cs_din, cpu_d_out => cs_dout, cpu_d_oe => cs_doe, cpu_rw => rw_at_chipset,
+		cpu_n_stb => n_stb_at_chipset, cpu_n_rdy => n_rdy, cpu_sync => sync, cpu_irq => irq,
 		cpu_tmr_exp => tmr_exp, cpu_halted => halted, cpu_waiting => waiting, cpu_n_rst => n_rst,
 		cpu_cdone => cpu_cdone,
 		mem_a => mem_a, mem_d_in => mem_d_in, mem_d_out => mem_d_out, mem_d_oe => mem_d_oe,

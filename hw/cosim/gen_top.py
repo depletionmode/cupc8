@@ -230,6 +230,53 @@ def gpo_indicator_routes(main, board):
     return links, paths, missing
 
 
+def cpu_control_routes(main, cpu, main_board, cpu_board):
+    """Two CPU-to-chipset control lines through their real series channels."""
+    if cpu.components.get('RN5') != ('33', ('Device', 'R_Pack04')):
+        raise ValueError('CPU strobe/RW: missing 33-ohm isolated series pack')
+    channels = {
+        'strobe': ('FPGA_nSTB', 'CPU_nSTB', ('U1', '23'), ('RN5', '1'),
+                   ('RN5', '8'), ('J1', 'B17'), ('J2', 'B17'), ('U7', '31'), 'RN5.1'),
+        'rw': ('FPGA_RW', 'CPU_RW', ('U1', '25'), ('RN5', '2'),
+               ('RN5', '7'), ('J1', 'B20'), ('J2', 'B20'), ('U7', '29'), 'RN5.2'),
+    }
+    if main.components.get('R80') != ('10k', ('Device', 'R')) or \
+            main.net('R80', '1') != '/+3V3' or main.net('R80', '2') != '/CPU_nSTB':
+        raise ValueError('CPU strobe: missing 10k chipset-side pull-up')
+    links, paths, missing = {}, [], []
+    for signal, (source_net, contact_net, source, series_in, series_out,
+                 finger, socket, receiver, series_ref) in channels.items():
+        if set(cpu.nets.get(f'/{source_net}', ())) != {source, series_in} or \
+                set(cpu.nets.get(f'/{contact_net}', ())) != {series_out, finger} or \
+                path(cpu, source, finger, '33') != series_ref or \
+                node(main, *socket) != f'/{contact_net}' or \
+                node(main, *receiver) != f'/{contact_net}':
+            raise ValueError(f'CPU {signal}: wrong FPGA, series pack, socket or chipset pad')
+        path(main, socket, receiver)
+        expected_main = {socket, receiver} | ({('R80', '2')} if signal == 'strobe' else set())
+        if set(main.nets[f'/{contact_net}']) != expected_main:
+            raise ValueError(f'CPU {signal}: unexpected main-board load')
+        connected = True
+        for board, pcb, net, first, last in (
+                ('cpu', cpu_board, source_net, source, series_in),
+                ('cpu', cpu_board, contact_net, series_out, finger),
+                ('main', main_board, contact_net, socket, receiver)):
+            mm = None
+            if pcb is not None and Path(pcb).is_file():
+                sys.path.insert(0, str(ROOT / 'hw/si'))
+                from ibis_bus import routed_distances
+                mm = routed_distances(Path(pcb), f'/{net}', first, [last])[
+                    f'{last[0]}.{last[1]}']
+            paths.append({'from': f'{board}.{first[0]}.{first[1]}',
+                          'to': f'{board}.{last[0]}.{last[1]}',
+                          'route_mm': mm, 'runtime': f'cpu_{signal}_connected'})
+            if mm is None:
+                connected = False
+                missing.append(f'{board}:{net}_cpu_{signal}_copper')
+        links[signal] = connected
+    return links, paths, missing
+
+
 @lru_cache(maxsize=2)
 def cpu_board_geometry(path):
     """Reuse CPU copper geometry across each route mutation in one audit."""
@@ -950,6 +997,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['gpo_led_connected'] = gpo_led_links
     manifest['runtime']['missing_routes'].extend(gpo_led_missing)
     manifest['runtime']['routed_top'] &= not gpo_led_missing
+    cpu_controls, control_paths, control_missing = cpu_control_routes(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['paths'].extend(control_paths)
+    manifest['runtime']['cpu_control_connected'] = cpu_controls
+    manifest['runtime']['missing_routes'].extend(control_missing)
+    manifest['runtime']['routed_top'] &= not control_missing
     circuits = {'main': main, **cards}
     structural = set()
     for connection in manifest['contacts']:
@@ -1029,6 +1082,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         if connected:
             runtime_net('main', f'GPO{bit}')
             runtime_net('main', f'LED_GPO{bit}')
+    for signal, contact, source in (('strobe', 'CPU_nSTB', 'FPGA_nSTB'),
+                                    ('rw', 'CPU_RW', 'FPGA_RW')):
+        if cpu_controls[signal]:
+            runtime_net('main', contact)
+            runtime_net('cpu', contact)
+            runtime_net('cpu', source)
     manifest.update(audit(circuits, executed, structural))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest
