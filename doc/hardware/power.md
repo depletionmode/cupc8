@@ -208,8 +208,8 @@ slot +5V ──┬── C 10 µF 25 V 0805 (C15850)
                  SW ── L 1 µH FXL0420-1R0-M (C167203, 27 mΩ, Isat 7 A) ── slot +5V
                  VOUT ──┬── 2 × 22 µF 25 V 0805 (C45783)
                         ├── R1 750 kΩ 1 % (C23240) ── FB ── R2 100 kΩ 1 % (C25803) ── GND
-                        └── SY6280AAC (C55136), as before: its RSET sets the 500 mA
-                            limit, EN from the RP2040, FLT to GPIO8 ── USB-A VBUS
+                        └── SY6280AAC (C55136): RSET=12 kΩ sets 567 mA nominal;
+                            EN from RP2040 ── USB-A VBUS. A VBUS divider feeds GPIO8.
 ```
 
 - The output is 5.06 V nominal, 4.84–5.28 V over VREF and the divider's
@@ -218,8 +218,11 @@ slot +5V ──┬── C 10 µF 25 V 0805 (C15850)
   5.5 V.
 - No feedforward capacitor is needed: 2 × 22 µF derates to about 26 µF at
   5 V, under the 40 µF above which TI recommends one.
-- The SY6280 keeps the 500 mA limit and the fault flag the firmware reads. It
-  only switches the boost's output.
+- The fitted SY6280AAC has no fault output. GPIO8 reads a 15 kΩ/22 kΩ
+  divider on VBUS and reports a low rail as `VBUS_FAULT`. The 12 kΩ ISET
+  resistor sets a **567 mA nominal** limit; the guaranteed short-circuit
+  current and response time at this setting are not bounded by the published
+  SY6280 data. See [IC-005 switch audit](ic005-switch-audit.md).
 - Layout follows TI's (SLVSF14B, section 10): the input and output capacitors
   go right at VIN/VOUT and GND, and the SW loop stays short.
 
