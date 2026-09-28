@@ -1,5 +1,12 @@
 # Wi-Fi return and heat sensitivity on the current route (2026-09-28)
 
+> **Superseded transient numbers (later 2026-09-28).** The 2.992/2.979 V
+> minima below came from a deck that lifted U2's GND pin above node 0; TI's
+> TLV62569 subcircuit references node 0 internally, so the 32 mV J1 return
+> drop was multiplied by 1 + R9/R10 = 5.53. See
+> `wifi-droop-fix-proposal.md` for the corrected deck, the sourced part data
+> and the current POW-003 results.
+
 The validated Wi-Fi board receipt is `build/hw/wifi/evidence.json`, SHA-256
 `d697e1ff24eccb5f1c6df469de263078f18118503f8ff6fcfb431d25f20f11c3`.
 `hw/power/wifi_ground.py` now extracts both the local regulator/load return

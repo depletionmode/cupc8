@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / 'hw/power'))
 import buck
 import design as d
 import wifi_limits
+import wifi_parts
 
 
 class WifiLimits(unittest.TestCase):
@@ -32,9 +33,9 @@ class WifiLimits(unittest.TestCase):
         for name in ('Rcesr1', 'Rcesr2', 'Rcesr3'):
             self.assertIn(name + ' ', deck)
             self.assertRegex(deck, r'(?m)^' + name + r' .* 0\.5$')
-        self.assertRegex(deck, r'(?m)^Rground return buck_gnd 0\.123$')
-        self.assertRegex(deck, r'(?m)^Rboardreturn buck_gnd 0 0\.47$')
-        self.assertIn('X1 vin fb sw vin buck_gnd', deck)
+        self.assertRegex(deck, r'(?m)^Rground return 0 0\.123$')
+        self.assertRegex(deck, r'(?m)^Rboardreturn 0 slot_gnd 0\.47$')
+        self.assertIn('X1 vin fb sw vin 0 TLV62569_TRANS', deck)
 
     def test_rail_extrema_use_burst_low_and_startup_high_corners(self):
         time = [0, buck.T_STEP, (buck.T_STEP + buck.T_REL) / 2, buck.T_REL, buck.T_END]
@@ -42,8 +43,8 @@ class WifiLimits(unittest.TestCase):
         wave = (time, volts, [], [])
         nominal = d.buck_vout(d.WIFI_BUCK_R1, d.WIFI_BUCK_R2)
         minimum, maximum = wifi_limits.rail_extrema(wave)
-        self.assertAlmostEqual(minimum, 3.1 * d.wifi_vout_range()[0] / nominal)
-        self.assertAlmostEqual(maximum, 3.2 * d.wifi_vout_range()[1] / nominal)
+        self.assertAlmostEqual(minimum, 3.1 * wifi_parts.vout_range()[0] / nominal)
+        self.assertAlmostEqual(maximum, 3.2 * wifi_parts.vout_range()[1] / nominal)
 
     def test_overvoltage_fails_even_when_burst_minimum_passes(self):
         self.assertFalse(wifi_limits.within_limits((3.097, 3.665)))

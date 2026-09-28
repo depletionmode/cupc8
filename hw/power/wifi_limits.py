@@ -12,13 +12,14 @@ import buck
 import design as d
 import wifi_board
 import wifi_ground
+import wifi_parts
 
 
 def rail_extrema(wave):
     t, vout, _, _ = wave
     nominal = d.buck_vout(d.WIFI_BUCK_R1, d.WIFI_BUCK_R2)
-    low_corner = d.wifi_vout_range()[0] / nominal
-    high_corner = d.wifi_vout_range()[1] / nominal
+    low_corner = wifi_parts.vout_range()[0] / nominal
+    high_corner = wifi_parts.vout_range()[1] / nominal
     return (min(buck.window(t, vout, buck.T_STEP, buck.T_REL)) * low_corner,
             max(vout) * high_corner)
 

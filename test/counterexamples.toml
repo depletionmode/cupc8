@@ -1301,3 +1301,10 @@ fixed_in = "fit.py key_position_check"
 revert = [["hw/mech/fit.py", "    if \"rib_plus\" not in sock:\n        return False, (", "    if False:\n        return False, ("]]
 cmd = "python3 -m unittest test/test_key_mating.py"
 must_fail = ["test_socket_without_published_rib_tolerance_cannot_pass"]
+
+[[bug]]
+name = "POW-003: the Wi-Fi buck deck lifted U2's GND above node 0, which TI's TLV62569 model uses as its reference (J1 return drop multiplied by 1+R9/R10)"
+fixed_in = "wifi_deck ground reference fix"
+revert = [["hw/power/buck.py", "C1 c1term 0 {cin}\nX1 vin fb sw vin 0 TLV62569_TRANS", "C1 c1term buck_gnd {cin}\nX1 vin fb sw vin buck_gnd TLV62569_TRANS"]]
+cmd = "python3 test/hw/test_wifi_limits.py"
+must_fail = ["test_esr_and_contact_reach_the_spice_elements"]
