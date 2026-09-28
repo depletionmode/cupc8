@@ -307,6 +307,36 @@ def cpu_ready_route(main, cpu, main_board, cpu_board):
     return not missing, paths, missing
 
 
+def cpu_sync_route(main, cpu, main_board, cpu_board):
+    """Bind the CPU instruction-boundary output to the chipset trace input."""
+    source, series_in = ('U1', '26'), ('RN5', '3')
+    series_out, finger = ('RN5', '6'), ('J1', 'B22')
+    socket, receiver = ('J2', 'B22'), ('U7', '26')
+    if cpu.components.get('RN5') != ('33', ('Device', 'R_Pack04')) or \
+            set(cpu.nets.get('/FPGA_SYNC', ())) != {source, series_in} or \
+            set(cpu.nets.get('/CPU_SYNC', ())) != {series_out, finger} or \
+            set(main.nets.get('/CPU_SYNC', ())) != {socket, receiver} or \
+            path(cpu, source, finger, '33') != 'RN5.3':
+        raise ValueError('CPU SYNC: wrong FPGA source, RN5, socket or chipset pad')
+    paths, missing = [], []
+    for board, pcb, net, first, last in (
+            ('cpu', cpu_board, 'FPGA_SYNC', source, series_in),
+            ('cpu', cpu_board, 'CPU_SYNC', series_out, finger),
+            ('main', main_board, 'CPU_SYNC', socket, receiver)):
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            mm = routed_distances(Path(pcb), f'/{net}', first, [last])[
+                f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}',
+                      'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': 'cpu_sync_connected'})
+        if mm is None:
+            missing.append(f'{board}:{net}_cpu_sync_copper')
+    return not missing, paths, missing
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
@@ -1071,6 +1101,12 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['cpu_ready_connected'] = ready_connected
     manifest['runtime']['missing_routes'].extend(ready_missing)
     manifest['runtime']['routed_top'] &= not ready_missing
+    sync_connected, sync_paths, sync_missing = cpu_sync_route(
+        main, cards['cpu'], pcb, cpu_board)
+    manifest['paths'].extend(sync_paths)
+    manifest['runtime']['cpu_sync_connected'] = sync_connected
+    manifest['runtime']['missing_routes'].extend(sync_missing)
+    manifest['runtime']['routed_top'] &= not sync_missing
     manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
         main, cards['system'], pcb, system_board)
     manifest['paths'].extend(manual_reset_paths)
@@ -1167,6 +1203,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         runtime_net('main', 'CPU_nRDY_SRC')
         runtime_net('main', 'CPU_nRDY')
         runtime_net('cpu', 'CPU_nRDY')
+    if sync_connected:
+        runtime_net('cpu', 'FPGA_SYNC')
+        runtime_net('cpu', 'CPU_SYNC')
+        runtime_net('main', 'CPU_SYNC')
     if manual_reset['sysctl']:
         runtime_net('system', 'SYS_nRST')
     if all(manual_reset.values()):

@@ -158,6 +158,8 @@ export class Machine {
       throw new Error('machinenative: invalid CPU control route model');
     if (netlistTop && typeof netlistTop.runtime.cpu_ready_connected !== 'boolean')
       throw new Error('machinenative: invalid CPU /RDY route model');
+    if (netlistTop && typeof netlistTop.runtime.cpu_sync_connected !== 'boolean')
+      throw new Error('machinenative: invalid CPU SYNC route model');
     if (netlistTop && typeof netlistTop.runtime.sysctl_manual_reset_connected !== 'boolean')
       throw new Error('machinenative: invalid system manual-reset route model');
     if (netlistTop && typeof netlistTop.runtime.button_manual_reset_connected !== 'boolean')
@@ -210,6 +212,7 @@ export class Machine {
       cpuStrobeConnected: netlistTop?.runtime.cpu_control_connected.strobe ?? true,
       cpuRwConnected: netlistTop?.runtime.cpu_control_connected.rw ?? true,
       cpuReadyConnected: netlistTop?.runtime.cpu_ready_connected ?? true,
+      cpuSyncConnected: netlistTop?.runtime.cpu_sync_connected ?? true,
       sysctlResetConnected: netlistTop?.runtime.sysctl_manual_reset_connected ?? true,
       resetButtonConnected: netlistTop?.runtime.button_manual_reset_connected ?? true,
       resetButtonPressed,

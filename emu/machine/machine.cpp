@@ -402,6 +402,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     board->cpuStrobeConnected = o.cpuStrobeConnected;
     board->cpuRwConnected = o.cpuRwConnected;
     board->cpuReadyConnected = o.cpuReadyConnected;
+    board->cpuSyncConnected = o.cpuSyncConnected;
     board->chipsetClockConnected = o.chipsetClockConnected;
     board->timedMemory = true;
     board->ramAccessNs = o.ramAccessNs;

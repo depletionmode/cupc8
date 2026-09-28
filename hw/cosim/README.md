@@ -127,6 +127,18 @@ Changing R33's source value also fails binding. The open-input logic high is
 a deterministic counterexample: open-pad voltage, `/RDY` propagation delay and
 signal edge quality remain outside this digital model. The focused probe is
 `test/hw/test_cosim_cpu_ready.py`.
+The CPU `SYNC` instruction-boundary output has a separate FPGA U1.26 →
+RN5.3, RN5.6 → CPU J1.B22, main J2.B22 → chipset U7.26 route, measuring
+3.824, 19.265 and 74.037 mm. The generator checks the exact 33 Ω RN5
+channel and every netlist pad. The routed flag drives the chipset's `SYNC`
+input, which feeds its real instruction-step and trace logic. In the focused
+native trace probe the intact board reports instruction-boundary flags;
+removing each of the three launch tracks on a private board copy yields
+zero such flags while CPU execution continues. Each open restores three
+strict coverage gaps; changing RN5's value fails source binding. The
+opened receiver is held low solely as a deterministic digital
+counterexample. Its physical voltage and edge integrity remain unmodeled.
+`test/hw/test_cosim_cpu_sync.py` exercises the source, copper and trace paths.
 The CPU clock follows Y1.3 to R18.1 (5.937 mm), the routed 33 Ω output
 to socket J2.B13 (60.564 mm), then the CPU card's J1.B13 to FPGA U1.21
 (31.218 mm). Opening the FPGA clock launch holds the native CPU
@@ -245,10 +257,10 @@ reserved contacts have pin-bound waivers, eight slot-bus source nets, 30
 card-local slot nets, 30 QSPI boot nets, 24 CPU-card bus nets, two CPU clock
 nets, three CPU reset nets, two chipset oscillator-branch nets and three
 system bridge source nets, the bridge MISO source, 16 main GPO indicator nets,
-six CPU `/STB`/`RW` nets, three CPU `/RDY` nets and the two system manual-reset
-nets now affect execution; 327 remain unmodeled.
+six CPU `/STB`/`RW` nets, three CPU `/RDY` nets, three CPU `SYNC` nets and
+the two system manual-reset nets now affect execution; 324 remain unmodeled.
 The remaining groups are boot/programming (68),
-slot/control bus (32), CPU/memory (38),
+slot/control bus (32), CPU/memory (35),
 power/return (65), clock/reset (44), indicators (36), external IO (26),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
