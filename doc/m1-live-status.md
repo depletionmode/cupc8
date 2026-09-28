@@ -1,186 +1,146 @@
 # CUPC/8 M1 live status
 
-Running status for whoever picks up the M1 release work. Newest entries
-first. Read `doc/m1-handoff-2026-09-28.md` for background and the release
-definition; this file records what changed after it.
+Running status for whoever picks up the M1 release work. Keep it current:
+update it after every finding, commit, decision or agent result (David,
+2026-09-28). Background and the release definition:
+`doc/m1-handoff-2026-09-28.md`.
 
-## 2026-09-28 (afternoon session)
+## State right now (2026-09-28 evening)
 
-### State right now
+- Branch `milestone-1`, HEAD `643403a`, not pushed. All work below is
+  committed except what "In flight" lists. User files left untracked on
+  purpose: `.claude/`, `card.img`, `test/emu/golden/E2E-002.txt.local-backup`.
+- Last full run (before today's fixes): `make verify JOBS=2` → 229 passed,
+  39 failed, 17 pending (`build/verify-20260928.log`). Not rerun since;
+  every board currently reads "stale" because `hw/tools/gerberdrc.py` and
+  board sources changed, until the coordinated rebuild (Everything left, A).
+- Evidence hashing: `hw/tools`, `hw/lib`, `hw/parts` and `hw/boards/<board>.py`
+  are hashed into each board's evidence. Any edit there, or any board build
+  that adds an `hw/parts/easyeda/*.yaml` cache file, makes boards stale and
+  makes any concurrently running board build fail with "board inputs changed
+  during pipeline". `hw/power` is not hashed.
+- Never rebuild a board into `build/hw` casually: WIFI-004/EINK-001 now
+  build in a temp dir (`tools/board_reproduce.py`). Canonical rebuilds are an
+  explicit step followed by re-pinning `doc/hardware/si-evidence/` (command in
+  `doc/hardware/si-models.md`, "ibis_route_receipts.py").
 
-- Branch `milestone-1`, HEAD `ac9388a` (David approved the commit): all
-  2026-09-27/28 agent and root work, this session's changes included. Not
-  pushed. User artifacts left untracked on purpose: `.claude/`,
-  `card.img`, `test/emu/golden/E2E-002.txt.local-backup`.
-- Full run: `make verify JOBS=2` → **229 passed, 39 failed, 17 pending**
-  (`build/verify-20260928.log`, per-test logs in `build/test/`).
-  `doc/hardware/fab-readiness.md` was regenerated from it (red).
+## Everything left before the boards can be ordered
 
-### Changes this session (uncommitted)
+### A. Engineering in progress or queued (Claude)
 
-- `test/catalogue.toml`: added FAB-002 (filled-region neck proof over all
-  eight boards; red by design until complex fills are proved) and SI-005
-  (routed SPI SCK topology extraction; diagnostic, passes). COSIM-003's
-  checks text now includes the sysctl host-VBUS sense.
-- `test/hw/test_cosim_routed_subset.py`: COSIM-003 also runs
-  `test_cosim_sysctl_vbus.py`. Standalone COSIM-003 passed (all six
-  sub-tests) before the full run.
-- `test/counterexamples.toml`: counterexample for the sysctl VBUS binding in
-  `hw/cosim/gen_top.py`.
-- `tools/counterexamples.py`: each scratch worktree gets a symlink to the
-  checkout's `build/hw` (gitignored; the receipt-bound board tests only read
-  it). Untested until the pending work is committed.
-- No separate notch gate: the 0.30 mm copper-to-notch failure already fails
-  by name in CC/GC/IC/SC/WC/EC/YC-009 (`boardcheck <card> fab`).
+1. **Main board MB-005 + MB-051** (agent running, scratch builds only):
+   new input-path requirement (<= 60 mOhm board-side loop, <= 20 C trace rise
+   at 3.213 A), widen/pour J1->F1->U2, dual-rail reset supervisor with margin,
+   simulations, rail_reset_window.py update. Deliverable includes the
+   canonical rebuild command.
+2. **GPU card** (agent running, sources only, no builds): overclock recorded as
+   a requirement; `rp2040_vreg.py` checks GPU against it; per-card DVI
+   burn-in hw test (GC-1xx); TMDS series resistors raised so RP2040 IO current
+   < 50 mA with valid DVI swing.
+3. **JLC do-not-trim order note** (David approved): add to
+   `kicadgen.order_spec` (hw/tools/kicadgen.py:2722) → `fab/order.json`.
+   Queued until the main-board agent finishes (hw/tools edit breaks its builds).
+4. **MECH-101 criterion: done** (>= 0.10 mm measured notch-wall-to-
+   finger gap): add to the MECH-101 checks text in test/catalogue.toml.
+5. **Card thermal rows** (David approved): verify the USB 2.0 full-speed
+   cable figures in `hw/power/rp2040_thermal.py` against the spec, then set
+   GC/IC/SC/EC/YC-006 cmd to `python3 hw/power/thermal.py rp2040 <board>
+   build/hw/<board>` (GPU passes only after item 2 + rebuild).
+6. **Coordinated rebuild** after 1-2 land: rebuild all eight boards into
+   `build/hw` one at a time (never two Freerouting runs at once), re-pin
+   `ibis-final-receipts.json` (and source audit/top if the main board changed:
+   `doc/hardware/si-models.md`), rerun COSIM-003..006, POW-003 (Wi-Fi 0.1 %
+   divider), all *-005/006/008/009, then full `make verify JOBS=2`, then
+   `tools/fabready.py`.
+7. **Pending rows with no implementation yet (17):**
+   - Signal integrity: MB-007, CC-007, GC-007, IC-007, SC-007, EC-007, YC-007.
+   - Board-level co-sim: MB-052, CC-051, SC-051, EC-051, YC-051.
+   - End to end on the netlist-generated machine: E2E-001, E2E-002, E2E-003,
+     E2E-004.
+   - MB-051 (item 1).
+   Agents for SI (high-speed USB/HDMI; slow buses), co-sim/E2E, CPU/main
+   thermal (iCE40 core current, HT7533 theta-JA) and an IO port-switch
+   replacement proposal were written but **not launched**: the permission
+   classifier returned no verdict for Agent launches (transient). Relaunch
+   them; prompts should carry the rules in this file (no board builds, no
+   hw/tools|lib|parts edits, give catalogue cmds instead of editing it).
+8. **Other red rows needing work:**
+   - FAB-002 filled-region neck proof: complex/holed fills are deferred
+     (`tools/fab_neck_coverage.py --require-complete`); needs a general
+     polygon min-width proof.
+   - IC-005: SY6280 has no fault pin or guaranteed limit → replacement part
+     proposal (needs David's approval to change the IO board).
+   - CC-006 / MB-006: iCE40 core current bound, HT7533 theta-JA.
+   - WIFI-003 load flake (40 s TLS wait under -j 2).
 
-### Failures in the latest full run, by cause
+### B. Needs outside data or measurement (cannot be closed by analysis)
 
-- **Known external blockers (unchanged):** MB-005, MB-006, MB-008, MB-009,
-  every card's -005/-006/-008/-009, WC-010, POW-003, MECH-001, FAB-002 (see
-  handoff for each).
-- **MUT-002:** stops at the first new counterexample ("fixed code is no
-  longer in hw/cosim/gen_top.py") because the fixes are uncommitted and the
-  runner uses a worktree of HEAD. Resolution: commit, then run the new
-  entries (`python3 tools/counterexamples.py COSIM`, `... MB-052`,
-  `... Fabrication`), then MUT-002 alone.
-- **COSIM-003, COSIM-004: caused by in-place board rebuilds, now fixed.**
-  WIFI-004/EINK-001 rebuilt wifi/eink into build/hw during verify. The
-  routing is deterministic (agent-verified: identical route.ses and
-  identical `sesreplay.preroute_digest` boards across rebuilds; an earlier
-  note here claiming otherwise was a raw-diff misread caused by pcbnew item
-  reordering). Raw bytes change every build (UUIDs, item order, netlist date,
-  PNGs), and the receipts pin raw sha256, so any rebuild broke them; under
-  -j the rebuild also deleted evidence.json mid-run. Fix: WIFI-004/EINK-001
-  now run `tools/board_reproduce.py <board>`, which builds into a temp dir
-  and requires identical normalized boards and route.ses vs build/hw.
-  `ibis-final-receipts.json` re-pinned to the current wifi/eink builds (only
-  those six hashes changed). Canonical rebuilds are now an explicit step
-  followed by re-pinning (command in doc/hardware/si-models.md). Verified:
-  each scratch rebuild matches alone; COSIM-003..006 pass on the re-pinned
-  receipts. Two scratch builds failed while run concurrently with another
-  board build / COSIM (error not captured; suspect Freerouting per-user state
-  when two instances start together). Watch WIFI-004/EINK-001 logs under -j 2.
-- **WIFI-003: load flake.** The self-signed-certificate refusal event did
-  not arrive inside the 40 s `wait_event` (test/emu/test_wifi_qemu.py:296)
-  while MUT-002 ran in parallel (63 s vs 24 s). Rerun alone: pass, 42 checks,
-  24 s. Not yet fixed; the QEMU TLS handshake is slow under `-j 2` load.
+- CC-005: slot/socket maximum contact resistance, board maker's minimum
+  finished copper/via resistance, guaranteed C22/C1-C4 capacitance and ESR,
+  iCE40 core-current envelope (doc/hardware/cpu-power-proof-gaps-20260928.md).
+- GC/SC/EC/YC-005: RP2040 DVDD load-step response (not published by
+  Raspberry Pi); SD card and panel current waveforms; slot contact resistance.
+- POW-003 F5/F7, WC-005: ESR and effective capacitance of the fitted C45783
+  22 uF (impedance measurement on a reel sample: ESR <= 150 mOhm, C1 >= 5.8 uF,
+  C2 >= 8.3 uF). F6/T4r: four-terminal return resistance through a mated
+  slot. F8/T4p: ESP32 current at 40 C full-duty TX. T4c (WC-010): measured
+  board temperature under sustained TX.
+- These are first-article measurements. Options for David: measure on
+  first articles before the full run (recommended: order a small first-
+  article batch), or accept documented typical data.
 
-### Counterexamples after the commit
+### C. Needs David
 
-- `COSIM-005` (e-ink panel) and `Fabrication: plotted copper` fail properly
-  with their bug back: ok.
-- `MB-052 subset` and `COSIM-003 subset` (sysctl VBUS) crashed in the
-  worktree before testing anything: their node probes need
-  `build/emu-machine/machine.node` and RP2040 firmware, which a fresh worktree
-  lacks. Their `cmd` now builds both first (`tools/fw_rp2040.sh &&
-  tools/emu_machine_build.sh && ...`, the convention other entries use).
-  Those dirs are deliberately NOT symlinked like `build/hw`: other entries
-  rebuild them with the bug in, which would write through a link into the
-  real checkout. Rerun: both ok. All four new counterexamples now fail
-  properly with their bug back, so MUT-002 should pass on the next full run.
+- **CPL sign-off** (MB-009 and every card's -009): after the coordinated
+  rebuild, regenerate overlays (`tools/fab_review_bundle.py`), review the 119
+  risky placements from `tools/cpl_focus.py` (ICs, diodes/LEDs, transistors,
+  connectors, crystals, switches, resistor networks), write
+  `build/hw/<board>/fab/cpl-review.json` per board.
+- IO port-switch replacement approval (after the proposal).
+- Whether first-article measurements (B) gate the full order.
+- Placing the order (never done by Claude).
 
-### Parallel work started (goal: manufacturable release)
+## David's decisions (2026-09-28)
 
-Agents, each owning disjoint files; none may rebuild boards in build/hw:
-- board-determinism: why wifi/eink reroute differently each build; fix options.
-- card thermal: RP2040 regulator dissipation (GC/IC/SC/EC/YC-006), CPU/main
-  regulator binding (CC-006, MB-006). Owns hw/power/thermal.py.
-- card power: GC-005 VREG droop, IC-005 SY6280 fault, CC-005 items, SC/EC/YC-005.
-- mechanical (done): all eight *-008 rows run the same `hw/mech/fit.py` and fail only on
-  MECH-001 key/notch fit. "smoke ... not yet designed: none" in their logs is
-  informational (HW-000 pipeline test board excluded; no board undesigned).
-- Wi-Fi: datasheet data for POW-003/WC-005/WC-010 F5-F8 and a droop-fix proposal
-  (doc/hardware/wifi-droop-fix-proposal.md), not applied until boards are deterministic.
+- MB-005: board-side loop <= 60 mOhm at the hot corner (contacts inside the
+  cable's Type-C R2.0 §4.4.1 budget) + <= 20 C rise at 3.213 A; widen/pour
+  the input path (doc/hardware/mb005-loop-requirement-derivation.md).
+- Card notch: standard PCIe CEM geometry; JLC 0.20 mm only for A11/A12/B11/B12
+  fingers at the notch walls; 0.30 mm elsewhere; first-article fit (MECH-101)
+  with >= 0.10 mm measured gap; do-not-trim note on the JLC order.
+- MB-051: redesign reset supervision for both rails.
+- GPU: accept the 252 MHz / 1.20 V overclock as a requirement, add burn-in,
+  fix TMDS resistors.
+- RP2040 thermal: accept ADC <= 2 mA and IO switching within the rated 50 mA
+  headroom, after verifying the USB figures.
+- Commits: approved; Claude commits as work lands (not pushed).
 
-- MB-005 requirement: deriving the real input-loop resistance limit from the
-  downstream power checks (doc/hardware/mb005-loop-requirement-derivation.md).
-  David questioned the 20 mΩ assumption (USB-IF allows 50 mΩ per mated
-  contact); the check stays at 20 mΩ until he decides.
-- All five analysis agents hit the weekly API limit once and were resumed
-  (no partial edits were left behind).
+## Done today (committed)
 
-### David's decisions (2026-09-28)
+- `ac9388a` integrated 09-27/28 evidence; `eacfbbd` counterexamples build
+  emulator/firmware in their worktree; `tools/counterexamples.py` symlinks
+  `build/hw` into each worktree.
+- `fdd9527` `hw/power/rp2040_vreg.py` (RP2040 VREG/clock vs datasheet, in
+  GC/IC/SC/EC/YC-005 cmds).
+- `565934f` fit.py: sockets without a toleranced rib fail (SOFNG bug) +
+  `hw/power/rp2040_thermal.py` (not yet wired).
+- `738d592` MB-005 loop derivation (`hw/power/mb005_loop_sweep.py`): binding
+  check allows 89.8 mOhm; input traces overheat at 3.213 A (inner F1-U2 up
+  to 562 C at thinnest copper).
+- `bcf95c7` WIFI-004/EINK-001 build in scratch and prove reproducibility;
+  receipts re-pinned; COSIM-003..006 pass. (Routing is deterministic; raw
+  bytes differ by UUIDs/order/dates.)
+- `c040ca4` Wi-Fi buck deck ground-reference bug fixed (the 2.979 V droop was
+  the deck); sourced part data (`hw/power/wifi_parts.py`).
+- `082a034` card notch decision applied (gerberdrc exemption, MECH-001
+  passes, MECH-101 hw test) + Wi-Fi R9/R10 0.1 % parts (C861412, C122538).
+- `643403a` `tools/cpl_focus.py`.
 
-- **MB-005:** replace the 20 mOhm assumption with a board-side input loop
-  <= 60 mOhm at the hot corner (USB-C contacts inside the cable's Type-C
-  R2.0 §4.4.1 IR-drop budget) plus a <= 20 C trace-rise rule at 3.213 A.
-  Widen/pour J1->F1->U2. (Derivation: doc/hardware/mb005-loop-requirement-derivation.md;
-  current inner F1-U2 trace models up to 562 C rise at the fault current.)
-- **Card notch:** accept standard PCIe CEM geometry; JLC's copper-to-edge
-  minimum only for the gold fingers at the key notch (0.30 mm elsewhere);
-  positional key fit qualified by first-article test-fit in the real sockets.
-- **MB-051:** redesign reset supervision for both rails with real margin.
-- **GPU overclock:** David asked whether 252 MHz / 1.20 V is OK; answered,
-  awaiting his choice.
-- In progress (agents, scratch builds only): main board (MB-005 + MB-051),
-  card notch rule/MECH-001. One coordinated canonical rebuild of all
-  boards + evidence re-pin follows, only after both agents finish (a build
-  racing their source edits fails with "board inputs changed during pipeline").
-- **Card notch decision applied.** hw/tools/gerberdrc.py: only
-  ConnectorPad flashes A11/A12/B11/B12 (with their pin-11/12 partner) against
-  Edge.Cuts between those pad centres get JLC's 0.20 mm (capabilities page,
-  "Copper clearance from routed board edges: >=0.2 mm", read 2026-09-28);
-  everything else keeps 0.30 mm; 1 nm float slack at the rule. test_fabcheck
-  (30 OK), 3 counterexamples. MECH-001 now passes (static CEM checks kept;
-  positional fit is info + new hw test MECH-101 first-article fit).
-  **Open with JLC:** their gold-finger pages mention a 0.5-1.0 mm finger-to-
-  outline "safety distance" and engineer "optimization"; put a note in the
-  order asking them not to trim fingers, and check at first article.
-  MECH-101's >= 0.10 mm measured-gap acceptance needs David's OK.
-  Card fab rows now stop at the CPL review blocker. Every board reads stale
-  (hw/tools changed) until the coordinated rebuild.
-- **Wi-Fi divider swap applied:** R9 C25818 -> C861412, R10
-  C25803 -> C122538 (YAGEO RT0603BRD07 0.1 %, 25 ppm/C) in hw/boards/wifi.py;
-  wifi_parts FITTED, design.WIFI_BUCK_RES_TOL = 0.001, POW-003 text updated.
-  wifi_proposal.py: worst min 3.074 V, max 3.537 V (limits 3.0/3.6). Scratch
-  build passed every step incl. BOM and JLC stock; POW-003 must be rerun on
-  the canonical rebuild.
+## Notes for a new agent
 
-### Agent results
-
-- **Card power (done).** No row turned green; all six fail only on their
-  declared `GAPS['power']` in hw/tools/boardcheck.py. New
-  `hw/power/rp2040_vreg.py` + `test/hw/test_rp2040_vreg.py` bind each RP2040
-  card's VREG pins, caps, firmware voltage and clock to the RP2040 datasheet
-  (build 2025-02-20): io/storage/eink/system pass; **gpu fails**: firmware
-  (`fw/rp2040/gpu/main.c:191-193`) sets VREG 1.20 V (1.164-1.236 V at +/-3%)
-  vs DVDD max 1.16 V, and 252 MHz vs 133 MHz documented. Wired into
-  GC/IC/SC/EC/YC-005 cmds. **New David decision:** accept the out-of-datasheet
-  GPU overclock (PicoDVI practice; requirement change + per-unit soak) or
-  change the design. Remaining red needs external data: RP2040 DVDD load-step
-  data, slot contact resistance max, SY6280 fault/limit data (IC-005; part
-  change or requirement rewrite), CPU card items in
-  doc/hardware/cpu-power-proof-gaps-20260928.md.
-- **Card thermal (done).** New `hw/power/rp2040_thermal.py` (+ `thermal.py
-  rp2040 BOARD DIR`, 8 tests incl. 3 mutations) bounds RP2040 package heat
-  from datasheet rated maxima (VREG 3.63 V x 100 mA, IIOVDD/IIOVSS 50 mA,
-  USB, ADC) and binds the netlist: 910 mW x 48 C/W -> 83.7 C vs 85 C case
-  limit (1.3 C margin). io/storage/eink/system pass, gpu fails (TMDS sinks
-  46 mA; steady IO 51.7 mA > 50 mA IIOVSS_MAX). **Not wired into
-  GC/IC/SC/EC/YC-006 yet** (would need cmd `python3 hw/power/thermal.py
-  rp2040 <board> build/hw/<board>`): the passes rest on assumptions David
-  must accept: ADC_AVDD <= 2 mA (no datasheet max), IO switching current
-  unbounded beyond the rated-total headroom (19.4 mA on storage/system),
-  USB 2.0 cable figures quoted from memory; also 100-ohm green LEDs draw
-  13.4 mA vs the 12 mA drive setting. CC-006/MB-006 need an iCE40 core
-  current bound (iCEcube2 estimate or measurement; ceiling ~100 mA); main
-  also lacks HT7533 standby LDO theta-JA.
-- **Mechanical (done).** Bug fixed in hw/mech/fit.py: the system card's
-  SOFNG x4 socket skipped the positional key check and passed on the EasyEDA
-  model's nominal 1.75 mm rib; the SOFNG drawing has no toleranced rib width
-  (its undesignated 1.78 at the title block's +/-0.15 allows 1.93 mm > the
-  1.84 mm minimum notch). `key_position_check` now fails any socket without a
-  published maximum rib. test/test_key_mating.py (4 tests) now runs under
-  MECH-001; counterexample added. MECH-001 fails 6 UMAX lines (0.005 mm/side vs
-  JLC +/-0.10 mm) + the SOFNG line; MECH-002..008 pass. Unblock: UMAX rib-to-
-  contact registration / tolerance data (C404113, C404111), a toleranced SOFNG
-  drawing (C19188869; also sources slot_w=1.78), or a socket/interconnect change.
-- Note: any edit under hw/tools/ changes every board's evidence hash and makes
-  all boards "stale"; such edits must be paired with re-pinning evidence.
-
-### Next steps
-
-1. Resolve board-build determinism; then re-pin receipts and regenerate the
-   co-sim top/evidence against boards that will stay put.
-2. Commit (David's call), validate the new counterexamples, rerun MUT-002.
-3. External blockers from the handoff remain David's decisions.
+- Background shell waits: never `pgrep -f '<pattern>'` in a loop whose own
+  command line contains the pattern (it matches itself forever); wait on a
+  PID with `kill -0`.
+- Run at most one board build (Freerouting) at a time.
+- Counterexamples run in a fresh worktree of HEAD: commit fixes before
+  running them; only `build/hw` is linked in.

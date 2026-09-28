@@ -1528,7 +1528,7 @@ cmd = "python3 -m unittest test/test_key_mating.py && python3 hw/mech/fit.py --c
 [[test]]
 id = "MECH-101"
 title = "First article: card key and fingers in the real sockets"
-checks = "before the full run, on first-article cards of every type: each card inserts fully in its socket type (x1 UMAX C404113, x8 UMAX C404111, x4 SOFNG C19188869) by hand, without force, key rib in the notch; reversed insertion is blocked by the key; continuity from A11/A12/B11/B12 to the socket's matching contacts; no finger trimmed or lifted, and no copper or gold exposed at the notch walls under magnification; measured notch width and notch-wall-to-finger gap on both faces"
+checks = "before the full run, on first-article cards of every type: each card inserts fully in its socket type (x1 UMAX C404113, x8 UMAX C404111, x4 SOFNG C19188869) by hand, without force, key rib in the notch; reversed insertion is blocked by the key; continuity from A11/A12/B11/B12 to the socket's matching contacts; no finger trimmed or lifted, and no copper or gold exposed at the notch walls under magnification; measured notch width and notch-wall-to-finger gap on both faces, each gap >= 0.10 mm (David, 2026-09-28)"
 method = "manual, recorded in bringup.md: calipers or optical measurement, 10x+ loupe or microscope, meter on the socket's solder tails"
 kind = "hw"
 vrow = "5"
