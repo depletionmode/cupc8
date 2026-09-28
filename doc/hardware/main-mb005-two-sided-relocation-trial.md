@@ -99,6 +99,47 @@ bounded. At the eFuse's 3.21 A maximum current-limit value, these 25/50 mΩ
 contact cases alone dissipate 258/515 mW. The connector's 80 °C maximum
 operating temperature has no qualified fault-heating margin.
 
+### Quantified contact qualification blocker
+
+The source netlist maps J1's two merged VBUS solder pads, `A4B9` and
+`B4A9`, to `/VBUS`, and its two merged signal-ground pads, `A1B12` and
+`B1A12`, to `/GND`. Each merged pad names two USB-C fingers. This gives a
+*generous* four independent mated fingers on each rail, assuming the mating
+plug connects and shares current across all of them. The shell hold-downs
+are not counted as a guaranteed power return. The [HRO TYPE-C-31-M-12
+product page](https://en.krhro.com/Product-Details/726.html) publishes
+`≤50 mΩ` contact resistance but gives no bound for the complete mated
+VBUS-plus-GND groups with the selected plug, temperature and life. The
+following four-finger calculation is a conditional sensitivity, not a
+claim that HRO guarantees individual or equal-sharing paths.
+
+For four equal contacts per rail at `r` mΩ each, their ideal loop
+contribution is `r/4 + r/4 = r/2`. The public 50 mΩ value permits the
+illustrative `r = 50 mΩ` corner: **25 mΩ from mated contacts alone**, with
+zero board copper, zero solder and zero plug wiring. It already exceeds
+the 20 mΩ loop ceiling by 5 mΩ. With the trial's A-side positive copper
+and finest In1-only return scenario, the arithmetic becomes
+`16.600 + 2.250 + 25.000 = 43.850 mΩ`, before all omitted terms. Two
+conducting fingers per rail would give 50 mΩ of contacts and a
+`68.850 mΩ` illustrative total. These are possible high-resistance
+corners under the published rating, not measured resistance of a unit.
+
+Conversely, with four equally loaded fingers per rail, the relocated
+trial's `16.600 + 2.250 = 18.850 mΩ` copper scenario leaves at most
+**1.150 mΩ combined contact resistance**, even granting ideal solder,
+pad/via interfaces and all omitted copper. It would require
+`r ≤ 2.300 mΩ` for *each* of the eight mated fingers. This is about
+21.7 times tighter than the public 50 mΩ figure. Even the optimistic
+15.863 mΩ tied-VBUS-pad solve leaves only 1.887 mΩ for the combined
+contact groups after the 2.250 mΩ return scenario, or
+`r ≤ 3.774 mΩ` per equally loaded finger. The In1-only return is not a
+bound; including other GND layers could reduce its copper contribution,
+while real barrels, spokes, solder and contact imbalance consume more
+budget. No change to F1/U2 placement or PCB copper can establish the
+specified *assembled* 20 mΩ maximum from the fitted connector's public
+data. Obtain a qualified mated-group maximum or substitute and qualify
+a suitable connector pair before treating further routing as closure.
+
 **Requirement decision:** retain the whole-loop ≤20 mΩ limit and keep MB-005
 red. The fitted HRO public guarantee cannot establish it, regardless of
 PCB route quality. For a 5 mΩ design margin, allocate no more than 4 mΩ
