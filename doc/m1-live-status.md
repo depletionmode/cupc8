@@ -7,7 +7,7 @@ update it after every finding, commit, decision or agent result (David,
 
 ## State right now (2026-09-28 evening)
 
-- Branch `milestone-1`, HEAD `643403a`, not pushed. All work below is
+- Branch `milestone-1`, pushed to origin on David's request (2026-09-28). All work below is
   committed except what "In flight" lists. User files left untracked on
   purpose: `.claude/`, `card.img`, `test/emu/golden/E2E-002.txt.local-backup`.
 - Last full run (before today's fixes): `make verify JOBS=2` → 229 passed,
@@ -65,10 +65,9 @@ update it after every finding, commit, decision or agent result (David,
    series arrays RN1/RN2 270 -> 360 ohm (UNI-ROYAL 4D03WGJ0361T5E, C182716,
    extended part, 4,617 in stock): IO 51.7 -> 41.5 mA vs 50 mA; worst DVI
    swing 215..939 mV vs 150..1200 mV (DVI 1.0 §4.2 figures not re-read from
-   the spec text). **At the coordinated rebuild:** copy
-   `<scratchpad>/C182716.yaml` → `hw/parts/C182716.yaml` (copy of C425067.yaml
-   with the new datasheet URL; the scratchpad is session-local, so if it is
-   gone recreate it that way) before rebuilding gpu. GC-006 still red on R4
+   the spec text). **At the coordinated rebuild:** move
+   `doc/hardware/pending-hw-parts-C182716.yaml` → `hw/parts/C182716.yaml`
+   (C425067.yaml with the new datasheet URL) before rebuilding gpu. GC-006 still red on R4
    (TMDS switching current unbounded).
 3. **JLC order instructions** (David approved): tick JLC's "Confirm
    Production File" option (review their post-CAM Gerbers vs ours before
