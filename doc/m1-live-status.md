@@ -133,7 +133,9 @@ MB-051.
   for the own-pad keep-out (both need the fix committed before the fresh-
   worktree run).
 - Build 3 (`scratchpad/main-new3`, log `build3.log`, pid `build3.pid`,
-  started 09:33). Results below when it finishes.
+  started 09:24). Routing stage started at once (09:28, 147 unrouted items,
+  no fanout stage); pass #1 took 52-55 min per run (8 runs), ending at 62-71
+  unrouted / 33 violations (10:22-10:25). Final result below when it finishes.
 
 ## Bus SI (MB/CC/SC/EC-007), resumed 2026-09-29 (sonnet agent)
 
@@ -240,13 +242,45 @@ but does NOT reach 3.66 V at every corner: getting there needs a main-board chan
 lower-Z0 routing. Decision needed from David on whether the -40 C/3.47 V corner
 must comply. CC-007 stays red until then.
 
-### Row status (2026-09-29)
+### Row status (2026-09-29): all four rows RED, on the routed boards, evidence stale
 
-- MB-007 has never completed: it crashed in extraction (wifi 2-layer B.Cu
-  void, fixed in slowbus_route.py); a 3712-case run was resumed.
-- Boards in build/hw are all stale ("source inputs differ"); runs use
-  `--artifacts-only`, so every report is `valid_for_row_4_6: false` until the
-  coordinated rebuild.
+Reports: build/si-slowbus/{MB,CC,SC,EC}-007.json (`--artifacts-only`: every board in
+build/hw is "stale: source inputs differ", so `valid_for_row_4_6` is false until the
+coordinated rebuild; a strict run refuses stale boards). MB-007 had never completed
+(crashed in extraction on the wifi 2-layer B.Cu void: fixed in slowbus_route.py);
+it now runs 3712 cases: 3041 failing.
+
+- **CC-007** 778/1008 failing: the CPU-bus overshoot above (sourced iCE40 IBIS,
+  both ends). Timing ok (BUS-005 setup 63 % slack). Clocks (assumed oscillator
+  bracket) also over.
+- **MB-007** SPI on the six slots, SCK/MOSI/CS/MISO all fail: SCK and MOSI with
+  storage cards in all slots ring back 0.5-1.8 V and dip non-monotonically up to
+  1.7 V through the 0.8-2.0 V band at every corner; per-slot CS peaks 3.9-5.3 V.
+  Series value of R35-R42 (SCK/MOSI/CS at U7) does not fix it: 33/47/68/100/150/220
+  ohm gives 0/32 passing for SCK-all and MOSI-all at every value (peak falls 4.37 ->
+  3.53 V, ring-back stays 360-1800 mV): a distributed six-stub star behind a source
+  above Z0 launches a staircase. Only a lightly loaded corner (one card in J16,
+  10 pF RP2040 input, max IBIS) passes as built. RP2040 pin C (1..10 pF) is unsourced
+  and decides pass/fail for SCK-J16-only (rx_c=1 passes, rx_c=0 fails at max).
+  MISO (74LVC1G125 family IBIS proxy, no series R on the cards): U7.48 peaks 4.54 V
+  for 6.8 ns / -0.64 V for 4.9 ns, timing -27 ns at 6 MHz (slot MISO turnaround).
+  SRAM/ROM bus: 406/624 failing (ring-back up to 527 mV on MEM_D2 at U10.15);
+  chipset -> CPU socket (main-driven, 33 ohm at main): 294/448 failing. Convergence
+  check fails on the SCK/CS cases (arrival time of ringing edges differs 2-4 ns
+  between mesh and half mesh; amplitude agrees to 8 mV).
+- **SC-007** 671/872: RP2040 -> microSD passes at the weak driver bound (170 ohm, 5 ns)
+  and fails at the fast bound (20 ohm, 0.5 ns, UNSOURCED; RP2040 has no IBIS, no
+  edge rate, no pin C): SD_SCK 4.46 V on the card (limit 3.6 V) with no series R. Red
+  until RP2040 4 mA/slow-slew edges are measured. SD read timing -7.2 ns.
+- **EC-007** 828/1128: same RP2040 bounds; HAT inputs undershoot -0.63 V at the fast
+  bound over a 100-300 ohm loose cable (assumed cable). 150 ohm instead of 33 passes
+  at 0.15 m and fails again at 0.3 m. UC8179 DIN setup/hold/SCL width -2.0 ns.
+- Not covered anywhere: USB D+/D- 90 ohm (other agent's openEMS rows).
+
+Focused tests (all 25 pass, ~2.3 min): `python3 test/hw/test_slowbus_si.py`.
+Mutations that must fail: RN arrays shorted (CPU bus, from the 68 ohm baseline), a
+60 mm and a 150 mm stub added (30 mm passes), R36 shorted (SPI), the EC series
+resistor removed and the EC cable doubled, a 100 ohm "pull-up" on the storage card.
 
 ## State right now (2026-09-28 evening)
 
@@ -625,3 +659,16 @@ must comply. CC-007 stays red until then.
   monotonic, 32/32 cable cases without threshold re-crossing (Z lower and upper).
   ngspice notes: T elements of 15-60 ps stall (minutes): board lines are now
   20 ps LC ladders; .options method=gear; 0.5 ns ramp floor; 300 s timeout fails the row.
+
+- 2026-09-29 10:35 results (scratch worktree with c040ca4 hw tools, the
+  boards' own receipts valid): PASS card_leds (rail indicators), sysctl_inputs
+  (presence/ID), io_vbus, system_usb (CC Rd), prog_port, coverage (waivers),
+  cpu_socket (CC-051, 6 mutations incl. 2 copper). E2E-002 (8 checks), E2E-003
+  (7), E2E-004 (22) pass on the netlist-generated top (not gated on the net
+  accounting). Pending: COSIM-003..006 re-run, MB-052 bridge, the E2E fault
+  injection (test_cosim_e2e_mutants.py), then the row commands in a fresh tree.
+
+## Main routing build #3 update (2026-09-29 11:55)
+- Passes 11-14 of 8 salts; best 53 unrouted (salt 0 pass 14), range 53-64; all "33 violations" = baseline (fixed copper), none added by us.
+- New vs build #1: a /5V_SYS via overlapping the +5V trunk at (8.4, 152.2) (input corner layout). Harmless if same net; else real DRC error. Must check in final KiCad DRC; fix in corner layout if flagged.
+- Improvement ~1 unrouted/pass; per-ordering cap (180 min from 09:28) ends ~12:28. Expect ~50 unrouted -> fallback: hand-place remaining connections (agreed with David).
