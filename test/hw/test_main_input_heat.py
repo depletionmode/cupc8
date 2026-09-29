@@ -150,6 +150,59 @@ class CopperMesh(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'open copper|no copper'):
             cm.solve(board, '/T', [('A', '1')], [('B', '1')], (-2, 7, 10, 13), 0.1)
 
+    def test_compiled_solvers_preserve_resistance_and_current_density(self):
+        import importlib.util
+        if importlib.util.find_spec('scipy') is None:
+            self.skipTest('optional SciPy sparse solver is not installed')
+        board = self.board(2.0, 20.0)
+        args = (board, '/T', [('A', '1')], [('B', '1')], (-2, 7, 22, 13), 0.1)
+        original = cm.solve(*args)
+        solvers = ['sparse'] + (['amg'] if importlib.util.find_spec('pyamg') else [])
+        for solver in solvers:
+            with self.subTest(solver=solver):
+                compiled = cm.solve(*args, solver=solver)
+                self.assertAlmostEqual(compiled.milliohms, original.milliohms, places=6)
+                self.assertAlmostEqual(compiled.j_max_a_per_mm['F.Cu'], original.j_max_a_per_mm['F.Cu'], places=6)
+                np.testing.assert_allclose(compiled.grids['F.Cu'][0], original.grids['F.Cu'][0], atol=1e-6)
+                with self.assertRaisesRegex(ValueError, 'open copper|no copper'):
+                    cm.solve(board, '/T', [('A', '1')], [('B', '1')], (-2, 7, 10, 13), 0.1, solver=solver)
+
+    def test_cached_geometry_solves_each_terminal_pair_again(self):
+        import pcbnew
+        board = self.board(2.0, 20.0)
+        middle = pcbnew.FOOTPRINT(board.FindFootprintByReference('A'))
+        middle.SetReference('C')
+        middle.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(10), pcbnew.FromMM(10)))
+        board.Add(middle)
+        for pad in middle.Pads():
+            pad.SetNet(board.FindNet('/T'))
+        cache = {}
+        args = (board, '/T', [('A', '1')])
+        window = (-2, 7, 22, 13)
+        full = cm.solve(*args, [('B', '1')], window, 0.1, geometry_cache=cache)
+        half = cm.solve(*args, [('C', '1')], window, 0.1, geometry_cache=cache)
+        fresh = cm.solve(*args, [('C', '1')], window, 0.1)
+        self.assertLess(half.milliohms, 0.6 * full.milliohms)
+        self.assertAlmostEqual(half.milliohms, fresh.milliohms, places=8)
+        np.testing.assert_allclose(half.grids['F.Cu'][0], fresh.grids['F.Cu'][0], atol=1e-8)
+
+    def test_unloaded_probe_reports_transfer_without_drawing_load(self):
+        import pcbnew
+        board = self.board(2.0, 20.0)
+        middle = pcbnew.FOOTPRINT(board.FindFootprintByReference('A'))
+        middle.SetReference('C')
+        middle.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(10), pcbnew.FromMM(10)))
+        board.Add(middle)
+        for pad in middle.Pads():
+            pad.SetNet(board.FindNet('/T'))
+        args = (board, '/T', [('A', '1')], [('B', '1')], (-2, 7, 22, 13), .1)
+        original = cm.solve(*args)
+        probed = cm.solve(*args, probes=(('C', '1'), ('B', '1')))
+        self.assertAlmostEqual(original.milliohms, probed.milliohms, places=8)
+        self.assertAlmostEqual(probed.transfer_milliohms[('B', '1')], probed.milliohms, places=8)
+        self.assertGreater(probed.transfer_milliohms[('C', '1')], .45 * probed.milliohms)
+        self.assertLess(probed.transfer_milliohms[('C', '1')], .60 * probed.milliohms)
+
 
 if __name__ == '__main__':
     unittest.main()

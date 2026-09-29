@@ -1431,9 +1431,16 @@ def _node_joins(board, skip=()):
         elif t.Type() == pcbnew.PCB_TRACE_T:
             segs.setdefault(net, []).append((i, t.GetLayer(), a.x, a.y, b.x, b.y, t.GetWidth()))
     pads = {}
-    for fp in board.GetFootprints():
+    for fp in sorted(board.GetFootprints(), key=lambda f: f.GetReference()):
         for p in fp.Pads():
             pads.setdefault(p.GetNetname(), []).append(p)
+    # pcbnew orders the copper of a saved board at random: what is chosen below must not depend on it
+    for ss in segs.values():
+        ss.sort(key=lambda r: r[1:])
+    for vs in vias.values():
+        vs.sort()
+    for ps in pads.values():
+        ps.sort(key=lambda p: (p.GetParentFootprint().GetReference(), p.GetNumber()))
     splits = {}                                  # track index -> [(k, x, y)]
     links = []                                   # (net, layer, x, y, px, py, width)
     for net, ss in segs.items():
@@ -1865,11 +1872,12 @@ def _spi_ncs6_escape(board):
 
 
 def _clear_main_silk_mask(board):
-    """Keep four pin-1 rings and four socket strokes clear of mask openings."""
+    """Keep five pin-1 rings and four socket strokes clear of mask openings."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     markers = {'U1': (28.33, 171.30), 'U3': (39.30, 161.67),
-               'U5': (56.519, 175.79), 'U8': (102.738, 83.92)}
+               'U5': (56.519, 175.79), 'U8': (102.738, 83.92),
+               'U17': (119.4, 89.65)}
     for ref, at in markers.items():
         fp = board.FindFootprintByReference(ref)
         if fp is None:
@@ -1879,7 +1887,8 @@ def _clear_main_silk_mask(board):
         for i in range(len(shapes)):
             item = shapes[i].Cast()
             if (item.GetClass() == 'PCB_SHAPE' and item.GetLayer() == pcbnew.F_SilkS and
-                    item.GetShape() == pcbnew.SHAPE_T_CIRCLE and item.GetWidth() == mm(0.3) and
+                    item.GetShape() == pcbnew.SHAPE_T_CIRCLE and
+                    item.GetWidth() == mm(0.25 if ref == 'U17' else 0.3) and
                     (round(to(item.GetStart().x), 4), round(to(item.GetStart().y), 4)) == at):
                 found.append(item)
         if len(found) != 1:
@@ -1889,8 +1898,8 @@ def _clear_main_silk_mask(board):
     socket = board.FindFootprintByReference('J3')
     if socket is None:
         raise RuntimeError('main socket silk: missing J3')
-    expected = {(76.635, 165.81, 78.365), (76.635, 158.19, 78.365),
-                (99.635, 165.81, 102.06), (99.635, 158.19, 102.06)}
+    expected = {(76.645, 165.81, 78.355), (76.645, 158.19, 78.355),
+                (99.645, 165.81, 102.06), (99.645, 158.19, 102.06)}
     matched = set()
     shapes = socket.GraphicalItems()
     for i in range(len(shapes)):
@@ -1934,6 +1943,7 @@ def _finish_route(board, replay_salt=None):
         # the route starts from main_seed's copper, which already carries
         # the salt-9 repairs below (the input corner's escape joints are
         # laid by main_power_corner.lay); the silk/mask clean-up remains
+        main_power_corner.widen_3v3_escape(board)
         _clear_main_silk_mask(board)
         return
 
@@ -2277,7 +2287,7 @@ def main():
                        replay=replay,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,
-                       boards=3, title=TITLE, revision=REVISION, revision_at=REV_AT)
+                       boards=2, title=TITLE, revision=REVISION, revision_at=REV_AT)
     net = os.path.join(os.path.abspath(out or os.path.join(ROOT, "build", "hw", "main")), "main.net")
     n = pincheck.check_mainboard(load_pins(), net)
     if pincheck.errors:

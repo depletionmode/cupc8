@@ -19,6 +19,70 @@ def worst(rows):
 
 
 class Windows(unittest.TestCase):
+    def test_ladder_bias_corners_satisfy_independent_two_node_kcl(self):
+        import numpy as np
+        with patch.multiple(rs, REF_ERR=0, R_TOL=0, R_TOL_25=0, IB=1e-6):
+            observed = {(round(a, 10), round(b, 10)) for a, b in rs.taps()}
+            a, b, c = rs.R_L1, rs.R_L2, rs.R_L3
+            matrix = np.array([[1/a + 1/b, -1/b], [-1/b, 1/b + 1/c]])
+            expected = {tuple(round(v, 10) for v in np.linalg.solve(matrix, [rs.VREF/a - i33, -i12]))
+                        for i33 in (-rs.IB, rs.IB) for i12 in (-rs.IB, rs.IB)}
+        self.assertEqual(observed, expected)
+        self.assertEqual(len(observed), 4)
+
+    def test_positive_input_bias_expands_both_rail_threshold_intervals(self):
+        tap = [(1.6, 1.15)]
+        with patch.object(rs, 'IB', 0):
+            original = [fn(tap=tap) for fn in (rs.thresholds_3v3, rs.thresholds_1v2)]
+        with patch.object(rs, 'IB', 1e-6):
+            biased = [fn(tap=tap) for fn in (rs.thresholds_3v3, rs.thresholds_1v2)]
+        for before, after in zip(original, biased):
+            self.assertLess(after[0], before[0])
+            self.assertGreater(after[1], before[1])
+            self.assertLess(after[2], before[2])
+            self.assertGreater(after[3], before[3])
+
+    def test_high_impedance_tap_is_charged_only_its_own_current(self):
+        pin, tap = .0342, .3145
+        effective = rs.effective_copper('/+1V2', pin, tap)
+        self.assertGreater(effective, pin)
+        self.assertLess(effective, rs.copper_limit_1v2())
+        self.assertGreaterEqual(worst(rs.m1_margins(cu12=effective)), rs.MARGIN_MIN)
+        self.assertGreaterEqual(rs.sense_current_bounds()['/+1V2'],
+                                (rs.V33_OP[1] + .1) / (rs.R_S * (1 - rs.R_TOL_1PCT)))
+
+    def test_passive_branch_transfer_and_superposition_bound(self):
+        # Exact star: source -- common -- junction -- load; a second
+        # junction branch ends at the sense tap. Unit load transfer to the
+        # tap is common, even if the tap branch is arbitrarily resistive.
+        common, load, sense = .01, .02, .40
+        load_self, tap_self, transfer = common + load, common + sense, common
+        self.assertLessEqual(transfer, load_self)
+        iload, isense = .04, rs.sense_current_bounds()['/+1V2']
+        actual_load_drop = iload * load_self + isense * transfer
+        actual_tap_drop = iload * transfer + isense * tap_self
+        bound = iload * rs.effective_copper('/+1V2', load_self, tap_self)
+        self.assertLessEqual(actual_load_drop, bound)
+        self.assertLessEqual(actual_tap_drop, bound)
+        self.assertGreater(iload * tap_self, bound)
+
+    def test_measured_route_passes_m1_and_keeps_future_failure_visible(self):
+        measured = 0.024645342566990188
+        self.assertGreaterEqual(worst(rs.m1_margins(measured)), rs.MARGIN_MIN)
+        future = next(row for row in rs.margins(measured) if row[0] == '3V3 slots 5-6 full')
+        self.assertLess(min(future[6], future[7]), rs.MARGIN_MIN)
+
+    def test_m1_copper_limit_is_derived_from_the_same_five_mv_margins(self):
+        limit = rs.copper_limit_3v3()
+        self.assertAlmostEqual(worst(rs.m1_margins(limit)), rs.MARGIN_MIN, places=10)
+        self.assertLess(worst(rs.m1_margins(limit + 0.001)), rs.MARGIN_MIN)
+        self.assertGreaterEqual(worst(rs.m1_margins(limit - 0.001)), rs.MARGIN_MIN)
+
+    def test_core_copper_limit_preserves_the_same_five_mv_margins(self):
+        limit = rs.copper_limit_1v2()
+        self.assertAlmostEqual(worst(rs.m1_margins(cu12=limit)), rs.MARGIN_MIN, places=10)
+        self.assertLess(worst(rs.m1_margins(cu12=limit + 0.001)), rs.MARGIN_MIN)
+
     def test_every_window_clears_by_at_least_5_mv(self):
         rows = rs.margins()
         self.assertGreaterEqual(worst(rows), rs.MARGIN_MIN)
@@ -49,6 +113,120 @@ class Windows(unittest.TestCase):
         # salt 9 fed the chipset core through 0.2 mm tracks: 1.68 ohm to U7.92
         rows = {r[0]: r for r in rs.margins(cu12=1.68)}
         self.assertLess(rows['1V2'][6], 0)
+
+
+class MeshRefinement(unittest.TestCase):
+    def test_pll_branch_cannot_be_omitted_from_core_current_inventory(self):
+        measurements = {'/+1V2': {('U7', '92'): {.1: 30, .07: 30},
+                                  ('R49', '1'): {.1: 200, .07: 200},
+                                  ('R50', '1'): {.1: 30, .07: 30},
+                                  ('R116', '1'): {.1: 310, .07: 310}}}
+        summary = gate.summarize(measurements)
+        self.assertEqual(summary['/+1V2'][1], ('R49', '1'))
+        self.assertGreater(rs.effective_copper('/+1V2', summary['/+1V2'][0],
+                                              summary['/+1V2 tap'][0]), rs.copper_limit_1v2())
+
+    def extract(self, solve):
+        pad = SimpleNamespace(GetNumber=lambda: '131', GetNetname=lambda: '/+3V3')
+        core = SimpleNamespace(GetNumber=lambda: '92', GetNetname=lambda: '/+1V2')
+        board = SimpleNamespace(FindFootprintByReference=lambda _: SimpleNamespace(Pads=lambda: [pad, core]))
+        output = StringIO()
+        with patch('pcbnew.LoadBoard', return_value=board), patch.object(gate, '_extract_pin', side_effect=solve), redirect_stdout(output):
+            result = gate.extract(Path('/unused.kicad_pcb'))
+        return result, output.getvalue()
+
+    def test_coarse_open_refines_only_affected_pin_and_keeps_other_results(self):
+        calls = []
+        def solve(job):
+            _, net, _, sink, _, pitch, _ = job[:7]
+            calls.append((sink, pitch))
+            if sink == ('U7', '131') and pitch == .1:
+                raise ValueError('open copper')
+            return net, sink, pitch, (20 if pitch == .07 else 20.5) if sink[0] == 'U7' else 10
+        result, output = self.extract(solve)
+        self.assertEqual(result['/+3V3'][0], .0205)
+        self.assertLess(result['/+3V3 pitch'], .1)
+        self.assertEqual([sink for sink, pitch in calls if pitch == .05], [('U7', '131')])
+        self.assertIn('R116.1 at 0.1 mm', output)
+        self.assertIn('mesh refinement /+3V3 U7.131', output)
+
+    def test_refined_disagreement_remains_a_gate_failure(self):
+        def solve(job):
+            _, net, _, sink, _, pitch, _ = job[:7]
+            if sink == ('U7', '131') and pitch == .1:
+                raise ValueError('open copper')
+            return net, sink, pitch, (20 if pitch in (.07, .035) else 30) if sink == ('U7', '131') else 10
+        result, _ = self.extract(solve)
+        self.assertGreater(result['/+3V3 pitch'], .1)
+
+    def test_actual_open_is_not_silently_discarded(self):
+        def solve(job):
+            _, net, _, sink, _, pitch, _ = job[:7]
+            if sink[0] == 'U7':
+                raise ValueError('open copper')
+            return net, sink, pitch, 10
+        with self.assertRaisesRegex(ValueError, 'open copper'):
+            self.extract(solve)
+
+
+class MeshReplay(unittest.TestCase):
+    def setUp(self):
+        import tempfile, hashlib, json
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.pcb = self.root / 'main.kicad_pcb'
+        self.log = self.root / 'mesh.log'
+        self.audit = self.root / 'audit.json'
+        self.digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+        self.meta = {'completed_exit_code': 0, 'sha256': {}, 'original_sources': {}}
+        for name in ('main.kicad_pcb', 'drc.json', 'main.net'):
+            p = self.root / name
+            p.write_text('immutable board input')
+            self.meta['sha256'][str(p)] = self.digest(p)
+        for name in ('copper_mesh.py', 'rail_reset_window.py', 'reset_supervisor.py'):
+            p = gate.HERE / name
+            copied = self.root / name
+            copied.write_bytes(p.read_bytes())
+            self.meta['sha256'][str(p.resolve())] = self.digest(p)
+            self.meta['original_sources'][name] = str(copied)
+        rows = [('/+3V3', ('U7', '6'), 25), ('/+3V3', ('R113', '1'), 20),
+                ('/+1V2', ('U7', '92'), 30), ('/+1V2', ('R116', '1'), 310),
+                ('/+1V2', ('R49', '1'), 20), ('/+1V2', ('R50', '1'), 20)]
+        self.log.write_text(''.join('mesh %s %s.%s at %g mm: %.10f mOhm\n' % (net, *sink, pitch, value)
+                                   for net, sink, value in rows for pitch in (.1, .07)))
+        self.meta['log_sha256'] = self.digest(self.log)
+        self.audit.write_text(json.dumps(self.meta))
+        pads = [SimpleNamespace(GetNumber=lambda: '6', GetNetname=lambda: '/+3V3'),
+                SimpleNamespace(GetNumber=lambda: '92', GetNetname=lambda: '/+1V2')]
+        self.board = SimpleNamespace(FindFootprintByReference=lambda _: SimpleNamespace(Pads=lambda: pads))
+
+    def replay(self):
+        with patch('pcbnew.LoadBoard', return_value=self.board):
+            return gate.replay_mesh(self.pcb, self.log, self.audit)[0]
+
+    def test_completed_replay_keeps_tap_and_qualified_loads_separate(self):
+        result = self.replay()
+        self.assertAlmostEqual(result['/+1V2'][0], .030)
+        self.assertAlmostEqual(result['/+1V2 tap'][0], .310)
+
+    def test_changed_board_or_log_is_rejected(self):
+        self.pcb.write_text('changed copper')
+        with self.assertRaisesRegex(ValueError, 'changed board input'):
+            self.replay()
+        self.pcb.write_text('immutable board input')
+        self.log.write_text(self.log.read_text() + 'changed result')
+        with self.assertRaisesRegex(ValueError, 'altered extraction log'):
+            self.replay()
+
+    def test_changed_solver_requires_new_extraction(self):
+        import json
+        copied = Path(self.meta['original_sources']['copper_mesh.py'])
+        copied.write_text(copied.read_text() + '\n# old solver revision\n')
+        self.meta['sha256'][str((gate.HERE / 'copper_mesh.py').resolve())] = self.digest(copied)
+        self.audit.write_text(json.dumps(self.meta))
+        with self.assertRaisesRegex(ValueError, 'copper solver changed'):
+            self.replay()
 
 
 class Fake:

@@ -62,6 +62,7 @@ class Result:
     iterations: int
     grids: dict = None        # {layer name: (sheet density per ampere, ny x nx, 0 off copper; near-terminal mask)}
     pitch: float = 0.0
+    transfer_milliohms: dict = None  # probe pad: maximum source-to-pad drop per ampere
 
 
 def _to(v):
@@ -149,10 +150,7 @@ def _pad_mask(grid, pad, layer):
     return mask
 
 
-def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), terminal_mm=1.0,
-          tol=1e-9, max_iter=200000):
-    """Resistance (mOhm) between two groups of pads [(ref, number)], each group
-    tied to one ideal potential, through all of `net`'s copper in `window`."""
+def _geometry(board, net, window, pitch, corner):
     grid = Grid(window, pitch)
     rho = corner.rho
     copper = {}
@@ -227,6 +225,23 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
             ek.append(np.array([2]))
     ea, eb, eg, ek = np.concatenate(ea), np.concatenate(eb), np.concatenate(eg), np.concatenate(ek)
 
+    return grid, copper, ids, ea, eb, eg, ek, offset, hubs
+
+
+def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), terminal_mm=1.0,
+          tol=1e-9, max_iter=200000, solver='cg', geometry_cache=None, probes=()):
+    """Resistance (mOhm) between two groups of pads [(ref, number)], each group
+    tied to one ideal potential, through all of `net`'s copper in `window`.
+    geometry_cache may be reused only while the supplied board is immutable."""
+    key = (id(board), net, tuple(window), pitch, corner)
+    if geometry_cache is not None and key in geometry_cache:
+        geometry = geometry_cache[key]
+    else:
+        geometry = _geometry(board, net, window, pitch, corner)
+        if geometry_cache is not None:
+            geometry_cache[key] = geometry
+    grid, copper, ids, ea, eb, eg, ek, offset, hubs = geometry
+
     def terminal(group):
         nodes = []
         for ref, num in group:
@@ -289,30 +304,68 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
         return y
 
     inv = np.where(free, 1 / np.maximum(diag, 1e-30), 0)
-    x = np.zeros(n)
-    r = rhs * free
-    z = inv * r
-    p = z.copy()
-    rz = r @ z
-    norm0 = math.sqrt(r @ r) or 1.0
-    for it in range(max_iter):
-        ap = matvec(p)
-        alpha = rz / (p @ ap)
-        x += alpha * p
-        r -= alpha * ap
-        if math.sqrt(r @ r) <= tol * norm0:
-            break
+    if solver in ('sparse', 'amg'):
+        # The same Laplacian and Jacobi-preconditioned CG, with compiled CSR
+        # matvecs. Drop only fixed/floating nodes, which the original CG zeros.
+        from scipy.sparse import coo_matrix, diags
+        from scipy.sparse.linalg import cg
+        nodes = np.flatnonzero(free)
+        ids_free = -np.ones(n, dtype=np.int64)
+        ids_free[nodes] = np.arange(nodes.size)
+        ia, ib = ids_free[fa], ids_free[fb]
+        a = coo_matrix((np.concatenate((diag[nodes], -fg, -fg)),
+                       (np.concatenate((np.arange(nodes.size), ia, ib)),
+                        np.concatenate((np.arange(nodes.size), ib, ia)))),
+                       shape=(nodes.size, nodes.size)).tocsr()
+        iterations = [0]
+        def counted(_):
+            iterations[0] += 1
+        preconditioner = diags(inv[nodes])
+        if solver == 'amg':
+            from pyamg import smoothed_aggregation_solver
+            preconditioner = smoothed_aggregation_solver(a, symmetry='symmetric').aspreconditioner()
+        xf, status = cg(a, rhs[nodes], rtol=tol, atol=0, maxiter=max_iter,
+                        M=preconditioner, callback=counted)
+        if status != 0:
+            raise ValueError('%s: mesh solve did not converge' % net)
+        x = np.zeros(n)
+        x[nodes] = xf
+        it = iterations[0] - 1
+    elif solver == 'cg':
+        x = np.zeros(n)
+        r = rhs * free
         z = inv * r
-        rz_new = r @ z
-        p = z + (rz_new / rz) * p
-        rz = rz_new
+        p = z.copy()
+        rz = r @ z
+        norm0 = math.sqrt(r @ r) or 1.0
+        for it in range(max_iter):
+            ap = matvec(p)
+            alpha = rz / (p @ ap)
+            x += alpha * p
+            r -= alpha * ap
+            if math.sqrt(r @ r) <= tol * norm0:
+                break
+            z = inv * r
+            rz_new = r @ z
+            p = z + (rz_new / rz) * p
+            rz = rz_new
+        else:
+            raise ValueError('%s: mesh solve did not converge' % net)
     else:
-        raise ValueError('%s: mesh solve did not converge' % net)
+        raise ValueError('unknown copper mesh solver: %s' % solver)
     volts = np.where(free, x, v)
     current = eg * (volts[ea] - volts[eb])          # A per V, from a to b
     total = abs(np.bincount(ea, current, n)[src].sum() - np.bincount(eb, current, n)[src].sum())
     if total <= 0:
         raise ValueError('%s: no current flows' % net)
+    transfers = {}
+    for probe in probes:
+        nodes = terminal([probe])
+        if not (seen[nodes] | fixed[nodes]).all():
+            raise ValueError('%s: open copper to qualified probe %s' % (net, probe))
+        # Do not draw current at a qualified probe. Its worst finite-pad
+        # cell gives a conservative drop rather than an averaged potential.
+        transfers[probe] = 1000 * float((1 - volts[nodes]).max()) / total
     current /= total                                 # per ampere of terminal current
 
     # sheet current density per unit width at each cell, outside and inside
@@ -354,7 +407,7 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
         if seen[hub]:
             through = sum(abs(g * (volts[hub] - volts[e])) for e in ends) / 2 / total
             via_amps.append((xy, through))
-    return Result(1000.0 / total, j_max, j_term, via_amps, int(seen.sum()), it + 1, grids, pitch)
+    return Result(1000.0 / total, j_max, j_term, via_amps, int(seen.sum()), it + 1, grids, pitch, transfers)
 
 
 def ipc_rise(amps, area_mm2, outer=True):

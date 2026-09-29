@@ -135,6 +135,44 @@ def lay(board):
 ISLAND = (92.4, 40.4, 109.6, 57.6)      # +1V2 on B.Cu inside U7's pin ring (U7 at (101, 49))
 
 
+def widen_3v3_escape(board):
+    """Keep U7.6's diagonal plane escape continuous at the mesh's corners.
+
+    The saved route's 0.15 mm trace becomes 0.12 mm at the width corner:
+    its diagonal rasterizes open at 0.1 mm. A 0.27 mm escape fits the
+    neighbouring GND via's 0.2 mm clearance and remains connected at
+    0.14/0.1/0.07 mm. The coarser MB-051 grid still needs refinement;
+    widening this further would violate the neighbouring pad/via clearance.
+    """
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+    pad = next(p for p in board.FindFootprintByReference('U7').Pads() if p.GetNumber() == '6')
+    if pad.GetNetname() != '/+3V3' or tuple(round(to(v), 4) for v in
+            (pad.GetPosition().x, pad.GetPosition().y)) != (90.05, 42.75):
+        raise RuntimeError('widen_3v3_escape: U7.6 moved or changed net')
+    expected = {
+        (90.05, 42.75, 91.0625, 42.75),
+        (90.05, 42.75, 91.25, 42.75),
+        (91.0625, 42.75, 91.25, 42.75),
+        (91.25, 42.75, 91.8864, 43.3864),
+    }
+    found = set()
+    tracks = board.Tracks()
+    for i in range(len(tracks)):
+        track = tracks[i]
+        if track.GetClass() != 'PCB_TRACK' or track.GetNetname() != '/+3V3' or track.GetLayer() != pcbnew.F_Cu:
+            continue
+        a, z = track.GetStart(), track.GetEnd()
+        ends = tuple(round(to(v), 4) for v in (a.x, a.y, z.x, z.y))
+        if ends in expected:
+            if round(to(track.GetWidth()), 3) != 0.15:
+                raise RuntimeError('widen_3v3_escape: unexpected escape width')
+            track.SetWidth(mm(0.27))
+            found.add(ends)
+    if found != expected:
+        raise RuntimeError('widen_3v3_escape: saved escape geometry changed: %s' % (expected - found,))
+
+
 def lay_1v2(board):
     """MB-051: the chipset core's +1V2 as copper, not 0.2 mm tracks.
 
@@ -221,4 +259,3 @@ def lay_1v2(board):
             ol.Append(mm(px), mm(py))
         board.Add(k)
     return [net.GetNetname()]
-

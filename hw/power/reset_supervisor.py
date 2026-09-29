@@ -30,9 +30,12 @@ The links R7 (3V3_BUCK -> +3V3) and R8 (1V2_LDO -> +1V2) become 1 mOhm alloy
 shunts: a 0 ohm jumper (<= 50 mOhm) drops 31-61 mV at 0.62-1.22 A of 3V3,
 more than the whole 3V3 window.
 
-This file holds the fitted values and the datasheet limits, and computes the
-guaranteed threshold windows by enumerating every tolerance corner. The
-routed-board binding is hw/power/rail_reset_window.py (MB-051).
+This file holds the fitted values and datasheet limits, and computes modeled
+threshold windows by enumerating the tolerance and input-bias corners. The
+1 nA input-bias bound is an engineering allowance: TI specifies a 25 C
+maximum, with typical curves at higher temperatures. Qualification therefore
+includes the first-article reset measurements at the specified ambient.
+The routed-board binding is hw/power/rail_reset_window.py (MB-051).
 
     python3 hw/power/reset_supervisor.py            # threshold windows (fast)
     python3 hw/power/reset_supervisor.py --spice    # + ngspice sequences
@@ -102,7 +105,8 @@ BAT54_VF_COLD = 0.10            # allowance for the rise at -40..0 C
 # ---------------------------------------------------------------- rails and loads
 V33_MIN, V12_MIN = d.V3V3_MIN, d.V1V2_MIN            # 3.135 V, 1.140 V: the valid floors
 POW001_3V3_LOW = 3.238          # POW-001 P4h: 0->500 mA step minimum at the DC low corner
-POW002_1V2_LOW = 1.172          # POW-002 L6: 1.2 V - 2 % - step droop - ripple/2
+POW002_1V2_LOW = 1.1715         # POW-002 same model/corner at conservative 46 mA: L6 1.171569 V,
+                               # rounded down; includes core + auxiliary + loose sense bound
 I_3V3 = {"M1": 0.617, "slots 5-6 full": 1.22}       # power.md: M1 max; with 2 x 300 mA future cards
 I_1V2 = d.I_1V2_MAX + 0.001     # the chipset core + the 1V2 LED base and sense branches
 R_LINK33 = 0.001 * 1.01 * (1 + 200e-6 * 95)          # R7 at 115 C: 1 % and 200 ppm/C
@@ -111,6 +115,7 @@ R_LINK12 = R_LINK33             # R8, the same 1 mOhm shunt
 CU33_MAX = 0.010                # R7:2 to the 3V3 sense point and to every U7 +3V3 pin
 CU12_MAX = 0.030                # R8:2 to the 1V2 sense point and to every U7 +1V2 pin
 MARGIN_MIN = 0.005              # required clearance on each side of each window
+M1_WINDOWS = ('3V3 M1', '1V2')   # slots 5-6 are future cards, outside the M1 release load
 
 
 def _signs(n):
@@ -121,13 +126,15 @@ def taps(l1=None, l2=None, l3=None):
     """[(T33, T12)] at every reference and ladder tolerance corner."""
     l1, l2, l3 = l1 or R_L1, l2 or R_L2, l3 or R_L3
     out = []
-    for sv, s1, s2, s3, si in _signs(5):
+    for sv, s1, s2, s3, si33, si12 in _signs(6):
         vr = VREF * (1 + sv * REF_ERR)
         a, b, c = l1 * (1 + s1 * R_TOL), l2 * (1 + s2 * R_TOL_25), l3 * (1 + s3 * R_TOL)
-        i = vr / (a + b + c) + 0 * si
-        # each op-amp input draws up to IB from its tap (ignored in i: 1 nA vs ~60 uA)
-        t33, t12 = vr - i * a, i * c
-        out.append((t33 + si * IB * a, t12 + si * IB * c))
+        g1, g2 = 1 / a + 1 / b, 1 / b + 1 / c
+        det = g1 * g2 - 1 / b**2
+        # Exact two-node KCL, including both independent IN- bias currents.
+        rhs33, rhs12 = vr / a - si33 * IB, -si12 * IB
+        out.append(((g2 * rhs33 + rhs12 / b) / det,
+                    (rhs33 / b + g1 * rhs12) / det))
     return out
 
 
@@ -137,13 +144,13 @@ def thresholds_3v3(r_t=None, r_bt=None, r_f=None, tap=None):
     up to VO_SWING, its low output 0..VO_SWING."""
     r_t, r_bt, r_f = r_t or R_T, r_bt or R_BT, r_f or R_F33
     falls, rises = [], []
-    for (t33, _), et, eb, ef, sv, sw in product(tap or taps(), (-1, 1), (-1, 1), (-1, 1), (-1, 1), (0, 1)):
+    for (t33, _), et, eb, ef, sv, sw, sib in product(tap or taps(), (-1, 1), (-1, 1), (-1, 1), (-1, 1), (0, 1), (-1, 1)):
         rt, rb, rf = r_t * (1 + et * R_TOL_25), r_bt * (1 + eb * R_TOL), r_f * (1 + ef * R_TOL_1PCT)
         vp = t33 + sv * VOS
         g = 1 / rt + 1 / rb + 1 / rf
         sw_v = sw * VO_SWING
-        rises.append((vp * g - sw_v / rf) / (1 / rt))                      # output low: VOL = sw_v
-        falls.append((vp * g + sw_v / rf) / (1 / rt + 1 / rf))             # output high: V33 - sw_v
+        rises.append((vp * g - sw_v / rf + sib * IB) / (1 / rt))          # output low: VOL = sw_v
+        falls.append((vp * g + sw_v / rf + sib * IB) / (1 / rt + 1 / rf)) # output high: V33 - sw_v
     return min(falls), max(falls), min(rises), max(rises)
 
 
@@ -151,11 +158,11 @@ def thresholds_1v2(r_s=None, r_f=None, tap=None):
     """(fall_min, fall_max, rise_min, rise_max) of +1V2 at R_S's rail end."""
     r_s, r_f = r_s or R_S, r_f or R_F12
     falls, rises = [], []
-    for (_, t12), es, ef, sv, sw, v33 in product(tap or taps(), (-1, 1), (-1, 1), (-1, 1), (0, 1), V33_OP):
+    for (_, t12), es, ef, sv, sw, v33, sib in product(tap or taps(), (-1, 1), (-1, 1), (-1, 1), (0, 1), V33_OP, (-1, 1)):
         rs, rf = r_s * (1 + es * R_TOL_1PCT), r_f * (1 + ef * R_TOL_1PCT)
         vp = t12 + sv * VOS
         for vout, out in ((sw * VO_SWING, rises), (v33 - sw * VO_SWING, falls)):
-            out.append(vp + (vp - vout) * rs / rf)
+            out.append(vp + (vp - vout) * rs / rf + sib * IB * rs)
     return min(falls), max(falls), min(rises), max(rises)
 
 
@@ -185,6 +192,75 @@ def margins(cu33=CU33_MAX, cu12=CU12_MAX):
     return rows
 
 
+def m1_margins(cu33=CU33_MAX, cu12=CU12_MAX):
+    """Required release windows; margins() also keeps the future-load diagnostic."""
+    return [row for row in margins(cu33, cu12) if row[0] in M1_WINDOWS]
+
+
+def copper_limit_3v3(case='M1'):
+    """Largest routed resistance preserving both unchanged 5 mV margins.
+
+    Derive the bound from the actual tolerance-corner thresholds and load,
+    rather than treating the original 10 mOhm planning estimate as a limit.
+    """
+    current = I_3V3[case]
+    fmin, fmax, _, rmax = thresholds_3v3()
+    return min((fmin - V33_MIN - MARGIN_MIN) / current,
+               (POW001_3V3_LOW - max(fmax, rmax) - MARGIN_MIN) / current - R_LINK33)
+
+
+def copper_limit_1v2():
+    """Core-rail copper bound from the same two 5 mV inequalities."""
+    fmin, fmax, _, rmax = thresholds_1v2()
+    return min((fmin - V12_MIN - MARGIN_MIN) / I_1V2,
+               (POW002_1V2_LOW - max(fmax, rmax) - MARGIN_MIN) / I_1V2 - R_LINK12)
+
+
+def sense_current_bounds():
+    """Absolute rail current at the two high-impedance monitor inputs.
+
+    Both comparator inputs must lie in their specified common-mode interval
+    (-0.1 V to supply +0.1 V), already required for the threshold proof.
+    Bound the entire voltage interval across each input resistor, including
+    tolerance and temperature drift. This intentionally loose copper bound
+    does not depend on the input bias typical-temperature curves. Reversal
+    is conservatively charged as a drop in either direction.
+    """
+    span = V33_OP[1] + 0.1
+    return {'/+3V3': span / (R_T * (1 - R_TOL_25)),
+            '/+1V2': max(span, d.V1V2_MAX + .1) / (R_S * (1 - R_TOL_1PCT))}
+
+
+def effective_copper(net, load_ohms, tap_ohms, case='M1'):
+    """Conservative equivalent drop with pin load and sense current separated.
+
+    For unit current into a load pad the passive-network maximum principle
+    puts every tap voltage between source and that pad. Its transfer drop
+    is thus <= that pad's driving-point resistance. Reciprocity gives the
+    same bound for the effect of sense current at a load. Superposition then
+    bounds distributed load by its total current times the worst *load-pad*
+    resistance, plus absolute sense current times the tap resistance. Include
+    the extra sense current through the fitted link as well.
+    """
+    current = I_3V3[case] if net == '/+3V3' else I_1V2
+    link = R_LINK33 if net == '/+3V3' else R_LINK12
+    # 3V3 also supplies non-chip loads. Reciprocity bounds their effect on
+    # each measured terminal by that terminal's self resistance. For 1V2,
+    # only the chipset's 40 mA is restricted to the measured U7 pins; keep
+    # the original additional 1 mA allowance at arbitrary unmeasured loads.
+    if net == '/+3V3':
+        load_drop = current * max(load_ohms, tap_ohms)
+    else:
+        # R11 LED transistor base and R100 ADC branch can each draw at most
+        # the full core rail over the minimum resistor. Their total is a
+        # conservative DC/sampling bound, without requiring ADC leakage data.
+        aux = d.V1V2_MAX * (1 / 10e3 + 1 / 1e3) / (1 - (.01 + 100e-6 * 95))
+        aux = max(aux, current - d.I_1V2_MAX)
+        load_drop = d.I_1V2_MAX * load_ohms + aux * max(load_ohms, tap_ohms)
+        load_drop += max(0, aux - (current - d.I_1V2_MAX)) * link
+    return (load_drop + sense_current_bounds()[net] * (tap_ohms + link)) / current
+
+
 def mr_low_level():
     """Worst ~MR voltage while a monitor output is low: diode VF (cold) +
     op-amp output swing, against the MAX811's VIL = 0.25 VCC at VCC = V33_MIN."""
@@ -203,7 +279,10 @@ def main():
            (f3[0], f3[1], f3[2], f3[3], 1000 * (sum(f3[2:]) - sum(f3[:2])) / 2))
     c.info("1V2 monitor", "falls %.4f..%.4f V, rises %.4f..%.4f V (nominal hysteresis %.1f mV)" %
            (f1[0], f1[1], f1[2], f1[3], 1000 * (sum(f1[2:]) - sum(f1[:2])) / 2))
-    for k, (name, lo, hi, fmin, rmax, fmax, mlo, mhi) in enumerate(margins()):
+    future = next(row for row in margins() if row[0] == '3V3 slots 5-6 full')
+    c.info('future slots 5-6 (advisory)', 'low/high margins %.2f/%.2f mV; outside M1 load' %
+           (1000 * future[6], 1000 * future[7]))
+    for k, (name, lo, hi, fmin, rmax, fmax, mlo, mhi) in enumerate(m1_margins()):
         c.info("window " + name, "valid-floor side %.4f V, regulator side %.4f V "
                "(copper allowances %.0f / %.0f mOhm)" % (lo, hi, 1e3 * CU33_MAX, 1e3 * CU12_MAX))
         c.check("W%da" % (k + 1), "%s: reset asserts (fall min) before any load leaves its valid range"
