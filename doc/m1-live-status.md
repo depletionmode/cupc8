@@ -803,3 +803,9 @@ resistor removed and the EC cable doubled, a 100 ohm "pull-up" on the storage ca
 ## Decisions 2026-09-29 (David, IC-005)
 - TI TPS61023 ngspice retry workaround (limit lowered in 5 mA steps where the model fails to converge above ~0.637 A): accepted, on the IC-005 verify agent's evidence (numerical, not physical; U5 IN moves ~1 mV over 0.55-0.647 A; binding cases T5/T6 ran at the true 647.4 mA with no retry). David's condition: fine if sane and it will work on real hardware; the real current limit is confirmed in first-article measurement.
 - C26980 (45.3k, JLC extended part) extra fee accepted (also C111738 extended).
+
+## Decisions 2026-09-29 (David, SI rows)
+- GC-007 (GPU TMDS): re-route the pairs to spec (0.2/0.2 mm coupled, <5 ps skew) in a scratch build; adopt only if the row goes green; no threshold weakened.
+- IC-007 (io USB, full-speed): ACCEPT, row stays red with a note (impedance lower bound >99 ohm on 13.5/15.6 mm; all other checks pass); measured in first-article.
+- SPI MISO (4.54 V peak, turnaround miss): try a BOM-only series-R sweep first (R20, R35-R43, 33 ohm now); find the RP2040 fast-edge datasheet source or state it is unsourced.
+- CPL: iCE40 (cpu U1, main U7) resolved by David after our netlist matched the Lattice TQ144 pinout on all 144 pins (pin 66 only overbar notation); tools/cpl_resolutions.yaml.

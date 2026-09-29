@@ -15,3 +15,31 @@ main/J4:
     Codex flagged JLC's pin 1 landing bottom-right after the 90 degree CPL rotation versus our
     top-left (a 180 degree numbering difference); the tool's geometry check passed because the
     part is marked interchangeable_pins.
+cpu/U1:
+  verdict: fine
+  by: David Kaplan (instruction in Claude session, sign off if we connected the iCE40 correctly and the issue is only JLC's symbol labelling)
+  date: 2026-09-29
+  justification: >-
+    iCE40HX4K-TQ144 (C1521989). The tool's mismatch is JLC's EasyEDA symbol pin NAMES (120 of 144
+    differ from ours). JLC assembles from pad positions and numbers, not signal names, and the pad
+    geometry matches JLC's footprint exactly at the CPL rotation. Our own netlist was checked against
+    hw/datasheets/iCE40HX4K-TQ144-pinout.csv (Lattice's HX4K TQ144 pinout): all 144 pin functions
+    match, the one textual difference being pin 66, KiCad's overbar ~{CRESET} for Lattice's CRESET_B.
+    So our connections are correct and the disagreement is a labelling difference in JLC's symbol.
+    Codex (verdict: check) agrees it is not an assembly risk. Still to confirm in JLC's preview:
+    the package pin-1 dot/chamfer at pad 1; our footprint at 0 deg has pad 1 lower-left, numbering
+    counterclockwise, as in the standard TQFP-144 drawing.
+main/U7:
+  verdict: fine
+  by: David Kaplan (instruction in Claude session, sign off if we connected the iCE40 correctly and the issue is only JLC's symbol labelling)
+  date: 2026-09-29
+  justification: >-
+    iCE40HX4K-TQ144 (C1521989). The tool's mismatch is JLC's EasyEDA symbol pin NAMES (120 of 144
+    differ from ours). JLC assembles from pad positions and numbers, not signal names, and the pad
+    geometry matches JLC's footprint exactly at the CPL rotation. Our own netlist was checked against
+    hw/datasheets/iCE40HX4K-TQ144-pinout.csv (Lattice's HX4K TQ144 pinout): all 144 pin functions
+    match, the one textual difference being pin 66, KiCad's overbar ~{CRESET} for Lattice's CRESET_B.
+    So our connections are correct and the disagreement is a labelling difference in JLC's symbol.
+    Codex (verdict: check) agrees it is not an assembly risk. Still to confirm in JLC's preview:
+    the package pin-1 dot/chamfer at pad 1; our footprint at 0 deg has pad 1 lower-left, numbering
+    counterclockwise, as in the standard TQFP-144 drawing.
