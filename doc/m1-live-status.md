@@ -5,6 +5,13 @@ update it after every finding, commit, decision or agent result (David,
 2026-09-28). Background and the release definition:
 `doc/m1-handoff-2026-09-28.md`.
 
+## Decisions 2026-09-29 (David)
+
+- Main-board routing: **pre-place fanout vias ourselves** (Freerouting's fanout took 6.5-11 min/pass with the failing set stuck at ~68 pins; my geometry test scratchpad/via_room.py found a legal via spot for all 79 bare connected pads). Main-board agent instructed to stop the old build, implement and restart into scratchpad/main-new2.
+- **ninja is missing on this host** (build caches point at another project's venv): David to run `sudo pacman -S ninja` (needs his password; not installed by Claude). Needed for emulator/firmware builds, fresh counterexample worktrees and the full verify.
+- CPU-bus overshoot (bus SI agent): /CPU_A0 (CPU card U1 -> RN1 33 ohm -> J1/J2 -> 110 mm 0.1 mm stripline Z0 89 ohm -> main U7.25) peaks 4.17-4.23 V vs the iCE40 3.6 V limit at all 32 corners; no single RN value clears them all. Options + which board changes requested from the agent (RN1 is on the CPU card).
+- High-speed SI agent expects GC-007 impedance red (routed GPU D0 lower bound > 110 ohm vs 100 ohm +-10 %).
+
 ## INTERRUPTED 2026-09-29 morning: agents hit the weekly API limit
 
 All four running agents stopped mid-task (Opus weekly limit, resets Oct 1
@@ -63,6 +70,48 @@ Test state of the partial work (run 2026-09-29):
 Still true: pending rows not implemented: MB-007, CC-007, GC-007, IC-007,
 SC-007, EC-007, YC-007, MB-052, CC-051, SC-051, EC-051, YC-051, E2E-001..004,
 MB-051.
+
+## Main board (MB-005 + MB-051), Sonnet resume 2026-09-29
+
+- Fixed `hw/power/main_input_heat.py` `rises()`: it silently returned 0 rise
+  for a mesh result with no density grids (the test fixture had none), so
+  the 20 C rule passed anything. It now raises; the fixture builds a real
+  grid; counterexample entry added. `test_main_input_heat.py` 10/10 OK.
+- OPA376 as comparator verified: `reset_supervisor.py` and `--spice`
+  (TI OPA376 model) all pass: swing 50 mV max, overload recovery 0.33 us,
+  fast +3V3 collapse nPOR low in 5.3 us, hysteresis 4.4 mV (3V3) / 1.2 mV
+  (1V2). Tight spot: W5 input-range margin 62 mV (3.7 %) at +3V3 = 3.00 V.
+  Integrated comparators (TLV7011/TLV3012) rejected: offset wider than the
+  1V2 window. All new parts checked on JLC 2026-09-29 (stock 2.9k-25k+).
+- `test_board_thermal.py` gained the LVC07 test (6 inputs x 500 uA dICC, fits
+  the HT7533 headroom). Its only error is the built CPU netlist C21 (expected
+  until the rebuild).
+- Scratch seeded build started 08:2x into
+  `.../scratchpad/main-new` (log `scratchpad/build.log`, pid file
+  `scratchpad/build.pid`). Results below when it finishes.
+
+## Bus SI (MB/CC/SC/EC-007), resumed 2026-09-29 (sonnet agent)
+
+- **The 4.234 V is not the SPI bus.** `test_baseline_passes` simulates the
+  CPU-bus net /CPU_A0 (CC-007): CPU-card U1.1 (iCE40 bank-3 IBIS) -> RN1 33 ohm
+  -> J1 -> J2 -> 110 mm of 0.1 mm In2/In3 stripline (Z0 89 ohm) -> main U7.25.
+- **Verdict: real per the vendor IBIS, not tuned.** All 32 IBIS/line/connector
+  corners fail (min corner 3.65-3.71 V, max corner 4.17-4.23 V vs the iCE40 3.6 V
+  limit and 3.66 V / 1.6 ns AC allowance; FPGA-DS-02029 Table 4.1 and the I/O
+  overshoot note). Cause: source impedance (IBIS pull-up ~14 ohm + 33 ohm) is
+  below the line Z0, so the open receiver end doubles a 2.2-2.4 V incident
+  step (hand calc 2*3.47*98/(98+47) = 4.7 V before package rounding). Package L
+  (0.3..7 nH) moves the peak <15 mV; the pin-side node peaks higher (4.40 V).
+- Independent cross-check (ideal lossless 98 ohm, 0.9 ns line, same IBIS driver,
+  1.1 pF + 7 nH TQ144 package, 1.3 pF C_comp + IBIS clamps): 33 ohm -> 4.220 V
+  (routed model 4.234 V), 47 -> 4.14, 68 -> 3.86, 100 -> 3.469 (no overshoot). At
+  62 ohm: 33 -> 3.99, 47 -> 3.58, 68 -> 3.47. The driver alone into 1 Mohm/5 pF
+  is clean and monotonic (max 3.469 V), so the Ku(t) inversion is not the source.
+  In the routed model 100 ohm still peaks at 3.67 V (12 mV over the 3.66 V AC
+  limit at the worst corner) and rings back on the fall edge: the socket and
+  z-steps add to the ideal case. No single RN value clears all 32 corners of
+  /CPU_A0 (68: 16 fail, 82: 20, 100: 28 (ring-back), 150: 32 (staircase in the
+  0.8-2.0 V band)).
 
 ## State right now (2026-09-28 evening)
 
@@ -359,3 +408,28 @@ MB-051.
 - Run at most one board build (Freerouting) at a time.
 - Counterexamples run in a fresh worktree of HEAD: commit fixes before
   running them; only `build/hw` is linked in.
+
+## High-speed SI (GC/IC/YC-007), 2026-09-29 (Sonnet agent)
+
+- Started: reviewing hw/si/tmds_si.py, hw/si/usb_fs_si.py (on top of
+  hw/si/route_si.py + xsection.py, a 2-D quasi-static extractor; rigorous
+  lower-bound impedance, so no unconverged field solve is involved).
+  test/hw/test_route_si.py (already on disk) asserts the routed GPU D0
+  lower bound is > 110 ohm: expect GC-007 impedance to be RED on the design.
+
+## Co-sim (MB-052, CC/SC/EC/YC-051, E2E-001..004), 2026-09-29 (Sonnet agent)
+
+- Environment: /usr/bin/ninja is gone on this host (build/emu-machine and
+  build/rp2040 CMake caches pinned it); `cmake -DCMAKE_MAKE_PROGRAM=<a ninja>`
+  once per build dir fixes an existing tree (a fresh worktree finds ninja on
+  PATH if one is installed). Emulator and RP2040 firmware rebuilt: OK.
+- Every existing co-sim row (COSIM-003..006) is RED at HEAD, for two reasons
+  that predate this agent's edits: (1) all eight board receipts are stale
+  (hw/tools, hw/lib, hw/parts, hw/boards/main.py changed; matches commit
+  c040ca4), so `boardevidence.validate` refuses; (2) the WIP changed
+  hw/cosim/gen_top.py, whose hash is pinned in
+  doc/hardware/si-evidence/ibis-final-receipts.json (and the pinned top).
+  Both clear at the coordinated rebuild + the re-pin command in
+  doc/hardware/si-models.md. To test meanwhile: a scratch worktree at HEAD
+  with hw/tools|lib|parts|boards taken from c040ca4 and build symlinked
+  (scratchpad/cosim-w/wt), then re-pin there.
