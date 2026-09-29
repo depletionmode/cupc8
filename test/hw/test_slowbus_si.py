@@ -10,7 +10,7 @@
   overshoot beyond the AC allowance, and pass a clean edge;
 * the routed six-slot SCK extraction matches SI-005's planar lengths, and an
   opened J16 launch is an open, not a silently shorter bus;
-* the as-built /CPU_A0 overshoot is real: the routed peak matches one ideal
+* the /CPU_A0 overshoot with the superseded 33 ohm arrays is real: the routed peak matches one ideal
   line driven by the same IBIS model, and only the series value moves it;
 * the same net with its arrays at 68 ohm passes at the min corner, fails
   once the series resistor is removed (netlist mutation) and once a stub
@@ -204,19 +204,25 @@ def add_stub(work, mm, net='/CPU_A0', ref='U7'):
     replace_file(work / 'main/main.kicad_pcb', text.rstrip()[:-1] + pieces + '\n)\n')
 
 
-class AsBuiltCpuBus(unittest.TestCase):
-    """/CPU_A0 (CPU-card U1.1 -> RN1 33 ohm -> J1 -> J2 -> 110 mm In2/In3 -> U7.25) is a
-    real overshoot, not a model artefact: the same IBIS driver into one ideal
-    lossless line reproduces the routed peak, and only the series value moves it."""
+class OldCpuBus33(unittest.TestCase):
+    """/CPU_A0 (CPU-card U1.1 -> RN1 -> J1 -> J2 -> 110 mm In2/In3 -> U7.25) with the
+    superseded 33 ohm arrays (the board now has 68 ohm, FIX_OHMS) is a real
+    overshoot, not a model artefact: the same IBIS driver into one ideal lossless
+    line reproduces the routed peak, and only the series value moves it."""
+
+    def routed_33(self):
+        with tempfile.TemporaryDirectory() as work:
+            fixed_boards(Path(work), ohms=33)
+            return si.simulate(cpu_case(si.Bench(Path(work))), Path(work))
 
     def test_overshoot_is_reported(self):
-        result = si.simulate(cpu_case(si.Bench(BOARD_DIR)), BOARD_DIR)
+        result = self.routed_33()
         self.assertTrue(any('main:U7.25: overshoot' in f and 'beyond abs max 3.600 V' in f
                             for f in result['failures']), result['failures'])
         self.assertGreater(result['receivers']['main:U7.25']['vmax'], 4.0)
 
     def test_ideal_line_reproduces_the_peak(self):
-        routed = si.simulate(cpu_case(si.Bench(BOARD_DIR)), BOARD_DIR)['receivers']['main:U7.25']['vmax']
+        routed = self.routed_33()['receivers']['main:U7.25']['vmax']
         ideal = ideal_line_peak(33)
         self.assertLess(abs(routed - ideal), .15, (routed, ideal))
         self.assertGreater(ideal, 4.0)
@@ -224,9 +230,11 @@ class AsBuiltCpuBus(unittest.TestCase):
 
     def test_schottky_clamps_alone_do_not_meet_the_limit(self):
         from dataclasses import replace
-        case = cpu_case(si.Bench(BOARD_DIR))
-        clamped = replace(case, config=replace(case.config, extra=(('rx_diode', 1),)))
-        peak = si.simulate(clamped, BOARD_DIR)['receivers']['main:U7.25']['vmax']
+        with tempfile.TemporaryDirectory() as work:
+            fixed_boards(Path(work), ohms=33)          # the superseded arrays
+            case = cpu_case(si.Bench(Path(work)))
+            clamped = replace(case, config=replace(case.config, extra=(('rx_diode', 1),)))
+            peak = si.simulate(clamped, Path(work))['receivers']['main:U7.25']['vmax']
         self.assertGreater(peak, 3.9)      # Vcc 3.47 V + Schottky drop at tens of mA
 
 
@@ -269,6 +277,113 @@ class Mutations(unittest.TestCase):
             path.write_bytes(bytes(data))
             with self.assertRaises(ValueError):
                 si.load_evidence(work, ('storage',), artifacts_only=True)
+
+
+def net_value(work, kind, refs, old, new):
+    """work/<kind>/<kind>.net with the value of each ref in `refs` changed old -> new."""
+    text = (BOARD_DIR / kind / f'{kind}.net').read_text()
+    for ref in refs:
+        text, count = re.subn(rf'(\(ref "{ref}"\)\s*\(value ")({re.escape(old)})("\))',
+                              rf'\g<1>{new}\3', text)
+        if count != 1:
+            raise AssertionError(f'{kind} {ref}: value {old} found {count} times')
+    replace_file(work / kind / f'{kind}.net', text)
+
+
+def pick(cases, name, **wanted):
+    found = [c for c in cases if c.name.startswith(name + ' ') and all(
+        (getattr(c.config, k) if hasattr(c.config, k) else c.config.get(k)) == v
+        for k, v in wanted.items())]
+    if len(found) != 1:
+        raise AssertionError(f'{name} {wanted}: {len(found)} cases')
+    return found[0]
+
+
+class StorageCard(unittest.TestCase):
+    """RP2040 -> microSD. The RP2040 publishes no IBIS or edge rate, so the row
+    is judged at both driver bounds: the weak bound (170 ohm, 5 ns) must pass; the
+    fast bound (20 ohm, 0.5 ns, unsourced) fails and stays red until measured."""
+
+    def case(self, work, bracket, net='SD_MOSI'):
+        return pick(si.sc_cases(si.Bench(work)), net, bracket=bracket, zscale=1.1, rx_c=0)
+
+    def test_weak_bound_passes_and_fast_bound_is_red(self):
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            mirror(BOARD_DIR, work, ('storage',))
+            self.assertEqual(si.simulate(self.case(work, 1), work)['failures'], [])
+            fast = si.simulate(self.case(work, 0), work)['failures']
+        self.assertTrue(any('overshoot' in f for f in fast), fast)
+
+    def test_wrong_pullup_fails(self):
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            mirror(BOARD_DIR, work, ('storage',))
+            net_value(work, 'storage', ('RN1',), '10k', '100')      # a 100 ohm "pull-up"
+            failures = si.simulate(self.case(work, 1), work)['failures']
+        self.assertTrue(any('never crosses VIL' in f for f in failures), failures)
+
+
+class EinkCard(unittest.TestCase):
+    """RP2040 -> 33 ohm -> panel cable -> HAT (TXB0108). Judged at the fast driver
+    bound over the 300 ohm loose-cable bound: the as-built 33 ohm fails; 150 ohm
+    passes at 0.15 m, and fails again for a removed resistor and a doubled cable."""
+
+    def simulate(self, ohms, cable_m=.15, net='EPD_CLK'):
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            mirror(BOARD_DIR, work, ('eink',))
+            if ohms != 33:
+                net_value(work, 'eink', ('R10', 'R11', 'R12'), '33R', f'{ohms:g}')
+            case = pick(si.ec_cases(si.Bench(work)), net, bracket=0, zscale=1.1, rx_c=0,
+                        cable_z=300.0, cable_m=cable_m)
+            return si.simulate(case, work)['failures']
+
+    def test_as_built_is_red_at_the_fast_bound(self):
+        self.assertTrue(any('undershoot' in f for f in self.simulate(33)))
+
+    def test_fixed_baseline_passes(self):
+        self.assertEqual(self.simulate(150), [])
+
+    def test_removed_series_resistor_fails(self):
+        self.assertTrue(self.simulate(.01))
+
+    def test_doubled_cable_fails(self):
+        self.assertTrue(self.simulate(150, cable_m=.3))
+
+
+class MainSpi(unittest.TestCase):
+    """iCE40 U7.43 -> R36 33 ohm -> six-slot SCK tree -> RP2040 card. Only a
+    lightly loaded corner passes as built (one storage card in J16, max IBIS,
+    10 pF RP2040 input); the populated-slot cases are red and are reported by
+    the row. Removing R36 must fail even in that corner."""
+
+    def simulate(self, ohms):
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            mirror(BOARD_DIR, work, ('main', 'storage'))
+            if ohms != 33:
+                net_value(work, 'main', ('R36',), '33', f'{ohms:g}')
+            case = pick(si.mb_spi_cases(si.Bench(work), kinds=('storage',), singles=('storage',)),
+                        'SCK storage in J16 only', corner='max', package=1, zscale=.9, rx_c=1,
+                        connector=0)
+            return si.simulate(case, work)['failures']
+
+    def test_lightly_loaded_baseline_passes(self):
+        self.assertEqual(self.simulate(33), [])
+
+    def test_removed_series_resistor_fails(self):
+        failures = self.simulate(.01)
+        self.assertTrue(any('overshoot' in f for f in failures), failures)
+
+    def test_full_slots_are_red_as_built(self):
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            mirror(BOARD_DIR, work, ('main', 'storage'))
+            case = pick(si.mb_spi_cases(si.Bench(work), kinds=('storage',), singles=()),
+                        'SCK all storage', corner='min', package=0, zscale=.9, rx_c=0, connector=0)
+            failures = si.simulate(case, work)['failures']
+        self.assertTrue(any('non-monotonic' in f or 'rings back' in f for f in failures), failures)
 
 
 def main():

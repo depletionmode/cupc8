@@ -1538,14 +1538,15 @@ cmd = "python3 -m unittest test/test_key_mating.py && python3 hw/mech/fit.py --c
 id = "MECH-101"
 title = "First article: card key and fingers in the real sockets"
 checks = "before the full run, on first-article cards of every type: each card inserts fully in its socket type (x1 UMAX C404113, x8 UMAX C404111, x4 SOFNG C19188869) by hand, without force, key rib in the notch; reversed insertion is blocked by the key; continuity from A11/A12/B11/B12 to the socket's matching contacts; no finger trimmed or lifted, and no copper or gold exposed at the notch walls under magnification; measured notch width and notch-wall-to-finger gap on both faces, each gap >= 0.10 mm (David, 2026-09-28)"
-method = "manual, recorded in bringup.md: calipers or optical measurement, 10x+ loupe or microscope, meter on the socket's solder tails"
+method = "manual, recorded in bringup.md: calipers or optical measurement, 10x+ loupe or microscope, meter on the socket's solder tails, results in doc/hardware/fa-results/MECH-101/"
 kind = "hw"
 vrow = "5"
+cmd = "python3 tools/fa_results.py MECH-101"
 
 [[test]]
 id = "MECH-002"
 title = "Finger bevel and card thickness vs PCIe CEM"
-checks = "each card's fab/order.json: thickness in 1.57 +/- 0.13, hard gold, bevel in CEM's 20 +/- 5 deg"
+checks = "each card's fab/order.json: thickness in 1.57 +/- 0.13, ENIG gold fingers, bevel in CEM's 20 +/- 5 deg"
 method = "hw/mech/fit.py reads the order spec kicadgen writes"
 kind = "static"
 vrow = "4.7"
@@ -1805,6 +1806,7 @@ checks = "USB D+/D− 90 Ω ±10%; SPI bus with 6 slots loaded; SRAM/ROM bus; CP
 method = "openEMS + ngspice/IBIS"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_slowbus_si.py && python3 hw/si/slowbus_si.py --row MB-007"
 
 [[test]]
 id = "MB-008"
@@ -1837,9 +1839,10 @@ cmd = "python3 hw/tools/boardcheck.py main connectors"
 id = "MB-051"
 title = "Main board reset and power sequencing"
 checks = "sysctl holds /CPU_RST and CARD_RST_n until rails are within 5%; iCE40 power-up order meets the datasheet"
-method = "ngspice + sysctl model"
+method = "ngspice (TI OPAx376 model) + datasheet-bound behavioural REF3425/MAX811T/LVC07 blocks: hw/power/reset_supervisor.py --spice (guaranteed windows and start-up, brown-out, fault sequences), test/hw/test_reset_supervisor.py, and hw/power/rail_reset_window.py (binds the circuit to the routed board's receipt, netlist and copper; red until the main board is rebuilt)"
 kind = "sim"
 vrow = "4.4"
+cmd = "python3 hw/power/reset_supervisor.py --spice && python3 test/hw/test_reset_supervisor.py && python3 hw/power/rail_reset_window.py"
 
 [[test]]
 id = "MB-052"
@@ -1870,10 +1873,11 @@ cmd = "python3 test/hw/test_efuse_escapes.py"
 [[test]]
 id = "MB-101"
 title = "Bring-up: rails"
-checks = "5V_SYS, 3V3, 1V2 within 5%, ripple within spec, with rail LEDs on"
-method = "manual, with a meter, recorded in bringup.md"
+checks = "3V3 3.246-3.390 V, 1V2 1.176-1.224 V, 3V3 ripple <= 30 mVpp, rail LEDs on"
+method = "manual, with a meter, recorded in bringup.md and doc/hardware/fa-results/MB-101/"
 kind = "hw"
 vrow = "5"
+cmd = "python3 tools/fa_results.py MB-101"
 
 [[test]]
 id = "MB-102"
@@ -1914,6 +1918,78 @@ checks = "PRSNT, CARD_RST_n, PROG_n and the SPI lines of each slot, via a slot t
 method = "cupc8.py selftest slots"
 kind = "hw"
 vrow = "5"
+
+[[test]]
+id = "MB-107"
+title = "First article: main board shorts and first power"
+checks = "each rail to GND >= 10 ohm unpowered; first power at 5.0 V, no cards, <= 250 mA"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-107/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-107"
+
+[[test]]
+id = "MB-108"
+title = "First article: main board input loop resistance"
+checks = "four-terminal J1 tails -> U2 IN plus U2 GND -> J1 GND tails, scaled to 115 C, <= 60 mOhm (MB-005)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-108/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-108"
+
+[[test]]
+id = "MB-109"
+title = "First article: input copper heating at the eFuse limit"
+checks = "input track rise at just under the unit's eFuse limit, scaled to 3.213 A by I^2, <= 20 C (MB-005)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-109/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-109"
+
+[[test]]
+id = "MB-110"
+title = "First article: slot contact resistance"
+checks = "four-terminal worst mated contact in the x1, x8 and x4 sockets <= 30 mOhm, also after 10 cycles and the heat soak (design.R_SLOT_CONTACTS)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-110/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-110"
+
+[[test]]
+id = "MB-111"
+title = "First article: chipset iCE40 1V2 core current, hot"
+checks = "at 40 C ambient, worst load: RT9013 output current via R8 <= 40 mA sustained; 1V2 at U7 >= 1.14 V (MB-006 F2)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-111/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-111"
+
+[[test]]
+id = "MB-112"
+title = "First article: main board thermal soak"
+checks = "5V_SYS >= 1.74 A for 60 min: eFuse, 3V3 buck, HT7533 and RT9013 top rise <= 55 C (MB-006)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-112/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-112"
+
+[[test]]
+id = "MB-113"
+title = "First article: reset thresholds"
+checks = "3V3 falling trip 3.1777-3.2099 V, 1V2 1.1505-1.1597 V, slot resets held while nPOR low (MB-051)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-113/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-113"
+
+[[test]]
+id = "MB-114"
+title = "First article: 3V3_STBY part currents"
+checks = "MAX16054 supply <= 15 uA and HT7533-2 ground current <= 20 uA at 60 C, 5 parts each (MB-006 H1/H2)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/MB-114/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py MB-114"
 
 # ---------------------------------------------------------------- CPU CARD
 [[test]]
@@ -1968,6 +2044,7 @@ checks = "bus fan-out to the edge fingers; CPU_CLK integrity"
 method = "ngspice/IBIS"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_slowbus_si.py && python3 hw/si/slowbus_si.py --row CC-007"
 
 [[test]]
 id = "CC-008"
@@ -2011,6 +2088,42 @@ checks = "CRAM load, CDONE; single-step the first 100 boot-ROM instructions; tra
 method = "cupc8.py cpu load + trace --diff"
 kind = "hw"
 vrow = "5"
+
+[[test]]
+id = "CC-102"
+title = "First article: CPU card shorts and first power"
+checks = "3V3, 1V2 to GND >= 10 ohm; idle 3V3 <= 40 mA; 1V2 1.176-1.224 V"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/CC-102/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py CC-102"
+
+[[test]]
+id = "CC-103"
+title = "First article: CPU card 3V3 feed and 1V2 route resistance"
+checks = "four-terminal: x8 +3V3 tails -> U3 <= 20 mOhm; U3.5 -> U1.40 <= 797 mOhm at 100 C (CC-005)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/CC-103/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py CC-103"
+
+[[test]]
+id = "CC-104"
+title = "First article: CPU card iCE40 1V2 current and far-pin voltage, hot"
+checks = "at 40 C ambient, worst load: 1V2 current <= 40 mA (card 3V3 bound), U1.40 >= 1.14 V, RT9013 rise <= 55 C (CC-005, CC-006 F2)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/CC-104/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py CC-104"
+
+[[test]]
+id = "CC-105"
+title = "First article: CPU card 1V2 capacitors under bias"
+checks = "C22 >= 1.88 uF at 1.2 V/25 C, ESR >= 5 mOhm; C21 >= 1.0 uF at 3.3 V; 5 parts each (CC-005)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/CC-105/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py CC-105"
 
 # ---------------------------------------------------------------- GPU CARD
 [[test]]
@@ -2110,6 +2223,26 @@ checks = "per card: 1 h continuous 640x480p60 DVI output (the firmware's 252 MHz
 method = "manual, recorded in bringup.md: card serial, ambient temperature log, monitor model, start/end time, observations"
 kind = "hw"
 vrow = "5"
+cmd = "python3 tools/fa_results.py GC-102"
+
+[[test]]
+id = "GC-103"
+title = "First article: GPU card shorts and first power"
+checks = "+5V, 3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 145 mA, +5V <= 95 mA; HDMI +5V 4.8-5.3 V"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/GC-103/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py GC-103"
+
+[[test]]
+id = "GC-104"
+title = "First article: GPU RP2040 DVDD and rails under load"
+checks = "DVDD 1.164-1.236 V DC, <= 100 mV deviation at 252 MHz; card 3V3 >= 3.135 V; 3V3 <= 145 mA; case rise <= 45 C (GC-005, GC-006)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/GC-104/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py GC-104"
+
 [[test]]
 id = "IC-001"
 title = "IO card ERC"
@@ -2149,11 +2282,11 @@ cmd = "python3 hw/tools/boardcheck.py io footprints"
 [[test]]
 id = "IC-005"
 title = "IO card power"
-checks = "SY6280 current limit set to ≤ 500 mA; soft start; fault flag on short"
+checks = "port switch limit guaranteed 500..647 mA (TPS2553-1, RILIM 45.3k 1 %); FAULT (open drain, 5..10 ms deglitch) to GPIO8 and latch-off on overcurrent; attach < 5 ms in limit; short transient within U5/TPS61023 absolute maxima (model)"
 method = "ngspice"
 kind = "sim"
 vrow = "4.4"
-cmd = "python3 hw/tools/boardcheck.py io power && python3 hw/power/rp2040_vreg.py io build/hw/io && python3 test/hw/test_rp2040_vreg.py"
+cmd = "python3 hw/tools/boardcheck.py io power && python3 hw/power/io_port_switch.py && python3 test/hw/test_io_port_switch.py && python3 hw/power/rp2040_vreg.py io build/hw/io && python3 test/hw/test_rp2040_vreg.py"
 
 [[test]]
 id = "IC-007"
@@ -2197,6 +2330,33 @@ checks = "flash over SWD; IDENT = $02; three different keyboards type correctly;
 method = "cupc8.py card flash/ident + typing test"
 kind = "hw"
 vrow = "5"
+
+[[test]]
+id = "IC-102"
+title = "First article: IO card shorts and first power"
+checks = "+5V, 3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 50 mA, +5V <= 0.80 A; keyboard VBUS 4.40-5.5 V"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/IC-102/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py IC-102"
+
+[[test]]
+id = "IC-103"
+title = "First article: IO RP2040 DVDD and rails under load"
+checks = "DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 50 mA; case rise <= 45 C (IC-005, IC-006)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/IC-103/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py IC-103"
+
+[[test]]
+id = "IC-104"
+title = "First article: keyboard port under load and short"
+checks = "VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/switch rise <= 55 C (IC-005, POW-007)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/IC-104/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py IC-104"
 
 # ---------------------------------------------------------------- WI-FI CARD
 [[test]]
@@ -2289,6 +2449,51 @@ kind = "hw"
 vrow = "5"
 
 [[test]]
+id = "WC-102"
+title = "First article: Wi-Fi card shorts and first power"
+checks = "+5V, 3V3 to GND >= 10 ohm; idle +5V <= 340 mA; 3V3 3.227-3.411 V"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-102/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py WC-102"
+
+[[test]]
+id = "WC-103"
+title = "First article: C45783 22 uF under bias"
+checks = "at 25 C: >= 7.80 uF at 5.5 V, >= 11.16 uF at 3.6 V, ESR <= 150 mOhm at 1-2 MHz; 10 parts of the lot (POW-003 F5/F7)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-103/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py WC-103"
+
+[[test]]
+id = "WC-104"
+title = "First article: Wi-Fi return resistance through the slot"
+checks = "four-terminal U2.2 and U1.1 -> main-board slot GND tails <= 1 ohm each (POW-003 F6, WC-010 T4r)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-104/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py WC-104"
+
+[[test]]
+id = "WC-105"
+title = "First article: ESP32 TX current and 3V3 envelope at 40 C"
+checks = "continuous TX at >= 38 C: V5 x I5 / V3 <= 0.50 A; bursty TX 3V3 within 3.074-3.537 V (POW-003 F8, WC-010 T4p)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-105/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py WC-105"
+
+[[test]]
+id = "WC-106"
+title = "First article: Wi-Fi buck board temperature under TX"
+checks = "30 min continuous TX: U2 GND-lead rise <= 50 C (WC-010 T4c)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-106/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py WC-106"
+
+[[test]]
 id = "SC-001"
 title = "Storage card erc"
 checks = "Current board build: erc; missing coverage or stale evidence fails"
@@ -2376,6 +2581,7 @@ checks = "Board-level signal integrity against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_slowbus_si.py && python3 hw/si/slowbus_si.py --row SC-007"
 
 [[test]]
 id = "SC-051"
@@ -2384,6 +2590,24 @@ checks = "Board-level co-sim against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "3.1"
+
+[[test]]
+id = "SC-101"
+title = "First article: storage card shorts and first power"
+checks = "3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 150 mA"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/SC-101/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py SC-101"
+
+[[test]]
+id = "SC-102"
+title = "First article: storage RP2040 DVDD and rails during SD writes"
+checks = "DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 150 mA; case rise <= 45 C (SC-005, SC-006)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/SC-102/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py SC-102"
 
 [[test]]
 id = "EC-001"
@@ -2473,6 +2697,7 @@ checks = "Board-level signal integrity against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_slowbus_si.py && python3 hw/si/slowbus_si.py --row EC-007"
 
 [[test]]
 id = "EC-051"
@@ -2481,6 +2706,24 @@ checks = "Board-level co-sim against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "3.1"
+
+[[test]]
+id = "EC-101"
+title = "First article: e-ink card shorts and first power"
+checks = "3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 95 mA"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/EC-101/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py EC-101"
+
+[[test]]
+id = "EC-102"
+title = "First article: e-ink RP2040 DVDD and rails during refresh"
+checks = "DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 95 mA; panel >= 2.3 V; case rise <= 45 C (EC-005, EC-006)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/EC-102/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py EC-102"
 
 [[test]]
 id = "YC-001"
@@ -2578,6 +2821,24 @@ checks = "Board-level co-sim against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "3.1"
+
+[[test]]
+id = "YC-101"
+title = "First article: system card shorts and first power"
+checks = "3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 50 mA"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/YC-101/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py YC-101"
+
+[[test]]
+id = "YC-102"
+title = "First article: system RP2040 DVDD and rails under load"
+checks = "DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 50 mA; case rise <= 45 C (YC-005, YC-006)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/YC-102/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py YC-102"
 
 [[test]]
 id = "CC-006"

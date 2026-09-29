@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Focused checks for GC-007 (TMDS) and IC-007/YC-007 (USB full speed) tools.
 
-    python3 test/hw/test_hs_si.py [--gpu build/hw/gpu] [--io build/hw/io] [--system build/hw/system]
+    python3 test/hw/test_hs_si.py [--row GC-007|IC-007|YC-007] [--gpu ...] [--io ...] [--system ...]
 
 The builds are only read; mutated copies go to a temporary directory.  Cut
 solves are shared with the row commands through build/si/cache, so this is
@@ -163,51 +163,65 @@ def usb_engine():
           f'({len(failures)} cases)')
 
 
-def mutations(gpu, io, system, tmp):
-    # wrong TMDS resistors: the whole tool must come back red, on the swing
+def tmds_mutations(gpu, tmp):
     net = gpu / 'gpu.net'
-    _, ohms = tmds_si.lanes(net, 'U1', 'J2')
     wiring, _ = tmds_si.lanes(net, 'U1', 'J2')
     refs = sorted({w['resistor'].split('.')[0] for w in wiring.values()})
+    # a wrong TMDS resistor: the whole tool comes back red, on the swing
     bad = set_all(net, refs, '1k', tmp / 'gpu-1k.net')
     status = run_main(tmds_si, ['--build', str(gpu), '--netlist', str(bad), '--no-evidence',
                                 '--out', str(tmp / 'gc-bad.json')])
     report = json.loads((tmp / 'gc-bad.json').read_text())
     assert status == 1 and not report['pass']
     assert any('swing' in f for f in report['failures']), report['failures']
-    # wrong USB series resistor
-    for board_dir, name, ref in ((io, 'io', 'R15'), (system, 'system', 'R2')):
-        bad = set_value(board_dir / f'{name}.net', ref, '100', tmp / f'{name}-100.net')
-        out = tmp / f'{name}-bad.json'
-        status = run_main(usb_fs_si, [name, '--build', str(board_dir), '--netlist', str(bad),
-                                      '--no-evidence', '--out', str(out)])
-        report = json.loads(out.read_text())
-        assert status == 1 and any('series resistor' in f for f in report['failures']), report['failures']
     # broken pair: an opened routed track is caught before any solve
     broken = opened(gpu / 'gpu.kicad_pcb', '/HD_D0P', tmp / 'gpu-open.kicad_pcb')
     expect_error('not connected', lambda: run_main(tmds_si, [
         '--build', str(gpu), '--board', str(broken), '--no-evidence', '--out', str(tmp / 'x.json')]))
-    broken = opened(io / 'io.kicad_pcb', '/USB_CONN_DM', tmp / 'io-open.kicad_pcb')
+    print('TMDS mutations fail as required: 1k series resistors, opened D0P')
+
+
+def usb_mutations(board, build, resistor, net, tmp):
+    # the real board's resistors pass the RS gate, so the failure below is the mutation's
+    wires = usb_fs_si.wiring(build / f'{board}.net', usb_fs_si.BOARDS[board])
+    assert not usb_fs_si.series_failures({'p': wires['dp']['ohms'], 'n': wires['dm']['ohms']})
+    # wrong USB series resistor
+    bad = set_value(build / f'{board}.net', resistor, '100', tmp / f'{board}-100.net')
+    out = tmp / f'{board}-bad.json'
+    status = run_main(usb_fs_si, [board, '--build', str(build), '--netlist', str(bad),
+                                  '--no-evidence', '--out', str(out)])
+    report = json.loads(out.read_text())
+    assert status == 1 and any('series resistor' in f for f in report['failures']), report['failures']
+    # broken pair: an opened D- track is caught before any solve
+    broken = opened(build / f'{board}.kicad_pcb', net, tmp / f'{board}-open.kicad_pcb')
     expect_error('not connected', lambda: run_main(usb_fs_si, [
-        'io', '--build', str(io), '--board-file', str(broken), '--no-evidence', '--out', str(tmp / 'y.json')]))
-    print('mutations fail as required: TMDS 1k, USB 100 ohm (IO and system), opened D0P, opened USB D-')
+        board, '--build', str(build), '--board-file', str(broken), '--no-evidence',
+        '--out', str(tmp / 'y.json')]))
+    print(f'USB ({board}) mutations fail as required: {resistor} = 100 ohm, opened {net}')
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--row', choices=('GC-007', 'IC-007', 'YC-007'), help='default: all three')
     parser.add_argument('--gpu', type=Path, default=ROOT / 'build/hw/gpu')
     parser.add_argument('--io', type=Path, default=ROOT / 'build/hw/io')
     parser.add_argument('--system', type=Path, default=ROOT / 'build/hw/system')
-    parser.add_argument('--engines-only', action='store_true', help='skip the routed-board mutations')
     args = parser.parse_args()
-    tmds_engine()
-    usb_engine()
+    rows = (args.row,) if args.row else ('GC-007', 'IC-007', 'YC-007')
+    if 'GC-007' in rows:
+        tmds_engine()
+    if 'IC-007' in rows or 'YC-007' in rows:
+        usb_engine()
     with tempfile.TemporaryDirectory(prefix='cupc8-hs-si-') as tmp:
         tmp = Path(tmp)
-        tmds_netlist(args.gpu, tmp)
-        if not args.engines_only:
-            mutations(args.gpu, args.io, args.system, tmp)
-    print('all high-speed SI checks pass')
+        if 'GC-007' in rows:
+            tmds_netlist(args.gpu, tmp)
+            tmds_mutations(args.gpu, tmp)
+        if 'IC-007' in rows:
+            usb_mutations('io', args.io, 'R15', '/USB_CONN_DM', tmp)
+        if 'YC-007' in rows:
+            usb_mutations('system', args.system, 'R2', '/USB_DM', tmp)
+    print('all high-speed SI checks pass:', ', '.join(rows))
 
 
 if __name__ == '__main__':

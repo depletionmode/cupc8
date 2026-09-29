@@ -298,7 +298,7 @@ other cards):
 |---|---|---|---|
 | Card parts (26) | JLC assembly | ≈ $2.60 a card | every part in stock at JLC, lowest 2,307 (the header) |
 | Extended-part loading fees | JLC | ≈ $3 × 4 types, per order | some are shared with the other cards when ordered together |
-| Card PCB, 4-layer, hard-gold fingers | JLC | as the other I/O cards | — |
+| Card PCB, 4-layer, ENIG gold fingers | JLC | as the other I/O cards | — |
 | **Panel, option 1:** GDEY075T7 + DESPI-C02 + 8 jumpers | buy-lcd.com (Good Display's shop), Evelta, AliExpress | $29.69 + $8.50 + ~$1 | both **out of stock** at buy-lcd today; other sellers vary |
 | **Panel, option 2:** Waveshare 7.5" e-Paper HAT (V2), cable included | Waveshare, Amazon | $56.99 | listed |
 | Panel, option 3: GDEY0583T81 (5.83") + DESPI-C02 | Evelta, Good Display | ≈ $33 + $8.50 | out of stock at Evelta |

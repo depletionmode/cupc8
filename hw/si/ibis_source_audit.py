@@ -176,7 +176,7 @@ def source_paths(main_build, cpu_build, top, banks):
         raise ValueError('slot SCK has multiple FPGA source pins')
     cpu_rows = []
     selected = [p for p in paths if p.get('from', '').startswith('cpu.U1.') and
-                p.get('to', '').startswith('cpu.J1.') and p.get('ohms') == 33]
+                p.get('to', '').startswith('cpu.J1.') and p.get('ohms') == 68]
     if len(selected) != 31:
         raise ValueError(f'CPU card expected 31 FPGA series outputs, found {len(selected)}')
     for link in selected:
@@ -184,7 +184,7 @@ def source_paths(main_build, cpu_build, top, banks):
         contact = link['to'].split('.')[-1]
         net = cpu_netlist.net('J1', contact)
         resistor = cpu_netlist.series(('U1', pin), ('J1', contact))
-        if resistor is None or resistor.value != '33' or resistor.ref != link.get('series'):
+        if resistor is None or resistor.value != '68' or resistor.ref != link.get('series'):
             raise ValueError(f'CPU {pin}->{contact}: top/netlist series mismatch')
         ref = resistor.ref.split('.')[0]
         far_pads = [pad for (part, pad), attached in cpu_netlist.pins.items()

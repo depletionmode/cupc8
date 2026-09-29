@@ -17,8 +17,11 @@ discrete-logic CPU card must both pass the same conformance testbench
   10 kΩ to 3V3. So an empty socket reads as "no cycle, no card".
 - **Weak keepers:** D[7:0] have a 47 kΩ pull-up on the main board, so a
   floating bus reads `$FF`.
-- **Series termination:** every card output has 33 Ω at the card driver, and
-  every chipset output has 33 Ω at the chipset.
+- **Series termination:** every card output has 68 Ω at the card driver
+  (RN1-RN8, 4D02WGJ0680TCE C52984), and every chipset CPU-bus output has 56 Ω
+  at the chipset (R21-R34, 0603 C25196). Both replace 33 Ω, which overshot the
+  iCE40's 3.6 V input limit to 4.2 V (David, 2026-09-29; hw/si/cpubus_options.py).
+  The chipset's SPI and BR_MISO outputs stay 33 Ω.
 
 ## Clocking
 
@@ -153,12 +156,12 @@ between the two clock traces. Required margin: ≥ 30% of the period.
 | Launch clock insertion (allowance) | 3.0 | 3.0 |
 | Flip-flop to pin (nextpnr) | 5.3 | 6.5 |
 | Output pad into ~15 pF (allowance) | 4.0 | 4.0 |
-| 150 mm trace, connector, 33 Ω | 2.2 | 2.2 |
+| 150 mm trace, connector, 68 Ω | 3.4 | 3.4 |
 | Input pad (allowance) | 0.5 | 0.5 |
 | Pin to flip-flop (nextpnr) | 11.6 | 12.1 |
 | Setup (allowance) | 0.4 | 0.4 |
 | Clock skew: mismatch + 50 mm | 1.4 | 1.4 |
-| **Total** | **28.3 → 55.0 slack (66%)** | **30.1 → 53.3 slack (64%)** |
+| **Total** | **29.4 → 53.9 slack (65%)** | **31.2 → 52.1 slack (63%)** |
 
 Hold has 1.75 ns of margin: the fastest data path (≥ 3 ns, an allowance)
 against the clock skew.

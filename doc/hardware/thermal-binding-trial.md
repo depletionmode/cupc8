@@ -36,7 +36,7 @@ routes finish. Wiring it alone must not remove the residual failure:
 - GPU and IO: their external converter/switch packages and feedback
   networks are bound, but the RP2040 internal VREG maximum 1V1 current,
   loss versus operating corner, and local heat coupling are not. IO also
-  needs the boost and SY6280 combined board/enclosure path.
+  needs the boost and TPS2553 combined board/enclosure path.
 - Storage, e-ink and system: RP2040 VREG topology is bound, while its
   internal loss and board/enclosure thermal path lack a maximum-load bound.
 - Wi-Fi: WC-010 already binds the buck and copper; it remains red until a

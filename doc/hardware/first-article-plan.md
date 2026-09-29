@@ -672,8 +672,8 @@ The test firmware needs, per card, a **worst-case load mode** and a
 
 ### IC-104: keyboard port under load and short (IC-005, POW-007)
 
-Conditional: IC-005's SY6280 may be replaced (the proposal awaiting
-David). Run against whichever part is fitted.
+IC-005's switch is the TPS2553DBVR-1 (David approved the proposal,
+2026-09-29). Run against the fitted part.
 
 - **Closes:** IC-005's "current limit; fault flag on short" on the real part,
   and POW-007's port voltage.

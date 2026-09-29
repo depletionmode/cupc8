@@ -46,7 +46,7 @@ def mutated_boards(board_dir, work, card_ohms=None, main_ohms=None, spi_ohms=Non
             (work / kind / item.name).symlink_to(item)
     if card_ohms is not None:
         text = (board_dir / 'cpu/cpu.net').read_text()
-        text, count = re.subn(r'(\(ref "RN\d+"\)\s*\(value ")33("\))', rf'\g<1>{card_ohms:g}\2', text)
+        text, count = re.subn(r'(\(ref "RN\d+"\)\s*\(value ")\d+("\))', rf'\g<1>{card_ohms:g}\2', text)
         if count != 8:
             raise ValueError(f'expected 8 RN arrays on the CPU card, found {count}')
         (work / 'cpu/cpu.net').unlink()
@@ -58,10 +58,10 @@ def mutated_boards(board_dir, work, card_ohms=None, main_ohms=None, spi_ohms=Non
                        for ref, _ in circuit.nets[net] if ref.startswith('R')})
         text = (board_dir / 'main/main.net').read_text()
         for ref in refs:
-            text, count = re.subn(rf'(\(ref "{ref}"\)\s*\(value ")33R?("\))',
+            text, count = re.subn(rf'(\(ref "{ref}"\)\s*\(value ")\d+R?("\))',
                                   rf'\g<1>{ohms:g}\2', text)
             if count != 1:
-                raise ValueError(f'{ref}: expected one 33 ohm value, found {count}')
+                raise ValueError(f'{ref}: expected one series value, found {count}')
         (work / 'main/main.net').unlink()
         (work / 'main/main.net').write_text(text)
     return work

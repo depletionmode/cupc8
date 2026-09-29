@@ -779,8 +779,8 @@ def gpo_indicator_routes(main, board):
 
 def cpu_control_routes(main, cpu, main_board, cpu_board):
     """Two CPU-to-chipset control lines through their real series channels."""
-    if cpu.components.get('RN5') != ('33', ('Device', 'R_Pack04')):
-        raise ValueError('CPU strobe/RW: missing 33-ohm isolated series pack')
+    if cpu.components.get('RN5') != ('68', ('Device', 'R_Pack04')):
+        raise ValueError('CPU strobe/RW: missing 68-ohm isolated series pack')
     channels = {
         'strobe': ('FPGA_nSTB', 'CPU_nSTB', ('U1', '23'), ('RN5', '1'),
                    ('RN5', '8'), ('J1', 'B17'), ('J2', 'B17'), ('U7', '31'), 'RN5.1'),
@@ -795,7 +795,7 @@ def cpu_control_routes(main, cpu, main_board, cpu_board):
                  finger, socket, receiver, series_ref) in channels.items():
         if set(cpu.nets.get(f'/{source_net}', ())) != {source, series_in} or \
                 set(cpu.nets.get(f'/{contact_net}', ())) != {series_out, finger} or \
-                path(cpu, source, finger, '33') != series_ref or \
+                path(cpu, source, finger, '68') != series_ref or \
                 node(main, *socket) != f'/{contact_net}' or \
                 node(main, *receiver) != f'/{contact_net}':
             raise ValueError(f'CPU {signal}: wrong FPGA, series pack, socket or chipset pad')
@@ -829,11 +829,11 @@ def cpu_ready_route(main, cpu, main_board, cpu_board):
     source, series_in = ('U7', '28'), ('R33', '1')
     series_out, socket = ('R33', '2'), ('J2', 'B19')
     finger, receiver = ('J1', 'B19'), ('U1', '24')
-    if main.components.get('R33') != ('33', ('Device', 'R')) or \
+    if main.components.get('R33') != ('56', ('Device', 'R')) or \
             set(main.nets.get('/CPU_nRDY_SRC', ())) != {source, series_in} or \
             set(main.nets.get('/CPU_nRDY', ())) != {series_out, socket} or \
             set(cpu.nets.get('/CPU_nRDY', ())) != {finger, receiver} or \
-            path(main, source, socket, '33') != 'R33':
+            path(main, source, socket, '56') != 'R33':
         raise ValueError('CPU /RDY: wrong chipset source, R33, socket or CPU pad')
     paths, missing = [], []
     for board, pcb, net, first, last in (
@@ -859,11 +859,11 @@ def cpu_sync_route(main, cpu, main_board, cpu_board):
     source, series_in = ('U1', '26'), ('RN5', '3')
     series_out, finger = ('RN5', '6'), ('J1', 'B22')
     socket, receiver = ('J2', 'B22'), ('U7', '26')
-    if cpu.components.get('RN5') != ('33', ('Device', 'R_Pack04')) or \
+    if cpu.components.get('RN5') != ('68', ('Device', 'R_Pack04')) or \
             set(cpu.nets.get('/FPGA_SYNC', ())) != {source, series_in} or \
             set(cpu.nets.get('/CPU_SYNC', ())) != {series_out, finger} or \
             set(main.nets.get('/CPU_SYNC', ())) != {socket, receiver} or \
-            path(cpu, source, finger, '33') != 'RN5.3':
+            path(cpu, source, finger, '68') != 'RN5.3':
         raise ValueError('CPU SYNC: wrong FPGA source, RN5, socket or chipset pad')
     paths, missing = [], []
     for board, pcb, net, first, last in (
@@ -892,15 +892,15 @@ def cpu_status_routes(main, cpu, main_board, cpu_board):
         'waiting': ('FPGA_WAITING', 'CPU_WAITING', ('U1', '61'), ('RN8', '4'),
                     ('RN8', '5'), ('J1', 'B46'), ('J2', 'B46'), ('U7', '130'), 'RN8.4'),
     }
-    if cpu.components.get('RN8') != ('33', ('Device', 'R_Pack04')):
-        raise ValueError('CPU status: missing 33-ohm isolated RN8 series pack')
+    if cpu.components.get('RN8') != ('68', ('Device', 'R_Pack04')):
+        raise ValueError('CPU status: missing 68-ohm isolated RN8 series pack')
     links, paths, missing = {}, [], []
     for signal, (source_net, contact_net, source, series_in, series_out,
                  finger, socket, receiver, series_ref) in channels.items():
         if set(cpu.nets.get(f'/{source_net}', ())) != {source, series_in} or \
                 set(cpu.nets.get(f'/{contact_net}', ())) != {series_out, finger} or \
                 set(main.nets.get(f'/{contact_net}', ())) != {socket, receiver} or \
-                path(cpu, source, finger, '33') != series_ref:
+                path(cpu, source, finger, '68') != series_ref:
             raise ValueError(f'CPU {signal}: wrong FPGA, RN8, socket or chipset pad')
         connected = True
         for board, pcb, net, first, last in (
@@ -938,12 +938,12 @@ def main_cpu_data_routes(main, board):
         source, series_in = ('U7', chipset_pad), (f'R{21 + bit}', '1')
         series_out, keeper, socket = (f'R{21 + bit}', '2'), \
             (f'R{90 + bit}', '2'), ('J2', socket_pad)
-        if main.components.get(series_in[0]) != ('33', ('Device', 'R')) or \
+        if main.components.get(series_in[0]) != ('56', ('Device', 'R')) or \
                 main.components.get(keeper[0]) != ('47k', ('Device', 'R')) or \
                 main.net(keeper[0], '1') != '/+3V3' or \
                 set(main.nets.get(source_net, ())) != {source, series_in} or \
                 set(main.nets.get(contact_net, ())) != {series_out, keeper, socket} or \
-                path(main, source, socket, '33') != series_in[0]:
+                path(main, source, socket, '56') != series_in[0]:
             raise ValueError(f'CPU D{bit}: wrong chipset pad, series part, keeper or socket')
         connected = True
         for net, first, last in ((source_net, source, series_in),
@@ -981,11 +981,11 @@ def cpu_irq_routes(main, cpu, main_board, cpu_board):
         chipset, series_in = ('U7', chipset_pad), (resistor, '1')
         series_out, main_socket = (resistor, '2'), ('J2', socket_pad)
         cpu_socket, fpga = ('J1', socket_pad), ('U1', fpga_pad)
-        if main.components.get(resistor) != ('33', ('Device', 'R')) or \
+        if main.components.get(resistor) != ('56', ('Device', 'R')) or \
                 set(main.nets.get(source_net, ())) != {chipset, series_in} or \
                 set(main.nets.get(contact_net, ())) != {series_out, main_socket} or \
                 set(cpu.nets.get(contact_net, ())) != {cpu_socket, fpga} or \
-                path(main, chipset, main_socket, '33') != resistor:
+                path(main, chipset, main_socket, '56') != resistor:
             raise ValueError(f'CPU IRQ{bit}: wrong chipset, series part, socket or FPGA pad')
         connected = True
         for board_name, board_path, net, first, last in (
@@ -1016,7 +1016,7 @@ def cpu_timer_exp_routes(main, cpu, main_board, cpu_board):
     for board_name, board_path in (('main', main_board), ('cpu', cpu_board)):
         if board_path is not None and Path(board_path).is_file():
             geometry[board_name] = cpu_board_geometry(str(Path(board_path).resolve()))
-    if cpu.components.get('RN8') != ('33', ('Device', 'R_Pack04')):
+    if cpu.components.get('RN8') != ('68', ('Device', 'R_Pack04')):
         raise ValueError('CPU timer expiry: wrong RN8 series pack')
     links, paths, missing = [], [], []
     for bit, (fpga_pad, in_pad, out_pad, socket_pad, chipset_pad) in enumerate(
@@ -1212,46 +1212,44 @@ def io_usb_host_routes(io, board):
 
 
 def io_vbus_routes(io, board):
-    """The IO card's keyboard VBUS switch: enable, output and the fault sense.
+    """The IO card's keyboard VBUS switch: enable, output and the fault flag.
 
-    GPIO7 (VBUS_EN) drives the SY6280AAC's EN (100 k pull-down); its OUT
-    feeds the receptacle's VBUS; GPIO8 (VBUS_nFAULT) reads VBUS through the
-    15 k / 22 k divider (the switch has no fault flag: a low reading is a
-    sag or a dead switch, io-card.md). The firmware sets GPIO7 high and
-    reports GPIO8 low as VBUS_FAULT. Returns ({'vbus_on', 'nfault_low',
-    'enable', 'out', 'sense_top', 'sense_r12', 'sense_r13'}, paths, missing).
-    The keyboard is powered only with VBUS on; the fault pin
-    reads low when VBUS is off and the divider is whole, low always with only
-    the 22 k leg (a deterministic counterexample), high (its pull-up) when
-    the divider is not connected to the pin.
+    GPIO7 (VBUS_EN) drives the TPS2553DBVR-1's EN (100 k pull-down); its OUT
+    feeds the receptacle's VBUS; its open-drain FAULT reaches GPIO8
+    (VBUS_nFAULT), pulled up by R12 (10 k to 3V3). The firmware sets GPIO7
+    high and reports GPIO8 low as VBUS_FAULT (and retries by toggling
+    EN). Returns ({'vbus_on', 'nfault_low', 'enable', 'out', 'fault',
+    'pullup'}, paths, missing). The keyboard is powered only with VBUS on.
+    FAULT is low only on a real overcurrent or over-temperature, which the
+    emulator does not inject, and every broken leg reads high (the pull-up,
+    the RP2040's own): 'nfault_low' is False, and an open FAULT or pull-up
+    leg masks a fault rather than raising one.
     """
     sys.path.insert(0, str(ROOT / 'hw/si'))
     from ibis_bus import routed_distances
-    if io.components.get('U5', ('', ''))[0] != 'SY6280AAC':
-        raise ValueError('io VBUS: the switch must be an SY6280AAC (U5)')
-    en, fault = named_pin(io, 'U1', 'GPIO7'), named_pin(io, 'U1', 'GPIO8')
+    if io.components.get('U5', ('', ''))[0] != 'TPS2553DBVR-1':
+        raise ValueError('io VBUS: the switch must be a TPS2553DBVR-1 (U5)')
+    en, gpio8 = named_pin(io, 'U1', 'GPIO7'), named_pin(io, 'U1', 'GPIO8')
     enable_pin, out_pin = named_pin(io, 'U5', 'EN'), named_pin(io, 'U5', 'OUT')
+    fault_pin = named_pin(io, 'U5', 'FAULT')
     receptacle = next(((r, p) for (r, p), name in io.pin_names.items()
                        if r == 'J2' and name == 'VCC'), None)
     if node(io, *en) != '/VBUS_EN' or node(io, *enable_pin) != '/VBUS_EN' or \
-            node(io, *fault) != '/VBUS_nFAULT' or receptacle is None or \
-            node(io, *out_pin) != node(io, *receptacle):
+            node(io, *gpio8) != '/VBUS_nFAULT' or node(io, *fault_pin) != '/VBUS_nFAULT' or \
+            receptacle is None or node(io, *out_pin) != node(io, *receptacle):
         raise ValueError('io VBUS: GPIO7 must reach the switch EN, its OUT the receptacle VCC, '
-                         'and GPIO8 the sense divider')
+                         'and its FAULT GPIO8')
     vbus = node(io, *out_pin)
-    divider = {r.value: r for r in io.resistors if vbus in r.ends or '/VBUS_nFAULT' in r.ends}
-    top = next((r for r in io.resistors if r.value == '15k' and set(r.ends) == {vbus, '/VBUS_nFAULT'}), None)
-    bottom = next((r for r in io.resistors if r.value == '22k' and set(r.ends) == {'/VBUS_nFAULT', '/GND'}), None)
+    pullup = next((r for r in io.resistors if r.value == '10k' and set(r.ends) == {'/3V3', '/VBUS_nFAULT'}), None)
     pulldown = next((r for r in io.resistors if r.value == '100k' and set(r.ends) == {'/VBUS_EN', '/GND'}), None)
-    if top is None or bottom is None or pulldown is None:
-        raise ValueError('io VBUS: 15k from VBUS and 22k to GND on the sense pin, 100k EN pull-down: '
-                         f'found {sorted(divider)}')
+    if pullup is None or pulldown is None:
+        raise ValueError('io VBUS: 10k from 3V3 on the FAULT/GPIO8 net and a 100k EN pull-down: found '
+                         f'{sorted(r.value for r in io.resistors if r.ends and "/VBUS_nFAULT" in r.ends)}')
     pad = lambda resistor, net: next((resistor.ref, q) for q in ('1', '2')  # noqa: E731
                                      if io.pins.get((resistor.ref, q)) == net)
     legs = {'enable': ('/VBUS_EN', en, enable_pin), 'out': (vbus, out_pin, receptacle),
-            'sense_top': (vbus, receptacle, pad(top, vbus)),
-            'sense_r12': ('/VBUS_nFAULT', pad(top, '/VBUS_nFAULT'), fault),
-            'sense_r13': ('/VBUS_nFAULT', pad(bottom, '/VBUS_nFAULT'), fault)}
+            'fault': ('/VBUS_nFAULT', fault_pin, gpio8),
+            'pullup': ('/VBUS_nFAULT', pad(pullup, '/VBUS_nFAULT'), gpio8)}
     routed, paths, missing = {}, [], []
     for key, (net, first, last) in legs.items():
         mm = None
@@ -1263,9 +1261,7 @@ def io_vbus_routes(io, board):
         if mm is None:
             missing.append(f'io:{net.lstrip("/")}_vbus_{key}_copper')
     routed['vbus_on'] = routed['enable'] and routed['out']
-    r12 = routed['sense_top'] and routed['sense_r12']
-    routed['nfault_low'] = (not routed['vbus_on']) if r12 and routed['sense_r13'] else \
-        (routed['sense_r13'] and not r12)
+    routed['nfault_low'] = False
     return routed, paths, missing
 
 
@@ -1462,8 +1458,8 @@ def cpu_bus_routes(card, board, address_map, data_map):
             if not all(len(items) == 1 for items in (source, finger, source_pad, contact_pad)) or \
                     source_pad[0][0] != contact_pad[0][0]:
                 raise ValueError(f'CPU {prefix}{card_bit}: FPGA/series/contact pad mapping missing')
-            if path(card, source[0], finger[0], '33') is None:
-                raise ValueError(f'CPU {prefix}{card_bit}: 33-ohm driver channel missing')
+            if path(card, source[0], finger[0], '68') is None:
+                raise ValueError(f'CPU {prefix}{card_bit}: 68-ohm driver channel missing')
             legs = (('source', source_net, source[0], source_pad[0]),
                     ('contact', contact_net, contact_pad[0], finger[0]))
             connected = True
@@ -1519,7 +1515,7 @@ def cpu_reset_route(main, card, main_board, cpu_board):
     """All three copper legs carrying chipset reset to the CPU FPGA."""
     source, socket = ('U7', '32'), ('J2', 'B16')
     finger, fpga = ('J1', 'B16'), ('U1', '22')
-    resistor = path(main, source, socket, '33')
+    resistor = path(main, source, socket, '56')
     if node(main, *source) != '/CPU_nRST_SRC' or \
             node(main, resistor, '1') != '/CPU_nRST_SRC' or \
             node(main, resistor, '2') != '/CPU_nRST' or \
@@ -1964,9 +1960,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             raise ValueError(f'CPU {signal}: main socket contact swapped or missing')
         if signal not in cpu.DRIVEN:
             continue
-        resistor = path(cards['cpu'], ('U1', str(pin)), ('J1', fingers[0]), '33')
+        resistor = path(cards['cpu'], ('U1', str(pin)), ('J1', fingers[0]), '68')
         manifest['paths'].append({'from': f'cpu.U1.{pin}', 'to': f'cpu.J1.{fingers[0]}',
-                                  'series': resistor, 'ohms': 33})
+                                  'series': resistor, 'ohms': 68})
     def cpu_map(prefix, count):
         mapping = []
         for i in range(count):
@@ -2296,10 +2292,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     if not io_usb_missing:
         for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
             runtime_net('io', name)
-    # the VBUS switch enable and its fault sense (io_vbus_routes)
+    # the VBUS switch enable and its fault flag (io_vbus_routes)
     if io_vbus['enable']:
         runtime_net('io', 'VBUS_EN')
-    if io_vbus['sense_top'] and io_vbus['sense_r12'] and io_vbus['sense_r13']:
+    if io_vbus['fault'] and io_vbus['pullup']:
         runtime_net('io', 'VBUS_nFAULT')
     for name in sd_contacts:
         runtime_net('storage', name)

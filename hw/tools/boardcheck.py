@@ -30,7 +30,7 @@ GAPS = {
     'power': {
         'cpu': 'bound socket 3V3 feed, minimum finished copper/contact resistance, effective C22/C1-C4 capacitance and ESR, and FPGA maximum core current',
         'gpu': 'RP2040 VREG 1.20 V transient/droop model at 252 MHz',
-        'io': 'SY6280 short/fault flag and current-limit transient model',
+        'io': 'TPS2553-1 short/fault flag and current-limit transient model',
         'storage': 'SD-card load-step and RP2040 internal regulator model',
         'eink': 'panel load-step and RP2040 internal regulator model',
         'system': 'RP2040 internal regulator transient model',

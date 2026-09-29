@@ -5,9 +5,9 @@ Each E2E row passes on the netlist-generated top; this runs the same
 whole-machine scenario (test/emu/test_e2e.mjs, native emulator) on a top
 generated from a board copy with one fault, and requires it to fail:
 
-  E2E-002 (blank ROM to BASIC): the ROM's DQ0 copper open (programming reads
-          back wrong bits); the system card's USB D+ launch open (cupc8.py
-          cannot reach the machine).
+  E2E-002 (blank ROM to BASIC): the ROM's /WE branch open (programming never
+          lands, the first verified chunk fails); the system card's USB D+
+          launch open (cupc8.py cannot reach the machine).
   E2E-003 (network fetch): the Wi-Fi card's SCK contact open (no join, no page).
   E2E-004 (negative system tests): the Type-C comparator reference divider's
           bottom resistor changed in the main netlist, so a 1.5 A source
@@ -41,7 +41,7 @@ def cc_reference_changed(circuit):
 
 # case -> [(label, board, ref, pad, net) copper opens | ('netlist', label, function)], env for the run
 CASES = {
-    'E2E-002': ([('ROM DQ0 copper open', 'main', 'U10', '13', '/MEM_D0'),
+    'E2E-002': ([('ROM /WE branch open (U10.31)', 'main', 'U10', '31', '/MEM_nWE'),
                  ('system card USB D+ launch open', 'system', 'U1', '47', '/USB_DP_MCU')], {}),
     'E2E-003': ([('Wi-Fi card SCK contact open', 'wifi', 'J1', 'B13', '/SCK')], {}),
     'E2E-004': ([('netlist', 'Type-C reference divider changed', cc_reference_changed)],

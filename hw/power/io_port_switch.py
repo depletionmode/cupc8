@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""IC-005 proposal: the IO card's keyboard-port switch as a TPS2553DBVR-1
-(doc/hardware/io-port-switch-proposal.md). Not yet on the board: hw/boards/io.py
-still fits the SY6280AAC until David approves the part change.
+"""IC-005: the IO card's keyboard-port switch, a TPS2553DBVR-1
+(doc/hardware/io-port-switch-proposal.md), on the board since David approved it
+with the 45.3k set resistor.
 
     python3 hw/power/io_port_switch.py      (~25 s, 5 behavioural + 8 TI-model ngspice runs in build/power)
 
@@ -48,8 +48,8 @@ EN_VIH, EN_VIL, EN_I = 1.1, 0.66, 0.5e-6
 THETA_JA = 182.6
 OTSD_LIMIT_MIN = 135.0               # thermal shutdown while in current limit (min)
 
-# ---- the proposed circuit (hw/boards/io.py is NOT changed) ----
-R_ILIM = 46.4e3                      # 0402WGF4642TCE (C52378), 1 %, 100 ppm/C
+# ---- the circuit (hw/boards/io.py) ----
+R_ILIM = 45.3e3                      # 0402WGF4532TCE (C26980), 1 %, 100 ppm/C
 R_ILIM_TOL = 0.01
 R_ILIM_TCR = 100e-6
 R_ILIM_DT = 60.0                     # resistor at 0..85 C: <= 60 K from the 25 C rating
@@ -103,7 +103,7 @@ def analytic_checks(c, rilim=R_ILIM, tol=R_ILIM_TOL, r_pullup=R_PULLUP):
                                                1e3 * lo, 1e3 * hi, *envelope()))
     c.check("S0", "RILIM within the recommended range", rilim / 1e3, RILIM_RANGE[0] / 1e3, ">=", "k", fmt="%.1f")
     c.check("S1", "minimum current limit vs the keyboard's 500 mA (USB 2.0 high-power device)", lo,
-            d.I_KEYBOARD, ">=", "A", fix="a lower RILIM (45.3k: 514 mA min, 647 mA max)")
+            d.I_KEYBOARD, ">=", "A", fix="a lower RILIM")
     ch = budget.chain("worst", keyboard=hi)
     il = d.iob_vout_range()[2] * hi / (d.IOB_ETA * ch["io_in"])
     c.check("S2", "boost inductor DC current at the maximum limit, worst card input %.2f V, vs the 2.7 A "
@@ -117,7 +117,7 @@ def analytic_checks(c, rilim=R_ILIM, tol=R_ILIM_TOL, r_pullup=R_PULLUP):
     w = budget.chain("worst")
     c.check("S4", "IO card +5V with a 500 mA keyboard vs slot.md's %.2f A (as B10)" % d.SLOT_5V_MAX,
             w["iio"], d.SLOT_5V_MAX, "<=", "A")
-    port = w["kbd_port"] + d.I_KEYBOARD * (d.SY6280_RON_MAX - RDS_MAX)
+    port = w["kbd_port"] + d.I_KEYBOARD * (d.IOSW_RON_MAX - RDS_MAX)
     c.check("S5", "keyboard VBUS, worst DC corner, 500 mA through RDS(on) max %.0f mOhm" % (1e3 * RDS_MAX),
             port, d.USB_PORT_MIN, ">=")
     c.check("S6", "U5 IN highest (the eFuse's OVLO trip, max, in pass-through) vs its 6.5 V recommended max",
@@ -224,7 +224,7 @@ SHORTS = ((50e-9, "plug"), (0.5e-6, "cable"))   # a short at the receptacle, and
 
 def ti_deck(corner, ios, t_resp, l_short, l_in=L_IN, c_in=C_IN_LOCAL, t_fall=T_FALL):
     """POW-007's chain (source, input path, slot, TI's TPS61023 model, 2 x 22 uF)
-    with this switch in place of the SY6280. The port capacitance is held at
+    with this switch (the earlier design fitted an SY6280AAC). The port capacitance is held at
     5.0 V until the switch turns on at 0.45 ms (the attach itself is T1's), a
     500 mA keyboard, then a short at 0.8 ms. For the peak current and the
     boost output / U5 IN excursions only."""
@@ -266,9 +266,23 @@ Lsh sh 0 {lsh}
 
 
 def ti_short(args):
+    """One TI-model short. TI's TPS61023 model fails to converge for some
+    limit values above ~0.637 A ("timestep too small", typical response, cable
+    short, fast clamp): the run is then repeated with the limit lowered in 5 mA
+    steps (at most 4 times). The excursions do not depend on the limit
+    there (U5 IN max 5.216..5.218 V from 0.55 to 0.636 A), and 'ios_run'
+    reports the limit actually simulated."""
     tag, kw = args
-    return spice.run("io_port_switch_ti_" + tag, ti_deck(**kw),
-                     libs=("TPS61023_TRANS.lib",))
+    for step in range(5):
+        ios = kw["ios"] - 5e-3 * step
+        try:
+            m = spice.run("io_port_switch_ti_" + tag, ti_deck(**dict(kw, ios=ios)),
+                          libs=("TPS61023_TRANS.lib",))
+            m["ios_run"] = ios
+            return m
+        except SystemExit:
+            if step == 4:
+                raise
 
 
 def transient_checks(c, lo, hi):
@@ -298,7 +312,9 @@ def transient_checks(c, lo, hi):
         up = max(0.0, VBOOST_MAX - m["vbpre"])
         c.info("short (TI boost model) " + tag.replace("_", " "),
                "peak %.1f A; boost output %.3f -> %.3f V; U5 IN %.2f..%.2f V (+%.3f V to the pass-through "
-               "maximum)" % (m["ipk"], m["vbpre"], m["vbmax"], m["vinmin"], m["vinmax"], up))
+               "maximum)%s" % (m["ipk"], m["vbpre"], m["vbmax"], m["vinmin"], m["vinmax"], up,
+                                 "" if m["ios_run"] == hi else "; limit simulated %.0f mA (the model "
+                                 "does not converge at %.0f mA)" % (1e3 * m["ios_run"], 1e3 * hi)))
         m["vbmax"] += up
         m["vinmax"] += up
     typ = [m for (tag, _), m in zip(cases, res) if tag.startswith("typ")]
@@ -319,7 +335,7 @@ def transient_checks(c, lo, hi):
 
 
 def main():
-    c = Checks("IC-005 proposal: %s (%s) keyboard-port switch (hw/power/io_port_switch.py)" % (PART, LCSC))
+    c = Checks("IC-005: %s (%s) keyboard-port switch (hw/power/io_port_switch.py)" % (PART, LCSC))
     lo, hi = analytic_checks(c)
     transient_checks(c, lo, hi)
     return c.done()

@@ -1,8 +1,9 @@
 # IC-005: replace the IO card's port switch (proposal)
 
-**Status: proposal, not applied.** `hw/boards/io.py` still fits the
-SY6280AAC. The change below needs David's approval before the IO board
-agent applies it. Background: [IC-005 switch audit](ic005-switch-audit.md).
+**Status: approved by David (2026-09-29) with RILIM = 45.3 kΩ (C26980,
+514–647 mA, the alternative below) and applied to `hw/boards/io.py`, the
+symbol/parts files, the firmware retry and the checks. Text below still
+describes the 46.4 kΩ recommendation where it quotes numbers. Background: [IC-005 switch audit](ic005-switch-audit.md).
 
 Checks: `python3 hw/power/io_port_switch.py` (behavioural decks plus TI's
 TPS61023 model, in `build/power`), tests: `python3 test/hw/test_io_port_switch.py`.

@@ -19,6 +19,7 @@ build. hw/tools/pincheck.py checks the netlist against the docs.
 
 import argparse
 import os
+import shutil
 import sys
 
 import yaml
@@ -32,6 +33,7 @@ import sesreplay  # noqa: E402
 import main_power_corner  # noqa: E402
 import main_seed  # noqa: E402
 import main_fanout  # noqa: E402
+import main_handroute  # noqa: E402
 import edgesym  # noqa: E402
 import sockets  # noqa: E402
 sys.path.append(os.path.join(ROOT, "hw", "power"))     # after hw/tools: the MB-051 values live there
@@ -79,7 +81,7 @@ POWER = {
 }
 
 # LCSC numbers of the passives (JLC basic parts unless noted)
-R0603 = {"0": "C21189", "33": "C23140", "100": "C22775", "1k": "C21190", "2.2k": "C4190", "3k": "C4211",
+R0603 = {"0": "C21189", "33": "C23140", "56": "C25196", "100": "C22775", "1k": "C21190", "2.2k": "C4190", "3k": "C4211",
          "4.7k": "C23162", "5.1k": "C23186", "10k": "C25804", "22k": "C31850", "27k": "C22967",
          "47k": "C25819", "100k": "C25803", "1M": "C22935"}
 C0603 = {"100n": "C14663", "1u": "C15849", "4.7u": "C19666", "10u": "C19702"}
@@ -151,7 +153,7 @@ def flat_signals(dev):
                 yield (s["name"] if w == 1 else "%s%d" % (s["name"], i)), pins[i]
 
 
-# chipset outputs with 33 ohm at the chipset (cpu-bus.md, slot.md): the FPGA
+# chipset outputs with 33 ohm (56 ohm on the CPU-bus lines) at the chipset (cpu-bus.md, slot.md): the FPGA
 # pin is on <name>_SRC and the resistor's far side on the bus net
 SERIES = ("CPU_nRDY", "CPU_IRQ", "CPU_D", "CPU_nRST", "SPI_SCK", "SPI_MOSI", "SPI_nCS", "BR_MISO")
 
@@ -396,7 +398,9 @@ def build_parts():
              "C1521989", conns, unit=unit)
     for i, sig in enumerate(s for s in sorted(set(chip.values()), key=str) if s and s.endswith("_SRC")):
         base = sig[:-4]
-        R("R%d" % (20 + i), "33", sig, far_net(base))
+        # the 14 CPU-bus lines (R21-R34) are 56 ohm to hold the overshoot at the
+        # CPU card's FPGA inside its limit (hw/si/cpubus_options.py); SPI and BR_MISO stay 33 ohm
+        R("R%d" % (20 + i), "56" if sig.startswith("CPU_") else "33", sig, far_net(base))
     # VCC 1V2: one 100 nF per pin, and bulk; VCCIO: one per pin; PLL filter
     for i, net in enumerate(["+1V2"] * 4 + ["+3V3"] * 10):
         C("C%d" % (20 + i), "100n", net)
@@ -1335,6 +1339,27 @@ SEED_RIPUP_NETS = ("/1V2_LDO",)
 ROUTE_SEEDED = True        # _finish_route: the salt-1/salt-9 repairs are in the seed already
 
 
+def _seeded_route(board, workdir):
+    """The route needs no router: main-route-seed.json (DeepPCB rev10's copper
+    plus this revision's own power copper, applied in prepare()) and
+    main-handroute-seed.json (main_handroute.py's copper for what those leave
+    open) are the whole route. Puts the hand-route seed on `board`, counts
+    the connections still open on the hand-router's own connectivity, and
+    returns the count: 0 means Freerouting is skipped, above 0 it runs with
+    all of this copper fixed and lays only the rest. Deterministic: the seeds
+    are files, no search runs here."""
+    import pcbnew
+    _, items = main_handroute.apply(board)
+    probe = os.path.join(workdir, "main-seeded.kicad_pcb")
+    pcbnew.SaveBoard(probe, board)
+    shutil.copyfile(os.path.join(workdir, "main.kicad_pro"), os.path.join(workdir, "main-seeded.kicad_pro"))
+    left = main_handroute.leftovers(main_handroute.Board(probe))
+    open_links = sum(len(comps) - 1 for _, comps in left)
+    print("hand-route seed: %d items, %d connections open%s" %
+          (items, open_links, "" if open_links else " (Freerouting skipped)"), end=" ", flush=True)
+    return open_links
+
+
 def _standby_vin(board):
     """The standby LDO's VIN (U15 pin 2, between GND and VOUT) up to C16,
     with a via to the inner layers beside C16 (locked: the router left it
@@ -2043,6 +2068,7 @@ def main():
                        # "not routed" in pass 1 and again in pass 2 (ripup costs rising), so it is off
                        route_fanout=False,
                        prepare=prepare,
+                       seeded_route=_seeded_route,
                        post_route=(lambda board: _finish_route(board, replay['salt'] if replay else None)),
                        replay=replay,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,

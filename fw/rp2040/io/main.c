@@ -19,6 +19,7 @@ static bool changed;                  /* status or response may differ: re-arm t
 static uint32_t key_led_until;        /* LED_KEY (activity) stays lit until then, in ms */
 
 #define KEY_LED_MS 30                 /* activity LED on-time after each HID report */
+#define VBUS_RETRY_MS 1000            /* port switch off time after a FAULT, before EN is raised again */
 
 static uint32_t now_ms(void)
 {
@@ -107,7 +108,9 @@ int main(void)
 	io_init(&io);
 	io.set_leds = set_leds;
 
-	/* the VBUS switch: on, and its fault flag (open drain, active low) */
+	/* the VBUS switch (TPS2553-1): on, and its fault flag (open drain, active
+	 * low). The -1 latches off after an overcurrent (FAULT low) until EN is
+	 * toggled: the loop below turns it off for VBUS_RETRY_MS and on again. */
 	gpio_init(PIN_VBUS_EN);
 	gpio_set_dir(PIN_VBUS_EN, true);
 	gpio_put(PIN_VBUS_EN, 1);
@@ -122,6 +125,8 @@ int main(void)
 	tuh_init(0);                    /* the native port */
 
 	bool fault = false;
+	bool retrying = false;          /* VBUS_EN low after a FAULT, waiting to retry */
+	uint32_t retry_at = 0;
 	for (;;) {
 		tuh_task();
 		send_leds();
@@ -131,7 +136,17 @@ int main(void)
 		io_poll(&io, now_ms());
 		if (io.count != before)
 			changed = true;
-		bool f = !gpio_get(PIN_VBUS_NFAULT);
+		bool nfault_low = !gpio_get(PIN_VBUS_NFAULT);
+		if (nfault_low && !retrying) {
+			gpio_put(PIN_VBUS_EN, 0);
+			retry_at = now_ms() + VBUS_RETRY_MS;
+			retrying = true;
+		} else if (retrying && (int32_t)(now_ms() - retry_at) >= 0) {
+			gpio_put(PIN_VBUS_EN, 1);
+			retrying = false;
+		}
+		/* FAULT releases while EN is low: keep reporting it through the wait */
+		bool f = nfault_low || retrying;
 		if (f != fault) {
 			fault = f;
 			io_vbus_fault(&io, f);

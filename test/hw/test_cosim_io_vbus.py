@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""IO card keyboard VBUS switch on routed copper: enable, output and fault sense.
+"""IO card keyboard VBUS switch on routed copper: enable, output and fault flag.
 
-hw/cosim/gen_top.py io_vbus_routes binds GPIO7 to the SY6280AAC's EN (100 k
-pull-down), its OUT to the receptacle VCC, and GPIO8 to the 15 k / 22 k
-divider that reads VBUS (the switch has no fault flag; io-card.md). The
-native machine powers the USB keyboard only with VBUS on and drives GPIO8
-low when the divider reads VBUS off; the real IO firmware reports GPIO8 low
-as VBUS_FAULT in every slot SPI status byte. Checks: the good board shows no
-fault and a keyboard; a changed divider resistor or switch part is refused;
-an open EN leg turns VBUS off (fault reported, no keyboard); an open 15 k resistor
-(its VBUS end) reports a fault with VBUS fine; an open EN leg with the 22 k leg open masks
-the fault (no keyboard, no report). Each open restores its net as a gap.
+hw/cosim/gen_top.py io_vbus_routes binds GPIO7 to the TPS2553DBVR-1's EN (100 k
+pull-down), its OUT to the receptacle VCC, and its open-drain FAULT to GPIO8
+with R12 (10 k to 3V3). The native machine powers the USB keyboard only with
+VBUS on; FAULT is low only on a real overcurrent, which the emulator does not
+inject, so GPIO8 reads high and the real IO firmware reports no VBUS_FAULT.
+Checks: the good board shows no fault and a keyboard; a changed pull-up
+resistor or another switch part is refused; an open EN leg turns VBUS off (no
+keyboard, no fault); an open FAULT leg or open pull-up masks a fault
+(keyboard fine, no report). Each open restores its net as a gap.
 """
 import copy
 import json
@@ -35,20 +34,20 @@ def main():
         cards = exported_cards(temporary / 'cards')
         routed, paths, missing = io_vbus_routes(cards['io'], boards['io'])
         assert routed['vbus_on'] and not routed['nfault_low'] and all(
-            routed[k] for k in ('enable', 'out', 'sense_top', 'sense_r12', 'sense_r13')), routed
-        assert not missing and len(paths) == 5 and all(p['route_mm'] for p in paths), (missing, paths)
-        print(f'{len(paths)} VBUS switch legs routed: VBUS on, fault sense reads high')
+            routed[k] for k in ('enable', 'out', 'fault', 'pullup')), routed
+        assert not missing and len(paths) == 4 and all(p['route_mm'] for p in paths), (missing, paths)
+        print(f'{len(paths)} VBUS switch legs routed: VBUS on, FAULT reads high')
 
         wrong = copy.deepcopy(cards['io'])
-        wrong.resistors = tuple(Resistor(r.ref, '150k', r.ends) if r.value == '15k' else r for r in wrong.resistors)
+        wrong.resistors = tuple(Resistor(r.ref, '1k', r.ends) if r.value == '10k' and r.ref == 'R12' else r for r in wrong.resistors)
         try:
             io_vbus_routes(wrong, None)
         except ValueError as error:
-            print(f'source binding refuses a changed sense divider: {error}')
+            print(f'source binding refuses a changed FAULT pull-up: {error}')
         else:
-            raise AssertionError('a 150k sense resistor passed source binding')
+            raise AssertionError('a 1k FAULT pull-up passed source binding')
         other = copy.deepcopy(cards['io'])
-        other.components['U5'] = ('TPS2553', other.components['U5'][1])
+        other.components['U5'] = ('SY6280AAC', other.components['U5'][1])
         try:
             io_vbus_routes(other, None)
         except ValueError as error:
@@ -65,13 +64,12 @@ def main():
         print(f'native: {base["frames"]} IO slot frames, no VBUS_FAULT, keyboard attached')
 
         cases = (
-            ('EN leg open (U5.4)', [('U5', '4', '/VBUS_EN')], {'io:VBUS_EN'},
-             lambda r: r['faults'] > 0 and not r['keyboard'], 'VBUS off: fault reported, no keyboard'),
-            ('15 k resistor VBUS end open (R12.1)', [('R12', '1', '/VBUS')], {'io:VBUS_nFAULT'},
-             lambda r: r['faults'] > 0 and r['keyboard'], 'a fault reported with VBUS fine'),
-            ('EN leg and 22 k leg open', [('U5', '4', '/VBUS_EN'), ('R13', '1', '/VBUS_nFAULT')],
-             {'io:VBUS_EN', 'io:VBUS_nFAULT'},
-             lambda r: r['faults'] == 0 and not r['keyboard'], 'VBUS off, fault masked, no keyboard'),
+            ('EN leg open (U5.3)', [('U5', '3', '/VBUS_EN')], {'io:VBUS_EN'},
+             lambda r: r['faults'] == 0 and not r['keyboard'], 'VBUS off: no keyboard, no fault'),
+            ('FAULT leg open (U5.4)', [('U5', '4', '/VBUS_nFAULT')], {'io:VBUS_nFAULT'},
+             lambda r: r['faults'] == 0 and r['keyboard'], 'fault masked, VBUS fine'),
+            ('pull-up open (R12.1)', [('R12', '1', '/3V3')], {'io:VBUS_nFAULT'},
+             lambda r: r['faults'] == 0 and r['keyboard'], 'fault masked, VBUS fine'),
         )
         for label, opens, gaps, expected, shown in cases:
             board = boards['io']

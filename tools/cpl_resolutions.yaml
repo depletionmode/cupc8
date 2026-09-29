@@ -1,0 +1,17 @@
+# CPL review pack: parts David has explicitly resolved (tools/cpl_review_pack.py build).
+# Keyed board/ref. Only entries here ever get the 'resolved' class; the tool and Codex
+# findings stay visible under the justification. An entry without a justification, or
+# with a verdict other than 'fine', is rejected and the build stops.
+# Each entry records who said so and when. This file is not the signed review:
+# fab/cpl-review.json still needs David's downloaded decisions and the sign helper.
+main/J4:
+  verdict: fine
+  by: David Kaplan (instruction in Claude session)
+  date: 2026-09-29
+  justification: >-
+    J4 is a plain, unkeyed vertical pin header (PinHeader_2x05_P2.54mm_Vertical, no shroud or notch).
+    A plain header's pins are all identical metal, so it works either way round: each pin goes to
+    whatever pad it sits on, and the pin-1 mark is on our silkscreen, which JLC doesn't touch.
+    Codex flagged JLC's pin 1 landing bottom-right after the 90 degree CPL rotation versus our
+    top-left (a 180 degree numbering difference); the tool's geometry check passed because the
+    part is marked interchangeable_pins.

@@ -23,9 +23,15 @@ thickness), `parts.md` (quantities, stock risks), `fab-readiness.md` /
   MECH-101's >= 0.10 mm first-article gap assumes ±0.1 mm. Check the price
   delta on the form when you order (not verified here). The main board can
   stay at ±0.2 mm.
-- **Gold fingers:** confirm with JLC (chat before ordering) that "Gold
-  fingers: Yes" means electroplated hard gold, and its thickness. ENIG's
-  immersion gold is very thin and wears through after repeated insertions.
+- **Gold fingers: ENIG accepted** (David, 2026-09-28). JLC lists gold
+  fingers only on ENIG, no hard-gold option. Immersion gold is thin, so
+  the design life is tens of insertions; revisit hard gold in a later
+  revision. `order_spec` now writes `"finger_finish": "ENIG"`.
+- **Panels: one card per panel** (David). JLC's PCBA minimum counts panels,
+  so 2-up would assemble four cards. `order_spec` writes
+  `"cards_per_panel": 1`. The panel geometry itself (rails, frame, slots,
+  tabs; live status, "Panel plan") is **not generated yet**: until it is,
+  the "Delivery format" row below cannot be completed.
 - **Impedance control:** Yes on every 4- and 6-layer board, with the stackup
   named in each board's `fab/order.json` (JLC04161H-7628 / JLC06161H-3313),
   once the SI rows confirm our trace geometry hits the targets on it.
@@ -42,13 +48,13 @@ thickness), `parts.md` (quantities, stock risks), `fab-readiness.md` /
 
 | # | What | Where | Proposed resolution |
 |---|---|---|---|
-| M1 | `order.json` has no **Confirm Production File** field and no **order note**. Both were agreed with David (live status A.3). | `kicadgen.order_spec` (hw/tools/kicadgen.py:2722), queued until the main-board agent finishes | Add `"confirm_production_file": true` and, for cards, `"order_note": "<the text in section 3>"` to `order_spec`, then rebuild. Until then this checklist is the only record. |
-| M2 | `order.json` names a stackup (JLC04161H-7628 / JLC06161H-3313) but has no **impedance control** field. `verification.md` (the TMDS row) says the GPU is a "4-layer board with controlled impedance", and the SI models (`si-models.md`) use this stackup's dielectric. | order.json, 4- and 6-layer boards | Order **Impedance control: Yes** with the named stackup on every 4- and 6-layer board (section 2). Add `"impedance_control": true` to `order_spec`. |
-| M3 | `order.json` has no **outline tolerance**. MECH-101's acceptance, a gap of at least 0.10 mm from notch wall to finger, is "JLC's 0.20 less their **±0.10 high-precision** edge tolerance" (card-notch decision, step 1). At the regular ±0.2 mm, the nominal 0.20 mm gap can go to zero. | order.json, all seven cards | Order **Board outline tolerance: ±0.1 mm (high precision)** on every card. Add it to `order_spec`. |
-| M4 | `order.json` and `milestone-1.md` say **hard gold** fingers. JLC's form offers "Gold fingers: Yes" plus a bevel. It is not clear from the form whether the fingers are electroplated hard gold or the board's ENIG. | all seven cards | Before ordering, ask JLC (chat or order note) whether "Gold fingers: Yes" is hard gold, and how thick. If it is only ENIG, David decides: accept it (with a waiver in `fab-waivers.md`) or change fabs. It is not a silent substitution. |
+| M1 | **Fixed in source 2026-09-29 (rebuild pending):** `order.json` gets `confirm_production_file`, `order_note` (cards), `pcba_type`, `solder_mask_colour`, `stencil_remark`. Was: no **Confirm Production File** field and no **order note**. Both were agreed with David (live status A.3). | `kicadgen.order_spec` (hw/tools/kicadgen.py:2722), queued until the main-board agent finishes | Add `"confirm_production_file": true` and, for cards, `"order_note": "<the text in section 3>"` to `order_spec`, then rebuild. Until then this checklist is the only record. |
+| M2 | **Fixed in source 2026-09-29 (rebuild pending):** `impedance_control: true` on 4- and 6-layer boards. Was: `order.json` names a stackup (JLC04161H-7628 / JLC06161H-3313) but has no **impedance control** field. `verification.md` (the TMDS row) says the GPU is a "4-layer board with controlled impedance", and the SI models (`si-models.md`) use this stackup's dielectric. | order.json, 4- and 6-layer boards | Order **Impedance control: Yes** with the named stackup on every 4- and 6-layer board (section 2). Add `"impedance_control": true` to `order_spec`. |
+| M3 | **Fixed in source 2026-09-29 (rebuild pending):** `outline_tolerance_mm: 0.1` on cards. Was: `order.json` has no **outline tolerance**. MECH-101's acceptance, a gap of at least 0.10 mm from notch wall to finger, is "JLC's 0.20 less their **±0.10 high-precision** edge tolerance" (card-notch decision, step 1). At the regular ±0.2 mm, the nominal 0.20 mm gap can go to zero. | order.json, all seven cards | Order **Board outline tolerance: ±0.1 mm (high precision)** on every card. Add it to `order_spec`. |
+| M4 | **Resolved by David, 2026-09-28: ENIG fingers accepted; source and docs changed to match.** Was: `order.json` and `milestone-1.md` said **hard gold** fingers. JLC's form offers "Gold fingers: Yes" plus a bevel. It is not clear from the form whether the fingers are electroplated hard gold or the board's ENIG. | all seven cards | Before ordering, ask JLC (chat or order note) whether "Gold fingers: Yes" is hard gold, and how thick. If it is only ENIG, David decides: accept it (with a waiver in `fab-waivers.md`) or change fabs. It is not a silent substitution. |
 | M5 | `order.json` says `"assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC"`, but the main board has **9 through-hole connectors** (J2 CPU socket C404111, J11-J16 slot sockets C404113, J4 2x5 header C42431818; J3 C19188869 is SMD with posts). So it needs JLC's through-hole assembly as well. | main | Order **Standard PCBA** (section 2). The THT lines appear, with their fee, on the BOM step. Check that all 8 are listed as placed. |
 | M6 | No material or TG in `order.json`. | all | FR-4, **TG155** on the 4- and 6-layer boards. JLC's multilayer stackups are defined in TG155 FR-4. For Wi-Fi (2-layer), use JLC's default FR-4 TG135, or TG155 if the form prices it the same. Not significant for these boards: record the choice. |
-| M7 | On the **Wi-Fi** card, 13 of the 190 via hits (0.3 mm) fall inside solder-mask openings, around U1 (ESP32-C3 module, X 34.8-46.0, Y 24.0-34.2 mm in Gerber coordinates). They are vias in pads, not tented. A via under a module pad can wick solder away in reflow, and JLC may raise an EQ about it. | wifi Gerbers | Confirm they are intentional (the module's GND pad stitching). If so, either ask for them to be plugged (Via covering: "Epoxy filled & capped", if the 2-layer form offers it) or accept the EQ. No other board has vias in mask openings (checked on cpu, main and wifi; the others were built by the same pipeline). |
+| M7 | **David: fix in the design, not accept** (live status). On the **Wi-Fi** card, 13 of the 190 via hits (0.3 mm) fall inside solder-mask openings, around U1 (ESP32-C3 module, X 34.8-46.0, Y 24.0-34.2 mm in Gerber coordinates). They are vias in pads, not tented. A via under a module pad can wick solder away in reflow, and JLC may raise an EQ about it. | wifi Gerbers | Confirm they are intentional (the module's GND pad stitching). If so, either ask for them to be plugged (Via covering: "Epoxy filled & capped", if the 2-layer form offers it) or accept the EQ. No other board has vias in mask openings (checked on cpu, main and wifi; the others were built by the same pipeline). |
 | M8 | The CPL reviews do not exist yet (`build/hw/*/fab/cpl-review.json`: none). `fab-readiness.md` is red. The boards read "stale" until the coordinated rebuild. | gate | Section 1 is the gate: do not order before it passes. |
 
 What matches: layers (main 6, cpu 6, gpu/io/storage/eink/system 4, wifi 2)
@@ -150,13 +156,13 @@ boards into a panel.
 | Board | Layers | Size (mm, job file) | Stackup | Fingers | BOM lines / placements | THT | Rev |
 |---|---|---|---|---|---|---|---|
 | main | 6 | 131.1 x 188.1 | JLC06161H-3313 | no | 58 / 254 | 8 THT (sockets, header) + J3 SMD with posts | A |
-| cpu | 6 | 62.1 x 47.55 | JLC06161H-3313 | x8, hard gold, 30° | 12 / 47 | none | A |
-| gpu | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, hard gold, 30° | 26 / 48 | none | A |
-| io | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, hard gold, 30° | 28 / 48 | none | A |
-| storage | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, hard gold, 30° | 18 / 38 | none | A |
-| wifi | 2 | 62.1 x 47.55 | (2-layer, none) | x1, hard gold, 30° | 14 / 23 | none | A |
-| eink | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, hard gold, 30° | 19 / 41 | none | A |
-| system | 4 | 56.1 x 56.5 | JLC04161H-7628 | x4, hard gold, 30° | 19 / 48 | none | A |
+| cpu | 6 | 62.1 x 47.55 | JLC06161H-3313 | x8, ENIG gold, 30° | 12 / 47 | none | A |
+| gpu | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 26 / 48 | none | A |
+| io | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 28 / 48 | none | A |
+| storage | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 18 / 38 | none | A |
+| wifi | 2 | 62.1 x 47.55 | (2-layer, none) | x1, ENIG gold, 30° | 14 / 23 | none | A |
+| eink | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 19 / 41 | none | A |
+| system | 4 | 56.1 x 56.5 | JLC04161H-7628 | x4, ENIG gold, 30° | 19 / 48 | none | A |
 
 (The "sockets" row in `fab-readiness.md` is not built and is not part of
 this order.) Update this table from `build/hw/<board>/fab/<board>-job.gbrjob`
@@ -176,7 +182,7 @@ not, stop: the zip is wrong.
 | PCB qty | section 5 | section 5 | section 5 | JLC's minimum is 5 |
 | Product type | Industrial/Consumer electronics | same | same | |
 | Different design | 1 | 1 | 1 | one board per zip |
-| Delivery format | Single PCB | Single PCB | Single PCB | not panelised: a panel would put rails or V-cuts at the finger edge |
+| Delivery format | Single PCB (main) | **Panel by customer**, one card per panel (`cards_per_panel`), fingers on the panel's outer edge | same | PENDING: the panel generator does not exist yet. A 62 x 47 mm card is under JLC's 70 x 70 mm Standard PCBA minimum and the 50 mm gold-finger minimum |
 | PCB thickness | 1.6 mm | 1.6 mm | 1.6 mm | `thickness_mm`; CEM card 1.57 ± 0.13 (`milestone-1.md`) |
 | PCB colour | Green | Green | Green | not specified anywhere; green is the cheapest and quickest |
 | Silkscreen | White | White | White | |

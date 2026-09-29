@@ -63,7 +63,7 @@ Package_TO_SOT_SMD:SOT-23-6:
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
 Resistor_SMD:R_0402_1005Metric:
   rotation: 0
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0402 (C11702, C25100, C25741, C25744, C25752, C25756, C25768)'
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0402 (C11702, C25100, C25741, C25744, C25752, C25756, C25768, C26980)'
 Resistor_SMD:R_0603_1608Metric:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s R0603 (C21190, C22775, C25804)'
@@ -138,7 +138,7 @@ jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR:
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR (C141836)'
 jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL:
   rotation: 0
-  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519)'
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL (C7519, C111738)'
 jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL (C52140430)'

@@ -12,7 +12,7 @@ Every check in hw/power reads its numbers from here. Each value is one of:
           are listed by running this file, and in doc/hardware/power.md.
 
 Datasheets (fetched 2026-09-24): TLV62569 SLVSDG1C (the main board's 3V3
-and the Wi-Fi card's); RT9013 DS9013-09; SY6280 AN_SY6280 Rev 0.1;
+and the Wi-Fi card's); RT9013 DS9013-09; TPS2553 SLVS841F;
 TLV7011 SLVSDM5F; SMD1812P350TF (Ruilon); SMD1206P110TFT (PTTC); SMF5.0A
 (MDD); ESP32-C3-MINI-1U datasheet v2.2; TPS25947 SLVSFC9C; TPS61023 SLVSF14B
 (2026-09-25).
@@ -82,12 +82,12 @@ INSW_RILM = assume("main", "eFuse RILM 1.13 kOhm 1 % (limit 2.63 / 2.96 / 3.21 A
 INSW_THETA_JA = 74.5        # DS RPW, JEDEC board (41.7 on TI's EVM)
 # OVLO: IN -> R1 -> OVLO -> R2 -> GND; trips at 1.2 V (1.183..1.223) x (R1 + R2) / R2.
 # Must stay above vSafe5V max and below the 6 V absolute maximum of what 5V_SYS feeds
-# (TLV62569 VIN, the IO card's SY6280)
+# (TLV62569 VIN, the IO card's TPS2553DBVR-1 has 7.0 V)
 INSW_OVLO_R = assume("main", "eFuse OVLO divider 37.4k / 10.0k 0.1 % from IN (1 % puts the trip up to "
                      "6.00 V; see budget.py B20)", (37.4e3, 10.0e3))
 INSW_OVLO_TOL = 0.001
 INSW_OVLO_VTH = (1.183, 1.223)
-DOWNSTREAM_ABS_MAX = 6.0    # DS TLV62569, SY6280: VIN absolute maximum
+DOWNSTREAM_ABS_MAX = 6.0    # DS TLV62569: VIN absolute maximum (the TPS2553: 7.0 V)
 # dVdt: SR (V/ms) = 2000 / CdVdt (pF), with the pin current's spread
 # (0.81..3.82 uA around 2.21 typ) scaling it
 INSW_CDVDT = assume("main", "eFuse dVdt capacitor 680 pF (5V_SYS rises at 1.1..5.1 V/ms)", 680e-12)
@@ -121,10 +121,10 @@ TVS_IR = assume("main", "SMF5.0A leakage at its 5.0 V standoff <= 400 uA (more a
 USBLC6_IR = 1e-6                                # DS USBLC6-2: 1 uA max at 5 V (on VBUS_F)
 USB_SUSPEND_MAX = 2.5e-3                        # SPEC USB 2.0 7.2.3: a suspended device draws <= 2.5 mA
 
-# SY6280: now only the IO card's keyboard port switch (500 mA)
-SY6280_RON_TYP = 0.080                          # DS (typ only)
-SY6280_RON_MAX = assume("IO", "SY6280 RDS(on) taken as 1.5 x the 80 mOhm typ (hot, no max in the datasheet)", 0.120)
-SY6280_THETA_JA = 200.0                         # DS, JEDEC 51-3 (low-K board)
+# TPS2553DBVR-1 (IC-005): the IO card's keyboard port switch (500 mA)
+IOSW_RON_TYP = 0.085                          # DS SLVS841F 7.5 (typ)
+IOSW_RON_MAX = 0.135                          # DS SLVS841F 7.5 (DBV, -40..125 C)
+IOSW_THETA_JA = 182.6                         # DS SLVS841F 7.4 (DBV)
 
 # ---------------------------------------------------------------------------
 # Slot +5V feed: PTC -> 0 ohm link -> 50 mOhm sense -> 3 contacts -> card
@@ -228,7 +228,7 @@ WIFI_I_LEDS = 0.0013 + 0.006 + 0.001   # power LED (1k), link LED (100 ohm), EN/
 WIFI_I_3V3 = ESP32_I_TX + WIFI_I_LEDS   # the Wi-Fi card's 3V3 load, TX at 100 % duty
 
 # ---------------------------------------------------------------------------
-# IO card keyboard port: slot +5V -> TPS61023 boost -> SY6280 (500 mA, FLT to
+# IO card keyboard port: slot +5V -> TPS61023 boost -> TPS2553DBVR-1 (500 mA, FAULT to
 # GPIO8) -> USB-A VBUS. Without the boost the port sat at 3.97 V at the worst
 # corner (USB 2.0 wants >= 4.40 V at a low-power port). The IO board agent
 # builds this circuit (power.md, "IO card keyboard boost").
@@ -239,7 +239,7 @@ IOB_L = assume("IO", "boost inductor 1 uH FXL0420-1R0-M (C167203): 27 mOhm, Isat
                "valley limit into a fault)", 1.0e-6)
 IOB_L_DCR = 0.027
 IOB_CIN = assume("IO", "boost input 10 uF 25 V 0805 (C15850) at VIN", 10e-6)
-IOB_COUT = assume("IO", "boost output 2 x 22 uF 25 V 0805 (C45783), then the SY6280", 2 * 22e-6)
+IOB_COUT = assume("IO", "boost output 2 x 22 uF 25 V 0805 (C45783), then the TPS2553DBVR-1", 2 * 22e-6)
 IOB_R1, IOB_R2 = assume("IO", "boost feedback 750k (C23240) / 100k (C25803) 1 %: 5.06 V", (750e3, 100e3))
 IOB_RES_TOL = 0.01
 IOB_VREF = (0.580, 0.595, 0.610)                # DS, PWM mode
@@ -339,7 +339,7 @@ I_KEYBOARD = 0.500          # USB 2.0 high-power device (IO card's switch limits
 
 FUTURE_SLOTS = 2            # slots 5-6 (slot 4 holds the storage card in M1)
 
-# Capacitance on 5V_SYS, charged through the SY6280 at attach
+# Capacitance on 5V_SYS, charged through the IO card's port switch at attach
 C_5VSYS = [
     ("main 5V_SYS bulk", assume("main", "5V_SYS bulk: 22 uF", 22e-6)),
     ("3V3 buck input", BUCK_CIN),

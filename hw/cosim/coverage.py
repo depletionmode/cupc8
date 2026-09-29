@@ -146,7 +146,7 @@ POWER_PINS = {
     'TPS259470ARPWR': {'IN', 'OUT', 'DVDT', 'ILM', 'OVLO/OVCSEL', 'EN/UVLO', 'GND'},
     'TPS63802DLAR': {'VIN', 'EN', 'VOUT', 'FB', 'L1', 'L2', 'GND', 'AGND'},
     'TPS61023DRLR': {'VIN', 'EN', 'VOUT', 'FB', 'SW', 'GND'},
-    'SY6280AAC': {'IN', 'OUT', 'ISET', 'GND'},
+    'TPS2553DBVR-1': {'IN', 'OUT', 'ILIM', 'GND'},
 }
 # Static logic straps tied to a rail. They are constants of the design,
 # checked by pin consistency and the board's pinout rows, never toggled.

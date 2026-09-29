@@ -19,6 +19,6 @@ why, and who decided.
 | Check | Done |
 |---|---|
 | 4.9: every board's CPL rendered over its Gerbers, each part's pin 1 and rotation checked by eye (BRD-001 checks rotations against JLC's footprints; this is the backstop) | |
-| JLC's order page: each board's options match its `fab/order.json` (layers, 1.6 mm, ENIG, hard-gold fingers and 30° bevel on cards) | |
+| JLC's order page: each board's options match its `fab/order.json` (layers, 1.6 mm, ENIG, ENIG gold fingers and 30° bevel on cards, Confirm Production File, the do-not-trim note, impedance control on 4- and 6-layer boards) | |
 | The antenna lead is SMA female (jack) and the antenna SMA male, not RP-SMA | |
 | Parts with low stock reserved in the JLC parts inventory (the ROM chips, the FPGAs: `parts.md`, Risks) | |

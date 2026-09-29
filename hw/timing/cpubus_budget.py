@@ -54,7 +54,8 @@ ALLOW = {
 
 PS_PER_MM = 7.0                 # FR4 stripline, the slow case (microstrip is ~6)
 CONNECTOR_NS = 0.1              # PCIe CEM edge connector, ~15 mm of contact
-RC_NS = 2.2 * 33 * 15e-12 * 1e9 # 33 ohm series resistor into 15 pF, 10-90%
+BUS_SERIES_OHMS = 68            # CPU card RN1-8 (main R21-R34 are 56): the larger one, for both directions
+RC_NS = 2.2 * BUS_SERIES_OHMS * 15e-12 * 1e9 # series resistor into 15 pF, 10-90%
 
 
 def io_delays(name):
@@ -107,7 +108,7 @@ def budget(launch, capture, bus_mm, clk_diff_mm):
         ("launch clock insertion", ALLOW["clk_insertion"]),
         ("launch flip-flop to pin (nextpnr)", launch[1]),
         ("output pad", ALLOW["out_pad"]),
-        ("board: %.0f mm, connector, 33 ohm" % bus_mm, board),
+        ("board: %.0f mm, connector, %d ohm" % (bus_mm, BUS_SERIES_OHMS), board),
         ("input pad", ALLOW["in_pad"]),
         ("capture pin to flip-flop (nextpnr)", capture[0]),
         ("capture setup", ALLOW["setup"]),

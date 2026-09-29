@@ -20,7 +20,7 @@ python3 hw/boards/wifi.py
 
 Shared rules:
 - **Revision:** every board passes `title`, `revision` and `revision_at` to `pipeline()`, which prints `<title> rev <revision>` on the top silkscreen and puts the revision in the title block (and so in the Gerbers). Bump the board script's `REVISION` (A, B, ...) for every order that changes the board (`doc/milestone-1.md`, Board revision).
-- **Cards:** 1.6 mm, with hard-gold fingers and a 30° chamfer. These are
+- **Cards:** 1.6 mm, with ENIG gold fingers and a 30° chamfer. These are
   order options, written in `fab/order.json` and checked there.
 - **Card edge:** each card's finger tab is KiCad's `BUS_PCIexpress_*`
   footprint. The script draws the body's outline and meets the tab where it
@@ -161,15 +161,15 @@ Spec: `doc/hardware/io-card.md`.
   0.3 mm pads, so the board script lays their tracks (VIN/EN to the input
   cap, SW to the inductor, VOUT to the output caps, FB to the divider) with
   the loops short, as TI's layout guide asks.
-- **U5, SY6280AAC** (C55136) switches the boost's output to VBUS, enabled by
-  GPIO7 (100 kΩ pull-down, so VBUS is off while the RP2040 is in reset).
-  R_SET = 12 kΩ: I_lim = 6800 / 12k = 0.57 A nominal, 0.42–0.71 A over the
-  datasheet's ±25 %, so a keyboard gets its 500 mA and the card stays under
-  the slot's 750 mA PTC. 10 µF at IN, 100 µF + 100 nF on VBUS.
-- **VBUS_nFAULT (GPIO8):** the SY6280AAC has no fault flag (io-card.md
-  assumed one). GPIO8 reads VBUS through 15k/22k (5 V → 2.97 V), so it goes
-  low when the switch limits and VBUS sags below ~3.4 V, or is shorted.
-  The firmware's active-low sense is unchanged.
+- **U5, TPS2553DBVR-1** (C111738, latch-off) switches the boost's output to
+  VBUS, enabled by GPIO7 (100 kΩ pull-down, so VBUS is off while the RP2040
+  is in reset). R10 = 45.3 kΩ 1 % (C26980) on ILIM: 514–647 mA guaranteed,
+  so a keyboard gets its 500 mA (IC-005, doc/hardware/io-port-switch-proposal.md).
+  1 µF (C25) at IN with C23/C24 within ~10 mm, 100 µF + 100 nF on VBUS.
+- **VBUS_nFAULT (GPIO8):** U5's open-drain FAULT, pulled up to 3V3 by R12
+  (10 kΩ); low 5–10 ms into an overcurrent. The switch then stays off until
+  EN toggles, so the firmware drops GPIO7 for 1 s and raises it again. The
+  firmware's active-low sense is unchanged.
 - **USB data:** 27 Ω in series with D+ and D− at the RP2040 (design guide),
   USBLC6-2SC6 (C7519) at the connector. **No external 15 kΩ pull-downs:**
   the RP2040's USB PHY switches its own on in host mode; external ones as
@@ -413,11 +413,11 @@ CRESET_n, CDONE; [system-slot.md](../../doc/hardware/system-slot.md)).
   LED on 3V3. The silkscreen labels them "PWR" and "1V2". There are test
   pads for 1V2, 3V3 and GND. The title and revision are "CUPC/8 CPU rev A".
 - **Parts** (LCSC): iCE40HX4K-TQ144 C1521989, W25Q32JVSSIQ C179173,
-  RT9013-12GB C58464, 4D02WGJ0330TCE 33 Ω × 4 C25501, MMBT3904 C20526,
+  RT9013-12GB C58464, 4D02WGJ0680TCE 68 Ω × 4 C52984, MMBT3904 C20526,
   KT-0603R red LED C2286, and 0402 basics: 100 nF C1525, 1 µF C52923,
   4.7 µF C23733, 10 kΩ C25744, 1 kΩ C11702, 100 Ω C25076.
 - **Stackup.** 6 layers (David, 2026-09-25), JLC06161H-3313, 1.6 mm, with
-  hard-gold fingers, bevelled per the fab order spec (`kicadgen.order_spec`).
+  ENIG gold fingers, bevelled per the fab order spec (`kicadgen.order_spec`).
   The layers are signal + GND pour / solid GND plane / signal / signal /
   solid 3V3 plane / signal + GND pour. 1V2 is routed as tracks. JLC offers
   gold fingers at any layer count, given ENIG and a board of at least 50 mm.

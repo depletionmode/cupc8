@@ -314,7 +314,7 @@ def main():
             if len(matches) != 1:
                 raise ValueError(f'{target}: netlist top lacks unique 33-ohm SCK source path')
         cpu = [p for p in paths if p.get('from', '').startswith('cpu.U1.') and
-               p.get('to', '').startswith('cpu.J1.') and p.get('ohms') == 33]
+               p.get('to', '').startswith('cpu.J1.') and p.get('ohms') == 68]
         if len(cpu) != 31:
             raise ValueError(f'CPU card: expected 31 series-terminated driver paths, got {len(cpu)}')
         report['top_sha256'] = hashlib.sha256(top_bytes).hexdigest()

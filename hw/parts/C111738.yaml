@@ -1,0 +1,12 @@
+# TPS2553DBVR-1 (TI), adjustable current-limit power switch with latch-off (the -1), SOT-23-6 (DBV)
+datasheet: https://www.ti.com/lit/ds/symlink/tps2553.pdf
+source: "TI SLVS841F (Aug 2016), section 6 Pin Configuration and Functions, DBV package (top view): 1 IN, 2 GND, 3 EN, 4 FAULT, 5 ILIM, 6 OUT"
+package: SOT-23-6
+pins:
+  1: IN
+  2: GND
+  3: EN
+  4: ["~{FAULT}", FAULT]
+  5: ILIM
+  6: OUT
+ccw: [1, 6]

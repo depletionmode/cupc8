@@ -11,12 +11,14 @@ common SPI framing in `slot.md`.
   (USBLC6-2 class).
 - **VBUS:** the slot's +5V → a TPS61023 boost to 5.06 V (the slot's +5V can
   sag to 3.97 V at the card; `power.md`, IO card keyboard boost) → an
-  SY6280AAC current-limited switch (567 mA nominal ISET setting, enabled by GPIO7) →
-  the receptacle. The SY6280AAC has no fault flag, so GPIO8 (VBUS_nFAULT)
-  reads VBUS through a 15k/22k divider. A low reading reports VBUS sag or
-  absence, not the switch's internal fault state. The published switch data
-  do not guarantee a 500 mA maximum or a short-to-flag delay for this circuit
-  ([IC-005 switch audit](ic005-switch-audit.md)).
+  TPS2553DBVR-1 latch-off current-limited switch (RILIM 45.3 kΩ:
+  514–647 mA guaranteed, enabled by GPIO7) → the receptacle. Its open-drain
+  FAULT (low 5–10 ms into an overcurrent) goes to GPIO8 (VBUS_nFAULT, 10 kΩ
+  pull-up to 3V3); the switch then stays off until EN is toggled, so the
+  firmware turns GPIO7 off for 1 s and back on, and reports the fault
+  (status bit 4) meanwhile. See the
+  [IC-005 proposal](io-port-switch-proposal.md) and
+  [switch audit](ic005-switch-audit.md).
 - **Host pull-downs on D+/D−:** the RP2040's USB PHY switches on its own
   15 kΩ pull-downs in host mode; the board adds none (external ones would
   halve them, out of USB's range).

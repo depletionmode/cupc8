@@ -1,0 +1,254 @@
+# What each part's datasheet drawing shows, read from the PDF page named here
+# (rendered by `tools/cpl_review_pack.py datasheets`, cropped to `crop`) by
+# whoever recorded it (Claude, 2026-09-29, from the rendered page images).
+# tools/cpl_review_pack.py compares these records with the KiCad footprint on
+# the board by code (pin names pad for pad, numbering direction seen from the
+# top): the record is the datasheet's side only. `result: could not determine`
+# means the drawing could not be obtained or read; nothing is guessed.
+#
+# Fields: url (where the PDF came from), page (1-based PDF page of the
+# pin/package drawing), crop [x0, y0, x1, y1] as fractions of the page, seen
+# (one line: what the drawing shows), numbering (ccw|cw: how the pin numbers
+# run seen from the top, for ring/two-row packages), ring (pads 1..N, or a
+# list, that form that ring), pins {pad: name at that pad}, others (name for
+# every pad not listed), text_pages (pages whose text is searched for the pin
+# names when `pins` is not transcribed).
+
+C2911374:
+  url: https://www.espressif.com/sites/default/files/documentation/esp32-c3-mini-1_datasheet_en.pdf
+  page: 10
+  crop: [0.2, 0.19, 0.75, 0.66]
+  seen: 'ESP32-C3-MINI-1 datasheet v2.2 Figure 3-1 Pin Layout (Top View): pin 1 (GND) is the top of the left column next to the antenna keep-out; 1-11 run down the left side, 12-24 along the bottom left to right, 25-35 up the right side, 36-48 (GND) along the top, 49 GND centre'
+  numbering: ccw
+  ring: 48
+  pins: {1: GND, 2: GND, 3: 3V3, 4: NC, 5: IO2, 6: IO3, 7: NC, 8: EN, 9: NC, 10: NC, 11: GND, 12: IO0, 13: IO1, 14: GND, 15: NC, 16: IO10, 17: NC, 18: IO4, 19: IO5, 20: IO6, 21: IO7, 22: IO8, 23: IO9, 24: NC, 25: NC, 26: IO18, 27: IO19, 28: NC, 29: NC, 30: RXD0, 31: TXD0, 32: NC, 33: NC, 34: NC, 35: NC}
+  others: GND
+C141836:
+  url: https://www.ti.com/lit/ds/symlink/tlv62569.pdf
+  page: 3
+  crop: [0.08, 0.11, 0.95, 0.62]
+  seen: 'TLV62569 SLVSDG1C 5 Pin Configuration, DBV package (SOT23-5) top view: 1 EN, 2 GND, 3 SW along the bottom left to right, 4 VIN, 5 FB along the top right to left'
+  numbering: ccw
+  pins: {1: EN, 2: GND, 3: SW, 4: VIN, 5: FB}
+C398365:
+  url: https://www.ti.com/lit/ds/symlink/tlv62569.pdf
+  page: 3
+  crop: [0.08, 0.11, 0.95, 0.62]
+  seen: 'TLV62569 SLVSDG1C 5 Pin Configuration, DDC package (SOT23-6) top view: 1 EN, 2 GND, 3 SW along the bottom left to right, 4 VIN, 5 PG, 6 FB along the top right to left'
+  numbering: ccw
+  pins: {1: EN, 2: GND, 3: SW, 4: VIN, 5: PG, 6: FB}
+C52140430:
+  url: https://datasheet.lcsc.com/datasheet/pdf/c41e2e94e8d4ddcc91df5b82be1805c5.pdf
+  page: 4
+  crop: [0.1, 0.22, 0.92, 0.68]
+  seen: 'MDD 74LVC1G125 Rev 1.0, 5.1 Pin map Fig 4 (SOT23-5 and SOT353 top view): pin 1 OE at the top left beside the package dot, 1 OE, 2 A, 3 GND down the left side, 4 Y, 5 VCC up the right side'
+  numbering: ccw
+  pins: {1: OE, 2: A, 3: GND, 4: Y, 5: VCC}
+C131025:
+  url: https://datasheet.lcsc.com/datasheet/pdf/abc83bb7f5b7f022c50f4fddf07136a0.pdf
+  page: 6
+  crop: [0.1, 0.17, 0.92, 0.86]
+  seen: 'Winbond W25Q16JV 3.1 Figure 1a SOIC 150/208-mil top view: pin 1 /CS at the top left (dot), 1-4 down the left, 5-8 up the right'
+  numbering: ccw
+  pins: {1: CS, 2: DO/IO1, 3: WP/IO2, 4: GND, 5: DI/IO0, 6: CLK, 7: HOLD/RESET/IO3, 8: VCC}
+C179173:
+  url: https://www.winbond.com/resource-files/w25q32jv%20revg%2003272018%20plus.pdf
+  page: 6
+  crop: [0.1, 0.11, 0.92, 0.86]
+  seen: 'Winbond W25Q32JV 3.1 Figure 1a SOIC 208-mil top view: pin 1 /CS at the top left (dot), 1-4 down the left, 5-8 up the right'
+  numbering: ccw
+  pins: {1: CS, 2: DO/IO1, 3: WP/IO2, 4: GND, 5: DI/IO0, 6: CLK, 7: HOLD/RESET/IO3, 8: VCC}
+C1348955:
+  url: https://datasheet.lcsc.com/datasheet/pdf/90ea0a0c4d567eb1821e29d9d114e8d1.pdf
+  page: 2
+  crop: [0.5, 0.11, 0.95, 0.42]
+  seen: 'ISSI IS62WV5128EBLL Rev A4 page 2, 32-pin STSOP (Type I) as drawn: pin 1 A11 at the top of the left column, 1-16 down the left, 17-32 up the right'
+  numbering: ccw
+  pins: {1: A11, 2: A9, 3: A8, 4: A13, 5: WE#, 6: A18, 7: A15, 8: VDD, 9: A17, 10: A16, 11: A14, 12: A12, 13: A7, 14: A6, 15: A5, 16: A4, 17: A3, 18: A2, 19: A1, 20: A0, 21: I/O0, 22: I/O1, 23: I/O2, 24: GND, 25: I/O3, 26: I/O4, 27: I/O5, 28: I/O6, 29: I/O7, 30: CS#, 31: A10, 32: OE#}
+C138714:
+  url: https://datasheet.lcsc.com/datasheet/pdf/86fce5e377410b6c2d1b0526f306f55e.pdf
+  page: 4
+  crop: [0.55, 0.13, 0.95, 0.35]
+  seen: 'TI TPD4E05U06 SLVSBO7L 5 Pin Configuration, DQA package (10-pin USON) top view: pin 1 D1+ at the top left (dot), 1-5 down the left (D1+, D1-, GND, D2+, D2-), 6-10 up the right (NC, NC, GND, NC, NC)'
+  numbering: ccw
+  pins: {1: D1+, 2: D1-, 3: GND, 4: D2+, 5: D2-, 6: NC, 7: NC, 8: GND, 9: NC, 10: NC}
+C160457:
+  url: https://datasheet.lcsc.com/datasheet/pdf/45e535d539b88fff0ea69eeb356a7f8b.pdf
+  page: 5
+  crop: [0.1, 0.54, 0.85, 0.88]
+  seen: 'HCI (Harmony) oscillator, 2. DIMENSION top view: (Index) at the bottom left corner = pin 1, 1 bottom left, 2 bottom right, 3 top right, 4 top left; #1 OE, #2 GND, #3 Output, #4 Vdd'
+  numbering: ccw
+  pins: {1: OE, 2: GND, 3: OUT, 4: VDD}
+C2845237:
+  url: https://www.ti.com/lit/ds/symlink/tps63802.pdf
+  page: 4
+  crop: [0.08, 0.11, 0.95, 0.55]
+  seen: 'TI TPS63802 SLVSEU9D Figure 7-1 10-pin DLA package top view: 1 EN, 2 MODE, 3 AGND, 4 FB, 5 PG down the left, 6 VOUT, 7 L2, 8 GND, 9 L1, 10 VIN up the right'
+  numbering: ccw
+  pins: {1: EN, 2: MODE, 3: AGND, 4: FB, 5: PG, 6: VOUT, 7: L2, 8: GND, 9: L1, 10: VIN}
+C352826:
+  url: https://datasheet.lcsc.com/datasheet/pdf/23a254f744eb1aed7c9789f75dc29aa0.pdf
+  page: 3
+  crop: [0.08, 0.11, 0.95, 0.6]
+  seen: 'TI CD74HC4051 SCHS122M 5 Pin Configuration, PW (TSSOP-16) top view: pin 1 A4 at the top left, 1-8 down the left, 9-16 up the right'
+  numbering: ccw
+  pins: {1: A4, 2: A6, 3: A, 4: A7, 5: A5, 6: E, 7: VEE, 8: GND, 9: S2, 10: S1, 11: S0, 12: A3, 13: A0, 14: A1, 15: A2, 16: VCC}
+C3662799:
+  url: https://www.ti.com/lit/ds/symlink/tps25947.pdf
+  page: 5
+  crop: [0.08, 0.11, 0.95, 0.5]
+  seen: 'TI TPS25947 SLVSFC9C Figure 5-1 RPW 10-pin QFN top view (TPS259470x column): 1 EN/UVLO, 2 OVLO, 3 AUXOFF, 4 FLT down the left, 5 IN and 6 OUT the two large centre pads, 7 DVDT, 8 GND, 9 ILM, 10 ITIMER up the right'
+  numbering: ccw
+  ring: [1, 2, 3, 4, 7, 8, 9, 10]
+  pins: {1: EN/UVLO, 2: OVLO, 3: AUXOFF, 4: FLT, 5: IN, 6: OUT, 7: DVDT, 8: GND, 9: ILM, 10: ITIMER}
+C465732:
+  url: https://datasheet.lcsc.com/datasheet/pdf/b87b1e8b19259fa8f353ae4a0dd9a62d.pdf
+  page: 4
+  crop: [0.08, 0.11, 0.95, 0.87]
+  seen: 'TI TCA9555 SCPS200E 6 Pin Configuration, DB/PW 24-pin TSSOP top view: pin 1 INT at the top left (dot), 1-12 down the left, 13-24 up the right'
+  numbering: ccw
+  pins: {1: INT, 2: A1, 3: A2, 4: P00, 5: P01, 6: P02, 7: P03, 8: P04, 9: P05, 10: P06, 11: P07, 12: GND, 13: P10, 14: P11, 15: P12, 16: P13, 17: P14, 18: P15, 19: P16, 20: P17, 21: A0, 22: SCL, 23: SDA, 24: VCC}
+C55136:
+  url: https://datasheet.lcsc.com/datasheet/pdf/0271e5b2ca2a46b8bb16f65855f12fe2.pdf
+  page: 2
+  crop: [0.1, 0.17, 0.92, 0.45]
+  seen: 'Silergy AN_SY6280 Pinout (top view) SOT23-5: 1 OUT, 2 GND, 3 ISET down the left, 4 EN, 5 IN up the right'
+  numbering: ccw
+  pins: {1: OUT, 2: GND, 3: ISET, 4: EN, 5: IN}
+C58464:
+  url: https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2304140030_Richtek-Tech-RT9013-12GB_C58464.pdf
+  page: 1
+  crop: [0.55, 0.6, 0.95, 0.92]
+  seen: 'Richtek RT9013 DS9013-09 Pin Configurations (top view) SOT-23-5: pin 1 marked by the corner triangle at the bottom left, 1 VIN, 2 GND, 3 EN along the bottom, 4 NC, 5 VOUT along the top'
+  numbering: ccw
+  pins: {1: VIN, 2: GND, 3: EN, 4: NC, 5: VOUT}
+C645939:
+  url: https://datasheet.lcsc.com/datasheet/pdf/406f13c11d944519b4ea113900723c66.pdf
+  page: 4
+  crop: [0.2, 0.12, 0.75, 0.72]
+  seen: 'Microchip SST39VF040 DS25023B Figure 2, 32-lead PLCC top view: pin 1 in the middle of the top edge (dot), numbers rise leftward along the top, down the left side (5-13), rightward along the bottom (14-20), up the right side (21-29), then 30-32 back along the top'
+  numbering: ccw
+  pins: {1: A18, 2: A16, 3: A15, 4: A12, 5: A7, 6: A6, 7: A5, 8: A4, 9: A3, 10: A2, 11: A1, 12: A0, 13: DQ0, 14: DQ1, 15: DQ2, 16: VSS, 17: DQ3, 18: DQ4, 19: DQ5, 20: DQ6, 21: DQ7, 22: CE#, 23: A10, 24: OE#, 25: A11, 26: A9, 27: A8, 28: A13, 29: A14, 30: A17, 31: WE#, 32: VDD}
+C702117:
+  url: https://datasheet.lcsc.com/datasheet/pdf/d955c7471084950f84e5242f5ec7a175.pdf
+  page: 3
+  crop: [0.08, 0.4, 0.95, 0.7]
+  seen: 'TI TLV7011 SLVSD17 5 Pin Configuration, DBV SOT-23 top view: 1 OUT, 2 VEE, 3 IN+ down the left, 4 IN-, 5 VCC up the right'
+  numbering: ccw
+  pins: {1: OUT, 2: VEE, 3: IN+, 4: IN-, 5: VCC}
+C7519:
+  url: https://datasheet.lcsc.com/datasheet/pdf/0d3a2ab954b34651a0695e7ccf534db0.pdf
+  page: 1
+  crop: [0.52, 0.35, 0.9, 0.48]
+  seen: 'ST USBLC6-2 Rev 5 Figure 1 functional diagram (top view) SOT23-6L: 1 I/O1, 2 GND, 3 I/O2 down the left, 4 I/O2, 5 VBUS, 6 I/O1 up the right'
+  numbering: ccw
+  pins: {1: I/O1, 2: GND, 3: I/O2, 4: I/O2, 5: VBUS, 6: I/O1}
+C919459:
+  url: https://www.ti.com/lit/ds/symlink/tps61023.pdf
+  page: 3
+  crop: [0.08, 0.1, 0.95, 0.5]
+  seen: 'TI TPS61023 SLVSF14B Figure 5-1 DRL 6-pin SOT563 top view: pin 1 FB at the top left (dot), 1 FB, 2 EN, 3 VIN down the left, 4 GND, 5 SW, 6 VOUT up the right'
+  numbering: ccw
+  pins: {1: FB, 2: EN, 3: VIN, 4: GND, 5: SW, 6: VOUT}
+C2040:
+  url: https://datasheet.lcsc.com/datasheet/pdf/3dad1d8f987a4e00bfc677055df1f959.pdf
+  page: 13
+  crop: [0.19, 0.09, 0.77, 0.5]
+  seen: 'RP2040 datasheet Figure 3 pinout for QFN-56 (top view): pin 1 IOVDD at the top left corner (dot), 1-14 down the left, 15-28 along the bottom, 29-42 up the right, 43-56 along the top right to left; 57 GND is the centre pad'
+  numbering: ccw
+  ring: 56
+  pins: {1: IOVDD, 2: GPIO0, 3: GPIO1, 4: GPIO2, 5: GPIO3, 6: GPIO4, 7: GPIO5, 8: GPIO6, 9: GPIO7, 10: IOVDD, 11: GPIO8, 12: GPIO9, 13: GPIO10, 14: GPIO11, 15: GPIO12, 16: GPIO13, 17: GPIO14, 18: GPIO15, 19: TESTEN, 20: XIN, 21: XOUT, 22: IOVDD, 23: DVDD, 24: SWCLK, 25: SWDIO, 26: RUN, 27: GPIO16, 28: GPIO17, 29: GPIO18, 30: GPIO19, 31: GPIO20, 32: GPIO21, 33: IOVDD, 34: GPIO22, 35: GPIO23, 36: GPIO24, 37: GPIO25, 38: GPIO26/ADC0, 39: GPIO27/ADC1, 40: GPIO28/ADC2, 41: GPIO29/ADC3, 42: IOVDD, 43: ADC_AVDD, 44: VREG_VIN, 45: VREG_VOUT, 46: USB_DM, 47: USB_DP, 48: USB_VDD, 49: IOVDD, 50: DVDD, 51: QSPI_SD3, 52: QSPI_SCLK, 53: QSPI_SD0, 54: QSPI_SD2, 55: QSPI_SD1, 56: QSPI_SS_N, 57: GND}
+C1521989:
+  url: https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2304140030_Lattice-ICE40HX4K-TQ144_C1521989.pdf
+  page: 34
+  pinout_csv: hw/datasheets/iCE40HX4K-TQ144-pinout.csv
+  seen: 'names only: Lattice pinout CSV for iCE40HX4K TQ144 (hw/datasheets/iCE40HX4K-TQ144-pinout.csv). The LCSC datasheet DS1040 has no TQ144 pin table or package drawing, so pin-1 corner and numbering direction were NOT checked'
+C9002:
+  url: https://datasheet.lcsc.com/datasheet/pdf/a84bd8d530dd46e4b0f6d0ee59d8a89c.pdf
+  page: 1
+  crop: [0.1, 0.68, 0.95, 0.95]
+  seen: 'YXC YSX321SL Dimensions and Top View Crystal Connection: #1 bottom left, #2 bottom right, #3 top right, #4 top left; #1 and #3 are the crystal terminals, #2 and #4 GND'
+  numbering: ccw
+  pins: {1: '1', 2: GND, 3: '3', 4: GND}
+C25501: &array
+  url: https://datasheet.lcsc.com/lcsc/1811061524_UNI-ROYAL-Uniroyal-Elec-4D02WGJ0330TCE_C25501.pdf
+  page: 4
+  crop: [0.05, 0.33, 0.95, 0.76]
+  seen: 'UNI-ROYAL 4D02/4D03 array 3.1 Equivalent Circuit Diagram (4 resistors): terminals 1-4 along the bottom left to right, 8-5 along the top, R1 between 1 and 8, R2 2-7, R3 3-6, R4 4-5 (all equal, so the part is 180-degree symmetric)'
+  numbering: ccw
+  mirror_ok: 'the four resistors are equal and every pair (k, 9-k) stays on opposite pads, so a mirrored numbering wires the same circuit'
+  pins: {1: R1.1, 2: R2.1, 3: R3.1, 4: R4.1, 5: R4.2, 6: R3.2, 7: R2.2, 8: R1.2}
+C29718:
+  <<: *array
+  url: https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_UNI-ROYAL-Uniroyal-Elec-4D03WGJ0103T5E_C29718.pdf
+C425067:
+  <<: *array
+  url: https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2304140030_UNI-ROYAL-Uniroyal-Elec-4D03WGJ0271T5E_C425067.pdf
+C8545:
+  url: https://datasheet.lcsc.com/datasheet/pdf/a141b8bd86b14475955ac8c4d3eea0a8.pdf
+  page: 1
+  crop: [0.62, 0.18, 0.95, 0.38]
+  seen: 'JCET 2N7002 page 1, SOT-23 pinout drawing: 1 GATE and 2 SOURCE on the bottom, 3 DRAIN on the top (numbered counterclockwise seen from above)'
+  numbering: ccw
+  pins: {1: G, 2: S, 3: D}
+C20526:
+  url: https://datasheet.lcsc.com/lcsc/1811081213_Jiangsu-Changjing-Electronics-Technology-Co-Ltd-MMBT3904_C20526.pdf
+  page: 1
+  crop: [0.66, 0.13, 0.94, 0.36]
+  seen: 'JSCJ MMBT3904 page 1, SOT-23 pinout drawing: 1 BASE and 2 EMITTER on the bottom, 3 COLLECTOR on the top (numbered counterclockwise seen from above)'
+  numbering: ccw
+  pins: {1: B, 2: E, 3: C}
+C2286: &led
+  url: https://www.lcsc.com/datasheet/lcsc_datasheet_1810231112_Hubei-KENTO-Elec-KT-0603R_C2286.pdf
+  page: 2
+  crop: [0.06, 0.34, 0.95, 0.56]
+  result: could not determine
+  why: 'the drawing marks the cathode end (green mark; symbol shows 1 = anode "+", 2 = cathode) but says nothing about which end sits where in the JLC tape/feeder, so no non-human check can tie the KiCad or JLC cathode pad to the physical marked end. KiCad and JLC agree with each other (polarity check); what is left is JLC''s own preview/first article'
+C12624:
+  <<: *led
+  url: https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/1806151818_Hubei-KENTO-Elec-KT-0603G_C12624.pdf
+C193402:
+  url: https://wmsc.lcsc.com/wmsc/upload/file/pdf/v2/lcsc/2308231016_MDD-Microdiode-Semiconductor-SMF5-0A_C193402.pdf
+  page: 1
+  crop: [0.05, 0.12, 0.95, 0.45]
+  result: could not determine
+  why: 'the datasheet only says polarity is marked on the body (band = cathode, unipolar symbol); nothing ties the band end to JLC placement, so the cathode pad cannot be checked against the physical part by a non-human check'
+C7272:
+  result: could not determine
+  why: 'datasheet PDF not obtainable from this machine (manufacturer site timed out or blocked, LCSC copy is a placeholder)'
+C79401:
+  result: could not determine
+  why: 'datasheet PDF not obtainable from this machine (manufacturer site timed out or blocked, LCSC copy is a placeholder)'
+C82217:
+  result: could not determine
+  why: 'datasheet PDF not obtainable from this machine (manufacturer site timed out or blocked, LCSC copy is a placeholder)'
+C165948:
+  result: could not determine
+  why: 'USB-C 16-pin: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C404111:
+  result: could not determine
+  why: 'UMAX CPU socket: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C404113:
+  result: could not determine
+  why: 'UMAX slot socket: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C19188869:
+  result: could not determine
+  why: 'PCIe 64P socket: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C42431818:
+  result: could not determine
+  why: '2x05 header: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C2858275:
+  result: could not determine
+  why: 'HDMI-A: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C112455:
+  result: could not determine
+  why: 'USB-A: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C91145:
+  result: could not determine
+  why: 'microSD: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C492417:
+  result: could not determine
+  why: '1x9 header: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+C318884:
+  result: could not determine
+  why: 'tact switch: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'

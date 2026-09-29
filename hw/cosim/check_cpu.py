@@ -26,8 +26,8 @@ def check(circuit):
             raise ValueError(f'{signal}: expected one CPU edge finger, got {socket_nodes}')
         fpga = ('U1', str(pin))
         resistor = circuit.series(fpga, socket_nodes[0])
-        if resistor is None or resistor.value != '33':
-            raise ValueError(f'{signal}: FPGA pin {pin} to {socket_nodes[0]} lacks a 33-ohm series resistor')
+        if resistor is None or resistor.value != '68':
+            raise ValueError(f'{signal}: FPGA pin {pin} to {socket_nodes[0]} lacks a 68-ohm series resistor')
         if circuit.direct(fpga, socket_nodes[0]):
             raise ValueError(f'{signal}: series resistor was bypassed')
         checked += 1

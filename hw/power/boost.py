@@ -5,7 +5,7 @@ model in ngspice) and the port voltage the keyboard gets.
     python3 hw/power/boost.py       (~1 min; the three decks run in parallel)
 
 The circuit is design.IOB_* (the IO board agent builds it, power.md): slot
-+5V -> 10 uF -> TPS61023 (1 uH, 2 x 22 uF, 750k/100k) -> SY6280 (its RON,
++5V -> 10 uF -> TPS61023 (1 uH, 2 x 22 uF, 750k/100k) -> TPS2553DBVR-1 (its RON,
 hot) -> USB-A VBUS. The card's +5V is fed through the whole chain (source,
 cable, input path, 5V_SYS with the other loads, slot PTC, link, sense,
 contacts), as POW-003 does for the Wi-Fi card, so it sags as the boost draws.
@@ -19,7 +19,7 @@ Runs:
 
 The model regulates at VREF's typical 0.595 V. Its output is scaled to the
 low and high DC corners (VREF 0.580-0.610 V, the divider's 1 %) before the
-SY6280's drop is taken off, and compared with USB's port limits.
+port switch's drop is taken off, and compared with USB's port limits.
 
 Model fixes (models/fetch.py): a current source's "10A" and near-ideal
 diodes. G0 checks the ported model still regulates where the datasheet says.
@@ -40,14 +40,14 @@ I_KBD = d.I_KEYBOARD
 
 def deck(corner):
     """The IO card's +5V fed through the whole chain at a corner, into the
-    boost; the keyboard's 500 mA step through the SY6280 to the port."""
+    boost; the keyboard's 500 mA step through the port switch to the port."""
     worst = corner == "worst"
     vbus = d.VBUS_MAX if corner == "high" else None
     # "high": vSafe5V max with the radio idle, so the card's +5V is as high as it gets
     ch = budget.chain("worst" if worst else "typical", vbus=vbus,
                       **({"wifi_3v3": budget.WIFI_IDLE_3V3} if corner == "high" else {}))
     r_in = d.r_in(worst)
-    ron = d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP
+    ron = d.IOSW_RON_MAX if worst else d.IOSW_RON_TYP
     return """
 .param ss=0
 Vs src 0 PWL(0 0 {ton} {vbus})
@@ -108,7 +108,7 @@ def main():
         # regulating: scale the whole output to the DC corners; passing through
         # the output is the input, which needs no scaling
         k_lo, k_hi = (1.0, 1.0) if through else (lo / nom, hi / nom)
-        drop = I_KBD * (d.SY6280_RON_MAX if corner == "worst" else d.SY6280_RON_TYP)
+        drop = I_KBD * (d.IOSW_RON_MAX if corner == "worst" else d.IOSW_RON_TYP)
         vmin = min(window(t, vout, T_STEP, T_REL)) * k_lo - drop
         vmax = max(window(t, port, 0.2e-3, T_END)) * k_hi
         c.info(corner, "card +5V %.3f V in the step (%s); boost output %.3f V before it" % (

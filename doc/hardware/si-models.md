@@ -536,7 +536,7 @@ It also checks the SHA-pinned vendor model's 0.8/2.0 V thresholds, 3.14/3.30/
 The SCK source is U7 pin 43, bank 2 in the reviewed TQ144 pin table, so its
 applicable 3.3 V model is `lvc330io`; the bank 3 model is a sensitivity case.
 All six SCK paths have the unique 33 Ω R36 source. The 31 CPU FPGA outputs
-likewise have unique 33 Ω series paths; 12 source pins take `lvc330io` and
+likewise have unique series paths (68 Ω since 2026-09-29; 33 Ω before); 12 source pins take `lvc330io` and
 19 take `lvc330_b3io`. Their resistor-to-card-edge planar copper lengths on
 the archived CPU card are 16.627–36.650 mm. The main-board R18-to-J2
 `CPU_CLK` path measured above is a separate oscillator input path and is

@@ -55,6 +55,23 @@ def main():
         print(f'{len(waivers)} non-digital waivers name implemented checks; a logic pin on +3V3, '
               'an expander output on GND, or an unimplemented check removes the waiver')
 
+        # the Wi-Fi boot straps (WC-006) and the POWER switch / eFuse enable chain (MB-053)
+        for key in ('wifi:STRAP2', 'wifi:STRAP8', 'main:PWR_BTN', 'main:PWR_EN'):
+            assert key in waivers, key
+        assert 'WC-006' in waivers['wifi:STRAP2']['checks'] and 'MB-053' in waivers['main:PWR_EN']['checks']
+        for board, net, ref, pin, check_id in (('wifi', 'STRAP2', 'U1', '18', 'WC-006'),
+                                               ('wifi', 'STRAP8', 'U1', '13', 'WC-006'),
+                                               ('main', 'PWR_BTN', 'U7', '74', 'MB-053'),
+                                               ('main', 'PWR_EN', 'U7', '74', 'MB-053')):
+            logic = copy.deepcopy(circuits[board])
+            logic.pins.pop((ref, pin), None)
+            logic.nets['/' + net] = logic.nets['/' + net] + ((ref, pin),)
+            logic.pins[(ref, pin)] = '/' + net                          # a GPIO on the net
+            key = f'{board}:{net}'
+            assert key not in reviewed_analog_waivers({**circuits, board: logic}, implemented), key
+            assert key not in reviewed_analog_waivers(circuits, implemented - {check_id}), key
+        print('a GPIO on a strap or power-enable net, or an unimplemented WC-006 / MB-053, removes its waiver')
+
         # --- 2. crystals: source binding
         links, paths, missing, nets = crystal_routes(cards, boards, args.system_board)
         assert all(links.values()) and not missing and len(paths) == 25, (links, missing, len(paths))

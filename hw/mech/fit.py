@@ -467,8 +467,8 @@ def check_order(b, res):
     t = order.get("thickness_mm")
     res.add(cid, t is not None and within(t, *CEM["thick"]),
             "%s: board %s mm, CEM %.2f +/- %.2f" % (name, t, *CEM["thick"]))
-    res.add(cid, order.get("finger_finish") == "hard gold",
-            "%s: finger finish %s (hard gold required, milestone-1.md)" % (name, order.get("finger_finish")))
+    res.add(cid, order.get("finger_finish") == "ENIG",
+            "%s: finger finish %s (ENIG required: JLC offers gold fingers only on ENIG, milestone-1.md)" % (name, order.get("finger_finish")))
     bev = order.get("finger_chamfer_deg")
     ok = bev is not None and (within(bev, *CEM["bevel_deg"]) or bev == CEM["bevel_waiver_deg"])
     res.add(cid, ok, "%s: finger bevel %s deg ordered, CEM Fig. 6-3 %.1f +/- %.1f deg%s" % (

@@ -1421,3 +1421,10 @@ fixed_in = "hw/boards/main_fanout.py own-pad keep-out (2026-09-29)"
 revert = [["hw/boards/main_fanout.py", "            if len(own_pads) and (_rect_dist(x, y, own_pads)[:, 0] < VIA / 2 + own_gap).any():", "            if False and len(own_pads) and (_rect_dist(x, y, own_pads)[:, 0] < VIA / 2 + own_gap).any():"]]
 cmd = "python3 test/hw/test_main_fanout.py FanOut"
 must_fail = ["test_via_keeps_its_class_clearance_and_stays_out_of_every_pad"]
+
+[[bug]]
+name = "MB-051 hand-route: the router judged an unplated hole only 0.4 mm round its centre (a track ran through the hole)"
+fixed_in = "hw/boards/main_handroute.py NPTH hole bounding box (2026-09-29)"
+revert = [["hw/boards/main_handroute.py", "            box = (p.cx - p.hole / 2, p.cy - p.hole / 2, p.cx + p.hole / 2, p.cy + p.hole / 2)\n", "            box = (p.cx, p.cy, p.cx, p.cy)\n"]]
+cmd = "python3 test/hw/test_main_handroute.py Route.test_keeps_out_of_an_unplated_hole"
+must_fail = ["hole_clearance"]

@@ -22,7 +22,7 @@ is off the host sees no system card, and `cupc8.py` cannot reach it.
 - **Connector:** one PCIe x4 card edge (64 contacts), LCSC C19188869, an SMD
   vertical socket with posts. It is physically unlike the six x1 I/O slots,
   so neither kind of card fits the other's slot.
-- **Board:** 1.6 mm, hard-gold fingers, 30° chamfer (see [milestone-1.md](../milestone-1.md)).
+- **Board:** 1.6 mm, ENIG gold fingers, 30° chamfer (see [milestone-1.md](../milestone-1.md)).
 - **Insertion:** with the power off. The card is not hot-pluggable.
 - **No card fitted:** every signal has a main-board pull that leaves the
   machine running. CRESET_n and the flash chip selects are pulled up, CDONE

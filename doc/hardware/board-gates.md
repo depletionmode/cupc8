@@ -166,7 +166,7 @@ fail until their contract coverage exists:
 - Power: the main board models need binding to the actual board netlist;
   the CPU output rail has partial routed binding described below;
   GPU needs the RP2040 internal regulator at its overclocked operating point;
-  IO needs SY6280 current-limit, short and fault-flag transients; storage,
+  IO needs TPS2553 current-limit, short and fault-flag transients; storage,
   e-ink and system need load-step/internal-regulator coverage. Existing
   buck, LDO, HDMI, USB boost and budget models still execute before these
   missing portions fail.

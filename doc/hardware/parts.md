@@ -34,7 +34,7 @@ extras. Stock checked 2026-09-23 (the power parts: 2026-09-24).
 | 3V3 buck | TLV62569PDDCR (2 A, SOT-23-6, 106 °C/W) | C398365 | 16,188 | 3 | main: the DBV (188 °C/W) reaches 100 °C at 1.21 A of 3V3 (THM-001) |
 | 1V2 LDO | RT9013-12GB (500 mA) | C58464 | 16,404 | 5 | main, CPU |
 | Input eFuse | TPS259470ARPWR (2.7–23 V, 28 mΩ, adjustable limit, OVLO, dVdt) | C3662799 | 2,749 | 3 | main input: RILM 1.13 kΩ (2.63–3.21 A), OVLO 37.4k/10.0k 0.1 %, dVdt 680 pF. Fallback: the latch-off TPS259470LRPWR, C3662793 (2,832) |
-| USB power switch | SY6280AAC | C55136 | 142,696 | 2 | IO card VBUS (the main input moved to the eFuse: the SY6280 can't pass the 3 A case) |
+| USB power switch | TPS2553DBVR-1 (latch-off, RILIM 45.3k C26980, 1 µF C52923) | C111738 | 14,185 | 2 | IO card VBUS (IC-005; the main input is the eFuse) |
 | USB-C receptacle | TYPE-C-31-M-12 (16P) | C165948 | 98,793 | 5 | main (power), system card (USB) |
 | USB ESD | USBLC6-2SC6 | C7519 | 38,417 | 5 | main, system card, IO card |
 | 5V TVS | SMF5.0A | C193402 | 582,382 | 3 | main |

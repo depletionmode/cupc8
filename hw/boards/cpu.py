@@ -18,7 +18,7 @@ Power, per Lattice's iCE40 hardware checklist (FPGA-TN-02006):
 Configuration: SPI_SS_B and SPI_SCK pulled up (controller mode), CRESET_B
 and CDONE pulled up here as well as on the main board. /WP and /HOLD of the
 flash are pulled high: the FPGA reads it with plain 0x0B fast reads.
-Bus: every card output has 33 ohm at the driver (cpu-bus.md, Electrical),
+Bus: every card output has 68 ohm at the driver (cpu-bus.md, Electrical),
 four to a resistor array. CARD_ID = 10: CARD_ID0 strapped to GND, CARD_ID1
 left to the main board's pull-up. PRSNT1_n is joined to PRSNT2_n.
 """
@@ -46,7 +46,7 @@ ARRAY = "jlc:RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL"
 LCSC = {
     "100n": "C1525", "1u": "C52923", "4.7u": "C23733",          # 0402 caps (basic)
     "10k": "C25744", "100": "C25076", "1k": "C11702",           # 0402 resistors (basic)
-    "33x4": "C25501",                                           # 4D02WGJ0330TCE, 33 ohm x4, 0402x4
+    "68x4": "C52984",                                           # 4D02WGJ0680TCE, 68 ohm x4, 0402x4 (same footprint as C25501)
 }
 
 
@@ -65,7 +65,7 @@ def fpga_pins():
 
 
 PINS = fpga_pins()
-# card outputs get 33 ohm at the driver: FPGA pin on FPGA_x, finger on x
+# card outputs get 68 ohm at the driver: FPGA pin on FPGA_x, finger on x
 DRIVEN = [n for n, d in sorted(PINS.values(), key=lambda v: v[0]) if d in ("out", "inout")]
 SERIES = [
     ["CPU_A0", "CPU_A1", "CPU_A2", "CPU_A3"],
@@ -181,10 +181,10 @@ def schematic(path, footprint_libs):
         s.connect(u3, pin, net)
     s.nc(u3, "NC")
 
-    # 33 ohm series arrays
+    # 68 ohm series arrays
     for i, nets in enumerate(SERIES):
-        rn = s.add("Device:R_Pack04", "RN%d" % (i + 1), "33", ARRAY,
-                   at=((16 + 16 * i) * G, 108 * G), fields={"LCSC": LCSC["33x4"]})
+        rn = s.add("Device:R_Pack04", "RN%d" % (i + 1), "68", ARRAY,
+                   at=((16 + 16 * i) * G, 108 * G), fields={"LCSC": LCSC["68x4"]})
         for k, net in enumerate(nets):
             if net:
                 s.connect(rn, "R%d.1" % (k + 1), "FPGA_" + net[4:])        # FPGA side: pads 1-4
@@ -337,7 +337,7 @@ def placement():
         # PLL0 filter (pins 53/54, right side) and PLL1 (126/127, left side)
         "C18": beside(53.5, dist=3.25)[:2] + (270,), "C17": (51.4, -20.9 + DY, 0), "R6": (48.2, -20.9 + DY, 0),
         "C20": beside(126.5, dist=3.25)[:2] + (90,), "C19": (3.2, -30.2 + DY, 0), "R7": (3.2, -26.6 + DY, 0),
-        # 33 ohm arrays at their pins, FPGA side (pads 1-4) towards the
+        # 68 ohm arrays at their pins, FPGA side (pads 1-4) towards the
         # package and in the pins' order, finger side (pads 8-5) away from
         # it: A and control in a row under the bottom side, D and the timer
         # lines in a column right of the right side

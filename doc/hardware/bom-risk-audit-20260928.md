@@ -4,7 +4,7 @@ Scope: every distinct LCSC part on the eight boards' fab BOMs
 (`build/hw/<board>/fab/bom.csv`: main, cpu, gpu, io, storage, wifi, eink,
 system), plus the pending parts that are not in `build/hw` yet:
 
-- GPU RN1/RN2 C425067 -> **C182716** (360 ohm arrays, `doc/hardware/pending-hw-parts-C182716.yaml`);
+- GPU RN1/RN2 C425067 -> **C182716** (360 ohm arrays, `hw/parts/C182716.yaml`);
 - Wi-Fi R9 C25818 -> **C861412**, R10 C25803 -> **C122538** (already in `hw/boards/wifi.py` and `hw/power/wifi_parts.py`; the built BOM is older);
 - main-board MB-051 reset qualifier from `hw/power/reset_supervisor.py`
   (proposed, unreviewed): U17 REF3425 C187836, U18/U20 OPA376 C42134, U19

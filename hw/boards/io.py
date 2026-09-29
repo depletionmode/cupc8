@@ -51,18 +51,21 @@ def schematic(path, footprint_libs):
     rc.two(s, c23, "VBOOST", "GND")
     rc.two(s, c24, "VBOOST", "GND")
 
-    # ---- VBUS: SY6280AAC switch from the boost's output. Ilim = 6800 / Rset:
-    # 12k -> 0.57 A nominal (0.42-0.71 A over the +-25% spread), so a
-    # keyboard gets its 500 mA and the card stays under the slot's 750 mA PTC
-    u5 = s.add("jlc:SY6280AAC", "U5", "SY6280AAC", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL",
-               at=(200 * G, 20 * G), fields={"LCSC": "C55136"})
+    # ---- VBUS: TPS2553DBVR-1 from the boost's output (IC-005,
+    # doc/hardware/io-port-switch-proposal.md). IOS(min) = 25230/R^1.016,
+    # IOS(max) = 22980/R^0.94 mA (R in kOhm): 45.3k 1 % -> 514..647 mA
+    # guaranteed. Latches off 5..10 ms into an overcurrent with FAULT low;
+    # toggling EN restarts it (the card's firmware retries).
+    u5 = s.add("jlc:TPS2553DBVR-1", "U5", "TPS2553DBVR-1", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
+               at=(200 * G, 20 * G), fields={"LCSC": "C111738"})
     s.connect(u5, "IN", "VBOOST")
     s.connect(u5, "OUT", "VBUS")
     s.connect(u5, "GND", "GND")
-    s.connect(u5, "ISET", "ISET")
+    s.connect(u5, "ILIM", "ILIM")
     s.connect(u5, "EN", "VBUS_EN")
-    r10 = rc.passive(s, "R", "R10", "12k", (186 * G, 30 * G))
-    rc.two(s, r10, "ISET", "GND")
+    s.connect(u5, "FAULT", "VBUS_nFAULT")
+    r10 = rc.passive(s, "R", "R10", "45k3", (186 * G, 30 * G), lcsc="C26980")
+    rc.two(s, r10, "ILIM", "GND")
     r11 = rc.passive(s, "R", "R11", "100k", (186 * G, 46 * G))       # EN must not float (RP2040 in reset)
     rc.two(s, r11, "VBUS_EN", "GND")
     c20 = rc.passive(s, "C", "C20", "10u", (214 * G, 12 * G))        # the boost's input (TPS61023: 10 uF at VIN)
@@ -71,13 +74,11 @@ def schematic(path, footprint_libs):
     rc.two(s, c21, "VBUS", "GND")
     c22 = rc.passive(s, "C", "C22", "100n", (228 * G, 30 * G))
     rc.two(s, c22, "VBUS", "GND")
-    # the SY6280AAC has no fault flag: VBUS_nFAULT reads VBUS through a
-    # divider (5 V -> 2.97 V), so it goes low when the switch limits and VBUS
-    # sags below ~3.4 V, or is shorted
-    r12 = rc.passive(s, "R", "R12", "15k", (200 * G, 46 * G))
-    r13 = rc.passive(s, "R", "R13", "22k", (200 * G, 64 * G))
-    rc.two(s, r12, "VBUS", "VBUS_nFAULT")
-    rc.two(s, r13, "VBUS_nFAULT", "GND")
+    c25 = rc.passive(s, "C", "C25", "1u", (206 * G, 12 * G))         # at U5 IN: 100 nF rings IN to 8.5 V in a short (T5)
+    rc.two(s, c25, "VBOOST", "GND")
+    # FAULT is open drain, active low: pulled up to the card's 3V3 for GPIO8
+    r12 = rc.passive(s, "R", "R12", "10k", (200 * G, 46 * G))
+    rc.two(s, r12, "3V3", "VBUS_nFAULT")
 
     # ---- USB-A receptacle, ESD, 27 ohm series (design guide). The RP2040's
     # USB PHY switches its own 15k host pull-downs on in host mode.
@@ -127,7 +128,8 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "U6": (41.4, -25.3, 0),
     "R14": (36.8, -19.6, 0),            # USB_DM, DP: by the ESD, over the cap column from pins 46/47
     "R15": (36.8, -22.6, 0),
-    "U5": (50, -22, 0),
+    "U5": (50, -22, 180),                # TPS2553 (SOT-23-6): IN top right, as the old SY6280 kept IN on top
+    "C25": (52.6, -25.6, 90),            # 1 uF at U5 IN (pad 1), <= ~10 mm from C23/C24
     # the boost (TPS61023 layout guide: caps at VIN and VOUT, short SW loop)
     "U7": (43, -11.5, 180),
     "L1": (47.5, -10.8, 0),
@@ -141,7 +143,6 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "R10": (46.3, -22.6, 90),
     "R11": (42.6, -18.3, 90),
     "R12": (33.5, -10.5, 90),
-    "R13": (36, -10.5, 90),
     # bring-up pads down the left edge, the SWD ones nearest the fingers they share
     "TP1": (-4, -36), "TP2": (-4, -18.5), "TP3": (-4, -22), "TP4": (-4, -25.5), "TP5": (-4, -29), "TP6": (-4, -32.5),
 })
@@ -157,10 +158,10 @@ def prepare(board):
     reach: VIN and EN to the input cap, SW to the inductor, VOUT to the
     output caps, FB to its divider (TPS61023 layout guide: short loops)."""
     import pcbnew
-    # U4/U5 body marks and U5's pin-one dot touch the mask-clearance limit.
+    # U4 body marks touch the mask-clearance limit.
     # Adjust these instances after the common footprint pad clipper runs.
     edits = 0
-    for ref in ("U4", "U5", "L1"):
+    for ref in ("U4", "L1"):
         fp = next(f for f in board.GetFootprints() if f.GetReference() == ref)
         for i in range(fp.GraphicalItems().size()):
             g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
@@ -171,13 +172,6 @@ def prepare(board):
             if ref == "U4" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ay + 18.88) < .001 and abs(by + 18.88) < .001:
                 g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(16.3), a.y))
                 g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(16.7), b.y))
-                edits += 1
-            elif ref == "U5" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ay + 22.85) < .001 and abs(by + 22.85) < .001:
-                g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(50.43), a.y))
-                g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(49.57), b.y))
-                edits += 1
-            elif ref == "U5" and g.GetShape() == pcbnew.SHAPE_T_CIRCLE and abs(ax - 48.35) < .001 and abs(ay + 20.86) < .001:
-                g.Move(pcbnew.VECTOR2I(pcbnew.FromMM(-.04), 0))
                 edits += 1
             elif ref == "L1" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ax - bx) < .001 and any(abs(ax - x) < .001 for x in (45.22, 49.78)):
                 if abs(ay + 12.094999) < .001:
@@ -191,8 +185,8 @@ def prepare(board):
                 else:
                     continue
                 edits += 1
-    if edits != 7:
-        raise ValueError("U4/U5/L1 silk geometry changed")
+    if edits != 5:
+        raise ValueError("U4/L1 silk geometry changed")
     rc.io_preroute(board)
     at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
     vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)

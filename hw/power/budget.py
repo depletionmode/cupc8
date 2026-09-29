@@ -63,7 +63,7 @@ def chain(corner, keyboard=d.I_KEYBOARD, wifi_3v3=d.WIFI_I_3V3, extra_3v3=0.0, e
         v_card = v5 - wifi * r_slot
         v_io = v5 - io * r_slot
         v_gpu = v5 - hdmi * r_slot
-    ron = d.SY6280_RON_MAX if worst else d.SY6280_RON_TYP        # the port switch after the boost
+    ron = d.IOSW_RON_MAX if worst else d.IOSW_RON_TYP        # the port switch after the boost
     return {"vbus": vbus, "itot": itot, "v5": v5, "r_slot": r_slot, "iwifi": wifi, "iio": io,
             "igpu": hdmi, "gpu_in": v_gpu, "wifi_in": v_card, "io_in": v_io,
             "kbd_port": d.iob_vout(v_io, keyboard, "lo" if worst else "nom") - keyboard * ron}
@@ -142,7 +142,7 @@ def main():
             d.ESP32_SUPPLY_MIN, ">=", "A")
     lo_b, nom_b, hi_b = d.iob_vout_range()
     c.info("keyboard boost", "TPS61023 set %.3f / %.3f / %.3f V (VREF +-2.5 %%, 1 %% divider); the "
-           "port = that less the SY6280's drop at 500 mA (the droop in a step is POW-007)" % (lo_b, nom_b, hi_b))
+           "port = that less the port switch's drop at 500 mA (the droop in a step is POW-007)" % (lo_b, nom_b, hi_b))
     c.check("B16", "keyboard VBUS at the IO card port, worst: boost at its low set point (USB 2.0 "
             "low-power port >= 4.40 V)", w["kbd_port"], d.USB_PORT_MIN, ">=")
     c.check("B17", "keyboard VBUS at the IO card port, typical", t["kbd_port"], d.USB_PORT_MIN, ">=")

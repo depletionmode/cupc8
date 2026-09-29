@@ -408,10 +408,11 @@ Bindings added, each with a copper or netlist counterexample in its test:
 - **System card Type-C Rd** (`system_usb_routes`): the host attaches in an
   orientation only while that CC line's 5.1 k Rd is wired (2 nets,
   `test_cosim_system_usb.py`).
-- **IO card VBUS switch** (`io_vbus_routes`): enable, output and the 15 k /
-  22 k fault sense; the keyboard is powered only with VBUS on and the real
-  firmware's VBUS_FAULT status bit follows GPIO8 (2 nets,
-  `test_cosim_io_vbus.py`).
+- **IO card VBUS switch** (`io_vbus_routes`): enable, output and the FAULT
+  flag with its 10 k pull-up (TPS2553DBVR-1); the keyboard is powered only
+  with VBUS on, and GPIO8 reads high (FAULT is low only on a real overcurrent,
+  which the emulator does not inject) so the real firmware reports no
+  VBUS_FAULT (2 nets, `test_cosim_io_vbus.py`).
 - **The card programming port** (`prog_port_routes`, `ProgPort` in
   `emu/machine`): sysctl's PROG_CLK / PROG_IO, the two 4051 muxes, MUX_SEL0-2,
   each slot's 33 ohm SWCLK / SWDIO legs and every RP2040 card's debug pins, 45

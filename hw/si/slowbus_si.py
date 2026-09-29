@@ -1005,7 +1005,7 @@ def mb_memory_cases(bench):
 
 
 def mb_socket_cases(bench):
-    """Chipset-driven CPU socket signals: U7 -> 33 ohm -> J2 -> CPU card."""
+    """Chipset-driven CPU socket signals: U7 -> 56 ohm -> J2 -> CPU card."""
     cases = []
     data, t_data = clock_edges(BUS_HZ / 2)
     circuit = bench.circuit('main')
@@ -1028,7 +1028,7 @@ def clock_cases(bench):
 
 
 def cc_bus_cases(bench):
-    """The 31 CPU-FPGA outputs: U1 -> RN 33 ohm -> J1 finger -> socket -> U7."""
+    """The 31 CPU-FPGA outputs: U1 -> RN 68 ohm -> J1 finger -> socket -> U7."""
     cases = []
     data, t_data = clock_edges(BUS_HZ / 2)
     circuit = bench.circuit('cpu')
@@ -1300,7 +1300,7 @@ def timing_checks(row, results):
 
 def bus_allowance_checks(results):
     """SI arrival vs the flight allowance BUS-005/005B assumed (out_pad 4 ns +
-    trace at 7 ps/mm + connector 0.1 ns + 33 ohm RC 1.09 ns for the CPU bus)."""
+    trace at 7 ps/mm + connector 0.1 ns + 68 ohm RC 2.24 ns for the CPU bus)."""
     sys.path.insert(0, str(ROOT / 'hw/timing'))
     from cpubus_budget import ALLOW, CONNECTOR_NS, PS_PER_MM, RC_NS
     lengths = json.loads((ROOT / 'build/hw/cpubus_lengths.json').read_text())

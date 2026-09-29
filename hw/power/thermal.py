@@ -21,7 +21,7 @@ at the corner that heats it most:
                   efficiency (design.GPUB_ETA), at 55 mA and its highest output
   input eFuse     I^2 x RON max at the most current it passes without
                   limiting (its minimum limit)
-  SY6280          the IO card's keyboard port at 500 mA, RDS(on) hot
+  TPS2553-1       the IO card's keyboard port at 500 mA, RDS(on) hot
 """
 
 import sys
@@ -240,9 +240,9 @@ def main():
     c.check("T8", "%s input eFuse at its minimum limit %.2f A (the most it passes without limiting): "
             "%.0f mW x %.1f C/W" % (d.INSW_PART, lo, 1e3 * p, d.INSW_THETA_JA), tj(p, d.INSW_THETA_JA), lim,
             "<=", "C", fmt="%.1f")
-    p = d.I_KEYBOARD ** 2 * d.SY6280_RON_MAX
-    c.check("T9", "SY6280 IO card keyboard port, 500 mA: %.0f mW x %.0f C/W" % (1e3 * p, d.SY6280_THETA_JA),
-            tj(p, d.SY6280_THETA_JA), lim, "<=", "C", fmt="%.1f")
+    p = d.I_KEYBOARD ** 2 * d.IOSW_RON_MAX
+    c.check("T9", "TPS2553-1 IO card keyboard port, 500 mA: %.0f mW x %.0f C/W" % (1e3 * p, d.IOSW_THETA_JA),
+            tj(p, d.IOSW_THETA_JA), lim, "<=", "C", fmt="%.1f")
     return c.done()
 
 

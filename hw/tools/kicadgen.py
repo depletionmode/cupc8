@@ -11,6 +11,7 @@ from the schematic, so the board can only contain what the schematic says.
 """
 
 import copy
+import fnmatch
 import math
 import os
 import re
@@ -829,7 +830,7 @@ def normalize_silk_strokes(board, minimum_mm=0.15):
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
                 zone_outline=None, labels=None, plane=False, silk_text=None, logo_keepout=False,
-                label_side=None):
+                label_side=None, power_nets=()):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -845,6 +846,8 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
     labels:    {ref: word}: the word (what an LED shows) printed where the part's
                designator would go, in its place
     logo_keepout: no tracks or vias on the copper under the logo (silk_keepout)
+    power_nets: net-name patterns of the power class (write_project): with the
+               pour nets, they keep solid pad connections (relieve_chip_pads)
     """
     import pcbnew
     mm = pcbnew.FromMM
@@ -959,7 +962,42 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
                                            (x0 + .5, y1 - .5)):
                 ol.Append(mm(px), mm(py))
             board.Add(z)
+    relieve_chip_pads(board, [z if isinstance(z, str) else z[0] for z in zones], power_nets)
     return board
+
+
+def relieve_chip_pads(board, pour_nets, power_nets, spoke_mm=0.25, gap_mm=0.3):
+    """Thermal-relief the pour connection of a small two-pad SMD part's pad
+    that sits in a pour while its other pad is on a signal track: the
+    tombstoning case in jlc-assembly-dfm-audit-20260928.md (I1), where the
+    solid pad heats slowly and the free pad's paste pulls the part up.
+    Everything else stays ZONE_CONNECTION_FULL, as the audit asks: exposed
+    and multi-pad parts (ICs, modules, connectors), and any part whose other
+    pad is on a pour net or a power-class net (decoupling and power paths
+    keep their low inductance). Spokes are `spoke_mm` wide. Returns the pads
+    relieved."""
+    import pcbnew
+    for z in board.Zones():
+        z.SetThermalReliefSpokeWidth(pcbnew.FromMM(spoke_mm))
+        z.SetThermalReliefGap(pcbnew.FromMM(gap_mm))
+    pour = set(pour_nets)
+
+    def rail(name):
+        return name in pour or any(fnmatch.fnmatchcase(name, pat) for pat in power_nets)
+
+    relieved = 0
+    for fp in board.GetFootprints():
+        pads = list(fp.Pads())
+        if len(pads) != 2 or not fp.GetAttributes() & pcbnew.FP_SMD:
+            continue
+        if any(max(pcbnew.ToMM(p.GetSize().x), pcbnew.ToMM(p.GetSize().y)) > 2.0 for p in pads):
+            continue
+        names = [p.GetNetname() for p in pads]
+        for pad, other in ((pads[0], names[1]), (pads[1], names[0])):
+            if pad.GetNetname() in pour and other and not rail(other):
+                pad.SetLocalZoneConnection(pcbnew.ZONE_CONNECTION_THERMAL)
+                relieved += 1
+    return relieved
 
 
 def card_zone(body, tab, reach):
@@ -2730,15 +2768,36 @@ def check_stock(counts, boards, margin=2):
     return "%d parts, %dx stock for %d boards" % (len(counts), margin, boards)
 
 
+# The do-not-trim note for every card's JLC order (David, 2026-09-28;
+# doc/hardware/jlc-order-checklist.md section 3).
+FINGER_ORDER_NOTE = ("Gold fingers follow PCIe CEM r3.0 geometry. Do not trim, narrow, shorten or shift any "
+                     "gold finger, and do not change the key notch. If your process requires any change, "
+                     "contact us before production.")
+
+
 def order_spec(layers, card_edge):
     """The JLC order options, written next to the Gerbers as order.json.
-    Cards (card_edge) are 1.6 mm with hard-gold fingers and a 30 degree
-    chamfer (milestone-1.md, Board thickness); check_order enforces it."""
+    Cards (card_edge) are 1.6 mm with ENIG gold fingers (JLC offers gold
+    fingers only on ENIG: David, 2026-09-28) and a 30 degree chamfer
+    (milestone-1.md, Board thickness); check_order enforces it. Every board
+    asks JLC for its post-CAM files before production (Confirm Production
+    File). Cards go to JLC one per panel (JLC's PCBA minimum counts panels);
+    the panel's geometry is not generated here yet (doc/m1-live-status.md)."""
     spec = {"layers": layers, "thickness_mm": 1.6, "surface_finish": "ENIG", "min_hole_mm": 0.3,
             "finished_outer_copper_oz": 1,
             "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
-            "gold_fingers": card_edge, "finger_finish": "hard gold" if card_edge else None,
+            "pcba_type": "Standard",       # gold fingers and THT parts rule out Economic
+            "confirm_production_file": True,
+            "solder_mask_colour": "green",  # black/white need a 0.13 mm web; main U2 is exactly there
+            "stencil_remark": "stencil apertures as supplied in the paste layers (RP2040 exposed-pad windowpane)",
+            "gold_fingers": card_edge, "finger_finish": "ENIG" if card_edge else None,
             "finger_chamfer_deg": 30 if card_edge else None}
+    if card_edge:
+        spec["cards_per_panel"] = 1
+        spec["outline_tolerance_mm"] = 0.1     # JLC high precision: MECH-101's 0.10 mm notch gap assumes it
+        spec["order_note"] = FINGER_ORDER_NOTE
+    else:
+        spec["edge_rails"] = "left and right (188 mm) edges only: J1 overhangs the bottom edge"
     if layers > 2:
         spec["finished_inner_copper_oz"] = 0.5
     # JLC's standard 1.6 mm stack-ups (jlcpcb.com/impedance); gold fingers
@@ -2746,6 +2805,7 @@ def order_spec(layers, card_edge):
     stackup = {4: "JLC04161H-7628", 6: "JLC06161H-3313"}.get(layers)
     if stackup:
         spec["stackup"] = stackup
+        spec["impedance_control"] = True       # the SI models use this stackup's dielectric
     return spec
 
 
@@ -2757,9 +2817,16 @@ def check_order(spec, card_edge):
         bad.append("finished outer copper must be 1 oz")
     if spec["layers"] > 2 and spec.get("finished_inner_copper_oz") != 0.5:
         bad.append("finished inner copper must be 0.5 oz")
-    if card_edge and (not spec["gold_fingers"] or spec["finger_finish"] != "hard gold"
-                      or spec["finger_chamfer_deg"] != 30):
-        bad.append("card edge needs hard-gold fingers with a 30 degree chamfer")
+    if card_edge and (not spec["gold_fingers"] or spec["finger_finish"] != "ENIG"
+                      or spec["surface_finish"] != "ENIG" or spec["finger_chamfer_deg"] != 30):
+        bad.append("card edge needs ENIG gold fingers with a 30 degree chamfer")
+    if card_edge and (spec.get("cards_per_panel") != 1 or spec.get("outline_tolerance_mm") != 0.1
+                      or spec.get("order_note") != FINGER_ORDER_NOTE):
+        bad.append("card edge needs one card per panel, 0.1 mm outline tolerance and the do-not-trim note")
+    if not spec.get("confirm_production_file") or spec.get("pcba_type") != "Standard":
+        bad.append("every board needs Confirm Production File and Standard PCBA")
+    if spec.get("stackup") and not spec.get("impedance_control"):
+        bad.append("a board with a named stackup needs impedance control")
     if bad:
         raise SystemExit("fab order: " + "; ".join(bad))
 
@@ -2770,7 +2837,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0, route_fanout=True,
              fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=(),
-             post_route=None, replay=None):
+             post_route=None, replay=None, seeded_route=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2787,6 +2854,12 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     would otherwise scatter). The nets it returns, if any, are finger escapes
     of its own, which Freerouting may report open: they are checked on KiCad's
     connectivity after routing, as the key-notch escapes are.
+
+    `seeded_route(board, workdir)`, if given, puts the board's own recorded
+    route on the pre-route board (a hand-route seed) and returns how many
+    connections are still unrouted. At 0 Freerouting is not run at all; above
+    0 it runs as usual, the recorded copper being fixed wiring, so it lays
+    only what is left.
 
     `post_route(board)`, if given, makes deterministic board-specific copper
     corrections after SES import and before connectivity/DRC checks and pours.
@@ -2857,7 +2930,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
                         label_side=label_side,
-                        plane=plane, silk_text=silk_text, logo_keepout=logo_keepout)
+                        plane=plane, silk_text=silk_text, logo_keepout=logo_keepout, power_nets=power_nets)
         state["silk_widened"] = normalize_silk_strokes(b)
         mark_revision(b, title, revision, revision_at)
         if card_edge:
@@ -2904,10 +2977,13 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             if round_:
                 state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
             try:
-                autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
-                          salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
-                          parallel=route_parallel, timeout=route_timeout, heap=route_heap,
-                          replay=replay, preroute_board=pcb, fanout=route_fanout)
+                if seeded_route and replay is None and not round_ and seeded_route(state["b"], out) == 0:
+                    pass                     # the seeds route every connection: no router run
+                else:
+                    autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
+                              salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
+                              parallel=route_parallel, timeout=route_timeout, heap=route_heap,
+                              replay=replay, preroute_board=pcb, fanout=route_fanout)
             except RuntimeError as e:        # nets left unrouted: the next round's orderings
                 if replay is not None:
                     raise
