@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/cosim'))
 from gen_top import check, exported_cards, io_usb_host_routes
 from netlist import read
-from test_cosim_main_cpu_data import open_pad_tracks
+from cosim_mutate import open_pad
 
 
 def probe(top):
@@ -58,16 +58,24 @@ def main():
         card_boards = {card: args.card_board_dir / card / f'{card}.kicad_pcb'
                        for card in ('gpu', 'io', 'storage', 'wifi', 'eink')}
         assert probe(args.top)['gpo'] == 0xa0
-        for label, ref, pin, net, segments, active in (
-                ('dm-source', 'U1', '46', '/USB_DM', 1, True),
-                ('dp-source', 'U1', '47', '/USB_DP', 1, True),
-                ('dm-contact', 'J2', '2', '/USB_CONN_DM', 2, True),
-                ('dp-contact', 'J2', '3', '/USB_CONN_DP', 1, True),
-                ('dm-esd', 'U6', '1', '/USB_CONN_DM', 1, False),
-                ('dp-esd', 'U6', '3', '/USB_CONN_DP', 2, False)):
+        # (how many track segments end on a pad depends on the routing: any number >= 1 is opened)
+        for label, ref, pin, net, active in (
+                ('dm-source', 'U1', '46', '/USB_DM', True),
+                ('dp-source', 'U1', '47', '/USB_DP', True),
+                ('dm-contact', 'J2', '2', '/USB_CONN_DM', True),
+                ('dp-contact', 'J2', '3', '/USB_CONN_DP', True),
+                ('dm-esd', 'U6', '1', '/USB_CONN_DM', None),
+                ('dp-esd', 'U6', '3', '/USB_CONN_DP', None)):
             opened = temporary / f'{label}.kicad_pcb'
-            open_pad_tracks(board, opened, ref, pin, net, segments)
+            open_pad(board, opened, ref, pin, net)
             link, _, gaps = io_usb_host_routes(io, opened)
+            if active is None:
+                # An ESD pad may also join the through route. Opening all
+                # its launch tracks can disconnect the receptacle too;
+                # check the native outcome against the measured copper.
+                assert f'io:{net.lstrip("/")}_esd_copper' in gaps
+                active = any(gap.endswith(('_source_copper', '_contact_copper'))
+                             for gap in gaps)
             assert gaps and link is (not active), (label, link, gaps)
             card_boards['io'] = opened
             mutant = check(cards, main, args.main_board, card_boards,

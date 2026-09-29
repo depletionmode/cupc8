@@ -68,7 +68,10 @@ def main():
              lambda r: r['faults'] == 0 and not r['keyboard'], 'VBUS off: no keyboard, no fault'),
             ('FAULT leg open (U5.4)', [('U5', '4', '/VBUS_nFAULT')], {'io:VBUS_nFAULT'},
              lambda r: r['faults'] == 0 and r['keyboard'], 'fault masked, VBUS fine'),
-            ('pull-up open (R12.1)', [('R12', '1', '/3V3')], {'io:VBUS_nFAULT'},
+            # R12's pad on the FAULT net (pad 2; pad 1 is on 3V3, whose leg is not measured: the rail
+            # is not traced, and an open there changes nothing the emulator can see). That pad is a
+            # junction of the U5.4 to GPIO8 route, so the FAULT leg opens with it
+            ('pull-up open (R12.2)', [('R12', '2', '/VBUS_nFAULT')], {'io:VBUS_nFAULT'},
              lambda r: r['faults'] == 0 and r['keyboard'], 'fault masked, VBUS fine'),
         )
         for label, opens, gaps, expected, shown in cases:
