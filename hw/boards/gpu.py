@@ -157,7 +157,7 @@ HX = CX + 1.5                  # the receptacle's centre: pin n at HX - 4.5 + 0.
 # and D1 pairs: DVDD's and IOVDD's caps stay in that pocket at their pins,
 # the rest leave it through vias, and the crystal sits off to the left.
 PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
-    "C4": (CX + 5.5, CY - 3.2, 0),       # IOVDD 10: GND pad to the right, so its fan-out via stays out of the CK pair's corridor
+    "C4": (CX + 5.9, CY - 3.2, 0),       # IOVDD 10: GND pad to the right, so its fan-out via stays out of the CK pair's corridor
     "C12": (CX + 5.2, CY - 1.2, 0),      # DVDD 23 (its pin escapes by a via: pocket_escapes)
     "C10": (CX - 1.5, CY + 6.2, 0),      # USB_VDD 48
     "C8": (CX - 1.5, CY + 8.2, 0),       # IOVDD 49
@@ -177,8 +177,8 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "J2": (HX, -44 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin
     "U5": (HX - 3.25, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
     "U6": (HX - 0.25, -31.0, 90),
-    "RN1": (HX - 3.3, -27.0, 90),       # 1.4 mm below the ESD GND vias (preroute)
-    "RN2": (HX + 0.5, -27.0, 90),
+    "RN1": (HX - 3.5, -27.0, 90),       # 1.4 mm below the ESD GND vias (preroute)
+    "RN2": (HX + 0.3, -27.0, 90),
     # the HDMI +5V buck-boost in the open area left of the receptacle; its
     # 5.045 V runs over to pin 18 (55 mA). TI's layout (SLVSEU9D, 12): U7
     # turned so its power pins (VIN, L1, GND, L2, VOUT) face up in a row, the
@@ -285,25 +285,31 @@ HD_W, HD_HALF = 0.25, 0.25              # 0.25 mm gap
 # chip side: pair centre lines, RP2040 pads to the resistor arrays' chip-side pads
 # (the arrays' pads are 0.5 mm wide, the pair's tracks land inside them)
 CHIP_SIDE = {
-    "D2": [(23.6, -19.5), (23.6, -22.0), (23.395, -22.205), (23.395, -26.0)],
-    "D1": [(27.6, -19.5), (27.6, -20.1), (27.8, -21.1), (27.8, -22.6), (25.005, -25.395), (25.005, -26.0)],
-    "D0": [(28.4, -19.5), (28.4, -19.95), (28.7, -21.25), (28.7, -23.2), (27.2, -24.7), (27.2, -26.0)],
-    "CK": [(29.5, -18.4), (30.0, -18.4), (30.0, -23.2), (28.8, -24.4), (28.8, -26.0)],
+    "D2": [(23.6, -19.5), (23.6, -21.6), (23.2, -22.0), (23.2, -25.85)],
+    "D1": [(27.6, -19.5), (27.6, -20.1), (27.8, -21.1), (27.8, -21.9), (24.8, -24.9), (24.8, -25.85)],
+    "D0": [(28.4, -19.5), (28.4, -19.95), (28.7, -21.25), (28.7, -23.0), (27.0, -24.7), (27.0, -25.85)],
+    "CK": [(29.5, -18.4), (29.95, -18.4), (30.3, -18.75), (30.3, -23.2), (28.6, -24.9), (28.6, -25.85)],
 }
-# connector side: arrays' connector-side pads, up between the ESD GND vias
-# (bulging 0.15 mm around them), through the ESD pads, to y = PARTING where the
-# two lines part to the receptacle's pads. The vertices at y = -30.615 and -31.385
-# are the ESD pads' centres (Freerouting joins a pad only at a track end).
+# connector side: from the arrays' connector-side pads up between the ESD GND vias
+# (bulging around them: the via is 0.6 mm and the ESD pads 0.5 mm apart), through
+# the ESD pads, to y = PARTING where the two lines part to the receptacle's pads.
+# The vertices at y = -30.615 and -31.385 are the ESD pads' centres (Freerouting
+# joins a pad only at a track end).
 PARTING = -32.05
 HD_SIDE = {
-    "D2": [(23.35, -27.9), (23.35, -29.9), (23.5, -30.35), (23.5, -30.615), (23.5, -31.385), (23.5, PARTING)],
-    "D1": [(25.0, -27.9), (25.0, -28.3), (25.15, -28.7), (25.15, -29.9), (25.0, -30.35), (25.0, -30.615),
+    "D2": [(23.2, -28.1), (23.2, -28.6), (23.35, -28.9), (23.35, -29.9), (23.5, -30.35), (23.5, -30.615),
+           (23.5, -31.385), (23.5, PARTING)],
+    "D1": [(24.8, -28.1), (24.8, -28.8), (25.15, -29.15), (25.15, -29.9), (25.0, -30.35), (25.0, -30.615),
            (25.0, -31.385), (25.0, PARTING)],
-    "D0": [(27.13, -27.9), (27.13, -28.65), (26.375, -28.95), (26.375, -29.9), (26.5, -30.3), (26.5, -30.615),
+    "D0": [(27.0, -28.1), (27.0, -28.8), (26.375, -29.425), (26.375, -29.9), (26.5, -30.3), (26.5, -30.615),
            (26.5, -31.385), (26.5, PARTING)],
-    "CK": [(28.72, -27.9), (28.72, -28.65), (28.125, -28.95), (28.125, -29.9), (28.0, -30.3), (28.0, -30.615),
+    "CK": [(28.6, -28.1), (28.6, -28.8), (28.125, -29.275), (28.125, -29.9), (28.0, -30.3), (28.0, -30.615),
            (28.0, -31.385), (28.0, PARTING)],
 }
+# pad numbers: RP2040 (P, N); resistor array and its chip-side and connector-side pads (P, N)
+U1_PADS = {"D2": (28, 27), "D1": (18, 17), "D0": (16, 15), "CK": (14, 13)}
+RN_PADS = {"D2": ("RN1", (1, 2), (8, 7)), "D1": ("RN1", (3, 4), (6, 5)),
+           "D0": ("RN2", (1, 2), (8, 7)), "CK": ("RN2", (3, 4), (6, 5))}
 # receptacle pad x (P, N) of each pair; the lines part at 45 degrees, then run up
 # into the pad (its bottom edge is at y = -32.44)
 J2_PADS = {"D2": (23.0, 24.0), "D1": (24.5, 25.5), "D0": (26.0, 27.0), "CK": (27.5, 28.5)}
@@ -335,21 +341,45 @@ def _lay(board, net, points, width):
 def tmds_route(board):
     """The four TMDS pairs, RP2040 pin to receptacle pad, laid coupled on F.Cu
     (CHIP_SIDE, HD_SIDE, J2_PADS). A rigid pair keeps P and N the same length
-    (a bend costs the outer line d x angle, and the bends of a pair cancel)."""
+    (a bend costs the outer line d x angle, and the bends of a pair cancel; the
+    one net bend, CK's, is 0.63 mm)."""
+    at = lambda ref, pad: rc.pad_at(board, ref, pad)           # noqa: E731
     for lane, (p, n) in PAIRS.items():
-        _lay(board, "/TMDS_" + p, _offset(CHIP_SIDE[lane], CHIP_HALF), CHIP_W)
-        _lay(board, "/TMDS_" + n, _offset(CHIP_SIDE[lane], -CHIP_HALF), CHIP_W)
+        rn, chip_pads, hd_pads = RN_PADS[lane]
+        for k, (net, sign) in enumerate((("/TMDS_" + p, 1), ("/TMDS_" + n, -1))):
+            line = [at("U1", U1_PADS[lane][k])] + _offset(CHIP_SIDE[lane], sign * CHIP_HALF) + [at(rn, chip_pads[k])]
+            _lay(board, net, line, CHIP_W)
         left, right = _offset(HD_SIDE[lane], HD_HALF), _offset(HD_SIDE[lane], -HD_HALF)
-        for net, line, pad, sign in (("/HD_" + p, left, J2_PADS[lane][0], -1), ("/HD_" + n, right, J2_PADS[lane][1], 1)):
+        for k, (net, line, pad) in enumerate((("/HD_" + p, left, J2_PADS[lane][0]), ("/HD_" + n, right, J2_PADS[lane][1]))):
+            # Open the corridor around U6's unchanged 0.6 mm GND via.
+            # The two inner launch corners need 50 um more clearance.
+            if (lane, k) in (("D0", 1), ("CK", 0)):
+                expected = (26.625, -29.861847) if lane == "D0" else (27.875, -29.861847)
+                if math.dist(line[3], expected) > 1e-5:
+                    raise ValueError("TMDS ESD launch corner geometry changed")
+                line[3] = (line[3][0] + (-0.05 if lane == "D0" else 0.05), line[3][1])
             x, y = line[-1]
-            step = abs(pad - x)
-            _lay(board, net, line + [(pad, y - step), (pad, -32.65)], HD_W)
+            path = [at(rn, hd_pads[k])] + line + [(pad, y - abs(pad - x)), (pad, -32.65)]
+            for i, (a, b) in enumerate(zip(path, path[1:])):
+                # Adjacent array-pad copper adds capacitance at the first
+                # departure diagonal. Narrow its first 0.25 mm on both
+                # polarities; keep the remainder at the normal pair width.
+                if lane != "D2" and i == 2:
+                    length = math.dist(a, b)
+                    if length < 0.25 or abs(abs(a[0] - b[0]) - abs(a[1] - b[1])) > 1e-5:
+                        raise ValueError("TMDS array departure geometry changed")
+                    fraction = 0.25 / length
+                    split = (a[0] + fraction * (b[0] - a[0]), a[1] + fraction * (b[1] - a[1]))
+                    rc.track(board, net, a, split, width=0.175)
+                    rc.track(board, net, split, b, width=HD_W)
+                else:
+                    rc.track(board, net, a, b, width=HD_W)
 
 
 def esd_silk(board):
     """U5 and U6 sit 3.0 mm apart (their pair centres line up with the
     receptacle's): U5's right end line and U6's pin 1 mark would touch each other
-    and U5's last pad. Drop the end line, move the mark 0.07 mm clear."""
+    and U5's last pad. Drop the end line, shrink the mark to a dot."""
     import pcbnew
     for ref, right in (("U5", True), ("U6", False)):
         fp = board.FindFootprintByReference(ref)
@@ -360,8 +390,39 @@ def esd_silk(board):
             x0 = pcbnew.ToMM(g.GetBoundingBox().GetX())
             if right and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and x0 > pcbnew.ToMM(fp.GetPosition().x) + 1.2:
                 fp.Remove(item)
-            elif not right and g.GetShape() == pcbnew.SHAPE_T_POLY:
-                g.Move(pcbnew.VECTOR2I(pcbnew.FromMM(0.07), 0))
+            elif not right and g.GetShape() == pcbnew.SHAPE_T_POLY:      # a dot instead of the triangle
+                g.GetPolyShape().Inflate(pcbnew.FromMM(-0.07), pcbnew.CORNER_STRATEGY_CHAMFER_ALL_CORNERS,
+                                         pcbnew.FromMM(0.005))
+
+
+def tmds_ground_escape(board):
+    """Move U6.3's existing fan-out via 0.21 mm towards the ESD package.
+
+    Keep its diameter/drill and ground connection; the array departure
+    bends need this space. Fail if the expected fan-out changes.
+    """
+    import pcbnew
+    x, y = rc.pad_at(board, "U6", 3)
+    old, new = (x, y + 1.0), (x, y + 0.79)
+    moved_vias = moved_ends = 0
+    tracks = board.Tracks()
+    for i in range(len(tracks)):
+        track = tracks[i]
+        if track.GetNetname() != "/GND":
+            continue
+        if track.Type() == pcbnew.PCB_VIA_T:
+            pos = track.GetPosition()
+            if math.dist((pcbnew.ToMM(pos.x), pcbnew.ToMM(pos.y)), old) < 1e-5:
+                track.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(new[0]), pcbnew.FromMM(new[1])))
+                moved_vias += 1
+        else:
+            for getter, setter in ((track.GetStart, track.SetStart), (track.GetEnd, track.SetEnd)):
+                pos = getter()
+                if math.dist((pcbnew.ToMM(pos.x), pcbnew.ToMM(pos.y)), old) < 1e-5:
+                    setter(pcbnew.VECTOR2I(pcbnew.FromMM(new[0]), pcbnew.FromMM(new[1])))
+                    moved_ends += 1
+    if (moved_vias, moved_ends) != (1, 1):
+        raise ValueError("U6.3 ground fan-out geometry changed")
 
 
 def preroute(board):
@@ -374,7 +435,8 @@ def preroute(board):
       fan-out via (or one of ours, 1.4 mm towards the chip) takes them down
     - the pins in the middle of the chip's top edge (rp2040card.pocket_escapes)
     - the HDMI +5V buck-boost (buck_boost)"""
-    # The clipped L1 outline ends exactly at the 0.15 mm mask clearance.
+    # The clipped L1 outline includes the 0.01 mm mask expansion beyond
+    # the 0.15 mm silk clearance from pad copper.
     # Shorten its four upright ends to give the plotted Gerber real margin.
     import pcbnew
     fp = next(f for f in board.GetFootprints() if f.GetReference() == "L1")
@@ -388,7 +450,7 @@ def preroute(board):
         if abs(ax - bx) > .001 or not any(abs(ax - x) < .001 for x in (6.72, 11.28)):
             continue
         def shortened(y):
-            for old, new in ((-36.635, -36.68), (-37.505, -37.47), (-40.095, -40.13)):
+            for old, new in ((-36.645, -36.68), (-37.495, -37.47), (-40.105, -40.13)):
                 if abs(y - old) < .001:
                     return new
             return y
@@ -416,6 +478,7 @@ def preroute(board):
         raise ValueError("U4 clipped silk outline changed")
     rc.pocket_escapes(board)
     buck_boost(board)
+    tmds_ground_escape(board)
     tmds_route(board)
     esd_silk(board)
     import pcbnew
