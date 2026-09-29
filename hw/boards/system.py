@@ -336,7 +336,8 @@ def main():
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
         title="CUPC/8 system", revision=REVISION, prepare=prepare, post_route=post_route, route_tries=6,
-        logo_keepout=True,
+        logo_keepout=True, pad_via_clear=0.1, pad_via_ok=("U1.57",),
+        # (no open via hole in a pad; U1.57, the RP2040 exposed pad, keeps its thermal via: audit I3, accepted)
         # the presence link crosses on In2.Cu just above the tab (the key notch
         # reaches the body) and above the GND ties' vias: on B.Cu it would wall
         # off the A-side fingers' escapes

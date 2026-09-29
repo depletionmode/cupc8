@@ -63,11 +63,15 @@ def main_cli():
         # passive. These mutations do not need to break an unrelated wiring
         # check: they must restore a strict coverage gap on their own.
         used_reserved = copy.deepcopy(main)
-        old_net = used_reserved.pins[('U7', '1')]
+        # a chipset pad with nothing on it (an active pad, such as IRQ0's, would
+        # trip its own source binding before the waiver is looked at)
+        spare = next(pin for (ref, pin), net in sorted(used_reserved.pins.items())
+                     if ref == 'U7' and net.startswith('unconnected-'))
+        old_net = used_reserved.pins[('U7', spare)]
         used_reserved.nets[old_net] = tuple(pin for pin in used_reserved.nets[old_net]
-                                             if pin != ('U7', '1'))
-        used_reserved.nets['/CPU_RSVD_A2'] += (('U7', '1'),)
-        used_reserved.pins[('U7', '1')] = '/CPU_RSVD_A2'
+                                             if pin != ('U7', spare))
+        used_reserved.nets['/CPU_RSVD_A2'] += (('U7', spare),)
+        used_reserved.pins[('U7', spare)] = '/CPU_RSVD_A2'
         exposed = check(cards, used_reserved)
         assert 'main:CPU_RSVD_A2' not in exposed['reviewed_waivers']
         assert 'main:CPU_RSVD_A2' in exposed['unmodeled_nets']

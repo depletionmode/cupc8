@@ -121,6 +121,7 @@ export class Machine {
   // pcap: a file for the Wi-Fi card's network traffic
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false, pwrHi = true,
     hostVbus = true, hostPort = true,
+    ioOverload = false,     // a short on the IO card's port: its switch holds FAULT low while EN is high
     resetButtonPressed = false,
     usbOrientation = 'A', chipsetFlash = null, cpuFlash = null, ccLine = 1,
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
@@ -307,7 +308,7 @@ export class Machine {
       sysctlHostVbus: hostVbus && (netlistTop?.runtime.sysctl_usb_vbus_contacts[usbOrientation] ?? true),
       // the keyboard needs VBUS: the switch enable and its output copper
       ioUsbHost: (netlistTop?.runtime.io_usb_host ?? true) && (netlistTop?.runtime.io_vbus?.vbus_on ?? true),
-      ioVbusNfaultLow: netlistTop?.runtime.io_vbus?.nfault_low ?? false,
+      ioVbusNfaultLow: ioOverload || (netlistTop?.runtime.io_vbus?.nfault_low ?? false),
       storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
       einkPanelLink: netlistTop?.runtime.eink_panel_link ?? true,
@@ -461,6 +462,12 @@ export class Machine {
     for (const kind of this.fittedKinds) boards.add(this.boardKind[kind]);
     return [...boards].flatMap((board) => (this.railLeds[board] ?? []).map((row) =>
       ({ board, led: row.led, rail: row.rail, lit: row.connected })));
+  }
+
+  // the IO card's port switch in a slot: {overload, en, nfaultLow, edges: [[card ns, EN level]]}
+  // (emu/machine Rp2040Card::vbus), or null with no IO card there
+  ioVbus(slot) {
+    return native.ioVbus(this.h, slot);
   }
 
   // the SWD target in a slot (1-6): {resets, calls, flash} as `cupc8.py card

@@ -30,8 +30,11 @@ def main():
         for file in (f'{name}.kicad_pcb', f'{name}-routed.kicad_pcb'):
             if preroute_digest(out / file) != preroute_digest(canonical / file):
                 raise SystemExit(f'{name}: rebuilt {file} differs from build/hw/{name}')
-        if (out / 'route.ses').read_bytes() != (canonical / 'route.ses').read_bytes():
-            raise SystemExit(f'{name}: rebuilt route.ses differs from build/hw/{name}')
+        # the main board's route is recorded in the seed files (main-route-seed.json, main-handroute-seed.json):
+        # no router runs, so there is no route.ses to compare
+        if (canonical / 'route.ses').exists() or (out / 'route.ses').exists():
+            if (out / 'route.ses').read_bytes() != (canonical / 'route.ses').read_bytes():
+                raise SystemExit(f'{name}: rebuilt route.ses differs from build/hw/{name}')
     print(f'{name}: scratch rebuild matches build/hw/{name} (boards and route.ses)')
 
 

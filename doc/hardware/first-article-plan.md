@@ -30,7 +30,8 @@ each gate green, red or pending.
 - [Stage 3: fit and four-terminal resistance](#stage-3-fit-and-four-terminal-resistance-unpowered):
   MECH-101 (insert), MB-110, MB-108, CC-103, WC-104
 - [Stage 4: functional bring-up](#stage-4-functional-bring-up-existing-rows):
-  the existing MB-102..106, CC-101, GC-101, IC-101, WC-101
+  the existing MB-102..106, CC-101, GC-101, IC-101, WC-101, and GC-105 (GPU
+  hot-plug detect and DDC/EDID)
 - [Stage 5: power integrity under load](#stage-5-power-integrity-under-load):
   WC-105, MB-111, CC-104, GC-104, IC-103, SC-102, EC-102, YC-102, IC-104,
   MB-113
@@ -512,6 +513,55 @@ limits; they now also write a record (see
 [Recording results](#recording-results)) so a check can see they were
 done. Stage 5 needs the firmware they load.
 
+Two of them close what the co-simulation deliberately does not model (David,
+2026-09-29; `hw/cosim/coverage.py` `BOUNDARY_DECISIONS`): **MB-106** proves
+each slot's CARD_RST_n and PROG_n on real cards (`cupc8.py card reset SLOT
+--hold` stops the card answering IDENT and `--release` brings it back; the
+Wi-Fi card enters its ROM bootloader with PROG_n low), and **WC-101** the
+Wi-Fi card's UART0 path (`cupc8.py card flash SLOT FILE --esp` through the
+slot mux) and its LINK, TX and RX LEDs, which light at first power-up and
+during the join. The emulator has no chip-level reset and QEMU no EN hook,
+so neither is an emulator check.
+
+### GC-105: GPU card hot-plug detect and DDC/EDID with a real monitor
+
+Closes the six GPU nets the firmware never touches and the emulator does not
+model (`DDC_SCL`, `DDC_SDA`, `HDMI_SCL`, `HDMI_SDA`, `HDMI_HPD`, `HPD_5V`;
+`gpu.py` lines 124-141): whether a real monitor's hot-plug line reaches the
+RP2040 pin as a high level and its EDID reads through the level shifters.
+
+- **Acceptance** (limits live in `tools/fa_results.py`):
+  `hpd_off_v` ≤ **0.4 V** with no sink (R21, 33 kΩ to GND, holds the pin low);
+  `hpd_on_v` **2.0-3.6 V** with the monitor on (the 22 kΩ/33 kΩ divider gives
+  about 3.0 V from a 5 V sink line; 2.0 V is the RP2040's VIH minimum at
+  3.3 V IOVDD, so a sink that only reaches HDMI's 2.4 V minimum would fail:
+  that is the finding this row exists to make);
+  `ddc_idle_5v_side_v` **4.5-5.3 V** (2.2 kΩ pull-up to HDMI +5V, cable side)
+  and `ddc_idle_3v3_side_v` **3.0-3.6 V** (4.7 kΩ to 3V3, RP2040 side) with the
+  monitor connected and idle; `edid_bytes_read` ≥ **128**, `edid_header_ok`
+  = 1 (`00 FF FF FF FF FF FF 00`), `edid_checksum_ok` = 1 (the 128 bytes sum
+  to 0 mod 256; VESA E-EDID).
+- **Setup:** the GPU card in a slot of a powered board (or on the bench
+  +5V), a real monitor on its HDMI port, the card held in reset so its
+  RP2040 does not drive GPIO18-20 (`cupc8.py card reset SLOT --hold`); DMM
+  for the voltages; a 3.3 V I2C master (a USB I2C adapter such as a CH341A
+  or FT232H, or a Raspberry Pi Pico with an I2C scanner) clipped to the
+  RP2040-side DDC nodes, R22 pad 2 (SCL) and R24 pad 2 (SDA), and GND.
+- **Procedure:** unplug the monitor, read the HPD node (R21 pad 1) for
+  `hpd_off_v`; plug it in and switch it on, read `hpd_on_v`, then the DDC
+  nodes at R23 pad 2 / R25 pad 2 (cable side) and R22 pad 2 / R24 pad 2
+  (RP2040 side) idle; read 128 bytes from I2C address 0x50, offset 0, and
+  check the header and checksum. The read goes monitor, cable, connector,
+  2N7002 level shifter, adapter: the whole DDC path except the RP2040 pins,
+  which no firmware uses.
+- **Sample:** 2 GPU cards on one monitor model; record the monitor's make
+  and model in `notes`, and repeat with a second monitor if the first
+  fails (a sink that does not raise HPD is a monitor fault, not a card fault).
+- **Design change if:** `hpd_on_v` under 2.0 V with a spec-compliant sink
+  (the divider passes 60 % of the line, so a sink line under 3.4 V fails):
+  raise R21 or drive GPIO18 from a comparator; a failed EDID read with sound
+  levels: check the 2N7002 (gate at 3V3, source on the RP2040 side).
+
 ---
 
 ## Stage 5: power integrity under load
@@ -909,6 +959,7 @@ and `cmd = "python3 tools/fa_results.py <ID>"`. Only `id`, `title` and
 | GC-102 | Per unit: GPU card DVI burn-in at 40 C | 60 min DVI at >= 38 C ambient: no glitches, dropouts or lockups; RP2040 case <= 85 C; every GPU card used |
 | GC-103 | First article: GPU card shorts and first power | +5V, 3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 145 mA, +5V <= 95 mA; HDMI +5V 4.8-5.3 V |
 | GC-104 | First article: GPU RP2040 DVDD and rails under load | DVDD 1.164-1.236 V DC, <= 100 mV deviation at 252 MHz; card 3V3 >= 3.135 V; 3V3 <= 145 mA; case rise <= 45 C (GC-005, GC-006) |
+| GC-105 | First article: GPU card hot-plug detect and DDC/EDID | with a real monitor: HPD at the RP2040 pin <= 0.4 V unplugged and 2.0-3.6 V plugged; DDC idle 4.5-5.3 V (cable side) and 3.0-3.6 V (RP2040 side); a 128-byte EDID with a valid header and checksum reads through the level shifters (co-sim waivers for GPU DDC/HPD) |
 | IC-102 | First article: IO card shorts and first power | +5V, 3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 50 mA, +5V <= 0.80 A; keyboard VBUS 4.40-5.5 V |
 | IC-103 | First article: IO RP2040 DVDD and rails under load | DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 50 mA; case rise <= 45 C (IC-005, IC-006) |
 | IC-104 | First article: keyboard port under load and short | VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/switch rise <= 55 C (IC-005, POW-007) |
@@ -944,8 +995,8 @@ vrow = "5"
 cmd = "python3 tools/fa_results.py WC-103"
 ```
 
-Per board: main 8 new + MB-101 amended; cpu 4; gpu 3; io 3; wifi 5;
-storage 2; eink 2; system 2; MECH-101 amended. 29 new entries.
+Per board: main 8 new + MB-101 amended; cpu 4; gpu 4; io 3; wifi 5;
+storage 2; eink 2; system 2; MECH-101 amended. 30 new entries.
 
 ## Gate coverage
 
@@ -974,6 +1025,8 @@ storage 2; eink 2; system 2; MECH-101 amended. 29 new entries.
 | GC/IC/SC/EC/YC-005 slot contact resistance | MB-110 (x1, x4) |
 | GC/IC/SC/EC/YC-006 RP2040 dissipation | the same -104/-103/-102 (case rise) |
 | GC-005 overclock per unit | GC-102 |
+| GPU DDC/EDID and hot-plug detect (co-sim waivers, David 2026-09-29) | GC-105 |
+| Slot CARD_RST_n / PROG_n and the Wi-Fi ESP32 EN/BOOT, LEDs and UART0 (co-sim waivers, David 2026-09-29) | MB-106, WC-101 (amended) |
 | IC-005 limit and fault flag | IC-104 |
 | MECH-101 notch fit | MECH-101 |
 

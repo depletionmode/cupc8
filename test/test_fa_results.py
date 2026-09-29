@@ -84,6 +84,22 @@ class FaResultsTests(unittest.TestCase):
         rec['measurements']['dt_input_copper_c'] = 16.0
         self.assertEqual(fa.verdict(rec)[0], 'fail')
 
+    def test_gpu_hdmi_hpd_and_edid_gate(self):
+        # GC-105: a real monitor's hot-plug detect and EDID through the GPU card's DDC path
+        good = {'hpd_off_v': 0.02, 'hpd_on_v': 2.95, 'ddc_idle_5v_side_v': 4.9, 'ddc_idle_3v3_side_v': 3.3,
+                'edid_bytes_read': 128, 'edid_header_ok': 1, 'edid_checksum_ok': 1}
+        self.assertEqual(fa.verdict(record('GC-105', 'gpu', measurements=good))[0], 'pass')
+        for key, value in (('hpd_on_v', 1.44),         # a 2.4 V sink HPD through the 22k/33k divider
+                           ('hpd_off_v', 0.6), ('ddc_idle_3v3_side_v', 2.6), ('edid_bytes_read', 127),
+                           ('edid_header_ok', 0), ('edid_checksum_ok', 0)):
+            self.assertEqual(fa.verdict(record('GC-105', 'gpu', measurements=dict(good, **{key: value})))[0],
+                             'fail', key)
+        missing = {k: v for k, v in good.items() if k != 'edid_checksum_ok'}
+        self.assertEqual(fa.verdict(record('GC-105', 'gpu', measurements=missing))[0], 'incomplete')
+        for unit in ('a', 'b'):
+            self.write(record('GC-105', 'gpu', unit, good))
+        self.assertEqual(fa.status('GC-105', fa.records(self.dir))[0], 'green')
+
     def test_malformed_records_are_rejected(self):
         cases = [(dict(record(), schema='cupc8-fa/0'), 'schema'),
                  (dict(record(), test='XX-999'), 'unknown test'),

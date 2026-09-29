@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check CPU schematic outputs through their physical 33-ohm pack channels.
+"""Check CPU schematic outputs through their physical 68-ohm pack channels.
 
 This checks generated KiCad connectivity. It is a prerequisite to CC-051,
 not a substitute for BUS-001..003 running through a schematic-derived model.
@@ -43,7 +43,7 @@ def main():
         cpu.schematic(str(schematic), ())
         kicadgen.export_netlist(str(schematic), str(netlist))
         count = check(read(netlist))
-    print(f'CPU schematic: {count} driven FPGA signals pass through 33-ohm pack channels to the edge')
+    print(f'CPU schematic: {count} driven FPGA signals pass through 68-ohm pack channels to the edge')
 
 
 if __name__ == '__main__':

@@ -8,8 +8,10 @@ the bridge RAM and ROM checks (test/hw/bridge_exercise.py), and the CPU
 card model boots from the ROM the bridge wrote. Three copper faults on the
 routed main board, each regenerated through gen_top.check(), must fail it: an
 open SRAM /WE branch (the RAM checks read back wrong), an open ROM /WE branch
-(programming never lands) and an open ROM A1 launch (the JEDEC unlock and
-every program address are wrong).
+(programming never lands) and an open chipset BR_MISO launch (the bridge
+reads back nothing). The routed top has no per-line model of the memory
+address pins (only the write branches, ROM DQ0 in COSIM-006 and the CPU
+bus), so an open ROM address launch is not a fault this row can inject.
 """
 import json
 import os
@@ -71,14 +73,14 @@ def main():
               f'the ROM the bridge wrote (GPO ${good["after"]["gpo"]:02X})')
 
         main_circuit = read(args.main_netlist)
-        rom_a1 = next(pin for (ref, pin), name in main_circuit.pin_names.items()
-                      if ref == 'U10' and name == 'A1')
+        miso_launch = next(pin for (ref, pin), net in main_circuit.pins.items()
+                           if ref == 'U7' and net == '/BR_MISO_SRC')
         (temporary / 'cards').mkdir()
         cards = exported_cards(temporary / 'cards')
         boards = card_boards(args)
         for label, ref, pin, net in (('SRAM /WE branch open (U9.5)', 'U9', '5', '/MEM_nWE'),
                                      ('ROM /WE branch open (U10.31)', 'U10', '31', '/MEM_nWE'),
-                                     (f'ROM A1 launch open (U10.{rom_a1})', 'U10', rom_a1, main_circuit.pins[('U10', rom_a1)])):
+                                     (f'chipset BR_MISO launch open (U7.{miso_launch})', 'U7', miso_launch, '/BR_MISO_SRC')):
             opened = temporary / f'open-{ref}-{pin}.kicad_pcb'
             open_pad(args.main_board, opened, ref, pin, net)
             mutant = check(cards, main_circuit, opened, boards, args.system_board, args.cpu_board)

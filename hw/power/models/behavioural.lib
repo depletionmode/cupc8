@@ -1,7 +1,8 @@
 * CUPC/8 behavioural power models (ngspice).
 *
 * These are NOT vendor models. Advanced Monolithic Systems, Richtek and
-* Silergy publish none for the AMS1117, RT9013 and SY6280. Each model is built
+* Silergy publish none for the AMS1117, RT9013 and SY6280 (a switch the IO card
+* no longer fits; SW_BEH's defaults were taken from it). Each model is built
 * from the datasheet figures that hw/power/design.py passes in as parameters,
 * and is only as good as those figures. The vendor models (TI TLV62569,
 * TLV7011) are fetched by hw/power/models/fetch.py.
@@ -49,9 +50,10 @@ Bin in gnd i = max(0, i(Vsense)) + {IQ}
 * SW_BEH: a current-limited, soft-started load switch or eFuse (the input TPS25947).
 *
 *   TDLY after t = 0 (IN is applied at t = 0 in every deck) the gate ramps,
-*   and the output follows it from 0 to IN over TON (SY6280: 120 us). The
+*   and the output follows it from 0 to IN over TON (default 120 us, the old
+*   SY6280's; callers pass the part's own). The
 *   channel is RON when fully on. Above ILIM the switch holds its current at
-*   ILIM (the SY6280 limits; it does not latch off). Reverse current is blocked (the SY6280 has no body diode).
+*   ILIM (it limits; it does not latch off). Reverse current is blocked (no body diode).
 *   Thermal shutdown is not modelled: the inrush check computes the energy.
 * ---------------------------------------------------------------------------
 .subckt SW_BEH in out gnd params: RON=80m ILIM=1.5 TON=120u TDLY=5u

@@ -15,6 +15,12 @@ from collections import defaultdict
 
 COORD = re.compile(r'^(?:X(-?\d+))?(?:Y(-?\d+))?D(0[123])\*$')
 ARC_COORD = re.compile(r'^X(-?\d+)Y(-?\d+)I(-?\d+)J(-?\d+)D01\*$')
+def _turned(points, degrees):
+    """A FreePoly macro's outline turned counter-clockwise about the aperture origin by a multiple
+    of 90 degrees (exact: no trigonometry on the coordinates)."""
+    c, s = ((1, 0), (0, 1), (-1, 0), (0, -1))[int(degrees // 90) % 4]
+    return [(px * c - py * s, px * s + py * c) for px, py in points]
+
 APERTURE = re.compile(r'^%ADD(\d+)(C|R|O|RoundRect|FreePoly\d+),([^*]+)\*%$')
 SELECT = re.compile(r'^D(\d+)\*$')
 PROFILE_MOVE = re.compile(r'^X(-?\d+)Y(-?\d+)D02\*$')
@@ -275,8 +281,9 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
             kind = match[2]
             if kind == 'RoundRect' and not macro_defined:
                 raise ValueError('%s:%d: undefined RoundRect macro' % (path.name, number))
-            if kind.startswith('FreePoly') and (kind not in free_polys or len(params) != 1 or params[0] != 0):
-                raise ValueError('%s:%d: unsupported FreePoly aperture rotation' % (path.name, number))
+            # the parameter is the macro's rotation in degrees, counter-clockwise: quarter turns only (U2 is turned 180)
+            if kind.startswith('FreePoly') and (kind not in free_polys or len(params) != 1 or params[0] % 90 != 0):
+                raise ValueError('%s:%d: unsupported FreePoly aperture' % (path.name, number))
             if (kind == 'C' and len(params) != 1 or kind in ('R', 'O') and len(params) != 2 or
                     kind == 'RoundRect' and len(params) != 10 or
                     any(not math.isfinite(x) for x in params) or
@@ -416,7 +423,8 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                     geometry.obrounds[shape] = (round(x*1e6), round(y*1e6), width, height)
                     bounds = (x-width/2,y-height/2,x+width/2,y+height/2)
                 elif kind.startswith('FreePoly'):
-                    points = [(x+px, y+py) for px, py in free_polys[kind]]
+                    turned = _turned(free_polys[kind], params[0])
+                    points = [(x+px, y+py) for px, py in turned]
                     shape = geometry.wkt(polygon(points))
                     xs, ys = zip(*points)
                     bounds = (min(xs), min(ys), max(xs), max(ys))
@@ -429,7 +437,7 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                     xs, ys = zip(*corners)
                     bounds = (min(xs)-radius,min(ys)-radius,max(xs)+radius,max(ys)+radius)
                 if operation == '03':
-                    definition = (tuple(free_polys[kind]) if kind.startswith('FreePoly')
+                    definition = (tuple(_turned(free_polys[kind], params[0])) if kind.startswith('FreePoly')
                                   else params)
                     geometry.flashes[shape] = (round(x*1e6), round(y*1e6),
                                                'FreePoly' if kind.startswith('FreePoly') else kind,

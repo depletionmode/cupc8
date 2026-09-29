@@ -2,8 +2,9 @@
 
 **Status: approved by David (2026-09-29) with RILIM = 45.3 kΩ (C26980,
 514–647 mA, the alternative below) and applied to `hw/boards/io.py`, the
-symbol/parts files, the firmware retry and the checks. Text below still
-describes the 46.4 kΩ recommendation where it quotes numbers. Background: [IC-005 switch audit](ic005-switch-audit.md).
+symbol/parts files, the firmware retry and the checks. The text below is
+updated to the approved 45.3 kΩ (the earlier 46.4 kΩ recommendation is kept
+only where it says why 45.3 kΩ was chosen). Background: [IC-005 switch audit](ic005-switch-audit.md).
 
 Checks: `python3 hw/power/io_port_switch.py` (behavioural decks plus TI's
 TPS61023 model, in `build/power`), tests: `python3 test/hw/test_io_port_switch.py`.
@@ -56,34 +57,34 @@ tested rows of 7.5 sit inside them to 0.26 % (20k, 210k min) and are tighter
 at 49.9k (565 mA max against the equation's 582). The check widens the
 equations by that 0.26 % envelope.
 
-**RILIM = 46.4 kΩ 1 %, 100 ppm/°C** (0402WGF4642TCE, C52378, 3,171 stock).
+**RILIM = 45.3 kΩ 1 %, 100 ppm/°C** (0402WGF4532TCE, C26980, 15,401 stock, JLC extended).
 With 1 % and 100 ppm/°C over a 0…85 °C resistor (±60 K from 25 °C) the
 resistor spans ±1.6 %:
 
-- minimum: 25230 / (46.4 × 1.016)^1.016 × 0.9974 = **501.9 mA**
-- maximum: 22980 / (46.4 × 0.984)^0.94 = **633.0 mA**
+- minimum: 25230 / (45.3 × 1.016)^1.016 × 0.9974 = **514.2 mA**
+- maximum: 22980 / (45.3 × 0.984)^0.94 = **647.4 mA**
 
 Against the requirement:
 
 | Requirement | Value | Check |
 |---|---|---|
-| A 500 mA keyboard (USB 2.0 high-power device) is never limited | 501.9 mA min | S1 pass (+0.4 %) |
+| A 500 mA keyboard (USB 2.0 high-power device) is never limited | 514.2 mA min | S1 pass (+2.8 %) |
 | IO card +5V, 500 mA keyboard, worst corner, vs slot.md 0.80 A | 0.767 A (unchanged: the switch is after the boost) | S4 pass (+4.1 %) |
-| Boost inductor at the max limit, worst card input 3.58 V, vs the 2.7 A valley limit | 1.03 A | S2 pass (+62 %) |
-| Machine VBUS current, worst corner, port at the max limit, vs the eFuse's 2.63 A min | 2.06 A | S3 pass (+21 %) |
+| Boost inductor at the max limit, worst card input 3.55 V, vs the 2.7 A valley limit | 1.057 A | S2 pass (+61 %) |
+| Machine VBUS current, worst corner, port at the max limit, vs the eFuse's 2.63 A min | 2.096 A | S3 pass (+20 %) |
 | Keyboard VBUS, worst DC corner, 500 mA through 135 mΩ | 4.776 V vs 4.40 V | S5 pass |
 | U5 IN at the eFuse's OVLO trip max (pass-through) vs 6.5 V recommended | 5.806 V | S6 pass |
-| Junction at 500 mA, 40 °C | 46 °C | S10 pass |
+| Junction at 500 mA, 40 °C | 46.2 °C | S10 pass |
 
 The 500 mA margin is thin by construction: 47.0k (basic part) would give
-496.7 mA min and fails S1. **45.3k** is the alternative if David wants
-margin on the minimum (514 mA min, 647 mA max; the card then reaches
-~1.06 A in the residual case below).
+496.7 mA min and fails S1; 46.4k (C52378) gives 501.9 mA min (+0.4 %), 633.0 mA
+max. David approved **45.3k** for the margin on the minimum (514 mA min,
+647 mA max; the card then reaches 1.057 A in the residual case below).
 
 **Residual (not closable by any switch in this class).** A device that draws
-between 500 mA and the actual limit (≤ 633 mA) is out of USB spec but is
+between 500 mA and the actual limit (≤ 647 mA) is out of USB spec but is
 neither limited nor flagged. At the worst corner the IO card's +5V then
-reaches **1.026 A**, over slot.md's 0.80 A and the slot PTC's 0.92 A hold at
+reaches **1.057 A**, over slot.md's 0.80 A and the slot PTC's 0.92 A hold at
 40 °C. Only the boost sits on the IO card's slot +5V (the RP2040 is on 3V3),
 so the consequence is the slot PTC tripping and dropping the keyboard port;
 the machine total stays 21 % under the eFuse's minimum limit (S3). No
@@ -95,7 +96,7 @@ available switch has a tolerance tight enough to guarantee both ≥ 500 mA and
 wording for IC-005 (David or the catalogue owner to apply):
 
 ```
-checks = "port switch limit guaranteed 500..633 mA (TPS2553-1, RILIM 46.4k 1 %); FAULT (open drain, 5..10 ms deglitch) to GPIO8 and latch-off on overcurrent; attach < 5 ms in limit; short transient within U5/TPS61023 absolute maxima (model)"
+checks = "port switch limit guaranteed 514..647 mA (TPS2553-1, RILIM 45.3k 1 %); FAULT (open drain, 5..10 ms deglitch) to GPIO8 and latch-off on overcurrent; attach < 5 ms in limit; short transient within U5/TPS61023 absolute maxima (model)"
 cmd = "python3 hw/tools/boardcheck.py io power && python3 hw/power/io_port_switch.py && python3 test/hw/test_io_port_switch.py && python3 hw/power/rp2040_vreg.py io build/hw/io && python3 test/hw/test_rp2040_vreg.py"
 ```
 
@@ -123,7 +124,7 @@ C20–C22 unchanged) with:
 ```python
     # ---- VBUS: TPS2553DBVR-1 from the boost's output (IC-005,
     # doc/hardware/io-port-switch-proposal.md). IOS(min) = 25230/R^1.016,
-    # IOS(max) = 22980/R^0.94 mA (R in kOhm): 46.4k 1 % -> 502..633 mA
+    # IOS(max) = 22980/R^0.94 mA (R in kOhm): 45.3k 1 % -> 514..647 mA
     # guaranteed. Latches off 5..10 ms into an overcurrent with FAULT low;
     # toggling EN restarts it.
     u5 = s.add("jlc:TPS2553DBVR-1", "U5", "TPS2553DBVR-1", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
@@ -134,7 +135,7 @@ C20–C22 unchanged) with:
     s.connect(u5, "ILIM", "ILIM")
     s.connect(u5, "EN", "VBUS_EN")
     s.connect(u5, "FAULT", "VBUS_nFAULT")
-    r10 = rc.passive(s, "R", "R10", "46k4", (186 * G, 30 * G), lcsc="C52378")
+    r10 = rc.passive(s, "R", "R10", "45k3", (186 * G, 30 * G), lcsc="C26980")
     rc.two(s, r10, "ILIM", "GND")
     r11 = rc.passive(s, "R", "R11", "100k", (186 * G, 46 * G))       # EN must not float (RP2040 in reset)
     rc.two(s, r11, "VBUS_EN", "GND")
@@ -153,7 +154,7 @@ BOM delta per IO card:
 | Ref | Was | Becomes | LCSC | Stock |
 |---|---|---|---|---|
 | U5 | SY6280AAC, SOT-23-5 (C55136) | TPS2553DBVR-1, SOT-23-6 | C111738 | 14,185 |
-| R10 | 12 kΩ ISET (C25752) | 46.4 kΩ 1 % 0402, ILIM | C52378 | 3,171 |
+| R10 | 12 kΩ ISET (C25752) | 45.3 kΩ 1 % 0402, ILIM | C26980 | 15,401 |
 | R12 | 15 kΩ VBUS→GPIO8 (C25756) | 10 kΩ 3V3→GPIO8 | C25744 (basic) | 22.9 M |
 | R13 | 22 kΩ GPIO8→GND (C25768) | removed | — | — |
 | C25 | — | 1 µF 25 V X5R 0402 at U5 IN | C52923 (basic) | 6.2 M |
@@ -198,22 +199,22 @@ uses 60 mΩ (70 % of the 85 mΩ typical).
 
 **T1, attach (behavioural).** EN switches the port on into 120 µF (C21
 +20 %) plus a device's 10 µF, with a 100 mA unconfigured-device load, at
-the **minimum** limit (502 mA) and an instant gate. The switch is in current
-limit for **1.37 ms** and VBUS reaches 4.40 V 1.25 ms after EN. The
+the **minimum** limit (514 mA) and an instant gate. The switch is in current
+limit for **1.33 ms** and VBUS reaches 4.40 V 1.22 ms after EN. The
 shortest FAULT deglitch is 5 ms (+73 %, 25 % required), so an attach never
 flags a fault or latches the port off.
 
 **T2/T3, short and latch (behavioural).** 500 mA steady, then a 20 mΩ short
 behind 50 nH (at the receptacle) or 0.5 µH (a cable's far end), at each
-response time. One millisecond later the switch holds its limit (≤ 633 mA),
+response time. One millisecond later the switch holds its limit (≤ 647 mA),
 and after the 10 ms maximum deglitch the -1 latches off (0 mA at the end).
 FAULT goes low 5–10 ms after the limit engages, or at once on thermal
-shutdown. U5 dissipates at most 5.43 V × 0.633 A = 3.44 W for ≤ 10.02 ms,
-**≤ 34.4 mJ** per event. The constant-current TPS2553 would instead keep
+shutdown. U5 dissipates at most 5.43 V × 0.647 A = 3.52 W for ≤ 10.02 ms,
+**≤ 35.2 mJ** per event. The constant-current TPS2553 would instead keep
 thermal-cycling for as long as the short lasts.
 
 **T4–T6, peak and excursions (TI's TPS61023 model).** POW-007's chain at
-vSafe5V max, with the switch in place of the SY6280, 10 nH and 5 mΩ of
+vSafe5V max, with the switch in place of the earlier SY6280, 10 nH and 5 mΩ of
 track from C23/C24 to U5 IN, and the proposed 1 µF at IN. Each excursion is
 moved up 0.313 V, from the model's 5.118 V regulation to the 5.431 V
 pass-through maximum:
@@ -221,9 +222,9 @@ pass-through maximum:
 | Response | Clamp | Short | Peak | U5 IN min…max (+0.313 V) |
 |---|---|---|---|---|
 | 2 µs typ | 0.1 µs | plug, 50 nH | 14.9 A | 3.61 … 5.79 (6.10) V |
-| 2 µs typ | 0.1 µs | cable, 0.5 µH | 2.8 A | 4.89 … 5.22 V |
+| 2 µs typ | 0.1 µs | cable, 0.5 µH | 2.8 A | 4.89 … 5.22 V (limit simulated at 632 mA) |
 | 2 µs typ | 1 µs | plug | 17.4 A | 3.24 … 5.22 V |
-| 2 µs typ | 1 µs | cable | 3.8 A | 4.73 … 5.22 V |
+| 2 µs typ | 1 µs | cable | 3.8 A | 4.73 … 5.22 V (limit simulated at 637 mA) |
 | 20 µs stress | either | plug | 22.0 A | 2.10 … 5.12 V |
 | 20 µs stress | either | cable | 16.4 A | 2.03 … 5.12 V |
 

@@ -20,7 +20,7 @@ def family(board, name):
         return 'clock_and_reset'
     if re.search(r'^CPU_|^FPGA_|^MEM_', name):
         return 'cpu_and_memory'
-    if re.search(r'LED|^GPO|^ISET$', name):
+    if re.search(r'LED|^GPO|^ILIM$', name):
         return 'indicators'
     if re.search(r'USB|^CC[12]$|HDMI|^HD_|^DDC|^EPD|^SD_|HPD|UART|U0RXD|U0TXD', name):
         return 'external_io'
@@ -190,7 +190,9 @@ ANALOG_NETS = {
             'BB_L2': ('POW-008',)},
     'io': {'GND': (), '+5V': ('POW-006',), '3V3': (), '1V1': (), 'VBOOST': ('POW-007',),
            'VBUS': ('POW-007', 'POW-006'), 'BOOST_FB': ('POW-007',),
-           'BOOST_SW': ('POW-007',), 'ISET': ('POW-006',)},
+           'BOOST_SW': ('POW-007',),
+           # the TPS2553-1 current-limit resistor (R10, 45.3k to GND): IC-005's limit and inrush checks
+           'ILIM': ('POW-006', 'IC-005')},
     'storage': {'GND': (), '+5V': (), '3V3': (), '1V1': ()},
     'eink': {'GND': (), '+5V': (), '3V3': (), '1V1': ()},
     'system': {'GND': (), '+3V3': (), '1V1': ()},
@@ -245,9 +247,158 @@ def reviewed_analog_waivers(circuits, implemented=None):
     return waivers
 
 
+# Nets at the edge of the machine, or whose far side the emulator does not
+# model. They are NOT static or analog: each is a waiver David decided on
+# (2026-09-29; BOUNDARY_DECISIONS below, per group), every net listed by name.
+# Pin-exact like the others: any change to the pins on the net (a part
+# swapped, a pin added) drops the waiver and the net is a gap again.
+#   test_access   a bring-up pad for a tool outside the machine (a debug probe,
+#                 a serial adapter, a jumper): nothing in the machine drives or reads it.
+#   card_control  sysctl's card reset / boot-select lines. sysctl's side runs (the TCA9555
+#                 model holds the outputs; power.c drives them); the card's reaction does
+#                 not: the emulator starts an RP2040 card from its ELF and has no whole-chip
+#                 reset (RP2040::reset() resets the cores only), and the ESP32-C3 in QEMU
+#                 has no EN/boot-strap input.
+#   esp_pins      ESP32-C3 pins the QEMU machine does not export (LED GPIOs and the ROM
+#                 bootloader's UART0 on the slot's SWD contacts).
+#   unused_by_fw  pins no firmware drives or reads and no model attaches.
+#   passive_loop  a presence loop only a pull-up and a test point read.
+#   external_header  a header for a device that is not part of the machine (AUX SPI, J4): the
+#                 chipset drives select 6 (SPI_nCS[6], output bit 8) but nothing is plugged in
+#                 and no firmware selects device 6.
+def _boundary_specs():
+    specs = {}
+
+    def add(board, net, kind, pins, why):
+        specs[f'{board}:{net}'] = (kind, pins.split(), why)
+
+    rp_cards = ('gpu', 'io', 'storage', 'eink')
+    for board in rp_cards:
+        add(board, 'BOOTSEL', 'test_access', 'R1.2 TP1.1',
+            'BOOTSEL pad (1k to QSPI_SS): shorted to GND by hand at power-up for the USB boot ROM')
+        add(board, 'RUN', 'card_control', 'J1.B9 R3.2 TP4.1 U1.26',
+            'CARD_RST_n from sysctl into the RP2040 RUN pin: no whole-chip reset in the emulator')
+        uart = 'TP5.1 U1.2' if board == 'gpu' else 'TP5.1 U1.27'
+        if board in ('io', 'storage'):
+            add(board, 'UART_TX', 'test_access', uart,
+                "the firmware's stdio UART (captured at the chip by the emulator); "
+                'read by a serial adapter on the pad, which is outside the machine')
+        else:
+            add(board, 'UART_TX', 'unused_by_fw', uart, 'the firmware does not use the UART')
+    add('system', 'BOOTSEL', 'test_access', 'R6.2 TP4.1', 'BOOTSEL pad, as on the slot cards')
+    add('system', 'RUN', 'test_access', 'TP3.1 U1.26',
+        'RUN pad on the system card (nothing else drives it): a reset jumper or probe')
+    add('system', 'SWCLK', 'test_access', 'TP1.1 U1.24', 'SWD pad for a debug probe')
+    add('system', 'SWDIO', 'test_access', 'TP2.1 U1.25', 'SWD pad for a debug probe')
+    add('system', 'PRSNT', 'passive_loop', 'J2.A1 J2.B32',
+        'PRSNT1_n (GND on the main board) to PRSNT2_n: the presence loop')
+    add('main', 'SYS_PRSNT2_n', 'passive_loop', 'J3.64 R104.2 TP41.1',
+        'pull-up and test point only: no IC reads the system card presence')
+    add('main', 'SPI_nCS6_SRC', 'external_header', 'R43.1 U7.74',
+        'chipset SPI select 6 (33 ohm R43) to the AUX SPI header J4: no device, no firmware use')
+    add('main', 'AUX_CS_n', 'external_header', 'J4.8 R43.2', 'the AUX SPI header J4 pin 8, nothing plugged in')
+    for slot in range(1, 7):
+        base, pin_rst, pin_prog = (slot + 1) * 100, 3 + slot, 12 + slot
+        connector = f'J{10 + slot}'
+        add('main', f'SLOT{slot}_RST_n', 'card_control',
+            f'{connector}.B9 R{base + 4}.2 U13.{pin_rst}',
+            'sysctl CARD_RST_n (TCA9555 U13 output, hold/release in power.c): the card '
+            'side is card_control above')
+        add('main', f'SLOT{slot}_PROG_n', 'card_control',
+            f'{connector}.A18 R{base + 5}.2 U13.{pin_prog}',
+            'sysctl PROG_n (U13): only the Wi-Fi card wires A18 (ESP32 IO9); it is NC on the '
+            'RP2040 cards')
+    add('wifi', 'EN', 'card_control', 'C5.1 J1.B9 R1.2 U1.8',
+        'CARD_RST_n into the ESP32-C3 EN: QEMU has no EN input')
+    add('wifi', 'BOOT', 'card_control', 'J1.A18 R2.2 U1.23',
+        'PROG_n into the ESP32-C3 IO9 (download-mode strap): not exported by QEMU')
+    for net, pins in (('LED_LINK', 'R6.1 U1.18'), ('LED_TX', 'R7.1 U1.12'), ('LED_RX', 'R8.1 U1.13'),
+                      ('LED_LINK_A', 'D2.2 R6.2'), ('LED_TX_A', 'D3.2 R7.2'), ('LED_RX_A', 'D4.2 R8.2')):
+        add('wifi', net, 'esp_pins', pins, 'ESP32-C3 GPIO indicator LED: QEMU does not export GPIO levels')
+    add('wifi', 'USB_DN', 'unused_by_fw', 'TP1.1 U1.26', 'native USB pad: test point only, unused by the firmware')
+    add('wifi', 'USB_DP', 'unused_by_fw', 'TP2.1 U1.27', 'native USB pad: test point only, unused by the firmware')
+    add('wifi', 'U0RXD', 'esp_pins', 'J1.B6 U1.30',
+        "ROM-bootloader UART0 on the slot's SWCLK contact (cupc8.py card flash --esp): "
+        'the prog port reaches no ESP UART in the emulator')
+    add('wifi', 'U0TXD', 'esp_pins', 'J1.B7 U1.31', 'as U0RXD, on the SWDIO contact')
+    for net, pins, why in (
+            ('DDC_SCL', 'J2.15 Q1.3 R23.2', "HDMI DDC clock (EDID): no monitor's I2C is modelled"),
+            ('DDC_SDA', 'J2.16 Q2.3 R25.2', 'HDMI DDC data (EDID)'),
+            ('HDMI_SCL', 'Q1.2 R22.2 U1.30', 'GPIO19 behind the DDC level shifter'),
+            ('HDMI_SDA', 'Q2.2 R24.2 U1.31', 'GPIO20 behind the DDC level shifter'),
+            ('HDMI_HPD', 'R20.2 R21.1 U1.29', 'GPIO18 behind the hot-plug divider'),
+            ('HPD_5V', 'J2.19 R20.1', 'hot-plug pin from the sink')):
+        add('gpu', net, 'unused_by_fw', pins, why + '; the GPU firmware never touches GPIO18-20')
+    return specs
+
+
+BOUNDARY = _boundary_specs()
+
+# David's decision per group (2026-09-29): all four waived, no new emulator or
+# QEMU modelling. `verified_by` names the first-article / bring-up rows that
+# close what the emulator cannot.
+BOUNDARY_DECISIONS = {
+    'test_access': {
+        'decision': 'accepted by David 2026-09-29: waived as test access',
+        'reason': 'bring-up pads for a tool outside the machine (a probe, a serial adapter, '
+                  'a jumper): nothing in the machine drives or reads them',
+        'verified_by': []},
+    'passive_loop': {
+        'decision': 'accepted by David 2026-09-29: waived as test access',
+        'reason': 'a presence loop that only a pull-up and a test point read',
+        'verified_by': []},
+    'card_control': {
+        'decision': 'accepted by David 2026-09-29: waived; verified at first article',
+        'reason': "sysctl's reset and boot-select lines run up to the expander; the card's reaction "
+                  '(RP2040 RUN, ESP32 EN and IO9) needs a whole-chip reset in the emulator and an '
+                  'EN hook in QEMU, which were declined',
+        'verified_by': ['MB-106', 'WC-101']},
+    'unused_by_fw': {
+        'decision': 'accepted by David 2026-09-29: waived; GPU DDC/HPD verified at first article',
+        'reason': 'no firmware drives or reads these pins and no emulator model attaches; the GPU '
+                  "card's DDC/EDID and hot-plug path is measured on a real monitor",
+        'verified_by': ['GC-105']},
+    'external_header': {
+        'decision': 'accepted by David 2026-09-29: waived; the planned model is dropped',
+        'reason': 'the AUX SPI header J4 has no device in the machine and no firmware selects '
+                  'device 6',
+        'verified_by': []},
+    'esp_pins': {
+        'decision': 'accepted by David 2026-09-29: waived; verified at first article',
+        'reason': 'QEMU exports no ESP32-C3 GPIO levels and the prog port reaches no ESP UART',
+        'verified_by': ['WC-101']},
+}
+
+
+def reviewed_boundary_waivers(circuits, implemented=None):
+    """Pin-exact waivers for the nets in BOUNDARY (see the note above it)."""
+    waivers = {}
+    for key, (kind, pins, why) in BOUNDARY.items():
+        board, name = key.split(':', 1)
+        circuit = circuits.get(board)
+        nodes = circuit.nets.get(f'/{name}') if circuit is not None else None
+        if not nodes or sorted(f'{r}.{p}' for r, p in nodes) != sorted(pins):
+            continue
+        decision = BOUNDARY_DECISIONS[kind]
+        checks = [_PINOUT_ROWS[board]]
+        if implemented is not None and not set(checks) <= implemented:
+            continue
+        waivers[key] = {
+            'family': 'boundary_' + kind,
+            'reason': why,
+            'checks': checks,
+            'pins': [f'{r}.{p}' for r, p in nodes],
+            'status': decision['decision'],
+            'group_reason': decision['reason'],
+            'verified_by': list(decision['verified_by']),
+        }
+    return waivers
+
+
 def audit(circuits, executed, structural, implemented=None):
     waivers = reviewed_reserved_waivers(circuits)
     analog = reviewed_analog_waivers(circuits, implemented)
+    boundary = reviewed_boundary_waivers(circuits, implemented)
     gaps, structural_only, families = [], [], {}
     for board, circuit in circuits.items():
         for net in circuit.nets:
@@ -256,13 +407,14 @@ def audit(circuits, executed, structural, implemented=None):
             key = f'{board}:{net.lstrip("/")}'
             if (board, net) in structural:
                 structural_only.append(key)
-            if key not in waivers and key not in analog:
+            if key not in waivers and key not in analog and key not in boundary:
                 gaps.append(key)
                 group = family(board, net.lstrip('/'))
                 families.setdefault(group, []).append(key)
     return {
         'reviewed_waivers': dict(sorted(waivers.items())),
         'analog_waivers': dict(sorted(analog.items())),
+        'boundary_waivers': dict(sorted(boundary.items())),
         'unmodeled_nets': sorted(gaps),
         'structural_only_nets': sorted(structural_only),
         'coverage_families': {k: sorted(v) for k, v in sorted(families.items())},

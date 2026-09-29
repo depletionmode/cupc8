@@ -100,6 +100,15 @@ GATES = {
     'GC-103': dict(boards=('gpu',), units=3, m=_rp2040_first(145, 95, extra={
         'v_hdmi_5v_v': ('range', 4.8, 5.3)})),
     'GC-104': dict(boards=('gpu',), units=2, m=_rp2040_load(DVDD_120, 145)),
+    # HDMI hot-plug detect and DDC/EDID with a real monitor (co-sim waivers for GPU DDC/HPD, David 2026-09-29):
+    # HPD low unplugged (R21 33k to GND), high through the 22k/33k divider from the sink's ~5 V (RP2040 VIH
+    # min 2.0 V, IOVDD 3.6 V max); the DDC lines idle high on both sides of the level shifters (2k2 to
+    # HDMI +5V 4.8-5.3 V less the sink's load, 4k7 to 3V3); the monitor's 128-byte EDID base block reads
+    # through the card: header 00 FF FF FF FF FF FF 00 and a zero byte sum (VESA E-EDID).
+    'GC-105': dict(boards=('gpu',), units=2, m={
+        'hpd_off_v': ('<=', 0.4), 'hpd_on_v': ('range', 2.0, 3.6),
+        'ddc_idle_5v_side_v': ('range', 4.5, 5.3), 'ddc_idle_3v3_side_v': ('range', 3.0, 3.6),
+        'edid_bytes_read': ('>=', 128), 'edid_header_ok': ('>=', 1), 'edid_checksum_ok': ('>=', 1)}),
     'IC-102': dict(boards=('io',), units=3, m=_rp2040_first(50, 800, extra={
         'v_kbd_vbus_v': ('range', 4.40, 5.5)})),
     'IC-103': dict(boards=('io',), units=2, m=_rp2040_load(DVDD_110, 50)),

@@ -290,6 +290,11 @@ def core(s, gpios, leds=(), usb=False):
     return p
 
 
+# JLC: keep every via's drill this far (mm) outside a pad's mask opening (kicadgen.pipeline);
+# the RP2040's exposed pad U1.57 is exempt: its thermal via stays in the pad (audit I3, accepted)
+PAD_VIA_CLEAR = 0.1
+
+
 def build(name, schematic, placement, power_nets, graphics, labels, gpios, title, revision, usb=False,
           layers=2, passes=40, preroute=None):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
@@ -302,7 +307,7 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
                        fine_nets=u1_nets(gpios, usb), prepare=preroute or tie_testen, route_tries=6,
-                       logo_keepout=True,
+                       logo_keepout=True, pad_via_clear=PAD_VIA_CLEAR, pad_via_ok=("U1.57",),
                        # four layers: GND poured on both outer layers, In1 a
                        # solid GND plane; In2 routes signals
                        zones=("/GND", ("/GND", ("In1.Cu",))) if layers == 4 else ("/GND",))

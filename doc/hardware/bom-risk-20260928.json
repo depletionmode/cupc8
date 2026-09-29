@@ -42,6 +42,47 @@
    ],
    "stock": 1124634
   },
+  "C111738": {
+   "attrition": 0,
+   "brand": "Texas Instruments",
+   "describe": "-40\u2103~+150\u2103 1 1.5A 2.5V~6.5V 85m\u03a9 Active High High Side Switch \u8fc7\u538b\u4fdd\u62a4\u3001\u8f6f\u542f\u52a8\u3001\u6b20\u538b\u9501\u5b9a\u3001\u53cd\u5411\u7535\u538b\u4fdd\u62a4\u3001\u96c6\u6210\u7535\u8377\u6cf5\u3001Overcurrent Protection\u3001Over temperature protection\u3001\u9501\u5b58\u4fdd\u62a4\u3001Short-Circuit  Protection\u3001\u53cd\u5411\u7535\u6d41\u963b\u65ad SOT-23-6 Power Distribution Switches ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 5,
+   "lcsc_stock": 14110,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "TPS2553DBVR-1",
+   "package": "SOT-23-6",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.2916
+    ],
+    [
+     50,
+     0.232
+    ],
+    [
+     150,
+     0.2064
+    ],
+    [
+     500,
+     0.1745
+    ],
+    [
+     3000,
+     0.1362
+    ],
+    [
+     6000,
+     0.1277
+    ]
+   ],
+   "stock": 14110
+  },
   "C112455": {
    "attrition": 1,
    "brand": "SOFNG",
@@ -2747,6 +2788,47 @@
     ]
    ],
    "stock": 14421
+  },
+  "C26980": {
+   "attrition": 10,
+   "brand": "UNI-ROYAL(Uniroyal Elec)",
+   "describe": "-55\u2103~+155\u2103 45.3k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+   "found": true,
+   "lcsc_cycle": "normal",
+   "lcsc_min_buy": 100,
+   "lcsc_stock": 0,
+   "library": "extended",
+   "min_buy": 1,
+   "mpn": "0402WGF4532TCE",
+   "package": "0402",
+   "preferred": false,
+   "prices": [
+    [
+     1,
+     0.0035
+    ],
+    [
+     1000,
+     0.0027
+    ],
+    [
+     3000,
+     0.0022
+    ],
+    [
+     10000,
+     0.0021
+    ],
+    [
+     50000,
+     0.0018
+    ],
+    [
+     50200,
+     0.0018
+    ]
+   ],
+   "stock": 15401
   },
   "C2845237": {
    "attrition": 0,

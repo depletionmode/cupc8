@@ -469,6 +469,12 @@ class Assembler:
             model = self.lvc[{'4': 'out', '1': 'oe', '2': 'in'}[pin]]
             die = self.uid('lv')
             corner = self.cfg.corner
+            if pin == '4' and self.cfg.get('tx_series'):
+                # what-if (hw/si/miso_options.py): a resistor in series with the
+                # buffer output, on the card, before the connector
+                after = self.uid('ts')
+                self.deck.lines.append(f'R{self.uid("ts")} {node} {after} {self.cfg.get("tx_series"):g}')
+                node = after
             self.deck.lines.append(f'L{self.uid("ll")} {node} {die} {LVC125_L_PKG:g}')
             self.deck.lines += models.ibis_device_lines(self.uid('v'), model, corner, die, 'vcc_ibis')
             if pin != '4':
@@ -550,6 +556,10 @@ def ibis_driver(edges, t_end, level=0.0):
         elif value == '74LVC1G125GW' and pin == '4':
             name, model = 'TI SN74LVC1G125 LVC1G125_OUT_33 (proxy)', asm.lvc['out']
             die = asm.uid('lvd')
+            if asm.cfg.get('tx_series'):     # what-if (hw/si/miso_options.py): R at the buffer output
+                after = asm.uid('ts')
+                asm.deck.lines.append(f'R{asm.uid("ts")} {after} {node} {asm.cfg.get("tx_series"):g}')
+                node = after
             asm.deck.lines.append(f'L{asm.uid("ll")} {die} {node} {LVC125_L_PKG:g}')
         else:
             raise ValueError(f'{ref}.{pin}: no IBIS driver for {value}')

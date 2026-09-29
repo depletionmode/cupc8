@@ -270,6 +270,15 @@ Also add to `order_spec`:
   a short neck with the via tented at least 0.25 mm beyond the pad edge, and
   move the partial ones in the centre field to the gaps between the 1.45 mm
   pads. The alternative is to order via plugging on this board.
+- **Status of I3, I5, I6 and io J2 (2026-09-29, Via-in-pad agent; source only, the
+  cards are not rebuilt in build/hw yet).** `kicadgen.pipeline(pad_via_clear=0.1)`
+  on gpu, io, storage, eink, system and wifi keeps every GND via's drill 0.1
+  mm outside every mask opening on a short neck: I5 (system Y1), I6 (the
+  module's GND vias, every one, not just the 11 edge pads) and io J2.5/J2.6
+  (shell) are fixed by that. I3 is **accepted, not plugged**: U1.57's one
+  thermal via stays open in the pad's paste gutter (plugging costs extra on
+  4 layers; the audit calls it low). Build fails on any other open hole
+  (`test/hw/test_via_in_pad.py`).
 - **Through-hole cost.** The main board has 328 hand-soldered joints. gpu J2,
   system J1 and eink J2 have 4, 4 and 9. Budget about $3.5 plus $0.0173 per
   joint, and a day.

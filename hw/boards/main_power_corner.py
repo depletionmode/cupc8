@@ -94,7 +94,9 @@ def lay(board):
     track([(32.4, 180.95), (32.4, 178.4)], 0.6, vbus)
     for at in ((32.4, 179.2), (32.4, 178.4)):
         via(at, vbus)
-    track([(32.4, 178.8), (26.2, 178.4)], 1.6, vbus, pcbnew.B_Cu)
+    # B4A9's B.Cu joint is 2.4 mm: at 1.6 mm it ran above the 20 C density with B4A9's contacts
+    # carrying the whole current
+    track([(32.4, 178.8), (26.2, 178.4)], 2.4, vbus, pcbnew.B_Cu)
     track(diag, 2.6, vbus, pcbnew.B_Cu)
     for k in range(4):
         f = k / 3
@@ -105,11 +107,17 @@ def lay(board):
     # VBUS_F: F1:2 straight up to U2's IN bar (south end, its escape);
     # C1 (the only capacitance ahead of the eFuse) on a spur
     track([(18.23, 161.2), (18.23, 161.7)], 0.3, vbus_f)
+    # the escape's joint to the bus: a tangent point has no copper width, so a 0.3 mm run and a 0.7 mm
+    # taper from 0.45 mm past U2's bars (as close as the neighbouring bar ends and corner pads allow)
+    track([(18.23, 161.7), (18.23, 162.6)], 0.3, vbus_f)
+    track([(18.23, 161.65), (18.23, 162.6)], 0.7, vbus_f)
     track([(18.23, 163.0), (18.0, 166.9)], 2.6, vbus_f)
     track([(19.0, 165.0), c1], 0.8, vbus_f)
 
     # 5V_SYS: U2's OUT (north end) west to C3 and up to R4:1, 2.0 mm on F.Cu
     track([(17.74, 158.8), (17.74, 157.6)], 0.3, v5)
+    track([(17.74, 157.6), (17.74, 156.7)], 0.3, v5)      # the same joint on the OUT bar's escape
+    track([(17.74, 158.35), (17.74, 156.7)], 0.7, v5)
     track([(17.74, 156.6), (10.0, 156.6), (9.8, 153.0)], 2.0, v5)
     track([(c3[0], 156.6), c3], 1.0, v5)
     # ... and east on B.Cu to C5 and the buck's two VIN pads
@@ -214,26 +222,3 @@ def lay_1v2(board):
         board.Add(k)
     return [net.GetNetname()]
 
-
-def finish(board):
-    """After routing (the pre-routing is bound by the route replay, these are
-    not): close the two escape-to-bus joints `lay` drew end to cap, a tangent
-    point with no copper width, with 0.7 mm tapers from 0.45 mm past U2's bars
-    (as close as the neighbouring bar ends and corner pads allow) into the
-    wide tracks; and widen J1 B4A9's B.Cu joint to 2.4 mm (at 1.6 mm it ran
-    above the 20 C density with B4A9's contacts carrying the whole current)."""
-    import pcbnew
-    mm = pcbnew.FromMM
-    for net, pts, width, layer in (
-            ("/VBUS_F", ((18.23, 161.7), (18.23, 162.6)), 0.3, pcbnew.F_Cu),
-            ("/VBUS_F", ((18.23, 161.65), (18.23, 162.6)), 0.7, pcbnew.F_Cu),
-            ("/5V_SYS", ((17.74, 157.6), (17.74, 156.7)), 0.3, pcbnew.F_Cu),
-            ("/5V_SYS", ((17.74, 158.35), (17.74, 156.7)), 0.7, pcbnew.F_Cu),
-            ("/VBUS", ((32.4, 178.8), (26.2, 178.4)), 2.4, pcbnew.B_Cu)):
-        t = pcbnew.PCB_TRACK(board)
-        t.SetStart(pcbnew.VECTOR2I(mm(pts[0][0]), mm(pts[0][1])))
-        t.SetEnd(pcbnew.VECTOR2I(mm(pts[1][0]), mm(pts[1][1])))
-        t.SetWidth(mm(width))
-        t.SetLayer(layer)
-        t.SetNet(board.FindNet(net))
-        board.Add(t)

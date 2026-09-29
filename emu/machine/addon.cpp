@@ -468,6 +468,40 @@ ENTRY(js_leds, {
   return list;
 })
 
+// the IO card's port switch in `slot`: {overload, en, nfaultLow, edges: [[ns, level]...]}
+// (EN edges, on the card's clock); null with no IO card there
+ENTRY(js_ioVbus, {
+  int32_t slot = 0;
+  napi_get_value_int32(env, a.argv[1], &slot);
+  napi_value none;
+  napi_get_null(env, &none);
+  for (auto &[s, c] : m->cards) {
+    auto *card = dynamic_cast<machine::Rp2040Card *>(c.get());
+    if (s != slot || !card || card->kind != "io") continue;
+    const auto &v = card->vbus;
+    napi_value o, b, edges;
+    napi_create_object(env, &o);
+    napi_get_boolean(env, v.overload, &b);
+    set(env, o, "overload", b);
+    napi_get_boolean(env, v.en, &b);
+    set(env, o, "en", b);
+    napi_get_boolean(env, v.overload && v.en, &b);
+    set(env, o, "nfaultLow", b);
+    napi_create_array_with_length(env, v.enEdges.size(), &edges);
+    for (size_t k = 0; k < v.enEdges.size(); k++) {
+      napi_value pair;
+      napi_create_array_with_length(env, 2, &pair);
+      napi_set_element(env, pair, 0, num(env, v.enEdges[k].first));
+      napi_get_boolean(env, v.enEdges[k].second, &b);
+      napi_set_element(env, pair, 1, b);
+      napi_set_element(env, edges, static_cast<uint32_t>(k), pair);
+    }
+    set(env, o, "edges", edges);
+    return o;
+  }
+  return none;
+})
+
 // sysctl's I2C expanders as they are now: [{address, pins: [port0, port1]}],
 // the level on each pin (an input pin: what the board puts on it; an output
 // pin: what it drives). Test hook for the presence and ID inputs.
@@ -870,7 +904,7 @@ napi_value init(napi_env env, napi_value exports) {
     napi_callback fn;
   } fns[] = {
       {"create", js_create},   {"powerOn", js_powerOn},   {"runFor", js_runFor},     {"ns", js_ns},
-      {"state", js_state},     {"leds", js_leds},     {"expanders", js_expanders},  {"progTarget", js_progTarget},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
+      {"state", js_state},     {"leds", js_leds},     {"expanders", js_expanders},  {"progTarget", js_progTarget}, {"ioVbus", js_ioVbus},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
       {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead}, {"consoleOpen", js_consoleOpen},   {"setThreaded", js_setThreaded},
       {"stats", js_stats},     {"cards", js_cards},       {"spiLog", js_spiLog},     {"keyboard", js_keyboard},
       {"destroy", js_destroy}, {"sdInsert", js_sdInsert}, {"sdRemove", js_sdRemove}, {"sdCard", js_sdCard},

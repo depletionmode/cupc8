@@ -1339,6 +1339,202 @@ SEED_RIPUP_NETS = ("/1V2_LDO",)
 ROUTE_SEEDED = True        # _finish_route: the salt-1/salt-9 repairs are in the seed already
 
 
+def _unbridge_vias(board, skip=()):
+    """A via that joins copper on one layer only, but two or more pieces of it (a fan-out via that
+    the hand-router used as a landing: the pad's stub ends in it and the route starts at its rim),
+    is KiCad's via_dangling and cannot simply go: it is what holds those pieces together. It is
+    replaced by short tracks from its centre to each piece, as wide as the narrowest track it
+    touches (inside the via's own copper and the tracks' end caps: nothing new is close to
+    anything). Vias on the `skip` nets (planes) are left alone. Returns how many were replaced."""
+    import math
+    import pcbnew
+    to = pcbnew.ToMM
+    tracks = board.Tracks()
+    layers = list(board.GetEnabledLayers().CuStack())
+    segs, vias = [], []
+    for i in range(len(tracks)):                 # plain numbers first: SWIG proxies do not survive edits
+        t = tracks[i]
+        a, b = t.GetStart(), t.GetEnd()
+        if t.Type() == pcbnew.PCB_VIA_T:
+            vias.append((i, t.GetNetname(), a.x, a.y, t.Cast().GetWidth(pcbnew.F_Cu) / 2))
+        elif t.Type() == pcbnew.PCB_TRACE_T:
+            segs.append((t.GetNetname(), t.GetLayer(), a.x, a.y, b.x, b.y, t.GetWidth() / 2))
+    pads = {}
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            pads.setdefault(p.GetNetname(), []).append(p)
+
+    def seg_dist(x, y, ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        k = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+        return math.hypot(x - ax - k * dx, y - ay - k * dy)
+    gone, links = [], []
+    for i, net, x, y, r in vias:
+        if net in skip or not net:
+            continue
+        touching = {}                            # layer -> [(width, end point) of each track it meets]
+        for n, layer, ax, ay, bx, by, w in segs:
+            if n == net and seg_dist(x, y, ax, ay, bx, by) <= r + w + 1:
+                # the piece's nearest point: the via's centre linked to that
+                dx, dy = bx - ax, by - ay
+                k = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+                touching.setdefault(layer, []).append((2 * w, (ax + k * dx, ay + k * dy), layer))
+        for p in pads.get(net, ()):
+            for layer in layers:
+                if p.IsOnLayer(layer) and p.HitTest(pcbnew.VECTOR2I(int(x), int(y)), int(r)):
+                    touching.setdefault(layer, []).append(None)
+        used = [l for l, items in touching.items() if items]
+        if len(used) != 1 or len(touching[used[0]]) < 2:
+            continue
+        pieces = [t for t in touching[used[0]] if t]
+        if len(pieces) < 2:                      # pads and one track: the pad is joined by the track alone
+            continue
+        width = min(t[0] for t in pieces)
+        gone.append(i)
+        links += [(net, used[0], x, y, int(px), int(py), int(width)) for _, (px, py), _ in pieces
+                  if math.hypot(px - x, py - y) > 1]
+    for i in sorted(gone, reverse=True):
+        board.Delete(tracks[i])
+    nets = board.GetNetsByName()
+    for net, layer, x, y, px, py, width in links:
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(int(x), int(y)))
+        t.SetEnd(pcbnew.VECTOR2I(px, py))
+        t.SetWidth(width)
+        t.SetLayer(layer)
+        t.SetNet(nets[net])
+        t.SetLocked(True)
+        board.Add(t)
+    return len(gone)
+
+
+def _node_joins(board, skip=()):
+    """Copper that KiCad counts as joined only because it overlaps (a track's end inside another
+    track's body, inside a via's disc, inside a pad away from its centre) gets a node where it
+    joins: the other track is split there and a link (as wide as the track that ends) runs from
+    the end to the node, inside both pieces' copper. KiCad's connectivity does not change; what
+    measures paths along the copper (the SI extraction, rail_reset_window.py) needs the shared
+    point, since it follows track ends. Nets in `skip` (the pours) are left alone. Returns the
+    number of joins made."""
+    import math
+    import pcbnew
+    tracks = board.Tracks()
+    segs, vias, ends = {}, {}, []
+    for i in range(len(tracks)):                 # plain numbers first: SWIG proxies do not survive edits
+        t = tracks[i]
+        net = t.GetNetname()
+        a, b = t.GetStart(), t.GetEnd()
+        if net in skip or not net:
+            continue
+        if t.Type() == pcbnew.PCB_VIA_T:
+            vias.setdefault(net, []).append((a.x, a.y, t.Cast().GetWidth(pcbnew.F_Cu) / 2))
+        elif t.Type() == pcbnew.PCB_TRACE_T:
+            segs.setdefault(net, []).append((i, t.GetLayer(), a.x, a.y, b.x, b.y, t.GetWidth()))
+    pads = {}
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            pads.setdefault(p.GetNetname(), []).append(p)
+    splits = {}                                  # track index -> [(k, x, y)]
+    links = []                                   # (net, layer, x, y, px, py, width)
+    for net, ss in segs.items():
+        nodes = {(l, x, y) for _, l, ax, ay, bx, by, w in ss for l, x, y in ((l, ax, ay), (l, bx, by))}
+        via_at = {(x, y) for x, y, _ in vias.get(net, ())}
+        for i, layer, ax, ay, bx, by, w in ss:
+            for x, y in ((ax, ay), (bx, by)):
+                # a node already: another track's end, a via's or a pad's centre
+                other_end = sum(1 for j, l2, cx, cy, dx, dy, _ in ss if j != i and l2 == layer and
+                                ((cx, cy) == (x, y) or (dx, dy) == (x, y)))
+                if other_end or (x, y) in via_at or \
+                        any(p.IsOnLayer(layer) and (p.GetPosition().x, p.GetPosition().y) == (x, y) for p in pads.get(net, ())):
+                    continue
+                target = None
+                for vx, vy, r in vias.get(net, ()):
+                    if math.hypot(x - vx, y - vy) <= r:
+                        target = (vx, vy)
+                        break
+                if target is None:
+                    for p in pads.get(net, ()):
+                        if p.IsOnLayer(layer) and p.HitTest(pcbnew.VECTOR2I(x, y), 0):
+                            target = (p.GetPosition().x, p.GetPosition().y)
+                            break
+                if target is None:
+                    for j, l2, cx, cy, dx, dy, w2 in ss:
+                        if j == i or l2 != layer:
+                            continue
+                        vx, vy = dx - cx, dy - cy
+                        sq = vx * vx + vy * vy
+                        if not sq:
+                            continue
+                        k = max(0.0, min(1.0, ((x - cx) * vx + (y - cy) * vy) / sq))
+                        px, py = int(round(cx + k * vx)), int(round(cy + k * vy))
+                        if math.hypot(x - px, y - py) <= w2 / 2:
+                            # a cut within 0.02 mm of an earlier one is that cut (no sliver between them)
+                            near = [c for c in splits.get(j, ()) if math.hypot(c[1] - px, c[2] - py) < 20000] + \
+                                [(0, ex, ey) for ex, ey in ((cx, cy), (dx, dy)) if math.hypot(ex - px, ey - py) < 20000]
+                            if near:
+                                px, py = near[0][1], near[0][2]
+                            target = (px, py)
+                            if 0.0 < k < 1.0 and not near:
+                                splits.setdefault(j, []).append((k, px, py))
+                            break
+                if target is not None and math.hypot(x - target[0], y - target[1]) > 1:
+                    links.append((net, layer, x, y, target[0], target[1], w))
+    # a via or pad whose centre lies inside a track's body (a track passing through it) is a node too
+    for net, ss in segs.items():
+        anchors = [(vx, vy, r + 0.0, None) for vx, vy, r in vias.get(net, ())] + \
+            [(p.GetPosition().x, p.GetPosition().y, 0.0, p) for p in pads.get(net, ())]
+        for vx, vy, r, pad in anchors:
+            for j, layer, cx, cy, dx, dy, w in ss:
+                if pad is not None and not pad.IsOnLayer(layer):
+                    continue
+                ex, ey = dx - cx, dy - cy
+                sq = ex * ex + ey * ey
+                if not sq or (cx, cy) == (vx, vy) or (dx, dy) == (vx, vy):
+                    continue
+                k = ((vx - cx) * ex + (vy - cy) * ey) / sq
+                px, py = int(round(cx + k * ex)), int(round(cy + k * ey))
+                gap = math.hypot(vx - px, vy - py)
+                if not (0.0 < k < 1.0) or gap > w / 2 + r or math.hypot(px - cx, py - cy) < 20000 or \
+                        math.hypot(px - dx, py - dy) < 20000:
+                    continue
+                if any(math.hypot(c[1] - px, c[2] - py) < 20000 for c in splits.get(j, ())):
+                    px, py = next((c[1], c[2]) for c in splits[j] if math.hypot(c[1] - px, c[2] - py) < 20000)
+                else:
+                    splits.setdefault(j, []).append((k, px, py))
+                if math.hypot(vx - px, vy - py) > 1:
+                    links.append((net, layer, px, py, vx, vy, w))
+    nets = board.GetNetsByName()
+    made = []
+    for j, cuts in splits.items():
+        t = tracks[j]
+        layer, width, net = t.GetLayer(), t.GetWidth(), t.GetNet()
+        a, b = t.GetStart(), t.GetEnd()
+        pts = sorted(set(cuts))
+        chain = [(a.x, a.y)] + [(px, py) for _, px, py in pts] + [(b.x, b.y)]
+        chain = [c for n, c in enumerate(chain) if n == 0 or c != chain[n - 1]]
+        t.SetEnd(pcbnew.VECTOR2I(*chain[1]))
+        made += [(net, layer, width, chain[n], chain[n + 1]) for n in range(1, len(chain) - 1)]
+    for net, layer, width, p0, p1 in made:
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(*p0))
+        t.SetEnd(pcbnew.VECTOR2I(*p1))
+        t.SetWidth(width)
+        t.SetLayer(layer)
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
+    for net, layer, x, y, px, py, width in links:
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pcbnew.VECTOR2I(x, y))
+        t.SetEnd(pcbnew.VECTOR2I(px, py))
+        t.SetWidth(width)
+        t.SetLayer(layer)
+        t.SetNet(nets[net])
+        t.SetLocked(True)
+        board.Add(t)
+    return len(links)
+
+
 def _seeded_route(board, workdir):
     """The route needs no router: main-route-seed.json (DeepPCB rev10's copper
     plus this revision's own power copper, applied in prepare()) and
@@ -1350,13 +1546,22 @@ def _seeded_route(board, workdir):
     are files, no search runs here."""
     import pcbnew
     _, items = main_handroute.apply(board)
+    # fan-out vias and stubs the seeds did not need (the input corner's box was re-laid): copper that
+    # meets nothing; the planes' vias (GND, +3V3, and +1V2's island) are joined by pours filled later
+    planes = PLANE_NETS + ("/+5V",)                # /+5V: the locked inner trunk
+    unbridged = _unbridge_vias(board, planes)
+    # +1V2's vias inside the island and the corridor are joined by B.Cu pours, filled later
+    x0, y0, x1, y1 = main_power_corner.ISLAND       # 1 mm out: a via's rim reaches the pour's edge from that far
+    pours = [tuple(int(v * 1e6) for v in box) for box in ((x0 - 1, y0 - 1, x1 + 1, y1 + 1), (107.0, 55.0, 124.0, 85.0))]
+    dangling = kg.remove_dangling(board, ("/GND", "/+3V3", "/+5V"), trim=True, keep_vias=pours)
+    joins = _node_joins(board, PLANE_NETS + ("/+5V",))
     probe = os.path.join(workdir, "main-seeded.kicad_pcb")
     pcbnew.SaveBoard(probe, board)
     shutil.copyfile(os.path.join(workdir, "main.kicad_pro"), os.path.join(workdir, "main-seeded.kicad_pro"))
     left = main_handroute.leftovers(main_handroute.Board(probe))
     open_links = sum(len(comps) - 1 for _, comps in left)
-    print("hand-route seed: %d items, %d connections open%s" %
-          (items, open_links, "" if open_links else " (Freerouting skipped)"), end=" ", flush=True)
+    print("hand-route seed: %d items, %d bridging vias relinked, %d dangling pieces removed, %d overlap joins noded, %d connections open%s" %
+          (items, unbridged, dangling, joins, open_links, "" if open_links else " (Freerouting skipped)"), end=" ", flush=True)
     return open_links
 
 
@@ -1727,9 +1932,8 @@ def _finish_route(board, replay_salt=None):
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     if ROUTE_SEEDED:
         # the route starts from main_seed's copper, which already carries
-        # the salt-9 repairs below; the input corner's two escape joints and
-        # the silk/mask clean-up remain
-        main_power_corner.finish(board)
+        # the salt-9 repairs below (the input corner's escape joints are
+        # laid by main_power_corner.lay); the silk/mask clean-up remains
         _clear_main_silk_mask(board)
         return
 

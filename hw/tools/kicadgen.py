@@ -1713,11 +1713,16 @@ def canonical_dsn(text, seed=0):
     return dump(tree).replace("(string_quote QUOTE_CHAR)", '(string_quote ")')
 
 
-def remove_dangling(board, pours=()):
+def remove_dangling(board, pours=(), trim=False, keep_vias=()):
     """What Freerouting sometimes leaves behind: a via joined on one layer
     only, or a track whose end meets nothing. Removed until none is left, as
     KiCad's own cleanup does. Nets in `pours` are left alone: their pours
-    are not filled yet, so their vias would look dangling. Returns the count.
+    are not filled yet, so their vias would look dangling. `trim`: a track
+    with a free end that other copper of its net meets along its body (a
+    tap on it) carries that copper's connection, so it is shortened to the
+    farthest such tap instead of removed. `keep_vias`: boxes (x0, y0, x1, y1, nm) in which no via is
+    removed (a via there is joined by a pour that is not filled yet). Returns the count of removed
+    items (trimmed ones are not counted).
     Every copper layer counts (inner signal layers too). The geometry is read
     once into plain numbers: on a board with thousands of tracks, the SWIG
     proxies of Cast() items stop working part-way through (Python 3.14)."""
@@ -1746,6 +1751,34 @@ def remove_dangling(board, pours=()):
         return math.hypot(x - ax - k * dx, y - ay - k * dy)
 
     gone = set()
+    trimmed = {}                                 # index -> (ax, ay, bx, by): the shortened track
+
+    def taps(i, net):
+        """Positions t in [0, 1] along track i where other copper of its net (a pad, a via, another
+        track's end) meets its body, that copper not being removed."""
+        _, ax, ay, bx, by, w, layer = next(r for r in segs[net] if r[0] == i)
+        dx, dy = bx - ax, by - ay
+        sq = dx * dx + dy * dy
+        if not sq:
+            return []
+        found = []
+
+        def at(x, y, reach):
+            k = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / sq))
+            if math.hypot(x - ax - k * dx, y - ay - k * dy) <= w + reach:
+                found.append(k)
+        for p in pads.get(net, ()):
+            if p.IsOnLayer(layer):
+                bb = p.GetBoundingBox()
+                at(bb.GetCenter().x, bb.GetCenter().y, max(bb.GetWidth(), bb.GetHeight()) // 2)
+        for j, vx, vy, r in vias.get(net, ()):
+            if j not in gone:
+                at(vx, vy, r)
+        for j, cx, cy, ex, ey, w2, l in segs[net]:
+            if j != i and j not in gone and l == layer:
+                at(cx, cy, w2)
+                at(ex, ey, w2)
+        return found
 
     def joined(x, y, layer, net, reach, skip):
         """anything of `net` on `layer` at (x, y): a pad, a via, another track"""
@@ -1766,17 +1799,36 @@ def remove_dangling(board, pours=()):
         more = set()
         for net, vs in vias.items():
             for i, x, y, r in vs:
-                if i not in gone and sum(1 for l in copper if joined(x, y, l, net, r, i)) < 2:
+                if i not in gone and sum(1 for l in copper if joined(x, y, l, net, r, i)) < 2 and \
+                        not any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in keep_vias):
                     more.add(i)
+        cut = {}
         for net, ss in segs.items():
             for i, ax, ay, bx, by, w, l in ss:
                 if i not in gone and not (joined(ax, ay, l, net, w, i) and joined(bx, by, l, net, w, i)):
+                    ks = taps(i, net) if trim and i not in trimmed else []
+                    if ks and max(ks) > min(ks):
+                        # keep the part between the taps; an end that is joined keeps its place
+                        t0 = 0.0 if joined(ax, ay, l, net, w, i) else min(ks)
+                        t1 = 1.0 if joined(bx, by, l, net, w, i) else max(ks)
+                        if t1 > t0:
+                            cut[i] = (net, (ax + (bx - ax) * t0, ay + (by - ay) * t0,
+                                            ax + (bx - ax) * t1, ay + (by - ay) * t1))
+                            continue
                     more.add(i)
-        if not more:
+        if not more and not cut:
             break
+        for i, (net, ends) in cut.items():
+            trimmed[i] = tuple(int(round(v)) for v in ends)
+            segs[net] = [(j, *trimmed[i], w, l) if j == i else (j, ax, ay, bx, by, w, l)
+                         for j, ax, ay, bx, by, w, l in segs[net]]
         gone |= more
     # removed from the end, by index, each proxy dropped at once: holding
     # proxies of removed items breaks SWIG for the rest of the process
+    for i, (ax, ay, bx, by) in trimmed.items():
+        if i not in gone:
+            tracks[i].SetStart(pcbnew.VECTOR2I(ax, ay))
+            tracks[i].SetEnd(pcbnew.VECTOR2I(bx, by))
     for i in sorted(gone, reverse=True):
         board.Delete(tracks[i])
     return len(gone)
@@ -2139,7 +2191,55 @@ def ground_fingers(board, net, tab_top, rise=1.0, rise_top=4.5, width=0.5, via=0
     return n
 
 
-def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2, margin=0.0):
+def _pad_gap(x, y, box):
+    """Distance (mm) from (x, y) to the axis-aligned box (x0, y0, x1, y1): 0 inside."""
+    return math.hypot(max(box[0] - x, 0.0, x - box[2]), max(box[1] - y, 0.0, y - box[3]))
+
+
+def _mask_openings(board):
+    """Every pad with a solder-mask opening, as (REF.PAD, (x0, y0, x1, y1) in
+    mm): the pad's bounding box grown by the board's mask expansion (a
+    rotated pad's box is a little generous, never short). NPTH holes are left
+    out: they are holes, not openings over copper."""
+    import pcbnew
+    to = pcbnew.ToMM
+    out = []
+    for fp in board.GetFootprints():
+        for p in fp.Pads():
+            if p.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:
+                continue
+            if not (p.IsOnLayer(pcbnew.F_Mask) or p.IsOnLayer(pcbnew.B_Mask)):
+                continue
+            bb = p.GetBoundingBox()
+            g = SOLDER_MASK_EXPANSION
+            out.append(("%s.%s" % (fp.GetReference(), p.GetNumber()),
+                        (to(bb.GetLeft()) - g, to(bb.GetTop()) - g, to(bb.GetRight()) + g, to(bb.GetBottom()) + g)))
+    return out
+
+
+def vias_in_pad_openings(board, clear=0.1, allowed=()):
+    """Vias whose drill is inside, or within `clear` mm of, a pad's solder-mask
+    opening: an open hole in a pad. JLC's SMT line wicks solder down such a
+    hole (its own words: "flows into the vias and may cause weak soldering"),
+    and plugging it costs extra on 4 layers. A tented via beside a pad
+    (copper touching it is fine) does not count. `allowed` are "REF.PAD"
+    names the board accepts (an exposed pad's thermal via, audit I3).
+    Returns ["REF.PAD via at x,y", ...]."""
+    import pcbnew
+    to = pcbnew.ToMM
+    openings = _mask_openings(board)
+    tracks = board.Tracks()
+    bad = []
+    for v in [tracks[i].Cast() for i in range(len(tracks)) if tracks[i].Type() == pcbnew.PCB_VIA_T]:
+        x, y = to(v.GetPosition().x), to(v.GetPosition().y)
+        need = to(v.GetDrillValue()) / 2 + clear
+        for name, box in openings:
+            if name not in allowed and _pad_gap(x, y, box) < need - 1e-4:
+                bad.append("%s via at %.2f,%.2f" % (name, x, y))
+    return bad
+
+
+def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2, margin=0.0, pad_clear=None, in_pad_ok=()):
     """Before routing, give every SMD pad on `net` (edge fingers aside) a
     short track to its own via, pointing away from a small part's centre
     (towards a big one's), so the
@@ -2154,7 +2254,15 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2, margin=0.0
     already grown by a clearance, then adds its own; each of those vias
     KiCad passes stayed a violation for the whole run (~1 per via: ~117 on
     the main board, found with `freerouting -de board.dsn -drc report.json`).
-    Returns the vias placed."""
+    `pad_clear` (mm), if given, keeps every via's drill that far outside every
+    pad's solder-mask opening, its own pad's and the net's other pads' too
+    (no open hole in a pad: JLC via-in-pad, audit I3/I5/I6), and looks for the
+    nearest such spot in any direction, on a 0.05 mm grid, when the fixed fan
+    of radii and angles has none (it lands vias in a neighbouring pad of the
+    same net, in a row of 0.8 mm-pitch module pads, and in a big pad). The via
+    then sits beside its pad on the pad's own short neck. `in_pad_ok` names "REF.PAD"
+    pads that keep the old placement, in the pad (an exposed pad's thermal
+    via, an accepted open hole). Returns the vias placed."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
     ni = board.FindNet(net)
@@ -2179,6 +2287,10 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2, margin=0.0
         if z.GetIsRuleArea() and z.GetZoneName() == "logo":
             bb = z.GetBoundingBox()
             others.append((to(bb.GetLeft()), to(bb.GetTop()), to(bb.GetRight()), to(bb.GetBottom()), 0.0))
+    openings = _mask_openings(board) if pad_clear is not None else []
+    # the hole's clearance, and the via's copper clear of the pad too: a ring that just clips
+    # a pad's corner leaves a sliver of copper (KiCad: connection too narrow), and the neck joins them
+    hole_reach = max(drill / 2 + (pad_clear or 0.0), via / 2 + 0.02)
     vias = []
     edge = board.GetBoardEdgesBoundingBox()
     ex0, ey0, ex1, ey1 = to(edge.GetLeft()) + 0.8, to(edge.GetTop()) + 0.8, to(edge.GetRight()) - 0.8, to(edge.GetBottom()) - 0.8
@@ -2208,53 +2320,69 @@ def ground_fanout(board, net, via=0.6, drill=0.3, track=0.3, gap=0.2, margin=0.0
         layer = pcbnew.F_Cu if p.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu
         # a fine-pitch pin (a QFN's TESTEN between two signals) leaves at its own width
         w = min(track, to(min(p.GetSize().x, p.GetSize().y)))
-        placed = False
         # after the fan of directions, straight along the pad's long side
         # (its pin's own lane, the only way out between fine-pitch neighbours)
         lane = (math.pi / 2 if p.GetSize().y > p.GetSize().x else 0.0) + (p.GetOrientation().AsRadians())
         if math.cos(lane - base) < 0:
             lane += math.pi
-        for r in (1.0, 1.3, 1.6, 2.0):
-            for a in [base + math.radians(da) for da in (0, 30, -30, 60, -60, 90, -90, 135, -135, 180)] + [lane]:
-                vx, vy = cx + r * math.cos(a), cy + r * math.sin(a)
-                if not (ex0 < vx < ex1 and ey0 < vy < ey1):
-                    continue
-                if not clear_of(vx, vy, via / 2 + gap, margin):
-                    continue
-                if any(b[0] - g < vx < b[2] + g and b[1] - g < vy < b[3] + g
-                       for b in own for g in (via / 2 + gap + margin,)):
-                    continue
-                if any(math.hypot(vx - ox, vy - oy) < via + 0.25 for ox, oy in vias):
-                    continue
-                if any(l[4] != net and seg_dist(vx, vy, *l[:4]) < via / 2 + gap + 0.35 for l in locked):   # 0.35: clears another net's via too
-                    continue
-                samples = [(cx + (vx - cx) * i / 12, cy + (vy - cy) * i / 12) for i in range(13)]
-                if not all(clear_of(sx, sy, w / 2 + gap) for sx, sy in samples):
-                    continue
-                if any(l[4] != net and seg_dist(sx, sy, *l[:4]) < w / 2 + gap + 0.25
-                       for l in locked for sx, sy in samples):
-                    continue
-                t = pcbnew.PCB_TRACK(board)
-                t.SetStart(p.GetPosition())
-                t.SetEnd(pcbnew.VECTOR2I(mm(vx), mm(vy)))
-                t.SetWidth(mm(w))
-                t.SetLayer(layer)
-                t.SetNet(ni)
-                t.SetLocked(True)
-                board.Add(t)
-                v = pcbnew.PCB_VIA(board)
-                v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(vy)))
-                v.SetWidth(mm(via))
-                v.SetDrill(mm(drill))
-                v.SetNet(ni)
-                v.SetLocked(True)
-                board.Add(v)
-                vias.append((vx, vy))
-                n += 1
-                placed = True
-                break
-            if placed:
-                break
+        key = "%s.%s" % (fp.GetReference(), p.GetNumber())
+        candidates = [(cx + r * math.cos(a), cy + r * math.sin(a))
+                      for r in (1.0, 1.3, 1.6, 2.0)
+                      for a in [base + math.radians(da) for da in (0, 30, -30, 60, -60, 90, -90, 135, -135, 180)] + [lane]]
+        if pad_clear is not None and key not in in_pad_ok:
+            # the fan stays first (a via that already keeps clear stays where it was); only when it
+            # has no spot: the nearest one to the pad, within 1.6 mm of it, that keeps the drill off
+            # every mask opening; among equals, the way a via would leave this pad anyway
+            box = next(b for k, b in openings if k == key)
+            found = []
+            for ix in range(int((box[0] - 1.6) / 0.05), int((box[2] + 1.6) / 0.05) + 1):
+                for iy in range(int((box[1] - 1.6) / 0.05), int((box[3] + 1.6) / 0.05) + 1):
+                    vx, vy = ix * 0.05, iy * 0.05
+                    d = _pad_gap(vx, vy, box)
+                    if d > 1.6:
+                        continue
+                    dev = abs((math.atan2(vy - cy, vx - cx) - base + math.pi) % (2 * math.pi) - math.pi)
+                    found.append((d + 0.25 * dev / math.pi, vx, vy))
+            candidates += [(vx, vy) for _, vx, vy in sorted(found)]
+        for vx, vy in candidates:
+            if not (ex0 < vx < ex1 and ey0 < vy < ey1):
+                continue
+            if pad_clear is not None and any(_pad_gap(vx, vy, ob) < hole_reach for k, ob in openings
+                                             if k != key or key not in in_pad_ok):
+                continue
+            if not clear_of(vx, vy, via / 2 + gap, margin):
+                continue
+            if any(b[0] - g < vx < b[2] + g and b[1] - g < vy < b[3] + g
+                   for b in own for g in (via / 2 + gap + margin,)):
+                continue
+            if any(math.hypot(vx - ox, vy - oy) < via + 0.25 for ox, oy in vias):
+                continue
+            if any(l[4] != net and seg_dist(vx, vy, *l[:4]) < via / 2 + gap + 0.35 for l in locked):   # 0.35: clears another net's via too
+                continue
+            samples = [(cx + (vx - cx) * i / 12, cy + (vy - cy) * i / 12) for i in range(13)]
+            if not all(clear_of(sx, sy, w / 2 + gap) for sx, sy in samples):
+                continue
+            if any(l[4] != net and seg_dist(sx, sy, *l[:4]) < w / 2 + gap + 0.25
+                   for l in locked for sx, sy in samples):
+                continue
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(p.GetPosition())
+            t.SetEnd(pcbnew.VECTOR2I(mm(vx), mm(vy)))
+            t.SetWidth(mm(w))
+            t.SetLayer(layer)
+            t.SetNet(ni)
+            t.SetLocked(True)
+            board.Add(t)
+            v = pcbnew.PCB_VIA(board)
+            v.SetPosition(pcbnew.VECTOR2I(mm(vx), mm(vy)))
+            v.SetWidth(mm(via))
+            v.SetDrill(mm(drill))
+            v.SetNet(ni)
+            v.SetLocked(True)
+            board.Add(v)
+            vias.append((vx, vy))
+            n += 1
+            break
     return n
 
 
@@ -2837,7 +2965,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0, route_fanout=True,
              fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=(),
-             post_route=None, replay=None, seeded_route=None):
+             post_route=None, replay=None, seeded_route=None, pad_via_clear=None, pad_via_ok=()):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -2867,6 +2995,12 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     `replay`, for the main board only, is a validated sesreplay snapshot. It
     imports that one content-bound SES without invoking Freerouting, then
     continues through the same post-route and fabrication steps.
+
+    `pad_via_clear` (mm, e.g. 0.1): no via's drill inside or nearer than this
+    to a pad's solder-mask opening, JLC's via-in-pad rule (ground_fanout
+    places them so, and the step after the pours fails on any that is not).
+    `pad_via_ok`: "REF.PAD" names exempt (an exposed pad's thermal via, which
+    stays open in the pad: audit I3). Left off, the board is built as before.
 
     `logo_keepout`: no tracks or vias on the copper under the logo (silk_keepout),
     and the silkscreen step fails on any there.
@@ -2943,7 +3077,8 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             state["escaped"] = key_escapes(b, outline[3], skip=pour_nets)
         # every poured net's pads get a via: GND, and any net on a plane
         # (build_board's (net, layers) zones), which is reached no other way
-        state["fanout"] = sum(ground_fanout(b, n, margin=fanout_margin) for n in pour_nets)
+        state["fanout"] = sum(ground_fanout(b, n, margin=fanout_margin, pad_clear=pad_via_clear,
+                                                 in_pad_ok=pad_via_ok) for n in pour_nets)
         if prepare:                   # the board's own locked pre-routing, before Freerouting
             # nets it returns are escapes of its own: checked like the key-notch ones
             state["escaped"] = list(state.get("escaped", [])) + list(prepare(b) or [])
@@ -2973,12 +3108,13 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         # KiCad's DRC on the routed copper throws such a try away too
         escaped = tuple(state.get("escaped", ()))
         routed = os.path.join(out, name + "-routed.kicad_pcb")
+        seeded = False
         for round_ in range(1 if replay is not None else 3):
             if round_:
                 state["b"] = pcbnew.LoadBoard(pcb)       # the board as built, unrouted
             try:
                 if seeded_route and replay is None and not round_ and seeded_route(state["b"], out) == 0:
-                    pass                     # the seeds route every connection: no router run
+                    seeded = True            # the seeds route every connection: no router run
                 else:
                     autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
                               salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
@@ -3003,6 +3139,9 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
                              if v["type"] == "clearance"]
                 if not too_close:
                     break
+            if seeded:                       # the recorded route is wrong: hours of the router would not fix that
+                raise RuntimeError("the recorded route left %s open or copper too close (%s)" %
+                                   (open_nets, "; ".join(too_close[:3])))
         else:
             if replay is not None:
                 raise RuntimeError('SES replay left %s open or copper too close (%s)' %
@@ -3056,6 +3195,13 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         return "%d stitching vias" % n + ("; designators moved off vias: " + " ".join(moved) if moved else "") + \
             ("; NOT JOINED: " + "; ".join(UNJOINED) if UNJOINED else "")
     step("stitch + zones + save", fill)
+
+    def open_holes():
+        bad = vias_in_pad_openings(state["b"], pad_via_clear, pad_via_ok)
+        if bad:
+            raise SystemExit("vias with their drill in a pad's mask opening (JLC via-in-pad):\n  " + "\n  ".join(bad))
+    if pad_via_clear is not None:
+        step("no open via in a pad", open_holes)
 
     def silk():
         bad = check_silk(state["b"], artwork=logo_keepout, labels=labels) + check_models()

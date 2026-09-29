@@ -32,12 +32,17 @@ def implemented_checks():
     return {row['id'] for row in rows if row.get('cmd')}
 
 
+def board_module(name):
+    spec = importlib.util.spec_from_file_location(f'cupc8_board_{name}', ROOT / 'hw/boards' / f'{name}.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def exported_cards(directory):
     result = {}
     for name in CARDS:
-        spec = importlib.util.spec_from_file_location(f'cupc8_board_{name}', ROOT / 'hw/boards' / f'{name}.py')
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = board_module(name)
         sch = directory / f'{name}.kicad_sch'
         net = directory / f'{name}.net'
         module.schematic(str(sch), ())
@@ -924,7 +929,7 @@ def cpu_status_routes(main, cpu, main_board, cpu_board):
 
 
 def main_cpu_data_routes(main, board):
-    """Bind chipset data pads, eight 33-ohm channels and weak keepers."""
+    """Bind chipset data pads, eight 56-ohm channels and weak keepers."""
     chipset_pads = ('20', '18', '19', '17', '9', '7', '10', '8')
     socket_pads = ('B23', 'B25', 'B26', 'B28', 'B29', 'B31', 'B32', 'B34')
     loaded_board = parsed_tree = None
@@ -1703,7 +1708,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             'cs': output_bits[signals['cs']], 'irq': int(signals['irq'].removeprefix('SLOT_nIRQ')),
             'miso': signals['miso'] == 'SPI_MISO'})
     manifest['runtime']['miso_idle'] = 1  # verified 47k pull-up above
-    manifest['runtime']['series_delay_ns'] = round(2.2 * 33 * 15e-12 * 1e9, 3)
+    # 10-90 % of the larger CPU-bus series R (card RN1-8 68 ohm; main R21-R34 are
+    # 56) into 15 pF: the same bound as hw/timing/cpubus_budget.py
+    manifest['runtime']['series_delay_ns'] = round(2.2 * 68 * 15e-12 * 1e9, 3)
     # Datasheet worst-case tAA: ISSI 45 ns, SST39VF040 70 ns. Route delay is
     # charged on launch and return using the slow FR4 stripline bound of
     # 7 ps/mm (the same assumption as hw/timing/*_budget.py).
@@ -2138,8 +2145,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
                                   'to': f'storage.J2.{connector_pin}',
                                   'net': signal, 'runtime': 'storage_sd_socket'})
     manifest['runtime']['storage_sd_socket'] = True
-    # All four HDMI differential lanes leave the RP2040 through the 270 ohm
-    # packs; the capture endpoint represents the receptacle, not MCU GPIOs.
+    # All four HDMI differential lanes leave the RP2040 through the series
+    # packs (gpu.py TMDS_R, 360 ohm: the RP2040 IIOVSS budget, GC-007); the
+    # capture endpoint represents the receptacle, not MCU GPIOs.
+    tmds_ohms = board_module('gpu').TMDS_R
     hdmi_contacts = {'D2P': '1', 'D2N': '3', 'D1P': '4', 'D1N': '6',
                      'D0P': '7', 'D0N': '9', 'CKP': '10', 'CKN': '12'}
     for lane, connector_pin in hdmi_contacts.items():
@@ -2147,10 +2156,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
                   if ref == 'U1' and net == f'/TMDS_{lane}']
         if len(source) != 1:
             raise ValueError(f'gpu TMDS_{lane}: RP2040 pad missing')
-        resistor = path(cards['gpu'], source[0], ('J2', connector_pin), '270')
+        resistor = path(cards['gpu'], source[0], ('J2', connector_pin), tmds_ohms)
         manifest['paths'].append({'from': f'gpu.U1.{source[0][1]}',
                                   'to': f'gpu.J2.{connector_pin}', 'series': resistor,
-                                  'ohms': 270, 'runtime': 'gpu_hdmi_link'})
+                                  'ohms': int(tmds_ohms), 'runtime': 'gpu_hdmi_link'})
     manifest['runtime']['gpu_hdmi_link'] = True
     epd_contacts = {'EPD_DIN': '3', 'EPD_CLK': '4', 'EPD_nCS': '5',
                     'EPD_DC': '6', 'EPD_nRST': '7', 'EPD_BUSY': '8',

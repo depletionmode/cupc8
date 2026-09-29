@@ -49,6 +49,20 @@ Shared rules:
   card's logo is the 10 mm size (milestone-1.md's minimum): with the 12 mm
   one's keep-out, Freerouting left QFN nets unrouted or pour pockets
   unjoined at every position tried.
+- **No open via hole in a pad** (JLC via-in-pad, audit I3/I5/I6 and io J2;
+  `pipeline(pad_via_clear=0.1, pad_via_ok=("U1.57",))` on gpu, io, storage,
+  eink, system and wifi): `ground_fanout` keeps each GND via's drill 0.1 mm
+  or more outside every pad's solder-mask opening (its own pad's and the
+  net's other pads', a big shell pad's too), and its copper ring 0.02 mm off
+  the pad, on a short neck; a via that already met that stays where the old
+  fan-out put it, and only the rest search the nearest spot on a 0.05 mm grid
+  within 1.6 mm. After the pours a step fails the build on any via that still
+  has its hole in an opening (`kicadgen.vias_in_pad_openings`,
+  `test/hw/test_via_in_pad.py`). The one accepted exception is the RP2040's
+  exposed pad U1.57: its one thermal via stays in the pad, in the paste
+  gutter (audit I3: accepted, not plugged: plugging costs extra on 4 layers).
+  Not applied to the cpu card (its one via touching a pad has the hole under
+  mask) or the main board.
 - **Designators** (`kicadgen.place_designators`, checked by
   `check_designators` in the silkscreen step, SILK-001): never over a pad
   or a via, another part's courtyard, any part's body or another word, by
@@ -485,6 +499,18 @@ module, which carries the booster; the card only drives its SPI.
 - **UART TX** (GPIO16) on a test pad.
 
 ## Main board (`main.py`)
+
+**The main board's route is recorded, not searched (2026-09-29).** `main-route-seed.json`
+(DeepPCB rev10's copper for the signal nets, this revision's own copper for the six
+power nets) and `main-handroute-seed.json` (`main_handroute.py`'s copper for the
+connections those left open) are applied as locked copper after `prepare()`; the
+pipeline (`main._seeded_route`) then relinks the fan-out vias the hand-route landed on,
+removes or trims what KiCad would call dangling, counts the open connections on
+`main_handroute`'s connectivity, and runs Freerouting only if any are left (fixed
+copper stays, so it lays just those). To renew the seeds: build to a scratch directory,
+`main_handroute.py route` the leftovers with `--seed-out`, and `main_seed.py extract` the
+routed board.
+
 
 Specs: `doc/hardware/cpu-bus.md`, `slot.md`, `system-slot.md`,
 `memory-map.md`, `power.md` (and `hw/power`), `sysctl.md`, `debugging.md`.

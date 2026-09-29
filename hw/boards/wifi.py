@@ -229,7 +229,8 @@ def main():
                        io_card=True, power_nets=("/+5V", "/3V3", "/GND"),
                        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7, -29, 0)],
                        labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
-                       title=TITLE, revision=REVISION, logo_keepout=True)    # bottom right
+                       title=TITLE, revision=REVISION, logo_keepout=True,    # bottom right
+                       pad_via_clear=0.1)      # no open via hole in the module's GND pads (audit I6)
     print("LCSC:", " ".join(sorted(lcsc)))
 
 

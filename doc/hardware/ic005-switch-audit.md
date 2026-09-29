@@ -1,5 +1,12 @@
 # IC-005: IO card VBUS switch proof gap
 
+> **Superseded (2026-09-29).** This audit is of the SY6280AAC circuit that
+> the IO card no longer uses: David approved the TPS2553DBVR-1 (latch-off,
+> RILIM 45.3 kΩ, FAULT to GPIO8, firmware retry) in
+> [io-port-switch-proposal.md](io-port-switch-proposal.md). Kept as the
+> record of why the SY6280 was replaced; the hashes and net tables below
+> describe the old board.
+
 **Status: red.** The catalogue asks for a SY6280 current limit set to
 ≤500 mA, soft start, and a fault flag on short. The fitted circuit cannot
 establish those three claims from the published part data.

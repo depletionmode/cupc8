@@ -622,7 +622,16 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     if (kind == "storage" || kind == "io") watchLeds(*c->e.mcu, c->leds, {24, 25});
     if (kind == "eink" || kind == "eink750") watchLeds(*c->e.mcu, c->leds, {24});
     if (kind == "io") {
-      c->e.mcu->gpio[8].setInputValue(!o.ioVbusNfaultLow);  // VBUS switch fault sense (low: fault)
+      // the port switch: FAULT (GPIO8) follows an overload while EN (GPIO7) is high
+      c->vbus.overload = o.ioVbusNfaultLow;
+      c->e.mcu->gpio[8].setInputValue(true);
+      Rp2040Card *card = c.get();
+      card->e.mcu->gpio[7].addListener([card](GPIOPinState st, GPIOPinState) {
+        const bool en = st == GPIOPinState::High;
+        if (en != card->vbus.en) card->vbus.enEdges.emplace_back(card->e.ns(), en);
+        card->vbus.en = en;
+        card->e.mcu->gpio[8].setInputValue(!(card->vbus.overload && en));
+      });
       if (o.ioUsbHost) keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
     }
     cards.emplace_back(slot, std::move(c));

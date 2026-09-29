@@ -130,6 +130,18 @@ class Rp2040Card : public Card {
   // changes, so csEdges <= csRises (E2E-011 checks it)
   uint64_t csRises = 0, csEdges = 0;
 
+  // The IO card's port switch (TPS2553-1, latch-off) as the board wires it:
+  // GPIO7 is its EN, GPIO8 its open-drain FAULT. With `overload` (a short on
+  // the port) FAULT is low while EN is high; the latched-off switch releases
+  // FAULT as soon as EN goes low, and an EN back high meets the short again.
+  // The switch's ~8 ms FAULT deglitch is not modelled (analog, outside the
+  // firmware's view). enEdges: [card ns, EN level] at every change.
+  struct VbusSwitch {
+    bool overload = false;
+    bool en = false;  // EN is pulled down (R11) until the firmware drives it high
+    std::vector<std::pair<double, bool>> enEdges;
+  } vbus;
+
  private:
   bool selNow = false;
   bool sel = false, sck_ = false;
@@ -310,7 +322,8 @@ class Machine {
     bool sysctlHostVbus = true;      // USB host VBUS reaches sysctl GPIO29 through Q1
     bool pwrHi = true;               // USB-C source advertises 3 A (chipset PWR_HI input)
     bool ioUsbHost = true;           // receptacle D+/D- physically reach the IO MCU
-    bool ioVbusNfaultLow = false;    // the IO card reads its VBUS fault sense (GPIO8) low: VBUS off or sag
+    bool ioVbusNfaultLow = false;    // the IO card's port is overloaded (a short): its TPS2553-1 holds FAULT (GPIO8) low
+                                     // while EN (GPIO7) is high, and releases it while EN is low (Rp2040Card::vbus)
     bool storageSdSocket = true;     // seven microSD contacts reach storage MCU
     bool gpuHdmiLink = true;         // four TMDS pairs reach the HDMI receptacle
     bool einkPanelLink = true;       // seven EPD signals reach the panel header

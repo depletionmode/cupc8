@@ -14,15 +14,30 @@ import copy
 import json
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'hw/cosim'), str(ROOT / 'test/hw')]
-from coverage import audit, reviewed_analog_waivers  # noqa: E402
+from coverage import BOUNDARY, BOUNDARY_DECISIONS, audit, reviewed_analog_waivers, reviewed_boundary_waivers  # noqa: E402
 from gen_top import check, crystal_routes, exported_cards, implemented_checks  # noqa: E402
 from netlist import Resistor, read  # noqa: E402
 from cosim_mutate import board_args, card_boards, open_pad  # noqa: E402
 from test_cosim_runtime import SLOT_PROBE, SYSTEM_BOOT_PROBE, run  # noqa: E402
+
+# David's decision 2026-09-29: the 50 nets the emulator does not model, by name and group
+PINNED_BOUNDARY = {**{net: 'card_control' for net in (
+    'eink:RUN', 'gpu:RUN', 'io:RUN', 'storage:RUN', 'wifi:BOOT', 'wifi:EN',
+    *(f'main:SLOT{n}_{line}' for n in range(1, 7) for line in ('PROG_n', 'RST_n')))},
+    **{net: 'esp_pins' for net in ('wifi:LED_LINK', 'wifi:LED_LINK_A', 'wifi:LED_RX', 'wifi:LED_RX_A',
+                                   'wifi:LED_TX', 'wifi:LED_TX_A', 'wifi:U0RXD', 'wifi:U0TXD')},
+    **{net: 'external_header' for net in ('main:AUX_CS_n', 'main:SPI_nCS6_SRC')},
+    **{net: 'passive_loop' for net in ('main:SYS_PRSNT2_n', 'system:PRSNT')},
+    **{net: 'test_access' for net in ('eink:BOOTSEL', 'gpu:BOOTSEL', 'io:BOOTSEL', 'io:UART_TX', 'storage:BOOTSEL',
+                                      'storage:UART_TX', 'system:BOOTSEL', 'system:RUN', 'system:SWCLK',
+                                      'system:SWDIO')},
+    **{net: 'unused_by_fw' for net in ('eink:UART_TX', 'gpu:DDC_SCL', 'gpu:DDC_SDA', 'gpu:HDMI_HPD', 'gpu:HDMI_SCL',
+                                       'gpu:HDMI_SDA', 'gpu:HPD_5V', 'gpu:UART_TX', 'wifi:USB_DN', 'wifi:USB_DP')}}
 
 
 def main():
@@ -71,6 +86,50 @@ def main():
             assert key not in reviewed_analog_waivers({**circuits, board: logic}, implemented), key
             assert key not in reviewed_analog_waivers(circuits, implemented - {check_id}), key
         print('a GPIO on a strap or power-enable net, or an unimplemented WC-006 / MB-053, removes its waiver')
+
+        # boundary waivers (David's decision, 2026-09-29): pinned by name, so a net cannot join
+        # or leave the list without editing this test; pin-exact; each with its decision text
+        assert PINNED_BOUNDARY == {key: BOUNDARY[key][0] for key in BOUNDARY}, \
+            sorted(set(PINNED_BOUNDARY.items()) ^ {(k, v[0]) for k, v in BOUNDARY.items()})
+        assert len(PINNED_BOUNDARY) == 50
+        boundary = reviewed_boundary_waivers(circuits, implemented)
+        assert set(boundary) == set(PINNED_BOUNDARY), sorted(set(PINNED_BOUNDARY) ^ set(boundary))
+        catalogue_ids = {row['id'] for row in tomllib.loads((ROOT / 'test/catalogue.toml').read_text())['test']}
+        for key, waiver in boundary.items():
+            board, net = key.split(':', 1)
+            assert waiver['pins'] == [f'{r}.{p}' for r, p in circuits[board].nets['/' + net]], key
+            assert waiver['reason'] and set(waiver['checks']) <= implemented, key
+            assert waiver['status'].startswith('accepted by David 2026-09-29'), (key, waiver['status'])
+            assert set(waiver['verified_by']) <= catalogue_ids, key
+            assert key not in audit(circuits, set(), set(), implemented)['unmodeled_nets'], key
+        assert set(BOUNDARY_DECISIONS) == set(PINNED_BOUNDARY.values())
+        # the decisions that name a verifying row: the GPU DDC/HPD first-article row, the reset and
+        # boot-select bring-up rows, the Wi-Fi bring-up row
+        assert boundary['gpu:DDC_SCL']['verified_by'] == ['GC-105'], boundary['gpu:DDC_SCL']
+        assert boundary['main:SLOT3_RST_n']['verified_by'] == ['MB-106', 'WC-101']
+        assert boundary['wifi:LED_TX']['verified_by'] == ['WC-101']
+        for key, pin in (('main:SLOT1_RST_n', ('U7', '74')), ('gpu:HDMI_HPD', ('U1', '2')),
+                         ('wifi:LED_TX', ('U1', '30')), ('io:UART_TX', ('U1', '3'))):
+            board, net = key.split(':', 1)
+            extra = copy.deepcopy(circuits[board])
+            extra.nets['/' + net] = extra.nets['/' + net] + (pin,)
+            extra.pins[pin] = '/' + net
+            assert key not in reviewed_boundary_waivers({**circuits, board: extra}, implemented), key
+            assert key in audit({**circuits, board: extra}, set(), set(), implemented)['unmodeled_nets'], key
+        # a part swapped on a waived net (the 10k pull-up R204 of SLOT1_RST_n replaced by a transistor)
+        swapped = copy.deepcopy(circuits['main'])
+        swapped.nets['/SLOT1_RST_n'] = tuple(('Q9', '1') if r == 'R204' else (r, p)
+                                             for r, p in swapped.nets['/SLOT1_RST_n'])
+        assert 'main:SLOT1_RST_n' not in reviewed_boundary_waivers({**circuits, 'main': swapped}, implemented)
+        assert 'main:SLOT1_RST_n' not in reviewed_boundary_waivers(circuits, implemented - {'MB-004'})
+        counts = {}
+        for waiver in boundary.values():
+            counts[waiver['family']] = counts.get(waiver['family'], 0) + 1
+        assert counts == {'boundary_test_access': 10, 'boundary_card_control': 18,
+                          'boundary_unused_by_fw': 10, 'boundary_passive_loop': 2,
+                          'boundary_external_header': 2, 'boundary_esp_pins': 8}, counts
+        print(f'{len(boundary)} boundary waivers accepted by David 2026-09-29 ({counts}): pinned by name; '
+              'an extra pin, a swapped part or an unimplemented pinout row turns each back into a gap')
 
         # --- 2. crystals: source binding
         links, paths, missing, nets = crystal_routes(cards, boards, args.system_board)

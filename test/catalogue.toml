@@ -1012,6 +1012,15 @@ vrow = "3.2"
 cmd = "tools/fw_esp32c3.sh qemu && tools/fw_rp2040.sh && tools/emu_machine_build.sh && tools/qemu_build.sh && node test/emu/test_wifi_lockstep.mjs"
 
 [[test]]
+id = "EMU-010"
+title = "Native whole-machine emulator: the IO card's port switch retry"
+checks = "the real io.elf on the native machine with a short on the keyboard port (emu/machine Rp2040Card::vbus, the TPS2553-1: FAULT low while EN is high, released with EN low): EN goes high, then low/high/low/high/low with each low 1000 ms (whole ms of the firmware's clock); the EN edge times are identical serially and on the card threads; without a short EN goes high once and stays"
+method = "test/emu/test_machine_io_vbus.mjs (machinenative.mjs ioOverload / ioVbus())"
+kind = "sim"
+vrow = "3.2"
+cmd = "tools/fw_rp2040.sh io && tools/emu_machine_build.sh && node test/emu/test_machine_io_vbus.mjs"
+
+[[test]]
 id = "GPU-004"
 title = "Real binary: SPI slave"
 checks = "the real gpu.elf, driven at its slot pins with the chipset's SPI timing: IDENT and idle FREE=127 at every clk_div 1-31; GETXY's response, and a new command discarding it; FREE counting bytes still queued (<= 2 right after an 8006-byte BLIT8, 127 once it has run); 300 PUTCs at full speed never queue more than a frame; full-screen CLS and FILL_RECT within one frame; POKEs at the minimum CS setup, byte gap and frame gap; a card crash or silence fails the test"
@@ -1100,7 +1109,7 @@ cmd = "make -s -C fw test_iocard"
 [[test]]
 id = "IOC-004"
 title = "Real binary: USB host and SPI side"
-checks = "the real io.elf: TinyUSB host enumerates a low-speed and a full-speed boot keyboard (address, configuration, SET_PROTOCOL boot), Num Lock LED on at connect; typed text arrives through GETKEYS with the FIFO count in the status byte and IRQ_n asserted then released; Caps Lock gives capitals and drives the LED; a held key repeats after 500 ms every 30 ms; unplugging clears KBD_CONNECTED; the host polling back to back against a 1 ms keyboard sees every status byte framed and only the held key; CS_n falling at every point of a preload swap still gives status then RESP_LEN; READs whose CS_n rises while the card replays an earlier READ (30 short READs straight after a 2000-byte one) all offer the ready response; the VBUS switch fault shows as VBUS_FAULT"
+checks = "the real io.elf: TinyUSB host enumerates a low-speed and a full-speed boot keyboard (address, configuration, SET_PROTOCOL boot), Num Lock LED on at connect; typed text arrives through GETKEYS with the FIFO count in the status byte and IRQ_n asserted then released; Caps Lock gives capitals and drives the LED; a held key repeats after 500 ms every 30 ms; unplugging clears KBD_CONNECTED; the host polling back to back against a 1 ms keyboard sees every status byte framed and only the held key; CS_n falling at every point of a preload swap still gives status then RESP_LEN; READs whose CS_n rises while the card replays an earlier READ (30 short READs straight after a 2000-byte one) all offer the ready response; a TPS2553-1 model (FAULT while overloaded and EN high, released with EN low): on a FAULT the firmware drops VBUS_EN, keeps reporting VBUS_FAULT through the wait, re-enables after 1000 ms, meets a persisting short again and drops EN again, and VBUS_FAULT clears once the short is gone"
 method = "test/emu/test_io.mjs: the rp2040js patch's USB host controller (usb-host.ts) with a keyboard model (test/emu/usbkbd.mjs); the CPU side at the slot pins (slothost.mjs)"
 kind = "sim"
 vrow = "2.5"
@@ -1339,6 +1348,7 @@ checks = "the top level is generated from the main board and all seven card KiCa
 method = "hw/cosim/gen_top.py"
 kind = "sim"
 vrow = "3.1"
+cmd = "python3 hw/cosim/run.py E2E-001"
 
 [[test]]
 id = "E2E-002"
@@ -1347,6 +1357,7 @@ checks = "blank ROM → program over USB → boot → BASIC → type and run a p
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
+cmd = "python3 hw/cosim/run.py E2E-002"
 
 [[test]]
 id = "E2E-002A"
@@ -1364,6 +1375,7 @@ checks = "Wi-Fi join → TCP fetch from a local server (a child process) → pag
 method = "co-sim"
 kind = "sim"
 vrow = "3.2"
+cmd = "python3 hw/cosim/run.py E2E-003"
 
 [[test]]
 id = "E2E-003A"
@@ -1435,6 +1447,7 @@ checks = "empty slots, a card removed between power cycles, corrupt kernel (bad 
 method = "co-sim"
 kind = "sim"
 vrow = "3.3"
+cmd = "python3 hw/cosim/run.py E2E-004"
 
 [[test]]
 id = "E2E-004A"
@@ -1705,7 +1718,7 @@ cmd = "python3 hw/power/budget.py"
 [[test]]
 id = "THM-001"
 title = "Regulator junction temperatures at 40 C ambient"
-checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 5-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, the IO card's keyboard boost at 500 mA, the GPU card's HDMI buck-boost at 55 mA, the input eFuse and the IO card's SY6280, from datasheet theta_JA"
+checks = "Tj <= 100 C for the 3V3 buck (M1 load, and with slots 5-6 at 300 mA of +3V3 each), the Wi-Fi card's buck at TX, both RT9013s, the IO card's keyboard boost at 500 mA, the GPU card's HDMI buck-boost at 55 mA, the input eFuse and the IO card's TPS2553-1 port switch, from datasheet theta_JA"
 method = "hw/power/thermal.py: dissipation at each part's hottest corner x theta_JA"
 kind = "static"
 vrow = "4.5"
@@ -1715,7 +1728,7 @@ cmd = "python3 hw/power/thermal.py"
 id = "POW-007"
 title = "IO card keyboard boost: USB VBUS at the port (TI TPS61023 model)"
 checks = "model regulates within 3 % of its set point; the keyboard's VBUS >= 4.40 V (USB 2.0 low-power port) through a 0->500 mA step at the DC low corner and <= 5.5 V at the DC high corner, at the worst and typical corners and at vSafe5V max (pass-through); boost up within 2 ms; inductor current under the 2.7 A valley limit"
-method = "hw/power/boost.py: TI's PSpice transient model (fetched, sha256-pinned, ported), fed through the source-to-card chain, into the SY6280 port switch"
+method = "hw/power/boost.py: TI's PSpice transient model (fetched, sha256-pinned, ported), fed through the source-to-card chain, into the TPS2553-1 port switch"
 kind = "sim"
 vrow = "4.4"
 cmd = "python3 hw/power/boost.py"
@@ -1851,6 +1864,7 @@ checks = "main board netlist + chipset + sysctl + SRAM/ROM models pass BRG-001/0
 method = "co-sim subset generated from the main board netlist only"
 kind = "sim"
 vrow = "3.1"
+cmd = "python3 hw/cosim/run.py MB-052"
 
 [[test]]
 id = "MB-053"
@@ -1914,7 +1928,7 @@ vrow = "5"
 [[test]]
 id = "MB-106"
 title = "Bring-up: slot and SPI loopback"
-checks = "PRSNT, CARD_RST_n, PROG_n and the SPI lines of each slot, via a slot test card or card IDENT"
+checks = "PRSNT, CARD_RST_n, PROG_n and the SPI lines of each slot, via a slot test card or card IDENT; a card held with `cupc8.py card reset SLOT --hold` stops answering IDENT and answers again on --release; the Wi-Fi card enters its ROM bootloader with PROG_n low (closes the co-sim waivers for the SLOTn RST_n/PROG_n and card RUN/EN/BOOT nets; David, 2026-09-29)"
 method = "cupc8.py selftest slots"
 kind = "hw"
 vrow = "5"
@@ -2080,6 +2094,7 @@ checks = "card netlist + CPU netlist passes BUS-001..003 through the modelled so
 method = "co-sim subset"
 kind = "sim"
 vrow = "3.1"
+cmd = "python3 hw/cosim/run.py CC-051"
 
 [[test]]
 id = "CC-101"
@@ -2178,6 +2193,7 @@ checks = "TMDS pairs 100 Ω ±10%, intra-pair skew < 5 ps, insertion/return loss
 method = "openEMS + length-match script"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_hs_si.py --row GC-007 && python3 hw/si/tmds_si.py --build build/hw/gpu --out build/si/gc-007.json"
 
 [[test]]
 id = "GC-008"
@@ -2244,6 +2260,15 @@ vrow = "5"
 cmd = "python3 tools/fa_results.py GC-104"
 
 [[test]]
+id = "GC-105"
+title = "First article: GPU card hot-plug detect and DDC/EDID"
+checks = "with a real monitor: HPD at the RP2040 pin <= 0.4 V unplugged and 2.0-3.6 V plugged; DDC idle 4.5-5.3 V (cable side) and 3.0-3.6 V (RP2040 side); a 128-byte EDID with a valid header and checksum reads through the level shifters (closes the co-sim waivers for the GPU DDC/HPD nets; David, 2026-09-29)"
+method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/GC-105/"
+kind = "hw"
+vrow = "5"
+cmd = "python3 tools/fa_results.py GC-105"
+
+[[test]]
 id = "IC-001"
 title = "IO card ERC"
 checks = "0 errors"
@@ -2295,6 +2320,7 @@ checks = "USB D+/D− 90 Ω ±10%, length matched"
 method = "openEMS / impedance calculation"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_hs_si.py --row IC-007 && python3 hw/si/usb_fs_si.py io --build build/hw/io --out build/si/ic-007.json"
 
 [[test]]
 id = "IC-008"
@@ -2443,7 +2469,7 @@ cmd = "python3 hw/tools/boardcheck.py wifi connectors"
 [[test]]
 id = "WC-101"
 title = "Bring-up: Wi-Fi card"
-checks = "flash over the UART bootloader; IDENT = $03; join a network; HTTPS fetch"
+checks = "flash over the UART bootloader (`cupc8.py card flash SLOT FILE --esp`, through the slot mux); IDENT = $03; the LINK, TX and RX LEDs light at power-up and during the join; join a network; HTTPS fetch (closes the co-sim waivers for the Wi-Fi LED and UART0 nets; David, 2026-09-29)"
 method = "cupc8.py card flash/ident + net test"
 kind = "hw"
 vrow = "5"
@@ -2590,6 +2616,7 @@ checks = "Board-level co-sim against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "3.1"
+cmd = "python3 hw/cosim/run.py SC-051"
 
 [[test]]
 id = "SC-101"
@@ -2706,6 +2733,7 @@ checks = "Board-level co-sim against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "3.1"
+cmd = "python3 hw/cosim/run.py EC-051"
 
 [[test]]
 id = "EC-101"
@@ -2813,6 +2841,7 @@ checks = "Board-level signal integrity against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "4.6"
+cmd = "python3 test/hw/test_hs_si.py --row YC-007 && python3 hw/si/usb_fs_si.py system --build build/hw/system --out build/si/yc-007.json"
 
 [[test]]
 id = "YC-051"
@@ -2821,6 +2850,7 @@ checks = "Board-level co-sim against verification contract"
 method = "Routed board and netlist models"
 kind = "sim"
 vrow = "3.1"
+cmd = "python3 hw/cosim/run.py YC-051"
 
 [[test]]
 id = "YC-101"
@@ -2960,7 +2990,7 @@ cmd = "python3 test/hw/test_cosim_netlist.py"
 [[test]]
 id = "COSIM-002"
 title = "CPU card series termination from its generated KiCad netlist"
-checks = "every driven CPU FPGA signal reaches exactly one edge finger through its own 33-ohm resistor-pack channel"
+checks = "every driven CPU FPGA signal reaches exactly one edge finger through its own 68-ohm resistor-pack channel"
 method = "generate the CPU schematic, export its KiCad netlist, and trace all 31 driven signal paths"
 kind = "static"
 vrow = "3.1"

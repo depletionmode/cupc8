@@ -253,12 +253,56 @@ for (const speed of [1, 2]) {
 }
 
 // ------------------------------------------------------------ VBUS fault
-emu.mcu.gpio[VBUS_NFAULT].setInputValue(false);
-wait(10e6);
-expect(status() & FAULT, 'the power switch fault shows as VBUS_FAULT');
-emu.mcu.gpio[VBUS_NFAULT].setInputValue(true);
-wait(10e6);
-expect(!(status() & FAULT), 'VBUS_FAULT clears with the fault');
+// The TPS2553-1 as the board wires it: FAULT (GPIO8, open drain) is low while
+// the output is overloaded and EN (GPIO7) is high; it latches off until EN is
+// taken low, and releases FAULT with it. (The switch's ~8 ms FAULT deglitch is
+// not modelled.) A firmware that only reports GPIO8 would show the fault for
+// the one moment before it drops EN; it must keep reporting it through the
+// wait, drop EN for 1 s, and re-enable, seeing the fault again if the
+// overload is still there. emu/machine models the same switch (ioVbusNfaultLow).
+{
+  const VBUS_EN = 7;
+  const en = emu.mcu.gpio[VBUS_EN];
+  const enOn = () => en.outputEnable && en.outputValue;
+  let overload = false;
+  const edges = [];                                   // [ns, EN level] at every change
+  let last = enOn();
+  const switchModel = () => emu.mcu.gpio[VBUS_NFAULT].setInputValue(!(overload && enOn()));
+  en.addListener(() => {
+    if (enOn() !== last) {
+      last = enOn();
+      edges.push([emu.ns, last]);
+    }
+    switchModel();
+  });
+  expect(enOn(), 'VBUS_EN is high at start-up (switch on)');
+
+  overload = true;
+  switchModel();                                      // FAULT goes low
+  expect(emu.runUntil(() => !enOn(), 50e6), 'a FAULT makes the firmware drop VBUS_EN');
+  wait(10e6);
+  expect(!enOn() && (status() & FAULT), 'FAULT released with EN low: VBUS_FAULT still reported (waiting)');
+  wait(400e6);
+  expect(!enOn() && (status() & FAULT), 'still off and reported 0.4 s later');
+  expect(emu.runUntil(() => enOn(), 1.2e9), 'VBUS_EN comes back');
+  wait(5e6);
+  expect(enOn() ? status() & FAULT : true, 'overload still there: FAULT is reported again');
+  expect(emu.runUntil(() => !enOn(), 50e6), 'and the firmware drops EN again');
+
+  overload = false;                                   // the short is gone during the second wait
+  switchModel();
+  expect(emu.runUntil(() => enOn(), 1.2e9), 'the second wait ends too');
+  wait(10e6);
+  expect(!(status() & FAULT), 'VBUS_FAULT clears once EN is back and the fault is gone');
+  expect(edges.map((e) => e[1]).join() === 'false,true,false,true', `EN toggled exactly off,on,off,on (${edges.map((e) => e[1])})`);
+  // off time: the firmware counts whole milliseconds from a truncated clock,
+  // so EN is low for 1000 ms less the fraction of a ms it had already run
+  for (const k of [0, 2]) {
+    if (!edges[k + 1]) continue;
+    const off = (edges[k + 1][0] - edges[k][0]) / 1e6;
+    expect(off > 999 && off < 1002, `EN low for 1000 ms (${off.toFixed(3)} ms)`);
+  }
+}
 
 console.log(`IOC-004: real io.elf on the emulated RP2040 with a USB keyboard model, ${checks} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

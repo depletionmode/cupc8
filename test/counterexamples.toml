@@ -1428,3 +1428,38 @@ fixed_in = "hw/boards/main_handroute.py NPTH hole bounding box (2026-09-29)"
 revert = [["hw/boards/main_handroute.py", "            box = (p.cx - p.hole / 2, p.cy - p.hole / 2, p.cx + p.hole / 2, p.cy + p.hole / 2)\n", "            box = (p.cx, p.cy, p.cx, p.cy)\n"]]
 cmd = "python3 test/hw/test_main_handroute.py Route.test_keeps_out_of_an_unplated_hole"
 must_fail = ["hole_clearance"]
+
+[[bug]]
+name = "MB-005/MB-051: main_fanout ignored a track's width when picking the tracks near a pad (a fan-out via landed inside the 7.5 mm /+5V trunk: KiCad shorting_items)"
+fixed_in = "hw/boards/main_fanout.py track box includes half its width (2026-09-29)"
+revert = [["hw/boards/main_fanout.py", "        S = [s for s in segs if max(s[0], s[2]) + s[4] / 2 >= cx - reach and min(s[0], s[2]) - s[4] / 2 <= cx + reach and\n             max(s[1], s[3]) + s[4] / 2 >= cy - reach and min(s[1], s[3]) - s[4] / 2 <= cy + reach]", "        S = [s for s in segs if max(s[0], s[2]) >= cx - reach and min(s[0], s[2]) <= cx + reach and\n             max(s[1], s[3]) >= cy - reach and min(s[1], s[3]) <= cy + reach]"]]
+cmd = "python3 test/hw/test_main_fanout.py WideTrackAndCustomPad"
+must_fail = ["test_a_wide_track_whose_centre_line_is_out_of_reach_still_keeps_vias_off"]
+
+[[bug]]
+name = "MB-005: main_fanout drew the stub of a custom-shape pad (U2's corner pads) 0.005 mm wide, its anchor's size (KiCad track_width, connection_width)"
+fixed_in = "hw/boards/main_fanout.py custom pad width from its box (2026-09-29)"
+revert = [["hw/boards/main_fanout.py", "        width = min(track_width(net), _mm(min(size)))", "        width = min(track_width(net), _mm(min(p.GetSize().x, p.GetSize().y)))"]]
+cmd = "python3 test/hw/test_main_fanout.py WideTrackAndCustomPad"
+must_fail = ["test_a_custom_shape_pad_gets_a_stub_as_wide_as_its_box_not_its_anchor"]
+
+[[bug]]
+name = "MB-051 seeded route: removing a dangling track deleted the tap-carrying copper of a seed's route (open connections after the cleanup)"
+fixed_in = "hw/tools/kicadgen.py remove_dangling(trim=True) shortens to the last tap (2026-09-29)"
+revert = [["hw/tools/kicadgen.py", "                    ks = taps(i, net) if trim and i not in trimmed else []", "                    ks = []"]]
+cmd = "python3 test/hw/test_main_seeded.py RemoveDangling"
+must_fail = ["test_a_dead_end_that_carries_a_tap_is_shortened_to_the_tap_not_removed"]
+
+[[bug]]
+name = "MB-051 seeded route: a fan-out via that the hand-route used as a landing was removed as dangling (open connection) or left as KiCad via_dangling"
+fixed_in = "hw/boards/main.py _unbridge_vias before the dangling cleanup (2026-09-29)"
+revert = [["hw/boards/main.py", "        if len(used) != 1 or len(touching[used[0]]) < 2:\n            continue", "        continue"]]
+cmd = "python3 test/hw/test_main_seeded.py UnbridgeVias"
+must_fail = ["test_a_via_that_holds_two_pieces_on_one_layer_becomes_a_link"]
+
+[[bug]]
+name = "MB-051 seeded route: /nPOR (and others) joined only by copper overlapping (a track end inside another's body): KiCad connected, but rail_reset_window.py's path measure saw open copper U6.2 to U19.3"
+fixed_in = "hw/boards/main.py _node_joins (2026-09-29)"
+revert = [["hw/boards/main.py", "                if target is not None and math.hypot(x - target[0], y - target[1]) > 1:\n                    links.append", "                if False and target is not None and math.hypot(x - target[0], y - target[1]) > 1:\n                    links.append"]]
+cmd = "python3 test/hw/test_main_seeded.py NodeJoins"
+must_fail = ["test_a_track_ending_in_anothers_body_gets_a_node_and_a_link"]

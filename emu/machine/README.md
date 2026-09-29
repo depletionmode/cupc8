@@ -160,7 +160,7 @@ are UART0, the ESP ROM bootloader link, not modelled).
 Also for the netlist top: `Machine.powerLeds()` (rail indicator LEDs, lit
 while their copper is whole), `Machine.expanders()` (the TCA9555 pin levels
 the presence and ID inputs put on the bus), the IO card's VBUS switch
-(`ioUsbHost` needs VBUS on; `ioVbusNfaultLow` drives GPIO8) and the Type-C
+(`ioUsbHost` needs VBUS on; `ioVbusNfaultLow`, `ioOverload` in machinenative.mjs, puts a short on the port: the TPS2553-1 model holds FAULT (GPIO8) low while EN (GPIO7) is high and releases it when EN goes low, so the firmware's 1 s off / on retry runs; `Machine.ioVbus(slot)` gives the EN edge times, `test_machine_io_vbus.mjs`) and the Type-C
 Rd legs (an orientation without its Rd has no host).
 
 Harness hooks used in emu/rp2040: `FIFO::onPull` (TMDS capture), the SPI

@@ -15,8 +15,9 @@ The native RTL machine consumes the manifest when `CUPC8_COSIM_TOP` points to
 it. CPU address/data wires and SRAM/ROM address/data pins use physical bit
 maps read from KiCad pads. Slot SPI/IRQ and system bridge lines use their
 connector maps. The shared MISO idle level comes from the verified 47 kΩ
-pull-up. Cards receive edges after the 33 Ω source RC delay (1.089 ns for a
-15 pF input). SRAM and ROM reads wait their 45 ns and 70 ns maximum access
+pull-up. Cards receive edges after the source RC delay of the larger CPU-bus
+series R (the card's 68 Ω RN1-8; the main board's R21-R34 are 56 Ω): 2.244 ns for
+a 15 pF input, the bound hw/timing/cpubus_budget.py uses. SRAM and ROM reads wait their 45 ns and 70 ns maximum access
 times plus routed copper delay (7 ps/mm). A memory bus with no routed copper
 gets provisional access times and `routed_timing: false`. The manifest lists
 unrouted CPU, memory, slot, bridge, clock, reset and power-policy signal nets
@@ -41,6 +42,28 @@ an IC pin or changing a mating card pad to an active net restores the coverage
 gap; the wiring mutation probe checks both cases. The record includes the
 actual pin list, mating contact, and reason for review. No power, clock,
 programming, bus, LED, or data signal receives this waiver.
+
+`boundary_waivers` (hw/cosim/coverage.py, `BOUNDARY` and `BOUNDARY_DECISIONS`)
+are the exception: 50 nets at the edge of the machine, or whose far side the
+emulator does not model, that David decided to waive on 2026-09-29 (no new
+emulator or QEMU modelling). Six groups, every net listed by name (and pinned
+by name in test/hw/test_cosim_coverage.py):
+
+| group | nets | verified by |
+|---|---|---|
+| `test_access` (10) | BOOTSEL pads of gpu/io/storage/eink/system, system RUN/SWCLK/SWDIO, io and storage UART_TX | nothing in the machine reads them |
+| `passive_loop` (2) | system PRSNT, main SYS_PRSNT2_n | nothing reads the system presence |
+| `card_control` (18) | main SLOT1-6 RST_n and PROG_n, gpu/io/storage/eink RUN, wifi EN and BOOT | MB-106, WC-101 (first article) |
+| `unused_by_fw` (10) | GPU DDC_SCL/SDA, HDMI_SCL/SDA/HPD, HPD_5V, gpu and eink UART_TX, wifi USB_DN/DP | GC-105 (real monitor's EDID and HPD) |
+| `external_header` (2) | main SPI_nCS6_SRC, AUX_CS_n (the AUX SPI header J4) | no device, no firmware use |
+| `esp_pins` (8) | wifi LED_LINK/TX/RX (and their anodes), U0RXD, U0TXD | WC-101 (LEDs, `card flash --esp`) |
+
+The emulator has no whole-chip reset (RP2040::reset() resets the cores only)
+and QEMU no EN hook and no GPIO export, which is why `card_control` and
+`esp_pins` are first-article checks. Every entry is pin-exact, carries its
+reason and status `accepted by David 2026-09-29`, and drops out (the net is
+a gap again) if a pin on the net changes or its board's pinout row loses its
+command.
 
 The Type-C source input in E2E-004 passes through the extracted Rd/averaging/
 reference network before it reaches the chipset's `PWR_HI` pin. The nominal
@@ -281,7 +304,7 @@ reset and RP2040 boot-ROM fallback remain outside this model.
 The storage card's seven SD signal contacts similarly control whether the
 microSD socket is attached to its RP2040 model.
 All four HDMI differential pairs, including the clock pair, must pass through
-their 270 Ω series pack channels to the receptacle before the TMDS capture
+their series pack channels (360 Ω, gpu.py TMDS_R) to the receptacle before the TMDS capture
 endpoint attaches. Seven e-paper data/control lines through 33 Ω resistors
 likewise control whether the panel attaches.
 E2E-002 and E2E-003 capture the native HDMI frame after the BASIC program or

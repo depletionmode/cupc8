@@ -37,9 +37,13 @@ FAN = [0] + [s * d for d in range(10, 181, 10) for s in (1, -1)]
 # (ref, pad number): why it may stay bare. Empty: every connected SMD pad has a fixed via or track.
 EXEMPT = {
     ("U19", "2"): "SLOT1_RST_n: 0.65 mm-pitch TSSOP row under the seed's inner-layer diagonal bundle; once the row's "
-                  "other vias are down no legal via spot is left within 3.6 mm (2026-09-29). Freerouting routes it.",
+                  "other vias are down no legal via spot is left within 3.6 mm (2026-09-29). The hand-router (main_handroute.py) routes it.",
     ("U2", "9"): "EFUSE_ILM: 0.45 mm-pitch QFN pad between the GND via lane and the input corner's locked copper, "
-                 "no legal spot within 3.6 mm (2026-09-29); it goes to R3 at the Fine class. Freerouting routes it.",
+                 "no legal spot within 3.6 mm (2026-09-29); it goes to R3 at the Fine class. The hand-router routes it.",
+    ("U7", "39"): "SPI_nCS2_SRC: TQ144 pad with every fan-out spot blocked by other nets' pads and tracks of the "
+                  "DeepPCB copper in the seed (2026-09-29). The hand-router (main_handroute.py) routes it.",
+    ("U7", "91"): "MEM_D4: TQ144 pad walled in by the seed's /MEM_A16 In3 diagonal (2026-09-29); the hand-router "
+                  "(main_handroute.py) routes it.",
 }
 
 
@@ -217,7 +221,9 @@ def fan_out_bare_pads(board, clearance, track_width=lambda net: STUB_MAX):
         pb = p.GetBoundingBox()
         own = (_mm(pb.GetLeft()), _mm(pb.GetTop()), _mm(pb.GetRight()), _mm(pb.GetBottom()))
         layer = pcbnew.F_Cu if p.IsOnLayer(pcbnew.F_Cu) else pcbnew.B_Cu
-        width = min(track_width(net), _mm(min(p.GetSize().x, p.GetSize().y)))
+        # a custom-shape pad (U2's corner pads) has a 0.005 mm anchor for its size: its box is what a stub can be
+        size = (pb.GetWidth(), pb.GetHeight()) if p.GetShape() == pcbnew.PAD_SHAPE_CUSTOM else (p.GetSize().x, p.GetSize().y)
+        width = min(track_width(net), _mm(min(size)))
         fx, fy = _mm(fp.GetPosition().x), _mm(fp.GetPosition().y)
         base = math.atan2(cy - fy, cx - fx) if math.hypot(cx - fx, cy - fy) > 0.1 else -math.pi / 2
         if len(fp.Pads()) > 8:
@@ -227,8 +233,10 @@ def fan_out_bare_pads(board, clearance, track_width=lambda net: STUB_MAX):
             lane += math.pi
         # the obstacles near this pad
         P = [q for q in pads if q[2] >= cx - reach and q[0] <= cx + reach and q[3] >= cy - reach and q[1] <= cy + reach]
-        S = [s for s in segs if max(s[0], s[2]) >= cx - reach and min(s[0], s[2]) <= cx + reach and
-             max(s[1], s[3]) >= cy - reach and min(s[1], s[3]) <= cy + reach]
+        # the box of a track is its centre line's plus half its width: a 7.5 mm inner-layer trunk
+        # reaches 3.75 mm past its line (the /+5V trunk beside R4's via)
+        S = [s for s in segs if max(s[0], s[2]) + s[4] / 2 >= cx - reach and min(s[0], s[2]) - s[4] / 2 <= cx + reach and
+             max(s[1], s[3]) + s[4] / 2 >= cy - reach and min(s[1], s[3]) - s[4] / 2 <= cy + reach]
         V = [v for v in vias if abs(v[0] - cx) <= reach and abs(v[1] - cy) <= reach]
         c_own = clearance(net)
         other_p = [q for q in P if q[4] != net]

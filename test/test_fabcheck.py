@@ -344,6 +344,12 @@ class FabCheckTests(unittest.TestCase):
             geometry = gerberdrc.Geometry()
             try:
                 self.assertEqual(len(gerberdrc.plotted_copper(path, geometry)), 1)
+                # a quarter turn is the pad's orientation (U2 is turned 180 degrees): the outline turns with it
+                path.write_text(macro + body.replace('FreePoly0,0.000000', 'FreePoly0,180.000000'))
+                turned = gerberdrc.plotted_copper(path, geometry)
+                self.assertEqual(len(turned), 1)
+                self.assertEqual(sorted(list(geometry.flashes.values())[-1][3]),
+                                 sorted([(0, 0), (-1, 0), (-1, -1), (0, 0)]))
                 for mutant in (macro.replace('4,1,4', '4,0,4') + body,
                                macro + body.replace('FreePoly0,0.000000', 'FreePoly0,0.100000'),
                                macro.replace('1,1,0,0,', '1,1,0,1,') + body):

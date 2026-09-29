@@ -31,6 +31,12 @@ FIRST_ARTICLE = 2       # assembled per board type
 # Approved or proposed changes not yet in build/hw (doc/m1-live-status.md):
 # board -> list of (designators, old LCSC or None, new LCSC or None, note)
 PENDING = {
+    # IC-005 (David, 2026-09-29): TPS2553DBVR-1 port switch, RILIM 45.3k, no R13
+    "io": [(["U5"], "C55136", "C111738", "TPS2553DBVR-1 port switch (latch-off)"),
+           (["R10"], "C25752", "C26980", "RILIM 45.3k 1 %"),
+           (["R12"], "C25756", "C25744", "FAULT pull-up 10k to 3V3"),
+           (["R13"], "C25768", None, "removed"),
+           (["C25"], None, "C52923", "1 uF at U5 IN")],
     "gpu": [(["RN1", "RN2"], "C425067", "C182716", "TMDS arrays 270 -> 360 ohm (A.2)")],
     "wifi": [(["R9"], "C25818", "C861412", "feedback 453k 0.1 %"),
              (["R10"], "C25803", "C122538", "feedback 100k 0.1 %")],
