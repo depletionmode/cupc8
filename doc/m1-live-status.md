@@ -18,6 +18,7 @@ CPU bus (12 MHz; CPU card U1 -> RN 33 ohm -> J1/J2 -> ~110 mm 0.1 mm stripline -
 
 - 08:24 seeded build #1 (main-new): Freerouting fanout 6.5-11 min/pass, ~68 pins stuck. Stopped 08:53.
 - 09:06 build #2 (main-new2) with our pre-placed fanout vias (hw/boards/main_fanout.py, 79 vias + stubs, all locked, in the DSN: verified): fanout pass #1 85-108 s, ~28-32 not routed; pass #2 125-455 s, still 27-32 not routed, ripup costs 100->200, plus 'normalizeTraces reached 2000 iterations' warnings. Not converging. Stopped 09:20.
+- 10:20 build #3 (main-new3, fanout off): routing stage started 09:28:48 for 147 unrouted items; **pass #1 finished at 10:20-10:22 (salts 0 and 5, identical: score 931.21, 65 unrouted, 33 violations) after ~3,000-3,100 s** but only ~1,470-1,540 CPU-s: the box was CPU-oversubscribed (load 42-54 on 24 cores: ~20 ngspice jobs from the bus-SI sweep, the SI extractor workers, co-sim tests, all at nice 5 like the router). Root lowered every agent analysis job (and its parent) to nice 15 at 10:22 (`scratchpad/deprioritize.sh`; children inherit): Freerouting runs went from ~52 % to ~99 % CPU each. Different salts gave the same pass-1 score, so the 8 runs are probably near-duplicates: killing some would not speed the others (each is single-threaded), only lower contention. Re-run the script if the router is starved again.
 - Finding: Freerouting 2.4.1 has an undocumented `--router.fanout.enabled=false` (FanoutSettings: enabled, max_passes, max_items, max_milliseconds_per_pin, ripup_allowed, alternate, min_escape_length_mm). Tested on the Wi-Fi DSN in scratch (scratchpad/frtest): no fanout stage. Main-board agent told to add a `fanout` flag through kicadgen (main passes False) and restart as main-new3.
 - Pads still bare after pre-placement: 2 exempt (U19.2 /SLOT1_RST_n, U2.9 /EFUSE_ILM). My escape test (scratchpad/escape.py): U2.9 has a 4.6 mm F.Cu path to its only other pad R3.1 and a legal via spot 0.66 mm away; U19.2 has a legal via spot 2.2 mm away by an F.Cu trace (2.9 mm at 0.2 mm rules): both routable; not a probability, a feasibility check. Final DRC/connectivity decides.
 - 26 of the 79 new vias are >1.5 mm from their pad (max 3.4 mm, U19.6 /SLOT3_RST_n), all on slow reset/monitor/CC nets.
@@ -615,3 +616,12 @@ must comply. CC-007 stays red until then.
   DDC/HPD (6), Wi-Fi card BOOT/EN/LEDs/USB/UART (12). `routed_distances` got
   `pad_reach` (a track ending inside a long edge finger counts as connected:
   system J2.B11 was reported open by the centre-only test; off by default).
+- 10:05 IC-007 (hw/si/usb_fs_si.py io) RED on the routed IO card: Zdiff lower
+  bound proven > 99 ohm on 13.5 of 15.6 mm (RP2040 side) and 14.3 of 24.7 mm
+  (connector side); USB 2.0 7.1.6.1 +-15 % line proven > 103.5 ohm on 13.7 mm.
+  The D+/D- routes run mostly uncoupled (single-ended lines add up to >100).
+  Passing: skew 64 ps (limit 100 = cable TSKEW), board delay bound 240 ps
+  (< 3 ns), line C 5.0/7.3 pF (< 75), edges: Fig 7-9 VCRS 1.653-1.694 V,
+  monotonic, 32/32 cable cases without threshold re-crossing (Z lower and upper).
+  ngspice notes: T elements of 15-60 ps stall (minutes): board lines are now
+  20 ps LC ladders; .options method=gear; 0.5 ns ramp floor; 300 s timeout fails the row.
