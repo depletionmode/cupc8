@@ -1695,7 +1695,7 @@ checks = "<= 10 uF on VBUS ahead of the input eFuse; the attach surge through it
 method = "hw/power/inrush.py: behavioural TPS25947 eFuse (dVdt ramp, current limit) into the 5V_SYS capacitance and the loads that start at attach"
 kind = "sim"
 vrow = "4.4"
-cmd = "python3 hw/power/inrush.py"
+cmd = "python3 hw/power/inrush.py && python3 test/hw/test_input_current_limit.py"
 
 [[test]]
 id = "POW-005"
