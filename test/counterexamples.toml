@@ -9,6 +9,15 @@
 # (Bugs in the RTL are also covered by mutants: tools/formal.py --mutants.)
 
 [[bug]]
+name = "Silkscreen clearance omitted solder-mask expansion"
+fixed_in = "kicadgen silk-to-mask clearance (2026-09-30)"
+revert = [["hw/tools/kicadgen.py", "0.15 + SOLDER_MASK_EXPANSION", "0.15"],
+          ["hw/tools/kicadgen.py", "    clearance += SOLDER_MASK_EXPANSION\n", ""],
+          ["hw/tools/kicadgen.py", "    gap += SOLDER_MASK_EXPANSION\n", ""]]
+cmd = "python3 test/hw/test_silk.py"
+must_fail = ["FAIL mask clearance 0.155 placement", "FAIL mask clearance 0.155 checker"]
+
+[[bug]]
 name = "BASIC ROM inspection accepted a corrupt header as absent"
 fixed_in = "a94a26b"
 before = "8c2a1d2"

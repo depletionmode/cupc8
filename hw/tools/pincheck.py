@@ -314,7 +314,7 @@ def check_mainboard(pins, path=MAINBOARD_NET):
     """The connectors of the main board (hw/boards/main.py) against the pinout
     docs and pins.yaml: every contact of every socket must reach the part the
     doc and the pin map say, directly or through one series resistor (the
-    33 ohm terminations). Returns the number of contacts checked."""
+    33/56 ohm terminations). Returns the number of contacts checked."""
     if not os.path.exists(path):
         print("pincheck: %s not built, main board netlist not checked" % os.path.relpath(path, ROOT))
         return 0
@@ -335,7 +335,8 @@ def check_mainboard(pins, path=MAINBOARD_NET):
     for (ref, pin), n in pin_net.items():
         nodes.setdefault(n, []).append((ref, pin))
 
-    # nets joined by a series termination (a resistor of 100 ohm or less) are one signal
+    # Nets joined by a fitted series termination are one signal. Include the
+    # approved 56 ohm CPU outputs; unrelated resistor values do not join nets.
     parent = {}
 
     def root(n):
@@ -343,7 +344,7 @@ def check_mainboard(pins, path=MAINBOARD_NET):
             n = parent[n]
         return n
     for ref, (lib, part, value) in comps.items():
-        if part == "R" and value in ("33", "22", "0"):
+        if part == "R" and value in ("56", "33", "22", "0"):
             a, b = pin_net.get((ref, "1")), pin_net.get((ref, "2"))
             if a and b and value != "0":
                 parent[root(a)] = root(b)

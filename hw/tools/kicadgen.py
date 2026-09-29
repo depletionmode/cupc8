@@ -1051,7 +1051,7 @@ def clip_silk_to_board(board, outline, gap=0.15):
 
 
 def clip_silk_to_pads(board, gap=0.15):
-    """Trim footprint silkscreen segments that come within `gap` of a pad on
+    """Trim footprint silkscreen segments that come within `gap` of a mask opening on
     their side (edge to pad, the line's width counted): some library
     footprints stop their outline 0.15 mm from a pad at the line's centre,
     which leaves its edge 0.09 mm away (the HRO TYPE-C-31-M-12's shield
@@ -1059,6 +1059,7 @@ def clip_silk_to_pads(board, gap=0.15):
     width goes; what is left under 0.2 mm long goes too."""
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
+    gap += SOLDER_MASK_EXPANSION
     pads = []
     for fp in board.GetFootprints():
         for pad in fp.Pads():
@@ -1176,7 +1177,7 @@ def _ink_box(text, grow=0.0):
 
 def silk_keepouts(board):
     """What a designator must stay off (mm boxes): every pad (grown by JLC's
-    0.15 mm silk clearance), every via (a tented via under a letter is a bump
+    0.15 mm silk-to-mask clearance plus the mask expansion), every via (a tented via under a letter is a bump
     in it, and JLC clips silk off an untented one), and each part's
     courtyard and its body (F.Fab outline: a connector's body can reach past
     its courtyard, over the board edge). Returns (pads, vias, {ref:
@@ -1184,7 +1185,7 @@ def silk_keepouts(board):
     as its courtyard."""
     import pcbnew
     fps = list(board.GetFootprints())
-    pads = [_mm_box(p.GetBoundingBox(), 0.15) for fp in fps for p in fp.Pads()]
+    pads = [_mm_box(p.GetBoundingBox(), 0.15 + SOLDER_MASK_EXPANSION) for fp in fps for p in fp.Pads()]
     tr = board.Tracks()
     vias = [(_mm_box(t.GetBoundingBox()), t.GetNetname()) for t in [tr[i] for i in range(len(tr))]
             if t.Type() == pcbnew.PCB_VIA_T]
@@ -1498,13 +1499,14 @@ def check_designators(board, labels=None):
     return bad
 
 
-def check_silk(board, clearance=0.15, artwork=False, labels=None):          # JLC: silkscreen 0.15 mm from pads
+def check_silk(board, clearance=0.15, artwork=False, labels=None):          # JLC: silkscreen 0.15 mm from mask openings
     """Silkscreen lines and texts that touch a pad (KiCad's DRC does not check
     a footprint's silkscreen against its own pads), designators out of place
     (check_designators), and with `artwork`, tracks and vias under a
     board-only graphic (the logo). Returns problems."""
     import pcbnew
     mm = pcbnew.FromMM
+    clearance += SOLDER_MASK_EXPANSION
     pads = []
     for fp in board.GetFootprints():
         for pad in fp.Pads():
