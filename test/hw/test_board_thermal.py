@@ -52,6 +52,19 @@ class Standby(unittest.TestCase):
         with self.assertRaises(ValueError):
             bt.stby_loads(c)
 
+    def test_reset_buffer_on_standby_is_charged_and_fits(self):
+        # U19 (SN74LVC07A, MB-051) on 3V3_STBY with all six inputs on nPOR: each input is
+        # charged its dICC, and the total must still fit the HT7533 (headroom ~5.76 mA)
+        c = copy.deepcopy(circuit('main'))
+        c.components['U19'] = ('SN74LVC07A', ('jlc', 'SN74LVC07A'))
+        for pin, net in [('14', bt.STBY_NET), ('7', '/GND')] + [(str(k), '/nPOR') for k in (1, 3, 5, 9, 11, 13)]:
+            c.pins[('U19', pin)] = net
+            c.nets[net] = list(c.nets.get(net, [])) + [('U19', pin)]
+        loads = dict(bt.stby_loads(c))
+        lvc = [i for name, i in loads.items() if name.startswith('U19')]
+        self.assertEqual(lvc, [bt.LVC07_ICC_MAX + 6 * bt.LVC07_DICC_MAX])
+        self.assertLess(sum(loads.values()), bt.ht7533_allowed())
+
     def test_datasheet_theta_is_used(self):
         self.assertEqual(bt.HT_THETA_JA, 500.0)
         with patch.object(bt, 'HT_THETA_JA', 50000.0):

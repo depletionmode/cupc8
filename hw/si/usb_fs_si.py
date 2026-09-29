@@ -63,6 +63,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / 'cosim'))
 sys.path.insert(0, str(HERE.parent / 'tools'))
 import route_si  # noqa: E402
+import si_cache  # noqa: E402
 import xsection  # noqa: E402
 from netlist import read as read_netlist  # noqa: E402
 
@@ -138,41 +139,65 @@ def ramp_for_tfr(tfr, r, c):
                 lo, hi = (mid, hi) if v(mid) < level else (lo, mid)
             return hi
         return cross(.9) - cross(.1)
-    lo, hi = 1e-12, tfr / .8
+    lo, hi = .5e-9, tfr / .8       # 0.5 ns floor: ngspice stalls on ps ramps through a 26 ns line (RC edges are 4+ ns)
     if measured(lo) > tfr:
-        raise ValueError(f'ZDRV {r} ohm into {c * 1e12:.0f} pF cannot reach {tfr * 1e9} ns')
+        # An ideal step through ZDRV into CL is already slower than tfr (44 ohm
+        # x 50 pF gives 4.8 ns): the fastest edge this ZDRV can produce.
+        return lo
     for _ in range(80):
         mid = (lo + hi) / 2
         lo, hi = (mid, hi) if measured(mid) < tfr else (lo, mid)
     return hi
 
 
-def sections(samples, results, own):
+MIN_SECTION = 5e-12
+
+
+def sections(samples, results, own, pick=0):
     """Merge consecutive samples into (Z, TD) line sections for SPICE.
 
-    Neighbours within 1 ohm merge, and so does anything shorter than 2 ps
-    (a 12 Mb/s edge cannot resolve it; it only forces tiny SPICE steps)."""
+    Neighbours within 1 ohm merge, and so does anything shorter than 5 ps
+    (a 12 Mb/s edge cannot resolve it; ngspice stalls on ps-scale lines)."""
     out = []
     for sample in samples:
         result = results[sample['key']]
-        z = route_si.se_bounds(result, own - 1)[0]
+        z = min(route_si.se_bounds(result, own - 1)[pick], 500.0)   # an unbounded estimate is capped
         td = sample['len_mm'] * 1e-3 * result['delay_s_per_m']
-        if out and (abs(out[-1][0] - z) < 1.0 or td < 2e-12 or out[-1][1] < 2e-12):
+        if out and (abs(out[-1][0] - z) < 1.0 or td < MIN_SECTION or out[-1][1] < MIN_SECTION):
             zp, tdp = out[-1]
             out[-1] = ((zp * tdp + z * td) / (tdp + td), tdp + td)
         else:
             out.append((z, td))
+    while len(out) > 1 and out[-1][1] < MIN_SECTION:
+        (zp, tdp), (z, td) = out[-2], out[-1]
+        out[-2:] = [((zp * tdp + z * td) / (tdp + td), tdp + td)]
     return out
 
 
+LADDER_PS = 20e-12    # delay per lumped section: cut-off ~ 16 GHz against a 12 Mb/s edge
+
+
 def line_netlist(tag, start, end, secs):
+    """The board's line sections as lumped LC ladders (pi sections).
+
+    ngspice's lossless T element is used only for the 26 ns cable: on board
+    sections of 15-60 ps it stalls (minutes per transient).  A 20 ps ladder
+    reproduces the T element to 0.01 % on a 3-section test (3.4150 against
+    3.4149 ns 10-90 % into 50 pF) and runs in about a second.
+    """
     if not secs:
         return [f'R{tag}short {start} {end} 1e-6']
     lines, node = [], start
     for index, (z, td) in enumerate(secs):
-        nxt = end if index == len(secs) - 1 else f'{tag}_{index}'
-        lines.append(f'T{tag}{index} {node} 0 {nxt} 0 Z0={z:.4f} TD={td:.6e}')
-        node = nxt
+        count = max(1, math.ceil(td / LADDER_PS))
+        cap, ind = td / z / count, z * td / count
+        for k in range(count):
+            nxt = end if (index == len(secs) - 1 and k == count - 1) else f'{tag}_{index}_{k}'
+            lines.append(f'L{tag}{index}_{k} {node} {nxt} {ind:.6e}')
+            # each node carries the halves of the two sections it joins
+            lines.append(f'C{tag}{index}_{k}a {node} 0 {cap / 2:.6e}')
+            lines.append(f'C{tag}{index}_{k}b {nxt} 0 {cap / 2:.6e}')
+            node = nxt
     return lines
 
 
@@ -181,11 +206,13 @@ def spice(net, probes, stop):
         deck = Path(tmp) / 'deck.cir'
         data = Path(tmp) / 'out.txt'
         deck.write_text('\n'.join(['* usb fs edge', *net,
+                                   # trapezoidal integration stalls on some lossless-line decks
+                                   '.options method=gear',
                                    f'.tran 5p {stop:.4e} 0 5p',
                                    '.control', 'set wr_singlescale', 'run',
                                    f'wrdata {data} ' + ' '.join(f'v({p})' for p in probes),
                                    'quit', '.endc', '.end']) + '\n')
-        subprocess.run(['ngspice', '-b', str(deck)], check=True, capture_output=True, text=True)
+        subprocess.run(['ngspice', '-b', str(deck)], check=True, capture_output=True, text=True, timeout=300)   # a stall fails the row
         rows = [list(map(float, line.split())) for line in data.read_text().split('\n') if line.strip()]
     time = [r[0] for r in rows]
     return time, {p: [r[1 + i] for r in rows] for i, p in enumerate(probes)}
@@ -199,7 +226,7 @@ def crossing(t, v, level, rising):
     return None
 
 
-def monotonic(t, v, rising, t0, t1, noise=1e-3):
+def monotonic(t, v, rising, t0, t1, noise=10e-3):   # 10 mV = 0.3 % of the swing: the lossless-line ripple floor (1.5 mV on ideal lines)
     peak = v[0]
     for ti, vi in zip(t, v):
         if t0 <= ti <= t1:
@@ -241,6 +268,74 @@ def board_deck(line_secs, rs, rint, ramp, lumped, load):
         net += line_netlist(f'c{tag}b', f'j{tag}', f'x{tag}', conn_secs[split:])
         net += load(tag)
     return net
+
+
+def run_edges(line_secs, lumped, rs, pull):
+    """Section 6 of the module docstring: (cases, failure strings)."""
+    failures = []
+    edges = []
+    for zdrv in ZDRV:
+        rint = zdrv - RS_REQUIRED
+        if rint < 0:
+            raise ValueError('series resistor above ZDRV minimum')
+        for tfr in TFR:
+            ramp = ramp_for_tfr(tfr, zdrv, CL_TEST)
+            # a) Figure 7-9 test load at the connector
+            net = board_deck(line_secs, rs, rint, ramp, lumped,
+                             lambda tag: [f'CL{tag} x{tag} 0 {CL_TEST:.4e}'])
+            t, v = spice(net, ['xp', 'xn'], 1e-9 + ramp + 120e-9)
+            tp = [crossing(t, v['xp'], VDD * f, True) for f in (.1, .9)]
+            tn = [crossing(t, v['xn'], VDD * f, False) for f in (.9, .1)]
+            # crossover: where the two lines meet during the transition
+            diff = [a - b for a, b in zip(v['xp'], v['xn'])]
+            tc = crossing(t, diff, 0.0, True)
+            i = min(range(len(t)), key=lambda k: abs(t[k] - tc))
+            vcrs = (v['xp'][i] + v['xn'][i]) / 2
+            mono = (monotonic(t, v['xp'], True, 1e-9, t[-1]) and monotonic(t, v['xn'], False, 1e-9, t[-1]))
+            case = {'zdrv': zdrv, 'tfr_ideal_ns': tfr * 1e9, 'load': 'fig7-9',
+                    'tfr_ns': round((tp[1] - tp[0]) * 1e9, 3), 'tff_ns': round((tn[1] - tn[0]) * 1e9, 3),
+                    'board_adds_ns': round((max(tp[1] - tp[0], tn[1] - tn[0]) - tfr) * 1e9, 3),
+                    'vcrs_v': round(vcrs, 4), 'monotonic': mono}
+            edges.append(case)
+            if not mono or not 1.3 <= vcrs <= 2.0:
+                failures.append(f'Figure 7-9 edge ZDRV {zdrv} TFR {tfr * 1e9:.0f} ns: monotonic {mono}, '
+                                f'VCRS {vcrs:.3f} V')
+            # b) cable to a far port
+            for zc in CABLE_Z:
+                for far_c in FAR_C:
+                    def load(tag, zc=zc, far_c=far_c):
+                        lines = [f'Tcab{tag} x{tag} 0 f{tag} 0 Z0={zc} TD={CABLE_TD:.4e}',
+                                 f'Cf{tag} f{tag} 0 {far_c:.4e}']
+                        # host port (io): far device pulls D+ up at 1.5 k and
+                        # the host's 15 k pull-downs sit at the connector;
+                        # device port: the host's 15 k pull-downs are far.
+                        if pull == 'down':
+                            lines.append(f'Rpd{tag} x{tag} 0 {R_PULL["down"]}')
+                            if tag == 'p':
+                                lines.append(f'Rpu{tag} f{tag} vdd {R_PULL["up"]}')
+                        else:
+                            lines.append(f'Rpd{tag} f{tag} 0 {R_PULL["down"]}')
+                            if tag == 'p':
+                                lines.append(f'Rpu{tag} x{tag} vdd {R_PULL["up"]}')
+                        return lines
+                    net = board_deck(line_secs, rs, rint, ramp, lumped, load) + [f'Vdd vdd 0 {VDD}']
+                    t, v = spice(net, ['fp', 'fn'], 1e-9 + ramp + CABLE_TD + 2 * BIT)
+                    first_p = crossing(t, v['fp'], VIH, True)
+                    first_n = crossing(t, v['fn'], VIL, False)
+                    fd = [a - b for a, b in zip(v['fp'], v['fn'])]
+                    first_d = crossing(t, fd, VDIFF, True)
+                    bad = (None in (first_p, first_n, first_d) or
+                           recross(t, v['fp'], VIH, True, first_p, BIT) or
+                           recross(t, v['fn'], VIL, False, first_n, BIT) or
+                           recross(t, fd, VDIFF, True, first_d, BIT))
+                    case = {'zdrv': zdrv, 'tfr_ideal_ns': tfr * 1e9, 'load': 'cable',
+                            'cable_z_se': zc, 'far_c_pf': far_c * 1e12, 'clean_thresholds': not bad,
+                            'far_peak_v': round(max(v['fp']), 3), 'far_min_v': round(min(v['fn']), 3)}
+                    edges.append(case)
+                    if bad:
+                        failures.append(f'cable edge ZDRV {zdrv} TFR {tfr * 1e9:.0f} ns Z {zc} C '
+                                        f'{far_c * 1e12:.0f} pF: threshold re-crossing')
+    return edges, failures
 
 
 def main():
@@ -294,7 +389,7 @@ def main():
         stub = {'segments': main_route['stubs'], 'vias': [], 'pad_mm': 0.0}
         stub_samples[tag] = route_si.sample_path(board, stub, nets['conn'], own) if stub['segments'] else []
     keys = [s['key'] for group in list(samples.values()) + list(stub_samples.values()) for s in group]
-    results = route_si.solve_all(keys, args.jobs)
+    results = si_cache.solve_all(keys, args.jobs)
     contacts = len(cfg['dp'])
     # 1. impedance
     row_lim = (Z_NOM * (1 - Z_ROW_TOL), Z_NOM * (1 + Z_ROW_TOL))
@@ -382,84 +477,34 @@ def main():
             failures.append(f'{label}: D+/D- capacitance differs by {entry["capacitance_imbalance_pct"]} % '
                             '(7.1.6.1 requires < 10 %)')
     # 6. transient edges on the primary contact
-    line_secs, lumped = {}, {}
+    lumped = {}
+    picks = {'lower': {}, 'upper': {}}       # impedance bound each line is drawn at
     for tag, name, own in (('p', 'dp', 1), ('n', 'dm', 2)):
         conn_samples = samples[(tag, 'conn', 0)]
         esd_at = [board.pads[node]['at'] for node in wires[name]['esd']]
         cx = sum(x for x, _ in esd_at) / len(esd_at)
         cy = sum(y for _, y in esd_at) / len(esd_at)
         junction = min(range(len(conn_samples)), key=lambda i: math.dist(conn_samples[i]['xy'], (cx, cy)))
-        conn_secs_a = sections(conn_samples[:junction], results, own)
-        conn_secs_b = sections(conn_samples[junction:], results, own)
         stub_c = sum(s['len_mm'] * 1e-3 * results[s['key']]['c_self_per_m'][
             0 if results[s['key']]['kind'] == 'z_se' else own - 1] for s in stub_samples[tag])
         vias = len(routes[(tag, 'mcu')]['vias']) + len(routes[(tag, 'conn', 0)]['vias'])
-        line_secs[tag] = {'mcu': sections(samples[(tag, 'mcu')], results, own),
-                          'conn': conn_secs_a + conn_secs_b, 'junction': len(conn_secs_a)}
         lumped[tag] = [('esd', ESD_C_MAX), ('stubs', stub_c), ('vias', vias * VIA_C_ALLOW)]
+        for pick, name_pick in enumerate(picks):
+            conn_secs_a = sections(conn_samples[:junction], results, own, pick)
+            conn_secs_b = sections(conn_samples[junction:], results, own, pick)
+            if conn_secs_b and sum(td for _, td in conn_secs_b) < MIN_SECTION:
+                conn_secs_a, conn_secs_b = sections(conn_samples, results, own, pick), []   # ESD at the pad
+            picks[name_pick][tag] = {'mcu': sections(samples[(tag, 'mcu')], results, own, pick),
+                                     'conn': conn_secs_a + conn_secs_b, 'junction': len(conn_secs_a)}
     edges = []
-    pull = cfg['pull']
-    for zdrv in ZDRV:
-        rint = zdrv - RS_REQUIRED
-        if rint < 0:
-            raise ValueError('series resistor above ZDRV minimum')
-        for tfr in TFR:
-            ramp = ramp_for_tfr(tfr, zdrv, CL_TEST)
-            # a) Figure 7-9 test load at the connector
-            net = board_deck(line_secs, rs, rint, ramp, lumped,
-                             lambda tag: [f'CL{tag} x{tag} 0 {CL_TEST:.4e}'])
-            t, v = spice(net, ['xp', 'xn'], 1e-9 + ramp + 120e-9)
-            tp = [crossing(t, v['xp'], VDD * f, True) for f in (.1, .9)]
-            tn = [crossing(t, v['xn'], VDD * f, False) for f in (.9, .1)]
-            # crossover: where the two lines meet during the transition
-            diff = [a - b for a, b in zip(v['xp'], v['xn'])]
-            tc = crossing(t, diff, 0.0, True)
-            i = min(range(len(t)), key=lambda k: abs(t[k] - tc))
-            vcrs = (v['xp'][i] + v['xn'][i]) / 2
-            mono = (monotonic(t, v['xp'], True, 1e-9, t[-1]) and monotonic(t, v['xn'], False, 1e-9, t[-1]))
-            case = {'zdrv': zdrv, 'tfr_ideal_ns': tfr * 1e9, 'load': 'fig7-9',
-                    'tfr_ns': round((tp[1] - tp[0]) * 1e9, 3), 'tff_ns': round((tn[1] - tn[0]) * 1e9, 3),
-                    'board_adds_ns': round((max(tp[1] - tp[0], tn[1] - tn[0]) - tfr) * 1e9, 3),
-                    'vcrs_v': round(vcrs, 4), 'monotonic': mono}
-            edges.append(case)
-            if not mono or not 1.3 <= vcrs <= 2.0:
-                failures.append(f'Figure 7-9 edge ZDRV {zdrv} TFR {tfr * 1e9:.0f} ns: monotonic {mono}, '
-                                f'VCRS {vcrs:.3f} V')
-            # b) cable to a far port
-            for zc in CABLE_Z:
-                for far_c in FAR_C:
-                    def load(tag, zc=zc, far_c=far_c):
-                        lines = [f'Tcab{tag} x{tag} 0 f{tag} 0 Z0={zc} TD={CABLE_TD:.4e}',
-                                 f'Cf{tag} f{tag} 0 {far_c:.4e}']
-                        # host port (io): far device pulls D+ up at 1.5 k and
-                        # the host's 15 k pull-downs sit at the connector;
-                        # device port: the host's 15 k pull-downs are far.
-                        if pull == 'down':
-                            lines.append(f'Rpd{tag} x{tag} 0 {R_PULL["down"]}')
-                            if tag == 'p':
-                                lines.append(f'Rpu{tag} f{tag} vdd {R_PULL["up"]}')
-                        else:
-                            lines.append(f'Rpd{tag} f{tag} 0 {R_PULL["down"]}')
-                            if tag == 'p':
-                                lines.append(f'Rpu{tag} x{tag} vdd {R_PULL["up"]}')
-                        return lines
-                    net = board_deck(line_secs, rs, rint, ramp, lumped, load) + [f'Vdd vdd 0 {VDD}']
-                    t, v = spice(net, ['fp', 'fn'], 1e-9 + ramp + CABLE_TD + 2 * BIT)
-                    first_p = crossing(t, v['fp'], VIH, True)
-                    first_n = crossing(t, v['fn'], VIL, False)
-                    fd = [a - b for a, b in zip(v['fp'], v['fn'])]
-                    first_d = crossing(t, fd, VDIFF, True)
-                    bad = (None in (first_p, first_n, first_d) or
-                           recross(t, v['fp'], VIH, True, first_p, BIT) or
-                           recross(t, v['fn'], VIL, False, first_n, BIT) or
-                           recross(t, fd, VDIFF, True, first_d, BIT))
-                    case = {'zdrv': zdrv, 'tfr_ideal_ns': tfr * 1e9, 'load': 'cable',
-                            'cable_z_se': zc, 'far_c_pf': far_c * 1e12, 'clean_thresholds': not bad,
-                            'far_peak_v': round(max(v['fp']), 3), 'far_min_v': round(min(v['fn']), 3)}
-                    edges.append(case)
-                    if bad:
-                        failures.append(f'cable edge ZDRV {zdrv} TFR {tfr * 1e9:.0f} ns Z {zc} C '
-                                        f'{far_c * 1e12:.0f} pF: threshold re-crossing')
+    # The extracted impedance is a lower bound (its upper estimate is in the
+    # impedance section): the edges are run at both, and both must pass.
+    for name_pick, line_secs in picks.items():
+        cases, edge_failures = run_edges(line_secs, lumped, rs, cfg['pull'])
+        for case in cases:
+            case['z_bound'] = name_pick
+        edges += cases
+        failures += [f'[{name_pick} Z] {f}' for f in edge_failures]
     report['edges'] = edges
     report['failures'] = failures
     report['pass'] = not failures

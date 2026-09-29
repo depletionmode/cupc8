@@ -133,7 +133,7 @@ POWER_PINS = {
     'TCA9555PWR': {'VCC', 'GND'},
     'MAX811TEUS': {'VCC', 'GND'},
     'TLV7011DBVR': {'VCC', 'VEE'},
-    'MAX16054AZT': {'VCC', 'GND'},
+    'MAX16054AZT': {'VCC', 'GND', 'IN', 'OUT'},   # IN/OUT: the POWER switch and the eFuse enable (MB-053)
     'ESP32-C3-MINI-1U-N4': {'3V3', 'GND'},
     '12MHz': {'VDD', 'GND', 'G'},
     'MMBT3904': {'E'},
@@ -143,7 +143,7 @@ POWER_PINS = {
     'RT9013-12GB': {'VIN', 'VOUT', 'EN', 'GND'},
     'TLV62569PDDCR': {'VIN', 'EN', 'SW', 'FB', 'GND'},
     'TLV62569DBVR': {'VIN', 'EN', 'SW', 'FB', 'GND'},
-    'TPS259470ARPWR': {'IN', 'OUT', 'DVDT', 'ILM', 'OVLO/OVCSEL', 'GND'},
+    'TPS259470ARPWR': {'IN', 'OUT', 'DVDT', 'ILM', 'OVLO/OVCSEL', 'EN/UVLO', 'GND'},
     'TPS63802DLAR': {'VIN', 'EN', 'VOUT', 'FB', 'L1', 'L2', 'GND', 'AGND'},
     'TPS61023DRLR': {'VIN', 'EN', 'VOUT', 'FB', 'SW', 'GND'},
     'SY6280AAC': {'IN', 'OUT', 'ISET', 'GND'},
@@ -157,6 +157,7 @@ STRAP_PINS = {
     'W25Q32JVSSIQ': {'HOLD#orRESET#(IO3)', 'WP#(IO2)'},
     'RP2040': {'TESTEN'},
     'MAX16054AZT': {'CLEAR'},
+    'ESP32-C3-MINI-1U-N4': {'IO2', 'IO8'},        # boot-mode straps sampled at reset (WC-006)
     'TPS63802DLAR': {'MODE'},
     '2N7002': {'G'},
 }
@@ -178,6 +179,9 @@ ANALOG_NETS = {
              'VCCPLL1': ('POW-002',), 'BUCK_FB': ('POW-001',), 'BUCK_SW': ('POW-001',),
              'EFUSE_DVDT': ('POW-004',), 'EFUSE_ILM': ('POW-004', 'POW-006'),
              'EFUSE_OVLO': ('POW-004', 'POW-006'),
+             # the POWER switch and the eFuse enable it drives: the machine is
+             # modelled powered; the on/off circuit is MB-053's netlist check
+             'PWR_BTN': ('MB-053',), 'PWR_EN': ('MB-053', 'POW-004'),
              **{f'SLOT{s}_5V{x}': ('POW-006',) for s in range(1, 7) for x in ('', '_F', '_L')}},
     'cpu': {'GND': (), '3V3': (), '1V2': (), 'VCCPLL0': (), 'VCCPLL1': (),
             'GNDPLL0': (), 'GNDPLL1': ()},
@@ -191,7 +195,9 @@ ANALOG_NETS = {
     'eink': {'GND': (), '+5V': (), '3V3': (), '1V1': ()},
     'system': {'GND': (), '+3V3': (), '1V1': ()},
     'wifi': {'GND': (), '+5V': ('POW-003',), '3V3': ('POW-003',), 'FB': ('POW-003',),
-             'SW': ('POW-003',)},
+             'SW': ('POW-003',),
+             # static boot-mode straps (resistors to a rail), WC-006 checks their levels
+             'STRAP2': ('WC-006',), 'STRAP8': ('WC-006',)},
 }
 
 

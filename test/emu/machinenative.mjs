@@ -147,6 +147,8 @@ export class Machine {
     // pwrHi names the host source class. For the netlist top, drive the
     // comparator with the worst 3 A minimum or 1.5 A maximum CC voltage.
     const pwrHiAtFpga = netlistTop ? (pwrHi ? 1.524 : 1.090) >= Math.max(...trips) : pwrHi;
+    if (netlistTop && ['vbus_on', 'nfault_low'].some((k) => typeof netlistTop.runtime.io_vbus?.[k] !== 'boolean'))
+      throw new Error('machinenative: missing routed IO VBUS switch model');
     if (netlistTop && typeof netlistTop.runtime.io_usb_host !== 'boolean')
       throw new Error('machinenative: invalid IO USB host path');
     if (netlistTop && typeof netlistTop.runtime.storage_sd_socket !== 'boolean')
@@ -232,18 +234,24 @@ export class Machine {
       throw new Error('machinenative: missing routed FPGA configuration links');
     // sysctl's two TCA9555s (emu/machine: Tca9555) on the routed I2C bus. U14
     // P10 is the CPU card's PRSNT2_n (its PRSNT1-PRSNT2 loop, grounded on the
-    // main board); P11/P12 the CPU card's ID straps. The slot presence bits
-    // follow the fitted cards; nothing reads them, and they are not bound to
-    // card copper.
+    // main board); P11/P12 the CPU card's ID straps. U14 port 0 carries the
+    // slots' PRSNT2_n (a fitted card's loop pulls it low over the routed
+    // copper of both boards). Only the CPU presence bit is read by firmware;
+    // the rest is visible through expanders().
     const i2c = netlistTop?.runtime.i2c;
-    if (netlistTop && (!Array.isArray(i2c?.expanders) || typeof i2c.cpu_present_link !== 'boolean'))
+    if (netlistTop && (!Array.isArray(i2c?.expanders) || typeof i2c.cpu_present_link !== 'boolean' ||
+      !i2c.card_loops || !i2c.slot_presence.every((x) => typeof x.link === 'boolean')))
       throw new Error('machinenative: missing routed I2C expander model');
     const expanders = i2c ? i2c.expanders.filter((x) => x.link).map((x) => {
       const inputs = [0xff, 0xff];
       if (x.address === 0x21) {
-        for (const { slot, bit } of i2c.slot_presence) if (bit !== null && slots[slot]) inputs[0] &= ~(1 << bit);
+        // a slot reads present (PRSNT2_n low) when a card is fitted, its own
+        // PRSNT loop is whole and the slot's copper reaches the expander
+        for (const { slot, bit, link } of i2c.slot_presence)
+          if (bit !== null && slots[slot] && link && i2c.card_loops[boardKind[slots[slot]]]) inputs[0] &= ~(1 << bit);
         if (i2c.cpu_present_link) inputs[1] &= ~1;
-        for (const { bit, level } of i2c.card_id) if (!level) inputs[1] &= ~(1 << bit);
+        // an ID strap tied to GND on the CPU card reads 0 when its copper reaches the expander
+        for (const { bit, level, link } of i2c.card_id) if (!level && link) inputs[1] &= ~(1 << bit);
       }
       return { address: x.address, inputs };
     }) : null;
@@ -279,9 +287,27 @@ export class Machine {
       });
       memoryWiring = { ...netlistTop.runtime, slots: slotWiring };
     }
+    // the card programming port (emu/machine ProgPort): an SWD target in each
+    // slot holding an RP2040 card, reachable through the muxes when the copper
+    // is whole. Without the netlist top every wire is whole.
+    const prog = netlistTop?.runtime.prog_port;
+    if (netlistTop && !(Array.isArray(prog?.channel) && Array.isArray(prog?.sel_bit) &&
+      Array.isArray(prog?.slot_legs) && prog?.card))
+      throw new Error('machinenative: missing routed programming port');
+    const progPort = activeSysctl ? {
+      selBit: prog?.sel_bit ?? [0, 1, 2], selWhole: prog?.sel_whole ?? [true, true, true],
+      clk: prog?.clk ?? true, io: prog?.io ?? true, channel: prog?.channel ?? [0, 1, 2, 3, 4, 5],
+      targets: [1, 2, 3, 4, 5, 6].map((slot) => {
+        const kind = boardKind[activeSlots[slot]];
+        if (!kind || kind === 'wifi') return false;
+        return prog ? Boolean(prog.slot_legs[slot - 1] && prog.card[kind]) : true;
+      }),
+    } : null;
     m.h = native.create({ slots: activeSlots, rom: m.rom, sysctl: activeSysctl, pwrHi: pwrHiAtFpga, root: ROOT, threaded, spiLog,
       sysctlHostVbus: hostVbus && (netlistTop?.runtime.sysctl_usb_vbus_contacts[usbOrientation] ?? true),
-      ioUsbHost: netlistTop?.runtime.io_usb_host ?? true,
+      // the keyboard needs VBUS: the switch enable and its output copper
+      ioUsbHost: (netlistTop?.runtime.io_usb_host ?? true) && (netlistTop?.runtime.io_vbus?.vbus_on ?? true),
+      ioVbusNfaultLow: netlistTop?.runtime.io_vbus?.nfault_low ?? false,
       storageSdSocket: netlistTop?.runtime.storage_sd_socket ?? true,
       gpuHdmiLink: netlistTop?.runtime.gpu_hdmi_link ?? true,
       einkPanelLink: netlistTop?.runtime.eink_panel_link ?? true,
@@ -302,12 +328,19 @@ export class Machine {
       ...(fpgaLinks ? { fpga: fpgaLinks } : {}),
       ...(expanders ? { expanders } : {}),
       ...(sysctlAdcVolts ? { sysctlAdcVolts } : {}),
+      ...(progPort ? { progPort } : {}),
       ...(chipsetFlash ? { chipsetFlash } : {}),
       ...(cpuFlash ? { cpuFlash } : {}),
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...activeSlots };
     m.boardKind = boardKind;
     m.cardLeds = netlistTop?.runtime.card_leds ?? null;
+    m.railLeds = netlistTop?.runtime.rail_leds ?? null;
+    m.hasSysctl = sysctl;              // fitted (its firmware may not boot: the indicators do not care)
+    m.fittedKinds = Object.values(slots);
+    if (netlistTop && !['main', 'cpu', 'system', 'gpu', 'io', 'storage', 'wifi', 'eink'].every((board) =>
+      Array.isArray(m.railLeds?.[board])))
+      throw new Error('machinenative: missing routed rail indicator paths');
     if (netlistTop && !['system', 'gpu', 'io', 'storage', 'eink'].every((kind) =>
       Array.isArray(m.cardLeds?.[kind])))
       throw new Error('machinenative: missing routed card LED paths');
@@ -315,7 +348,8 @@ export class Machine {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
     }
-    if (Object.values(activeSlots).includes('io') && (netlistTop?.runtime.io_usb_host ?? true)) {
+    if (Object.values(activeSlots).includes('io') && (netlistTop?.runtime.io_usb_host ?? true) &&
+        (netlistTop?.runtime.io_vbus?.vbus_on ?? true)) {
       const h = m.h;
       m.keyboard = {
         press: (mods, ...keys) => native.press(h, mods, keys),
@@ -414,6 +448,30 @@ export class Machine {
       return { slot, kind, gpio, net: row?.net ?? null, lit: connected && level,
         rises: connected ? rises : 0 };
     });
+  }
+
+  // The rail indicator LEDs (gen_top.py rail_indicator_routes) of the boards
+  // in this machine: [{board, led, rail, lit}]. The rail is assumed present
+  // (the power tree is analog), so an indicator is lit while the powered
+  // machine's copper legs are whole. Without the netlist top: none.
+  powerLeds() {
+    if (!this.railLeds) return [];
+    const boards = new Set(['main', 'cpu']);
+    if (this.hasSysctl) boards.add('system');
+    for (const kind of this.fittedKinds) boards.add(this.boardKind[kind]);
+    return [...boards].flatMap((board) => (this.railLeds[board] ?? []).map((row) =>
+      ({ board, led: row.led, rail: row.rail, lit: row.connected })));
+  }
+
+  // the SWD target in a slot (1-6): {resets, calls, flash} as `cupc8.py card
+  // flash` left it, or null (no RP2040 card there, or its debug copper is open)
+  progTarget(slot) {
+    return native.progTarget(this.h, slot);
+  }
+
+  // sysctl's expanders now: [{address, pins: [port0, port1]}] (a test hook)
+  expanders() {
+    return native.expanders(this.h);
   }
 
   state() {

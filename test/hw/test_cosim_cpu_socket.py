@@ -6,7 +6,9 @@ netlists, routed copper links for address, data, control, clock and reset)
 comes from a hw/cosim/gen_top.py manifest; tools/lockstep.py --socket puts it
 between the CPU RTL and tb_cpu_trace's chipset model. Every BUS-001..003
 argument set must match sim.nim through it. Swapped address or data contacts,
-an open data link and a swapped CPU-card finger in the netlist must be caught.
+an open data link, a swapped CPU-card finger in the netlist, and an open FPGA
+launch track on the routed CPU card (address A2, data D0), regenerated through
+gen_top.check(), must be caught.
 Receipt validation of the boards is done by the caller, not here.
 """
 import argparse
@@ -95,6 +97,30 @@ def netlist_swap(directory):
     return code != 0
 
 
+def copper_open(directory, net):
+    """Open the CPU card's FPGA launch of `net` (U1's pad on the routed board) and regenerate."""
+    sys.path[:0] = [str(ROOT / 'hw/cosim'), str(ROOT / 'hw/boards'), str(ROOT / 'hw/tools'), str(ROOT / 'test/hw')]
+    import gen_top
+    from cosim_mutate import open_pad
+    from netlist import read
+    (directory / 'cards-copper').mkdir(exist_ok=True)
+    cards = gen_top.exported_cards(directory / 'cards-copper')
+    pad = next(pin for (ref, pin), attached in cards['cpu'].pins.items() if ref == 'U1' and attached == net)
+    opened = directory / f'cpu-open-{net[1:]}.kicad_pcb'
+    open_pad(BUILD / 'cpu/cpu.kicad_pcb', opened, 'U1', pad, net)
+    main_net = BUILD / 'main/main.net'
+    manifest = gen_top.check(
+        cards, read(main_net), main_net.with_suffix('.kicad_pcb'),
+        {card: BUILD / card / f'{card}.kicad_pcb' for card in ('gpu', 'io', 'storage', 'wifi', 'eink')},
+        BUILD / 'system/system-routed.kicad_pcb', opened)
+    path = directory / f'cpu-open-{net[1:]}.json'
+    path.write_text(json.dumps(manifest))
+    code, tail = lockstep(['--waits', '3'], path)
+    print(('detected ' if code else 'MISSED   ') + f'CPU card {net[1:]} launch copper open (U1.{pad}): {tail}',
+          flush=True)
+    return code != 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--top', type=Path, help='an already generated manifest')
@@ -125,12 +151,13 @@ def main():
         caught = [mutant(top, directory, 'address contacts A2/A3 swapped', swap('cpu_address', 2, 3)),
                   mutant(top, directory, 'data contacts D0/D1 swapped', swap('cpu_data', 0, 1)),
                   mutant(top, directory, 'data D0 link open', open_data),
-                  netlist_swap(directory)]
+                  netlist_swap(directory),
+                  copper_open(directory, '/FPGA_A2'), copper_open(directory, '/FPGA_D0')]
     if not good:
         raise SystemExit('FAIL: BUS-001..003 through the modelled CPU socket')
     if not all(caught):
         raise SystemExit('FAIL: a socket wiring mutation was not detected')
-    print('CC-051: BUS-001..003 pass through the netlist CPU socket; 4 wiring mutations detected')
+    print('CC-051: BUS-001..003 pass through the netlist CPU socket; 6 wiring mutations detected')
 
 
 if __name__ == '__main__':

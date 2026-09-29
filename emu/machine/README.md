@@ -139,6 +139,30 @@ card's presence and ID straps on its port 1); without them every address
 NACKs as before. The expanders' outputs (CARD_RST_n, PROG_n) drive nothing
 yet: holding or restarting a card needs an RP2040 reset in emu/rp2040.
 
+The card programming port (`ProgPort`, machine.h): the system card's PROG_CLK
+(GPIO18) and PROG_IO (GPIO19) reach an SWD target in each slot that has an
+RP2040 card, through the two 4051 muxes as MUX_SEL0-2 (GPIO20-22) select
+them: a listener on PROG_CLK's rising edges, in the system card's own thread,
+feeds `fw/test/swdtarget.c` (the bit-level SW-DP the sysctl host tests use:
+multi-drop wake-up, DPIDR, AHB-AP, halt/registers, the boot ROM's flash
+routines) with what sysctl drives on PROG_IO, and puts the target's next bit on
+PROG_IO before the host's next sample; the clock after a turn from driving to
+reading is the turnaround and shifts nothing. An input select pin reads high
+(the board's pull-up: channel 7, nothing there), as does an open select's
+copper (`Options.prog`, from the netlist top's `prog_port`; the plain machine
+has every wire whole). The target is the card's debug port, not its running
+firmware: its flash starts as the card's flash (a real `cupc8.py card flash`
+verifies against it) and keeps what is written, the emulated card keeps
+running its ELF, and a SYSRESETREQ only counts (`Machine.progTarget(slot)`:
+`{resets, calls, flash}`). The Wi-Fi card has no SWD (its SWCLK / SWDIO pins
+are UART0, the ESP ROM bootloader link, not modelled).
+
+Also for the netlist top: `Machine.powerLeds()` (rail indicator LEDs, lit
+while their copper is whole), `Machine.expanders()` (the TCA9555 pin levels
+the presence and ID inputs put on the bus), the IO card's VBUS switch
+(`ioUsbHost` needs VBUS on; `ioVbusNfaultLow` drives GPIO8) and the Type-C
+Rd legs (an orientation without its Rd has no host).
+
 Harness hooks used in emu/rp2040: `FIFO::onPull` (TMDS capture), the SPI
 `onTransmit`/`completeTransmit` callbacks, the I2C `onConnect`/`onWriteByte`/
 `onReadByte` callbacks, GPIO `addListener`, USBCDC and UsbKeyboard; nothing

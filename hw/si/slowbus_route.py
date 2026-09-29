@@ -250,6 +250,10 @@ def cross_section(board_path, kind, layer, width, p, q):
         # over a plane clearance (antipad, pad keep-out): the nearest return
         # is the declared plane; the length is reported as unreferenced
         refs = ['void'] + [l for l in BOARDS[kind][1] if l != layer]
+        if refs == ['void']:
+            # a two-layer board's own ground layer has the void: the far side
+            # of the core is the nearest return
+            refs += [l for l in board_layers(stackup) if l != layer][:1]
     return f'{stackup}|{layer}|{width:.4f}|{",".join(refs)}|{gaps[0]}|{gaps[1]}'
 
 
@@ -651,7 +655,10 @@ def _all_segments(path):
 def plane_height(stackup, planes, layer):
     """Distance from a signal layer's centre to its nearest declared plane."""
     z = layer_z(stackup)
-    return min(abs(z[layer] - z[p]) for p in planes if p != layer)
+    others = [abs(z[layer] - z[p]) for p in planes if p != layer]
+    # a track on the plane layer itself (a two-layer board's B.Cu pour): the
+    # nearest other copper layer is the dielectric height
+    return min(others or [abs(z[layer] - z[l]) for l in z if l != layer])
 
 
 def coupling_constants(victim_key, layer_a, width_a, dx):

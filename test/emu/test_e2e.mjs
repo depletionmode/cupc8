@@ -176,6 +176,9 @@ async function e2e004() {
     expect(false, 'E2E-004 needs CUPC8_EMU=native');
     return;
   }
+  // CUPC8_E2E004_ONLY=sparse|storage|lowpower|kernel|partial runs one scenario
+  // (the fault-injection runs of test/hw/test_cosim_e2e_mutants.py); default: all
+  const want = (name) => !process.env.CUPC8_E2E004_ONLY || process.env.CUPC8_E2E004_ONLY === name;
   const rom = kernelRom();
   const boot = async (slots, image = rom, options = {}) => {
     const m = await Machine.create({ slots, rom: image, ...options });
@@ -183,71 +186,82 @@ async function e2e004() {
     return m;
   };
 
-  // Slots 1, 3, 5 and 6 have no card. Probe must continue across the gaps.
-  let m = await boot({ 2: 'hdmi', 4: 'io' });
-  expect(await waitFor(m, '>>', 6e9), 'sparse slots: BASIC reaches the HDMI card in slot 2');
-  m.type('10 print 6*7\nrun\n');
-  expect(await waitFor(m, '42', 3e9), 'sparse slots: IO in slot 4 accepts input and the program runs');
-  m.stop();
-
-  // The first boot sees a storage card with an empty SD socket. With that
-  // slot physically vacant on the next boot, DIR must report the distinction.
-  m = await boot({ 1: 'hdmi', 2: 'io', 3: 'storage' });
-  expect(await waitFor(m, '>>', 6e9), 'storage card fitted: BASIC prompt');
-  m.type('dir\n');
-  expect(await waitFor(m, 'no SD card', 3e9), 'fitted storage card reports its empty SD socket');
-  m.stop();
-  m = await boot({ 1: 'hdmi', 2: 'io' });
-  expect(await waitFor(m, '>>', 6e9), 'storage card removed while off: BASIC prompt');
-  m.type('dir\n');
-  expect(await waitFor(m, 'no storage card', 3e9), 'removed storage card is absent after power cycle');
-  m.stop();
-
-  m = await boot({ 1: 'hdmi', 2: 'io', 3: 'storage' }, rom, { pwrHi: false });
-  expect(await waitFor(m, '>>', 6e9), 'source below 3 A: BASIC still boots');
-  m.type('10 print 42\nsave "x"\n');
-  expect(await waitFor(m, 'USB power under 3A: SD writes off', 3e9),
-    'source below 3 A: kernel refuses SD writes');
-  m.type('dir\n');
-  expect(await waitFor(m, 'no SD card', 3e9),
-    'source below 3 A: DIR reaches the storage card and reports its empty socket');
-  m.stop();
-
-  for (const [what, offset, post, message] of [
-    ['bad magic', 0x800, 0x90, 'no kernel in ROM'],
-    ['bad header checksum', 0x80d, 0x90, 'no kernel in ROM'],
-    ['bad body checksum', 0x810, 0xa0, 'kernel checksum bad'],
-  ]) {
-    const broken = Buffer.from(rom);
-    broken[offset] ^= 1;
-    m = await boot({ 1: 'hdmi', 2: 'io' }, broken);
-    const halted = await m.runUntil(() => m.state().halted, 6e9, 100e6);
-    const state = m.state();
-    expect(halted && state.gpo === post, `${what}: boot ROM halts with POST $${post.toString(16)} (${JSON.stringify(state)})`);
-    expect(screenText(m).includes(message), `${what}: boot ROM prints ${JSON.stringify(message)}`);
-    expect(!screenText(m).includes('>>'), `${what}: BASIC does not start`);
+  let m;
+  if (want('sparse')) {
+    // Slots 1, 3, 5 and 6 have no card. Probe must continue across the gaps.
+    m = await boot({ 2: 'hdmi', 4: 'io' });
+    expect(await waitFor(m, '>>', 6e9), 'sparse slots: BASIC reaches the HDMI card in slot 2');
+    m.type('10 print 6*7\nrun\n');
+    expect(await waitFor(m, '42', 3e9), 'sparse slots: IO in slot 4 accepts input and the program runs');
     m.stop();
   }
 
-  // Program only the first two 2048-byte host protocol chunks into an
-  // erased ROM, then end the upload as if the host disappeared. The header
-  // and part of the body are present, so reset must reject the incomplete
-  // image by its checksum. ROM writes go through the real sysctl firmware.
-  const partial = path.join(ROOT, 'build/emu/e2e004-partial-rom.bin');
-  fs.mkdirSync(path.dirname(partial), { recursive: true });
-  fs.writeFileSync(partial, rom.subarray(0, 4096));
-  m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff), sysctl: true });
-  m.powerOn();
-  const write = await cupc8(m, 'rom', 'write', partial);
-  expect(write.code === 0 && write.out.includes('wrote and verified 4096 bytes'),
-    `interrupted upload: first two chunks were programmed (${write.out.trim()})`);
-  const reset = await cupc8(m, 'reset');
-  expect(reset.code === 0, `interrupted upload: reset (${reset.out.trim()})`);
-  const halted = await m.runUntil(() => m.state().halted, 6e9, 100e6);
-  expect(halted && m.state().gpo === 0xa0,
-    `interrupted upload: boot rejects the partial kernel with POST $a0 (${JSON.stringify(m.state())})`);
-  expect(screenText(m).includes('kernel checksum bad'), 'interrupted upload: HDMI explains the checksum failure');
-  m.stop();
+  if (want('storage')) {
+    // The first boot sees a storage card with an empty SD socket. With that
+    // slot physically vacant on the next boot, DIR must report the distinction.
+    m = await boot({ 1: 'hdmi', 2: 'io', 3: 'storage' });
+    expect(await waitFor(m, '>>', 6e9), 'storage card fitted: BASIC prompt');
+    m.type('dir\n');
+    expect(await waitFor(m, 'no SD card', 3e9), 'fitted storage card reports its empty SD socket');
+    m.stop();
+    m = await boot({ 1: 'hdmi', 2: 'io' });
+    expect(await waitFor(m, '>>', 6e9), 'storage card removed while off: BASIC prompt');
+    m.type('dir\n');
+    expect(await waitFor(m, 'no storage card', 3e9), 'removed storage card is absent after power cycle');
+    m.stop();
+  }
+
+  if (want('lowpower')) {
+    m = await boot({ 1: 'hdmi', 2: 'io', 3: 'storage' }, rom, { pwrHi: false });
+    expect(await waitFor(m, '>>', 6e9), 'source below 3 A: BASIC still boots');
+    m.type('10 print 42\nsave "x"\n');
+    expect(await waitFor(m, 'USB power under 3A: SD writes off', 3e9),
+      'source below 3 A: kernel refuses SD writes');
+    m.type('dir\n');
+    expect(await waitFor(m, 'no SD card', 3e9),
+      'source below 3 A: DIR reaches the storage card and reports its empty socket');
+    m.stop();
+  }
+
+  if (want('kernel')) {
+    for (const [what, offset, post, message] of [
+      ['bad magic', 0x800, 0x90, 'no kernel in ROM'],
+      ['bad header checksum', 0x80d, 0x90, 'no kernel in ROM'],
+      ['bad body checksum', 0x810, 0xa0, 'kernel checksum bad'],
+    ]) {
+      const broken = Buffer.from(rom);
+      broken[offset] ^= 1;
+      m = await boot({ 1: 'hdmi', 2: 'io' }, broken);
+      const halted = await m.runUntil(() => m.state().halted, 6e9, 100e6);
+      const state = m.state();
+      expect(halted && state.gpo === post, `${what}: boot ROM halts with POST $${post.toString(16)} (${JSON.stringify(state)})`);
+      expect(screenText(m).includes(message), `${what}: boot ROM prints ${JSON.stringify(message)}`);
+      expect(!screenText(m).includes('>>'), `${what}: BASIC does not start`);
+      m.stop();
+    }
+  }
+
+  if (want('partial')) {
+    // Program only the first two 2048-byte host protocol chunks into an
+    // erased ROM, then end the upload as if the host disappeared. The header
+    // and part of the body are present, so reset must reject the incomplete
+    // image by its checksum. ROM writes go through the real sysctl firmware.
+    const partial = path.join(ROOT, 'build/emu/e2e004-partial-rom.bin');
+    fs.mkdirSync(path.dirname(partial), { recursive: true });
+    fs.writeFileSync(partial, rom.subarray(0, 4096));
+    m = await Machine.create({ slots: { 1: 'hdmi', 2: 'io' }, rom: Buffer.alloc(512 * 1024, 0xff), sysctl: true });
+    m.powerOn();
+    const write = await cupc8(m, 'rom', 'write', partial);
+    expect(write.code === 0 && write.out.includes('wrote and verified 4096 bytes'),
+      `interrupted upload: first two chunks were programmed (${write.out.trim()})`);
+    const reset = await cupc8(m, 'reset');
+    expect(reset.code === 0, `interrupted upload: reset (${reset.out.trim()})`);
+    const halted = await m.runUntil(() => m.state().halted, 6e9, 100e6);
+    expect(halted && m.state().gpo === 0xa0,
+      `interrupted upload: boot rejects the partial kernel with POST $a0 (${JSON.stringify(m.state())})`);
+    expect(screenText(m).includes('kernel checksum bad'), 'interrupted upload: HDMI explains the checksum failure');
+    m.stop();
+  }
 }
 
 // ------------------------------------------------------------------ E2E-007

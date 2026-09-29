@@ -1398,3 +1398,26 @@ fixed_in = "MB-005/MB-051 main-board work (2026-09-28)"
 revert = [["hw/boards/main.py", """    R("R7", "1m", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", POWER["LINK"][1])  # 3V3 isolation link""", """    R("R7", "0", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", "C17888")  # 3V3 isolation link"""]]
 cmd = "python3 test/hw/test_reset_supervisor.py BoardSource"
 must_fail = ["test_links_are_1_mohm_shunts"]
+
+[[bug]]
+name = "MB-005: the 20 C copper-rise rule silently passed a mesh result that carried no current-density grids"
+fixed_in = "main_input_heat.rises fails closed (2026-09-29)"
+revert = [["hw/power/main_input_heat.py", """    if not result.grids:
+        raise ValueError('mesh result carries no current-density grids: the rise cannot be bounded')
+""", ""]]
+cmd = "python3 test/hw/test_main_input_heat.py MainInputHeat"
+must_fail = ["test_result_without_grids_cannot_pass_the_rise_rule"]
+
+[[bug]]
+name = "MB-051: Freerouting's own fan-out stage took 6.5-11 min a pass on the seeded main board and left 27-32 pins unrouted pass after pass"
+fixed_in = "main.py route_fanout=False with main_fanout.py's pre-placed vias (2026-09-29)"
+revert = [["hw/boards/main.py", "                       route_fanout=False,\n", "                       route_fanout=True,\n"]]
+cmd = "python3 test/hw/test_freerouting_cmd.py FreeroutingCommand"
+must_fail = ["test_main_board_turns_it_off_and_others_do_not"]
+
+[[bug]]
+name = "MB-051: a pre-placed fan-out via could land in its own pad (via-in-pad)"
+fixed_in = "hw/boards/main_fanout.py own-pad keep-out (2026-09-29)"
+revert = [["hw/boards/main_fanout.py", "            if len(own_pads) and (_rect_dist(x, y, own_pads)[:, 0] < VIA / 2 + own_gap).any():", "            if False and len(own_pads) and (_rect_dist(x, y, own_pads)[:, 0] < VIA / 2 + own_gap).any():"]]
+cmd = "python3 test/hw/test_main_fanout.py FanOut"
+must_fail = ["test_via_keeps_its_class_clearance_and_stays_out_of_every_pad"]

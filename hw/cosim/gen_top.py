@@ -9,6 +9,7 @@ This is the wiring prerequisite for E2E-001; it does not itself run RTL.
 import argparse
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 from functools import lru_cache
@@ -297,20 +298,25 @@ def adc_sense_routes(main, system, main_board, system_board):
     return links, paths, missing, whole
 
 
-def i2c_expander_routes(main, cards, main_board, cpu_board, system_board):
+def i2c_expander_routes(main, cards, main_board, cpu_board, system_board, card_boards=None):
     """sysctl's I2C0 to the two TCA9555s, and the CPU card presence input.
 
     Returns (rows, paths, missing, whole_nets). rows: the expanders (address
     from their A0-A2 straps, whether SDA and SCL reach them), the CPU-card
     presence path (main J2.B49 to U14 P10 and the card's PRSNT1-PRSNT2 loop),
-    the CPU card ID straps, and each slot's presence path. Only the CPU
-    presence bit is read by software (sysctl STATUS); slot presence and the
-    ID bits are presented on the bus but nothing reads them.
+    the CPU card ID straps (their main-board legs to U14 P11/P12), and each
+    slot's presence path: main J1n.B18 to its U14 pin and every card kind's
+    own PRSNT loop (J1.A1 to J1.B18, PRSNT1_n grounded on the main board).
+    Only the CPU presence bit is read by software (sysctl STATUS); slot
+    presence and the ID bits are presented on the bus (the model's input
+    registers) but nothing in the firmware reads them.
     """
     sys.path.insert(0, str(ROOT / 'hw/si'))
     from ibis_bus import routed_distances
     system, cpu = cards['system'], cards['cpu']
     boards = {'main': (main, main_board), 'system': (system, system_board), 'cpu': (cpu, cpu_board)}
+    for kind in ('gpu', 'io', 'storage', 'wifi', 'eink'):
+        boards[kind] = (cards[kind], (card_boards or {}).get(kind))
     paths, missing, whole = [], [], {}
 
     def leg(board, net, first, last, flag):
@@ -378,12 +384,32 @@ def i2c_expander_routes(main, cards, main_board, cpu_board, system_board):
         net = node(main, *pad)
         strap = next(p for (r, p), n in main.pins.items() if r == 'J2' and n == net)
         card = cpu.net('J1', strap) or 'NC'
+        if not [r for r, other in main.pulls('/+3V3') if other == net]:
+            raise ValueError(f'main:{net}: the CPU card ID line has no pull-up')
         rows['card_id'].append({'bit': bit, 'net': net.lstrip('/'),
-                                'level': 0 if card == '/GND' else 1})
+                                'level': 0 if card == '/GND' else 1,
+                                'link': leg('main', net.lstrip('/'), ('J2', strap), pad, 'card_id')})
+    # each card kind's presence loop: PRSNT1_n (A1) wired to PRSNT2_n (B18)
+    # on the card, PRSNT1_n grounded on the main board
+    rows['card_loops'] = {}
+    for kind in ('gpu', 'io', 'storage', 'wifi', 'eink'):
+        circuit = cards[kind]
+        if circuit.pin_names.get(('J1', 'A1'), '').split('_')[0] != 'PRSNT1' or \
+                circuit.pin_names.get(('J1', 'B18')) != 'PRSNT2_n' or \
+                node(circuit, 'J1', 'A1') != '/PRSNT' or node(circuit, 'J1', 'B18') != '/PRSNT':
+            raise ValueError(f'{kind}: PRSNT1_n must be wired to PRSNT2_n on the card')
+        rows['card_loops'][kind] = leg(kind, 'PRSNT', ('J1', 'A1'), ('J1', 'B18'), 'slot_presence')
     for slot in range(1, 7):
         net = f'SLOT{slot}_PRSNT2_n'
+        socket = f'J{10 + slot}'
         pad = next(((r, p) for (r, p), n in main.pins.items() if r == presence and n == f'/{net}'), None)
-        rows['slot_presence'].append({'slot': slot, 'bit': int(main.pin_names[pad][2]) if pad else None})
+        if pad is None or node(main, socket, 'B18') != f'/{net}' or node(main, socket, 'A1') != '/GND' or \
+                not [r for r, other in main.pulls('/+3V3') if other == f'/{net}']:
+            raise ValueError(f'main:{net}: slot presence must run from {socket}.B18 to {presence}, '
+                             'with a 3V3 pull-up and PRSNT1_n on GND')
+        rows['slot_presence'].append({
+            'slot': slot, 'bit': int(main.pin_names[pad][2]),
+            'link': leg('main', net, (socket, 'B18'), pad, 'slot_presence')})
     return rows, paths, missing, whole
 
 
@@ -435,6 +461,76 @@ def card_led_routes(cards, card_boards, system_board):
             rows[board].append({'gpio': int(label[4:].split('/')[0]), 'net': source_net.lstrip('/'),
                                 'anode_net': anode_net.lstrip('/'), 'led': diode,
                                 'connected': connected})
+    return rows, paths, missing
+
+
+RAIL_NET = re.compile(r'/(?:\+?\d+V\d*|5V_SYS)')     # /+3V3 /3V3 /+5V /+1V2 /1V2 /5V_SYS
+
+
+def rail_indicator_routes(circuits, pcbs):
+    """Rail indicator LEDs (power, 5V/3V3/1V2 present), leg by leg on copper.
+
+    Two shapes, found by netlist topology and net names only (never by
+    reference): rail -> resistor -> LED anode with the cathode on GND, and
+    (the 1V2 indicators) the same with the cathode on an NPN collector whose
+    emitter is on GND and whose base is fed from a rail through one
+    resistor. An indicator counts as lit while every signal leg is on routed
+    copper (the rail and GND pads sit on planes: DRC checks them); the rail
+    itself is assumed present, so this models the wiring of the indicator,
+    not LED current, brightness or the rail (POW-*, -005 rows).
+    Returns ({board: rows}, paths, missing).
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    rows, paths, missing = {}, [], []
+    for board, circuit in circuits.items():
+        pcb = pcbs.get(board)
+        rows[board] = []
+        for ref, (_, source) in sorted(circuit.components.items()):
+            if source != ('Device', 'LED'):
+                continue
+            anode, cathode = named_pin(circuit, ref, 'A'), named_pin(circuit, ref, 'K')
+            legs = []
+
+            def feeder(net, pad):
+                """The one resistor on `net` besides `pad`, if its far side is a rail."""
+                others = [n for n in circuit.nets[net] if n != pad]
+                if len(others) != 1 or circuit.components[others[0][0]][1] != ('Device', 'R'):
+                    return None
+                far = circuit.pins.get((others[0][0], '2' if others[0][1] == '1' else '1'))
+                return (others[0], far) if far and RAIL_NET.fullmatch(far) else None
+
+            anode_net, cathode_net = node(circuit, *anode), node(circuit, *cathode)
+            fed = feeder(anode_net, anode)
+            if fed is None:
+                continue
+            legs.append((anode_net, fed[0], anode))
+            transistor = None
+            if cathode_net != '/GND':
+                pads = [n for n in circuit.nets[cathode_net] if n != cathode]
+                if len(pads) != 1 or circuit.components[pads[0][0]][0] != 'MMBT3904' or \
+                        circuit.pin_names.get(pads[0]) != 'C':
+                    continue
+                transistor = pads[0][0]
+                base = named_pin(circuit, transistor, 'B')
+                base_fed = feeder(node(circuit, *base), base)
+                if base_fed is None or node(circuit, *named_pin(circuit, transistor, 'E')) != '/GND':
+                    continue
+                legs += [(cathode_net, cathode, pads[0]), (node(circuit, *base), base, base_fed[0])]
+            connected = True
+            nets = []
+            for net, first, last in legs:
+                mm = None
+                if pcb is not None and Path(pcb).is_file():
+                    mm = routed_distances(Path(pcb), net, first, [last])[f'{last[0]}.{last[1]}']
+                paths.append({'from': f'{board}.{first[0]}.{first[1]}', 'to': f'{board}.{last[0]}.{last[1]}',
+                              'route_mm': mm, 'runtime': f'{board}_rail_led_{ref}'})
+                nets.append(net.lstrip('/'))
+                if mm is None:
+                    connected = False
+                    missing.append(f'{board}:{net.lstrip("/")}_rail_led_copper')
+            rows[board].append({'led': ref, 'rail': fed[1].lstrip('/'), 'transistor': transistor,
+                                'nets': nets, 'connected': connected})
     return rows, paths, missing
 
 
@@ -999,6 +1095,27 @@ def system_usb_routes(system, board):
                     orientation = {'A': False, 'B': False}
                 elif branch.startswith('contact_'):
                     orientation[branch[-1]] = False
+    # The Type-C Rd on each CC line (5.1 k to GND): the host sees a sink, and
+    # so supplies VBUS and talks, only in the orientation whose CC line has
+    # its Rd wired. A plug one way round uses CC1 (A5, orientation A), the
+    # other CC2 (B5, orientation B).
+    for side, net, contact, resistor in (('A', '/USB_CC1', ('J1', 'A5'), 'R4'),
+                                         ('B', '/USB_CC2', ('J1', 'B5'), 'R5')):
+        if system.components.get(resistor) != ('5.1k', ('Device', 'R')) or \
+                set(system.nets.get(net, ())) != {contact, (resistor, '1')} or \
+                node(system, resistor, '2') != '/GND':
+            raise ValueError(f'system USB {net}: Rd must be 5.1k from the receptacle CC contact to GND')
+        mm = None
+        if loaded_board is not None:
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+            mm = routed_distances(Path(board), net, contact, [(resistor, '1')],
+                                  loaded_board=loaded_board, parsed_tree=parsed_tree)[f'{resistor}.1']
+        paths.append({'from': f'system.{contact[0]}.{contact[1]}', 'to': f'system.{resistor}.1',
+                      'route_mm': mm, 'runtime': f'system_usb_cc_{side}'})
+        if mm is None:
+            missing.append(f'system:{net.lstrip("/")}_cc_copper')
+            orientation[side] = False
     return orientation, paths, missing
 
 
@@ -1092,6 +1209,192 @@ def io_usb_host_routes(io, board):
                 if branch != 'esd':
                     host_connected = False
     return host_connected, paths, missing
+
+
+def io_vbus_routes(io, board):
+    """The IO card's keyboard VBUS switch: enable, output and the fault sense.
+
+    GPIO7 (VBUS_EN) drives the SY6280AAC's EN (100 k pull-down); its OUT
+    feeds the receptacle's VBUS; GPIO8 (VBUS_nFAULT) reads VBUS through the
+    15 k / 22 k divider (the switch has no fault flag: a low reading is a
+    sag or a dead switch, io-card.md). The firmware sets GPIO7 high and
+    reports GPIO8 low as VBUS_FAULT. Returns ({'vbus_on', 'nfault_low',
+    'enable', 'out', 'sense_top', 'sense_r12', 'sense_r13'}, paths, missing).
+    The keyboard is powered only with VBUS on; the fault pin
+    reads low when VBUS is off and the divider is whole, low always with only
+    the 22 k leg (a deterministic counterexample), high (its pull-up) when
+    the divider is not connected to the pin.
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    if io.components.get('U5', ('', ''))[0] != 'SY6280AAC':
+        raise ValueError('io VBUS: the switch must be an SY6280AAC (U5)')
+    en, fault = named_pin(io, 'U1', 'GPIO7'), named_pin(io, 'U1', 'GPIO8')
+    enable_pin, out_pin = named_pin(io, 'U5', 'EN'), named_pin(io, 'U5', 'OUT')
+    receptacle = next(((r, p) for (r, p), name in io.pin_names.items()
+                       if r == 'J2' and name == 'VCC'), None)
+    if node(io, *en) != '/VBUS_EN' or node(io, *enable_pin) != '/VBUS_EN' or \
+            node(io, *fault) != '/VBUS_nFAULT' or receptacle is None or \
+            node(io, *out_pin) != node(io, *receptacle):
+        raise ValueError('io VBUS: GPIO7 must reach the switch EN, its OUT the receptacle VCC, '
+                         'and GPIO8 the sense divider')
+    vbus = node(io, *out_pin)
+    divider = {r.value: r for r in io.resistors if vbus in r.ends or '/VBUS_nFAULT' in r.ends}
+    top = next((r for r in io.resistors if r.value == '15k' and set(r.ends) == {vbus, '/VBUS_nFAULT'}), None)
+    bottom = next((r for r in io.resistors if r.value == '22k' and set(r.ends) == {'/VBUS_nFAULT', '/GND'}), None)
+    pulldown = next((r for r in io.resistors if r.value == '100k' and set(r.ends) == {'/VBUS_EN', '/GND'}), None)
+    if top is None or bottom is None or pulldown is None:
+        raise ValueError('io VBUS: 15k from VBUS and 22k to GND on the sense pin, 100k EN pull-down: '
+                         f'found {sorted(divider)}')
+    pad = lambda resistor, net: next((resistor.ref, q) for q in ('1', '2')  # noqa: E731
+                                     if io.pins.get((resistor.ref, q)) == net)
+    legs = {'enable': ('/VBUS_EN', en, enable_pin), 'out': (vbus, out_pin, receptacle),
+            'sense_top': (vbus, receptacle, pad(top, vbus)),
+            'sense_r12': ('/VBUS_nFAULT', pad(top, '/VBUS_nFAULT'), fault),
+            'sense_r13': ('/VBUS_nFAULT', pad(bottom, '/VBUS_nFAULT'), fault)}
+    routed, paths, missing = {}, [], []
+    for key, (net, first, last) in legs.items():
+        mm = None
+        if board is not None and Path(board).is_file():
+            mm = routed_distances(Path(board), net, first, [last])[f'{last[0]}.{last[1]}']
+        paths.append({'from': f'io.{first[0]}.{first[1]}', 'to': f'io.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': f'io_vbus_{key}'})
+        routed[key] = mm is not None
+        if mm is None:
+            missing.append(f'io:{net.lstrip("/")}_vbus_{key}_copper')
+    routed['vbus_on'] = routed['enable'] and routed['out']
+    r12 = routed['sense_top'] and routed['sense_r12']
+    routed['nfault_low'] = (not routed['vbus_on']) if r12 and routed['sense_r13'] else \
+        (routed['sense_r13'] and not r12)
+    return routed, paths, missing
+
+
+def prog_port_routes(main, cards, main_board, system_board, card_boards):
+    """The card programming port: sysctl to the two 4051 muxes to each slot's SWD pins.
+
+    sysctl's PROG_CLK (GPIO18) and PROG_IO (GPIO19) reach the common pins of
+    U11 (clock) and U12 (data); its MUX_SEL0-2 (GPIO20-22) reach both muxes'
+    S0-S2. Channel Yn of each mux runs through a 33 ohm resistor to a slot's
+    SWCLK / SWDIO contacts and, on an RP2040 card, on to the chip's debug pins
+    (U1 SWCLK, SWDIO). Everything is bound by netlist topology and net names:
+    the mux channel and select bit each signal really reaches are read from
+    the pins (a swapped select or a slot on another channel changes the
+    decode), and each leg is measured on the routed copper. The Wi-Fi card's
+    SWCLK / SWDIO contacts are its UART0 (an ESP ROM bootloader link, not
+    modelled here). Returns (config, paths, missing, whole_nets); config:
+    {'sel_bit': the mux select input GPIO20-22 drive, 'sel_whole', 'clk',
+    'io' (the common legs), 'channel': the mux channel each slot's pair hangs
+    on, 'slot_legs': per slot whether both 33 ohm legs of both channels are
+    routed, 'card': per RP2040 card kind whether its two debug legs are}.
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    system = cards['system']
+    boards = {'main': (main, main_board), 'system': (system, system_board)}
+    for kind in ('gpu', 'io', 'storage', 'eink'):
+        boards[kind] = (cards[kind], (card_boards or {}).get(kind))
+    paths, missing, whole = [], [], {}
+
+    def leg(board, net, first, last, tag):
+        circuit, pcb = boards[board]
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            mm = routed_distances(Path(pcb), net, first, [last], pad_reach=True)[
+                f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}', 'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': f'prog_{tag}'})
+        whole[(board, net)] = whole.get((board, net), True) and mm is not None
+        if mm is None:
+            missing.append(f'{board}:{net.lstrip("/")}_prog_{tag}_copper:{first[0]}.{first[1]}->{last[0]}.{last[1]}')
+        return mm is not None
+
+    muxes = {}                                    # ref -> role
+    for ref, (value, _) in main.components.items():
+        if value == 'CD74HC4051PWR':
+            common = named_pin(main, ref, 'A')
+            net = node(main, *common)
+            muxes[net] = ref
+    if set(muxes) != {'/PROG_CLK', '/PROG_IO'}:
+        raise ValueError(f'main: the two 4051 muxes must have PROG_CLK and PROG_IO on their common pins, found {sorted(muxes)}')
+    clk_mux, io_mux = muxes['/PROG_CLK'], muxes['/PROG_IO']
+
+    def system_signal(gpio):
+        pad = named_pin(system, 'U1', gpio)
+        net = node(system, *pad)
+        card_contact = next(((r, p) for (r, p), n in system.pins.items() if r == 'J2' and n == net), None)
+        if card_contact is None:
+            raise ValueError(f'system:{net}: no system-slot contact')
+        # the main board's socket contact for this card contact: A1-A32 are
+        # J3.1-32, B1-B32 J3.33-64 (the x4 pad translation)
+        number = int(card_contact[1][1:]) + (32 if card_contact[1][0] == 'B' else 0)
+        main_contact = ('J3', str(number))
+        main_net = node(main, *main_contact)
+        return pad, card_contact, main_contact, net, main_net
+
+    config = {}
+    for signal, gpio, mux in (('clk', 'GPIO18', clk_mux), ('io', 'GPIO19', io_mux)):
+        pad, card_contact, main_contact, net, main_net = system_signal(gpio)
+        if main_net != ('/PROG_CLK' if signal == 'clk' else '/PROG_IO'):
+            raise ValueError(f'{gpio} reaches {main_net} on the main board, not the {signal.upper()} common line')
+        config[signal] = leg('system', net, pad, card_contact, signal) and \
+            leg('main', main_net, main_contact, named_pin(main, mux, 'A'), signal)
+    config['sel_bit'], config['sel_whole'] = [], []
+    for k, gpio in enumerate(('GPIO20', 'GPIO21', 'GPIO22')):
+        pad, card_contact, main_contact, net, main_net = system_signal(gpio)
+        bits = set()
+        ok = leg('system', net, pad, card_contact, f'sel{k}')
+        for mux in (clk_mux, io_mux):
+            select = next((p for (r, p), n in main.pins.items()
+                           if r == mux and n == main_net and main.pin_names.get((r, p), '')[:1] == 'S'), None)
+            if select is None:
+                raise ValueError(f'{gpio} reaches {main_net}: not a select input of {mux}')
+            bits.add(int(main.pin_names[(mux, select)][1:]))
+            ok &= leg('main', main_net, main_contact, (mux, select), f'sel{k}')
+        if len(bits) != 1:
+            raise ValueError(f'{gpio}: the two muxes see it on different select inputs {sorted(bits)}')
+        config['sel_bit'].append(bits.pop())
+        config['sel_whole'].append(ok)
+    if sorted(config['sel_bit']) != [0, 1, 2]:
+        raise ValueError(f'the three mux selects are not a permutation: {config["sel_bit"]}')
+
+    config['channel'], config['slot_legs'] = [], []
+    for slot in range(1, 7):
+        socket = f'J{10 + slot}'
+        channels, ok = set(), True
+        for contact, signal, mux in (('B6', 'SWCLK', clk_mux), ('B7', 'SWDIO', io_mux)):
+            slot_net = node(main, socket, contact)
+            if slot_net != f'/SLOT{slot}_{signal}':
+                raise ValueError(f'{socket}.{contact}: expected SLOT{slot}_{signal}, got {slot_net}')
+            series = next((r for r in main.resistors if slot_net in r.ends), None)
+            if series is None or series.value != '33':
+                raise ValueError(f'{slot_net}: a 33 ohm series resistor must lead to the mux')
+            near = next((series.ref, q) for q in ('1', '2') if main.pins[(series.ref, q)] == slot_net)
+            far = next((series.ref, q) for q in ('1', '2') if main.pins[(series.ref, q)] != slot_net)
+            far_net = main.pins[far]
+            channel = next((p for (r, p), n in main.pins.items() if r == mux and n == far_net), None)
+            if channel is None or not main.pin_names.get((mux, channel), '').startswith('A') or \
+                    main.pin_names[(mux, channel)] == 'A':
+                raise ValueError(f'{far_net}: not a channel input of {mux}')
+            channels.add(int(main.pin_names[(mux, channel)][1:]))
+            ok &= leg('main', far_net, (mux, channel), far, f'slot{slot}_{signal.lower()}_mux')
+            ok &= leg('main', slot_net, near, (socket, contact), f'slot{slot}_{signal.lower()}_socket')
+        if len(channels) != 1:
+            raise ValueError(f'slot {slot}: the clock and data channels differ ({sorted(channels)})')
+        config['channel'].append(channels.pop())
+        config['slot_legs'].append(ok)
+    if sorted(config['channel']) != sorted(set(config['channel'])) or max(config['channel']) > 5:
+        raise ValueError(f'slot channels collide or leave the six modelled inputs: {config["channel"]}')
+    config['card'] = {}
+    for kind in ('gpu', 'io', 'storage', 'eink'):
+        circuit, ok = cards[kind], True
+        for contact, name in (('B6', 'SWCLK'), ('B7', 'SWDIO')):
+            net = node(circuit, 'J1', contact)
+            pad = named_pin(circuit, 'U1', name)
+            if node(circuit, *pad) != net:
+                raise ValueError(f'{kind}: J1.{contact} must reach the RP2040 {name} pin')
+            ok &= leg(kind, net, ('J1', contact), pad, f'{name.lower()}')
+        config['card'][kind] = ok
+    return config, paths, missing, whole
 
 
 def sysctl_manual_reset_route(main, system, main_board, system_board):
@@ -1624,7 +1927,7 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         main, cards['cpu'], cards['system'], pcb, cpu_board, system_board)
     manifest['runtime']['fpga_links'] = fpga_links
     i2c_rows, i2c_paths, i2c_missing, i2c_nets = i2c_expander_routes(
-        main, cards, pcb, cpu_board, system_board)
+        main, cards, pcb, cpu_board, system_board, card_boards)
     manifest['runtime']['i2c'] = i2c_rows
     manifest['paths'].extend(i2c_paths)
     manifest['runtime']['missing_routes'].extend(i2c_missing)
@@ -1632,10 +1935,21 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['sysctl_adc'] = adc_links
     manifest['paths'].extend(adc_paths)
     manifest['runtime']['missing_routes'].extend(adc_missing)
+    prog_config, prog_paths, prog_missing, prog_nets = prog_port_routes(
+        main, cards, pcb, system_board, card_boards)
+    manifest['runtime']['prog_port'] = prog_config
+    manifest['paths'].extend(prog_paths)
+    manifest['runtime']['missing_routes'].extend(prog_missing)
     led_rows, led_paths, led_missing = card_led_routes(cards, card_boards, system_board)
     manifest['runtime']['card_leds'] = led_rows
     manifest['paths'].extend(led_paths)
     manifest['runtime']['missing_routes'].extend(led_missing)
+    rail_rows, rail_paths, rail_missing = rail_indicator_routes(
+        {'main': main, **cards}, {'main': pcb, 'cpu': cpu_board, 'system': system_board,
+                                  **(card_boards or {})})
+    manifest['runtime']['rail_leds'] = rail_rows
+    manifest['paths'].extend(rail_paths)
+    manifest['runtime']['missing_routes'].extend(rail_missing)
     manifest['paths'].extend(fpga_paths)
     manifest['runtime']['missing_routes'].extend(fpga_missing)
     manifest['runtime']['missing_routes'].sort()
@@ -1808,6 +2122,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['io_usb_host'] = io_usb_host
     manifest['runtime']['missing_routes'].extend(io_usb_missing)
     manifest['runtime']['routed_top'] &= not io_usb_missing
+    io_vbus, io_vbus_paths, io_vbus_missing = io_vbus_routes(cards['io'], io_usb_board)
+    manifest['runtime']['io_vbus'] = io_vbus
+    manifest['paths'].extend(io_vbus_paths)
+    manifest['runtime']['missing_routes'].extend(io_vbus_missing)
+    manifest['runtime']['routed_top'] &= not io_vbus_missing
     # The microSD socket is a direct seven-wire attachment to the storage
     # RP2040. An absent or swapped contact removes that socket from co-sim.
     sd_contacts = {'SD_DAT2': '1', 'SD_nCS': '2', 'SD_MOSI': '3',
@@ -1977,6 +2296,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     if not io_usb_missing:
         for name in ('USB_DM', 'USB_DP', 'USB_CONN_DM', 'USB_CONN_DP'):
             runtime_net('io', name)
+    # the VBUS switch enable and its fault sense (io_vbus_routes)
+    if io_vbus['enable']:
+        runtime_net('io', 'VBUS_EN')
+    if io_vbus['sense_top'] and io_vbus['sense_r12'] and io_vbus['sense_r13']:
+        runtime_net('io', 'VBUS_nFAULT')
     for name in sd_contacts:
         runtime_net('storage', name)
     for name in hdmi_contacts:
@@ -2048,6 +2372,17 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             if row['connected']:
                 runtime_net(board, row['net'])
                 runtime_net(board, row['anode_net'])
+    # The programming port (prog_port_routes): SWD from sysctl through the muxes
+    # to an RP2040 card's debug pins; a net executes while its legs are routed.
+    for (board, net), whole in prog_nets.items():
+        if whole:
+            runtime_net(board, net.lstrip('/'))
+    # Rail indicators (rail_indicator_routes) execute while every leg is routed.
+    for board, rows in rail_rows.items():
+        for row in rows:
+            if row['connected']:
+                for net in row['nets']:
+                    runtime_net(board, net)
     # The crystal network gates each RP2040 card's firmware (crystal_routes);
     # a net counts as executed while every one of its legs is routed.
     for (board, net), whole in crystal_nets.items():
@@ -2099,7 +2434,7 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     if all(manual_reset.values()):
         runtime_net('main', 'nMR')
     if not usb_missing:
-        for name in ('USB_DM', 'USB_DM_MCU', 'USB_DP', 'USB_DP_MCU'):
+        for name in ('USB_DM', 'USB_DM_MCU', 'USB_DP', 'USB_DP_MCU', 'USB_CC1', 'USB_CC2'):
             runtime_net('system', name)
     if all(vbus_contacts.values()):
         for name in ('USB_VBUS', 'VBUS_GATE', 'USB_nVBUS'):
@@ -2134,7 +2469,9 @@ def main_cli():
         raise ValueError(f'co-sim paths lack routed copper: {", ".join(missing)}')
     if args.require_coverage and not manifest['coverage_complete']:
         missing = manifest['unmodeled_nets']
-        raise ValueError(f'{len(missing)} netlist nets lack a model or explicit waiver: {", ".join(missing[:25])}')
+        families = ', '.join(f'{name} {len(nets)}' for name, nets in manifest['coverage_families'].items())
+        raise ValueError(f'{len(missing)} netlist nets lack a model or explicit waiver ({families}): '
+                         f'{", ".join(missing)}')
     output = json.dumps(manifest, indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

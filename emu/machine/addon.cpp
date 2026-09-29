@@ -148,6 +148,7 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.sysctlHostVbus = flag("sysctlHostVbus", true);
     opt.pwrHi = flag("pwrHi", true);
     opt.ioUsbHost = flag("ioUsbHost", true);
+    opt.ioVbusNfaultLow = flag("ioVbusNfaultLow", false);
     opt.storageSdSocket = flag("storageSdSocket", true);
     opt.gpuHdmiLink = flag("gpuHdmiLink", true);
     opt.einkPanelLink = flag("einkPanelLink", true);
@@ -189,6 +190,40 @@ napi_value js_create(napi_env env, napi_callback_info info) {
       link("fl0Sysctl", l.fl0Sysctl);
       link("fl1Sysctl", l.fl1Sysctl);
       link("cdoneLed", l.cdoneLed);
+    }
+    // the card programming port (machine.h, ProgPort): absent = no SWD anywhere
+    if (napi_value pp = prop(env, o, "progPort"); isType(env, pp, napi_object)) {
+      auto &g = opt.prog;
+      g.on = true;
+      auto bools = [&](const char *k, auto &out) {
+        napi_value list = prop(env, pp, k);
+        for (uint32_t i = 0; i < out.size(); i++) {
+          napi_value v;
+          bool b = false;
+          if (!list || napi_get_element(env, list, i, &v) != napi_ok || !isType(env, v, napi_boolean) ||
+              napi_get_value_bool(env, v, &b) != napi_ok)
+            throw std::runtime_error(std::string("progPort: ") + k + " must be booleans");
+          out[i] = b;
+        }
+      };
+      auto ints = [&](const char *k, auto &out, int hi) {
+        napi_value list = prop(env, pp, k);
+        for (uint32_t i = 0; i < out.size(); i++) {
+          napi_value v;
+          int32_t n = -1;
+          if (!list || napi_get_element(env, list, i, &v) != napi_ok || napi_get_value_int32(env, v, &n) != napi_ok ||
+              n < 0 || n > hi)
+            throw std::runtime_error(std::string("progPort: ") + k + " must be small integers");
+          out[i] = n;
+        }
+      };
+      bools("selWhole", g.selWhole);
+      bools("targets", g.targets);
+      ints("selBit", g.selBit, 2);
+      ints("channel", g.channel, 7);
+      napi_value v;
+      for (auto [k, out] : {std::pair<const char *, bool *>{"clk", &g.clk}, {"io", &g.io}})
+        if ((v = prop(env, pp, k)) && isType(env, v, napi_boolean)) napi_get_value_bool(env, v, out);
     }
     auto image = [&](const char *k, std::vector<uint8_t> &out) {
       napi_value v = prop(env, o, k);
@@ -431,6 +466,49 @@ ENTRY(js_leds, {
   if (m->sysctl) add(0, m->sysctl->leds);
   for (auto &[slot, c] : m->cards) add(slot, c->leds);
   return list;
+})
+
+// sysctl's I2C expanders as they are now: [{address, pins: [port0, port1]}],
+// the level on each pin (an input pin: what the board puts on it; an output
+// pin: what it drives). Test hook for the presence and ID inputs.
+ENTRY(js_expanders, {
+  napi_value list;
+  napi_create_array(env, &list);
+  uint32_t n = 0;
+  if (m->sysctl)
+    for (const auto &x : m->sysctl->expanders) {
+      napi_value o, pins;
+      napi_create_object(env, &o);
+      set(env, o, "address", num(env, x.address));
+      napi_create_array_with_length(env, 2, &pins);
+      for (uint32_t port = 0; port < 2; port++) napi_set_element(env, pins, port, num(env, x.level(static_cast<int>(port))));
+      set(env, o, "pins", pins);
+      napi_set_element(env, list, n++, o);
+    }
+  return list;
+})
+
+// the SWD target in `slot` (1-6): {resets, calls, connected, flash: Buffer}
+// as the last `cupc8.py card flash` left it; null with no target there
+ENTRY(js_progTarget, {
+  int32_t slot = 0;
+  napi_get_value_int32(env, a.argv[1], &slot);
+  napi_value o;
+  const swdt_t *t = m->sysctl && m->sysctl->prog && slot >= 1 && slot <= 6
+                        ? m->sysctl->prog->target[static_cast<size_t>(slot - 1)].get()
+                        : nullptr;
+  if (!t) {
+    napi_get_null(env, &o);
+    return o;
+  }
+  napi_create_object(env, &o);
+  set(env, o, "resets", num(env, t->resets));
+  set(env, o, "calls", num(env, t->calls));
+  napi_value b;
+  void *data;
+  napi_create_buffer_copy(env, SWDT_FLASH, t->flash, &data, &b);
+  set(env, o, "flash", b);
+  return o;
 })
 
 ENTRY(js_state, {
@@ -792,7 +870,7 @@ napi_value init(napi_env env, napi_value exports) {
     napi_callback fn;
   } fns[] = {
       {"create", js_create},   {"powerOn", js_powerOn},   {"runFor", js_runFor},     {"ns", js_ns},
-      {"state", js_state},     {"leds", js_leds},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
+      {"state", js_state},     {"leds", js_leds},     {"expanders", js_expanders},  {"progTarget", js_progTarget},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
       {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead}, {"consoleOpen", js_consoleOpen},   {"setThreaded", js_setThreaded},
       {"stats", js_stats},     {"cards", js_cards},       {"spiLog", js_spiLog},     {"keyboard", js_keyboard},
       {"destroy", js_destroy}, {"sdInsert", js_sdInsert}, {"sdRemove", js_sdRemove}, {"sdCard", js_sdCard},

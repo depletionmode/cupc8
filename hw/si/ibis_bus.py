@@ -46,11 +46,18 @@ def routed_geometry(path):
     return pcbnew.LoadBoard(path), parse(Path(path).read_text())
 
 
-def routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None):
+def routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None,
+                     pad_reach=False):
     """Measure layer-aware shortest copper paths; report disconnected pads.
 
     This measures planar track length only. It does not turn branches, vias, pad stubs or
     changing reference planes into an electrical transmission-line model.
+
+    A track is on a pad when it ends at the pad's centre. With `pad_reach` it
+    is also on the pad when its end lies within the pad's copper (KiCad's own
+    connectivity: a router ends a track on the edge of a long edge finger);
+    the extra pad-to-endpoint distance is counted. Off by default: the pinned
+    receipts were measured without it.
     """
     if loaded_board is None or parsed_tree is None:
         cached_board, cached_tree = routed_geometry(str(Path(board_path).resolve()))
@@ -111,6 +118,12 @@ def routed_distances(board_path, net, source, receivers, *, loaded_board=None, p
                      if pad.IsOnLayer(getattr(pcbnew, layer.replace('.', '_')))]
             for a, b in zip(nodes, nodes[1:]):
                 add_edge(a, b, 0.0)
+            if pad_reach:
+                for (point, layer) in list(graph):
+                    if point != xy and (xy, layer) in nodes and math.dist(point, xy) < 10.0 and pad.HitTest(
+                            pcbnew.VECTOR2I(pcbnew.FromMM(point[0]), pcbnew.FromMM(point[1])),
+                            pcbnew.FromMM(0.15)):
+                        add_edge((xy, layer), (point, layer), math.dist(point, xy))
 
     distances, pending = {}, []
     for node in pad_nodes(source):

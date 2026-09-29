@@ -161,6 +161,10 @@ DRIVE = {
     'TXB0108': ((20.0, .5e-9), (4000.0, 3.9e-9)),
 }
 
+# What-if clamp for the fix studies only (not on any board): a generic
+# BAT54-class small-signal Schottky fitted to Nexperia's typical Vf curve
+# (0.32 V at 1 mA, 0.40 V at 10 mA, 0.5 V at 30 mA, ~1 V at 100 mA).
+SCHOTTKY_MODEL = '.model DSCH D(IS=8e-9 N=1.05 RS=2.5 CJO=8p M=.4 VJ=.4 BV=30)'
 # Slot/socket contact (per contact; card edge). No per-contact L/C is
 # published for the fitted UMAX 3183 slot. A PCIe-CEM-class contact meeting
 # return loss <= -12 dB to 1.3 GHz (FCI GS-12-233 Rev H 4.5-4.7, a
@@ -411,6 +415,12 @@ class Assembler:
             na, nb = pads[a], pads[b]
             if kind_ == 'R':
                 self.deck.lines.append(f'R{self.uid("s")} {na} {nb} {value:g}')
+                shunt = self.cfg.get('tx_shunt_c')
+                if shunt and a[1].startswith('RN'):
+                    # what-if: a capacitor on the line side (pads 5-8) of a series
+                    # array, i.e. an RC edge filter beside the driver
+                    line_side = na if a[2] in '5678' else nb
+                    self.deck.lines.append(f'C{self.uid("tc")} {line_side} 0 {shunt:g}')
             else:
                 k = CONNECTOR[self.cfg.connector]
                 mid = self.uid('km')
@@ -431,6 +441,7 @@ class Assembler:
         label = f'{inst}:{ref}.{pin}'
         if value == 'ICE40HX4K-TQ144':
             model = self.ice40[self.bench.ice40_model(pin)]
+            node = self.receiver_options(node)
             die = self.package(node, label)
             self.deck.lines += models.ibis_device_lines(self.uid('i'), model, self.cfg.corner,
                                                         die, 'vcc_ibis')
@@ -469,6 +480,33 @@ class Assembler:
         self.deck.lines += [f'L{self.uid("l")} {node} {die} {part.l_pkg:g}',
                             f'C{self.uid("r")} {die} 0 {part.c_in[self.cfg.rx_c]:g}']
         self.deck.probes.append(Probe(label, die, value, group=self.group))
+
+    def receiver_options(self, node):
+        """What-if parts at an iCE40 receiver pad (fix studies, cfg.extra keys;
+        absent keys leave the as-built board unchanged):
+        rx_series ohm   resistor in series with the pad, then the package
+        rx_shunt (ohm, F)  R+C from the pad to ground (AC termination)
+        rx_diode        Schottky (BAT54-class) clamps from the pad to the rail
+                        and to ground
+        rx_extra_c F    added pad capacitance (the data sheet's 6 pF I/O C)"""
+        cfg = self.cfg
+        if cfg.get('rx_extra_c'):
+            self.deck.lines.append(f'C{self.uid("xc")} {node} 0 {cfg.get("rx_extra_c"):g}')
+        if cfg.get('rx_shunt'):
+            r, c = cfg.get('rx_shunt')
+            mid = self.uid('sh')
+            self.deck.lines += [f'R{self.uid("sr")} {node} {mid} {r:g}',
+                                f'C{self.uid("sc")} {mid} 0 {c:g}']
+        if cfg.get('rx_diode'):
+            if SCHOTTKY_MODEL not in self.deck.lines:
+                self.deck.lines.append(SCHOTTKY_MODEL)
+            self.deck.lines += [f'D{self.uid("du")} {node} vcc_ibis DSCH',
+                                f'D{self.uid("dd")} 0 {node} DSCH']
+        if cfg.get('rx_series'):
+            after = self.uid('rs')
+            self.deck.lines.append(f'R{self.uid("rs")} {node} {after} {cfg.get("rx_series"):g}')
+            node = after
+        return node
 
     def package(self, node, label):
         pkg = models.TQ144_ENVELOPE[self.cfg.package]

@@ -189,6 +189,8 @@ def rises(result, amps):
     the conductor's peak density, outside short necks. A neck is a connected
     region above cut_density() no longer than NECK_MAX_MM (a pad escape, the
     crowding round a via): its rise above the body is neck_rise()."""
+    if not result.grids:
+        raise ValueError('mesh result carries no current-density grids: the rise cannot be bounded')
     cut = cut_density(amps)
     body_j = {}
     necks = []

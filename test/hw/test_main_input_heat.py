@@ -9,6 +9,8 @@ import sys
 import tempfile
 import unittest
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'hw/power'))
 import copper_mesh as cm
@@ -18,7 +20,9 @@ import main_input_heat as gate
 
 def result(milliohms, j=0.4, j_term=1.0, vias=()):
     """A mesh result: j = peak sheet density per ampere (1/j = equivalent width, mm)."""
-    return cm.Result(milliohms, {'F.Cu': j}, j_term, list(vias), 1000, 10)
+    grid = np.full((5, 100), j)                  # a 10 mm strip at 0.1 mm pitch
+    return cm.Result(milliohms, {'F.Cu': j}, j_term, list(vias), 1000, 10,
+                     {'F.Cu': (grid, np.zeros(grid.shape, bool))}, 0.1)
 
 
 class MainInputHeat(unittest.TestCase):
@@ -59,6 +63,11 @@ class MainInputHeat(unittest.TestCase):
         status, text = self.report(5.0, 3.0, 5.0)
         self.assertEqual(status, 1)
         self.assertIn('FAIL I3', text)
+
+    def test_result_without_grids_cannot_pass_the_rise_rule(self):
+        # the rule once read nothing from a result with no density grids and passed
+        with self.assertRaisesRegex(ValueError, 'no current-density grids'):
+            gate.rises(cm.Result(5.0, {'F.Cu': 0.4}, 1.0, [], 1000, 10), 3.213)
 
     def test_the_old_route_width_fails_heating(self):
         # the salt-9 J1-F1 track: 0.5 mm drawn, 80 % etched, 24.9 um

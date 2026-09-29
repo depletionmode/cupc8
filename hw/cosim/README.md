@@ -389,3 +389,63 @@ and the CPU card ID (read by nothing), the power switch and eFuse enable, HDMI D
 VBUS switch control, the Wi-Fi card's straps, LEDs and USB test points,
 rail indicator LEDs (no analog check names them), the AUX header chip
 select, and the system card's Type-C CC resistors.
+
+## Third pass (2026-09-29): 129 to 50 gaps, and the rows
+
+Bindings added, each with a copper or netlist counterexample in its test:
+
+- **Rail indicator LEDs** (`rail_indicator_routes`): rail, resistor, LED,
+  GND (and the 1V2 indicators' NPN switch), found by topology and net names,
+  every signal leg on routed copper; `Machine.powerLeds()` lights one while
+  its legs are whole (the rail itself is assumed present). 16 nets on main,
+  CPU, system and the five slot cards (`test_cosim_card_leds.py`).
+- **Slot presence and CPU card ID** (`i2c_expander_routes`): each card kind's
+  PRSNT loop on the card, the slot's PRSNT2_n leg on the main board and the
+  CPU card ID legs; the model's TCA9555 input registers read present or 0
+  only over whole copper (`Machine.expanders()`, new addon call). Nothing in
+  the firmware reads them, so the test reads the model's registers
+  (`test_cosim_sysctl_inputs.py`). 15 nets.
+- **System card Type-C Rd** (`system_usb_routes`): the host attaches in an
+  orientation only while that CC line's 5.1 k Rd is wired (2 nets,
+  `test_cosim_system_usb.py`).
+- **IO card VBUS switch** (`io_vbus_routes`): enable, output and the 15 k /
+  22 k fault sense; the keyboard is powered only with VBUS on and the real
+  firmware's VBUS_FAULT status bit follows GPIO8 (2 nets,
+  `test_cosim_io_vbus.py`).
+- **The card programming port** (`prog_port_routes`, `ProgPort` in
+  `emu/machine`): sysctl's PROG_CLK / PROG_IO, the two 4051 muxes, MUX_SEL0-2,
+  each slot's 33 ohm SWCLK / SWDIO legs and every RP2040 card's debug pins, 45
+  legs bound by topology (the mux channel and select bit each signal reaches
+  are read from the netlist, so a swapped select or a slot on another channel
+  changes the decode). The native machine puts a bit-level SW-DP
+  (`fw/test/swdtarget.c`, the target the sysctl host tests use) in each slot
+  with an RP2040 card and whole copper, decoded from the select pins sysctl
+  really drives (a released or open select reads high: the board's pull-up,
+  channel 7). Real `cupc8.py` `Rp2040.flash` programs and verifies every
+  fitted card through it; an empty slot answers nobody
+  (`test_cosim_prog_port.py`, 42 nets; `Machine.progTarget(slot)`). The target
+  is the card's debug port, not its running firmware: its flash starts as the
+  card's real flash and keeps what `card flash` writes, while the emulated
+  card keeps running the ELF it was built from (a card restart from the
+  reprogrammed flash is not modelled). The Wi-Fi card's SWCLK / SWDIO are its
+  UART0 (ESP ROM bootloader); not modelled.
+- Non-digital or static waivers (`coverage.py`): the Wi-Fi card's IO2/IO8
+  boot straps (WC-006) and the main board's POWER switch / eFuse enable chain
+  (MB-053, POW-004).
+
+Still executed by nothing (50): card reset and boot pins (RUN / CARD_RST_n on
+every RP2040 card and slot, BOOTSEL: needs an RP2040 restart in the emulator,
+the card's `Emu` and its attachments rebuilt), the ESP32's EN / BOOT
+(SLOTn_PROG_n), UART0 (U0RXD / U0TXD), LEDs and USB pins, the four debug
+UART_TX pins (the shipped firmware prints nothing), the GPU's DDC / HPD (no
+firmware uses them), the AUX header chip select and the system slot's presence
+pin, and the system card's own SWCLK / SWDIO / RUN / BOOTSEL test points.
+`python3 hw/cosim/gen_top.py --require-coverage` prints them by family.
+
+`run.py` rows: E2E-001 (coverage plus every binding test), E2E-002..004
+(the scenario on the netlist top, then on a top with one wiring fault, which
+must fail: `test/hw/test_cosim_e2e_mutants.py`), MB-052, CC-051, SC/EC/YC-051.
+The strict rows need the eight board receipts valid; they read stale until
+the coordinated rebuild (hw/tools, hw/lib, hw/parts, hw/boards/main.py
+changed), and the pinned COSIM-003..006 top and receipts under
+`doc/hardware/si-evidence` must then be re-pinned (`doc/hardware/si-models.md`).

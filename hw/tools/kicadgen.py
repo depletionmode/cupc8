@@ -1774,7 +1774,18 @@ def fixed_violations(dsn, env):
         return None
 
 
-def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout=None):
+def _freerouting_cmd(dsn, ses, max_passes, fanout=True):
+    """Freerouting's command line. One optimiser thread (-mt 1): with a pool
+    the route, and whether it completes, changes from run to run. fanout=False
+    drops its fan-out stage (--router.fanout.enabled=false, Freerouting 2.4.1):
+    a board that pre-places its own fan-out vias (main.py) gains nothing from
+    it, and on the seeded main board it took 6.5-11 minutes a pass without the
+    unrouted count ever falling."""
+    return ["freerouting", "-de", dsn, "-do", ses, "-mp", str(max_passes), "-mt", "1", "--gui.enabled=false"] + \
+           ([] if fanout else ["--router.fanout.enabled=false"])
+
+
+def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout=None, fanout=True):
     """`parallel` Freerouting runs at once, each on its own ordering (salt) of
     the problem and its own copy of the DSN, for each of `tries` pass
     budgets. The run kept is the lowest-salted one that routes completely
@@ -1810,8 +1821,8 @@ def _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, t
             if fixed is None:                    # the same fixed items in every ordering
                 fixed = fixed_violations(dsn, env)
             logf = open(log, "w")
-            proc = subprocess.Popen(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)),
-                                     "-mt", "1", "--gui.enabled=false"], stdout=logf, stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(_freerouting_cmd(dsn, ses, passes * (attempt + 1), fanout),
+                                    stdout=logf, stderr=subprocess.STDOUT,
                                     env=env, start_new_session=True)   # its own group: the java under the script
             jobs.append([sk, proc, ses, log, logf, None, time.time()])
         chosen = None
@@ -1889,14 +1900,15 @@ def _replay_session(board, workdir, manifest, preroute_board):
 
 
 def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, timeout=None, heap=None,
-              replay=None, preroute_board=None):
+              replay=None, preroute_board=None, fanout=True):
     """Route with Freerouting through a Specctra DSN/SES round trip. Its run
     sometimes stops with connections left; those outside the `pours` nets
     (which the pours and stitching join) mean another try with more passes,
     and an error after `tries`. `salt` starts the tries' orderings further
     on, for a second round that must not repeat the first. With `parallel`
     > 0 each try runs that many differently ordered routes at once
-    (_route_parallel), each capped at `timeout` seconds of wall time. `heap`
+    (_route_parallel), each capped at `timeout` seconds of wall time. `fanout`
+    False turns Freerouting's own fan-out stage off (_freerouting_cmd). `heap`
     (e.g. "1g") caps each Freerouting JVM's heap: by default Java takes a
     quarter of the RAM, which is what limited how many ran at once (a run's
     live data is ~110 MB)."""
@@ -1935,8 +1947,7 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, 
                 os.remove(ses)
             # one optimiser thread: with a pool, the route (and whether it
             # completes) changes from run to run
-            r = run(["freerouting", "-de", dsn, "-do", ses, "-mp", str(passes * (attempt + 1)), "-mt", "1",
-                     "--gui.enabled=false"], env=env)
+            r = run(_freerouting_cmd(dsn, ses, passes * (attempt + 1), fanout), env=env)
             with open(os.path.join(workdir, "freerouting.log"), "w") as f:
                 f.write(r.stdout + r.stderr)
             left = [n for n in re.findall(r"Net '([^']+)' \(\d+ unrouted", r.stdout + r.stderr) if n not in pours]
@@ -1946,7 +1957,7 @@ def autoroute(board, workdir, passes=40, pours=(), tries=3, salt=0, parallel=0, 
             if not parallel:
                 raise RuntimeError("Freerouting left %s unrouted after %d tries (see freerouting.log)" % (left, tries))
         if parallel:
-            ses, chosen = _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout)
+            ses, chosen = _route_parallel(board, workdir, passes, pours, tries, salt, parallel, env, timeout, fanout)
             stable_uuids(board, chosen)                 # the ordering that session was routed on
     if not os.path.exists(ses):
         raise RuntimeError("Freerouting wrote no session file")
@@ -2757,7 +2768,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              graphics=(), edge=None, layers=2, footprint_libs=("cupc8",), passes=40, card_edge=False,
              zone_outline=None, boards=2, labels=None, title=None, revision=None, revision_at=None,
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
-             tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0,
+             tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0, route_fanout=True,
              fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=(),
              post_route=None, replay=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
@@ -2896,7 +2907,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
                 autoroute(state["b"], out, passes, pours=tuple(pour_nets) + escaped,
                           salt=route_tries * max(1, route_parallel) * round_, tries=route_tries,
                           parallel=route_parallel, timeout=route_timeout, heap=route_heap,
-                          replay=replay, preroute_board=pcb)
+                          replay=replay, preroute_board=pcb, fanout=route_fanout)
             except RuntimeError as e:        # nets left unrouted: the next round's orderings
                 if replay is not None:
                     raise

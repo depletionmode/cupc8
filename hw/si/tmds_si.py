@@ -20,9 +20,14 @@ Checks, for all four TMDS pairs (D0, D1, D2, clock), on the routed copper:
    body excluded) in a 100 ohm differential reference, cascaded from the
    per-sample line sections at both the lower-bound and the upper-estimate
    impedance, whichever is worse.  Budget (the repository defines none):
-     |SDD11| <= -19.58 dB: the worst standing-wave reflection a line within
-       the row's own 100 ohm +-10 % tolerance can produce,
+     |SDD11| <= -19.58 dB for the line itself (pads and breakout, ESD array
+       left out): the worst standing-wave reflection a line within the row's
+       own 100 ohm +-10 % tolerance can produce,
        ((1/0.9)^2 - 1) / ((1/0.9)^2 + 1) = 0.105;
+     |SDD11| <= -15 dB with the ESD array in: an allocation proposed here,
+       awaiting David's confirmation.  The array's 0.31 pF differential
+       capacitance alone gives about -18.5 dB at 1.26 GHz on a perfect
+       100 ohm line, so the -19.58 dB figure cannot apply to it;
      |SDD21| >= -0.5 dB: an allocation proposed here, awaiting David's
        confirmation (no DVI 1.0 / HDMI clause budgets a source PCB).
    Losses: copper skin effect with a 2x current-crowding factor on both
@@ -48,14 +53,20 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / 'cosim'))
 sys.path.insert(0, str(HERE.parent / 'tools'))
+sys.path.insert(0, str(HERE.parent / 'power'))
+sys.path.insert(0, str(HERE.parent))
 import route_si  # noqa: E402
+import si_cache  # noqa: E402
 from netlist import read as read_netlist  # noqa: E402
+import design  # noqa: E402
+import rp2040_thermal  # noqa: E402
 
 HDMI_PINS = {'d2': ('1', '3'), 'd1': ('4', '6'), 'd0': ('7', '9'), 'ck': ('10', '12')}
 Z_NOM, Z_TOL = 100.0, .10
 SKEW_MAX = 5e-12
 F_MAX = 1.26e9
 RL_MAX_DB = 20 * math.log10((1 / .9 ** 2 - 1) / (1 / .9 ** 2 + 1))   # -19.58
+RL_ESD_MAX_DB = -15.0
 IL_MIN_DB = -.5
 ESD_CL, ESD_CL_SENS, ESD_CROSS = .5e-12, 1.0e-12, .06e-12
 TAN_DELTA = .02
@@ -94,6 +105,24 @@ def lanes(netlist, rp2040, connector):
     if len(values) != 1:
         raise ValueError(f'TMDS series resistors differ: {sorted(values)}')
     return out, values.pop()
+
+
+def swing_report(series_ohms):
+    """DVI 1.0 4.2 receiver swing 150-1200 mV over every corner of
+    rp2040_thermal.tmds_swing, for the netlist's series resistor (that
+    function's minimum is |Vp-Vn|; the 1200 mV maximum is read as the
+    peak-to-peak 2|Vp-Vn|, exactly as power check R6/R7 do)."""
+    rail_max = design.buck_vout_range()[1]
+    low, _ = rp2040_thermal.tmds_swing(series_ohms, design.V3V3_MIN, rail_max)
+    _, high = rp2040_thermal.tmds_swing(series_ohms, design.V3V3_MIN, rail_max)
+    out = {'series_ohms': series_ohms, 'min_mv': round(1e3 * low, 1), 'max_pp_mv': round(2e3 * high, 1),
+           'limit_mv': [1e3 * rp2040_thermal.DVI_SWING_MIN, 1e3 * rp2040_thermal.DVI_SWING_MAX],
+           'failures': []}
+    if 1e3 * low < 1e3 * rp2040_thermal.DVI_SWING_MIN:
+        out['failures'].append(f'TMDS swing {1e3 * low:.0f} mV < 150 mV (DVI 1.0 4.2) with {series_ohms:g} ohm')
+    if 2e3 * high > 1e3 * rp2040_thermal.DVI_SWING_MAX:
+        out['failures'].append(f'TMDS swing {2e3 * high:.0f} mV pp > 1200 mV (DVI 1.0 4.2) with {series_ohms:g} ohm')
+    return out
 
 
 def abcd_line(z, delay, length_m, f):
@@ -155,6 +184,8 @@ def main():
             failures.append(f'board evidence: {exc}')
     wiring, series_ohms = lanes(netlist_path, args.rp2040, args.connector)
     report['series_resistor_ohms'] = series_ohms
+    report['swing'] = swing_report(series_ohms)
+    failures += report['swing']['failures']
     board = route_si.Board(board_path)
     routes = {}
     for (lane, pol), w in wiring.items():
@@ -166,7 +197,7 @@ def main():
         nets = (wiring[(lane, 'p')][side], wiring[(lane, 'n')][side])
         samples[(lane, pol, side)] = route_si.sample_path(board, route, nets, 1 if pol == 'p' else 2)
     keys = [s['key'] for group in samples.values() for s in group]
-    results = route_si.solve_all(keys, args.jobs)
+    results = si_cache.solve_all(keys, args.jobs)
     lo_limit, hi_limit = Z_NOM * (1 - Z_TOL), Z_NOM * (1 + Z_TOL)
     freqs = [F_MAX * k / 126 for k in range(1, 127)]
     report['lanes'] = {}
@@ -228,8 +259,8 @@ def main():
         cy = sum(y for _, y in esd_pads) / len(esd_pads)
         at = min(range(len(group)), key=lambda i: math.dist(group[i]['xy'], (cx, cy)))
         worst = {}
-        for cl_name, cl in (('typ', ESD_CL), ('2x_typ', ESD_CL_SENS)):
-            shunt = {at: cl / 2 + ESD_CROSS}
+        for cl_name, cl in (('line', None), ('typ', ESD_CL), ('2x_typ', ESD_CL_SENS)):
+            shunt = {} if cl is None else {at: cl / 2 + ESD_CROSS}
             rl, il = -math.inf, 0.0
             for pick in (0, 1):
                 if any(math.isinf(p[pick]) for p in prof):
@@ -243,9 +274,11 @@ def main():
                     il = min(il, 20 * math.log10(abs(s21)))
             worst[cl_name] = {'sdd11_max_db': round(rl, 3), 'sdd21_min_db': round(il, 4)}
         entry['loss'] = {'to_hz': F_MAX, 'sdd11_limit_db': round(RL_MAX_DB, 2),
-                         'sdd21_limit_db': IL_MIN_DB, **worst}
-        if worst['typ']['sdd11_max_db'] > RL_MAX_DB:
-            failures.append(f'{lane}: |SDD11| {worst["typ"]["sdd11_max_db"]:.2f} dB > {RL_MAX_DB:.2f} dB')
+                         'sdd11_esd_limit_db': RL_ESD_MAX_DB, 'sdd21_limit_db': IL_MIN_DB, **worst}
+        if worst['line']['sdd11_max_db'] > RL_MAX_DB:
+            failures.append(f'{lane}: line |SDD11| {worst["line"]["sdd11_max_db"]:.2f} dB > {RL_MAX_DB:.2f} dB')
+        if worst['typ']['sdd11_max_db'] > RL_ESD_MAX_DB:
+            failures.append(f'{lane}: |SDD11| with ESD {worst["typ"]["sdd11_max_db"]:.2f} dB > {RL_ESD_MAX_DB} dB')
         if worst['typ']['sdd21_min_db'] < IL_MIN_DB:
             failures.append(f'{lane}: |SDD21| {worst["typ"]["sdd21_min_db"]:.3f} dB < {IL_MIN_DB} dB')
         report['lanes'][lane] = entry
@@ -257,8 +290,11 @@ def main():
         imp, sk, loss = entry['impedance'], entry['skew'], entry['loss']['typ']
         print(f'{lane}: Zdiff lower bound {imp["z_lower_min"]}-{imp["z_lower_max"]} ohm on '
               f'{imp["trace_mm"]} mm trace (limit {imp["limit_ohm"][0]:.0f}-{imp["limit_ohm"][1]:.0f}); '
-              f'skew {sk["skew_ps"]} ps; SDD11 <= {loss["sdd11_max_db"]} dB, SDD21 >= {loss["sdd21_min_db"]} dB')
-    print(f'series resistors {series_ohms:g} ohm (netlist); report {args.out}')
+              f'skew {sk["skew_ps"]} ps; SDD11 <= {entry["loss"]["line"]["sdd11_max_db"]} dB line, '
+              f'{loss["sdd11_max_db"]} dB with ESD, SDD21 >= {loss["sdd21_min_db"]} dB')
+    sw = report['swing']
+    print(f'series resistors {series_ohms:g} ohm (netlist); sink swing {sw["min_mv"]} mV min, '
+          f'{sw["max_pp_mv"]} mV pp max (DVI 1.0: 150-1200); report {args.out}')
     for failure in failures:
         print('FAIL', failure)
     print('GC-007', 'PASS' if report['pass'] else 'FAIL')

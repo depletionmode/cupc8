@@ -46,6 +46,10 @@
 #include "usb/cdchost.h"
 #include "usb/usbkbd.h"
 
+extern "C" {
+#include "swdtarget.h"
+}
+
 struct MainBoard;
 
 namespace machine {
@@ -211,6 +215,25 @@ struct Tca9555 {
   }
 };
 
+// The card programming port (doc/hardware/sysctl.md): sysctl's PROG_CLK and
+// PROG_IO through the two 4051 muxes to a slot's SWCLK / SWDIO. The muxes are
+// decoded from MUX_SEL0-2 as sysctl drives them (an input pin is pulled up by
+// the board: channel 7, nothing). A slot with an RP2040 card and whole copper
+// has a `swdt_t` (fw/test/swdtarget.c, the bit-level SW-DP the sysctl host
+// tests use) at its end of the wire. The target is the card's debug port, not
+// its running firmware: its flash starts as the card's real flash, and what
+// `cupc8.py card flash` writes stays in the target (the emulated card keeps
+// running the ELF it was built from).
+struct ProgPort {
+  std::array<int, 3> selBit{{0, 1, 2}};                // the mux select input GPIO20, 21, 22 reach
+  std::array<bool, 3> selWhole{{true, true, true}};    // its copper; open: the mux sees the pull-up
+  bool clk = true, io = true;                          // PROG_CLK / PROG_IO to the mux commons
+  std::array<int, 6> channel{{0, 1, 2, 3, 4, 5}};      // the mux input each slot hangs on
+  std::array<std::unique_ptr<swdt_t>, 6> target;       // an SWD target at the end of that slot's wire
+  bool prevDriving = false;                            // the host drove SWDIO at the last clock
+  bool ioLevel = true;                                 // what the target puts on SWDIO for the host
+};
+
 struct BridgePins {
   uint32_t sck = 0, mosi = 0, ncs = 1;
 };
@@ -253,6 +276,9 @@ class SysctlCard {
   // the expanders on I2C0 (GPIO24/25); none answers while its copper is open
   std::vector<Tca9555> expanders;
   void attachExpanders(std::vector<Tca9555> list);
+  // the programming port; nothing is attached (no SWD answers) without it
+  std::unique_ptr<ProgPort> prog;
+  void attachProgPort(std::unique_ptr<ProgPort> port);
 
  private:
   SpiFlash *flash[2] = {nullptr, nullptr};
@@ -262,6 +288,8 @@ class SysctlCard {
   uint8_t flashMiso = 0;
   std::unique_ptr<rp2040js::IAlarm> flashDone;
   std::function<void()> unlisten[2];
+  std::function<void()> unlistenProg;
+  void progClock();
 };
 
 class Machine {
@@ -282,6 +310,7 @@ class Machine {
     bool sysctlHostVbus = true;      // USB host VBUS reaches sysctl GPIO29 through Q1
     bool pwrHi = true;               // USB-C source advertises 3 A (chipset PWR_HI input)
     bool ioUsbHost = true;           // receptacle D+/D- physically reach the IO MCU
+    bool ioVbusNfaultLow = false;    // the IO card reads its VBUS fault sense (GPIO8) low: VBUS off or sag
     bool storageSdSocket = true;     // seven microSD contacts reach storage MCU
     bool gpuHdmiLink = true;         // four TMDS pairs reach the HDMI receptacle
     bool einkPanelLink = true;       // seven EPD signals reach the panel header
@@ -338,6 +367,16 @@ class Machine {
     // (GPIO28); the netlist top sets them from the source's CC level and the
     // 1V2 rail, 0 where copper is open (and by default, as before)
     std::array<double, 3> sysctlAdcVolts{{0, 0, 0}};
+    // the programming port: `targets[slot-1]` puts an SWD target in that slot
+    // (an RP2040 card, its debug copper whole); the rest as in ProgPort
+    struct Prog {
+      bool on = false;
+      std::array<int, 3> selBit{{0, 1, 2}};
+      std::array<bool, 3> selWhole{{true, true, true}};
+      bool clk = true, io = true;
+      std::array<int, 6> channel{{0, 1, 2, 3, 4, 5}};
+      std::array<bool, 6> targets{{false, false, false, false, false, false}};
+    } prog;
   };
   struct Stats {
     uint64_t idleWindows = 0, busyIterations = 0, idleClocks = 0, busyClocks = 0;

@@ -5,6 +5,15 @@ update it after every finding, commit, decision or agent result (David,
 2026-09-28). Background and the release definition:
 `doc/m1-handoff-2026-09-28.md`.
 
+## DECISION NEEDED FROM DAVID: CPU-bus overshoot (bus SI agent, 2026-09-29)
+
+CPU bus (12 MHz; CPU card U1 -> RN 33 ohm -> J1/J2 -> ~110 mm 0.1 mm stripline -> main U7) overshoots the iCE40 input limit (3.6 V, AC 3.66 V / 1.6 ns): 4.23 V at every one of 32 IBIS corners as built. Not an SPI-bus issue. Timing is not the constraint (period 83.3 ns, setup slack ~52 ns; a 68 ohm array adds ~1.2 ns).
+- No drive-strength/slew setting exists for these I/O (DS Table 4.13; only a pull-up), so nothing to change in the bitstream.
+- **BOM-only option (no reroute, same footprints):** CPU card RN1-RN8 33 -> 68 ohm and main R21-R34 (the 14 main-driven lines) 33 -> 56 ohm. Typical corner peak ~3.74 V (4 of 8 typical-corner cases pass), worst corner (VCCIO 3.47 V, -40 C fast silicon) ~4.0 V: does NOT reach 3.66 V at every corner. LCSC numbers/stock for the 68 ohm 0402x4 array (4D02WGJ0680TCE) and the 56 ohm 0402 are NOT verified (LCSC search from here returned nothing; only C25501 33 ohm is in hw/parts).
+- **Full compliance options (MAIN-board change, 31+ lines beside the 0.5 mm TQ144, partial reroute):** 33 ohm + ~100 pF at U7 (peak 3.59 V but 92 mV monotonicity dip, +7.5 ns), or lower-Z0 routing. Series values alone cannot clear all corners (overshoot needs Rs+14 >= Z0 ~98 ohm, but the routed net's 53-165 ohm pieces then park the receiver in the 0.8-2.0 V band).
+- **Accept as built (option 6):** out of spec by 0.57 V above 3.66 V and 2.5 ns vs 1.6 ns per edge; duty ~1.5 % (25 % allowed); small damage energy but the vendor gives no tolerance: a reliability risk, not compliance.
+- Agent's recommendation: BOM-only 68/56 ohm, rebuild, measure a first article at U7.25 and CPU-card U1 with a >= 1 GHz probe. Decision: must the -40 C / 3.47 V corner comply? CC-007/MB-007 stay red until decided. Answer to 'which board': CPU card (RN1-8) for the CPU-card-driven lines and main (R21-R34) for the main-driven lines, as BOM value changes; a receiver-side fix would need the main board.
+
 ## Main-board routing log (root, 2026-09-29; David AFK, told Claude to carry on)
 
 - 08:24 seeded build #1 (main-new): Freerouting fanout 6.5-11 min/pass, ~68 pins stuck. Stopped 08:53.
@@ -110,31 +119,133 @@ MB-051.
   it). `hw/tools/boardevidence.py` now also hashes main_power_corner.py,
   main_seed.py, main_fanout.py and main-route-seed.json (they fed the board
   but were not in its evidence hash).
-- Build 2 (`scratchpad/main-new2`, started 09:04; log `build2.log`, pid
-  `build2.pid`). Results below when it finishes.
+- Build 2 (`main-new2`, 09:04, stopped by root 09:20): the 79 pre-placed
+  vias cut fanout pass 1 from 388-667 s to 85-108 s, but Freerouting's own
+  fanout did not converge (pass 2: 125-455 s, "not routed" flat at 27-32,
+  ripup costs rising; normalizeTraces hit 2000 iterations on /3V3_BUCK,
+  /FL0_nCS, /FL0_MOSI).
+- **Fanout stage off** (root's finding: Freerouting 2.4.1
+  `--router.fanout.enabled=false`): `kicadgen._freerouting_cmd` +
+  `fanout` kwarg through `autoroute`/`_route_parallel`/`pipeline
+  (route_fanout=True default)`; only main.py passes `route_fanout=False`.
+  Test `test/hw/test_freerouting_cmd.py`; counterexample entries for it and
+  for the own-pad keep-out (both need the fix committed before the fresh-
+  worktree run).
+- Build 3 (`scratchpad/main-new3`, log `build3.log`, pid `build3.pid`,
+  started 09:33). Results below when it finishes.
 
 ## Bus SI (MB/CC/SC/EC-007), resumed 2026-09-29 (sonnet agent)
 
-- **The 4.234 V is not the SPI bus.** `test_baseline_passes` simulates the
-  CPU-bus net /CPU_A0 (CC-007): CPU-card U1.1 (iCE40 bank-3 IBIS) -> RN1 33 ohm
-  -> J1 -> J2 -> 110 mm of 0.1 mm In2/In3 stripline (Z0 89 ohm) -> main U7.25.
-- **Verdict: real per the vendor IBIS, not tuned.** All 32 IBIS/line/connector
-  corners fail (min corner 3.65-3.71 V, max corner 4.17-4.23 V vs the iCE40 3.6 V
-  limit and 3.66 V / 1.6 ns AC allowance; FPGA-DS-02029 Table 4.1 and the I/O
-  overshoot note). Cause: source impedance (IBIS pull-up ~14 ohm + 33 ohm) is
-  below the line Z0, so the open receiver end doubles a 2.2-2.4 V incident
-  step (hand calc 2*3.47*98/(98+47) = 4.7 V before package rounding). Package L
-  (0.3..7 nH) moves the peak <15 mV; the pin-side node peaks higher (4.40 V).
-- Independent cross-check (ideal lossless 98 ohm, 0.9 ns line, same IBIS driver,
-  1.1 pF + 7 nH TQ144 package, 1.3 pF C_comp + IBIS clamps): 33 ohm -> 4.220 V
-  (routed model 4.234 V), 47 -> 4.14, 68 -> 3.86, 100 -> 3.469 (no overshoot). At
-  62 ohm: 33 -> 3.99, 47 -> 3.58, 68 -> 3.47. The driver alone into 1 Mohm/5 pF
-  is clean and monotonic (max 3.469 V), so the Ku(t) inversion is not the source.
-  In the routed model 100 ohm still peaks at 3.67 V (12 mV over the 3.66 V AC
-  limit at the worst corner) and rings back on the fall edge: the socket and
-  z-steps add to the ideal case. No single RN value clears all 32 corners of
-  /CPU_A0 (68: 16 fail, 82: 20, 100: 28 (ring-back), 150: 32 (staircase in the
-  0.8-2.0 V band)).
+### The 4.234 V: real, and it is the CPU bus (CC-007), not the SPI bus
+
+`test_baseline_passes` simulated /CPU_A0: CPU-card U1.1 (iCE40 bank-3 IBIS) ->
+RN1 33 ohm -> J1 -> J2 -> 110 mm of 0.1 mm In2/In3 stripline (Z0 89 ohm, x1.1
+corner 98 ohm) -> main U7.25. Limits (FPGA-DS-02029-3.9 Table 4.1: I/O tri-state
+voltage -0.5..3.60 V; note: 200 mV over VCCIO max 3.46 V = 3.66 V and -200 mV
+under VIL min, each <= 1.6 ns and 25 % duty; Table 4.13 VIH max VCCIO + 0.2 V).
+Not tuned: routed peak 4.234 V for 2.54 ns above 3.66 V, undershoot -0.76 V for
+1.7 ns. Evidence it is not an artefact: (1) the IBIS driver alone into 1 Mohm /
+5 pF is clean and monotonic (3.469 V); (2) one ideal lossless 98 ohm 0.9 ns line
+with the same driver, TQ144 package and clamps gives 4.220 V at 33 ohm, 4.14 (47),
+3.86 (68), 3.469 (100) (`AsBuiltCpuBus.test_ideal_line_reproduces_the_peak`);
+(3) hand calc: Zs = 14 (IBIS pull-up) + 33 < Z0, so the open end doubles a 2.35 V
+step; (4) package L 0.3..7 nH moves the peak < 15 mV, the connector < 10 mV; the
+pin-side node peaks higher (4.40 V), the die probe is the kinder one; (5) all 32
+corners fail (min corner 3.65-3.71 V, typ corner A0 3.99 V, max 4.17-4.23 V).
+Clamp energy is not the issue (IBIS power clamp ~9 mA for ~2 ns, 8.5 pC per edge,
+~50 uA average per line at 6 MHz toggling): the exceedance is amplitude (+0.57 V
+over the 3.66 V allowance) and duration (2.5 ns vs 1.6 ns).
+
+### Which lines (as built, 32 IBIS/line/connector corners each)
+
+All 31 CPU-card-driven lines fail: address/control 0-4 of 32 pass, peak 4.21-4.28 V,
+trough -0.75..-0.80 V; D0-D7 16/32 (max corner fails, 4.04-4.09 V; these nets also carry
+the main-side 33 ohm R21..R28 tap, and all min corners pass); TMR_EXP/HALTED/WAITING 10-16/32 (4.17-4.19 V). The 14
+main-driven lines (D0-7, IRQ0-3, nRDY, nRST; U7 -> R21..R34 33 ohm -> J2 -> CPU
+card U1) fail the same way (sampled D0, D5, IRQ2; the full group is in the
+MB-007 run): D0/D5 16/32 at 4.18/4.13 V, IRQ2 0/32 at 4.24 V. The
+12 MHz clock nets (assumed oscillator bracket, weaker evidence) also fail:
+cpu:U1.21 3.87 V for 1.2 ns. Full data: build/si-slowbus/CC-007.json.
+
+### Fix options (tool: `hw/si/cpubus_options.py`; JSON in build/si-slowbus/cpubus-*.json)
+
+All numbers are the routed model at 32 corners for /CPU_A0 unless stated; "pass" =
+no overshoot/undershoot/ring-back/non-monotonic failure. Bus: 12 MHz, T = 83.3 ns,
+BUS-005 setup slack 52.6 / 51.0 ns (63 %), hold margin 1.47 ns.
+
+| # | Option | Boards / parts | pass /32 | worst peak / trough | ring-back / dip | added settle |
+|---|---|---|---|---|---|---|
+| 0 | as built, 33 ohm | - | 0 | 4.234 / -0.76 V | - | - |
+| 1 | RN 47 ohm | CPU card RN1-8 value | 10 | 4.16 / -0.69 | 0 / 0 mV | +0.04 ns |
+| 1 | RN 56 | same | 16 | 4.11 / -0.63 | 0 / 0 | +0.07 |
+| 1 | **RN 68** | same | 16 (all min corners) | 4.01 / -0.52 | 0 / 0 | +0.11 |
+| 1 | RN 75 | same | 16 | 3.92 / -0.45 | 66 / 0 | +2.2 |
+| 1 | RN 82 | same | 12 | 3.90 / -0.42 | 177 / 0 | +2.3 |
+| 1 | RN 100 | same | 4 | 3.85 / -0.37 | 424 / 0 | +2.4 |
+| 1 | RN 120 | same | 0 | 3.75 / -0.27 | 648 / 520 | +2.4 |
+| 4 | 33 ohm card + 22/33/47/68 ohm at U7 | main, 31 parts at U7 | 8 | 4.20/4.20/4.18/4.16 | 0 | <= +0.14 |
+| 4 | split 47 card + 47 at U7 | both | 16 | 4.10 / -0.63 | 0 | +0.16 |
+| 3 | AC term 91 ohm + 47 pF at U7 | main, 62 parts | 0 | 3.49 / -0.02 | 424 / 207 | +2.9 |
+| 3 | AC term (22..47 ohm card, 68/91 ohm, 100/220 pF) | main | 0 (12 combos) | 3.36-3.47 | 320-790 / 250-830 | +4.8..+20 |
+| 3 | Schottky clamps to rail and GND (BAT54 class) | main, 62 parts | 16 | 4.10 / -0.63 | 0 | +0.7 |
+| 3 | 33 ohm + 100 pF at U7 | main, 31 caps | 16 | 3.59 / -0.11 | 6 / 92 mV | +7.5 |
+| 3 | 33 ohm + 47 pF at U7 | main | 16 | 3.93 / -0.44 | 0 / 58 | +3.6 |
+| 3 | 33 ohm + 22 pF at the CPU card RN | CPU card only, 31 caps | 2 | 4.17 / -0.69 | 170 / 0 | +4.0 |
+
+Main-driven lines (R21..R34 value, BOM only): 33 ohm D0/D5 16/32 (4.18/4.13 V),
+IRQ2 0/32; 56 ohm 18/12/10 of 32 (3.93/3.88/4.18 V); 68 ohm 10/6/4 with 177-253 mV
+ring-back; >= 75 ohm worse. Other card lines (A9, D4, A11, D5, A15) track A0 within
+0.05 V; best single value is 56-68 ohm on every line (A0 68: 16, A9 16, A11 16, A15
+16, D4 8, D5 16; 56: 16/16/14/16/20/16), so per-line values (option 2) buy nothing:
+the surviving failures are the max corner (VCCIO 3.47 V, -40 C fast silicon) and they
+do not move below 3.9-4.0 V with any series value that keeps edges monotonic.
+Typical corner (3.3 V, 25 C), A0: 33 ohm 3.99 V 0/8, 47 3.92 0/8, 56 3.87 2/8,
+**68 3.74 V 4/8**, 75 3.71 V 5/8, 82 3.70 2/8, 100 3.64 V 1/8 (ring-back 338 mV).
+
+Why no series value clears everything: overshoot needs Rs+14 >= Z0 (~98 ohm at the
+x1.1 corner, i.e. R >= ~85), but the routed net is a chain of 53-165 ohm pieces and
+the staircase then parks the receiver in the 0.8-2.0 V band (ring-back 177-650 mV).
+
+Option 5 (drive/slew): none. FPGA-DS-02029-3.9 Table 4.13: LVCMOS33 IOL/IOH 8 mA
+(16/24 mA only for the High Drive LED (RGB) outputs, footnote 2); the data sheet lists
+only a programmable pull-up (no drive-strength or slew attribute for normal I/O), and
+the Lattice IBIS has one model per bank/standard. Nothing to select in the CPU-card
+bitstream.
+
+Option 6 (accept): out of spec by 0.57 V over the 3.66 V allowance (0.63 V over
+3.60 V) and by 2.5 ns vs 1.6 ns per edge; duty is ~1.5 % (25 % allowed) so only the
+per-event amplitude/duration are violated. Damage energy is small (above) but the
+vendor gives no tolerance beyond the note, so it is a reliability risk, not a
+compliance.
+
+Bus timing at the options: T = 83.3 ns; BUS-005 allows a 33 ohm RC of 1.09 ns; a
+68 ohm array adds ~1.2 ns (2.2*R*15 pF), 100 ohm ~2.2 ns, of a 52 ns slack; hold
+margin 1.47 ns improves by the first-band delay (+0.02..0.06 ns).
+
+Which board: series value alone = CPU card RN1-RN8 (+ main R21-R34 for the 14
+main-driven lines: a BOM value change, no reroute, same footprints). Any receiver-side
+part (U7 caps, terminations, clamps) is a main-board change with parts beside a
+0.5 mm TQ144 for 31+ lines, i.e. a partial reroute. 4D02WGJ0470TCE (47 ohm) and
+4D02WGJ0680TCE (68 ohm) exist by MPN in distributor listings; LCSC numbers and JLC
+stock NOT verified (only C25501 = 33 ohm is in hw/parts): check jlcpcb.com/parts
+before committing.
+
+Recommendation: change the 8 CPU-card RN arrays to 68 ohm and R21-R34 on the main
+board to 56 ohm (BOM only), rebuild, and measure a first article at U7.25 and
+CPU-card U1 with a >= 1 GHz probe. This removes the undershoot violations at the
+typical corner and cuts the peak to ~3.74 V typ (4.0 V at the -40 C/3.47 V corner),
+but does NOT reach 3.66 V at every corner: getting there needs a main-board change
+(33 ohm + ~100 pF at U7: peak 3.59 V but 92 mV monotonicity dips and +7.5 ns), or
+lower-Z0 routing. Decision needed from David on whether the -40 C/3.47 V corner
+must comply. CC-007 stays red until then.
+
+### Row status (2026-09-29)
+
+- MB-007 has never completed: it crashed in extraction (wifi 2-layer B.Cu
+  void, fixed in slowbus_route.py); a 3712-case run was resumed.
+- Boards in build/hw are all stale ("source inputs differ"); runs use
+  `--artifacts-only`, so every report is `valid_for_row_4_6: false` until the
+  coordinated rebuild.
 
 ## State right now (2026-09-28 evening)
 
@@ -489,3 +600,18 @@ MB-051.
 - Development method: never sync the scratch worktree while a run is going
   (it overwrites the re-pinned doc/hardware/si-evidence files); use
   scratchpad/cosim-w/cycle.sh (sync, re-pin, run).
+
+- 2026-09-29 (later): card programming port modelled: `prog_port_routes`
+  (45 legs: sysctl PROG_CLK/PROG_IO/MUX_SEL0-2, the two 4051 muxes, each
+  slot's 33 ohm SWCLK/SWDIO legs, each RP2040 card's debug pins; mux channel
+  and select bit read from the netlist) and `ProgPort` in emu/machine (a
+  bit-level SW-DP, `fw/test/swdtarget.c`, in every slot with an RP2040 card;
+  decoded from the select pins sysctl really drives; card flash starts as the
+  card's real flash). Real `cupc8.py` `Rp2040.flash` programs and verifies
+  through it on the native machine (1.15 s of machine time for 2 cards);
+  `Machine.progTarget(slot)`. Unmodeled nets now 50 (from 129):
+  card RUN/BOOTSEL/UART_TX (12), system BOOTSEL/RUN/SWCLK/SWDIO/PRSNT (5),
+  main SLOTn_PROG_n/SLOTn_RST_n/AUX_CS_n/SPI_nCS6_SRC/SYS_PRSNT2_n (15), GPU
+  DDC/HPD (6), Wi-Fi card BOOT/EN/LEDs/USB/UART (12). `routed_distances` got
+  `pad_reach` (a track ending inside a long edge finger counts as connected:
+  system J2.B11 was reported open by the centre-only test; off by default).

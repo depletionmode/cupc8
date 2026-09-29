@@ -345,6 +345,62 @@ void SysctlCard::attachExpanders(std::vector<Tca9555> list) {
   };
 }
 
+// ------------------------------------------------------------ programming port
+
+static constexpr int PROG_CLK = 18, PROG_IO = 19, MUX_SEL0 = 20;
+
+void SysctlCard::attachProgPort(std::unique_ptr<ProgPort> port) {
+  prog = std::move(port);
+  e.mcu->gpio[PROG_IO].setInputValue(true);  // no target: the line's pull-up
+  unlistenProg = e.mcu->gpio[PROG_CLK].addListener([this](GPIOPinState st, GPIOPinState old) {
+    if (st == GPIOPinState::High && old != GPIOPinState::High) progClock();
+  });
+}
+
+// One rising edge of PROG_CLK, in SWD mode (both pins on SIO; the PIO UART
+// uses the same pins in another mode). The target samples SWDIO on the edge
+// when the host drives it; when the host reads, the target drives its next
+// bit right after the edge, ready for the host's sample before the next one.
+// The clock after a turn from driving to reading is the turnaround: the
+// target does not shift then, but presents its first bit.
+void SysctlCard::progClock() {
+  ProgPort &p = *prog;
+  GPIOPin &clk = e.mcu->gpio[PROG_CLK], &io = e.mcu->gpio[PROG_IO];
+  if (clk.functionSelect() != FUNCTION_SIO || io.functionSelect() != FUNCTION_SIO) return;
+  int sel = 0;
+  for (int k = 0; k < 3; k++) {
+    GPIOPin &s = e.mcu->gpio[MUX_SEL0 + k];
+    bool level = s.outputEnable() ? s.outputValue() : true;  // released: the board's pull-up
+    if (!p.selWhole[k]) level = true;                        // open copper: the mux input floats up
+    sel |= (level ? 1 : 0) << p.selBit[k];
+  }
+  swdt_t *t = nullptr;
+  if (p.clk && p.io)
+    for (int slot = 0; slot < 6; slot++)
+      if (p.channel[slot] == sel && p.target[slot]) t = p.target[slot].get();
+  const bool driving = io.outputEnable();
+  auto present = [&](bool level) {
+    if (p.ioLevel == level) return;  // setInputValue latches an edge on every call
+    p.ioLevel = level;
+    io.setInputValue(level);
+  };
+  if (!t) {
+    p.prevDriving = driving;
+    present(true);
+    return;
+  }
+  if (driving) {
+    swdt_out(t, io.outputValue() ? 1 : 0);
+    p.prevDriving = true;
+    return;
+  }
+  if (p.prevDriving)
+    p.prevDriving = false;  // the turnaround clock
+  else
+    swdt_in(t);             // the host sampled the bit before this edge
+  present(t->outq_pos < t->outq_n ? t->outq[t->outq_pos] != 0 : true);
+}
+
 void SysctlCard::attachFlashes(SpiFlash *fl0, bool fl0Reach, SpiFlash *fl1, bool fl1Reach) {
   flash[0] = fl0;
   flash[1] = fl1;
@@ -566,10 +622,29 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     if (kind == "storage" || kind == "io") watchLeds(*c->e.mcu, c->leds, {24, 25});
     if (kind == "eink" || kind == "eink750") watchLeds(*c->e.mcu, c->leds, {24});
     if (kind == "io") {
-      c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
+      c->e.mcu->gpio[8].setInputValue(!o.ioVbusNfaultLow);  // VBUS switch fault sense (low: fault)
       if (o.ioUsbHost) keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
     }
     cards.emplace_back(slot, std::move(c));
+  }
+  if (sysctl && o.prog.on) {
+    // an SWD target per slot with an RP2040 card and whole debug copper; its
+    // flash starts as the card's flash
+    auto port = std::make_unique<ProgPort>();
+    port->selBit = o.prog.selBit;
+    port->selWhole = o.prog.selWhole;
+    port->clk = o.prog.clk;
+    port->io = o.prog.io;
+    port->channel = o.prog.channel;
+    for (auto &[slot, card] : cards) {
+      if (slot < 1 || slot > 6 || !o.prog.targets[static_cast<size_t>(slot - 1)] || !card->emu()) continue;
+      auto target = std::make_unique<swdt_t>();
+      swdt_init(target.get());
+      const auto &flash = card->emu()->mcu->flash;
+      std::copy_n(flash.begin(), std::min<size_t>(SWDT_FLASH, flash.size()), target->flash);
+      port->target[static_cast<size_t>(slot - 1)] = std::move(target);
+    }
+    sysctl->attachProgPort(std::move(port));
   }
   romImage = o.rom;
   if (threaded_) startWorkers();

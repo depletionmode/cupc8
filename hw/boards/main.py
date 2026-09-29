@@ -31,6 +31,7 @@ import kicadgen as kg  # noqa: E402
 import sesreplay  # noqa: E402
 import main_power_corner  # noqa: E402
 import main_seed  # noqa: E402
+import main_fanout  # noqa: E402
 import edgesym  # noqa: E402
 import sockets  # noqa: E402
 sys.path.append(os.path.join(ROOT, "hw", "power"))     # after hw/tools: the MB-051 values live there
@@ -1299,10 +1300,30 @@ def prepare(board):
     _label_keepouts(board)
     added, dropped = main_seed.apply(board, SEED_RIPUP, SEED_RIPUP_NETS)
     print("route seed: %d items kept, dropped %s" % (added, dropped), end=" ", flush=True)
+    fanned = _fan_out(board)
+    print("%d fan-out vias pre-placed" % fanned, end=" ", flush=True)
     # Freerouting reports the wide locked inner-layer +5V trunk as several
     # unrouted via/slot links even though KiCad already joins R4 and all six
     # fuse inputs. Check the entire net with KiCad after SES import instead.
     return nets + standby + corner + core + signal + ["/+5V"]
+
+
+def _fan_out(board):
+    """A locked stub and via on every connected SMD pad the seed and the
+    locked copper leave bare (main_fanout.py: Freerouting's own fan-out takes
+    ~10 minutes a pass here and stalls on the same ~68 pins). Returns how
+    many; stops the build if a pad has no legal spot or is still bare."""
+    dense, fine = set(dense_nets()), set(fine_nets()) | set(FINE_POWER_NETS)
+    power = {"/GND", "/+3V3", "/+1V2", "/+5V", "/VBUS", "/VBUS_F", "/5V_SYS", "/3V3_STBY", "/3V3_BUCK"}
+
+    def clearance(net):
+        return 0.1 if net in dense else 0.15 if net in fine else 0.2
+    placed, unplaced = main_fanout.fan_out_bare_pads(board, clearance, lambda net: 0.3 if net in power else 0.2)
+    bare = main_fanout.bare_pads(board)               # less the documented EXEMPT pads
+    unplaced = [u for u in unplaced if (u[0], u[1]) not in main_fanout.EXEMPT]
+    if unplaced or bare:
+        raise SystemExit("fan-out: no legal via spot for %s; still bare: %s" % (unplaced, bare))
+    return len(placed)
 
 
 # The route seed (main_seed.py): the last receipt-bound route, kept outside
@@ -2017,6 +2038,10 @@ def main():
                        route_parallel=ROUTE_PARALLEL, route_timeout=ROUTE_TIMEOUT, route_heap=ROUTE_HEAP,
                        zone_min_width=0.3,          # at 0.25 KiCad's fill left a 0.063 mm plane neck
                        fanout_margin=FANOUT_MARGIN,
+                       # main_fanout.py pre-places the fan-out vias; Freerouting's own fan-out stage
+                       # (2026-09-29, seeded build) took 6.5-11 min a pass and left 27-32 pins
+                       # "not routed" in pass 1 and again in pass 2 (ripup costs rising), so it is off
+                       route_fanout=False,
                        prepare=prepare,
                        post_route=(lambda board: _finish_route(board, replay['salt'] if replay else None)),
                        replay=replay,
