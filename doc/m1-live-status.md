@@ -5,6 +5,15 @@ update it after every finding, commit, decision or agent result (David,
 2026-09-28). Background and the release definition:
 `doc/m1-handoff-2026-09-28.md`.
 
+## Main-board routing log (root, 2026-09-29; David AFK, told Claude to carry on)
+
+- 08:24 seeded build #1 (main-new): Freerouting fanout 6.5-11 min/pass, ~68 pins stuck. Stopped 08:53.
+- 09:06 build #2 (main-new2) with our pre-placed fanout vias (hw/boards/main_fanout.py, 79 vias + stubs, all locked, in the DSN: verified): fanout pass #1 85-108 s, ~28-32 not routed; pass #2 125-455 s, still 27-32 not routed, ripup costs 100->200, plus 'normalizeTraces reached 2000 iterations' warnings. Not converging. Stopped 09:20.
+- Finding: Freerouting 2.4.1 has an undocumented `--router.fanout.enabled=false` (FanoutSettings: enabled, max_passes, max_items, max_milliseconds_per_pin, ripup_allowed, alternate, min_escape_length_mm). Tested on the Wi-Fi DSN in scratch (scratchpad/frtest): no fanout stage. Main-board agent told to add a `fanout` flag through kicadgen (main passes False) and restart as main-new3.
+- Pads still bare after pre-placement: 2 exempt (U19.2 /SLOT1_RST_n, U2.9 /EFUSE_ILM). My escape test (scratchpad/escape.py): U2.9 has a 4.6 mm F.Cu path to its only other pad R3.1 and a legal via spot 0.66 mm away; U19.2 has a legal via spot 2.2 mm away by an F.Cu trace (2.9 mm at 0.2 mm rules): both routable; not a probability, a feasibility check. Final DRC/connectivity decides.
+- 26 of the 79 new vias are >1.5 mm from their pad (max 3.4 mm, U19.6 /SLOT3_RST_n), all on slow reset/monitor/CC nets.
+- All 8 board pins counts: 1052 SMD pads = 530 track+via, 475 track-only (connected by the seed's locked F.Cu tracks, need no via), 45 no-connect, 2 bare.
+
 ## Decisions 2026-09-29 (David)
 
 - Main-board routing: **pre-place fanout vias ourselves** (Freerouting's fanout took 6.5-11 min/pass with the failing set stuck at ~68 pins; my geometry test scratchpad/via_room.py found a legal via spot for all 79 bare connected pads). Main-board agent instructed to stop the old build, implement and restart into scratchpad/main-new2.
@@ -86,9 +95,23 @@ MB-051.
 - `test_board_thermal.py` gained the LVC07 test (6 inputs x 500 uA dICC, fits
   the HT7533 headroom). Its only error is the built CPU netlist C21 (expected
   until the rebuild).
-- Scratch seeded build started 08:2x into
-  `.../scratchpad/main-new` (log `scratchpad/build.log`, pid file
-  `scratchpad/build.pid`). Results below when it finishes.
+- Build 1 (`scratchpad/main-new`, 08:24) was stopped by David's decision: its
+  8 Freerouting runs spent 6.5-11 min per fanout pass with ~68 pins never
+  routed. Preroute: 5162 seed items kept, 81 connected SMD pads bare.
+- **Pre-placed fan-out** (`hw/boards/main_fanout.py`, called from
+  `main.prepare` via `_fan_out`): a locked stub + 0.6/0.3 via on every bare
+  connected SMD pad, nearest legal spot (class clearance 0.1/0.15/0.2 + 0.05,
+  no via-in-pad, 0.85 hole spacing, out of no-via areas, all layers'
+  copper), retried in reordered rounds for fine-pitch rows. 79 placed in ~7 s;
+  **exempt (documented in `EXEMPT`, Freerouting fans out itself): U19.2
+  (SLOT1_RST_n) and U2.9 (EFUSE_ILM)**. The build stops if any other
+  connected SMD pad is bare (`bare_pads`). Test
+  `test/hw/test_main_fanout.py` (6 tests; the own-pad-keepout mutation fails
+  it). `hw/tools/boardevidence.py` now also hashes main_power_corner.py,
+  main_seed.py, main_fanout.py and main-route-seed.json (they fed the board
+  but were not in its evidence hash).
+- Build 2 (`scratchpad/main-new2`, started 09:04; log `build2.log`, pid
+  `build2.pid`). Results below when it finishes.
 
 ## Bus SI (MB/CC/SC/EC-007), resumed 2026-09-29 (sonnet agent)
 
@@ -433,3 +456,36 @@ MB-051.
   doc/hardware/si-models.md. To test meanwhile: a scratch worktree at HEAD
   with hw/tools|lib|parts|boards taken from c040ca4 and build symlinked
   (scratchpad/cosim-w/wt), then re-pin there.
+- 09:15 GC-007 first full run (hw/si/tmds_si.py on build/hw/gpu; note the built
+  netlist still has 270 ohm packs, the tool reads whatever the netlist has).
+  RED on the routed design, not on the tool: differential impedance lower
+  bound proven > 110 ohm on 9.6-21 mm of every lane's trace (pairs run
+  loosely coupled; d0 92.9-137.7 ohm); intra-pair skew D1 34.9 ps and CK
+  33.3 ps (limit 5; D0 1.1, D2 4.0 pass); line return loss -18.4..-19.05 dB
+  vs the -19.58 dB (=+-10 % tolerance) budget; insertion loss >= -0.15 dB.
+  New: hw/si/si_cache.py (disk cache of the 10-40 s cut solves under
+  build/si/cache, keyed by solver-source hash), swing check in tmds_si
+  (rp2040_thermal.tmds_swing at the netlist R: 360 ohm gives >= 215 mV,
+  <= 939 mV pp against DVI 150-1200), test/hw/test_hs_si.py.
+  A full run costs ~45 min on a loaded machine (538 cut solves); cached reruns are fast.
+
+### Co-sim progress (2026-09-29, same agent)
+
+- Unmodeled nets 129 -> 92 so far (build/hw at c040ca4 boards, HEAD
+  gen_top). New bindings (all in hw/cosim/gen_top.py, each with a copper or
+  netlist mutation in test/hw): rail indicator LEDs (`rail_indicator_routes`,
+  16 nets; `Machine.powerLeds()`; test_cosim_card_leds.py), slot presence and
+  CPU card ID (`i2c_expander_routes`, 15 nets; `Machine.expanders()` new
+  addon call; test_cosim_sysctl_inputs.py), system Type-C Rd on CC1/CC2
+  (`system_usb_routes`, 2 nets; test_cosim_system_usb.py), IO VBUS switch
+  enable/fault sense (`io_vbus_routes`, 2 nets; test_cosim_io_vbus.py, new).
+  Analog/static waivers added in coverage.py: wifi STRAP2/STRAP8 (WC-006),
+  main PWR_BTN/PWR_EN (MB-053, POW-004): judgment calls for David.
+- Remaining after that (92): the card programming port (SWD, mux, PROG_n,
+  RST_n/RUN, BOOTSEL: ~70 nets; needs an SWD target and card reset in the
+  emulator), UART_TX test points (4), GPU DDC/HPD (6, the firmware never
+  uses them), Wi-Fi LEDs/USB/UART/EN/BOOT (14), AUX header CS (2), system
+  presence (2).
+- Development method: never sync the scratch worktree while a run is going
+  (it overwrites the re-pinned doc/hardware/si-evidence files); use
+  scratchpad/cosim-w/cycle.sh (sync, re-pin, run).
