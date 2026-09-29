@@ -76,10 +76,10 @@ class FaResultsTests(unittest.TestCase):
         self.assertEqual(fa.verdict(rec)[0], 'pass')
 
     def test_heating_scaled_to_rated_current(self):
-        # 12 C at 2.8 A is 12 x (3.213 / 2.8)^2 = 15.8 C at the eFuse's maximum limit
+        # Normalize to the guaranteed limit, including external RILM tolerance/TCR.
         rec = record('MB-109', 'main', measurements={'i_load_a': 2.8, 'minutes_at_load': 20,
                                                      'dt_input_copper_c': 12.0})
-        self.assertAlmostEqual(fa.value(rec, 'dt_input_copper_c'), 12.0 * (3.213 / 2.8) ** 2)
+        self.assertAlmostEqual(fa.value(rec, 'dt_input_copper_c'), 12.0 * (fa.insw_ilim()[2] / 2.8) ** 2)
         self.assertEqual(fa.verdict(rec)[0], 'pass')
         rec['measurements']['dt_input_copper_c'] = 16.0
         self.assertEqual(fa.verdict(rec)[0], 'fail')
@@ -99,6 +99,33 @@ class FaResultsTests(unittest.TestCase):
         for unit in ('a', 'b'):
             self.write(record('GC-105', 'gpu', unit, good))
         self.assertEqual(fa.status('GC-105', fa.records(self.dir))[0], 'green')
+
+    def test_reset_thresholds_require_room_and_soaked_hot_measurements(self):
+        good = {'ambient_room_c': 25, 'ambient_hot_c': 40, 'minutes_hot': 30,
+                'v_3v3_fall_trip_v': 3.19, 'v_1v2_fall_trip_v': 1.155,
+                'v_3v3_fall_trip_hot_v': 3.19, 'v_1v2_fall_trip_hot_v': 1.155,
+                'slot_rst_held': 1}
+        self.assertEqual(fa.verdict(record('MB-113', 'main', measurements=good))[0], 'pass')
+        for key in ('ambient_hot_c', 'minutes_hot', 'v_3v3_fall_trip_hot_v',
+                    'v_1v2_fall_trip_hot_v'):
+            with self.subTest(missing=key):
+                missing = {k: v for k, v in good.items() if k != key}
+                result, lines = fa.verdict(record('MB-113', 'main', measurements=missing))
+                self.assertEqual(result, 'incomplete')
+                self.assertIn(key, '\n'.join(lines))
+        for key, value in (('ambient_hot_c', 37.9), ('minutes_hot', 29.9),
+                           ('v_3v3_fall_trip_hot_v', 3.1697),
+                           ('v_3v3_fall_trip_hot_v', 3.2036),
+                           ('v_1v2_fall_trip_hot_v', 1.1506),
+                           ('v_1v2_fall_trip_hot_v', 1.1605)):
+            with self.subTest(field=key, value=value):
+                result, lines = fa.verdict(record('MB-113', 'main', measurements=dict(good, **{key: value})))
+                self.assertEqual(result, 'fail')
+                self.assertIn(key, '\n'.join(lines))
+        for unit in ('a', 'b'):
+            self.write(record('MB-113', 'main', unit, good))
+            expected = 'pending' if unit == 'a' else 'green'
+            self.assertEqual(fa.status('MB-113', fa.records(self.dir))[0], expected)
 
     def test_malformed_records_are_rejected(self):
         cases = [(dict(record(), schema='cupc8-fa/0'), 'schema'),

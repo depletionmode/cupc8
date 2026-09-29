@@ -1,5 +1,15 @@
 # MB-005: deriving the input-loop requirement, 2026-09-28
 
+**2026-09-30 correction:** the historical 3.213 A figures below omitted
+the external 1.13 kΩ RILM's ±1% tolerance and ±100 ppm/°C TCR. The current
+`design.insw_ilim()` bound is 3.288102 A (3.289 A outward rounded), over
+C22833's full −55..155°C resistor rating; the minimum is 2.565371 A.
+The unchanged 20°C criterion and all live current-dependent gates use this
+stronger bound. Historical table estimates below have not been re-labelled
+as calculations at the corrected current. See the [manufacturer resistor
+datasheet](https://www.uni-royal.cn/images/userfile/file/1590821906c56505e6d9ab55c7.pdf).
+
+
 **Status: decided (David, 2026-09-28): option 2.** `design.R_RECEPTACLE`
 is now the ≤ 60 mΩ board-side loop at the hottest corner, with the ≤ 20 °C
 rise rule at 3.213 A for every full-current conductor; the main board's

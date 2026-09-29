@@ -63,7 +63,7 @@ REDUCED_CLASS = "Type-C 1.5 A"      # what a 1.5 A source must still run: radio 
 # eFuse's maximum current limit.
 R_RECEPTACLE = assume("main", "board-side input loop (J1 terminations + VBUS/GND copper to F1/U2, solder, "
                       "transitions; not the mated contacts, USB Type-C R2.0 4.4.1): <= 60 mOhm at the hottest "
-                      "corner, and <= 20 C copper rise at 3.213 A", 0.060)
+                      "corner, and <= 20 C copper rise at the worst eFuse current limit", 0.060)
 # input PTC: SMD1812P350TF/16 (Ruilon, C46970911, 310 at JLC; the 6 V
 # SMD1812P350TF C20815, 2,858, is the fallback). Rmin/R1max from the LCSC
 # listing; the 40 C hold uses the Ruilon family's 90 % derating (P200: 1.80/2.00)
@@ -78,7 +78,16 @@ INSW_ILIM_K = 3340.0        # DS table: ILIM ~ 3340 / RILM (1.007 A at 3.32k, 2.
 INSW_ILIM_TOL = (0.112, 0.087)  # DS: 1.800..2.200 A at 1.65k and 3.96..4.84 at 750 ohm (-11.2 %, +8.7 %)
 # RILM: the limit's max stays under 3.3 A (a 3.0 A source + 10 %), its min
 # well over the machine's worst case (budget.py B2)
-INSW_RILM = assume("main", "eFuse RILM 1.13 kOhm 1 % (limit 2.63 / 2.96 / 3.21 A min/nom/max)", 1130.0)
+INSW_RILM = assume("main", "eFuse RILM 1.13 kOhm 1 % (limit 2.565 / 2.956 / 3.289 A including resistor TCR)", 1130.0)
+INSW_RILM_TOL = 0.01
+# C22833 = UNI-ROYAL 0603WAF1131T5E: general thick-film 0603,
+# >10 ohm +/-100 ppm/C; https://www.uni-royal.cn/images/userfile/file/1590821906c56505e6d9ab55c7.pdf
+# Bound the resistor over its complete rated range, independently of eFuse
+# junction temperature. The electrical-table ILIM spread uses exact RILM
+# values and does not include this external resistor's tolerance or TCR.
+INSW_RILM_TCR = 100e-6
+INSW_RILM_TEMP_RANGE_C = (-55.0, 155.0)
+INSW_RILM_REF_C = 25.0
 INSW_THETA_JA = 74.5        # DS RPW, JEDEC board (41.7 on TI's EVM)
 # OVLO: IN -> R1 -> OVLO -> R2 -> GND; trips at 1.2 V (1.183..1.223) x (R1 + R2) / R2.
 # Must stay above vSafe5V max and below the 6 V absolute maximum of what 5V_SYS feeds
@@ -477,10 +486,23 @@ def iob_vout(v_in, i_out, corner):
     return max(vset, through) if v_in >= vset * 1.01 else vset
 
 
-def insw_ilim(rilm=None):
-    """The eFuse's current limit (min, nom, max) for an RILM."""
+def insw_ilim(rilm=None, resistor_temp_c=None):
+    """Limit (min, nominal, max), including external RILM tolerance/TCR.
+
+    Default corners cover the resistor's entire rated temperature range.
+    A supplied resistor temperature selects its TCR excursion from 25 C.
+    """
     nom = INSW_ILIM_K / (rilm or INSW_RILM)
-    return nom * (1 - INSW_ILIM_TOL[0]), nom, nom * (1 + INSW_ILIM_TOL[1])
+    if resistor_temp_c is None:
+        excursion = max(abs(t - INSW_RILM_REF_C) for t in INSW_RILM_TEMP_RANGE_C)
+    else:
+        if not INSW_RILM_TEMP_RANGE_C[0] <= resistor_temp_c <= INSW_RILM_TEMP_RANGE_C[1]:
+            raise ValueError('RILM temperature is outside its rated range')
+        excursion = abs(resistor_temp_c - INSW_RILM_REF_C)
+    drift = INSW_RILM_TCR * excursion
+    return (nom * (1 - INSW_ILIM_TOL[0]) / ((1 + INSW_RILM_TOL) * (1 + drift)),
+            nom,
+            nom * (1 + INSW_ILIM_TOL[1]) / ((1 - INSW_RILM_TOL) * (1 - drift)))
 
 
 def insw_ovlo():

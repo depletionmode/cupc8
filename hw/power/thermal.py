@@ -235,10 +235,10 @@ def main():
     c.check("T6", "TPS63802 GPU card HDMI buck-boost, 55 mA at %.2f V, %.0f %% efficient: %.0f mW x %.0f C/W" % (
         vout, 100 * d.GPUB_ETA, 1e3 * p, d.GPUB_THETA_JA), tj(p, d.GPUB_THETA_JA), lim, "<=", "C", fmt="%.1f")
 
-    lo, _, _ = d.insw_ilim()
-    p = lo ** 2 * d.INSW_RON_MAX
-    c.check("T8", "%s input eFuse at its minimum limit %.2f A (the most it passes without limiting): "
-            "%.0f mW x %.1f C/W" % (d.INSW_PART, lo, 1e3 * p, d.INSW_THETA_JA), tj(p, d.INSW_THETA_JA), lim,
+    _, _, hi = d.insw_ilim()
+    p = hi ** 2 * d.INSW_RON_MAX
+    c.check("T8", "%s input eFuse at its maximum limit %.2f A before limiting: "
+            "%.0f mW x %.1f C/W" % (d.INSW_PART, hi, 1e3 * p, d.INSW_THETA_JA), tj(p, d.INSW_THETA_JA), lim,
             "<=", "C", fmt="%.1f")
     p = d.I_KEYBOARD ** 2 * d.IOSW_RON_MAX
     c.check("T9", "TPS2553-1 IO card keyboard port, 500 mA: %.0f mW x %.0f C/W" % (1e3 * p, d.IOSW_THETA_JA),

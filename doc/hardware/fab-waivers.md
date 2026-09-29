@@ -13,6 +13,7 @@ why, and who decided.
 | verification.md 3.3: a missing CPU card | Out of scope | A machine without its CPU card is broken hardware. | David, 2026-09-24 |
 | verification.md 3.3: a card pulled while running | Out of scope | Cards are plugged or removed only with the power off (`slot.md`). | David, 2026-09-24 |
 | `hw/power` current budgets: 10 % margin (POW-006) | POW-006 B5, the machine on a 1.5 A source (radio off, SD writes refused, SD reading, a 500 mA keyboard), needs 5 %. It is 1.383 A, 7.8 % under 1.5 A. | Every tolerance is at its worst at once (vSafe5V min, the Type-C cable's full drop, every resistance at its max, every load at its max), and the case still fits the source class. The full machine is specified on a 3.0 A source. | David, 2026-09-25 |
+| YC-007 system-card USB impedance and D+/D- capacitance balance | Accept the existing routing for first articles only; retain the failed SI checks and test physical USB before a larger run | All 32 modeled cable cases and edge checks pass, but routed impedance and 19–26 % capacitance imbalance fail the design limits. Possible issue: failed enumeration, intermittent disconnects or unreliable transfers with some cables/hosts; a later board revision may be needed. See `first-article-plan.md`, system-card USB acceptance check. | David, 2026-09-30: "accept it for now and note it as a possible issue" |
 
 ## Hand checks (to do before ordering, with a date)
 

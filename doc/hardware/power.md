@@ -8,7 +8,7 @@ USB-C receptacle (main board)
   │           source's advertised current.
   ├─ TVS (SMF5.0A) + 3.5 A input PTC (SMD1812P350TF/16)
   ├─ standby LDO (HT7533-2, 3V3_STBY) ── POWER button controller (MAX16054) ─┐
-  └─ eFuse (TPS259470ARPWR): 2.63–3.21 A limit, OVLO 5.60–5.81 V, dVdt soft start
+  └─ eFuse (TPS259470ARPWR): 2.565–3.289 A limit, OVLO 5.60–5.81 V, dVdt soft start
        │  EN/UVLO ← the controller's OUT (the machine on) ──────────────────────┘
        │  ≤ 10 µF directly on VBUS; the rest charges behind the dVdt ramp
        └── 5V_SYS ──┬── 3V3 buck (TLV62569PDDCR, 2 A)
@@ -136,11 +136,18 @@ can leave the file system damaged.
   pulls U6's ~MR low through a BAT54A. An SN74LVC07A on 3V3_STBY holds all
   six `SLOTn_RST_n` low whenever `nPOR` is low, so a card on slot +5V stays
   in reset while +3V3 or +1V2 is absent; a 100 kΩ pull-down holds `nPOR`
-  low while U6 is unpowered. Guaranteed thresholds (every datasheet
-  tolerance, hysteresis and copper allowance): +3V3 falls 3.170–3.204 V,
-  rises ≤ 3.208 V; +1V2 falls 1.151–1.160 V, rises ≤ 1.161 V — at least
-  11.6 mV (3V3) and 9.3 mV (1V2) inside the windows between each rail's
-  valid floor at the loads and its regulator's worst low. The 3V3 and 1V2
+  low while U6 is unpowered. Modeled tolerance thresholds, including
+  hysteresis and the stated engineering allowances: +3V3 falls
+  3.1698–3.2035 V, rises ≤ 3.2079 V; +1V2 falls 1.1508–1.1604 V,
+  rises ≤ 1.1615 V. The routed M1 qualifier requires at least 5 mV on
+  both sides of each window after actual copper/load/sense-current bounds.
+  The OPA376's 1 nA input-bias allowance is conservative engineering
+  judgment: TI specifies 10 pA maximum at 25 C and typical curves at
+  other temperatures, without a guaranteed hot maximum. MB-113 confirms
+  thresholds on both first articles at room temperature and after at
+  least 30 minutes at 38 C or warmer in the 40 C box; a modeled pass does
+  not replace that hardware qualification.
+  MAX811's specified temperature range is -40..85 C. The 3V3 and 1V2
   isolation links are 1 mΩ shunts (a 0 Ω jumper is ≤ 50 mΩ), and the
   chipset core's +1V2 is a B.Cu pour fed from an LDO beside U7. Analysis:
   `hw/power/reset_supervisor.py` (with `--spice`: TI's OPA376 model through
@@ -181,7 +188,12 @@ passes at 7.8 % against a 5 % margin, under a waiver
 **The input path, re-sized for 3 A.** The SY6280 (limit at most 2.5 A,
 ±25 %) could not pass the 3 A case with margin. It is replaced on the main
 board by a **TPS259470ARPWR eFuse** (C3662799). Its limit is 3340/RILM with
-−11 %/+9 %; RILM 1.13 kΩ gives 2.63 / 2.96 / 3.21 A (min/nom/max). The OVLO
+−11.2 %/+8.7 % device spread. RILM 1.13 kΩ ±1% (C22833, UNI-ROYAL
+0603WAF1131T5E) adds ±100 ppm/°C TCR: over its full −55..155°C
+rating, the combined limits are 2.565 / 2.956 / 3.289 A (min/nom/max;
+outward rounded). At 25°C, tolerance alone gives 2.598 / 2.956 /
+3.246 A. The [manufacturer resistor datasheet](https://www.uni-royal.cn/images/userfile/file/1590821906c56505e6d9ab55c7.pdf)
+specifies the TCR independently of the eFuse device spread. The OVLO
 divider keeps a misbehaving source off 5V_SYS, and a 680 pF dVdt capacitor
 slows the attach. The 2 A input PTC becomes a **3.5 A SMD1812P350TF/16**
 (C46970911). The TVS stays SMF5.0A: its 9.2 V clamp is now far inside the
@@ -330,7 +342,7 @@ then `set_sys_clock_khz(DVI_TIMING.bit_clk_khz)`). The RP2040 datasheet
 | POW-003 Wi-Fi card buck (as built) | ESP32-C3 minimum in a 358 mA TX burst: 3.199 V at the worst corner (+199 mV over 3.0), 3.201 V typical. Maximum 3.495 V (+105 mV under 3.6). Slot +5V at the card 4.116 V in the burst (+587 mV of headroom). |
 | POW-004 inrush | 1 µF ahead of the eFuse (≤ 10 µF). The eFuse ramps 5V_SYS in 1.1–4.4 ms, so the 84 µF behind it charges at 91–427 mA. The whole surge, loads starting included, peaks at 0.85–1.34 A, under the eFuse's 2.63 A minimum limit (+49 %). The receptacle stays ≥ 3.91 V. |
 | POW-005 CC | Realised CC ranges: default 0.317–0.571 V, 1.5 A 0.829–1.090 V, 3.0 A 1.524–1.936 V. PWR_HI trips between 1.203 V (+112 mV clear of 1.5 A) and 1.386 V (+138 mV clear of 3.0 A). The ADC classes clear by 60–102 mV. TI's TLV7011 model agrees at both edges. |
-| POW-006 budget | M1 worst case 1.737 A: +42 % under a 3.0 A source, +34 % under the eFuse's minimum limit, +45 % under the PTC's 40 °C hold. The eFuse's max limit, 3.21 A, is +2.6 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.383 A (+7.8 %, against 5 % under the waiver). Default USB at typical loads: 374 mA (+25 % under 500 mA). Slots 5–6 have 0.65 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.397 V highest (+103 mV under 5.5). Per card +5V: IO 0.750 A (+6.3 % under slot.md's 0.80 A, +19 % under the fuse's 0.92 A hold), GPU 0.095 A, Wi-Fi 0.34 A. OVLO 5.60–5.81 V. |
+| POW-006 budget | M1 worst case 1.737 A: +42 % under a 3.0 A source, +32 % under the eFuse's minimum limit, +45 % under the PTC's 40 °C hold. The eFuse's max limit, 3.289 A, is +0.4 % under 3.3 A. With a 1.5 A source (radio off, SD reading): 1.383 A (+7.8 %, against 5 % under the waiver). Default USB at typical loads: 374 mA (+25 % under 500 mA). Slots 5–6 have 0.65 A left. Keyboard VBUS 4.784 V worst (+384 mV over 4.40), 5.397 V highest (+103 mV under 5.5). Per card +5V: IO 0.750 A (+6.3 % under slot.md's 0.80 A, +19 % under the fuse's 0.92 A hold), GPU 0.095 A, Wi-Fi 0.34 A. OVLO 5.60–5.81 V. |
 | POW-007 keyboard boost | Model check: 0.8 % off the set point. Port minimum in a 0→500 mA step at the DC low corner: 4.697 V worst (+297 mV over 4.40), 4.724 V typical, 5.129 V at vSafe5V max (pass-through). Port maximum 5.431 V (+69 mV under 5.5). Up in 0.32–0.36 ms. Inductor current 0.75 A against the 2.7 A valley limit. |
 | POW-008 HDMI +5V (TPS63802, behavioural) | Model check: 147 mV dip against the datasheet figure's 130 mV. Pin in a 10→55 mA step, over every tolerance: 4.874 V minimum (+74 mV over 4.8) and 5.233–5.252 V maximum (+48 mV under 5.3; 300k/33k, both basic: the 825k (C25823) had 418 in stock), at the worst and typical corners and at vSafe5V max. Converter input at vSafe5V max 5.409 V (+91 mV under its 5.5 V OVP), at the worst corner 3.750 V (over 1.3 V). PTC current 0.096 A against its 0.17 A hold (+44 %). With the PTC after the converter the pin would be 4.670 V. |
 | THM-001 | 3V3 buck (PDDC) 52.2 °C at the M1 load, 73.9 °C with slots 5–6 at 300 mA each. Wi-Fi card buck 50.9 °C. IO card boost 55.5 °C, GPU card buck-boost 45.8 °C. RT9013 62.2 °C. Input eFuse at 2.62 A 63.1 °C. IO card port switch (TPS2553-1) 46.2 °C. The AMS1117 rows are gone: no M1 card has one. |
@@ -346,7 +358,7 @@ then `set_sys_clock_khz(DVI_TIMING.bit_clk_khz)`). The RP2040 datasheet
   width, 24.9/11.4 µm copper, 15 µm via wall). The mated VBUS/GND contacts
   are not in it: USB Type-C R2.0 §4.4.1 counts them in the cable's IR-drop
   budget, which the model already takes at its limit. **Every full-current
-  conductor rises ≤ 20 °C at the eFuse's 3.213 A maximum limit**, which it
+  conductor rises ≤ 20 °C at the eFuse's 3.289 A maximum limit**, which it
   can carry indefinitely (IPC-2221B; ≥ 1.75 mm drawn on outer 1 oz). The
   derivation is `mb005-loop-requirement-derivation.md`; the routed check is
   `hw/power/main_input_heat.py`.

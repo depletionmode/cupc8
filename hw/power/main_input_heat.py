@@ -9,7 +9,7 @@ hw/power/design.py R_RECEPTACLE):
     receptacle terminations, solder joints and layer transitions -- is at
     most 60 mOhm at the hottest corner. The mated VBUS/GND contacts are not
     in it: USB Type-C R2.0 4.4.1 counts them in the cable's IR-drop budget;
-  - every full-current conductor rises at most 20 C at the eFuse's 3.213 A
+  - every full-current conductor rises at most 20 C at the eFuse's worst-case current limit
     maximum current limit, which it can carry indefinitely.
 
 Resistance: copper_mesh.solve over every layer, zone fill, track, pad and
@@ -19,7 +19,7 @@ their drawn width; 24.9 / 11.4 um outer / inner copper; 15 um via wall;
 of the two contact groups), at two mesh pitches; the larger result counts.
 Solder joints and the receptacle's tails are allowances (TRANSITIONS).
 
-Temperature: at 3.213 A each conductor's peak sheet current density (outside
+Temperature: at worst-case current limit each conductor's peak sheet current density (outside
 1 mm of a terminal pad) is turned into an equivalent trace carrying the
 whole current at that density, and IPC-2221B gives its rise (the external k
 for every layer, as the derivation does; the internal-k bound is printed).

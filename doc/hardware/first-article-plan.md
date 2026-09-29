@@ -94,7 +94,7 @@ What a hobbyist bench can realistically hold, and where it is not enough.
 | Oscilloscope | 100 MHz, 2 channels, 8-bit is fine, AC coupling down to 10 mV/div, 20 MHz bandwidth limit, CSV export; 10× probes with **spring ground tips** (≤ 1 cm) | M-S: rail droop, bursts, reset timing | the 15 cm ground lead (rings at tens of MHz and shows 50–200 mV of false spikes on a 1 V rail); the scope's DC accuracy (±2–3 % of full scale) for margins of tens of mV: take DC from the DMM. For TMDS eye (252 Mb/s) you would need ≥ 1.5 GHz; GC-102 is the functional substitute |
 | Temperature | K-type thermocouples, 36–40 AWG fine wire, Kapton tape, thermal paste; a second thermocouple for ambient | M-T | an IR thermometer/gun (spot far larger than an SOT-23); an IR camera on bare metal, gold or glossy packages (emissivity errors of tens of °C) without a matte-black dot or Kapton on the target |
 | IR camera (optional) | ≥ 160 × 120, with the target ≥ 3 × 3 pixels | finding the hot spot before placing a thermocouple | as the recorded value on small parts |
-| 40 °C box | expanded-polystyrene box, 25–40 W heater (incandescent bulb or PTC heater), a thermostat module (for example a W1209), a small fan stirring the air but not blowing on the boards | GC-102, WC-105, WC-106, MB-111, CC-104 | a hair dryer or hot-air station (uneven, unregulated) |
+| 40 °C box | expanded-polystyrene box, 25–40 W heater (incandescent bulb or PTC heater), a thermostat module (for example a W1209), a small fan stirring the air but not blowing on the boards | GC-102, WC-105, WC-106, MB-111, MB-113, CC-104 | a hair dryer or hot-air station (uneven, unregulated) |
 | Impedance | a NanoVNA (50 kHz–1.5 GHz) with the bias fixture in M-Z; better, an LCR meter or impedance analyser **with DC bias** (for example a makerspace's or university lab's HP 4284A / Keysight E4980A) | M-Z: capacitor C and ESR under bias | an ESR meter or a handheld LCR meter (DE-5000 class): no DC bias, and the bias loss (−55 % at 5.5 V) is the quantity being measured. At most a screen for gross ESR |
 | DC electronic load | 0–5 A, constant-current, ≥ 25 W | MB-109, MB-112, IC-104 | power resistors alone (cannot sweep to find the eFuse limit) |
 | USB-C | a USB-C plug breakout rated 5 A, with ≥ 20 AWG leads; a USB power meter | injecting the bench supply into J1; sanity check of input power | a USB power meter's current as a recorded value (±1–2 % plus offset; fine as a sanity check) |
@@ -523,6 +523,24 @@ slot mux) and its LINK, TX and RX LEDs, which light at first power-up and
 during the join. The emulator has no chip-level reset and QEMU no EN hook,
 so neither is an emulator check.
 
+### System-card USB acceptance check (YC-007, first articles)
+
+David accepted the existing system-card USB routing for first articles on
+2026-09-30. Keep YC-007's impedance and capacitance-balance failures visible;
+functional tests do not establish electrical compliance. The recovered
+model passes all 32 cable cases, but capacitance imbalance is 19–26 %
+(limit 10 %) and routed impedance is outside the target. Possible symptoms
+are failed enumeration, intermittent disconnects or unreliable transfers.
+
+On each first-article system card, record the host, cable, USB-C plug
+orientation and test duration. Check repeated attach/enumeration in both
+orientations using multiple known-good data cables and more than one host.
+Exercise both CDC ports, console input/output and programming/control
+transfers, verifying transferred contents and recording errors, unexpected
+disconnects and timeouts. Preserve host logs. If symptoms occur, reproduce
+them and investigate the USB waveform/layout before a larger manufacturing
+run. A working sample does not close the failed impedance/balance checks.
+
 ### GC-105: GPU card hot-plug detect and DDC/EDID with a real monitor
 
 Closes the six GPU nets the firmware never touches and the emulator does not
@@ -745,23 +763,32 @@ IC-005's switch is the TPS2553DBVR-1 (David approved the proposal,
 
 ### MB-113: reset thresholds (MB-051 confirmation)
 
-Conditional on the MB-051 dual-rail qualifier being fitted
-(`hw/power/reset_supervisor.py`, not yet reviewed).
+For the fitted MB-051 dual-rail qualifier (`hw/power/reset_supervisor.py`).
 
 - **Closes:** confirms MB-051 on hardware: reset asserts before a rail
   leaves its valid range and never inside the regulator's range.
-- **Acceptance:** falling trips `v_3v3_fall_trip_v` **3.1777–3.2099 V** and
-  `v_1v2_fall_trip_v` **1.1505–1.1597 V**, the guaranteed windows
-  `python3 hw/power/reset_supervisor.py` prints (2026-09-28); and all six
+- **Acceptance:** falling trips `v_3v3_fall_trip_v` **3.1698–3.2035 V** and
+  `v_1v2_fall_trip_v` **1.1507–1.1604 V**, the outward-rounded modeled
+  windows from `python3 hw/power/reset_supervisor.py` (2026-09-30); and all six
   SLOTn_RST_n held low while nPOR is low (`slot_rst_held` = 1). Update these
   numbers if the design changes before the order.
 - **Setup:** on main board unit 1, remove R7 (then R8) and feed `+3V3`
   (`+1V2`) from the bench supply at the link's load-side pad; DMM at the
-  monitor input; scope on nPOR. The 1V2 window is 9 mV wide: the supply
+  rail-side sense pad R113.1 (`+3V3`) or R116.1 (`+1V2`); scope on nPOR.
+  The 1V2 window is 9 mV wide: the supply
   needs 1 mV steps, or add a 1 Ω 10-turn rheostat in series and trim with it.
 - **Procedure:** from nominal, lower in 1 mV steps (5 s each) until nPOR
-  falls; record the rail at that moment. Raise until release (hysteresis,
-  info). Check the slot resets at the slot pins.
+  falls, then refine the crossing to 0.1 mV with the trim resistor; record
+  the rail at that moment. Raise until release (hysteresis, info). Check
+  the slot resets at the slot pins. Repeat after at least 30 minutes at
+  38 C or warmer in the 40 C box, recording `minutes_hot` (at least 30),
+  `ambient_hot_c` (at least 38 C),
+  `v_3v3_fall_trip_hot_v` and `v_1v2_fall_trip_hot_v` against the same bands.
+  Record room temperature as `ambient_room_c` (15–35 C).
+  TI's OPA376 input-bias hot data is typical; the model's 1 nA allowance
+  is an engineering assumption that this hot test must confirm. The
+  30-minute soak is an engineering qualification minimum; keep soaking if
+  the monitor temperatures have not stabilized (M-T).
 - **Sample:** 2 main boards.
 - **Design change if:** a trip outside its window: the tolerance stack in
   `reset_supervisor.py` is wrong; fix the model and the ladder.
@@ -774,14 +801,14 @@ Conditional on the MB-051 dual-rail qualifier being fitted
 
 **Can damage the board.** Run on unit 1 only, after everything else on it.
 
-- **Closes:** MB-005's thermal half: "≤ 20 C copper rise at 3.213 A"
+- **Closes:** MB-005's thermal half: "≤ 20 C copper rise at 3.289 A"
   (`hw/power/design.py` lines 64–66;
   `mb005-loop-requirement-derivation.md` lines 99–134). A load just under
   the eFuse limit is a continuous condition, so the copper must survive it
   in steady state.
 - **Acceptance:** `dt_input_copper_c` ≤ **20 °C** after the tool scales it by
-  (3.213 A / `i_load_a`)² (I²R heating). The unit's eFuse limits somewhere
-  between 2.63 and 3.21 A (`power.md` lines 312, 314), so load it just under
+  (`design.insw_ilim()[2]` / `i_load_a`)² (3.288102 A before outward rounding) (I²R heating). The unit's eFuse limits somewhere
+  between 2.565 and 3.289 A (including RILM tolerance/TCR; `power.md`), so load it just under
   its own limit; `i_load_a` ≥ 2.5 A for the scaling to be meaningful.
 - **Setup:** bench supply 5.0 V, limit 4 A, into J1 through the 5 A USB-C
   breakout (short, ≥ 20 AWG). Electronic load on 5V_SYS taken at the
@@ -946,11 +973,11 @@ and `cmd = "python3 tools/fa_results.py <ID>"`. Only `id`, `title` and
 |---|---|---|
 | MB-107 | First article: main board shorts and first power | each rail to GND >= 10 ohm unpowered; first power at 5.0 V, no cards, <= 250 mA |
 | MB-108 | First article: main board input loop resistance | four-terminal J1 tails -> U2 IN plus U2 GND -> J1 GND tails, scaled to 115 C, <= 60 mOhm (MB-005) |
-| MB-109 | First article: input copper heating at the eFuse limit | input track rise at just under the unit's eFuse limit, scaled to 3.213 A by I^2, <= 20 C (MB-005) |
+| MB-109 | First article: input copper heating at the eFuse limit | input track rise at just under the unit's eFuse limit, scaled to 3.289 A by I^2, <= 20 C (MB-005) |
 | MB-110 | First article: slot contact resistance | four-terminal worst mated contact in the x1, x8 and x4 sockets <= 30 mOhm, also after 10 cycles and the heat soak (design.R_SLOT_CONTACTS) |
 | MB-111 | First article: chipset iCE40 1V2 core current, hot | at 40 C ambient, worst load: RT9013 output current via R8 <= 40 mA sustained; 1V2 at U7 >= 1.14 V (MB-006 F2) |
 | MB-112 | First article: main board thermal soak | 5V_SYS >= 1.74 A for 60 min: eFuse, 3V3 buck, HT7533 and RT9013 top rise <= 55 C (MB-006) |
-| MB-113 | First article: reset thresholds | 3V3 falling trip 3.1777-3.2099 V, 1V2 1.1505-1.1597 V, slot resets held while nPOR low (MB-051) |
+| MB-113 | First article: reset thresholds | two main boards at room temperature and after >= 30 min at >= 38 C: 3V3 falling trip 3.1698-3.2035 V, 1V2 1.1507-1.1604 V, slot resets held while nPOR low; qualifies the modeled OPA376 bias allowance (MB-051) |
 | MB-114 | First article: 3V3_STBY part currents | MAX16054 supply <= 15 uA and HT7533-2 ground current <= 20 uA at 60 C, 5 parts each (MB-006 H1/H2) |
 | CC-102 | First article: CPU card shorts and first power | 3V3, 1V2 to GND >= 10 ohm; idle 3V3 <= 40 mA; 1V2 1.176-1.224 V |
 | CC-103 | First article: CPU card 3V3 feed and 1V2 route resistance | four-terminal: x8 +3V3 tails -> U3 <= 20 mOhm; U3.5 -> U1.40 <= 797 mOhm at 100 C (CC-005) |
@@ -1018,7 +1045,7 @@ storage 2; eink 2; system 2; MECH-101 amended. 30 new entries.
 | MB-006 H1/H2 (3V3_STBY currents) | MB-114 |
 | MB-006 (board θ, neighbours) | MB-112 |
 | MB-005 loop ≤ 60 mΩ | MB-108 |
-| MB-005 rise ≤ 20 °C at 3.213 A | MB-109 |
+| MB-005 rise ≤ 20 °C at 3.289 A | MB-109 |
 | MB-051 | MB-113 (confirmation) |
 | GC/IC/SC/EC/YC-005 RP2040 DVDD load step | GC-104, IC-103, SC-102, EC-102, YC-102 |
 | SC-005 SD current; EC-005 panel current | SC-102, EC-102 (card 3V3 current and droop) |

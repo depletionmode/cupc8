@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'hw/power'))
+from design import insw_ilim
 RESULTS = ROOT / 'doc/hardware/fa-results'
 SCHEMA = 'cupc8-fa/1'
 BOARDS = ('main', 'cpu', 'gpu', 'io', 'wifi', 'storage', 'eink', 'system')
@@ -69,7 +71,7 @@ GATES = {
                    scale={'r_loop_mohm': ('cu', 115.0)}),
     'MB-109': dict(boards=('main',), units=1, m={
         'i_load_a': ('>=', 2.50), 'minutes_at_load': ('>=', 15), 'dt_input_copper_c': ('<=', 20)},
-                   scale={'dt_input_copper_c': ('i2', 'i_load_a', 3.213)}),
+                   scale={'dt_input_copper_c': ('i2', 'i_load_a', insw_ilim()[2])}),
     'MB-110': dict(boards=('main',), units=2, m={
         'r_contact_x1_max_mohm': ('<=', 30), 'r_contact_x8_max_mohm': ('<=', 30),
         'r_contact_x4_max_mohm': ('<=', 30)}),
@@ -79,7 +81,10 @@ GATES = {
         'i_5vsys_a': ('>=', 1.74), 't_efuse_rise_c': ('<=', 55), 't_buck_rise_c': ('<=', 55),
         't_ht7533_rise_c': ('<=', 55), 't_rt9013_rise_c': ('<=', 55)}),
     'MB-113': dict(boards=('main',), units=2, m={
-        'v_3v3_fall_trip_v': ('range', 3.1777, 3.2099), 'v_1v2_fall_trip_v': ('range', 1.1505, 1.1597),
+        'ambient_room_c': ('range', 15, 35), 'ambient_hot_c': ('>=', 38), 'minutes_hot': ('>=', 30),
+        'v_3v3_fall_trip_v': ('range', 3.1698, 3.2035), 'v_1v2_fall_trip_v': ('range', 1.1507, 1.1604),
+        'v_3v3_fall_trip_hot_v': ('range', 3.1698, 3.2035),
+        'v_1v2_fall_trip_hot_v': ('range', 1.1507, 1.1604),
         'slot_rst_held': ('>=', 1)}),
     'MB-114': dict(boards=('main',), units=5, m={
         'max16054_icc_ua': ('<=', 15), 'ht7533_ignd_ua': ('<=', 20)}),
