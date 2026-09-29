@@ -75,10 +75,18 @@ MAX16054_RPU_MIN = d.assume('main', 'MAX16054 IN pull-up >= 31.5 kOhm (DS: 63 kO
 EN_LEAK_MAX = d.assume('main', 'TPS25947 EN/UVLO input current <= 10 uA', 10e-6)
 CAP_LEAK_MAX = d.assume('main', 'MLCC leakage <= 1 uA per capacitor on 3V3_STBY', 1e-6)
 STBY_NET = '/3V3_STBY'
+LINK_MAX = 0.002                    # the 1V2 link: a 0 ohm jumper, or the MB-051 1 mOhm shunt
+# SN74LVC07A (TI SCAS595, 6.5 Electrical Characteristics, VCC 2.7-3.6 V): ICC <= 10 uA with
+# inputs at a rail, plus dICC <= 500 uA per input 0.6 V below VCC. Its inputs are nPOR (U6,
+# from +3V3), which may sit below 3V3_STBY: every input is charged its dICC.
+LVC07_ICC_MAX, LVC07_DICC_MAX = 10e-6, 500e-6
 
 
 def ohms(value):
-    text = value.upper().replace('OHM', '').rstrip('R')
+    text = value.split()[0]                 # "7.5k 0.1%": the tolerance is not part of the value
+    if text.endswith('m'):
+        return float(text[:-1]) * 1e-3      # milliohms (the main board's 1 mOhm links, R7 and R8)
+    text = text.upper().replace('OHM', '').rstrip('R')
     for suffix, factor in (('K', 1e3), ('M', 1e6)):
         if suffix in text:
             return float(text.replace(suffix, '.').rstrip('.')) * factor
@@ -151,8 +159,8 @@ def rail_1v2(board, circuit):
         raise ValueError('%s.5 (VOUT) on %s, not %s' % (ldo, circuit.net(ldo, '5'), ldo_net))
     if net != ldo_net:
         links = [r for r in circuit.resistors if set(r.ends) == {net, ldo_net}]
-        if len(links) != 1 or ohms(links[0].value) != 0:
-            raise ValueError('%s must reach %s through one 0 ohm link' % (ldo_net, net))
+        if len(links) != 1 or ohms(links[0].value) > LINK_MAX:
+            raise ValueError('%s must reach %s through one <= %g ohm link' % (ldo_net, net, LINK_MAX))
     branches, pll = [], []
     for res in circuit.resistors:
         if net not in res.ends or ldo_net in res.ends and net != ldo_net:
@@ -203,6 +211,10 @@ def stby_loads(circuit):
                     loads.append(('%s OUT into %s EN (ASSUME)' % (ref, r), EN_LEAK_MAX))
                 else:
                     raise ValueError('%s.%s on %s not modelled' % (r, p, out))
+        elif kind[0] == 'SN74LVC07A' and pin == '14':
+            ins = [p for p in (str(k) for k in (1, 3, 5, 9, 11, 13)) if circuit.net(ref, p) != '/GND']
+            loads.append(('%s ICC + dICC x %d inputs (DS max)' % (ref, len(ins)),
+                          LVC07_ICC_MAX + LVC07_DICC_MAX * len(ins)))
         else:
             raise ValueError('unmodelled 3V3_STBY load %s.%s (%s)' % (ref, pin, kind[0]))
     return loads

@@ -339,3 +339,53 @@ slot/control bus (32), CPU/memory (3),
 power/return (65), clock/reset (44), indicators (36), external IO (22),
 and power policy (18). E2E-001 through E2E-004 remain
 pending behind `--require-coverage` despite passing narrower runtime probes.
+
+## Second pass (2026-09-28): 284 to 129 gaps
+
+- **Non-digital waivers** (`coverage.py`, `analog_waivers`): 76 supply,
+  return and regulator-internal nets (rails, GND, feedback and switch
+  nodes, the eFuse's DVDT/ILM/OVLO, the slot +5V feeds, the iCE40 PLL
+  supplies). A net is waived only while every attached pin is passive, a
+  connector contact, a listed power/analog pin of its part, or a listed
+  static strap (TCA9555 A0-A2, the 4051s' ~E/VEE, W25Q WP/HOLD, RP2040
+  TESTEN, ...), and only while every analog check it names (the board's
+  -005/-006 rows, POW-001..008, the pinout row for straps) has a command
+  in the catalogue. The waiver names those checks; it does not claim they
+  pass. A logic pin on a rail, or an unimplemented check, restores the gap
+  (`test/hw/test_cosim_coverage.py`).
+- **RP2040 crystals** (`crystal_routes`): XIN, XOUT, the 1k and both 33p load
+  capacitors on every RP2040 card, each leg on routed copper; an open leg
+  leaves that card's firmware stopped (like the QSPI prerequisite).
+  Oscillator start-up margin is analog and not modelled.
+- **FPGA configuration** (`fpga_config_routes`, `emu/machine/fpgaconfig.h`):
+  both iCE40s boot from their W25Q flashes; sysctl's CRESET_B/CDONE lines,
+  its SPI1 to both flashes (FL0 on the main board, FL1 through the CPU
+  socket), the CPU card's CDONE into the chipset and the D5 CDONE LED, 56
+  legs on 40 nets. Real `cupc8.py fpga hold/boot`, `flash id` and
+  `fpga flash` run on the native machine; an image without the iCE40 sync
+  word leaves the CPU card unconfigured and the CPU in reset
+  (`test/hw/test_cosim_fpga_config.py`, nine copper opens).
+- **Card indicator LEDs** (`card_led_routes`): the seven firmware-driven
+  LEDs (storage ACT/CARD, IO KEY/KBD, e-ink REFRESH, system USB TX/RX) light
+  in `m.leds()` only while both copper legs are whole
+  (`test/hw/test_cosim_card_leds.py`).
+- **sysctl's I2C expanders** (`i2c_expander_routes`): U13/U14 at their
+  strapped addresses on the routed I2C bus; U14 P10 carries the CPU card's
+  presence loop, so `cupc8.py status` reports the CPU card present. The
+  expanders' CARD_RST_n and PROG_n outputs drive nothing yet.
+- **sysctl's ADC** (`adc_sense_routes`): the Type-C CC1/CC2 contacts to
+  GPIO26/27 and +1V2 through R100 (1k) to GPIO28; `status` reads the source
+  class and the 1V2 rail (`Machine.create({pwrHi, ccLine})`). Both are
+  checked with `test/hw/test_cosim_sysctl_inputs.py`.
+
+`hw/cosim/run.py` now also runs the board rows (MB-052, CC-051, SC-051,
+EC-051, YC-051) and validates all eight board receipts first.
+
+What is left (129): the card programming port (the 4051 mux, SWD to every
+slot, the ESP UART, card RUN/EN, PROG_n/BOOT and the expanders' outputs
+that drive them; this needs an RP2040 reset and an SWD target in
+emu/rp2040), BOOTSEL and debug UART test points, slot and system presence
+and the CPU card ID (read by nothing), the power switch and eFuse enable, HDMI DDC/HPD, the IO card's
+VBUS switch control, the Wi-Fi card's straps, LEDs and USB test points,
+rail indicator LEDs (no analog check names them), the AUX header chip
+select, and the system card's Type-C CC resistors.

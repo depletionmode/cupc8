@@ -1,5 +1,13 @@
 # MB-005 connector decision, 2026-09-28
 
+> **Superseded (David, 2026-09-28):** the requirement is now the board-side
+> loop ≤ 60 mΩ at the hottest corner with the mated contacts in the cable's
+> USB Type-C §4.4.1 budget, plus ≤ 20 °C copper rise at 3.213 A
+> (`mb005-loop-requirement-derivation.md`, option 2). No connector
+> qualification beyond a compliant USB-C receptacle is needed; the input
+> corner was re-laid (`hw/boards/main_power_corner.py`). This note is kept
+> as the record of the earlier 20 mΩ analysis.
+
 **Verdict: the current main board cannot meet the assembled ≤20 mΩ
 VBUS/GND input-loop gate. No source-backed, JLC-assembled drop-in USB-C
 replacement has been identified that would close it.** Keep the requirement

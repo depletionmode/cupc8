@@ -168,6 +168,73 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.spiLog = flag("spiLog", false);
     opt.espTx = integer("espTx", -1);
     opt.espRx = integer("espRx", -1);
+    // the FPGA configuration chain (fpgaconfig.h): every link defaults to whole
+    if (napi_value f = prop(env, o, "fpga"); isType(env, f, napi_object)) {
+      auto link = [&](const char *k, bool &out) {
+        napi_value v = prop(env, f, k);
+        if (!v) return;
+        if (!isType(env, v, napi_boolean) || napi_get_value_bool(env, v, &out) != napi_ok)
+          throw std::runtime_error(std::string("fpga: invalid link ") + k);
+      };
+      auto &l = opt.fpga;
+      link("chipsetConfigCopper", l.chipsetConfigCopper);
+      link("cpuConfigCopper", l.cpuConfigCopper);
+      link("chipsetCreset", l.chipsetCreset);
+      link("cpuCreset", l.cpuCreset);
+      link("chipsetCdoneSysctl", l.chipsetCdoneSysctl);
+      link("cpuCdoneSysctl", l.cpuCdoneSysctl);
+      link("cpuCdoneCard", l.cpuCdoneCard);
+      link("cpuCdoneMain", l.cpuCdoneMain);
+      link("cpuCdonePullup", l.cpuCdonePullup);
+      link("fl0Sysctl", l.fl0Sysctl);
+      link("fl1Sysctl", l.fl1Sysctl);
+      link("cdoneLed", l.cdoneLed);
+    }
+    auto image = [&](const char *k, std::vector<uint8_t> &out) {
+      napi_value v = prop(env, o, k);
+      if (!v) return;
+      void *data;
+      size_t len;
+      if (napi_get_buffer_info(env, v, &data, &len) != napi_ok) throw std::runtime_error(std::string(k) + ": not a Buffer");
+      out.assign(static_cast<uint8_t *>(data), static_cast<uint8_t *>(data) + len);
+    };
+    if (napi_value list = prop(env, o, "expanders")) {
+      bool array = false;
+      uint32_t count = 0;
+      if (napi_is_array(env, list, &array) != napi_ok || !array || napi_get_array_length(env, list, &count) != napi_ok)
+        throw std::runtime_error("expanders: not an array");
+      for (uint32_t i = 0; i < count; i++) {
+        napi_value x;
+        napi_get_element(env, list, i, &x);
+        machine::Tca9555 t;
+        int32_t a = -1;
+        napi_value addr = prop(env, x, "address"), inputs = prop(env, x, "inputs");
+        if (!addr || napi_get_value_int32(env, addr, &a) != napi_ok || a < 0x20 || a > 0x27)
+          throw std::runtime_error("expanders: invalid address");
+        t.address = static_cast<uint8_t>(a);
+        for (uint32_t p = 0; p < 2; p++) {
+          napi_value v;
+          int32_t b = -1;
+          if (!inputs || napi_get_element(env, inputs, p, &v) != napi_ok || napi_get_value_int32(env, v, &b) != napi_ok ||
+              b < 0 || b > 255)
+            throw std::runtime_error("expanders: invalid input levels");
+          t.in[p] = static_cast<uint8_t>(b);
+        }
+        opt.expanders.push_back(t);
+      }
+    }
+    if (napi_value volts = prop(env, o, "sysctlAdcVolts")) {
+      for (uint32_t ch = 0; ch < 3; ch++) {
+        napi_value v;
+        double d = 0;
+        if (napi_get_element(env, volts, ch, &v) != napi_ok || napi_get_value_double(env, v, &d) != napi_ok ||
+            !(d >= 0 && d <= 3.3))
+          throw std::runtime_error("sysctlAdcVolts: three volts in 0..3.3");
+        opt.sysctlAdcVolts[ch] = d;
+      }
+    }
+    image("chipsetFlash", opt.chipsetFlash);
+    image("cpuFlash", opt.cpuFlash);
     if (napi_value wiring = prop(env, o, "memoryWiring"); isType(env, wiring, napi_object)) {
       auto pins = [&](const char *key, auto &out) {
         napi_value values = prop(env, wiring, key);
@@ -344,6 +411,28 @@ ENTRY(js_setThreaded, {
   return nullptr;
 })
 
+// every watched indicator LED: [{slot (0: the system card), gpio, level, rises}]
+ENTRY(js_leds, {
+  napi_value list;
+  napi_create_array(env, &list);
+  uint32_t n = 0;
+  auto add = [&](int slot, const std::vector<machine::LedWatch> &leds) {
+    for (const auto &w : leds) {
+      napi_value o, b;
+      napi_create_object(env, &o);
+      set(env, o, "slot", num(env, slot));
+      set(env, o, "gpio", num(env, w.gpio));
+      napi_get_boolean(env, w.level, &b);
+      set(env, o, "level", b);
+      set(env, o, "rises", num(env, static_cast<double>(w.rises)));
+      napi_set_element(env, list, n++, o);
+    }
+  };
+  if (m->sysctl) add(0, m->sysctl->leds);
+  for (auto &[slot, c] : m->cards) add(slot, c->leds);
+  return list;
+})
+
 ENTRY(js_state, {
   const auto s = m->state();
   napi_value o;
@@ -355,6 +444,13 @@ ENTRY(js_state, {
   set(env, o, "halted", num(env, s.halted));
   set(env, o, "nrst", num(env, s.nrst));
   set(env, o, "gpo", num(env, s.gpo));
+  napi_value b;
+  napi_get_boolean(env, s.chipsetConfigured, &b);
+  set(env, o, "chipsetConfigured", b);
+  napi_get_boolean(env, s.cpuConfigured, &b);
+  set(env, o, "cpuConfigured", b);
+  napi_get_boolean(env, s.cdoneLed, &b);
+  set(env, o, "cdoneLed", b);
   return o;
 })
 
@@ -696,7 +792,7 @@ napi_value init(napi_env env, napi_value exports) {
     napi_callback fn;
   } fns[] = {
       {"create", js_create},   {"powerOn", js_powerOn},   {"runFor", js_runFor},     {"ns", js_ns},
-      {"state", js_state},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
+      {"state", js_state},     {"leds", js_leds},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
       {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead}, {"consoleOpen", js_consoleOpen},   {"setThreaded", js_setThreaded},
       {"stats", js_stats},     {"cards", js_cards},       {"spiLog", js_spiLog},     {"keyboard", js_keyboard},
       {"destroy", js_destroy}, {"sdInsert", js_sdInsert}, {"sdRemove", js_sdRemove}, {"sdCard", js_sdCard},

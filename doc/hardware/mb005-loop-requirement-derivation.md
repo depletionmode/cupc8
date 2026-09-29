@@ -1,8 +1,11 @@
 # MB-005: deriving the input-loop requirement, 2026-09-28
 
-**Status: analysis only.** Nothing here changes a threshold or a check.
-`design.R_RECEPTACLE` stays at 20 mΩ and MB-005 stays red until David
-decides. The reproducible sweep is `hw/power/mb005_loop_sweep.py`, with its
+**Status: decided (David, 2026-09-28): option 2.** `design.R_RECEPTACLE`
+is now the ≤ 60 mΩ board-side loop at the hottest corner, with the ≤ 20 °C
+rise rule at 3.213 A for every full-current conductor; the main board's
+input corner was re-laid for it (`hw/boards/main_power_corner.py`) and
+`hw/power/main_input_heat.py` checks the routed board. The analysis below
+is kept as the record of the decision. The reproducible sweep is `hw/power/mb005_loop_sweep.py`, with its
 test in `test/hw/test_mb005_loop_sweep.py`.
 
 ## Where the 20 mΩ enters

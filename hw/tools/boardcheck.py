@@ -18,7 +18,8 @@ import boardevidence
 ROOT = boardevidence.ROOT
 BOARDS = ('main', 'cpu', 'gpu', 'io', 'wifi', 'storage', 'eink', 'system')
 POWER = {
-    'main': [('buck.py',), ('ldo.py', '1v2'), ('inrush.py',), ('cc.py',), ('budget.py',)],
+    'main': [('buck.py',), ('ldo.py', '1v2'), ('inrush.py',), ('cc.py',), ('budget.py',),
+             ('main_bind.py', '{out}'), ('main_input_heat.py', '{out}')],
     'cpu': [('ldo.py', 'cpu-card')], 'wifi': [('buck.py', 'wifi-card')],
     'gpu': [('hdmi.py',)], 'io': [('boost.py',)],
     'storage': [('budget.py',)], 'eink': [('budget.py',)], 'system': [('budget.py',)],
@@ -27,7 +28,6 @@ POWER = {
 # the specified tests exist; do not silently narrow the catalogue's claims.
 GAPS = {
     'power': {
-        'main': 'bind regulator/input path models to the actual main-board netlist',
         'cpu': 'bound socket 3V3 feed, minimum finished copper/contact resistance, effective C22/C1-C4 capacitance and ESR, and FPGA maximum core current',
         'gpu': 'RP2040 VREG 1.20 V transient/droop model at 252 MHz',
         'io': 'SY6280 short/fault flag and current-limit transient model',
@@ -104,7 +104,8 @@ def check(board, mode, out):
         run([sys.executable, 'hw/mech/fit.py'])
     elif mode == 'power':
         for command in POWER[board]:
-            args = [sys.executable, 'hw/power/' + command[0], *command[1:]]
+            args = [sys.executable, 'hw/power/' + command[0],
+                    *(out if a == '{out}' else a for a in command[1:])]
             if board in ('wifi', 'cpu'):
                 args.append(out)
             run(args)

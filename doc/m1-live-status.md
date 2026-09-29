@@ -5,9 +5,57 @@ update it after every finding, commit, decision or agent result (David,
 2026-09-28). Background and the release definition:
 `doc/m1-handoff-2026-09-28.md`.
 
+## INTERRUPTED 2026-09-29 morning: agents hit the weekly API limit
+
+All four running agents stopped mid-task (Opus weekly limit, resets Oct 1
+5 pm Asia/Jerusalem; David switched the session model to Sonnet 5.5, so new
+agents should be launched with model "sonnet"). Their partial work is
+committed as one "WIP" commit so it survives this machine; it is UNREVIEWED
+and the tree needs the coordinated rebuild (hw/tools, hw/lib, hw/parts changed).
+Test state of the partial work (run 2026-09-29):
+
+- **Main board MB-005 + MB-051 (agent a81e21b):** design and models written,
+  **no scratch build/route exists yet** (main routing takes ~3 h per attempt:
+  this is the critical path). Files: hw/boards/main.py (+177/-59),
+  main_power_corner.py, main_seed.py + main-route-seed.json (locks the proven
+  route outside re-laid areas), hw/power/{reset_supervisor,reset_sequence,
+  copper_mesh,main_bind}.py, rail_reset_window.py, main_input_heat.py,
+  design.py (R_RECEPTACLE 60 mOhm), budget.py, models/fetch.py, board_thermal.py,
+  hw/tools/boardcheck.py (main power now runs main_bind + main_input_heat;
+  GAPS['power']['main'] removed), new footprints/symbols/parts for the reset
+  qualifier (TSSOP-14 SN74LVC07A, SOT-23 parts, OPA376). Tests:
+  test_reset_supervisor OK, test_power_value_parsing OK;
+  **test_main_input_heat FAILS**: test_narrow_conductor_fails_the_20_c_rule
+  (rule not catching a narrow conductor yet: unfinished);
+  test_board_thermal errors only because the built CPU netlist still has
+  C21 1u (expected until rebuild). Last step: tests for the fetch VSWITCH
+  suffix and board_thermal milliohm parsing.
+- **Co-sim + E2E (agent aa8449e):** hw/cosim/{gen_top,coverage,run}.py,
+  emu/machine (I2C expanders, fpgaconfig.h, addon/machine/board.h),
+  test/emu/machinenative.mjs, tools/lockstep.py, soc/tb, new tests
+  test_cosim_{card_leds,coverage,cpu_socket,fpga_config,mb052_bridge,
+  sysctl_inputs}.py + probes. test_cosim_coverage passes. Last step: JS ADC
+  volts + a ccLine option (sysctl inputs). Not yet run against the catalogue
+  rows; no cmds/catalogue entries reported. E2E-001..004, MB-052, CC/SC/EC/
+  YC-051 still pending.
+- **Bus SI MB/CC/SC/EC-007 (agent a7fc4c7):** hw/si/{slowbus_*,route_si,
+  xsection}.py, test/hw/test_slowbus_si.py, test_route_si.py. **test_baseline_
+  passes FAILS: the baseline extraction reports main:U7.25 overshoot 4.234 V**
+  (either a real SPI overshoot beyond the iCE40's input limit or an unfinished
+  model: must be resolved, not waived). Waiting on CC-007 run when stopped.
+- **High-speed SI GC/IC/YC-007 (agent af7e73c):** hw/si/{tmds_si,usb_fs_si}.py
+  present, no tests or report; effectively just started.
+- Loose ends to fix when resuming: tools/fab_neck_coverage.py modified (from
+  the paused FAB-002 agent, unreviewed); scratch shells from the SI agents
+  may still exist under scratchpad/si007.
+
+Still true: pending rows not implemented: MB-007, CC-007, GC-007, IC-007,
+SC-007, EC-007, YC-007, MB-052, CC-051, SC-051, EC-051, YC-051, E2E-001..004,
+MB-051.
+
 ## State right now (2026-09-28 evening)
 
-- Branch `milestone-1`, pushed to origin on David's request (2026-09-28). All work below is
+- Branch `milestone-1` (pushed to origin; the WIP commit on top is unreviewed). All work below is
   committed except what "In flight" lists. User files left untracked on
   purpose: `.claude/`, `card.img`, `test/emu/golden/E2E-002.txt.local-backup`.
 - Last full run (before today's fixes): `make verify JOBS=2` → 229 passed,

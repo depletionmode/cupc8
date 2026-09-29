@@ -10,6 +10,8 @@ soc/tb/tb_cpu_trace.vhd, and diffs the traces. Verification row 1.2.
   lockstep.py --waits -1 --seed S   random 0..15 wait states per cycle
   lockstep.py --engine verilator    run the synthesised netlist instead of RTL
   lockstep.py --engine mainboard [--noise]   CPU + chipset + memory models
+  lockstep.py --socket TOP.json     the CPU seen through the physical CPU socket
+                                    of a netlist-generated co-sim top (CC-051)
 
 Programs that touch SPI ($f1xx) are skipped: the SPI devices live in the
 chipset, which this CPU-only testbench does not model.
@@ -122,11 +124,40 @@ def _build_verilator():
         sys.exit("verilator build failed:\n" + r.stdout[-3000:] + r.stderr[-3000:])
 
 
+def socket_generics(top_path):
+    """tb_cpu_trace generics for the CPU socket of a gen_top.py manifest.
+
+    Index i of each map is the chipset-side (main J2) bit; its value is the
+    CPU-card bit on that contact. Links are the routed copper flags."""
+    import json
+    with open(top_path) as f:
+        rt = json.load(f)["runtime"]
+    amap, dmap = rt["cpu_address"], rt["cpu_data"]
+    if sorted(amap) != list(range(16)) or sorted(dmap) != list(range(8)):
+        raise ValueError("socket map is not a permutation")
+    alinks, dlinks = rt["cpu_address_links"], rt["cpu_data_links"]
+    if len(alinks) != 16 or len(dlinks) != 8:
+        raise ValueError("socket link flags missing")
+    mask = lambda bits: sum(1 << i for i, b in enumerate(bits) if b)
+    ctl = rt["cpu_control_connected"]
+    flag = lambda v: "true" if v is True else "false" if v is False else None
+    links = {"STB_LINK": ctl["strobe"], "RW_LINK": ctl["rw"],
+             "RDY_LINK": rt["cpu_ready_connected"], "SYNC_LINK": rt["cpu_sync_connected"],
+             "CLK_LINK": rt["cpu_clock_connected"], "RST_LINK": rt["cpu_reset_connected"]}
+    if any(flag(v) is None for v in links.values()):
+        raise ValueError("socket control link flags missing")
+    generics = ["-gA_MAP=" + "".join("%x" % b for b in amap),
+                "-gD_MAP=" + "".join("%x" % b for b in dmap),
+                "-gA_LINK=%d" % mask(alinks), "-gD_LINK=%d" % mask(dlinks)]
+    generics += ["-g%s=%s" % (k, flag(v)) for k, v in links.items()]
+    return generics
+
+
 def trace_lines(text):
     return [l for l in text.splitlines() if l[:2] in ("S ", "W ", "E ")]
 
 
-def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0, inject=0):
+def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0, inject=0, socket=None):
     with open(src) as f:
         if SPI_RE.search(f.read()):
             return "skip", "uses SPI (needs the chipset model)"
@@ -135,6 +166,10 @@ def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0, inject=0):
     progs = os.path.join(PROGS, "%s-w%d-s%d%s%s%s" % (engine, waits, seed, "-noise" if noise else "",
                                                      "-st%d" % stall if stall else "",
                                                      "-r%d" % reset_at if reset_at else ""))
+    if socket:
+        # distinct runs of different sockets must not share trace files
+        import hashlib
+        progs += "-sock" + hashlib.sha256(" ".join(socket).encode()).hexdigest()[:12]
     rel = os.path.relpath(src, ROOT)
     obj = os.path.join(progs, os.path.splitext(rel)[0] + ".o")
     os.makedirs(os.path.dirname(obj), exist_ok=True)
@@ -142,11 +177,11 @@ def check(src, waits, seed, engine, noise=False, stall=0, reset_at=0, inject=0):
     if r.returncode or not os.path.exists(obj):
         return "skip", "does not assemble"
     return compare_image(obj, waits, seed, engine=engine, noise=noise, stall=stall, reset_at=reset_at,
-                         inject=inject)
+                         inject=inject, socket=socket)
 
 
 def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=False, stall=0, reset_at=0,
-                  inject=0):
+                  inject=0, socket=None):
     """Run a binary image (loaded at $1000) on both models and diff the traces.
     Returns (status, message); the traces are left next to the image."""
     base = os.path.splitext(obj)[0]
@@ -170,8 +205,8 @@ def compare_image(obj, waits=0, seed=1, max_steps=100000, engine="ghdl", noise=F
     else:
         r = run([os.path.join(OSS, "ghdl"), "-r", "--std=08", "-fsynopsys", "tb_cpu_trace",
                  "-gIMAGE=" + hexf, "-gWAITS=%d" % waits, "-gSEED=%d" % seed,
-                 "-gSTALL=%d" % stall, "-gRESET_AT=%d" % reset_at,
-                 "--ieee-asserts=disable"], cwd=GHDL_WORK, timeout=1200)
+                 "-gSTALL=%d" % stall, "-gRESET_AT=%d" % reset_at] + list(socket or []) +
+                ["--ieee-asserts=disable"], cwd=GHDL_WORK, timeout=1200)
     if r.returncode:
         return "FAIL", "testbench error: " + (r.stdout + r.stderr).strip().splitlines()[-1]
     dut = trace_lines(r.stdout)
@@ -218,7 +253,15 @@ def main():
                     help="self-test: corrupt line N of the DUT trace (HOST-003)")
     ap.add_argument("--reset-at", type=int, default=0,
                     help="ghdl only: reset mid-cycle once at cycle N (or at HALT), then compare the rerun (BUS-003)")
+    ap.add_argument("--socket", metavar="TOP.json",
+                    help="ghdl only: the CPU's pins through the CPU socket of a netlist-generated "
+                         "co-sim top (hw/cosim/gen_top.py): contact permutation and copper links (CC-051)")
     args = ap.parse_args()
+    socket = None
+    if args.socket:
+        if args.engine != "ghdl":
+            ap.error("--socket applies to the ghdl engine (tb_cpu_trace)")
+        socket = socket_generics(args.socket)
     files = args.files or sorted(glob.glob(os.path.join(ROOT, "tools", "testdata", "*.s")) +
                                  glob.glob(os.path.join(ROOT, "test", "*.s")) +
                                  glob.glob(os.path.join(ROOT, "test", "isa", "*.s")))
@@ -230,7 +273,7 @@ def main():
     counts = {"ok": 0, "FAIL": 0, "skip": 0}
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.j) as pool:
         jobs = [pool.submit(check, os.path.abspath(src), args.waits, args.seed, args.engine, args.noise,
-                            args.stall, args.reset_at, args.inject)
+                            args.stall, args.reset_at, args.inject, socket)
                 for src in files]
         for src, job in zip(files, jobs):
             status, msg = job.result()

@@ -53,7 +53,17 @@ REDUCED_CLASS = "Type-C 1.5 A"      # what a 1.5 A source must still run: radio 
 # at JLC 2026-09-24; the latch-off TPS259470LRPWR C3662793 is the fallback).
 # DS SLVSFC9C (sha256 8f96de38...), fetched 2026-09-24.
 # ---------------------------------------------------------------------------
-R_RECEPTACLE = assume("main", "USB-C receptacle + VBUS/GND copper to the fuse: <= 20 mOhm loop", 0.020)
+# MB-005 (David, 2026-09-28; doc/hardware/mb005-loop-requirement-derivation.md):
+# the board-side input loop is the positive J1 -> F1 -> U2 copper, the GND
+# return copper from the eFuse / 5V_SYS input to J1, the receptacle
+# terminations, solder and layer transitions, at the hottest corner. The
+# mated VBUS/GND contacts are not in it: USB Type-C R2.0 4.4.1 counts them in
+# the cable's IR-drop budget (CABLE_R_VBUS/GND). Checked on the routed board
+# by hw/power/main_input_heat.py, with the 20 C copper-rise rule at the
+# eFuse's maximum current limit.
+R_RECEPTACLE = assume("main", "board-side input loop (J1 terminations + VBUS/GND copper to F1/U2, solder, "
+                      "transitions; not the mated contacts, USB Type-C R2.0 4.4.1): <= 60 mOhm at the hottest "
+                      "corner, and <= 20 C copper rise at 3.213 A", 0.060)
 # input PTC: SMD1812P350TF/16 (Ruilon, C46970911, 310 at JLC; the 6 V
 # SMD1812P350TF C20815, 2,858, is the fallback). Rmin/R1max from the LCSC
 # listing; the 40 C hold uses the Ruilon family's 90 % derating (P200: 1.80/2.00)
@@ -105,6 +115,8 @@ STBY_LDO_VOUT = (3.3 * 0.98, 3.3 * 1.02)        # DS: +-2 %
 STBY_LDO_DROPOUT = 0.1                          # DS: at 1 mA (the load here is ~10 uA)
 STBY_LDO_IQ_MAX = assume("main", "HT7533-2 quiescent current <= 5 uA (DS: 2.5 uA typ)", 5e-6)
 INSW_I_OFF = assume("main", "TPS25947 input current with EN low <= 20 uA", 20e-6)
+STBY_CLAMP_I = assume("main", "SN74LVC07A slot-reset clamp (MB-051) on 3V3_STBY: <= 10 uA with the machine off "
+                      "(DS ICC max; its inputs, nPOR, sit at GND)", 10e-6)
 TVS_IR = assume("main", "SMF5.0A leakage at its 5.0 V standoff <= 400 uA (more above it)", 400e-6)
 USBLC6_IR = 1e-6                                # DS USBLC6-2: 1 uA max at 5 V (on VBUS_F)
 USB_SUSPEND_MAX = 2.5e-3                        # SPEC USB 2.0 7.2.3: a suspended device draws <= 2.5 mA

@@ -1,0 +1,20 @@
+# SN74LVC07APWR (TI), hex buffer with open-drain outputs, TSSOP-14 (PW)
+datasheet: https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf
+source: "TI SCAS595, Pin Configuration and Functions: D, DB, NS, PW package (top view) and Pin Functions"
+package: TSSOP-14
+pins:
+  1: 1A
+  2: 1Y
+  3: 2A
+  4: 2Y
+  5: 3A
+  6: 3Y
+  7: GND
+  8: 4Y
+  9: 4A
+  10: 5Y
+  11: 5A
+  12: 6Y
+  13: 6A
+  14: VCC
+ccw: [1, 14]

@@ -55,7 +55,8 @@ def main():
         assert base['runtime']['eink_panel_copper_connected']
         assert base['eink_panel_copper']['paths'] == rows
         assert not base['eink_panel_copper']['missing']
-        assert len(base['unmodeled_nets']) == 284
+        pinned = json.loads((ROOT / 'doc/hardware/si-evidence/ibis-final-top.json').read_text())
+        assert base['unmodeled_nets'] == pinned['unmodeled_nets']
         assert 'eink:EPD_VCC' in base['runtime_nets']
         assert 'eink:EPD_VCC' not in base['unmodeled_nets']
         intact = temporary / 'intact.json'

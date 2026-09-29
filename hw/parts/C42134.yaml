@@ -1,0 +1,11 @@
+# OPA376AIDBVR (TI), precision rail-to-rail CMOS op amp (MB-051 rail monitor), SOT-23-5 (DBV)
+datasheet: https://www.ti.com/lit/ds/symlink/opa376.pdf
+source: "TI SBOS406G, 5 Pin Configuration and Functions: DBV package (top view) and Pin Functions: OPA376 (DBV column)"
+package: SOT-23-5
+pins:
+  1: OUT
+  2: ["V-", "V–"]
+  3: ["IN+", "+IN"]
+  4: ["IN-", "–IN"]
+  5: V+
+ccw: [1, 5]

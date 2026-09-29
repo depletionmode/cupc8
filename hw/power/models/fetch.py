@@ -72,6 +72,18 @@ MODELS = {
         # hw/power/boost.py checks the model against the datasheet
         [(r"(E_ABM5\s+N00055 0 VALUE \{ if\([^\n]*?,\s*)V\(Q\)\)\)",
           r"\1if(V(Q)>{THRESH},{VDD},{VSS})))")]),
+    # OPAx376 PSpice model (datasheet SBOS406G); the main board's MB-051 rail
+    # monitors, used open loop as comparators (hw/power/reset_sequence.py)
+    "OPAx376.LIB": (
+        "https://www.ti.com/lit/zip/sbom406",
+        "1a9850f5747d94f9fdf42067cd69feea81eb8885629d9ce083a12eda804ad81e",
+        "OPAx376.LIB",
+        # its output clamp's two ideal diodes are switches controlled by their
+        # own terminal voltage (on above 10 mV): ngspice finds no operating
+        # point with them. A smooth one-sided conductance (50 S, knee at 5 mV,
+        # 1 GOhm off) is the same clamp without the discontinuity
+        [(r"(?m)^(\.SUBCKT BLOCK_DC_(S[12])_OPAx376 1 2 3 4\s*\n)S_S[12][^\n]*\n",
+          r"\1G_\2 3 4 VALUE={V(3,4)*1e-9 + 25*((V(1,2)-5e-3) + SQRT((V(1,2)-5e-3)*(V(1,2)-5e-3) + 1e-8))}\n")]),
     # TLV7011 PSpice model, Rev. A (datasheet SLVSDM5F), version 2.0
     "tlv7011.lib": (
         "https://www.ti.com/lit/mo/slvmde3a/slvmde3a.zip",
@@ -84,7 +96,15 @@ def port(text):
     """PSpice VSWITCH models -> ngspice SW (see the module docstring)."""
     def sw(m):
         params = dict((k.lower(), v) for k, v in re.findall(r"(\w+)\s*=\s*([^\s)]+)", m.group(2)))
-        num = lambda s: float(re.sub(r"[vV]$", "", s))
+        def num(s):
+            # SPICE scale suffixes (the OPAx376's "VON=10MV" is 10 mV); a
+            # plain number or one ending in V reads as before
+            m = re.fullmatch(r"([-+0-9.eE]+)(MEG|[TGKMUNPF])?V?", s.upper())
+            if not m:
+                raise ValueError("VSWITCH threshold %r" % s)
+            scale = {"T": 1e12, "G": 1e9, "MEG": 1e6, "K": 1e3, "M": 1e-3, "U": 1e-6, "N": 1e-9,
+                     "P": 1e-12, "F": 1e-15, None: 1.0}[m.group(2)]
+            return float(m.group(1)) * scale
         von, voff = num(params["von"]), num(params["voff"])
         ron, roff = params["ron"], params["roff"]
         if von < voff:          # an inverted switch: on while the control is low
@@ -108,7 +128,7 @@ def write_atomic(path, data):
     os.replace(tmp, path)
 
 
-PORT_VERSION = 5               # bump when port() or a model's fixes change: re-ports the cache
+PORT_VERSION = 6               # bump when port() or a model's fixes change: re-ports the cache
 
 
 def fetch(name):

@@ -1,146 +1,184 @@
 #!/usr/bin/env python3
-"""MB-051 receipt-bound diagnosis of the fitted reset circuit.
+"""MB-051: the dual-rail reset qualifier, bound to the routed main-board receipt.
 
-The printed states are counterexamples to the required sequencing contract,
-not a simulation of an unfitted redesign. A valid board receipt and connected
-reset copper cannot make the fitted one-rail supervisor qualify both rails.
+hw/power/reset_supervisor.py holds the circuit (REF3425, two OPA376
+comparators, D7 into U6's ~MR, U19 clamping the six slot resets) and proves
+its threshold windows from datasheet limits, with copper allowances between
+each regulator and the loads. This script checks that the receipt's netlist
+is that circuit, part for part and value for value; that the reset copper
+is connected on the routed board; and it extracts the copper those
+allowances stand for (+3V3: R7 to every chipset +3V3 pin and to the monitor's
+tap; +1V2: R8 to every chipset +1V2 pin and to the monitor's tap), then
+re-runs the windows with the extracted values.
+
+    python3 hw/power/rail_reset_window.py [build/hw/main]
+    python3 hw/power/rail_reset_window.py --spice [build/hw/main]   # + the ngspice sequences
 """
 
 import argparse
-from itertools import product
+import json
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / 'hw'))
 sys.path.insert(0, str(ROOT / 'hw/tools'))
 sys.path.insert(0, str(ROOT / 'hw/si'))
-from cosim.netlist import read
-import boardevidence
-from boardcheck import check_report
-from ibis_bus import routed_distances
-import json
+sys.path.insert(0, str(HERE))
+from cosim.netlist import read  # noqa: E402
+import boardevidence  # noqa: E402
+from boardcheck import check_report  # noqa: E402
+import reset_supervisor as rs  # noqa: E402
+from spice import Checks  # noqa: E402
 
-THREEV3_MIN = 3.3 * 0.95
-ONEV2_MIN = 1.2 * 0.95
-MODELED_THREEV3_LOW = 3.246  # POW-001 DC worst corner
-MODELED_ONEV2_LOW = 1.172    # POW-002, including step and ripple
-MODELED_ONEV2_STEADY = 1.176  # POW-002 1.173 V step floor + 3.2 mV step droop
+# (ref, pin): net, from reset_supervisor's circuit
+PINS = {
+    ('U6', '4'): '/+3V3', ('U6', '1'): '/GND', ('U6', '2'): '/nPOR', ('U6', '3'): '/nMR',
+    ('U7', '61'): '/nPOR',
+    ('U17', '4'): '/+3V3', ('U17', '3'): '/+3V3', ('U17', '1'): '/GND', ('U17', '2'): '/GND',
+    ('U17', '5'): '/VREF25', ('U17', '6'): '/VREF25',
+    ('U18', '5'): '/+3V3', ('U18', '2'): '/GND', ('U18', '3'): '/MON33_P', ('U18', '4'): '/MON_T33',
+    ('U18', '1'): '/MON33_OK',
+    ('U20', '5'): '/+3V3', ('U20', '2'): '/GND', ('U20', '3'): '/MON12_P', ('U20', '4'): '/MON_T12',
+    ('U20', '1'): '/MON12_OK',
+    ('D7', '3'): '/nMR', ('D7', '1'): '/MON33_OK', ('D7', '2'): '/MON12_OK',
+    ('U19', '14'): '/3V3_STBY', ('U19', '7'): '/GND',
+    ('SW1', '1'): '/nMR',
+}
+for k, (a, y) in enumerate(((1, 2), (3, 4), (5, 6), (9, 8), (11, 10), (13, 12))):
+    PINS[('U19', str(a))] = '/nPOR'
+    PINS[('U19', str(y))] = '/SLOT%d_RST_n' % (k + 1)
+    PINS[('J%d' % (11 + k), 'B9')] = '/SLOT%d_RST_n' % (k + 1)
+    PINS[('U13', str(k + 4))] = '/SLOT%d_RST_n' % (k + 1)
+# resistor: (ends, ohms)
+RESISTORS = {
+    'R110': ({'/VREF25', '/MON_T33'}, rs.R_L1), 'R111': ({'/MON_T33', '/MON_T12'}, rs.R_L2),
+    'R112': ({'/MON_T12', '/GND'}, rs.R_L3), 'R113': ({'/+3V3', '/MON33_P'}, rs.R_T),
+    'R114': ({'/MON33_P', '/GND'}, rs.R_BT), 'R115': ({'/MON33_OK', '/MON33_P'}, rs.R_F33),
+    'R116': ({'/+1V2', '/MON12_P'}, rs.R_S), 'R117': ({'/MON12_OK', '/MON12_P'}, rs.R_F12),
+    'R118': ({'/nPOR', '/GND'}, rs.R_NPOR_PD),
+    'R7': ({'/3V3_BUCK', '/+3V3'}, 0.001), 'R8': ({'/1V2_LDO', '/+1V2'}, 0.001),
+}
+LCSC = dict([(ref, lcsc) for ref, (_, lcsc) in rs.PARTS.items()] +
+            [('R110', rs.R_PREC[rs.R_L1]), ('R111', rs.R_PREC[rs.R_L2]), ('R112', rs.R_PREC[rs.R_L3]),
+             ('R113', rs.R_PREC[rs.R_T]), ('R114', rs.R_PREC[rs.R_BT]),
+             ('R115', rs.R_1PCT[rs.R_F33]), ('R116', rs.R_1PCT[rs.R_S]), ('R117', rs.R_1PCT[rs.R_F12])])
+RESET_PATHS = [('nPOR', ('U6', '2'), [('U7', '61')] + [('U19', a) for a in ('1', '3', '5', '9', '11', '13')]),
+               ('nMR', ('U6', '3'), [('D7', '3'), ('SW1', '1')])] + \
+    [('SLOT%d_RST_n' % (k + 1), ('U19', y), [('J%d' % (11 + k), 'B9')])
+     for k, y in enumerate(('2', '4', '6', '8', '10', '12'))]
+PITCHES = (0.25, 0.18)
 
 
-def falling_min(nominal, accuracy):
-    return nominal * (1 - accuracy)
+def ohms(value):
+    text = value.split()[0]
+    if text.endswith('m'):
+        return float(text[:-1]) * 1e-3
+    scale = {'k': 1e3, 'K': 1e3, 'M': 1e6}.get(text[-1], 1.0)
+    return float(text[:-1] if scale != 1.0 else text) * scale
 
 
-def rising_max(nominal, accuracy, hysteresis_max):
-    return nominal * (1 + accuracy) * (1 + hysteresis_max)
-
-
-def netlist_gap(path):
+def netlist_bind(path):
     circuit = read(path)
     if circuit.components.get('U6', (None,))[0] != 'MAX811TEUS':
-        raise ValueError('fitted supervisor changed; reassess thresholds and reset ownership')
-    for pin, expected in ((('U6', '4'), '/+3V3'), (('U6', '2'), '/nPOR'),
-                          (('U6', '3'), '/nMR'), (('U7', '61'), '/nPOR')):
-        if circuit.net(*pin) != expected:
-            raise ValueError(f'{pin}: expected {expected}, got {circuit.net(*pin)}')
-    if not any(net == '/+1V2' for (ref, _), net in circuit.pins.items() if ref == 'U7'):
-        raise ValueError('chipset has no 1V2 core pins')
-    if any(circuit.net('U6', pin) == '/+1V2' for pin in ('1', '2', '3', '4')):
-        raise ValueError('unexpected 1V2 input at fitted 3V3 supervisor')
-    for n in range(1, 7):
-        net = f'/SLOT{n}_RST_n'
-        nodes = circuit.nets[net]
-        pulls = [ref for ref, _ in nodes if ref.startswith('R') and
-                 circuit.components[ref][0] == '10k' and any(
-                     r.ref == ref and set(r.ends) == {net, '/+3V3'}
-                     for r in circuit.resistors)]
-        expected = {(f'J{n + 10}', 'B9'), ('U13', str(n + 3))}
-        if len(pulls) != 1 or set(nodes) != expected | {(pulls[0], '2')}:
-            raise ValueError(f'{net}: fitted pull-up/control topology changed; reassess MB-051')
+        raise ValueError('U6 is not the MAX811T the qualifier drives')
+    for pin, net in PINS.items():
+        if circuit.net(*pin) != net:
+            raise ValueError('%s.%s: expected %s, got %s' % (pin[0], pin[1], net, circuit.net(*pin)))
+    for ref, (ends, value) in RESISTORS.items():
+        res = next((r for r in circuit.resistors if r.ref == ref), None)
+        if res is None or set(res.ends) != ends:
+            raise ValueError('%s: expected between %s' % (ref, sorted(ends)))
+        if abs(ohms(res.value) - value) > 1e-6 * value:
+            raise ValueError('%s: value %s, the analysis has %g ohm' % (ref, res.value, value))
     return circuit
 
 
-def routed_reset_paths(out):
-    """Bind the existing control routes to a content-valid, clean main PCB."""
-    boardevidence.validate('main', out)
-    check_report(json.loads((out / 'drc.json').read_text()), 'drc')
-    circuit = netlist_gap(out / 'main.net')
-    pcb = out / 'main.kicad_pcb'
-    paths = [('nPOR', ('U6', '2'), [('U7', '61')])]
-    for slot in range(1, 7):
-        paths.append((f'SLOT{slot}_RST_n', ('U13', str(slot + 3)),
-                      [(f'J{slot + 10}', 'B9')]))
+def bom_bind(out):
+    import csv
+    have = {}
+    with (out / 'fab/bom.csv').open() as f:
+        for row in csv.DictReader(f):
+            for ref in row['Designator'].split(','):
+                have[ref.strip()] = row['LCSC Part #']
+    for ref, lcsc in LCSC.items():
+        if have.get(ref) != lcsc:
+            raise ValueError('%s: BOM has %s, the analysis has %s' % (ref, have.get(ref), lcsc))
+
+
+def routed_paths(pcb):
+    from ibis_bus import routed_distances
     measured = {}
-    for net, source, targets in paths:
-        full_name = '/' + net
-        if circuit.net(*source) != full_name or any(
-                circuit.net(*target) != full_name for target in targets):
-            raise ValueError(f'{net}: reset pins differ from the exported netlist')
-        distances = routed_distances(pcb, full_name, source, targets)
+    for net, source, targets in RESET_PATHS:
+        distances = routed_distances(pcb, '/' + net, source, targets)
         for target in targets:
-            length = distances.get(f'{target[0]}.{target[1]}')
+            length = distances.get('%s.%s' % target)
             if length is None:
-                raise ValueError(f'{net}: open copper to {target[0]}.{target[1]}')
-            measured[net] = length
+                raise ValueError('%s: open copper %s.%s to %s.%s' % (net, *source, *target))
+            measured['%s %s.%s' % (net, *target)] = length
     return measured
+
+
+def extract(pcb):
+    """Worst driving-point resistances (ohm) from each link to the chipset's
+    supply pins and to the monitor tap, all layers and zones, two pitches."""
+    import pcbnew
+    import copper_mesh as cm
+    board = pcbnew.LoadBoard(str(pcb))
+    u7 = board.FindFootprintByReference('U7')
+    worst = {}
+    for net, link, tap, window in (('/+3V3', ('R7', '2'), ('R113', '1'), (40.0, 20.0, 128.0, 160.0)),
+                                   ('/+1V2', ('R8', '2'), ('R116', '1'), (85.0, 30.0, 131.0, 110.0))):
+        sinks = [('U7', p.GetNumber()) for p in u7.Pads() if p.GetNetname() == net] + [tap]
+        vals = []
+        for sink in sinks:
+            r = [cm.solve(board, net, [link], [sink], window, pitch).milliohms for pitch in PITCHES]
+            vals.append((max(r) / 1000, sink, abs(r[0] - r[1]) / max(r)))
+        worst[net] = max(vals)
+        worst[net + ' pitch'] = max(v[2] for v in vals)
+    return worst
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('out', nargs='?', type=Path, default=ROOT / 'build/hw/main',
-                        help='completed main-board receipt directory')
+    parser.add_argument('out', nargs='?', type=Path, default=ROOT / 'build/hw/main')
+    parser.add_argument('--spice', action='store_true')
     args = parser.parse_args()
+    out = args.out.resolve()
+    c = Checks('MB-051 reset qualifier bound to the routed main board (hw/power/rail_reset_window.py)')
     try:
-        lengths = routed_reset_paths(args.out.resolve())
+        boardevidence.validate('main', out)
+        check_report(json.loads((out / 'drc.json').read_text()), 'drc')
+        netlist_bind(out / 'main.net')
+        bom_bind(out)
+        lengths = routed_paths(out / 'main.kicad_pcb')
+        cu = extract(out / 'main.kicad_pcb')
     except (OSError, ValueError, KeyError) as error:
-        print(f'MB-051 FAIL: board receipt or reset topology: {error}')
-        return 1
-    print(f'BASELINE BIND: {args.out}: MAX811T U6 monitors +3V3 only; '
-          'six slot resets have independent 10k pull-ups and TCA9555 controls')
-    print('ROUTED RESET COPPER (mm): ' + ', '.join(
-        f'{name}={lengths[name]:.3f}' for name in sorted(lengths)))
-    print('3V3 ±5%% floor %.3f V; MAX811T cold/hot falling threshold 3.00..3.15 V' % THREEV3_MIN)
-    if 3.00 < THREEV3_MIN:
-        print('FAIL: MAX811T can release below the 3V3 valid floor by %.0f mV' %
-              (1000 * (THREEV3_MIN - 3.00)))
-    print('COUNTEREXAMPLE 1: +3V3=3.100 V, +1V2=1.200 V, supervisor '
-          'threshold=3.000 V, manual reset released, hold timer expired: '
-          'nPOR may release while +3V3 is below 3.135 V.')
-    print('COUNTEREXAMPLE 2: +3V3=3.300 V, +1V2=0 V, sysctl absent: '
-          'U6 sees its good rail; U13 powers up with reset outputs as inputs '
-          'and each slot reset has a 10k pull-up. Slots can leave reset '
-          'before +1V2 is good.')
-    # TI TPS3890 fixed 3.17 V: ±1% falling accuracy, ≤0.825% hysteresis.
-    lo3, hi3 = falling_min(3.17, .01), rising_max(3.17, .01, .00825)
-    print('TPS389033 screen: falling >= %.4f V; rising <= %.4f V; '
-          'normal low %.3f V' % (lo3, hi3, MODELED_THREEV3_LOW))
-    if not THREEV3_MIN < lo3 < hi3 < MODELED_THREEV3_LOW:
-        raise ValueError('3V3 candidate has no threshold window')
-    # With ±1% and ≤0.825% hysteresis, no TPS3890 nominal 1V2 threshold
-    # can both assert above the FPGA's 1.140 V floor and release by the
-    # existing regulator's 1.172 V low corner. Divider tolerance shrinks it.
-    nominal_floor = ONEV2_MIN / (1 - .01)
-    nominal_ceiling = MODELED_ONEV2_LOW / ((1 + .01) * (1 + .00825))
-    print('TPS3890 1V2 nominal threshold would need >= %.4f V to assert '
-          'before 1.140 V and <= %.4f V to release by %.3f V' %
-          (nominal_floor, nominal_ceiling, MODELED_ONEV2_LOW))
-    if nominal_floor >= nominal_ceiling:
-        print('FAIL: no guaranteed 1V2 threshold window; shortfall %.2f mV '
-              'before divider tolerance or remote card drop' %
-              (1000 * (nominal_floor - nominal_ceiling)))
-    # Abstract desired wiring. This confirms the logic requirement while
-    # leaving device startup, propagation, analog hysteresis and routing open.
-    for power, g3, g1, manual, chipset, expander in product((0, 1), repeat=6):
-        por = power and g3 and g1 and manual
-        cpu = por and chipset
-        slot = por and expander
-        assert not (cpu or slot) if not (power and g3 and g1 and manual) else True
-    print('LOGIC SCREEN: all 64 desired-state combinations keep CPU/slot reset '
-          'asserted until both rails, power and manual reset permit release')
-    print('MB-051 OPEN: the routed board has no fitted dual-rail qualifier, '
-          'cold-off clamps or remote-rail bounds')
-    return 1
+        c.info('receipt/topology', str(error))
+        c.check('R0', 'receipt, netlist, BOM and routed reset copper match the analysed circuit', 0, 1, '>=', '',
+                fmt='%d')
+        return c.done()
+    c.info('bound', '%s: U6 + REF3425 + 2 x OPA376 + D7 + U19 and every value/LCSC as reset_supervisor.py' % out)
+    c.info('reset copper (mm)', ', '.join('%s %.1f' % (k, v) for k, v in sorted(lengths.items())))
+    r33, sink33, _ = cu['/+3V3']
+    r12, sink12, _ = cu['/+1V2']
+    c.info('extracted', '+3V3 R7:2 -> %s.%s %.2f mOhm; +1V2 R8:2 -> %s.%s %.2f mOhm (worst of the chipset '
+           'pins and the monitor tap, %g/%g mm pitches)' % (*sink33, 1e3 * r33, *sink12, 1e3 * r12, *PITCHES))
+    c.check('R1', '+3V3 copper, link to any chipset pin or the tap, vs the analysis allowance', 1e3 * r33,
+            1e3 * rs.CU33_MAX, '<=', 'mOhm')
+    c.check('R2', '+1V2 copper, link to any chipset pin or the tap, vs the analysis allowance', 1e3 * r12,
+            1e3 * rs.CU12_MAX, '<=', 'mOhm')
+    c.check('R3', 'mesh pitch convergence', 100 * max(cu['/+3V3 pitch'], cu['/+1V2 pitch']), 10.0, '<=', '%')
+    for k, (name, lo, hi, fmin, rmax, fmax, mlo, mhi) in enumerate(rs.margins(r33, r12)):
+        c.check('R%da' % (4 + k), '%s (extracted copper): asserts before any load leaves its range' % name,
+                1000 * mlo, 1000 * rs.MARGIN_MIN, '>=', 'mV')
+        c.check('R%db' % (4 + k), '%s (extracted copper): releases and never trips at the regulator low' % name,
+                1000 * mhi, 1000 * rs.MARGIN_MIN, '>=', 'mV')
+    if args.spice:
+        import reset_sequence
+        reset_sequence.run(c)
+    return c.done()
 
 
 if __name__ == '__main__':

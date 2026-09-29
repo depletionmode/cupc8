@@ -173,7 +173,7 @@ def main():
     r1, r2 = d.INSW_OVLO_R
     ovlo = d.VBUS_MAX / (r1 + r2)
     tvs = d.TVS_IR * (d.VBUS_MAX / d.TVS_VRWM)          # over its standoff: taken as rising in proportion
-    stby = ovlo + tvs + d.USBLC6_IR + d.INSW_I_OFF + d.STBY_LDO_IQ_MAX + d.ONOFF_I_MAX
+    stby = ovlo + tvs + d.USBLC6_IR + d.INSW_I_OFF + d.STBY_LDO_IQ_MAX + d.ONOFF_I_MAX + d.STBY_CLAMP_I
     c.info("standby (machine off)", "at VBUS %.1f V: OVLO divider %.0f uA, TVS %.0f uA, eFuse off %.0f uA, "
            "LDO %.0f uA, controller %.0f uA, USBLC6 %.0f uA; %.0f uA more while POWER is held" % (
                d.VBUS_MAX, 1e6 * ovlo, 1e6 * tvs, 1e6 * d.INSW_I_OFF, 1e6 * d.STBY_LDO_IQ_MAX,

@@ -18,6 +18,15 @@
 -- in WAI with no bus cycle is reset at that clock while idle. Memory goes
 -- back to the image and only the run after the reset is traced, so it must
 -- match sim.nim exactly.
+--
+-- CC-051 socket options (tools/lockstep.py --socket TOP.json): the chipset
+-- model sees the CPU's pins through the physical CPU socket read from the
+-- KiCad netlists (hw/cosim/gen_top.py). A_MAP/D_MAP give, for each chipset-
+-- side bit i (character i+1, hex), the CPU-card bit on that contact; A_LINK/
+-- D_LINK are masks of intact copper links, and the *_LINK booleans the
+-- control, clock and reset links. Open wires take soc/emu/machine_core.vhd's
+-- deterministic levels (address, data, /STB, RW, /RDY high; SYNC low; clock
+-- and /CPU_RST low). The defaults are a straight-through socket.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -31,7 +40,12 @@ entity tb_cpu_trace is
 		SEED:		natural := 1;
 		MAX_CYCLES:	natural := 20_000_000;
 		STALL:		natural := 0;
-		RESET_AT:	natural := 0
+		RESET_AT:	natural := 0;
+		A_MAP:		string := "0123456789abcdef";
+		D_MAP:		string := "01234567";
+		A_LINK:		natural := 16#ffff#;
+		D_LINK:		natural := 16#ff#;
+		STB_LINK, RW_LINK, RDY_LINK, SYNC_LINK, CLK_LINK, RST_LINK: boolean := true
 	);
 end entity;
 
@@ -49,6 +63,32 @@ architecture sim of tb_cpu_trace is
 	signal fl:		std_logic_vector(1 downto 0);
 	signal done:	boolean := false;
 	signal pending, mask: std_logic_vector(4 downto 0) := "00000";
+	-- the CPU card's side of the socket
+	signal a_cpu:	std_logic_vector(15 downto 0);
+	signal d_in_cpu, d_out_cpu: std_logic_vector(7 downto 0);
+	signal rw_cpu, n_stb_cpu, sync_cpu, n_rdy_cpu, n_rst_cpu: std_logic;
+
+	function nib(m: string; i: natural) return natural is
+		constant c: character := m(m'low + i);
+	begin
+		if c >= '0' and c <= '9' then return character'pos(c) - character'pos('0'); end if;
+		return character'pos(c) - character'pos('a') + 10;
+	end function;
+
+	function linked(mask: natural; i: natural) return boolean is
+	begin
+		return (mask / 2**i) mod 2 = 1;
+	end function;
+
+	-- the chipset-side data bit that reaches CPU data bit j
+	function inv(m: string; j: natural) return natural is
+	begin
+		for i in 0 to 7 loop
+			if nib(m, i) = j then return i; end if;
+		end loop;
+		report "D_MAP is not a permutation" severity failure;
+		return 0;
+	end function;
 
 	function hx(v: std_logic_vector) return string is
 		constant digits: string(1 to 16) := "0123456789abcdef";
@@ -75,11 +115,37 @@ architecture sim of tb_cpu_trace is
 		writeline(output, l);
 	end procedure;
 begin
-	dut: entity work.cpu port map(
-		clk => clk, n_rst => n_rst, a => a, d_in => d_in, d_out => d_out, d_oe => d_oe,
-		rw => rw, n_stb => n_stb, n_rdy => n_rdy, sync => sync, irq => irq,
-		tmr_exp => tmr_exp, halted => halted, waiting => waiting,
-		dbg_pc => pc, dbg_sp => sp, dbg_r0 => r0, dbg_r1 => r1, dbg_f => fl);
+	-- The clock reaches the CPU without a delta delay (a generate, not an
+	-- assignment), so the socket's one-delta wires below keep every sample
+	-- on the same clock edge as a direct connection.
+	clocked: if CLK_LINK generate
+		dut: entity work.cpu port map(
+			clk => clk, n_rst => n_rst_cpu, a => a_cpu, d_in => d_in_cpu, d_out => d_out_cpu, d_oe => d_oe,
+			rw => rw_cpu, n_stb => n_stb_cpu, n_rdy => n_rdy_cpu, sync => sync_cpu, irq => irq,
+			tmr_exp => tmr_exp, halted => halted, waiting => waiting,
+			dbg_pc => pc, dbg_sp => sp, dbg_r0 => r0, dbg_r1 => r1, dbg_f => fl);
+	end generate;
+	unclocked: if not CLK_LINK generate
+		dut: entity work.cpu port map(
+			clk => '0', n_rst => n_rst_cpu, a => a_cpu, d_in => d_in_cpu, d_out => d_out_cpu, d_oe => d_oe,
+			rw => rw_cpu, n_stb => n_stb_cpu, n_rdy => n_rdy_cpu, sync => sync_cpu, irq => irq,
+			tmr_exp => tmr_exp, halted => halted, waiting => waiting,
+			dbg_pc => pc, dbg_sp => sp, dbg_r0 => r0, dbg_r1 => r1, dbg_f => fl);
+	end generate;
+
+	-- the socket: each chipset-side wire from its CPU-card contact
+	address_wires: for i in 0 to 15 generate
+		a(i) <= a_cpu(nib(A_MAP, i)) when linked(A_LINK, i) else '1';
+	end generate;
+	data_wires: for i in 0 to 7 generate
+		d_out(i) <= d_out_cpu(nib(D_MAP, i)) when linked(D_LINK, i) else '1';
+		d_in_cpu(i) <= d_in(inv(D_MAP, i)) when linked(D_LINK, inv(D_MAP, i)) else '1';
+	end generate;
+	n_stb <= n_stb_cpu when STB_LINK else '1';
+	rw <= rw_cpu when RW_LINK else '1';
+	sync <= sync_cpu when SYNC_LINK else '0';
+	n_rdy_cpu <= n_rdy when RDY_LINK else '1';
+	n_rst_cpu <= n_rst when RST_LINK else '0';
 
 	clk <= not clk after 5 ns when not done;
 	irq <= ((pending(3) and mask(3)) or (pending(4) and mask(4))) &

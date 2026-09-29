@@ -66,3 +66,42 @@ assembly availability at twice the proposed build quantity is unverified.
 
 No board source or power requirement was changed in this audit. MB-051
 remains red.
+
+## Redesign (David's decision, 2026-09-28)
+
+The main board now qualifies both rails before `nPOR` and every slot reset
+can release (`hw/power/reset_supervisor.py`, bound to the routed board by
+`hw/power/rail_reset_window.py`):
+
+- **Qualifier:** a REF3425 (C187836; 2.5 V, ±0.05 %, 6 ppm/°C box) feeds a
+  0.1 % ladder (7.5k/4.12k/10k) with taps at 1.633 V and 1.156 V. Two
+  OPA376 (C42134; Vos ≤ 25 µV + 2 µV/°C, 0.33 µs overload recovery) run open
+  loop with 6.8 MΩ / 2.7 MΩ hysteresis: +3V3 through 9.53k/10k 0.1 %, +1V2
+  through 1 kΩ. Either output low pulls U6's ~MR low through a BAT54A
+  (C92068). U6 (MAX811T) then holds `nPOR` for 140–560 ms after both rails,
+  RESET and `SYS_nRST` let go. A zero-drift OPA333 was tried first and
+  rejected: TI's model recovers from saturation in about 440 µs. Integrated
+  comparators (TLV7011/TLV1811/TLV3012: 4–15 mV maximum offset) are wider
+  than the whole 1V2 window.
+- **Slots:** an SN74LVC07A (C7809) on 3V3_STBY, inputs on `nPOR`, drives each
+  `SLOTn_RST_n` low while `nPOR` is low, in parallel with the TCA9555 (which
+  only ever drives low) and the 10k pull-ups. A 100 kΩ pull-down holds
+  `nPOR` low while U6 is unpowered, so a card on slot +5V stays in reset
+  with +3V3 or +1V2 absent.
+- **Copper:** R7 and R8 (the 3V3 and 1V2 links) are 1 mΩ alloy shunts
+  (C393098); a 0 Ω jumper (≤ 50 mΩ) would drop more than the 3V3 window at
+  1.22 A. The RT9013 moved beside U7 and feeds the core through a B.Cu pour
+  inside U7's pin ring: the old 0.2 mm tracks were 1.4–1.7 Ω from R8 to the
+  core pins (69 mV at 41 mA, below 1.140 V at the old regulator's low).
+- **Guaranteed windows** (every datasheet tolerance, the hysteresis, the
+  links and copper allowances of 10 mΩ (+3V3) and 30 mΩ (+1V2)): the
+  reset asserts at least 17.6 mV (3V3) / 4.6 mV + 5 mV (1V2) above each
+  valid floor at the loads and releases at least 11.6 mV / 4.3 mV + 5 mV
+  below the regulators' worst lows (`rs.MARGIN_MIN` = 5 mV is required on
+  top). `rail_reset_window.py` re-runs these with the extracted copper.
+- **Simulated** (ngspice, TI's OPA376 model; behavioural REF3425/MAX811/
+  LVC07 at their datasheet limits): start-up, +1V2 absent, cold-off with a
+  self-powered card, slow brown-outs of each rail (trip at 1.153 V and
+  3.180 V at the worst reference corner), an 18 mV/µs +3V3 collapse (nPOR
+  low 5.3 µs after the rail leaves its range), the RESET button, and the
+  worst regulator lows (no nuisance trip): all pass.

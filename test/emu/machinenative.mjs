@@ -122,7 +122,7 @@ export class Machine {
   static async create({ slots = { 1: 'hdmi', 2: 'io' }, rom = null, sysctl = false, pwrHi = true,
     hostVbus = true, hostPort = true,
     resetButtonPressed = false,
-    usbOrientation = 'A',
+    usbOrientation = 'A', chipsetFlash = null, cpuFlash = null, ccLine = 1,
     threaded = process.env.CUPC8_EMU_THREADS !== '0', spiLog = false, forward = [], pcap = null } = {}) {
     const m = new Machine();
     // Co-simulation suites can build the ROM in their Python harness and
@@ -215,9 +215,52 @@ export class Machine {
     // A disconnected MCU-to-flash path prevents that card firmware from
     // starting. The digital model leaves the physically fitted card inert;
     // it does not predict RP2040 boot-ROM fallback or analog open-pin levels.
+    // The 12 MHz crystal network is a second boot prerequisite of the same
+    // kind: with an open leg the RP2040 has no clock and its firmware never
+    // runs. Oscillator start-up margin is analog and is not modeled.
+    const crystal = netlistTop?.runtime.crystal_connected;
+    if (netlistTop && !['system', 'gpu', 'io', 'storage', 'eink'].every((kind) =>
+      typeof crystal?.[kind] === 'boolean'))
+      throw new Error('machinenative: missing routed crystal boot prerequisites');
+    // The FPGA configuration chain (emu/machine/fpgaconfig.h): CRESET_B,
+    // CDONE and both configuration flashes, each link from routed copper.
+    const FPGA_LINKS = ['chipsetConfigCopper', 'cpuConfigCopper', 'chipsetCreset', 'cpuCreset',
+      'chipsetCdoneSysctl', 'cpuCdoneSysctl', 'cpuCdoneCard', 'cpuCdoneMain', 'cpuCdonePullup',
+      'fl0Sysctl', 'fl1Sysctl', 'cdoneLed'];
+    const fpgaLinks = netlistTop?.runtime.fpga_links;
+    if (netlistTop && !FPGA_LINKS.every((k) => typeof fpgaLinks?.[k] === 'boolean'))
+      throw new Error('machinenative: missing routed FPGA configuration links');
+    // sysctl's two TCA9555s (emu/machine: Tca9555) on the routed I2C bus. U14
+    // P10 is the CPU card's PRSNT2_n (its PRSNT1-PRSNT2 loop, grounded on the
+    // main board); P11/P12 the CPU card's ID straps. The slot presence bits
+    // follow the fitted cards; nothing reads them, and they are not bound to
+    // card copper.
+    const i2c = netlistTop?.runtime.i2c;
+    if (netlistTop && (!Array.isArray(i2c?.expanders) || typeof i2c.cpu_present_link !== 'boolean'))
+      throw new Error('machinenative: missing routed I2C expander model');
+    const expanders = i2c ? i2c.expanders.filter((x) => x.link).map((x) => {
+      const inputs = [0xff, 0xff];
+      if (x.address === 0x21) {
+        for (const { slot, bit } of i2c.slot_presence) if (bit !== null && slots[slot]) inputs[0] &= ~(1 << bit);
+        if (i2c.cpu_present_link) inputs[1] &= ~1;
+        for (const { bit, level } of i2c.card_id) if (!level) inputs[1] &= ~(1 << bit);
+      }
+      return { address: x.address, inputs };
+    }) : null;
+    // sysctl's ADC (GPIO26-28): the source's CC voltage on the attached CC
+    // line (`ccLine`: the power cable's orientation; the other line has only
+    // Rd), and the 1V2 rail through R100. Open copper reads 0 V.
+    const adc = netlistTop?.runtime.sysctl_adc;
+    if (netlistTop && !['cc1', 'cc2', 'v1v2'].every((k) => typeof adc?.[k] === 'boolean'))
+      throw new Error('machinenative: missing routed sysctl ADC paths');
+    if (![1, 2].includes(ccLine)) throw new Error('machinenative: ccLine must be 1 or 2');
+    const ccVolts = pwrHi ? 1.524 : 1.090;
+    const sysctlAdcVolts = adc ? [adc.cc1 && ccLine === 1 ? ccVolts : 0,
+      adc.cc2 && ccLine === 2 ? ccVolts : 0, adc.v1v2 ? 1.2 : 0] : null;
+    const boots = (kind) => boot[kind] !== false && crystal[kind] !== false;
     const activeSlots = netlistTop ? Object.fromEntries(Object.entries(slots).filter(([, kind]) =>
-      boot[boardKind[kind]] !== false)) : slots;
-    const activeSysctl = sysctl && (!netlistTop || boot.system);
+      boots(boardKind[kind]))) : slots;
+    const activeSysctl = sysctl && (!netlistTop || boots('system'));
     let memoryWiring = netlistTop?.runtime;
     if (netlistTop) {
       const links = netlistTop.runtime.card_slot_links;
@@ -256,8 +299,18 @@ export class Machine {
       resetButtonPressed,
       chipsetClockConnected: netlistTop?.runtime.chipset_clock_connected ?? true,
       memoryWiring,
+      ...(fpgaLinks ? { fpga: fpgaLinks } : {}),
+      ...(expanders ? { expanders } : {}),
+      ...(sysctlAdcVolts ? { sysctlAdcVolts } : {}),
+      ...(chipsetFlash ? { chipsetFlash } : {}),
+      ...(cpuFlash ? { cpuFlash } : {}),
       espTx: m.esp?.tx ?? -1, espRx: m.esp?.rx ?? -1 });
     m.kinds = { ...activeSlots };
+    m.boardKind = boardKind;
+    m.cardLeds = netlistTop?.runtime.card_leds ?? null;
+    if (netlistTop && !['system', 'gpu', 'io', 'storage', 'eink'].every((kind) =>
+      Array.isArray(m.cardLeds?.[kind])))
+      throw new Error('machinenative: missing routed card LED paths');
     if (hostPort && activeSysctl && (netlistTop?.runtime.system_usb_connected[usbOrientation] ?? true)) {
       m.sysctlPort = await m.listen();
       m.console = new Console(m);
@@ -348,6 +401,19 @@ export class Machine {
 
   get ns() {
     return native.ns(this.h);
+  }
+
+  // the cards' firmware-driven indicator LEDs: [{slot (0: system card), kind,
+  // net, gpio, lit, rises}]. With the netlist top an LED whose copper is open
+  // never lights; `net` is the MCU-side net the top bound to that GPIO.
+  leds() {
+    return native.leds(this.h).map(({ slot, gpio, level, rises }) => {
+      const kind = slot === 0 ? 'system' : this.boardKind[this.kinds[slot]];
+      const row = this.cardLeds ? this.cardLeds[kind]?.find((r) => r.gpio === gpio) : null;
+      const connected = this.cardLeds ? Boolean(row?.connected) : true;
+      return { slot, kind, gpio, net: row?.net ?? null, lit: connected && level,
+        rises: connected ? rises : 0 };
+    });
   }
 
   state() {

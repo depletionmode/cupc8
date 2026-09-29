@@ -1353,3 +1353,48 @@ fixed_in = "gpu.py TMDS_R 360 ohm (C182716)"
 revert = [["hw/boards/gpu.py", 'TMDS_R, TMDS_R_LCSC = "360", "C182716"', 'TMDS_R, TMDS_R_LCSC = "270", "C425067"']]
 cmd = "python3 -m unittest test/hw/test_rp2040_thermal.py -k test_gpu_tmds_sink_within_iovss_with_margin"
 must_fail = ["test_gpu_tmds_sink_within_iovss_with_margin"]
+
+[[bug]]
+name = "Power models: a VSWITCH threshold with a SPICE scale suffix (VON=10MV) crashed the port"
+fixed_in = "MB-005/MB-051 main-board work (2026-09-28)"
+revert = [["hw/power/models/fetch.py", """        def num(s):
+            # SPICE scale suffixes (the OPAx376's "VON=10MV" is 10 mV); a
+            # plain number or one ending in V reads as before
+            m = re.fullmatch(r"([-+0-9.eE]+)(MEG|[TGKMUNPF])?V?", s.upper())
+            if not m:
+                raise ValueError("VSWITCH threshold %r" % s)
+            scale = {"T": 1e12, "G": 1e9, "MEG": 1e6, "K": 1e3, "M": 1e-3, "U": 1e-6, "N": 1e-9,
+                     "P": 1e-12, "F": 1e-15, None: 1.0}[m.group(2)]
+            return float(m.group(1)) * scale""", """        num = lambda s: float(re.sub(r"[vV]$", "", s))"""]]
+cmd = "python3 test/hw/test_power_value_parsing.py"
+must_fail = ["test_millivolt_suffix_thresholds_port"]
+
+[[bug]]
+name = "MB-006 board thermal: the 1 mOhm link value '1m' read as 1 MOhm"
+fixed_in = "MB-005/MB-051 main-board work (2026-09-28)"
+revert = [["hw/power/board_thermal.py", """    text = value.split()[0]                 # "7.5k 0.1%": the tolerance is not part of the value
+    if text.endswith('m'):
+        return float(text[:-1]) * 1e-3      # milliohms (the main board's 1 mOhm links, R7 and R8)
+    text = text.upper().replace('OHM', '').rstrip('R')""", """    text = value.upper().replace('OHM', '').rstrip('R')"""]]
+cmd = "python3 test/hw/test_power_value_parsing.py"
+must_fail = ["test_one_milliohm_link_is_not_one_megohm"]
+
+[[bug]]
+name = "MB-051: slot resets could release with +1V2 absent (no clamp from the qualified nPOR)"
+fixed_in = "MB-005/MB-051 main-board work (2026-09-28)"
+revert = [["hw/boards/main.py", """    u19 = {"GND": "GND", "VCC": "3V3_STBY"}
+    for k in range(1, 7):
+        u19["%dA" % k] = "nPOR"
+        u19["%dY" % k] = "SLOT%d_RST_n" % k
+    part("U19", "jlc:SN74LVC07APWR", "SN74LVC07A", "jlc:TSSOP-14_L5.0-W4.4-P0.65-LS6.4-BL",
+         sv.PARTS["U19"][1], u19)
+""", ""]]
+cmd = "python3 test/hw/test_reset_supervisor.py BoardSource"
+must_fail = ["test_every_slot_reset_is_clamped_from_npor_on_standby"]
+
+[[bug]]
+name = "MB-051: the 3V3 isolation link was a <= 50 mOhm 0 ohm jumper (61 mV at 1.22 A, wider than the reset window)"
+fixed_in = "MB-005/MB-051 main-board work (2026-09-28)"
+revert = [["hw/boards/main.py", """    R("R7", "1m", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", POWER["LINK"][1])  # 3V3 isolation link""", """    R("R7", "0", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", "C17888")  # 3V3 isolation link"""]]
+cmd = "python3 test/hw/test_reset_supervisor.py BoardSource"
+must_fail = ["test_links_are_1_mohm_shunts"]

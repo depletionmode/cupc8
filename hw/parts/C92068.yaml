@@ -1,0 +1,8 @@
+# BAT54ALT1G (onsemi), dual Schottky diode, common anode, SOT-23
+datasheet: https://www.onsemi.com/pdf/datasheet/bat54alt1-d.pdf
+source: "onsemi BAT54ALT1 datasheet, package outline SOT-23 STYLE 12: pin 1 cathode, pin 2 cathode, pin 3 anode"
+package: SOT-23
+pins:
+  1: ["K", "CATHODE"]
+  2: ["K", "CATHODE"]
+  3: ["A", "ANODE"]

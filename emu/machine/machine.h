@@ -40,6 +40,7 @@
 
 #include "einkpanel.h"
 #include "emu.h"
+#include "fpgaconfig.h"
 #include "sdcard.h"
 #include "tmds.h"
 #include "usb/cdchost.h"
@@ -61,9 +62,20 @@ struct SpiFrame {
   uint32_t extra;
 };
 
+// an indicator LED's GPIO on a card: its level now and the times it rose
+// (a listener: it sees every change the firmware makes, between samples too)
+struct LedWatch {
+  int gpio = 0;
+  bool level = false;
+  uint64_t rises = 0;
+  std::function<void()> unlisten;
+};
+void watchLeds(rp2040js::RP2040 &mcu, std::vector<LedWatch> &leds, std::initializer_list<int> gpios);
+
 class Card {
  public:
   std::string kind;
+  std::vector<LedWatch> leds;  // the card's firmware-driven indicator LEDs
   int slot = 0;
   bool logging = false;
   std::vector<SpiFrame> log;  // every slot SPI frame, when logging
@@ -158,6 +170,47 @@ class EspCard : public Card {
   void writeAll(const std::vector<uint8_t> &b);
 };
 
+// a TCA9555 16-bit I2C expander on sysctl's I2C0 (U13 CARD_RST_n/PROG_n,
+// U14 presence and CPU card ID; power.c): its registers, with each pin an
+// input (the board's pull-up, or what the netlist puts on it) unless its
+// configuration bit makes it an output. The register pointer toggles within
+// a pair after each byte, as the part's does.
+struct Tca9555 {
+  uint8_t address = 0x20;
+  uint8_t in[2] = {0xff, 0xff};  // the levels outside drives on the pins
+  uint8_t out[2] = {0xff, 0xff}, pol[2] = {0, 0}, cfg[2] = {0xff, 0xff};
+  uint8_t ptr = 0;
+  bool pointed = false;
+  uint8_t level(int port) const { return static_cast<uint8_t>((cfg[port] & in[port]) | (~cfg[port] & out[port] & in[port])); }
+  uint8_t read() {
+    uint8_t v = 0;
+    const int port = ptr & 1;
+    switch (ptr >> 1) {
+      case 0: v = level(port) ^ pol[port]; break;
+      case 1: v = out[port]; break;
+      case 2: v = pol[port]; break;
+      default: v = cfg[port]; break;
+    }
+    ptr ^= 1;
+    return v;
+  }
+  void write(uint8_t b) {
+    if (!pointed) {
+      ptr = b & 7;
+      pointed = true;
+      return;
+    }
+    const int port = ptr & 1;
+    switch (ptr >> 1) {
+      case 0: break;  // input registers are read-only
+      case 1: out[port] = b; break;
+      case 2: pol[port] = b; break;
+      default: cfg[port] = b; break;
+    }
+    ptr ^= 1;
+  }
+};
+
 struct BridgePins {
   uint32_t sck = 0, mosi = 0, ncs = 1;
 };
@@ -175,6 +228,7 @@ class SysctlCard {
   };
   std::optional<Pending> pending;
   std::deque<uint8_t> toCard[2];
+  std::vector<LedWatch> leds;  // LED_USB_TX/RX (GPIO0/1)
   std::vector<uint8_t> fromCard[2];  // CDC output not yet collected by the host side
   bool consoleOpen = false;
   // the PC opens or closes the console port (DTR); between runs only
@@ -188,6 +242,26 @@ class SysctlCard {
   }
   BridgePins bridgePins(uint32_t brMiso);
   bool sysReset();
+  // the FPGAs' configuration pins (fpgaconfig.h): CRESET_B driven low by
+  // sysctl (GPIO6 chipset, GPIO16 CPU card), CDONE as sysctl reads it
+  bool cresetLow(int fpga);
+  void setCdone(int fpga, bool level);
+  // SPI1 to the configuration flashes (FL0 GPIO10-13, FL1 GPIO14/15/8/9);
+  // a bus whose copper is open reaches nothing and reads back 0 (the pads'
+  // default pull-down)
+  void attachFlashes(SpiFlash *fl0, bool fl0Reach, SpiFlash *fl1, bool fl1Reach);
+  // the expanders on I2C0 (GPIO24/25); none answers while its copper is open
+  std::vector<Tca9555> expanders;
+  void attachExpanders(std::vector<Tca9555> list);
+
+ private:
+  SpiFlash *flash[2] = {nullptr, nullptr};
+  bool flashReach[2] = {false, false};
+  bool flashSelected[2] = {false, false};
+  bool cdone[2] = {true, true};
+  uint8_t flashMiso = 0;
+  std::unique_ptr<rp2040js::IAlarm> flashDone;
+  std::function<void()> unlisten[2];
 };
 
 class Machine {
@@ -247,6 +321,23 @@ class Machine {
     std::array<uint8_t, 3> bridgeInputs{{0, 1, 2}};
     std::array<bool, 3> bridgeSourceConnected{{true, true, true}};
     bool bridgeMiso = true;
+    // the FPGA configuration chain (fpgaconfig.h), from the routed netlists
+    struct FpgaLinks {
+      bool chipsetConfigCopper = true, cpuConfigCopper = true;  // FPGA-to-flash, CRESET_B pull-up
+      bool chipsetCreset = true, cpuCreset = true;              // sysctl GPIO to CRESET_B
+      bool chipsetCdoneSysctl = true, cpuCdoneSysctl = true;    // CDONE to sysctl GPIO
+      bool cpuCdoneCard = true, cpuCdoneMain = true, cpuCdonePullup = true;  // CPU CDONE to the chipset
+      bool fl0Sysctl = true, fl1Sysctl = true;                  // sysctl SPI1 to each flash
+      bool cdoneLed = true;                                     // chipset CDONE to D5 through Q2
+    } fpga;
+    std::vector<uint8_t> chipsetFlash, cpuFlash;  // flash contents; empty: a stand-in iCE40 image
+    // sysctl's I2C expanders, with their input levels (from the netlist top);
+    // empty: none on the bus (every address NACKs, as before)
+    std::vector<Tca9555> expanders;
+    // the volts on sysctl's ADC pins: CC1 (GPIO26), CC2 (GPIO27), V1V2_SENSE
+    // (GPIO28); the netlist top sets them from the source's CC level and the
+    // 1V2 rail, 0 where copper is open (and by default, as before)
+    std::array<double, 3> sysctlAdcVolts{{0, 0, 0}};
   };
   struct Stats {
     uint64_t idleWindows = 0, busyIterations = 0, idleClocks = 0, busyClocks = 0;
@@ -265,6 +356,7 @@ class Machine {
 
   struct State {
     uint32_t pc, sp, r0, r1, halted, nrst, gpo;
+    bool chipsetConfigured, cpuConfigured, cdoneLed;
   };
   State state() const;
   TmdsCapture::Frame frame();
@@ -304,6 +396,10 @@ class Machine {
   std::array<bool, 3> bridgeSourceConnected{{true, true, true}};
   bool bridgeMiso = true;
   BridgePins br;
+  Options::FpgaLinks fpgaLinks;
+  FpgaConfig fpgaCfg[2];  // 0 the chipset, 1 the CPU card
+  void configStep();
+  bool cpuCdoneAtChipset() const;
   std::vector<std::array<uint8_t, 16>> font;
 
   uint32_t inputs(bool por = true);

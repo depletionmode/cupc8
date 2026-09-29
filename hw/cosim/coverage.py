@@ -1,7 +1,10 @@
 """Conservative E2E net coverage accounting for all eight KiCad netlists.
 
-Only a pin-exact, electrically unused reserved contact may be waived here.
-Classification is a work queue, not evidence that a circuit was simulated.
+Two waiver kinds exist: a pin-exact, electrically unused reserved contact,
+and a non-digital (supply, return, regulator-internal) net whose attached
+pins are all passive, power/analog or static straps, naming the analog
+catalogue checks that cover it. Classification is a work queue, not
+evidence that a circuit was simulated.
 """
 import re
 
@@ -108,8 +111,137 @@ def reviewed_reserved_waivers(circuits):
     return waivers
 
 
-def audit(circuits, executed, structural):
+# Non-digital nets: supply rails, returns and regulator-internal nodes. The
+# digital co-simulation assumes these rails are present; their behaviour is
+# the job of the named analog checks (catalogue rows with a command). A net
+# is waived only while every attached pin is a passive part, a connector
+# contact, a power/analog pin of a listed IC, or a listed static strap pin.
+# Any other package pin (a GPIO, a logic input or output) on the net removes
+# the waiver and the net becomes a coverage gap again.
+POWER_PINS = {
+    'ICE40HX4K-TQ144': {'VCC', 'VCCIO_0', 'VCCIO_1', 'VCCIO_2', 'VCCIO_3', 'VCC_SPI',
+                        'VPP_2V5', 'VCCPLL0', 'VCCPLL1', 'GNDPLL0', 'GNDPLL1', 'GND'},
+    'RP2040': {'IOVDD', 'DVDD', 'VREG_VIN', 'VREG_VOUT', 'USB_VDD', 'ADC_AVDD', 'GND'},
+    'W25Q32JVSSIQ': {'VCC', 'GND'},
+    'W25Q16JVSSIQ': {'VCC', 'GND'},
+    '74LVC1G125GW': {'VCC', 'GND'},
+    'TPD4E05U06DQAR': {'GND'},
+    'USBLC6-2SC6': {'VBUS', 'GND'},
+    'IS62WV5128EBLL-45HLI': {'VDD', 'GND'},
+    'SST39VF040': {'VDD', 'VSS'},
+    'CD74HC4051PWR': {'VCC', 'GND'},
+    'TCA9555PWR': {'VCC', 'GND'},
+    'MAX811TEUS': {'VCC', 'GND'},
+    'TLV7011DBVR': {'VCC', 'VEE'},
+    'MAX16054AZT': {'VCC', 'GND'},
+    'ESP32-C3-MINI-1U-N4': {'3V3', 'GND'},
+    '12MHz': {'VDD', 'GND', 'G'},
+    'MMBT3904': {'E'},
+    '2N7002': {'S'},
+    # regulators, switches and the eFuse: their power and analog-control pins
+    'HT7533-2': {'VIN', 'VOUT', 'GND'},
+    'RT9013-12GB': {'VIN', 'VOUT', 'EN', 'GND'},
+    'TLV62569PDDCR': {'VIN', 'EN', 'SW', 'FB', 'GND'},
+    'TLV62569DBVR': {'VIN', 'EN', 'SW', 'FB', 'GND'},
+    'TPS259470ARPWR': {'IN', 'OUT', 'DVDT', 'ILM', 'OVLO/OVCSEL', 'GND'},
+    'TPS63802DLAR': {'VIN', 'EN', 'VOUT', 'FB', 'L1', 'L2', 'GND', 'AGND'},
+    'TPS61023DRLR': {'VIN', 'EN', 'VOUT', 'FB', 'SW', 'GND'},
+    'SY6280AAC': {'IN', 'OUT', 'ISET', 'GND'},
+}
+# Static logic straps tied to a rail. They are constants of the design,
+# checked by pin consistency and the board's pinout rows, never toggled.
+STRAP_PINS = {
+    'TCA9555PWR': {'A0', 'A1', 'A2'},
+    'CD74HC4051PWR': {'VEE', '~{E}'},
+    '12MHz': {'~{OE}'},
+    'W25Q32JVSSIQ': {'HOLD#orRESET#(IO3)', 'WP#(IO2)'},
+    'RP2040': {'TESTEN'},
+    'MAX16054AZT': {'CLEAR'},
+    'TPS63802DLAR': {'MODE'},
+    '2N7002': {'G'},
+}
+_PASSIVE = re.compile(r'^(?:R|RN|C|L|F|FB|D|TP|SW)\d+$')
+
+# board -> net -> named analog checks (catalogue ids). Every board's rails
+# also carry that board's power and thermal rows.
+_BOARD_ROWS = {'main': ('MB-005', 'MB-006'), 'cpu': ('CC-005', 'CC-006'),
+               'gpu': ('GC-005', 'GC-006'), 'io': ('IC-005', 'IC-006'),
+               'storage': ('SC-005', 'SC-006'), 'eink': ('EC-005', 'EC-006'),
+               'system': ('YC-005', 'YC-006'), 'wifi': ('WC-005', 'WC-010')}
+_PINOUT_ROWS = {'main': 'MB-004', 'cpu': 'CC-004', 'gpu': 'GC-004', 'io': 'IC-004',
+                'storage': 'SC-004', 'eink': 'EC-004', 'system': 'YC-004', 'wifi': 'WC-004'}
+ANALOG_NETS = {
+    'main': {'GND': (), '+5V': ('POW-006',), '+3V3': ('POW-001',), '+1V2': ('POW-002',),
+             '5V_SYS': ('POW-004', 'POW-006'), '3V3_BUCK': ('POW-001',),
+             '1V2_LDO': ('POW-002',), '3V3_STBY': (), 'VBUS': ('POW-004',),
+             'VBUS_F': ('POW-004', 'POW-006'), 'VCCPLL0': ('POW-002',),
+             'VCCPLL1': ('POW-002',), 'BUCK_FB': ('POW-001',), 'BUCK_SW': ('POW-001',),
+             'EFUSE_DVDT': ('POW-004',), 'EFUSE_ILM': ('POW-004', 'POW-006'),
+             'EFUSE_OVLO': ('POW-004', 'POW-006'),
+             **{f'SLOT{s}_5V{x}': ('POW-006',) for s in range(1, 7) for x in ('', '_F', '_L')}},
+    'cpu': {'GND': (), '3V3': (), '1V2': (), 'VCCPLL0': (), 'VCCPLL1': (),
+            'GNDPLL0': (), 'GNDPLL1': ()},
+    'gpu': {'GND': (), '+5V': (), '3V3': (), '1V1': (), 'HDMI_5V': ('POW-008',),
+            'HDMI_5V_F': ('POW-008',), 'BB_FB': ('POW-008',), 'BB_L1': ('POW-008',),
+            'BB_L2': ('POW-008',)},
+    'io': {'GND': (), '+5V': ('POW-006',), '3V3': (), '1V1': (), 'VBOOST': ('POW-007',),
+           'VBUS': ('POW-007', 'POW-006'), 'BOOST_FB': ('POW-007',),
+           'BOOST_SW': ('POW-007',), 'ISET': ('POW-006',)},
+    'storage': {'GND': (), '+5V': (), '3V3': (), '1V1': ()},
+    'eink': {'GND': (), '+5V': (), '3V3': (), '1V1': ()},
+    'system': {'GND': (), '+3V3': (), '1V1': ()},
+    'wifi': {'GND': (), '+5V': ('POW-003',), '3V3': ('POW-003',), 'FB': ('POW-003',),
+             'SW': ('POW-003',)},
+}
+
+
+def reviewed_analog_waivers(circuits, implemented=None):
+    """Pin-bound waivers for supply, return and regulator-internal nets.
+
+    `implemented` is the set of catalogue ids that have a command; a waiver
+    whose named checks are not all implemented is withheld (the net stays a
+    gap). The waiver records the pins it was granted for.
+    """
+    waivers = {}
+    for board, nets in ANALOG_NETS.items():
+        circuit = circuits.get(board)
+        if circuit is None:
+            continue
+        for name, extra in nets.items():
+            pins = circuit.nets.get(f'/{name}')
+            if not pins:
+                continue
+            ok, straps = True, []
+            for ref, pin in pins:
+                if _PASSIVE.match(ref) or ref.startswith('J'):
+                    continue
+                value = circuit.components[ref][0]
+                label = (circuit.pin_names or {}).get((ref, pin))
+                if label in POWER_PINS.get(value, ()):
+                    continue
+                if label in STRAP_PINS.get(value, ()):
+                    straps.append(f'{ref}.{pin} {label}')
+                    continue
+                ok = False
+                break
+            checks = sorted(set(_BOARD_ROWS[board]) | set(extra) |
+                            ({_PINOUT_ROWS[board], 'E2E-005'} if straps or 'PLL' in name else set()))
+            if not ok or (implemented is not None and not set(checks) <= implemented):
+                continue
+            waivers[f'{board}:{name}'] = {
+                'family': 'non_digital',
+                'reason': 'supply, return or regulator-internal node: every attached pin is '
+                          'passive, a connector contact, a power/analog pin or a static strap',
+                'checks': checks,
+                'pins': [f'{ref}.{pin}' for ref, pin in pins],
+                'static_straps': straps,
+            }
+    return waivers
+
+
+def audit(circuits, executed, structural, implemented=None):
     waivers = reviewed_reserved_waivers(circuits)
+    analog = reviewed_analog_waivers(circuits, implemented)
     gaps, structural_only, families = [], [], {}
     for board, circuit in circuits.items():
         for net in circuit.nets:
@@ -118,12 +250,13 @@ def audit(circuits, executed, structural):
             key = f'{board}:{net.lstrip("/")}'
             if (board, net) in structural:
                 structural_only.append(key)
-            if key not in waivers:
+            if key not in waivers and key not in analog:
                 gaps.append(key)
                 group = family(board, net.lstrip('/'))
                 families.setdefault(group, []).append(key)
     return {
         'reviewed_waivers': dict(sorted(waivers.items())),
+        'analog_waivers': dict(sorted(analog.items())),
         'unmodeled_nets': sorted(gaps),
         'structural_only_nets': sorted(structural_only),
         'coverage_families': {k: sorted(v) for k, v in sorted(families.items())},

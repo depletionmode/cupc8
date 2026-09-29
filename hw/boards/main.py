@@ -29,8 +29,12 @@ sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
 import sesreplay  # noqa: E402
+import main_power_corner  # noqa: E402
+import main_seed  # noqa: E402
 import edgesym  # noqa: E402
 import sockets  # noqa: E402
+sys.path.append(os.path.join(ROOT, "hw", "power"))     # after hw/tools: the MB-051 values live there
+import reset_supervisor as sv  # noqa: E402
 
 G = kg.GRID
 
@@ -68,6 +72,9 @@ POWER = {
     "CC_AVG_R": ("1M 1%", "C22935"),                  # R13, R14
     "CC_REF_R1": ("41.2k 1%", "C23166"),              # R15: 0.648 V, PWR_HI = a 3.0 A source
     "CC_REF_R2": ("10k 1%", "C25804"),                # R16
+    # the 3V3 and 1V2 isolation links: 1 mOhm alloy shunts, not 0 ohm jumpers
+    # (<= 50 mOhm: 31-61 mV at 0.62-1.22 A, more than the MB-051 reset window)
+    "LINK": ("1m RLM12FTCMR001", "C393098"),         # R7, R8
 }
 
 # LCSC numbers of the passives (JLC basic parts unless noted)
@@ -271,12 +278,12 @@ def build_parts():
     C("C5", "10u", "5V_SYS")
     C("C6", "100n", "5V_SYS")
     C("C7", "22u", "3V3_BUCK")
-    R("R7", "0", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", "C17888")  # 3V3 isolation link
+    R("R7", "1m", "3V3_BUCK", "+3V3", "Resistor_SMD:R_1206_3216Metric", POWER["LINK"][1])  # 3V3 isolation link
     part("U4", "jlc:RT9013-12GB", "RT9013-12GB", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", "C58464",
          {"VIN": "+3V3", "EN": "+3V3", "GND": "GND", "NC": None, "VOUT": "1V2_LDO"})
     C("C9", "1u", "+3V3")
     C("C10", "1u", "1V2_LDO")
-    R("R8", "0", "1V2_LDO", "+1V2")                 # 1V2 isolation link
+    R("R8", "1m", "1V2_LDO", "+1V2", "Resistor_SMD:R_1206_3216Metric", POWER["LINK"][1])   # 1V2 isolation link
 
     # ---- rail LEDs (the 1V2 one through a transistor: 1.2 V cannot light an LED)
     R("R9", "2.2k", "+5V", "LED_5V")
@@ -310,6 +317,41 @@ def build_parts():
     part("U6", "jlc:MAX811TEUS+T", "MAX811TEUS", "jlc:SOT-143_L2.9-W1.3-P1.92-LS2.3-BR", "C7272",
          {"VCC": "+3V3", "GND": "GND", "~{MR}": "nMR", "~{RESET}": "nPOR"})
     C("C13", "100n", "+3V3")
+    group("reset")
+    # MB-051 (David, 2026-09-28; hw/power/reset_supervisor.py): U6 also holds
+    # nPOR while either rail is outside its valid range. Two precision op amps
+    # (OPA376, open loop with resistor hysteresis) compare +3V3 and +1V2 with
+    # taps of a REF3425; either one low pulls ~MR low through D7. U19 holds
+    # every slot's CARD_RST_n low while nPOR is, from 3V3_STBY (a card on slot
+    # +5V stays in reset while +3V3 is absent); R118 holds nPOR low while U6
+    # is unpowered.
+    part("U17", "jlc:REF3425IDBVR", "REF3425", "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR", sv.PARTS["U17"][1],
+         {"GND_F": "GND", "GND_S": "GND", "ENABLE": "+3V3", "IN": "+3V3", "OUT_S": "VREF25", "OUT_F": "VREF25"})
+    C("C51", "100n", "+3V3")
+    C("C52", "1u", "VREF25")
+    for ref, value, a, b in (("R110", sv.R_L1, "VREF25", "MON_T33"), ("R111", sv.R_L2, "MON_T33", "MON_T12"),
+                             ("R112", sv.R_L3, "MON_T12", "GND"), ("R113", sv.R_T, "+3V3", "MON33_P"),
+                             ("R114", sv.R_BT, "MON33_P", "GND")):
+        R(ref, "%gk 0.1%%" % (value / 1e3), a, b, lcsc=sv.R_PREC[value])
+    for ref, out, inp, ref_net, cap in (("U18", "MON33_OK", "MON33_P", "MON_T33", "C53"),
+                                        ("U20", "MON12_OK", "MON12_P", "MON_T12", "C55")):
+        part(ref, "jlc:OPA376AIDBVR", "OPA376", "jlc:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR", sv.PARTS[ref][1],
+             {"OUT": out, "V-": "GND", "IN+": inp, "IN-": ref_net, "V+": "+3V3"})
+        C(cap, "100n", "+3V3")
+    R("R115", "6.8M", "MON33_OK", "MON33_P", lcsc=sv.R_1PCT[sv.R_F33])
+    R("R116", "1k", "+1V2", "MON12_P", lcsc=sv.R_1PCT[sv.R_S])
+    R("R117", "2.7M", "MON12_OK", "MON12_P", lcsc=sv.R_1PCT[sv.R_F12])
+    part("D7", "jlc:BAT54ALT1G", "BAT54A", "jlc:SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR", sv.PARTS["D7"][1],
+         {1: "MON33_OK", 2: "MON12_OK", 3: "nMR"})
+    R("R118", "100k", "nPOR", "GND")
+    u19 = {"GND": "GND", "VCC": "3V3_STBY"}
+    for k in range(1, 7):
+        u19["%dA" % k] = "nPOR"
+        u19["%dY" % k] = "SLOT%d_RST_n" % k
+    part("U19", "jlc:SN74LVC07APWR", "SN74LVC07A", "jlc:TSSOP-14_L5.0-W4.4-P0.65-LS6.4-BL",
+         sv.PARTS["U19"][1], u19)
+    C("C54", "100n", "3V3_STBY")
+    group("clock")
     # the switch's two terminals each join a pair of pads; diagonal pads are
     # always on different terminals, whichever way the pairs run
     part("SW1", "jlc:TS-1187A-B-A-B", "RESET", "jlc:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5", "C318884",
@@ -901,11 +943,14 @@ def wanted(parts):
     at["R107"] = (70.0, row_slot(5), 0)
     # power: south edge, around the USB-C inlet
     y, dx = H - 9.0, -40.0                      # the south-west corner
-    power = {"R1": (62.0, y - 2), "R2": (78.0, y - 2), "U1": (70.0, y - 9, 0), "F1": (58.0, y - 9, 90),
-             "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "U2": (58.0, y - 19),
-             "R3": (58.0, y - 23), "R58": (62.5, y - 21), "R59": (62.5, y - 24), "C15": (54.0, y - 24), "C3": (51.0, y - 19, 90),
+    # MB-005 (main_power_corner): U2 half turned, its IN bar towards F1 and
+    # OUT towards the loads; its small parts beside it, R1 off the VBUS copper
+    power = {"R1": (66.0, y - 5), "R2": (78.0, y - 2), "U1": (70.0, y - 9, 0), "F1": (58.0, y - 9, 90),
+             "D1": (53.0, y - 9, 90), "C1": (62.0, y - 14), "U2": (58.0, y - 19, 180),
+             "R3": (53.8, y - 17.1), "R58": (61.6, y - 18.8), "R59": (61.6, y - 16.8), "C15": (54.3, y - 19.7, 90),
+             "C3": (51.0, y - 19, 270),
              "R4": (51.0, y - 27, 0), "U3": (78.0, y - 19, 90), "L1": (84.0, y - 20), "R5": (86.5, y - 15),
-             "R6": (86.5, y - 12), "C5": (74.0, y - 19, 90), "C6": (72.0, y - 23), "C7": (89.5, y - 19, 90),
+             "R6": (86.5, y - 12), "C5": (74.0, y - 19, 270), "C6": (76.3, y - 16.6), "C7": (89.5, y - 19, 90),
              "R7": (90.0, y - 25), "U4": (98.0, y - 19, 90), "C9": (95.0, y - 13, 0),
              "C10": (101.0, y - 13, 0), "R8": (101.0, y - 25), "R13": (84.0, y - 5), "R14": (84.0, y - 2),
              "C11": (88.0, y - 5), "R15": (91.5, y - 5), "R16": (91.5, y - 2), "U5": (95.0, y - 5, 90),
@@ -917,6 +962,31 @@ def wanted(parts):
     # pull-down and their pads in the free corner west of the eFuse
     at["U16"] = (BUTTONS_X + 7.0, H - 3.4, 0)
     at["C18"] = (BUTTONS_X + 7.0, H - 9.6, 0)
+    # MB-051: the chipset core's LDO beside U7 (main_power_corner.lay_1v2) and
+    # the reset qualifier (reset_supervisor.py) east of the configuration flash
+    at["U4"] = (120.0, 78.0, 90)
+    at["C9"] = (117.2, 78.0, 90)
+    at["C10"] = (122.8, 78.0, 90)
+    at["R8"] = (120.0, 82.0, 0)
+    at[tp("1V2_LDO")] = (126.0, 76.5, 0)
+    at[tp("+1V2")] = (126.0, 80.0, 0)
+    at["U17"] = (118.0, 88.0, 0)
+    at["C51"] = (114.6, 88.0, 90)
+    at["C52"] = (121.4, 88.0, 90)
+    for i, r in enumerate(("R110", "R111", "R112")):
+        at[r] = (125.5, 86.0 + 2.2 * i, 0)
+    at["U18"] = (118.0, 94.0, 0)
+    at["C53"] = (114.6, 94.0, 90)
+    for i, r in enumerate(("R113", "R114", "R115")):
+        at[r] = (122.5, 92.5 + 2.2 * i, 0)
+    at["U20"] = (118.0, 100.5, 0)
+    at["C55"] = (114.6, 100.5, 90)
+    for i, r in enumerate(("R116", "R117")):
+        at[r] = (122.5, 99.5 + 2.2 * i, 0)
+    at["D7"] = (126.5, 96.5, 0)
+    at["R118"] = (108.0, 141.0, 90)                   # nPOR's pull-down, at U6
+    at["U19"] = (44.0, 32.5, 90)                      # the slot-reset clamps, near U13
+    at["C54"] = (47.5, 32.5, 90)
     at["U15"] = (6.5, 162.0, 90)
     at["C16"] = (6.5, 158.0, 0)
     at["C17"] = (6.5, 166.0, 0)
@@ -925,7 +995,8 @@ def wanted(parts):
     at[tp("PWR_EN")] = (11.0, 168.0, 0)
     for i, net in enumerate(("VBUS_F", "5V_SYS", "+5V", "3V3_BUCK", "+3V3", "1V2_LDO", "+1V2", "CC1", "CC2",
                              "PWR_HI")):
-        at[tp(net)] = (44.0 + 3.8 * (i % 5), y - 26.0 + 3.2 * (i // 5), 0)
+        if net not in ("1V2_LDO", "+1V2"):              # beside the LDO, above
+            at[tp(net)] = (44.0 + 3.8 * (i % 5), y - 26.0 + 3.2 * (i // 5), 0)
     return at
 
 
@@ -944,16 +1015,19 @@ _FP_CACHE = {}
 _BOARDS = []
 
 
-def legalize(parts, at, margin=0.35, extra=None):
+def legalize(parts, at, margin=0.35, extra=None, pinned=None):
     """Sockets, the chipset and the memory stay where they are put; every
     other part moves to the nearest spot where its courtyard and pads clear
-    everything placed before it (a spiral search)."""
+    everything placed before it (a spiral search). `pinned` parts ({ref:
+    (x, y, rot)}) go exactly there, first: the placement the route seed was
+    made on."""
     import math
     import pcbnew
     mm = pcbnew.FromMM
     # the LEDs (one row), the buttons and their controller (the front edge) stay put too
     fixed = ("J", "U7", "U9", "U10", "H", "D", "SW", "U16")
-    order = sorted(at, key=lambda r: (not r.startswith(fixed), r))
+    pinned = pinned or {}
+    order = sorted(at, key=lambda r: (r not in pinned, not r.startswith(fixed), r))
     fps = {}
     for s in parts:
         if s.fp and s.ref not in fps:
@@ -966,11 +1040,15 @@ def legalize(parts, at, margin=0.35, extra=None):
                    LOGO_AT[0] + LOGO_MM / 2 + 0.5, LOGO_AT[1] + LOGO_MM / 2 + 0.5))
     out = {}
     for r in order:
-        x, y, rot = at[r]
+        x, y, rot = pinned.get(r, at[r])
         fp = fps[r]
         fp.SetOrientationDegrees(rot)
         found = None
         fp.SetPosition(pcbnew.VECTOR2I(mm(x), mm(y)))
+        if r in pinned:
+            placed.append(_box(fp))
+            out[r] = (x, y, rot)
+            continue
         e = 0.0 if r.startswith(fixed) else (extra or {}).get(r, 0.0)
         b0 = _box(fp)
         b0 = (b0[0] - e, b0[1] - e, b0[2] + e, b0[3] + e)
@@ -999,15 +1077,41 @@ def placement():
     missing = sorted({s.ref for s in parts if s.fp} - set(at))
     if missing:
         raise SystemExit("no placement for: %s" % ", ".join(missing))
+    # every part the route seed was made on stays exactly where it was,
+    # unless this revision moves it (RELAID); the rest are legalized round them
+    by_net = {}
+    for p in parts:
+        for n in set(p.conns.values()):
+            by_net.setdefault(n, []).append(p.ref)
+    relaid = set(RELAID) | {r for n in ("1V2_LDO", "+1V2") for r in by_net[n] if r.startswith("TP")}
+    pinned = {r: v for r, v in main_seed.placements().items() if r in at and r not in relaid}
+    pinned.update(PINNED)
     extra = {}
     for _ in range(200):
-        pl = legalize(parts, at, extra=extra)
+        pl = legalize(parts, at, extra=extra, pinned=pinned)
         bad = _designators(parts, pl) or _designators_kicad(parts, pl)
         if not bad:
             return pl
         for r in bad:
-            extra[r] = extra.get(r, 0.0) + 0.5
+            if r not in pinned:
+                extra[r] = extra.get(r, 0.0) + 0.5
+                continue
+            near = [q for q in pl if q not in pinned and
+                    abs(pl[q][0] - pl[r][0]) < 8.0 and abs(pl[q][1] - pl[r][1]) < 8.0]
+            if not near:
+                raise SystemExit("placement: pinned %s has no room for its designator" % r)
+            for q in near:
+                extra[q] = extra.get(q, 0.0) + 0.5
     raise SystemExit("placement: no room for the designators of %s" % ", ".join(bad))
+
+
+# the parts this revision moves from where the route seed has them
+# (MB-005 input corner, MB-051 1V2 LDO), and those that must land exactly
+RELAID = ("U2", "R3", "R58", "R59", "C15", "C3", "C5", "C6", "R1", "U4", "C9", "C10", "R8", "TP105", "TP106")
+PINNED = {"U2": (18.0, 160.0, 180), "C3": (11.0, 160.0, 270), "R1": (26.0, 174.0, 0), "C5": (34.0, 160.0, 270),
+          "C15": (13.2, 159.6, 270), "R3": (13.2, 163.0, 90), "R58": (23.8, 159.8, 90), "R59": (25.7, 161.8, 90),
+          "TP105": (23.0, 154.3, 0),
+          "C6": (36.3, 162.4, 0)}
 
 
 _TEXT_W = {}
@@ -1187,14 +1291,63 @@ def prepare(board):
     board.Add(v)
     _plane_pads(board)
     nets = _efuse_escapes(board, fp)
-    standby = _standby_preroute(board)
+    standby = _standby_vin(board)
+    corner = main_power_corner.lay(board)
+    core = main_power_corner.lay_1v2(board)
     _five_volt_bus(board)
     signal = _spi_ncs6_escape(board)
     _label_keepouts(board)
+    added, dropped = main_seed.apply(board, SEED_RIPUP, SEED_RIPUP_NETS)
+    print("route seed: %d items kept, dropped %s" % (added, dropped), end=" ", flush=True)
     # Freerouting reports the wide locked inner-layer +5V trunk as several
     # unrouted via/slot links even though KiCad already joins R4 and all six
     # fuse inputs. Check the entire net with KiCad after SES import instead.
-    return nets + standby + signal + ["/+5V"]
+    return nets + standby + corner + core + signal + ["/+5V"]
+
+
+# The route seed (main_seed.py): the last receipt-bound route, kept outside
+# what this revision re-lays: the input corner (MB-005), and on B.Cu the
+# +1V2 island and corridor (MB-051). (x0, y0, x1, y1[, layer]) mm.
+SEED_RIPUP = [(0.0, 151.0, 44.0, 188.0)] + \
+    [(x0, y0, x1, y1, "B.Cu") for x0, y0, x1, y1 in (main_power_corner.ISLAND, (107.0, 55.0, 121.0, 78.0))]
+SEED_RIPUP_NETS = ("/1V2_LDO",)
+ROUTE_SEEDED = True        # _finish_route: the salt-1/salt-9 repairs are in the seed already
+
+
+def _standby_vin(board):
+    """The standby LDO's VIN (U15 pin 2, between GND and VOUT) up to C16,
+    with a via to the inner layers beside C16 (locked: the router left it
+    open in most runs once the POWER button was added)."""
+    import pcbnew
+    mm, to = pcbnew.FromMM, pcbnew.ToMM
+
+    def pad(ref, num):
+        p = [q for q in board.FindFootprintByReference(ref).Pads() if q.GetNumber() == num][0]
+        return p, (to(p.GetPosition().x), to(p.GetPosition().y))
+
+    def track(pts, width, net, layer=pcbnew.F_Cu):
+        for a, b in zip(pts, pts[1:]):
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1])))
+            t.SetEnd(pcbnew.VECTOR2I(mm(b[0]), mm(b[1])))
+            t.SetWidth(mm(width))
+            t.SetLayer(layer)
+            t.SetNet(net)
+            t.SetLocked(True)
+            board.Add(t)
+    vin, (vx, vy) = pad("U15", "2")
+    c16, (cx, cy) = pad("C16", "1")
+    track([(vx, vy), (vx, cy + 1.2), (cx, cy + 0.4), (cx, cy)], 0.3, vin.GetNet())
+    via = (cx - 1.3, cy)
+    track([(cx, cy), via], 0.3, vin.GetNet())
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(pcbnew.VECTOR2I(mm(via[0]), mm(via[1])))
+    v.SetWidth(mm(0.6))
+    v.SetDrill(mm(0.3))
+    v.SetNet(vin.GetNet())
+    v.SetLocked(True)
+    board.Add(v)
+    return [vin.GetNetname()]
 
 
 def _label_keepouts(board):
@@ -1377,32 +1530,8 @@ def _five_volt_bus(board):
             all(abs(y - (44.72 + 20.32 * i)) < 0.05 for i, y in enumerate(row_y))):
         raise SystemExit("_five_volt_bus: power or slot rows moved; redraw the 5 V copper")
 
-    # The eFuse-to-R4 current initially runs through a 0.5 mm outer track
-    # and a 1 mm inner track. Both can be widened without a DRC clearance
-    # violation; the QFN's 0.3 mm pin escape stays narrow for only 2 mm.
     tracks = board.Tracks()
     items = [tracks[i].Cast() for i in range(len(tracks))]
-    widened_f, widened_inner = 0, 0
-    parallel_inner = []
-    for item in items:
-        if item.GetNetname() != "/5V_SYS" or item.Type() != pcbnew.PCB_TRACE_T:
-            continue
-        a, b = item.GetStart(), item.GetEnd()
-        if item.GetLayer() == pcbnew.In3_Cu and abs(to(item.GetWidth()) - 1.0) < 0.01:
-            item.SetWidth(mm(2.0))
-            widened_inner += 1
-            # The R4 pad-side horizontal segment is too near the +5V bus
-            # on In2; the other three fit there as a parallel current path.
-            if not (abs(to(a.y) - 153.875) < 0.01 and abs(to(b.y) - 153.875) < 0.01):
-                parallel_inner.append(((to(a.x), to(a.y)), (to(b.x), to(b.y)), item.GetNet()))
-        elif item.GetLayer() == pcbnew.F_Cu and abs(to(a.y) - 162) < 0.01 and \
-                abs(to(b.y) - 162) < 0.01 and abs(to(a.x - b.x)) > 20:
-            item.SetWidth(mm(1.2))
-            widened_f += 1
-    if (widened_f, widened_inner, len(parallel_inner)) != (1, 4, 3):
-        raise SystemExit("_five_volt_bus: eFuse power pre-route changed; check widths")
-    for a, b, net in parallel_inner:
-        track(a, b, 2.0, net, pcbnew.In2_Cu)
 
     # ground_fanout gave each IRQ pull-up a +3V3 via at x=4.675. Move only
     # those six vias and their short traces; the second +3V3 via at x=8.875
@@ -1447,25 +1576,7 @@ def _five_volt_bus(board):
     track((sx, sy), (15.6, sy), 0.7, power, pcbnew.F_Cu)
     for x in (14.0, 14.8, 15.6):
         via((x, sy), power)
-
-    # The buck's VIN pads are on opposite sides of its six-pin package. A
-    # direct south-side feed to pin 1 and west-side feed to pin 4 avoid the
-    # long 0.5 mm detour the router used on the prior board (28 mOhm to
-    # pin 1). The C5-to-U3 path is under 17 mOhm in the nominal copper model.
-    buck = pad("U2", "6").GetNet()
-    if any(abs(xy(pad("U3", p))[i] - expect) > 0.05 for p, coords in
-           (("1", (39.15, 160.95)), ("4", (36.85, 159.05)))
-           for i, expect in enumerate(coords)):
-        raise SystemExit("_five_volt_bus: buck moved; redraw the VIN feeds")
-    for a, b, width in (
-            ((34.0, 162.0), (34.0, 163.0), 1.0),
-            ((34.0, 163.0), (40.0, 163.0), 1.0),
-            ((40.0, 163.0), (40.0, 160.95), 0.5),
-            ((40.0, 160.95), (39.15, 160.95), 0.5),
-            ((34.0, 160.775), (35.5, 160.775), 0.5),
-            ((35.5, 160.775), (35.5, 159.05), 0.5),
-            ((35.5, 159.05), (36.85, 159.05), 0.4)):
-        track(a, b, width, buck, pcbnew.F_Cu)
+    # the eFuse's output and the buck's VIN feeds: main_power_corner.lay
 
 
 def _spi_ncs6_escape(board):
@@ -1568,6 +1679,13 @@ def _finish_route(board, replay_salt=None):
     """
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
+    if ROUTE_SEEDED:
+        # the route starts from main_seed's copper, which already carries
+        # the salt-9 repairs below; the input corner's two escape joints and
+        # the silk/mask clean-up remain
+        main_power_corner.finish(board)
+        _clear_main_silk_mask(board)
+        return
 
     def point(xy):
         return pcbnew.VECTOR2I(mm(xy[0]), mm(xy[1]))
@@ -1758,7 +1876,7 @@ def _efuse_escapes(board, fp):
     return [pads["5"].GetNetname(), pads["6"].GetNetname()] + ([] if same else [pads["1"].GetNetname()])
 
 
-PLANE_NETS = ("/GND", "/+3V3")
+PLANE_NETS = ("/GND", "/+3V3", "/+1V2")     # +1V2: the B.Cu island inside U7 (main_power_corner.lay_1v2)
 FINE_PITCH = ("U2", "U7", "U9")
 
 

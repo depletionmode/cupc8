@@ -1,0 +1,12 @@
+# REF3425IDBVR (TI), 2.5 V series voltage reference, +-0.05 %, 6 ppm/C, SOT-23-6 (DBV)
+datasheet: https://www.ti.com/lit/ds/symlink/ref34.pdf
+source: "TI REF34xx SBAS804G, 5 Pin Configuration and Functions: Figure 5-1 DBV package (top view) and Table 5-1 (REF34xx DBV column)"
+package: SOT-23-6
+pins:
+  1: GND_F
+  2: GND_S
+  3: ["EN", "ENABLE"]
+  4: IN
+  5: OUT_S
+  6: OUT_F
+ccw: [1, 6]

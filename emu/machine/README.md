@@ -108,9 +108,41 @@ socket on its SPI1 (`emu/rp2040/harness/sdcard.h`); `Machine::sd()`, and
 an image in and take it out between runs. The model runs on the storage
 card's own clock, inside its thread.
 
+The two iCE40s' configuration (`fpgaconfig.h`): each FPGA is configured
+from its W25Q flash (a `SpiFlash`: JEDEC ID, read, status, write enable,
+page program and 4 KB erase, completing at CS_n rising) when the flash holds
+the iCE40 sync word and the FPGA-to-flash copper is whole. sysctl's GPIO6/16
+(CRESET_B, open drain) hold an FPGA unconfigured; releasing it configures
+it again 200 ms later (fpga.c's figure), and GPIO7/17 read CDONE. The
+system card's SPI1 reaches the chipset's flash on GPIO10-13 and the CPU
+card's on GPIO14/15/8/9, whichever pin set the firmware has on SPI; an open
+bus reads 0. The chipset unconfigured holds the board's nPOR input low; the
+CPU card unconfigured runs no clock and drives nothing (MainBoard
+`setCpuConfigured`), and its CDONE low makes the chipset hold the CPU in
+reset. `state()` adds `chipsetConfigured`, `cpuConfigured` and `cdoneLed`
+(D5). At power-on both are configured at once, as before (the real ~0.2 s
+start-up is not modelled); `Machine.create({chipsetFlash, cpuFlash})` sets
+the flash contents (default: a stand-in image with the sync word), and the
+netlist top's `fpga_links` gate each leg. This runs at the serial point of
+each iteration (`configStep`), with every card parked.
+
+Indicator LEDs: a GPIO listener on each firmware-driven LED pin (storage
+GPIO24/25, IO 24/25, e-ink 24, system card 0/1) records its level and rising
+edges; `leds()` in the addon, `m.leds()` in machinenative.mjs (which with the
+netlist top lights only LEDs whose copper is whole). Listeners only observe:
+the cards' step sequence is unchanged.
+
+sysctl's I2C0 carries two TCA9555 models (`Tca9555`, registers with the
+part's pointer toggling within a pair) when `Machine.create` is given
+`expanders` (the netlist top does: U13 at $20, U14 at $21 with the CPU
+card's presence and ID straps on its port 1); without them every address
+NACKs as before. The expanders' outputs (CARD_RST_n, PROG_n) drive nothing
+yet: holding or restarting a card needs an RP2040 reset in emu/rp2040.
+
 Harness hooks used in emu/rp2040: `FIFO::onPull` (TMDS capture), the SPI
-`onTransmit`/`completeTransmit` callbacks, USBCDC and UsbKeyboard; nothing in
-emu/rp2040 was changed for this directory.
+`onTransmit`/`completeTransmit` callbacks, the I2C `onConnect`/`onWriteByte`/
+`onReadByte` callbacks, GPIO `addListener`, USBCDC and UsbKeyboard; nothing
+in emu/rp2040 was changed for this directory.
 
 ## Speed
 

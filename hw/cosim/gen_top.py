@@ -24,6 +24,13 @@ import kicadgen
 CARDS = ('cpu', 'system', 'gpu', 'io', 'storage', 'wifi', 'eink')
 
 
+def implemented_checks():
+    """Catalogue ids that have a command: an analog waiver may only name these."""
+    import tomllib
+    rows = tomllib.loads((ROOT / 'test/catalogue.toml').read_text())['test']
+    return {row['id'] for row in rows if row.get('cmd')}
+
+
 def exported_cards(directory):
     result = {}
     for name in CARDS:
@@ -162,6 +169,450 @@ def qspi_boot_routes(cards, card_boards, system_board):
                 missing.append(f'{board}:{name}_qspi_copper')
         rows[board] = connected
     return rows, paths, missing
+
+
+def crystal_routes(cards, card_boards, system_board):
+    """Digital boot prerequisite: each RP2040's 12 MHz crystal network.
+
+    XIN reaches the crystal and its load capacitor; XOUT reaches its 1k
+    series resistor, whose far side reaches the crystal's other terminal
+    and load capacitor. Any open leg leaves that card's firmware stopped
+    (the RP2040 has no clock to boot from in this model). Oscillator start-up
+    margin, drive level and frequency error are analog and are not modeled.
+    """
+    rows, paths, missing, whole = {}, [], [], {}
+    for board in ('system', 'gpu', 'io', 'storage', 'eink'):
+        circuit = cards[board]
+        pcb = system_board if board == 'system' else (card_boards or {}).get(board)
+        routed = pcb is not None and Path(pcb).is_file()
+        if routed:
+            sys.path.insert(0, str(ROOT / 'hw/si'))
+            from ibis_bus import routed_distances
+        xin, xout = named_pin(circuit, 'U1', 'XIN'), named_pin(circuit, 'U1', 'XOUT')
+        xin_net, xout_net = node(circuit, *xin), node(circuit, *xout)
+        crystal = [ref for ref, (value, _) in circuit.components.items()
+                   if ref.startswith('Y') and value == '12MHz']
+        if len(crystal) != 1:
+            raise ValueError(f'{board}: expected one 12 MHz crystal')
+        crystal = crystal[0]
+        ends = sorted((pin for (ref, pin), net in circuit.pins.items()
+                       if ref == crystal and net != '/GND'),
+                      key=lambda pin: node(circuit, crystal, pin) != xin_net)
+        if len(ends) != 2 or node(circuit, crystal, ends[0]) != xin_net:
+            raise ValueError(f'{board}: crystal {crystal} must span XIN and the XOUT resistor')
+        far_net = node(circuit, crystal, ends[1])
+        resistor = circuit.series(xout, (crystal, ends[1]))
+        if resistor is None or resistor.value != '1k':
+            raise ValueError(f'{board}: XOUT must reach the crystal through its 1k resistor')
+        near = next(pin for pin in ('1', '2') if node(circuit, resistor.ref, pin) == xout_net)
+        far = '2' if near == '1' else '1'
+
+        def load_cap(net):
+            caps = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
+                    if attached == net and ref.startswith('C')]
+            if len(caps) != 1 or circuit.components[caps[0][0]][0] != '33p' or \
+                    node(circuit, caps[0][0], '2' if caps[0][1] == '1' else '1') != '/GND':
+                raise ValueError(f'{board}:{net}: expected one grounded 33p load capacitor')
+            return caps[0]
+
+        legs = [(xin_net, xin, [(crystal, ends[0]), load_cap(xin_net)]),
+                (xout_net, xout, [(resistor.ref, near)]),
+                (far_net, (resistor.ref, far), [(crystal, ends[1]), load_cap(far_net)])]
+        for net, first, targets in legs:
+            # nothing else may load the oscillator nodes
+            if set(circuit.nets[net]) != {first, *targets}:
+                raise ValueError(f'{board}:{net}: unexpected parts on the crystal network')
+        connected = True
+        for net, first, targets in legs:
+            lengths = {}
+            if routed:
+                lengths = routed_distances(Path(pcb), net, first, targets)
+            for target in targets:
+                mm = lengths.get(f'{target[0]}.{target[1]}')
+                paths.append({'from': f'{board}.{first[0]}.{first[1]}',
+                              'to': f'{board}.{target[0]}.{target[1]}',
+                              'route_mm': mm, 'runtime': f'{board}_crystal_connected'})
+                whole[(board, net)] = whole.get((board, net), True) and mm is not None
+                if mm is None:
+                    connected = False
+                    missing.append(f'{board}:{net.lstrip("/")}_crystal_copper:{target[0]}.{target[1]}')
+        rows[board] = connected
+    return rows, paths, missing, whole
+
+
+def adc_sense_routes(main, system, main_board, system_board):
+    """sysctl's ADC inputs: the Type-C CC lines and the 1V2 sense.
+
+    CC1/CC2 run from the power receptacle's CC contacts through the system
+    socket to GPIO26/27; V1V2_SENSE from +1V2 through R100 (1k) to GPIO28.
+    Returns ({'cc1', 'cc2', 'v1v2'} links, paths, missing, whole_nets). The
+    native machine puts the source's CC voltage and 1.2 V on those pins
+    (open copper reads 0 V); the analog thresholds are POW-005's.
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    boards = {'main': (main, main_board), 'system': (system, system_board)}
+    paths, missing, whole, links = [], [], {}, {}
+
+    def leg(board, net, first, last, flag):
+        circuit, pcb = boards[board]
+        path(circuit, first, last)
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            mm = routed_distances(Path(pcb), f'/{net}', first, [last])[f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}', 'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': f'adc_{flag}'})
+        whole[(board, f'/{net}')] = whole.get((board, f'/{net}'), True) and mm is not None
+        if mm is None:
+            missing.append(f'{board}:{net}_adc_{flag}')
+        return mm is not None
+
+    def socket(net):
+        pads = [p for (r, p), n in main.pins.items() if r == 'J3' and n == f'/{net}']
+        if len(pads) != 1:
+            raise ValueError(f'main:{net}: expected one system-socket contact')
+        number = int(pads[0])
+        return ('J3', pads[0]), ('J2', f'A{number}' if number <= 32 else f'B{number - 32}')
+
+    for flag, net, receptacle, gpio in (('cc1', 'CC1', ('J1', 'A5'), 'GPIO26/ADC0'),
+                                        ('cc2', 'CC2', ('J1', 'B5'), 'GPIO27/ADC1')):
+        main_contact, card_contact = socket(net)
+        mcu = named_pin(system, 'U1', gpio)
+        if node(system, *card_contact) != f'/{net}' or node(system, *mcu) != f'/{net}':
+            raise ValueError(f'system:{net}: socket contact or {gpio} moved')
+        links[flag] = leg('main', net, receptacle, main_contact, flag) and \
+            leg('system', net, card_contact, mcu, flag)
+    main_contact, card_contact = socket('V1V2_SENSE')
+    sense = resistor_between(main, main_contact, next(
+        (r, p) for (r, p), n in main.pins.items() if n == '/+1V2' and r.startswith('R') and
+        main.series((r, p), main_contact) is not None))
+    if sense.value != '1k':
+        raise ValueError('main: V1V2_SENSE must be +1V2 through a 1k resistor')
+    near = next((sense.ref, p) for p in ('1', '2') if node(main, sense.ref, p) == '/V1V2_SENSE')
+    mcu = named_pin(system, 'U1', 'GPIO28/ADC2')
+    if node(system, *card_contact) != '/V1V2_SENSE' or node(system, *mcu) != '/V1V2_SENSE':
+        raise ValueError('system:V1V2_SENSE: socket contact or GPIO28 moved')
+    links['v1v2'] = leg('main', 'V1V2_SENSE', near, main_contact, 'v1v2') and \
+        leg('system', 'V1V2_SENSE', card_contact, mcu, 'v1v2')
+    return links, paths, missing, whole
+
+
+def i2c_expander_routes(main, cards, main_board, cpu_board, system_board):
+    """sysctl's I2C0 to the two TCA9555s, and the CPU card presence input.
+
+    Returns (rows, paths, missing, whole_nets). rows: the expanders (address
+    from their A0-A2 straps, whether SDA and SCL reach them), the CPU-card
+    presence path (main J2.B49 to U14 P10 and the card's PRSNT1-PRSNT2 loop),
+    the CPU card ID straps, and each slot's presence path. Only the CPU
+    presence bit is read by software (sysctl STATUS); slot presence and the
+    ID bits are presented on the bus but nothing reads them.
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    system, cpu = cards['system'], cards['cpu']
+    boards = {'main': (main, main_board), 'system': (system, system_board), 'cpu': (cpu, cpu_board)}
+    paths, missing, whole = [], [], {}
+
+    def leg(board, net, first, last, flag):
+        circuit, pcb = boards[board]
+        path(circuit, first, last)
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            mm = routed_distances(Path(pcb), f'/{net}', first, [last])[f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}', 'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': flag})
+        whole[(board, f'/{net}')] = whole.get((board, f'/{net}'), True) and mm is not None
+        if mm is None:
+            missing.append(f'{board}:{net}_{flag}:{first[0]}.{first[1]}->{last[0]}.{last[1]}')
+        return mm is not None
+
+    expanders = sorted(ref for ref, (value, _) in main.components.items() if value == 'TCA9555PWR')
+    if len(expanders) != 2:
+        raise ValueError(f'main: expected two TCA9555 expanders, found {expanders}')
+    lines = {}
+    for signal, gpio in (('SDA', 'GPIO24'), ('SCL', 'GPIO25')):
+        net = f'I2C_{signal}'
+        mcu = named_pin(system, 'U1', gpio)
+        if node(system, *mcu) != f'/{net}':
+            raise ValueError(f'system: {gpio} is not on {net}')
+        pads = [p for (r, p), n in main.pins.items() if r == 'J3' and n == f'/{net}']
+        if len(pads) != 1:
+            raise ValueError(f'main:{net}: expected one system-socket contact')
+        number = int(pads[0])
+        contact = ('J2', f'A{number}' if number <= 32 else f'B{number - 32}')
+        system_ok = leg('system', net, mcu, contact, 'i2c')
+        pulls = [r for r, other in system.pulls('/+3V3') if other == f'/{net}'] + \
+                [r for r, other in main.pulls('/+3V3') if other == f'/{net}']
+        if not pulls:
+            raise ValueError(f'{net}: no pull-up to 3V3')
+        lines[signal] = (system_ok, ('J3', pads[0]))
+    rows = {'expanders': [], 'cpu_present_link': False, 'card_id': [], 'slot_presence': []}
+    for ref in expanders:
+        address = 0x20
+        for bit, name in enumerate(('A0', 'A1', 'A2')):
+            level = node(main, *named_pin(main, ref, name))
+            if level not in ('/GND', '/+3V3'):
+                raise ValueError(f'main:{ref} {name}: address strap is on {level}')
+            address |= (level == '/+3V3') << bit
+        link = True
+        for signal, (system_ok, contact) in lines.items():
+            pad = named_pin(main, ref, signal)
+            link &= system_ok and leg('main', f'I2C_{signal}', contact, pad, 'i2c')
+        rows['expanders'].append({'ref': ref, 'address': address, 'link': link})
+    if sorted(x['address'] for x in rows['expanders']) != [0x20, 0x21]:
+        raise ValueError('main: sysctl addresses its expanders at $20 and $21 (power.c)')
+    presence = next(x['ref'] for x in rows['expanders'] if x['address'] == 0x21)
+    p10 = named_pin(main, presence, 'P10')
+    if node(main, *p10) != '/CPU_PRSNT2_n':
+        raise ValueError(f'main:{presence} P10 is not CPU_PRSNT2_n')
+    contact = next(('J2', p) for (r, p), n in main.pins.items() if r == 'J2' and n == '/CPU_PRSNT2_n')
+    first = next(('J1', p) for (r, p), n in cpu.pins.items()
+                 if r == 'J1' and n == '/PRSNT' and cpu.pin_names.get(('J1', p)) == 'PRSNT1_n')
+    card_contact = ('J1', contact[1])
+    if node(cpu, *card_contact) != '/PRSNT' or node(main, 'J2', first[1]) != '/GND':
+        raise ValueError('CPU card presence loop: PRSNT2_n must reach PRSNT1_n, grounded on the main board')
+    rows['cpu_present_link'] = leg('main', 'CPU_PRSNT2_n', contact, p10, 'cpu_presence') and \
+        leg('cpu', 'PRSNT', first, card_contact, 'cpu_presence')
+    for bit, name in ((1, 'P11'), (2, 'P12')):
+        pad = named_pin(main, presence, name)
+        net = node(main, *pad)
+        strap = next(p for (r, p), n in main.pins.items() if r == 'J2' and n == net)
+        card = cpu.net('J1', strap) or 'NC'
+        rows['card_id'].append({'bit': bit, 'net': net.lstrip('/'),
+                                'level': 0 if card == '/GND' else 1})
+    for slot in range(1, 7):
+        net = f'SLOT{slot}_PRSNT2_n'
+        pad = next(((r, p) for (r, p), n in main.pins.items() if r == presence and n == f'/{net}'), None)
+        rows['slot_presence'].append({'slot': slot, 'bit': int(main.pin_names[pad][2]) if pad else None})
+    return rows, paths, missing, whole
+
+
+def card_led_routes(cards, card_boards, system_board):
+    """Firmware-driven indicator LEDs on the RP2040 cards, leg by leg.
+
+    An indicator is an RP2040 GPIO whose net holds only that pad and one
+    resistor, whose far net holds only the resistor and an LED anode, the
+    LED's cathode on GND. Both signal legs must be on the routed copper for
+    the native machine to show the LED (Machine.leds()). LED current and
+    brightness are analog and not modelled.
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    rows, paths, missing = {}, [], []
+    for board in ('system', 'gpu', 'io', 'storage', 'eink'):
+        circuit = cards[board]
+        pcb = system_board if board == 'system' else (card_boards or {}).get(board)
+        routed = pcb is not None and Path(pcb).is_file()
+        rows[board] = []
+        for (ref, pin), label in sorted(circuit.pin_names.items()):
+            if ref != 'U1' or not label.startswith('GPIO') or (ref, pin) not in circuit.pins:
+                continue
+            source_net = circuit.pins[(ref, pin)]
+            others = [n for n in circuit.nets[source_net] if n != (ref, pin)]
+            if len(others) != 1 or circuit.components[others[0][0]][1] != ('Device', 'R'):
+                continue
+            resistor = others[0]
+            far = (resistor[0], '2' if resistor[1] == '1' else '1')
+            anode_net = circuit.pins.get(far)
+            leds = [n for n in circuit.nets.get(anode_net, ()) if n != far]
+            if len(leds) != 1 or circuit.components[leds[0][0]][1] != ('Device', 'LED') or \
+                    circuit.pin_names.get(leds[0]) != 'A':
+                continue
+            diode = leds[0][0]
+            cathode = named_pin(circuit, diode, 'K')
+            if node(circuit, *cathode) != '/GND':
+                raise ValueError(f'{board}:{diode}: indicator LED cathode must be on GND')
+            connected = True
+            for net, first, last in ((source_net, (ref, pin), resistor), (anode_net, far, leds[0])):
+                mm = None
+                if routed:
+                    mm = routed_distances(Path(pcb), net, first, [last])[f'{last[0]}.{last[1]}']
+                paths.append({'from': f'{board}.{first[0]}.{first[1]}', 'to': f'{board}.{last[0]}.{last[1]}',
+                              'route_mm': mm, 'runtime': f'{board}_led_{source_net.lstrip("/")}'})
+                if mm is None:
+                    connected = False
+                    missing.append(f'{board}:{net.lstrip("/")}_led_copper')
+            rows[board].append({'gpio': int(label[4:].split('/')[0]), 'net': source_net.lstrip('/'),
+                                'anode_net': anode_net.lstrip('/'), 'led': diode,
+                                'connected': connected})
+    return rows, paths, missing
+
+
+def fpga_config_routes(main, cpu, system, main_board, cpu_board, system_board):
+    """The two iCE40s' configuration chain, leg by leg on routed copper.
+
+    Returns (links, paths, missing, legs_by_net). `links` are the native
+    machine's fpga_links (emu/machine/fpgaconfig.h): each is the conjunction
+    of its copper legs. legs_by_net maps (board, net) to whether every leg
+    on that net is present, so an open leg restores the net's coverage gap.
+    Pins are bound by net name and package pin name; a renamed or moved
+    net fails here with the name it expected.
+    """
+    sys.path.insert(0, str(ROOT / 'hw/si'))
+    from ibis_bus import routed_distances
+    circuits = {'main': (main, main_board), 'cpu': (cpu, cpu_board),
+                'system': (system, system_board)}
+    paths, missing, legs_by_net = [], [], {}
+
+    def pad(board, ref, net=None, name=None):
+        circuit = circuits[board][0]
+        if name is not None:
+            found = named_pin(circuit, ref, name)
+            if net is not None and node(circuit, *found) != f'/{net}':
+                raise ValueError(f'{board}:{ref} {name}: expected on {net}, found {node(circuit, *found)}')
+            return found
+        pads = [(r, p) for (r, p), attached in circuit.pins.items()
+                if r == ref and attached == f'/{net}']
+        if len(pads) != 1:
+            raise ValueError(f'{board}:{net}: expected one {ref} pad, found {pads}')
+        return pads[0]
+
+    def leg(board, net, first, last, flag):
+        circuit, pcb = circuits[board]
+        if node(circuit, *first) != f'/{net}' or node(circuit, *last) != f'/{net}':
+            raise ValueError(f'{board}:{net}: {first} or {last} is no longer on this net')
+        mm = None
+        if pcb is not None and Path(pcb).is_file():
+            mm = routed_distances(Path(pcb), f'/{net}', first, [last])[f'{last[0]}.{last[1]}']
+        paths.append({'from': f'{board}.{first[0]}.{first[1]}', 'to': f'{board}.{last[0]}.{last[1]}',
+                      'route_mm': mm, 'runtime': f'fpga_{flag}'})
+        ok = mm is not None
+        legs_by_net[(board, f'/{net}')] = legs_by_net.get((board, f'/{net}'), True) and ok
+        if not ok:
+            missing.append(f'{board}:{net}_fpga_{flag}:{first[0]}.{first[1]}->{last[0]}.{last[1]}')
+        return ok
+
+    def pullup(board, net, rail):
+        """The resistor from `net` to `rail`; returns its pad on `net`."""
+        circuit = circuits[board][0]
+        found = [r for r, other in circuit.pulls(rail) if other == f'/{net}']
+        if len(found) != 1 or found[0].value != '10k':
+            raise ValueError(f'{board}:{net}: expected one 10k pull-up to {rail}')
+        return next((found[0].ref, p) for p in ('1', '2') if node(circuit, found[0].ref, p) == f'/{net}')
+
+    def system_contact(main_pin):
+        number = int(main_pin)
+        return ('J2', f'A{number}' if number <= 32 else f'B{number - 32}')
+
+    def socket_bridge(main_net, card_board, card_net, main_ref, card_ref):
+        """A main socket contact and the card contact it mates with."""
+        pins = [p for (r, p), n in main.pins.items() if r == main_ref and n == f'/{main_net}']
+        if len(pins) != 1:
+            raise ValueError(f'main:{main_net}: expected one {main_ref} contact')
+        mate = system_contact(pins[0]) if card_board == 'system' else (card_ref, pins[0])
+        if node(circuits[card_board][0], *mate) != f'/{card_net}':
+            raise ValueError(f'main.{main_ref}.{pins[0]} ({main_net}) mates with '
+                             f'{card_board}.{mate[0]}.{mate[1]}, not {card_net}')
+        return (main_ref, pins[0]), mate
+
+    links = {}
+    # --- the chipset: U7 boots from U8 over FL0; CRESET_B pulled up by a 10k
+    u7 = {k: pad('main', 'U7', name=v) for k, v in (('sck', 'IOB_107_SCK'), ('sdo', 'IOB_105_SDO'),
+                                                     ('sdi', 'IOB_106_SDI'), ('ss', 'IOB_108_SS'),
+                                                     ('creset', '~{CRESET}'), ('cdone', 'CDONE'))}
+    u8 = {k: pad('main', 'U8', name=v) for k, v in (('clk', 'CLK'), ('di', 'DI(IO0)'),
+                                                     ('do', 'DO(IO1)'), ('cs', '~{CS}'))}
+    config = [leg('main', 'FL0_SCK', u7['sck'], u8['clk'], 'chipset_config'),
+              leg('main', 'FL0_MOSI', u7['sdo'], u8['di'], 'chipset_config'),
+              leg('main', 'FL0_MISO', u8['do'], u7['sdi'], 'chipset_config'),
+              leg('main', 'FL0_nCS', u7['ss'], u8['cs'], 'chipset_config'),
+              leg('main', 'CHIPSET_nCRESET', pullup('main', 'CHIPSET_nCRESET', '/+3V3'), u7['creset'],
+                  'chipset_config')]
+    links['chipsetConfigCopper'] = all(config)
+    # --- the CPU card: U1 boots from U2 over FL1; WP/HOLD and CRESET_B pulled up
+    c1 = {k: pad('cpu', 'U1', name=v) for k, v in (('sck', 'IOB_107_SCK'), ('sdo', 'IOB_105_SDO'),
+                                                    ('sdi', 'IOB_106_SDI'), ('ss', 'IOB_108_SS'),
+                                                    ('creset', '~{CRESET}'), ('cdone', 'CDONE'))}
+    c2 = {k: pad('cpu', 'U2', name=v) for k, v in (('clk', 'CLK'), ('di', 'DI/IO_{0}'),
+                                                    ('do', 'DO/IO_{1}'), ('cs', '~{CS}'),
+                                                    ('wp', '~{WP}/IO_{2}'),
+                                                    ('hold', '~{HOLD}/~{RESET}/IO_{3}'))}
+    wphold = pullup('cpu', 'FL1_WPHOLD', '/3V3')
+    config = [leg('cpu', 'FL1_SCK', c1['sck'], c2['clk'], 'cpu_config'),
+              leg('cpu', 'FL1_MOSI', c1['sdo'], c2['di'], 'cpu_config'),
+              leg('cpu', 'FL1_MISO', c2['do'], c1['sdi'], 'cpu_config'),
+              leg('cpu', 'FL1_nCS', c1['ss'], c2['cs'], 'cpu_config'),
+              leg('cpu', 'FL1_WPHOLD', wphold, c2['wp'], 'cpu_config'),
+              leg('cpu', 'FL1_WPHOLD', wphold, c2['hold'], 'cpu_config'),
+              leg('cpu', 'CRESET_n', pullup('cpu', 'CRESET_n', '/3V3'), c1['creset'], 'cpu_config')]
+    links['cpuConfigCopper'] = all(config)
+    # --- sysctl GPIO6/7/16/17: CRESET_B out (open drain), CDONE in
+    s1 = lambda gpio: named_pin(system, 'U1', gpio)  # noqa: E731
+    j3, sj2 = socket_bridge('CHIPSET_nCRESET', 'system', 'CHIPSET_nCRESET', 'J3', 'J2')
+    links['chipsetCreset'] = all([leg('system', 'CHIPSET_nCRESET', s1('GPIO6'), sj2, 'chipset_creset'),
+                                  leg('main', 'CHIPSET_nCRESET', j3, u7['creset'], 'chipset_creset')])
+    j3, sj2 = socket_bridge('CHIPSET_CDONE', 'system', 'CHIPSET_CDONE', 'J3', 'J2')
+    links['chipsetCdoneSysctl'] = all([
+        leg('main', 'CHIPSET_CDONE', u7['cdone'], j3, 'chipset_cdone'),
+        leg('main', 'CHIPSET_CDONE', pullup('main', 'CHIPSET_CDONE', '/+3V3'), u7['cdone'], 'chipset_cdone'),
+        leg('system', 'CHIPSET_CDONE', sj2, s1('GPIO7'), 'chipset_cdone')])
+    j3, sj2 = socket_bridge('CPUCARD_nCRESET', 'system', 'CPUCARD_nCRESET', 'J3', 'J2')
+    j2, cj1 = socket_bridge('CPUCARD_nCRESET', 'cpu', 'CRESET_n', 'J2', 'J1')
+    links['cpuCreset'] = all([leg('system', 'CPUCARD_nCRESET', s1('GPIO16'), sj2, 'cpu_creset'),
+                              leg('main', 'CPUCARD_nCRESET', j3, j2, 'cpu_creset'),
+                              leg('cpu', 'CRESET_n', cj1, c1['creset'], 'cpu_creset')])
+    j3, sj2 = socket_bridge('CPU_CDONE', 'system', 'CPUCARD_CDONE', 'J3', 'J2')
+    j2, cj1 = socket_bridge('CPU_CDONE', 'cpu', 'CDONE', 'J2', 'J1')
+    card_leg = leg('cpu', 'CDONE', c1['cdone'], cj1, 'cpu_cdone')
+    card_pull = leg('cpu', 'CDONE', pullup('cpu', 'CDONE', '/3V3'), c1['cdone'], 'cpu_cdone')
+    main_pull = leg('main', 'CPU_CDONE', pullup('main', 'CPU_CDONE', '/+3V3'), j2, 'cpu_cdone')
+    links['cpuCdoneCard'] = card_leg
+    links['cpuCdoneMain'] = leg('main', 'CPU_CDONE', j2, pad('main', 'U7', 'CPU_CDONE'), 'cpu_cdone')
+    links['cpuCdonePullup'] = main_pull or (card_leg and card_pull)
+    links['cpuCdoneSysctl'] = card_leg and all([leg('main', 'CPU_CDONE', j2, j3, 'cpu_cdone'),
+                                                leg('system', 'CPUCARD_CDONE', sj2, s1('GPIO17'), 'cpu_cdone')])
+    # --- sysctl SPI1 to each flash: MCU pad, 33R, socket, flash pad
+    def flash_bus(bus, gpios, flash_pads, via_cpu):
+        ok = True
+        for signal, gpio, series in (('SCK', gpios[0], True), ('MOSI', gpios[1], True),
+                                     ('MISO', gpios[2], False), ('nCS', gpios[3], True)):
+            net = f'{bus}_{signal}'
+            mcu = s1(gpio)
+            j3, sj2 = socket_bridge(net, 'system', net, 'J3', 'J2')
+            if series:
+                resistor = circuits['system'][0].series(mcu, sj2)
+                if resistor is None or resistor.value != '33':
+                    raise ValueError(f'system:{net}: expected a 33R from {gpio} to the socket')
+                near = next(p for p in ('1', '2') if node(system, resistor.ref, p) == f'/{net}_MCU')
+                far = '2' if near == '1' else '1'
+                ok &= leg('system', f'{net}_MCU', mcu, (resistor.ref, near), f'{bus.lower()}_sysctl')
+                ok &= leg('system', net, (resistor.ref, far), sj2, f'{bus.lower()}_sysctl')
+            else:
+                ok &= leg('system', net, sj2, mcu, f'{bus.lower()}_sysctl')
+            if via_cpu:
+                j2, cj1 = socket_bridge(net, 'cpu', net, 'J2', 'J1')
+                ok &= leg('main', net, j3, j2, f'{bus.lower()}_sysctl')
+                ok &= leg('cpu', net, cj1, flash_pads[signal], f'{bus.lower()}_sysctl')
+            else:
+                ok &= leg('main', net, j3, flash_pads[signal], f'{bus.lower()}_sysctl')
+        return ok
+    links['fl0Sysctl'] = flash_bus('FL0', ('GPIO10', 'GPIO11', 'GPIO12', 'GPIO13'),
+                                   {'SCK': u8['clk'], 'MOSI': u8['di'], 'MISO': u8['do'],
+                                    'nCS': u8['cs']}, False)
+    links['fl1Sysctl'] = flash_bus('FL1', ('GPIO14', 'GPIO15', 'GPIO8', 'GPIO9'),
+                                   {'SCK': c2['clk'], 'MOSI': c2['di'], 'MISO': c2['do'],
+                                    'nCS': c2['cs']}, True) and links['cpuConfigCopper']
+    # --- D5 lights with CDONE: U7.65 → R55 → Q2 base; +3V3 → R56 → D5 → Q2 collector
+    r55 = circuits['main'][0].series(u7['cdone'], pad('main', 'Q2', name='B'))
+    if r55 is None:
+        raise ValueError('main: CDONE LED driver resistor missing')
+    q2 = {k: pad('main', 'Q2', name=k) for k in ('B', 'C', 'E')}
+    d5 = {k: pad('main', 'D5', name=k) for k in ('A', 'K')}
+    if node(main, *q2['E']) != '/GND' or node(main, *d5['K']) != node(main, *q2['C']):
+        raise ValueError('main: CDONE LED D5 must sink through Q2 to GND')
+    anode_res = [r for r, other in main.pulls('/+3V3') if other == node(main, *d5['A'])]
+    if len(anode_res) != 1:
+        raise ValueError('main: CDONE LED D5 anode resistor to +3V3 missing')
+    anode_pad = next((anode_res[0].ref, p) for p in ('1', '2')
+                     if node(main, anode_res[0].ref, p) == node(main, *d5['A']))
+    near = next(p for p in ('1', '2') if node(main, r55.ref, p) == '/CHIPSET_CDONE')
+    far = '2' if near == '1' else '1'
+    links['cdoneLed'] = all([
+        leg('main', 'CHIPSET_CDONE', u7['cdone'], (r55.ref, near), 'cdone_led'),
+        leg('main', node(main, *q2['B']).lstrip('/'), (r55.ref, far), q2['B'], 'cdone_led'),
+        leg('main', node(main, *q2['C']).lstrip('/'), q2['C'], d5['K'], 'cdone_led'),
+        leg('main', node(main, *d5['A']).lstrip('/'), anode_pad, d5['A'], 'cdone_led')])
+    return links, paths, missing, legs_by_net
 
 
 def system_bridge_source_routes(system, board):
@@ -1164,6 +1615,29 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manifest['runtime']['qspi_boot_connected'] = boot_links
     manifest['paths'].extend(boot_paths)
     manifest['runtime']['missing_routes'].extend(boot_missing)
+    crystal_links, crystal_paths, crystal_missing, crystal_nets = crystal_routes(
+        cards, card_boards, system_board)
+    manifest['runtime']['crystal_connected'] = crystal_links
+    manifest['paths'].extend(crystal_paths)
+    manifest['runtime']['missing_routes'].extend(crystal_missing)
+    fpga_links, fpga_paths, fpga_missing, fpga_nets = fpga_config_routes(
+        main, cards['cpu'], cards['system'], pcb, cpu_board, system_board)
+    manifest['runtime']['fpga_links'] = fpga_links
+    i2c_rows, i2c_paths, i2c_missing, i2c_nets = i2c_expander_routes(
+        main, cards, pcb, cpu_board, system_board)
+    manifest['runtime']['i2c'] = i2c_rows
+    manifest['paths'].extend(i2c_paths)
+    manifest['runtime']['missing_routes'].extend(i2c_missing)
+    adc_links, adc_paths, adc_missing, adc_nets = adc_sense_routes(main, cards['system'], pcb, system_board)
+    manifest['runtime']['sysctl_adc'] = adc_links
+    manifest['paths'].extend(adc_paths)
+    manifest['runtime']['missing_routes'].extend(adc_missing)
+    led_rows, led_paths, led_missing = card_led_routes(cards, card_boards, system_board)
+    manifest['runtime']['card_leds'] = led_rows
+    manifest['paths'].extend(led_paths)
+    manifest['runtime']['missing_routes'].extend(led_missing)
+    manifest['paths'].extend(fpga_paths)
+    manifest['runtime']['missing_routes'].extend(fpga_missing)
     manifest['runtime']['missing_routes'].sort()
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     # CPU driver pack channels must remain explicit; the native board model
@@ -1554,6 +2028,31 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     for prefix, count in (('A', 16), ('D', 8)):
         for bit in range(count):
             runtime_net('cpu', f'FPGA_{prefix}{bit}')
+    # The FPGA configuration chain (fpga_config_routes): a net counts as
+    # executed while every one of its legs is on the routed copper.
+    for (board, net), whole in fpga_nets.items():
+        if whole:
+            runtime_net(board, net.lstrip('/'))
+    # sysctl's I2C bus and the CPU presence input it reads (i2c_expander_routes)
+    for (board, net), ok in i2c_nets.items():
+        if ok:
+            runtime_net(board, net.lstrip('/'))
+    # sysctl's ADC inputs (adc_sense_routes); main CC1/CC2 already execute
+    # through the PWR_HI comparator model above
+    for (board, net), ok in adc_nets.items():
+        if ok and (board, net) not in (('main', '/CC1'), ('main', '/CC2')):
+            runtime_net(board, net.lstrip('/'))
+    # Firmware-driven LEDs (card_led_routes) execute while both legs are routed.
+    for board, rows in led_rows.items():
+        for row in rows:
+            if row['connected']:
+                runtime_net(board, row['net'])
+                runtime_net(board, row['anode_net'])
+    # The crystal network gates each RP2040 card's firmware (crystal_routes);
+    # a net counts as executed while every one of its legs is routed.
+    for (board, net), whole in crystal_nets.items():
+        if whole:
+            runtime_net(board, net.lstrip('/'))
     runtime_net('main', 'CPU_CLK')
     runtime_net('cpu', 'CPU_CLK')
     runtime_net('main', 'CPU_nRST')
@@ -1605,7 +2104,7 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     if all(vbus_contacts.values()):
         for name in ('USB_VBUS', 'VBUS_GATE', 'USB_nVBUS'):
             runtime_net('system', name)
-    manifest.update(audit(circuits, executed, structural))
+    manifest.update(audit(circuits, executed, structural, implemented_checks()))
     manifest['runtime_nets'] = sorted(f'{board}:{net.lstrip("/")}' for board, net in executed)
     return manifest
 

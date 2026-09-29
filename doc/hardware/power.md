@@ -128,9 +128,26 @@ can leave the file system damaged.
   THM-001 (verification rows 4.4 and 4.5). Results are below.
 - **Sequencing:** the iCE40 HX power-up sequence is checked against the
   Lattice datasheet. The RP2040 boots from 3V3 alone.
-- **Brown-out:**
-  - sysctl holds /CPU_RST and CARD_RST_n until all rails are within 5%.
-  - The 1V2 rail is monitored by sysctl through a divider into an ADC input.
+- **Brown-out and reset (MB-051, David 2026-09-28):** U6 (MAX811T) holds
+  `nPOR` low until +3V3 **and** +1V2 are both inside their valid ranges, the
+  RESET button and `SYS_nRST` are released, and then for its 140–560 ms
+  timeout. Two OPA376 comparators with resistor hysteresis compare +3V3 and
+  +1V2 with taps of a REF3425 (2.5 V, ±0.19 % worst case); either one low
+  pulls U6's ~MR low through a BAT54A. An SN74LVC07A on 3V3_STBY holds all
+  six `SLOTn_RST_n` low whenever `nPOR` is low, so a card on slot +5V stays
+  in reset while +3V3 or +1V2 is absent; a 100 kΩ pull-down holds `nPOR`
+  low while U6 is unpowered. Guaranteed thresholds (every datasheet
+  tolerance, hysteresis and copper allowance): +3V3 falls 3.170–3.204 V,
+  rises ≤ 3.208 V; +1V2 falls 1.151–1.160 V, rises ≤ 1.161 V — at least
+  11.6 mV (3V3) and 9.3 mV (1V2) inside the windows between each rail's
+  valid floor at the loads and its regulator's worst low. The 3V3 and 1V2
+  isolation links are 1 mΩ shunts (a 0 Ω jumper is ≤ 50 mΩ), and the
+  chipset core's +1V2 is a B.Cu pour fed from an LDO beside U7. Analysis:
+  `hw/power/reset_supervisor.py` (with `--spice`: TI's OPA376 model through
+  start-up, a missing 1V2, cold-off, brown-outs, a fast collapse, the
+  RESET button and the worst regulator lows); the routed binding:
+  `hw/power/rail_reset_window.py`.
+  - The 1V2 rail is also read by sysctl through a divider into an ADC input.
 
 ## Verification results (rows 4.4 and 4.5)
 
@@ -320,7 +337,17 @@ then `set_sys_clock_khz(DVI_TIMING.bit_clk_khz)`). The RP2040 datasheet
 
 `python3 hw/power/design.py` prints the current list. As of this writing:
 
-- **Main board, input:** USB-C receptacle and VBUS/GND copper ≤ 20 mΩ loop.
+- **Main board, input (MB-005, David 2026-09-28):** the board-side input
+  loop — positive copper J1 → F1 → U2, the GND return from the eFuse and its
+  5V_SYS input capacitors to J1, the receptacle's terminations, solder and
+  layer transitions — **≤ 60 mΩ at the hottest corner** (115 °C, 80 % etched
+  width, 24.9/11.4 µm copper, 15 µm via wall). The mated VBUS/GND contacts
+  are not in it: USB Type-C R2.0 §4.4.1 counts them in the cable's IR-drop
+  budget, which the model already takes at its limit. **Every full-current
+  conductor rises ≤ 20 °C at the eFuse's 3.213 A maximum limit**, which it
+  can carry indefinitely (IPC-2221B; ≥ 1.75 mm drawn on outer 1 oz). The
+  derivation is `mb005-loop-requirement-derivation.md`; the routed check is
+  `hw/power/main_input_heat.py`.
   Input PTC **SMD1812P350TF/16** (C46970911), then the SMF5.0A TVS. Input
   switch **TPS259470ARPWR** (C3662799) with EN/UVLO driven by the POWER
   button's controller (MAX16054 from the HT7533-2 standby LDO), RILM

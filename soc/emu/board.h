@@ -56,6 +56,10 @@ struct MainBoard {
 	std::array<uint8_t, 4> cpuIrqConnected{1, 1, 1, 1};
 	std::array<uint8_t, 2> cpuTmrExpConnected{1, 1};
 	bool chipsetClockConnected = true;
+	// The CPU card's FPGA is configured (emu/machine/fpgaconfig.h). While it
+	// is not, it runs nothing and drives nothing: its clock input is idle and
+	// each of its outputs reads as an open pad (the *_connected levels).
+	bool cpuConfigured = true;
 
 	Vmachine_core *top = nullptr;
 	sst39_t rom;
@@ -89,26 +93,12 @@ struct MainBoard {
 		top->cpu_a_map = addressMap;
 		top->cpu_d_map = dataMap;
 		top->cpu_d_inv_map = dataInverse;
-		uint16_t addressConnected = 0;
-		uint8_t dataConnected = 0;
-		for (unsigned i = 0; i < 16; ++i) addressConnected |= uint16_t(wiring.cpuAddressConnected[i] != 0) << i;
-		for (unsigned i = 0; i < 8; ++i) dataConnected |= uint8_t(wiring.cpuDataConnected[i] != 0) << i;
-		top->cpu_a_connected = addressConnected;
-		top->cpu_d_connected = dataConnected;
-		top->cpu_clk_connected = cpuClockConnected;
 		top->cpu_rst_connected = cpuResetConnected;
-		top->cpu_stb_connected = cpuStrobeConnected;
-		top->cpu_rw_connected = cpuRwConnected;
 		top->cpu_rdy_connected = cpuReadyConnected;
-		top->cpu_sync_connected = cpuSyncConnected;
-		top->cpu_halted_connected = cpuHaltedConnected;
-		top->cpu_waiting_connected = cpuWaitingConnected;
 		uint8_t irqConnected = 0;
 		for (unsigned i = 0; i < 4; ++i) irqConnected |= uint8_t(cpuIrqConnected[i] != 0) << i;
 		top->cpu_irq_connected = irqConnected;
-		uint8_t timerConnected = 0;
-		for (unsigned i = 0; i < 2; ++i) timerConnected |= uint8_t(cpuTmrExpConnected[i] != 0) << i;
-		top->cpu_tmr_exp_connected = timerConnected;
+		applyCpuConfigured();
 		top->chipset_clk_connected = chipsetClockConnected;
 		sst39_init(&rom);
 		memcpy(rom.mem, data, len < sizeof rom.mem ? len : sizeof rom.mem);
@@ -121,6 +111,32 @@ struct MainBoard {
 		apply(1 | 0x3F << 1 | 1 << 9 | 1 << 11);         // nPOR low: the supervisor holds reset
 		top->clk = 0;
 		top->eval();
+	}
+
+	void setCpuConfigured(bool on)
+	{
+		cpuConfigured = on;
+		if (top) applyCpuConfigured();
+	}
+
+	void applyCpuConfigured()
+	{
+		const bool on = cpuConfigured;
+		uint16_t addressConnected = 0;
+		uint8_t dataConnected = 0;
+		for (unsigned i = 0; i < 16; ++i) addressConnected |= uint16_t(on && wiring.cpuAddressConnected[i] != 0) << i;
+		for (unsigned i = 0; i < 8; ++i) dataConnected |= uint8_t(on && wiring.cpuDataConnected[i] != 0) << i;
+		top->cpu_a_connected = addressConnected;
+		top->cpu_d_connected = dataConnected;
+		top->cpu_clk_connected = on && cpuClockConnected;
+		top->cpu_stb_connected = on && cpuStrobeConnected;
+		top->cpu_rw_connected = on && cpuRwConnected;
+		top->cpu_sync_connected = on && cpuSyncConnected;
+		top->cpu_halted_connected = on && cpuHaltedConnected;
+		top->cpu_waiting_connected = on && cpuWaitingConnected;
+		uint8_t timerConnected = 0;
+		for (unsigned i = 0; i < 2; ++i) timerConnected |= uint8_t(on && cpuTmrExpConnected[i] != 0) << i;
+		top->cpu_tmr_exp_connected = timerConnected;
 	}
 
 	uint32_t outputs() const

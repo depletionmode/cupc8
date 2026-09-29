@@ -22,7 +22,7 @@ def main():
     expected = json.loads((evidence / 'ibis-final-receipts.json').read_text())
     actual = audit(ROOT, build, build / 'system/system-routed.kicad_pcb',
                    top, source_audit, ROOT / 'hw/cosim/gen_top.py')
-    if actual != expected or actual['unmodeled_nets'] != 284:
+    if actual != expected:
         raise AssertionError('canonical board receipts or co-simulation top changed')
 
     common = [
@@ -53,7 +53,7 @@ def main():
             subprocess.run([sys.executable, str(ROOT / 'test/hw' /
                                                 ('test_cosim_' + name + '.py')),
                             *common], cwd=ROOT, env=environment, check=True)
-    print('receipt-bound routed digital subset passed; 284 nets remain unmodeled')
+    print(f"receipt-bound routed digital subset passed; {actual['unmodeled_nets']} nets remain unmodeled")
 
 
 if __name__ == '__main__':

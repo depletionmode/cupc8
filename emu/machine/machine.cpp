@@ -230,6 +230,21 @@ void EspCard::drive(uint32_t sck, uint32_t mosi, bool sel) {
 
 uint32_t EspCard::miso() { return selected ? (bit < bits.size() ? bits[bit] : 0) : 1; }
 
+// ------------------------------------------------------------ indicator LEDs
+
+void watchLeds(RP2040 &mcu, std::vector<LedWatch> &leds, std::initializer_list<int> gpios) {
+  leds.reserve(gpios.size());
+  for (int g : gpios) {
+    leds.push_back(LedWatch{g, false, 0, {}});
+    LedWatch *w = &leds.back();
+    w->unlisten = mcu.gpio[g].addListener([w](GPIOPinState st, GPIOPinState) {
+      const bool on = st == GPIOPinState::High;
+      if (on && !w->level) w->rises++;
+      w->level = on;
+    });
+  }
+}
+
 // ------------------------------------------------------------ SysctlCard
 
 static constexpr int BR_NCS = 5, SYS_NRST = 23, CHIPSET_CDONE = 7, CPUCARD_CDONE = 17;
@@ -239,6 +254,7 @@ SysctlCard::SysctlCard(const std::string &elf) : e(elf, 125), cdc(e.mcu->usbCtrl
   g[CHIPSET_CDONE].setInputValue(true);  // both FPGAs configured
   g[CPUCARD_CDONE].setInputValue(true);
   g[8].setInputValue(true);
+  watchLeds(*e.mcu, leds, {0, 1});  // LED_USB_TX, LED_USB_RX
   e.mcu->spi[0].onTransmit = [this](uint32_t b) { pending = Pending{b, 0, 0, 0}; };
   for (size_t p = 0; p < 2; p++) {
     cdc.ports[p].onSerialData = [this, p](const std::vector<uint8_t> &buf) {
@@ -285,6 +301,78 @@ BridgePins SysctlCard::bridgePins(uint32_t brMiso) {
 bool SysctlCard::sysReset() {
   GPIOPin &p = e.mcu->gpio[SYS_NRST];
   return p.outputEnable() && !p.outputValue();  // driven low: the supervisor resets the board
+}
+
+static constexpr int CRESET_PIN[2] = {6, 16}, CDONE_PIN[2] = {CHIPSET_CDONE, CPUCARD_CDONE};
+static constexpr int FL_SCK[2] = {10, 14}, FL_NCS[2] = {13, 9};
+
+bool SysctlCard::cresetLow(int fpga) {
+  GPIOPin &p = e.mcu->gpio[CRESET_PIN[fpga]];
+  return p.outputEnable() && !p.outputValue();  // open drain: only low is driven
+}
+
+void SysctlCard::setCdone(int fpga, bool level) {
+  if (cdone[fpga] == level) return;  // setInputValue latches an edge on every call
+  cdone[fpga] = level;
+  e.mcu->gpio[CDONE_PIN[fpga]].setInputValue(level);
+}
+
+void SysctlCard::attachExpanders(std::vector<Tca9555> list) {
+  expanders = std::move(list);
+  RPI2C &i2c = e.mcu->i2c[0];
+  i2c.onConnect = [this](uint32_t address, I2CMode mode) {
+    RPI2C &bus = e.mcu->i2c[0];
+    for (Tca9555 &x : expanders)
+      if (x.address == address) {
+        if (mode == I2CMode::Write) x.pointed = false;
+        bus.completeConnect(true);
+        return;
+      }
+    bus.completeConnect(false);
+  };
+  i2c.onWriteByte = [this](uint32_t v) {
+    RPI2C &bus = e.mcu->i2c[0];
+    for (Tca9555 &x : expanders)
+      if (x.address == bus.targetAddress) x.write(static_cast<uint8_t>(v));
+    bus.completeWrite(true);
+  };
+  i2c.onReadByte = [this](bool) {
+    RPI2C &bus = e.mcu->i2c[0];
+    uint8_t v = 0xff;
+    for (Tca9555 &x : expanders)
+      if (x.address == bus.targetAddress) v = x.read();
+    bus.completeRead(v);
+  };
+}
+
+void SysctlCard::attachFlashes(SpiFlash *fl0, bool fl0Reach, SpiFlash *fl1, bool fl1Reach) {
+  flash[0] = fl0;
+  flash[1] = fl1;
+  flashReach[0] = fl0Reach;
+  flashReach[1] = fl1Reach;
+  RPSPI &spi = e.mcu->spi[1];
+  flashDone = e.mcu->clock.createAlarm([this] { e.mcu->spi[1].completeTransmit(flashMiso); });
+  for (int b = 0; b < 2; b++)
+    unlisten[b] = e.mcu->gpio[FL_NCS[b]].addListener([this, b](GPIOPinState st, GPIOPinState) {
+      if (st != GPIOPinState::Low && flashSelected[b]) {
+        flashSelected[b] = false;
+        if (flash[b] && flashReach[b]) flash[b]->deselect();
+      }
+    });
+  spi.onTransmit = [this](uint32_t v) {
+    RPSPI &s1 = e.mcu->spi[1];
+    uint8_t out = 0;  // MISO undriven: the RP2040 pad's pull-down
+    for (int b = 0; b < 2; b++) {
+      if (e.mcu->gpio[FL_SCK[b]].functionSelect() != 1) continue;  // F1: SPI
+      GPIOPin &cs = e.mcu->gpio[FL_NCS[b]];
+      if (!(cs.outputEnable() && !cs.outputValue())) continue;
+      flashSelected[b] = true;
+      if (flash[b] && flashReach[b]) out = flash[b]->exchange(static_cast<uint8_t>(v));
+    }
+    flashMiso = out;
+    const double hz = s1.clockFrequency();
+    flashDone->schedule(hz > 0 ? s1.dataBits() * 1e9 / hz : 0);
+  };
 }
 
 // ------------------------------------------------------------ TmdsCapture
@@ -426,6 +514,33 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     // copper is open. The fitted Q1 pulls it low only with host VBUS.
     sysctl->e.mcu->gpio[29].setInputValue(!o.sysctlHostVbus);
   }
+  fpgaLinks = o.fpga;
+  // the configuration flashes: given contents, or a stand-in iCE40 image
+  // (the sync word; the RTL is what the configured FPGA runs)
+  const std::vector<uint8_t> *images[2] = {&o.chipsetFlash, &o.cpuFlash};
+  const bool copper[2] = {o.fpga.chipsetConfigCopper, o.fpga.cpuConfigCopper};
+  for (int i = 0; i < 2; i++) {
+    FpgaConfig &c = fpgaCfg[i];
+    if (!images[i]->empty()) {
+      std::copy(images[i]->begin(), images[i]->begin() + std::min(images[i]->size(), c.flash.mem.size()),
+                c.flash.mem.begin());
+    } else {
+      static const uint8_t standIn[] = {0xff, 0x00, 0x00, 0xff, 0x7e, 0xaa, 0x99, 0x7e};
+      std::copy(std::begin(standIn), std::end(standIn), c.flash.mem.begin());
+    }
+    c.copper = copper[i];
+    c.configured = c.copper && c.flash.holdsBitstream();
+  }
+  board->setCpuConfigured(fpgaCfg[1].configured);
+  if (sysctl) {
+    sysctl->attachFlashes(&fpgaCfg[0].flash, o.fpga.fl0Sysctl, &fpgaCfg[1].flash, o.fpga.fl1Sysctl);
+    if (!o.expanders.empty()) sysctl->attachExpanders(o.expanders);
+    for (int ch = 0; ch < 3; ch++)
+      sysctl->e.mcu->adc.channelValues[ch] =
+          static_cast<uint32_t>(std::clamp(o.sysctlAdcVolts[ch] / 3.3 * 4096.0, 0.0, 4095.0));
+    sysctl->setCdone(0, o.fpga.chipsetCdoneSysctl && fpgaCfg[0].configured);
+    sysctl->setCdone(1, o.fpga.cpuCdoneSysctl && o.fpga.cpuCdonePullup && fpgaCfg[1].configured);
+  }
   for (const auto &[slot, kind] : o.slots) {
     if (kind == "wifi") {
       auto c = std::make_unique<EspCard>(o.espTx, o.espRx);
@@ -447,6 +562,9 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
       panels[slot] = std::make_unique<EinkPanel>(c->e, EinkPanel::config(kind == "eink" ? 648 : 800, 480));
     if (kind == "storage" && o.storageSdSocket)
       c->sd = std::make_unique<rp2040js::harness::SdSocket>(*c->e.mcu);  // empty until a card goes in
+    // the firmware-driven indicators (fw/*/pins.h): ACT/CARD, KEY/KBD, REFRESH
+    if (kind == "storage" || kind == "io") watchLeds(*c->e.mcu, c->leds, {24, 25});
+    if (kind == "eink" || kind == "eink750") watchLeds(*c->e.mcu, c->leds, {24});
     if (kind == "io") {
       c->e.mcu->gpio[8].setInputValue(true);  // VBUS switch: no fault
       if (o.ioUsbHost) keyboard = std::make_unique<UsbKeyboard>(UsbKeyboard::Options{1, 10});
@@ -489,7 +607,32 @@ uint32_t Machine::inputs(bool por) {
   return miso | (nirq << 1) | (((bridge >> bridgeInputs[0]) & 1u) << 7) |
          (((bridge >> bridgeInputs[1]) & 1u) << 8) | (((bridge >> bridgeInputs[2]) & 1u) << 9) |
          ((pwrHi ? 1u : 0u) << 10) |
-         (1u << 11) | ((por && porConnected && !reset ? 1u : 0u) << 12);
+         ((cpuCdoneAtChipset() ? 1u : 0u) << 11) |
+         ((por && porConnected && !reset && fpgaCfg[0].configured ? 1u : 0u) << 12);
+}
+
+// the CPU card's CDONE at chipset U7.33: an open main-board leg leaves the pad
+// undefined (low here, a deterministic counterexample); with the card leg
+// open the main board's pull-up reads high whatever the card does
+bool Machine::cpuCdoneAtChipset() const {
+  const auto &l = fpgaLinks;
+  return l.cpuCdoneMain && l.cpuCdonePullup && (!l.cpuCdoneCard || fpgaCfg[1].configured);
+}
+
+// CRESET_B from sysctl, the configurations' progress, and CDONE back to
+// sysctl and the chipset; run in the serial part, with every card parked
+void Machine::configStep() {
+  const double t = board->ns();
+  const bool links[2] = {fpgaLinks.chipsetCreset, fpgaLinks.cpuCreset};
+  for (int i = 0; i < 2; i++) {
+    // an open CRESET_B leg: the FPGA's pull-up keeps it released
+    const bool low = sysctl && links[i] && sysctl->cresetLow(i);
+    if (fpgaCfg[i].step(low, t) && i == 1) board->setCpuConfigured(fpgaCfg[1].configured);
+  }
+  if (sysctl) {
+    sysctl->setCdone(0, fpgaLinks.chipsetCdoneSysctl && fpgaCfg[0].configured);
+    sysctl->setCdone(1, fpgaLinks.cpuCdoneSysctl && fpgaLinks.cpuCdonePullup && fpgaCfg[1].configured);
+  }
 }
 
 bool Machine::selected(int slot, uint32_t out) const {
@@ -524,6 +667,7 @@ void Machine::runFor(double ns) {
 }
 
 void Machine::iterate() {
+  configStep();
   const uint32_t out = board->outputs();
   const uint32_t cs = (out >> 2) & 0x7f;
   if (sysctl) br = sysctl->bridgePins(bridgeMiso ? ((out >> 9) & 1) : 1);
@@ -594,6 +738,7 @@ bool Machine::leadNext() {
       runDone.wake();
       return false;
     }
+    configStep();
     const uint32_t out = board->outputs();
     const uint32_t cs = (out >> 2) & 0x7f;
     if (sysctl) br = sysctl->bridgePins(bridgeMiso ? ((out >> 9) & 1) : 1);
@@ -770,7 +915,8 @@ void Machine::traceStep() {
 
 Machine::State Machine::state() const {
   Vmachine_core *top = board->top;
-  return {top->dbg_pc, top->dbg_sp, top->dbg_r0, top->dbg_r1, top->cpu_halted, top->cpu_n_rst, top->gpo};
+  return {top->dbg_pc, top->dbg_sp, top->dbg_r0, top->dbg_r1, top->cpu_halted, top->cpu_n_rst, top->gpo,
+          fpgaCfg[0].configured, fpgaCfg[1].configured, fpgaLinks.cdoneLed && fpgaCfg[0].configured};
 }
 
 // capture a whole frame from the GPU's TMDS output (about two frame times)
