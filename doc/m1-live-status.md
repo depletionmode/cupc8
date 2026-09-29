@@ -18,8 +18,9 @@ main board (MB-005 + MB-051, first seeded scratch build), bus SI (resolve the
 writes progress under its own heading in this file. Routing speed notes
 (David asked): main routing = 10 parallel salted single-thread Freerouting
 runs (24 cores, 1 GB heap, 180 min cap), only salt 9 ever completed (~3 h);
-fastest fix is the seeded build (main_seed.py); then raise ROUTE_PARALLEL
-10->20 and lower the cap once seeded timing is known; do NOT add threads per
+fastest fix is the seeded build (main_seed.py). **David set (2026-09-29)
+ROUTE_PARALLEL = 8 and ROUTE_HEAP = 3g** (8 x 3 GB = 24 GB of 35 GB free;
+hw/boards/main.py); lower the 180 min cap once seeded timing is known; do NOT add threads per
 run (breaks per-salt reproducibility).
 
 Test state of the partial work (run 2026-09-29):

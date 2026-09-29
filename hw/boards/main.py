@@ -1230,8 +1230,8 @@ FINE_PARTS = ("U7", "U9", "U2")            # U2: the eFuse's 0.45 mm-pitch QFN
 # (CPU_HALTED, SLOT1_PROG_n, SLOT5_SWDIO, SLOT6_RSVD_A1), try 2 one (MEM_A5)
 ROUTE_PASSES, ROUTE_TRIES = 30, 3
 ROUTE_TIMEOUT = 180 * 60                   # per-run wall-time cap, seconds
-ROUTE_PARALLEL = 10                        # approved 2026-09-27, with 1 GB per worker
-ROUTE_HEAP = "1g"                           # each run's JVM heap cap (kicadgen route_heap): uncapped, Java takes 15.5 GB
+ROUTE_PARALLEL = 8                         # David, 2026-09-29: 8 runs at 3 GB each (was 10 at 1 GB, approved 2026-09-27)
+ROUTE_HEAP = "3g"                           # each run's JVM heap cap (kicadgen route_heap): uncapped, Java takes 15.5 GB
 # the fan-out vias a clearance off their own pads, 0.05 mm further from other
 # nets' and clear of the NPTH holes' keep-outs, as Freerouting judges them:
 # at KiCad's own margins they were ~117 violations it carried through every
