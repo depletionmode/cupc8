@@ -435,7 +435,7 @@ resistor removed and the EC cable doubled, a 100 ohm "pull-up" on the storage ca
    swing 215..939 mV vs 150..1200 mV (DVI 1.0 §4.2 figures not re-read from
    the spec text). **At the coordinated rebuild:** move
    `doc/hardware/pending-hw-parts-C182716.yaml` → `hw/parts/C182716.yaml`
-   (C425067.yaml with the new datasheet URL) before rebuilding gpu. GC-006 still red on R4
+   (**done 2026-09-29, Rebuild-prep agent**; C425067.yaml kept) before rebuilding gpu. GC-006 still red on R4
    (TMDS switching current unbounded).
 3. **JLC order instructions** (David approved): tick JLC's "Confirm
    Production File" option (review their post-CAM Gerbers vs ours before
@@ -672,3 +672,18 @@ resistor removed and the EC cable doubled, a 100 ohm "pull-up" on the storage ca
 - Passes 11-14 of 8 salts; best 53 unrouted (salt 0 pass 14), range 53-64; all "33 violations" = baseline (fixed copper), none added by us.
 - New vs build #1: a /5V_SYS via overlapping the +5V trunk at (8.4, 152.2) (input corner layout). Harmless if same net; else real DRC error. Must check in final KiCad DRC; fix in corner layout if flagged.
 - Improvement ~1 unrouted/pass; per-ordering cap (180 min from 09:28) ends ~12:28. Expect ~50 unrouted -> fallback: hand-place remaining connections (agreed with David).
+
+## IC-005 agent
+- 11:58 started: applying TPS2553DBVR-1 (45.3k, C25=1u, no R13, FW retry)
+- 12:00 done: jlc.kicad_sym symbol, hw/parts C111738.yaml+easyeda C111738/C26980, rotation yaml, hw/boards/io.py (U5 rot 180, C25, no R13, R10=45k3 C26980, R12 10k to 3V3). Next: tests/catalogue, design.py, model script, gen_top/cosim, thermal_bind, firmware retry, docs
+
+## Catalogue agent (2026-09-29)
+- test/catalogue.toml: cmd added to MB-007/CC-007/SC-007/EC-007 (`test_slowbus_si.py && slowbus_si.py --row <ROW>`); rows stay red, no thresholds touched. HOST-003 intact.
+- 28 new hw rows from first-article-plan.md added (MB-107..114, CC-102..105, GC-103/104, IC-102..104, WC-102..106, SC-101/102, EC-101/102, YC-101/102), cmd = tools/fa_results.py <ID> (pending, exit 1 until records exist). GC-102 already existed (bring-up burn-in): kept, cmd added. MB-101 and MECH-101 amended per plan (+cmd). Catalogue parses, 326 ids, no duplicates.
+- MB-051: reset_supervisor.py --spice all pass (25 checks), test_reset_supervisor.py 13 OK; row now has a cmd. Only red part: rail_reset_window.py R0 (stale board evidence, needs the main-board rebuild).
+
+## Decisions 2026-09-29 (David, later)
+- CPU-bus overshoot: BOM-only series R (RN1-8 -> 68 ohm, R21-R34 -> 56 ohm); compliance required over the normal operating range only, extreme corner (3.47 V/-40 C) reported, not a gate. Residual non-compliance goes in first-article measurement.
+- IO port switch approved: TPS2553DBVR-1 latch-off (IC-005 agent applying).
+- CPL sign-off: Claude generates a per-board review pack for the 119 placements; David signs off in fab/cpl-review.json.
+- David's own actions remaining: reserve parts in JLC Parts Manager (3 ROM, 5 FPGA, EOL 4/10/4), ask JLC about ENIG gold fingers, place the order.
