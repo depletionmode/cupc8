@@ -687,3 +687,42 @@ resistor removed and the EC cable doubled, a 100 ohm "pull-up" on the storage ca
 - IO port switch approved: TPS2553DBVR-1 latch-off (IC-005 agent applying).
 - CPL sign-off: Claude generates a per-board review pack for the 119 placements; David signs off in fab/cpl-review.json.
 - David's own actions remaining: reserve parts in JLC Parts Manager (3 ROM, 5 FPGA, EOL 4/10/4), ask JLC about ENIG gold fingers, place the order.
+- 12:01 done: hw/cosim/gen_top.py io_vbus_routes + test_cosim_io_vbus.py + cosim README rebound to TPS2553 (source binding checked on exported netlist; native part not run, needs rebuilt boards). Next: design.py/power model/tests, thermal_bind, catalogue, fw retry, docs
+- 12:02 done: design.py IOSW_* (0.085/0.135/182.6) rename in budget/boost/thermal, io_port_switch.py R_ILIM=45.3k, test_io_port_switch.py updated: 8 tests OK. Next: io_port_switch.py full run, budget/thermal checks, thermal_bind, catalogue, fw retry, docs
+
+## Rebuild-prep agent
+- 2026-09-29: source edits only, no rebuild, nothing committed; evidence stale until the coordinated rebuild. NOTE: hw/tools, hw/lib, hw/parts edits make any main-board build in flight fail with "board inputs changed".
+- Done: `hw/parts/C182716.yaml` (git mv from doc/hardware/pending-hw-parts-C182716.yaml; refs in this file and bom-risk-audit fixed).
+- Done: `kicadgen.order_spec`/`check_order`: ENIG fingers (David), `cards_per_panel` 1, `outline_tolerance_mm` 0.1 and `order_note` (do-not-trim text) on cards, `confirm_production_file`, `pcba_type` Standard, `impedance_control` on 4/6-layer, green mask, stencil remark, main `edge_rails`. `hw/mech/fit.py` MECH-002 and its catalogue text now want ENIG; milestone-1, slot, system-slot, fab-waivers, boards README, checklist (M1-M4) updated. `python3 test/hw/test_silk.py` passes (0.8 s).
+- Done: io U7 pin-1 dot moved in `hw/lib/jlc.pretty/SOT-563_...kicad_mod` to (0.75, 0.96) so it clears pad 1 by 0.165 mm after the 0.15 mm widening (checked on build/hw/io/io-routed.kicad_pcb: stays on F.SilkS, check_silk clean for U7). Still list U7 in the CPL review.
+- Done: `kicadgen.relieve_chip_pads` (audit I1): two-pad SMD chip parts (pads <= 2 mm) get ZONE_CONNECTION_THERMAL, 0.25 mm spokes, only on the pad in a pour whose other pad is on a non-rail, non-pour net; all else stays FULL. Not yet built: check for unconnected pads after the fill at the rebuild.
+- NOT done (cannot pin down from the audit; vias come from the fan-out/router): I5 system Y1 vias, I6 wifi module GND vias (David: fix in design), I3 RP2040 EP via (audit: accept or plug), io J2 shell vias. Panel geometry (rails, frame, slots, tabs) is not generated: `cards_per_panel` is only declared.
+- 12:06 done: io_port_switch.py all checks pass at 45.3k (TI-model cases that don't converge above ~637 mA retried at lower limit, noted in output). Next: budget/thermal/boost runs, thermal_bind, catalogue, fw retry, docs
+
+## Decisions 2026-09-29 (David, panels/reliefs)
+- Thermal reliefs (audit I1): as implemented (kicadgen.relieve_chip_pads): only two-pad chip parts with one pad in a pour and the other on a signal net; FULL everywhere else.
+- Panels: order "panel by JLC", one card per panel (finger edge outermost, do-not-trim note, Confirm Production File preview to be read carefully: connector-tab slots, tabs off keep-outs). No KiKit panel step. Check order.json/order note wording says so.
+
+## CPL pack agent (2026-09-29)
+- 12:10 tools/cpl_review_pack.py written: `build` makes build/cpl-review-pack/{index,<board>}.html + manifest.json for the 119 focus placements (45 main, 14 cpu, 13 gpu, 11 io, 11 storage, 9 eink, 9 system, 7 wifi) from build/hw as it is; `sign` turns the downloaded decisions JSON into build/hw/<board>/fab/cpl-review.json (all OK + hashes current + --reviewer, else refuses). Nothing signed, no cpl-review.json written (sign helper tested only on a scratch copy; fabcheck.check_review passed there).
+- Tool flags: main J3 (PCIe socket) pad 65 (hold-down) 0.200 mm from JLC's land, at the limit. No pin-1/polarity disagreement found by the numbers. The pack MUST be regenerated after the main-board/IO rebuild (hashes go stale, sign refuses).
+- 12:09 done: thermal_bind, coverage, boardcheck, catalogue IC-005 row, fw/rp2040/io/main.c retry (not compiled: no SDK check). boost.py rerun in background. Next: docs (io-card, boards README, power.md, parts.md, proposal status)
+- 12:10 done: docs (io-card, power, boards README, parts, first-article, proposal status). Left: boost.py (POW-007) rerun result pending (background, may time out under load); board rebuild + DRC of U5 area (placement U5 rot 180, C25 at 52.6,-25.6 unverified, silk trims for SOT-23-6 dropped); FW not compiled
+
+## CPU-bus BOM agent (2026-09-29, Sonnet 5.5; David: fix the overshoot BOM-only)
+
+- 12:xx Edited (no rebuild, no verify, evidence stale until the coordinated rebuild): CPU card RN1-RN8 33 -> 68 ohm, 4D02WGJ0680TCE **C52984** (hw/boards/cpu.py, hw/parts/C52984.yaml + easyeda record); main R21-R34 (the 14 /CPU_*_SRC lines only; SPI R35-R43 and R20 BR_MISO stay 33) 33 -> 56 ohm, 0603WAF560JT5E **C25196** (hw/boards/main.py value + R0603 table). Both LCSC numbers verified against JLC's parts API today: C52984 68 ohm 0402x4 +-5 %, extended, stock 21.4k; C25196 56 ohm 0603 +-1 %, extended, stock 1.1M. EasyEDA footprints checked pad for pad: C52984 == C25501 (RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL, same 8 pads), C25196 == C23140 (R0603): no layout change. Both are JLC *extended* parts (C25501 was too; C23140 33 ohm was basic): one extra feeder fee for the 56 ohm.
+- Co-sim/SI pins moved with the values: hw/cosim/gen_top.py + check_cpu.py (RN 68, R21-R34 56, manifest 'ohms' 68 for the 31 card outputs), hw/si/ibis_bus.py + ibis_source_audit.py (31 card paths at 68), hw/timing/cpubus_budget.py (RC budgeted at 68 ohm: slack still 49.8-51.4 ns), cpubus_options.py (mutation regexes accept any series value), test/hw/test_slowbus_si.py (the "as built overshoot" tests now build the superseded 33 ohm via fixed_boards so they hold after the rebuild). doc/hardware/cpu-bus.md, si-models.md, hw/boards/README.md updated. Not re-run: co-sim/E2E and the gen_top bindings (need the rebuilt netlists).
+- **SI result (build/hw copper, mutated netlists, 16 cases per corner per line; limit 3.60 V DC / 3.66 V AC for <= 1.6 ns; undershoot/ring-back/monotonicity also gated):**
+  - CPU card RN 68: min corner all 4 A lines pass (peak 3.42-3.54 V); **typ corner 3.74-3.84 V: only 8/16 cases pass (package=1 fails, overshoot 0.24-0.26 ns)**; max corner (3.47 V/-40 C) 4.01-4.09 V, 0/16 (reported, not a gate).
+  - CPU_D4 (short stub): 3.15-3.55 V (no overshoot) but the non-monotonic-in-band check fails in 8/16 typ and 8/16 min cases (10-102 mV).
+  - Main R 56: CPU_D0 typ 3.68 V (14/16), CPU_D5 typ 3.64 V (8/16, ring-back/non-monotonic), **CPU_IRQ2 typ 3.92 V, 0/16 (overshoot at the CPU card U1.49 up to 0.73 ns, undershoot, ring-back); min corner 3.66 V, 10/16**; max 4.18 V.
+  - So BOM-only 68/56 ohm does NOT give compliance over the normal (typ/min) range as David required. Better than 33 ohm (4.23 V at every corner) but the row stays red. Needs David: a receiver-side fix (main board / CPU card) or accept. Raw per-case data: scratchpad percorner.json.
+
+## CPU-bus sweep agent (2026-09-29, Sonnet 5.5; David: try higher series R first, BOM-only)
+
+- 12:2x Started. Harness: scratchpad `sw/sw.py` (slowbus_si.py cases on build/hw copper + mutated netlists, corners min/typ/max, 16 cases per corner per line, all 45 CPU-bus lines). Note the D lines carry BOTH resistors (card RN and main R21-R34 sit in each direction's path), so D is swept jointly; A/card-control lines see only RN, IRQ/nRDY/nRST only R21-R34. The previous 68/56 numbers for D lines used a 33 ohm main R in the card->main direction (netlists in build/hw are not rebuilt). ~0.7 CPU-s per case, niced 19, 4 jobs.
+
+## DeepPCB test (2026-09-29 ~12:45)
+- David bought the $30 hour and started a run from build/deeppcb/main-seeded.dsn. Their importer read 6 layers, 388 parts, 345 nets, 5 classes, 5,082 wire segments + 941 vias kept, 123 airwires (73 nets) left. J1 D+/D-/SBU deliberately unconnected (power-only USB-C).
+- Boundary clearance 0.25 mm suggestion accepted. Lock status of existing copper unknown: after the run, diff the result's 5,082 segments/941 vias against build/deeppcb/main-preroute.kicad_pcb, then run DRC/connectivity/MB-005 gates on the result. Freerouting reference: 52 unrouted (salt 0).
