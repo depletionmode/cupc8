@@ -181,6 +181,35 @@ class FaResultsTests(unittest.TestCase):
             self.write(record(unit='s%d' % i))
         self.assertEqual(run(), 0)
 
+    def test_io_transient_limits_use_measured_uncertainty_bounds(self):
+        good = dict(v_vbus_500ma_min_v=4.7, i_slot_5v_500ma_a=0.78,
+                    i_port_trip_a=0.55, fault_flag_on_short=1,
+                    t_boost_rise_c=30, t_tps2553_rise_c=30,
+                    c25_effective_uf=1.8, c25_uncertainty_uf=0.1,
+                    v_u5_in_peak_v=6.8, v_u5_in_uncertainty_v=0.1,
+                    v_u7_out_peak_v=5.8, v_u7_out_uncertainty_v=0.1)
+        self.assertEqual(fa.verdict(record('IC-104', 'io', measurements=good))[0], 'pass')
+        for key in ('c25_effective_uf', 'c25_uncertainty_uf', 'v_u5_in_peak_v',
+                    'v_u5_in_uncertainty_v', 'v_u7_out_peak_v', 'v_u7_out_uncertainty_v',
+                    't_tps2553_rise_c'):
+            with self.subTest(missing=key):
+                missing = {k: v for k, v in good.items() if k != key}
+                self.assertEqual(fa.verdict(record('IC-104', 'io', measurements=missing))[0], 'incomplete')
+        for key, val in (('c25_effective_uf', 1.69),
+                         ('v_u5_in_peak_v', 6.9), ('v_u5_in_peak_v', 7.0),
+                         ('v_u7_out_peak_v', 5.9), ('v_u7_out_peak_v', 6.0),
+                         ('c25_uncertainty_uf', -0.1)):
+            with self.subTest(field=key, value=val):
+                self.assertEqual(fa.verdict(record('IC-104', 'io', measurements=dict(good, **{key: val})))[0], 'fail')
+        # Equality is a failure even with a zero-error fixture.
+        for key, val in (('v_u5_in_peak_v', 7.0), ('v_u7_out_peak_v', 6.0)):
+            candidate = dict(good, **{key: val}, v_u5_in_uncertainty_v=0,
+                             v_u7_out_uncertainty_v=0)
+            self.assertEqual(fa.verdict(record('IC-104', 'io', measurements=candidate))[0], 'fail')
+        for unit in ('a', 'b'):
+            self.write(record('IC-104', 'io', unit=unit, measurements=good))
+        self.assertEqual(fa.status('IC-104', fa.records(self.dir))[0], 'green')
+
     def test_every_gate_is_well_formed(self):
         for test, gate in fa.GATES.items():
             self.assertTrue(set(gate['boards']) <= set(fa.BOARDS), test)
@@ -190,7 +219,7 @@ class FaResultsTests(unittest.TestCase):
                 self.assertIn(rule[0], ('cu', 'i2'), test)
                 self.assertIn('board_temp_c' if rule[0] == 'cu' else rule[1], gate['m'], test)
             for lim in gate['m'].values():
-                self.assertIn(lim[0], ('<=', '>=', 'range'), test)
+                self.assertIn(lim[0], ('<', '<=', '>=', 'range'), test)
                 self.assertEqual(len(lim), 3 if lim[0] == 'range' else 2, test)
 
 

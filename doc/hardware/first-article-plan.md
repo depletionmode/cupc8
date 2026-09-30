@@ -842,12 +842,22 @@ IC-005's switch is the TPS2553DBVR-1 (David approved the proposal,
   `v_u5_in_peak_v` must remain **<7 V** (TPS2553-1 absolute maximum), and
   `v_u7_out_peak_v` **<6 V** (TPS61023 absolute maximum), with measurement
   uncertainty accounted for. This measures the actual capacitance, switch
-  response and loop together; the nominal 1 µF model and engineering
+  response and loop together; the qualified 1.6 µF engineering model and engineering
   20 nH/20 µs scenarios do not establish guaranteed production corners.
+  IC-104 requires numeric measured estimates `v_u5_in_peak_v` and
+  `v_u7_out_peak_v` plus their nonnegative uncertainty fields
+  `v_u5_in_uncertainty_v` and `v_u7_out_uncertainty_v`. The parser compares
+  each peak estimate **plus** its uncertainty against the strict limit;
+  equality at 7 V / 6 V fails. Retain waveform/probe/calibration evidence.
   Inspect C25 fitted identity, and record rail temperature and sample age.
-- **Prepared C25 upgrade qualification:** for the proposed 4.7 µF C23733
+- **Prepared C25 upgrade qualification:** for the fitted 4.7 µF C23733
   same-pad substitution, require measured operating C25 capacitance
-  **≥1.6 µF** at the actual rail bias/temperature. This is an engineering
+  **≥1.6 µF** at the actual rail bias/temperature. Record numeric
+  `c25_effective_uf` and nonnegative `c25_uncertainty_uf`; the parser
+  requires estimate **minus** uncertainty ≥1.6 µF. Missing either field is
+  incomplete. Record actual U5 package rise as `t_tps2553_rise_c` (the
+  obsolete SY6280 field is not accepted; no measured records existed at
+  this verification-source correction). This is an engineering
   target, not a guaranteed Samsung minimum. Measure the isolated fitted
   component or calibrated biased fixture, not the combined in-circuit
   C23/C24/C25 bank; record frequency dependence, fixture correction,
@@ -989,6 +999,61 @@ For the fitted MB-051 dual-rail qualifier (`hw/power/reset_supervisor.py`).
 
 ---
 
+## Focused receiving extensions from the final design critique
+
+These eleven procedures extend the existing catalogue gates; they do not
+create duplicate jobs or claim measurements already occurred. Record each
+step against the named gate, actual serial/lot/parts, software and receipt
+hashes, instruments, calibration/probe setup and raw files. Existing numeric
+limits and sample counts remain binding. A passing native model does not
+replace actual USB, RF, module power, panel SPI or thermal measurements.
+Stop load escalation if a limit fails or instrument uncertainty prevents a
+passing conclusion. Current limiting does not clamp every fast local spike.
+
+### M01 — Main supply and policy
+
+MB-101/102 and SYS-005/KRN-004: use the documented 5 V / 150 mA standby setup, then 500 mA before POWER, in both USB-C orientations. Record POWER/off/standby, current, rails and PWR_HI. Confirm full operation from a genuine 3 A source. With 1.5 A advertising, verify restricted radio/SD-write policy; full-stack operation is not required. Record loaded input voltage and ordinary on/off recovery.
+
+### M02 — Rail sequencing and resets
+
+MB-113/CC-101: after initial power checks, scope Main 3V3/1V2, CPU CDONE/reset and every fitted card reset during a slow input ramp and ordinary supply interruption/recovery. Retain actual ramp and trip measurements; compare existing MB-113 limits. Confirm cards remain reset while qualified rails are absent and boot resumes after recovery. Do not introduce unbounded overvoltage ramps.
+
+### M03 — Configuration, memory and programming recovery
+
+MB-103/104/105/CC-101: program and verify both configuration flashes. Verify ROM prefix and full 512 KiB readback including erased tail. Cold boot without System. Execute RAM march, walking address/data and bank-boundary tests, with CPU/bridge ownership trace. On a backed-up test ROM, interrupt programming before verification; reconnect System with power off, then restore, verify and boot. Test reset during memory access and failed/stalled configuration against existing native expected behavior. Native fault tests are references, not physical passing records.
+
+### M04 — CPU workload and receiving voltage stress
+
+CC-101/103/104: run ALU, busy memory and timer IRQ loops at the actual 12 MHz point. Capture CDONE/reset, far-pin 1V2, socket current and correct results/trace. Apply the named CPU voltage-stress exception only to its precise signals; slot MISO has separate limits.
+
+### M05 — System physical bootstrap and programming
+
+MB-102/YC-101/SYS-004: verify RPI-RP2 BOOTSEL and CDC using powered Main and a separate System data cable. Program/verify Main/CPU flashes, ROM, RP cards and actual ESP physical images/offsets. Interrupt a backed-up programming operation and demonstrate recovery, including System BOOTSEL if needed. Exercise stop/step/trace. Connect/remove the data cable and check unintended power/reset effects. Power off, remove System and cold boot. Preserve host logs and readbacks.
+
+### M06 — Keyboard and protected port
+
+IC-101/103/104: use the intended keyboard before boot, after boot and after reconnect. Exercise modifiers, intended rollover, repeat and lock LEDs while SD/network/display operate. Verify IDENT and key delivery during enumeration, and no stuck key after unplugging a held key. Scope ordinary attachment/load release before the 500 mA dummy load or designated short/retry tests. Check fault/status/IRQ recovery. Enforce the existing port/current/heat limits and supplemental Ceff/peak limits.
+
+### M07 — Storage persistence and intended medium
+
+SC-101/STO-003: SAVE a unique known program, wait for CLOSE/sync, and preserve host-read/FAT content without rewriting. Power off the computer. Cold boot with the same SD medium and issue NEW, LOAD and RUN **before any second SAVE**. Confirm exact previous contents/output. Exercise intended FAT16/FAT32, chunk/multi-sector boundaries, full-medium errors, removal/reinsert and slow/busy behavior. Measure real write-current peaks under SC-102. Existing native88 checks cover model corners; they do not prove the exact whole-computer first-LOAD ordering or every physical SD card.
+
+### M08 — WiFi, real GPSPI, RF and service
+
+WC-101/105/MB-106: verify actual EN/BOOT/UART programming, intended AP, DHCP/DNS/TCP fetch and sustained TX with SD traffic. Capture 3 MHz receiving SCK/MOSI/CS/MISO, local rails and ground. Test legal short IDENT/READ, lengths around DMA words (1/2/3/4/5 and maximum legal payload minus one/exact maximum), and repeated descriptor reuse. Save 100 NET_CONFIG updates during traffic; measure actual rearm against the 20 µs minimum gap, first/last bits and turnaround, with zero corruptions. Power cycle twice and verify saved settings. Check actual antenna mating, lead route and RF operation. QEMU cannot substitute for this silicon test.
+
+### M09 — Actual video, GPIO current and burn-in
+
+GC-101/102/104/105: use intended monitor/cable with changing images and keyboard/SD/WiFi activity. Capture frames and compare expected output, or retain video for the documented reviewed alternative. Monitor temperature, rails and current from initial DVI operation. Each used GPU then needs 60 minutes at ambient ≥38°C, case ≤85°C and zero glitches/dropouts/lockups. Run HPD/DDC/EDID checks. Independently establish GPIO+QSPI source and sink demand ≤50 mA each by validated measurement/load model; total card 3V3 current ≤145 mA cannot establish that bound.
+
+### M10 — Actual selected eInk module and panel bus
+
+EC-101/102: before power, verify every J2 wire against actual module labels: VCC, GND, DIN, CLK, CS, DC, RST, BUSY, PWR. Confirm 800×480 generation, Rev2.3 HAT, Display Config B, 4-line SPI and fresh750 image. Measure J2 input and internal VCI/VDDIO during full/fast/partial/grey refresh against actual selected vendor operating limits, plus card3V3 ≥3.135 V. The legacy parser’s 2.3 V threshold alone is insufficient. Capture the separate 10 MHz panel SPI signals at the module/controller side where accessible. Verify real glass modes, sleep/wake and ordinary recovery. A deliberately stuck-BUSY test follows normal rail checks; release it and verify timeout/recovery. Retain panel identity, photos and waveform files.
+
+### M11 — Whole-computer mixed workload
+
+Test the two display alternatives separately in display1/IO2/WiFi3/storage4. After earlier limits pass, run 30 minutes of monitored keyboard/display/SD writes/real HTTP traffic, checking data and events. Follow with M07 persistence and cold System-removed boot. GPU also retains its required60-minute hot burn-in; eInk refresh-current checks remain separate. This does not qualify arbitrary maps/populations.
+
 ## Recording results
 
 ### Layout
@@ -1091,7 +1156,7 @@ and `cmd = "python3 tools/fa_results.py <ID>"`. Only `id`, `title` and
 | GC-105 | First article: GPU card hot-plug detect and DDC/EDID | with a real monitor: HPD at the RP2040 pin <= 0.4 V unplugged and 2.0-3.6 V plugged; DDC idle 4.5-5.3 V (cable side) and 3.0-3.6 V (RP2040 side); a 128-byte EDID with a valid header and checksum reads through the level shifters (co-sim waivers for GPU DDC/HPD) |
 | IC-102 | First article: IO card shorts and first power | +5V, 3V3, 1V1 to GND >= 10 ohm; idle 3V3 <= 50 mA, +5V <= 0.80 A; keyboard VBUS 4.40-5.5 V |
 | IC-103 | First article: IO RP2040 DVDD and rails under load | DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 50 mA; case rise <= 45 C (IC-005, IC-006) |
-| IC-104 | First article: keyboard port under load and short | VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/switch rise <= 55 C (IC-005, POW-007) |
+| IC-104 | First article: keyboard port under load and short | VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/TPS2553 rise <= 55 C; C25 estimate-minus-uncertainty >=1.6 uF; U5 IN and boost OUT peak-plus-uncertainty strictly <7/<6 V (IC-005, POW-007) |
 | WC-102 | First article: Wi-Fi card shorts and first power | +5V, 3V3 to GND >= 10 ohm; idle +5V <= 340 mA; 3V3 3.227-3.411 V |
 | WC-103 | First article: fitted C602037 22 uF under bias | at 25 C: >= 7.80 uF at 5.5 V, >= 11.16 uF at 3.6 V, ESR <= 150 mOhm at 1-2 MHz; 10 parts of the lot (POW-003 F5/F7) |
 | WC-104 | First article: Wi-Fi return resistance through the slot | four-terminal U2.2 and U1.1 -> main-board slot GND tails <= 1 ohm each (POW-003 F6, WC-010 T4r) |

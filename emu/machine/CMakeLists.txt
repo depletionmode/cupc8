@@ -84,3 +84,10 @@ target_include_directories(einkqueue PRIVATE "${FW}/eink/core" "${FW}/gpu/core" 
 target_compile_definitions(einkqueue PRIVATE GPU_GFX_BYTES=96000)
 target_compile_options(einkqueue PRIVATE -O2 -Wall -Wextra -Wno-stringop-overflow)
 target_link_libraries(einkqueue PRIVATE machine)
+
+add_executable(einkfree einkfree.cpp "${FW}/eink/core/eink.c" "${FW}/eink/core/uc8179.c" "${FW}/gpu/core/gpu.c"
+  "${FW}/common/cardproto.c" "${FW}/common/font8x8_cp437.c")
+target_include_directories(einkfree PRIVATE "${FW}/eink/core" "${FW}/gpu/core" "${FW}/common")
+target_compile_definitions(einkfree PRIVATE GPU_GFX_BYTES=96000)
+target_compile_options(einkfree PRIVATE -O2 -Wall -Wextra -Wno-stringop-overflow)
+target_link_libraries(einkfree PRIVATE machine)

@@ -117,9 +117,15 @@ GATES = {
     'IC-102': dict(boards=('io',), units=3, m=_rp2040_first(50, 800, extra={
         'v_kbd_vbus_v': ('range', 4.40, 5.5)})),
     'IC-103': dict(boards=('io',), units=2, m=_rp2040_load(DVDD_110, 50)),
-    'IC-104': dict(boards=('io',), units=2, m={
+    'IC-104': dict(boards=('io',), units=2, uncertainty_bounds={
+        'c25_effective_uf': ('lower', 'c25_uncertainty_uf'),
+        'v_u5_in_peak_v': ('upper', 'v_u5_in_uncertainty_v'),
+        'v_u7_out_peak_v': ('upper', 'v_u7_out_uncertainty_v')}, m={
         'v_vbus_500ma_min_v': ('>=', 4.40), 'i_slot_5v_500ma_a': ('<=', 0.80), 'i_port_trip_a': ('>=', 0.50),
-        'fault_flag_on_short': ('>=', 1), 't_boost_rise_c': ('<=', 55), 't_sy6280_rise_c': ('<=', 55)}),
+        'fault_flag_on_short': ('>=', 1), 't_boost_rise_c': ('<=', 55), 't_tps2553_rise_c': ('<=', 55),
+        'c25_effective_uf': ('>=', 1.6), 'c25_uncertainty_uf': ('>=', 0),
+        'v_u5_in_peak_v': ('<', 7.0), 'v_u5_in_uncertainty_v': ('>=', 0),
+        'v_u7_out_peak_v': ('<', 6.0), 'v_u7_out_uncertainty_v': ('>=', 0)}),
     'WC-102': dict(boards=('wifi',), units=3, m={
         'r_5v_ohm': ('>=', 10), 'r_3v3_ohm': ('>=', 10), 'i_5v_idle_ma': ('<=', 340),
         'v_3v3_v': ('range', 3.227, 3.411)}),
@@ -171,6 +177,10 @@ def load(path):
 def value(rec, mid):
     """The measurement as the gate compares it (copper scaled to its hot corner)."""
     v = rec['measurements'][mid]
+    bound = GATES[rec['test']].get('uncertainty_bounds', {}).get(mid)
+    if bound:
+        uncertainty = rec['measurements'][bound[1]]
+        v += uncertainty if bound[0] == 'upper' else -uncertainty
     rule = GATES[rec['test']].get('scale', {}).get(mid)
     if rule and rule[0] == 'cu':    # copper resistance, linear in temperature (copper.py, 20 C reference)
         t = rec['measurements']['board_temp_c']
@@ -182,6 +192,8 @@ def value(rec, mid):
 
 def within(v, limit):
     op = limit[0]
+    if op == '<':
+        return v < limit[1]
     if op == '<=':
         return v <= limit[1]
     if op == '>=':
@@ -267,6 +279,9 @@ def main(argv=None):
             for m, lim in g['m'].items():
                 rule = g.get('scale', {}).get(m)
                 note = ''
+                bound = g.get('uncertainty_bounds', {}).get(m)
+                if bound:
+                    note = ' (compare %s measurement bound using %s)' % bound
                 if rule and rule[0] == 'cu':
                     note = ' (copper, scaled to %.0f C from board_temp_c)' % rule[1]
                 elif rule:

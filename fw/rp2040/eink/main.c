@@ -69,8 +69,8 @@ static const epd_bus_t bus = {0, epd_command, epd_data, epd_pin, epd_busy};
 static uint8_t status(card_t *c, uint32_t queued_bytes, uint32_t queued_frames)
 {
 	(void)c;
-	/* as the graphics card: what is still in the SPI ring counts as used */
-	uint32_t free = gpu_fifo_free(&eink.gpu), used = queued_bytes + 2 * queued_frames;
+	/* Reserve queued frames and the next command's two-byte FIFO header. */
+	uint32_t free = gpu_fifo_free(&eink.gpu), used = queued_bytes + 2 * queued_frames + 2;
 	uint32_t units = free > used ? (free - used) / 64 : 0;
 	return (uint8_t)(units > 127 ? 127 : units);
 }

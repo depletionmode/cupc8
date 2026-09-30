@@ -179,9 +179,9 @@ static void __not_in_flash_func(core1_main)(void)
 static uint8_t status(card_t *c, uint32_t queued_bytes, uint32_t queued_frames)
 {
 	(void)c;
-	/* FREE counts what is still in the SPI ring as used: every queued byte
-	 * plus the FIFO's 2-byte header per frame */
-	uint32_t free = gpu_fifo_free(&gpu), used = queued_bytes + 2 * queued_frames;
+	/* Reserve queued frames and the next command's two-byte FIFO header;
+	 * FREE credits count wire bytes, including the opcode. */
+	uint32_t free = gpu_fifo_free(&gpu), used = queued_bytes + 2 * queued_frames + 2;
 	uint32_t units = free > used ? (free - used) / 64 : 0;
 	return (uint8_t)(units > 127 ? 127 : units);
 }

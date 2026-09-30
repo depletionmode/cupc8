@@ -1092,6 +1092,15 @@ kind = "sim"
 vrow = "2.4"
 cmd = "node test/emu/test_eink_queue_api.mjs --source $CUPC8_EINK_API_SOURCE --out $CUPC8_EINK_API_OUT"
 
+[[test]]
+id = "GPU-012"
+title = "Graphics FREE reserves the next two-byte FIFO header"
+checks = "a genuine750ELF under actual grey-refresh hold accepts legal8006byteBLIT8 and118bytePUTS, leavingexact64physicalFIFO bytes; FREE mustreportzero atthatboundary; afterrealdrain thehost obtainscredit andlegal64bytePUTS isaccepted withzeroGPU/transport errors; --expect-loss requires originalFREE1 and actualrejection/GPUerror ofthelegal64byteframe; SRAMstate isobservedonly, nofakefirmware orRAMwrites"
+method = "emu/machine/einkfree.cpp with test/emu/test_eink_free_boundary.py, actual3MHz slotpins andUC8179 model; ELFsymbolsidentify realFIFO counters; existingpanelbusy gates/deadlines unchanged"
+kind = "sim"
+vrow = "2.4"
+cmd = "tools/fw_rp2040.sh eink750 && tools/emu_machine_build.sh && python3 test/emu/test_eink_free_boundary.py --elf build/rp2040/eink750.elf"
+
 # ============================================================================
 # IOC: IO card firmware
 # ============================================================================
@@ -1164,6 +1173,15 @@ vrow = "2.9"
 cmd = "cmake -G Ninja -S emu/rp2040 -B build/emu-native >/dev/null && ninja -C build/emu-native rp2040emu.node >/dev/null && tools/fw_rp2040.sh storage && CUPC8_EMU=native node test/emu/test_storage.mjs"
 
 # ============================================================================
+[[test]]
+id = "STO-004"
+title = "Whole-computer storage persistence across cold System removal"
+checks = "Actual CPU SAVE/CLOSE to SD; destroy the whole machine; first LOAD/RUN after fresh System-removed boot before any second SAVE; exact PC FAT contents and unchanged SD image; GPU and selected750 stacks; immutable source and asset bindings"
+method = "test/emu/test_storage_persistence.mjs --source explicit qualified tree --out unique directory --profile gpu|eink750"
+kind = "sim"
+vrow = "2.4"
+cmd = "node test/emu/test_storage_persistence.mjs --source $CUPC8_PERSISTENCE_SOURCE --out $CUPC8_PERSISTENCE_GPU_OUT --profile gpu && node test/emu/test_storage_persistence.mjs --source $CUPC8_PERSISTENCE_SOURCE --out $CUPC8_PERSISTENCE_EINK_OUT --profile eink750"
+
 # WIFI: Wi-Fi card firmware
 # ============================================================================
 [[test]]
@@ -2414,7 +2432,7 @@ cmd = "python3 tools/fa_results.py IC-103"
 [[test]]
 id = "IC-104"
 title = "First article: keyboard port under load and short"
-checks = "VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/switch rise <= 55 C (IC-005, POW-007)"
+checks = "VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/TPS2553 rise <= 55 C (IC-005, POW-007); C25 estimate minus uncertainty >= 1.6 uF; U5 IN peak plus uncertainty strictly < 7 V; boost OUT peak plus uncertainty strictly < 6 V; missing bounds incomplete"
 method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/IC-104/"
 kind = "hw"
 vrow = "5"
