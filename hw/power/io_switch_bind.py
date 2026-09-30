@@ -14,7 +14,7 @@ from netlist import read
 from ibis_bus import routed_connectivity,routed_distances
 VALUES={'U5':('TPS2553DBVR-1',('jlc','TPS2553DBVR-1')),
         **{r:(v,('Device','R')) for r,v in {'R10':'45k3','R11':'100k','R12':'10k'}.items()},
-        **{r:(v,('Device','C')) for r,v in {'C21':'100u','C22':'100n','C25':'1u','C23':'22u','C24':'22u'}.items()}}
+        **{r:(v,('Device','C')) for r,v in {'C21':'100u','C22':'100n','C25':'4.7u','C23':'22u','C24':'22u'}.items()}}
 PINMAP={'1':('IN','/VBOOST'),'2':('GND','/GND'),'3':('EN','/VBUS_EN'),
         '4':('FAULT','/VBUS_nFAULT'),'5':('ILIM','/ILIM'),'6':('OUT','/VBUS')}
 NETS={'/ILIM':{('R10','1'),('U5','5')},
@@ -39,7 +39,7 @@ def topology(circuit):
  # Catch a stale behavioral model before attributing its results to this board.
  for name,value in {'R_ILIM':45300.,'R_ILIM_TOL':.01,'R_ILIM_TCR':100e-6,
                     'R_EN':100000.,'R_PULLUP':10000.,
-                    'C_IN_LOCAL':1e-6,'C_BOOST':26e-6,'L_IN':20e-9}.items():
+                    'C_IN_LOCAL':1.6e-6,'C_BOOST':26e-6,'L_IN':20e-9}.items():
   if getattr(model,name)!=value:raise ValueError(f'{name}: behavioral model changed; requalify binding')
  if model.C_PORT!=(120e-6,10e-6):raise ValueError('port capacitor/USB load scenario changed')
  if model.PART!='TPS2553DBVR-1' or model.LCSC!='C111738':raise ValueError('model switch identity changed')
@@ -51,7 +51,7 @@ def physical(circuit,board_path,bom_path):
  codes={}
  for row in csv.DictReader(Path(bom_path).open()):
   for ref in row['Designator'].split(','):codes[ref.strip()]=row['LCSC Part #']
- if codes.get('U5')!='C111738' or codes.get('R10')!='C26980':raise ValueError('wrong switch/ILIM BOM part')
+ if codes.get('U5')!='C111738' or codes.get('R10')!='C26980' or codes.get('C25')!='C23733':raise ValueError('wrong switch/ILIM/local-cap BOM part')
  for ref in VALUES:
   fp=fps.get(ref)
   if fp is None or fp.GetValue()!=VALUES[ref][0]:raise ValueError(f'{ref}: missing or different PCB value')
@@ -95,7 +95,10 @@ def check(out):
                    'evidence_sha256':hashlib.sha256((out/'evidence.json').read_bytes()).hexdigest(),
                    'assumptions':{'loop_inductance_h':model.L_IN,'physically_derived_loop_bound':False,
                                   'response_stress_s':model.T_RESP_STRESS,'guaranteed_max_response':False,
-                                  'nominal_input_cap_f':model.C_IN_LOCAL},
+                                  'nominal_input_cap_f':4.7e-6,
+                                  'modeled_effective_input_cap_f':model.C_IN_LOCAL,
+                                  'guaranteed_operating_Ceff':False,
+                                  'effective_capacitance_status':'engineering target; IC-104 measured qualification required'},
                    'paths':paths,'manufacturing_release_approved':False},indent=2))
  return 0
 if __name__=='__main__':

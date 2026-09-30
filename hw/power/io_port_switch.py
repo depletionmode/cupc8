@@ -55,7 +55,7 @@ R_ILIM_TCR = 100e-6
 R_ILIM_DT = 60.0                     # resistor at 0..85 C: <= 60 K from the 25 C rating
 R_PULLUP = 10e3                      # FAULT to 3V3 (C25744), GPIO8
 R_EN = 100e3                         # R11, kept
-C_IN_LOCAL = 1e-6                    # new C25 1 uF at IN (7.3 asks >= 0.1 uF; 100 nF rings to 8.5 V, T5)
+C_IN_LOCAL = 1.6e-6                  # C25 4.7u nominal C23733; engineering/IC-104 measured Ceff target, not guaranteed vendor minimum
 L_IN = 20e-9                         # engineering bound: 13.85 mm C24-to-U5 route, with ground return
 C_PORT = (120e-6, 10e-6)             # C21 100 uF +20 %, and a USB device's 10 uF maximum
 C_BOOST = 26e-6                      # C23/C24 2 x 22 uF derated at 5 V (power.md)

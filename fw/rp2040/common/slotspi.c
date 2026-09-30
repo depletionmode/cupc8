@@ -63,6 +63,11 @@ static uint fill(uint8_t *p)
 	uint32_t queued_bytes = frame_start - replayed_bytes;
 	uint n = 0;
 	p[n++] = (uint8_t)(status_fn(card, queued_bytes, queued_frames) & 0x7f);
+	/* Graphics FREE must cover descriptor capacity as well as FIFO bytes.
+	 * Leave headroom for a status already preloaded and the next command.
+	 * Other card types use status bitfields, not graphics FREE credits. */
+	if (card->ops->type == CARD_TYPE_GPU && queued_frames >= QUEUE_LEN / 2)
+		p[0] = 0;
 	if (!q_commands && !busy && card->resp_ready) {
 		p[n++] = (uint8_t)card->resp_len;
 		memcpy(&p[n], card->resp, (size_t)card->resp_len);
@@ -117,7 +122,11 @@ static void cs_rose(uint gpio, uint32_t events)
 	dma_channel_abort(dma_tx);
 	sm_restart();
 	if (end != frame_start) {
-		if (q_head - q_tail < QUEUE_LEN) {
+		/* A single $FF byte is a status poll, never a command. Replaying it
+		 * would waste descriptors while rendering and hide unread responses. */
+		if (end - frame_start == 1 && ring[frame_start % RING_SIZE] == 0xff) {
+			replayed_bytes++;
+		} else if (q_head - q_tail < QUEUE_LEN) {
 			queue[q_head % QUEUE_LEN].start = frame_start;
 			queue[q_head % QUEUE_LEN].end = end;
 			q_head++;

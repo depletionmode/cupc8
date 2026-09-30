@@ -282,6 +282,12 @@ gpu_putc:
 	ld r0, [gpu_spi]
 	eq r0, #0xff
 	bzf .none
+	; Short PUTC frames can exhaust transport descriptors during rendering.
+	; Preserve gpu_char across the status poll, which uses r0 and r1.
+	mov r0, #1
+	push pch
+	push pcl
+	b gpu_wait_free
 	push pch
 	push pcl
 	b gpu_cs_on

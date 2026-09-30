@@ -23,37 +23,59 @@ Standing direction: always use parallel agents for pending work when it fits
 and is independent. Preserve owners and frozen job inputs; do not duplicate
 runs or concurrently mutate the same stage/source files.
 
-#### Current follow-up: 2026-10-01 00:17 Israel
+#### Current follow-up: 2026-10-01 00:36 Israel
 
-All8 normal live-stock qty2 packages, full fabrication, mechanical and strict
-DC checks are complete. Final intended-stack conditional SPI evidence is
-complete, with four early MOSI data diagnostics and all stated model/ESP
-limits preserved. No newly demonstrated PCB defect requires Main rerouting.
-Source checkpoint pushed on milestone-1 through a20f2c8 (5adfd72 source fixes
-and guarded routes; a20f2c8 preserves executable verification runner).
+All eight normal live-stock qty2 packages, fabrication, mechanical and strict
+DC checks are complete. Conditional SPI electrical evidence is complete;
+four early MOSI diagnostics and model/ESP limits remain visible. No new PCB
+fault requires Main rerouting. Source checkpoints pushed through 7b8c73e.
 
-Whole-design prereview found two real delivery faults. System bootstrap must
-use powered Main plus a separate System data cable: now corrected. The selected
-Waveshare7.5-inch V2/800x480 panel requires eink750 rather than the default583
-firmware: genuine750 ELF and six exact-derived RP UF2/BIN pairs now included.
-Correct750 native panel benchmark PASS25/25; genuine wrong583-as750 negative
-benchmark fails INFO/glass as required, and permanent regression passes.
-External peripheral/FAT-media instructions and all10 review dispositions exist.
+Selected 800x480 eInk integration failed after System removal. Focused replay
+3019 and raw trace 97238 also exited 1; preserve all failures. Actual incoming
+SPI contains the complete HTTP reply, while the glass loses text after the
+32-entry command queue fills. A diagnostic full refresh does not restore it.
+This is a real firmware transport/flow-control fault; HTTP-server starvation
+is no longer the leading explanation. The standalone750 25/25 pass did not
+cover this unthrottled per-character kernel burst.
 
-Root68805 full750 integrated test EXIT1: System-present programming/SD/display/
-WiFi phase completed; removed-System HTTP/display assertion failed. Preserve
-original143 and this failure. Root3019 focused removed-phase diagnostic LIVE,
-using actual full-chip readback and SD image, unchanged firmware/assertions/
-deadlines, extra machine/panel/network/UART capture. Read-only source review
-identified possible same-process HTTP-server starvation by synchronous native
-emulation; this is unconfirmed until diagnostics. No firmware/board repair or
-weakened deadline adopted. Candidate remains not cleared for ordering.
+Root has prepared a minimal software repair: wait for graphics FREE before
+every PUTC, advertise zero graphics FREE at descriptor half-capacity, and
+discard status-only single-byte FF polls without queuing or changing unread
+responses. Other cards retain their status bitfields. This patch is unqualified
+until full GPU/750 native integration passes. Fresh six-RP firmware, ROM and
+native builds have now passed. The exact captured-stream counterexample
+reproduces 17 dropped frames/max32 descriptors/15110 differing pixels on old
+firmware; repaired firmware has zero drops/max16 descriptors/2066 FREE=0 polls
+and exact raster equality. Ninety-six FF polls consume no descriptors and
+preserve the INFO response/READ behavior. Old143 tests qualify the original
+assets, not the new patch.
 
-Ordinary full-green readiness, unknown power/transient/current/Ceff/thermal
-bounds, exact final Astra critique, supplier production options/preview and
-physical sample obligations remain distinct and incomplete. Authorized qty2
-cannot silently satisfy retained three-unit qualification gates. card.img
-remains untouched and untracked.
+Initial fresh integration attempts exited SIGABRT because the copied QEMU
+installation lacked its ESP ROM/share resources. Both failures are preserved.
+The actual 108 original resource files are now copied/hash-bound separately;
+unchanged integration retries are live: root87190 GPU and root93659 eink750,
+programming genuine new ROM and checking complete System-present/removed flow.
+
+The IO verification-only omission is repaired: fitted C25 was already 4.7u,
+but the binder/model still expected 1u. Actual final binding,16 mutations,
+two wrong-BOM negatives and complete transient suite now pass. Hardware input
+maps/receipts are unchanged. Ceff1.6u/20nH/response assumptions remain explicit
+engineering inputs, not guaranteed supplier bounds.
+
+Parallel owners: eink_network_diagnosis builds the queue/response regression;
+release_audit prepares isolated fresh software builds and integration; power_closure
+triages remaining power/thermal evidence. Root owns the firmware repair and
+full-access execution. Owned numerical SI qualifications are finished. Four legacy Sep28 SI workers
+and two old Claude-worktree HTTP servers remain idle/orphaned; they are not
+current qualification runs and have been recorded separately. No long SI
+solve is required for these software-only edits. Electrical input/source
+binding must still be reconciled explicitly.
+
+Ordering is not cleared. Remaining work includes corrected software qualification,
+updated firmware/handoff archive and independent hash audit, actionable power/
+thermal/current evidence or explicit conditional disposition, exact final
+critique, supplier preview and physical sample obligations. Qty2 does not
+satisfy retained three-unit qualification gates. card.img remains untouched.
 
 #### Current follow-up: 2026-09-30 23:38 Israel
 
