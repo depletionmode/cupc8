@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused filled-region neck proof and deferral regressions."""
+"""Focused filled-region neck proof and boundary reuse regressions."""
 
 from pathlib import Path
 import sys
@@ -7,7 +7,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
-from fab_neck_coverage import analyze_layer  # noqa: E402
+from fab_neck_coverage import analyze_layer, ProofGeometry  # noqa: E402
 
 
 def dumbbell(width):
@@ -49,23 +49,51 @@ def main():
         for path, is_silk in ((copper, False), (silk, True)):
             path.write_text(plot(dumbbell(100000), is_silk))
             good = analyze_layer(path, .1, silk=is_silk)
-            assert good['filled_regions'] == 1 and good['isolated_exact_pass'] == 1
-            assert good['deferred'] == 0 and good['complete_for_filled_regions']
+            assert good['filled_regions'] == 1 and good['orthogonal_certificates'] == 1
+            assert good['proved'] == 1 and good['complete_for_filled_regions']
             path.write_text(plot(dumbbell(80000), is_silk))
-            expect_failure(lambda: analyze_layer(path, .1, silk=is_silk),
-                           'isolated filled region has a 0.080000 mm span')
-        # A nonorthogonal shape wider than the rule is not declared proved by
-        # the exact orthogonal certificate, even when no witness finds a fault.
+            bad = analyze_layer(path, .1, silk=is_silk)
+            assert not bad['complete_for_filled_regions']
+            assert any(row['kind'] == 'pinch' and abs(row['width_mm'] - .08) < 1e-6
+                       for row in bad['failures'])
+        # An acute terminal tip remains unproved under the corner rule.
         sloped = ('G36*\nX1000000Y1000000D02*\nX2000000Y1000000D01*\n'
                   'X2200000Y1800000D01*\nX1000000Y1800000D01*\n'
                   'X1000000Y1000000D01*\nG37*\n')
         copper.write_text(plot(sloped))
-        deferred = analyze_layer(copper, .1)
-        assert deferred['filled_regions'] == 1
-        assert deferred['isolated_exact_pass'] == 0
-        assert deferred['nonorthogonal_or_complex'] == 1
-        assert not deferred['complete_for_filled_regions']
-    print('filled necks: exact orthogonal pass; 80 um copper/silk necks fail; sloped region defers')
+        acute = analyze_layer(copper, .1)
+        assert acute['filled_regions'] == 1
+        assert acute['orthogonal_certificates'] == 0
+        assert not acute['complete_for_filled_regions']
+        # A nonorthogonal region covered by wider plotted ink exercises the
+        # union certificate without using the isolated orthogonal shortcut.
+        beveled = ('G36*\nX1000000Y1000000D02*\nX2000000Y1000000D01*\n'
+                   'X2200000Y1200000D01*\nX2200000Y1800000D01*\n'
+                   'X2000000Y2000000D01*\nX1000000Y2000000D01*\n'
+                   'X1000000Y1000000D01*\nG37*\n')
+        copper.write_text(plot(beveled))
+        standalone = analyze_layer(copper, .1)
+        assert standalone['orthogonal_certificates'] == 0
+        assert standalone['proved'] == 1 and standalone['complete_for_filled_regions']
+        copper.write_text(plot(beveled).replace('M02*',
+            '%ADD11C,3.000000*%\nD11*\nX1500000Y1500000D03*\nM02*'))
+        complex_result = analyze_layer(copper, .1)
+        assert complex_result['orthogonal_certificates'] == 0
+        assert complex_result['proved'] == 1 and complex_result['complete_for_filled_regions']
+    engine = ProofGeometry()
+    try:
+        shape = engine.wkt('POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))')
+        point = engine.wkt('POINT (0.5 0.5)')
+        boundary = engine.boundary(shape)
+        retained = len(engine.shapes)
+        for _ in range(1000):
+            assert engine.boundary(shape) == boundary
+            assert engine.distance(point, engine.boundary(shape)) == .5
+        assert len(engine.shapes) == retained
+    finally:
+        engine.close()
+    assert not engine._boundaries
+    print('filled necks: orthogonal/complex pass; 80 um copper/silk necks and acute tips fail; boundary reused')
 
 
 if __name__ == '__main__':

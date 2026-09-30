@@ -66,6 +66,7 @@ class ProofGeometry(gerberdrc.Geometry):
         self.sources = {}
         self.prepared = []
         self._functions = {}
+        self._boundaries = {}
 
     def buffer(self, shape, radius):
         result = super().buffer(shape, radius)
@@ -192,8 +193,13 @@ class ProofGeometry(gerberdrc.Geometry):
         return points
 
     def boundary(self, shape):
-        return self.own(self.fn('GEOSBoundary_r', ctypes.c_void_p, ctypes.c_void_p)(
-            self.ctx, shape), 'take a boundary')
+        # Geometry is immutable for this engine's lifetime. A width witness
+        # must not retain another copy of the complete board boundary.
+        if shape not in self._boundaries:
+            self._boundaries[shape] = self.own(
+                self.fn('GEOSBoundary_r', ctypes.c_void_p, ctypes.c_void_p)(
+                    self.ctx, shape), 'take a boundary')
+        return self._boundaries[shape]
 
     def prepare(self, shape):
         prepared = self.fn('GEOSPrepare_r', ctypes.c_void_p, ctypes.c_void_p)(self.ctx, shape)
@@ -214,6 +220,7 @@ class ProofGeometry(gerberdrc.Geometry):
         for prepared in self.prepared:
             destroy(self.ctx, prepared)
         super().close()
+        self._boundaries.clear()
 
 
 def expand_region_arcs(path, directory):
@@ -305,7 +312,13 @@ def corner_caps(engine, ink_prepared, vertices, box, radius):
         bisector = first + second
         bisector /= numpy.hypot(*bisector)
         center = v + bisector * (outer / math.sin(angle / 2))
-        p1, p2 = v + first * leg, v + second * leg
+        # Tangent coordinates rounded for GEOS can land infinitesimally
+        # outside a diagonal edge. Move the unchanged full-size disk and
+        # the cap's contact vertices 0.1 nm into the ink. Both candidates
+        # must still pass strict Covers; no containment slack is allowed.
+        inward = bisector * 1e-7
+        center += inward
+        p1, p2 = v + first * leg + inward, v + second * leg + inward
         triangle = engine.wkt('POLYGON ((%.12f %.12f, %.12f %.12f, %.12f %.12f, %.12f %.12f))' %
                               (*v, *p1, *p2, *v))
         disk = engine.styled_buffer(engine.wkt('POINT (%.12f %.12f)' % tuple(center)),
