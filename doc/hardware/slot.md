@@ -51,7 +51,7 @@ and 12. The pinout is custom. Never plug a real PCIe card in.
 
 | Signal | Direction | Notes |
 |---|---|---|
-| SCK, MOSI, CS_n | main → card | 3.3 V push-pull from the chipset, 33 Ω series at the source. SCK ≤ 6 MHz. |
+| SCK, MOSI, CS_n | main → card | 3.3 V push-pull from the chipset, 33 Ω series at the source. M1 qualification targets SCK ≤ 3 MHz. |
 | MISO | card → main | Push-pull while this card's CS_n is low, **Hi-Z otherwise** (all slots share MISO). 47 kΩ pull-up on the main board. |
 | IRQ_n | card → main | **Open-drain**, active low, level. 4.7 kΩ pull-up on the main board, one per slot. Read in `$f202`. |
 | CARD_RST_n | main → card | Per slot, open-drain from the sysctl I²C expander. Low = the card MCU is held in reset (RP2040 RUN, ESP32 EN). Released 10 ms after the rails are good. |
@@ -76,11 +76,22 @@ whole-system budget is in `power.md`.
 Every card is an SPI slave in **mode 0**, MSB first. The CPU (through the
 chipset) is always the master.
 
+M1 uses divider 2 from the 12 MHz master clock: **3 MHz SCK**, as selected
+by the ROM and kernel card drivers. Signal-integrity turnaround checks must
+meet that operating rate. Divider 1 can generate 6 MHz digitally, but its
+analog timing is unqualified; the SI report retains its budget as an
+unsupported hardware-maximum diagnostic. A 3 MHz timing pass does not
+waive voltage stress, card-specific timing gaps or output-release checks.
+
 ### Framing
 
 - **A command is one CS_n-low frame.** The host sets `SPI_CS=1`, sends
   opcode and argument bytes, clocks any response bytes, then sets
   `SPI_CS=0`.
+- **Card handover.** Release the previous card's CS_n before selecting a
+  different card, allowing its buffer's worst output-disable time plus
+  interconnect skew. One-hot logical selection alone does not prove that
+  two real output buffers never drive MISO together.
 - **Resync.** A CS_n rising edge ends the frame. The card discards any
   incomplete command, so a lost byte can never desynchronise a card for
   longer than one frame.

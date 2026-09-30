@@ -84,6 +84,45 @@ class Waveform(unittest.TestCase):
         self.assertTrue(any('AC allowance' in f for f in self.check(long, part='ICE40HX4K-TQ144')))
 
 
+class SlotSpiQualification(unittest.TestCase):
+    """M1's required rate and unsupported hardware maximum stay distinct."""
+
+    def results(self, miso_settled_ns=20):
+        def receiver(group, label, rise, fall):
+            return {'group': group, 'receivers': {label: {'edges': [
+                {'edge': 'rise', 'first_band_ns': 1, 'settled_ns': rise},
+                {'edge': 'fall', 'first_band_ns': 1, 'settled_ns': fall}]}}}
+        return [receiver('MB spi SCK', 'J16:storage:U1.4', 2, 30),
+                receiver('MB spi MOSI', 'J16:storage:U1.5', 4, 4),
+                receiver('MB spi MISO', 'main:U7.48', miso_settled_ns, miso_settled_ns)]
+
+    def test_qualified_rate_pass_does_not_qualify_hardware_maximum(self):
+        report = si.timing_checks('CC-007', self.results())
+        checks = [c for c in report['checks'] if 'slot MISO turnaround' in c['check']]
+        required, diagnostic = checks
+        self.assertTrue(required['required'])
+        self.assertTrue(required['ok'])
+        self.assertIn('3 MHz', required['check'])
+        self.assertFalse(diagnostic['required'])
+        self.assertFalse(diagnostic['ok'])
+        self.assertIn('6 MHz', diagnostic['check'])
+        self.assertIn('unsupported', diagnostic['check'])
+        self.assertTrue(report['ok'])
+        self.assertFalse(report['slot_spi_qualification']['hardware_max_analog_qualified'])
+
+    def test_missing_qualified_sample_budget_fails(self):
+        report = si.timing_checks('CC-007', self.results(miso_settled_ns=100))
+        self.assertFalse(report['ok'])
+        self.assertIn('3 MHz', report['summary'])
+
+    def test_waveform_period_uses_qualified_rate(self):
+        self.assertEqual(si.SPI_HZ, si.QUALIFIED_SPI_HZ)
+        self.assertEqual(si.QUALIFIED_SPI_HZ, 3e6)
+        self.assertEqual(si.SPI_HARDWARE_MAX_HZ, 6e6)
+        edges, _ = si.clock_edges(si.SPI_HZ)
+        self.assertAlmostEqual((edges[1][0] - edges[0][0]) * 1e9, 166.6666667)
+
+
 class Models(unittest.TestCase):
     def test_ladder_matches_ideal_line(self):
         g = route.Graph('x', 'n', 'JLC04161H-7628', {'In1.Cu': '/GND'})

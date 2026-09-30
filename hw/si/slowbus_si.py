@@ -92,7 +92,8 @@ SOURCES = {
     'rp2040': 'Raspberry Pi RP2040 Datasheet, build-date 2025-02-20 3184e62 '
               '(datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)',
     'ice40': 'Lattice FPGA-DS-02029-4.3 iCE40 LP/HX (Feb 2025) Tables 4.1, 4.5, 4.13',
-    'lvc125': 'Nexperia 74LVC1G125 Rev. 17.1 (3 Sep 2024) Tables 5, 7, 8',
+    'lvc125': 'Nexperia 74LVC1G125 Rev. 17.1 (3 Sep 2024) Tables 5, 7, 8 '
+              '(family limits proxy; fitted MDD C52140430 is uncharacterized)',
     'esp32c3': 'Espressif ESP32-C3-MINI-1 datasheet v2.2 Table 6-3',
     'sd': 'Kingston SDCIT microSDHC spec sheet 4900180-001.A00 Tables 6-1, 6-2, 6-6, 7-1 '
           '(the SD Association simplified spec leaves these blank)',
@@ -915,7 +916,11 @@ def sweep(base, **axes):
 
 
 # ------------------------------------------------------------------- rows
-SPI_HZ, SD_HZ, EPD_HZ, BUS_HZ = 6e6, 12.5e6, 10e6, 12e6
+# M1 ROM and kernel card drivers use divider 2 on the 12 MHz master.
+# Divider 1 remains a digital hardware capability, not an analog qualification.
+QUALIFIED_SPI_HZ, SPI_HARDWARE_MAX_HZ = 3e6, 6e6
+SPI_HZ = QUALIFIED_SPI_HZ
+SD_HZ, EPD_HZ, BUS_HZ = 12.5e6, 10e6, 12e6
 IBIS_AXES = dict(corner=('min', 'max'), package=(0, 1), zscale=(.9, 1.1), rx_c=(0, 1),
                  connector=(0, 1))
 LVC_AXES = dict(corner=('min', 'max'), zscale=(.9, 1.1), rx_c=(0, 1), connector=(0, 1))
@@ -1152,8 +1157,11 @@ ASSUMPTIONS = [
     '1 nH package, no clamp diodes (overstates overshoot)',
     'ESP32-C3 (wifi slot): no IBIS or IO abs max; VIH max VDD+0.3 / VIL min -0.3 used as limits; '
     'inputs 1..10 pF; no SPI-slave AC timing is published, so wifi-slot SPI timing is not verified',
-    '74LVC1G125GW (card MISO buffer): TI SN74LVC1G125 IBIS used as a same-family proxy for the '
-    'Nexperia part; Nexperia limits (VI -0.5..6.5 V, tpd <= 4.5 ns) apply',
+    '74LVC1G125GW (card MISO buffer): fitted MDD C52140430 has no characterized model here; '
+    'TI SN74LVC1G125 IBIS and Nexperia limits (VI -0.5..6.5 V, tpd <= 4.5 ns) are family '
+    'proxies, not verified electrical bounds for the fitted MDD part',
+    'M1 slot SPI qualification targets the ROM/kernel divider-2 rate, 3 MHz; the 6 MHz '
+    'digital hardware maximum is an unsupported analog-timing diagnostic',
     'SRAM/ROM/oscillator/SD card/TXB0108 outputs: behavioural bracket drivers (DRIVE)',
     'slot/socket contact: 1..5 nH, 0.3..1.5 pF, 30 mOhm (no per-contact data; bounded by a '
     'PCIe-CEM-class return-loss limit)',
@@ -1227,7 +1235,7 @@ def timing_checks(row, results):
         return False
 
     if 'MB spi SCK' in groups:
-        half = .5 / SPI_HZ
+        half = .5 / QUALIFIED_SPI_HZ
         rp = lambda pin: (lambda label: label.endswith(f':U1.{pin}') and 'wifi' not in label)
         sck_r = _span(_edges(results, 'MB spi SCK', rp(4), 'rise'))
         sck_f = _span(_edges(results, 'MB spi SCK', rp(4), 'fall'))
@@ -1236,9 +1244,10 @@ def timing_checks(row, results):
             first = min(m[0] for m in mosi)
             last = max(m[1] for m in mosi)
             skew = RP_IN_MAX - RP_IN_MIN
-            add('slot MOSI setup at RP2040 cards (6 MHz)', half + sck_r[0] - last - skew,
+            add(f'slot MOSI setup at RP2040 cards ({QUALIFIED_SPI_HZ / 1e6:g} MHz)',
+                half + sck_r[0] - last - skew,
                 'T/2 + SCK rise earliest - MOSI settled latest - pad skew (Table 630)')
-            add('slot MOSI hold at RP2040 cards (6 MHz)',
+            add(f'slot MOSI hold at RP2040 cards ({QUALIFIED_SPI_HZ / 1e6:g} MHz)',
                 2 * half + first - (half + sck_r[1]) - skew - 2 * T_SYS,
                 'MOSI changes one period after it launched; PIO samples up to 2 clk_sys '
                 '+ pad skew after SCK')
@@ -1247,15 +1256,20 @@ def timing_checks(row, results):
         if need('slot MISO turnaround', sck_f, miso):
             sys.path.insert(0, str(ROOT / 'hw/timing'))
             from cpubus_budget import ALLOW
-            for hz in (SPI_HZ, 3e6):
+            for hz in (QUALIFIED_SPI_HZ, SPI_HARDWARE_MAX_HZ):
                 half_ = .5 / hz
                 used = (ALLOW['clk_insertion'] * 1e-9 + sck_f[1] + RP_IN_MAX +
                         PIO_RESPONSE_CYCLES * T_SYS + RP_OUT_MAX + LVC125_TPD_MAX + miso[1] +
                         (ALLOW['in_pad'] + ALLOW['setup']) * 1e-9)
-                add(f'slot MISO turnaround, RP2040 cards at {hz / 1e6:g} MHz', half_ - used,
+                diagnostic = hz == SPI_HARDWARE_MAX_HZ
+                add(f'slot MISO turnaround, RP2040 cards at {hz / 1e6:g} MHz' +
+                    (' (unsupported hardware maximum diagnostic)' if diagnostic else ''),
+                    half_ - used,
                     'clock insertion + SCK fall settled + pad in + PIO response '
                     f'({PIO_RESPONSE_CYCLES} clk_sys) + pad out + 74LVC1G125 tpd + MISO settled '
-                    '+ iCE40 in-pad/setup <= T/2', required=(hz == SPI_HZ))
+                    '+ iCE40 in-pad/setup <= T/2; ' +
+                    ('budget-only diagnostic, not 6 MHz analog qualification' if diagnostic
+                     else 'required M1 firmware operating rate'), required=not diagnostic)
         add('slot SPI timing at the ESP32-C3 (wifi) card', None,
             'no ESP32-C3 SPI-slave AC timing is published', required=row == 'MB-007')
     if 'SC storage' in groups:
@@ -1304,6 +1318,9 @@ def timing_checks(row, results):
         add('UC8179 SCL cycle tSCYCW >= 100 ns', 1 / EPD_HZ - UC_CYC,
             'fw EPD_SPI_HZ 10 MHz; spi_set_baudrate never exceeds the request')
     return {'ok': ok, 'checks': items,
+            'slot_spi_qualification': {'qualified_hz': QUALIFIED_SPI_HZ,
+                                       'hardware_max_hz': SPI_HARDWARE_MAX_HZ,
+                                       'hardware_max_analog_qualified': False},
             'summary': ', '.join(f'{i["check"]}: {i["margin_ns"]} ns' for i in items
                                  if i['required'] and not i['ok']) or 'all required checks met'}
 
@@ -1578,6 +1595,14 @@ def main():
         print(f'  convergence {c["case"][:60]}: {"ok" if c["ok"] else "FAIL"} '
               f'(dV {c.get("max_delta_v")}, dt {c.get("max_delta_ns")} ns)')
     print(f'  timing: {"ok" if extra["timing"]["ok"] else "FAIL"} - {extra["timing"]["summary"]}')
+    if 'MB spi SCK' in groups:
+        print(f'  slot SPI qualification: {QUALIFIED_SPI_HZ / 1e6:g} MHz; '
+              f'{SPI_HARDWARE_MAX_HZ / 1e6:g} MHz analog operation is unsupported')
+        for check in extra['timing']['checks']:
+            if 'unsupported hardware maximum diagnostic' in check['check']:
+                print(f'  diagnostic: {check["check"]}: '
+                      f'{"budget met" if check["ok"] else "budget missed"}, '
+                      f'{check["margin_ns"]} ns margin (not analog qualification)')
     print(f'  crosstalk screen (advisory): {"ok" if extra["crosstalk"]["ok"] else "over"} - '
           f'{extra["crosstalk"]["summary"]}')
     for item in UNCOVERED[args.row]:

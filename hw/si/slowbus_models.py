@@ -10,8 +10,8 @@ Two kinds of model, never mixed silently:
   one-waveform method). Every driver is replayed into its own IBIS fixture
   and must reproduce the vendor waveform (`fixture_check`) before use.
 * **Bracketed behavioural** for parts whose vendor publishes no IBIS
-  (RP2040, ESP32-C3, microSD cards, the Nexperia 74LVC1G125 behind a bot
-  wall): an ideal ramp behind a resistance, swept between a fast/strong and a
+  (RP2040, ESP32-C3, microSD cards): an ideal ramp behind a resistance,
+  swept between a fast/strong and a
   slow/weak bound, with input capacitance swept between bounds. No clamps are
   modelled for these parts, which can only overstate overshoot/undershoot.
 """
@@ -347,8 +347,9 @@ def _ti_zip(url, digest, cache, member):
 def load_lvc125(cache):
     """TI SN74LVC1G125 IBIS (scem270, File Rev 1.3): 3.3 V 3-state output.
 
-    A same-function, same-family (JESD8C LVC, +/-24 mA) proxy for the fitted
-    Nexperia 74LVC1G125GW, whose IBIS is not fetchable (bot wall)."""
+    A same-function, same-family proxy for fitted MDD 74LVC1G125GW
+    (C52140430), whose electrical behavior is not characterized here.
+    These TI tables do not establish guaranteed bounds for the MDD part."""
     text = _ti_zip(LVC125_URL, LVC125_ZIP_SHA256, cache, 'sn74lvc1g125.ibs')
     return {'out': parse_ibis(text, 'LVC1G125_OUT_33'), 'in': parse_ibis(text, 'LVC1G125_IN_33'),
             'oe': parse_ibis(text, 'LVC1G125_NOE_33')}
