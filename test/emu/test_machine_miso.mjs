@@ -10,6 +10,9 @@ import {kernelRom, ROOT} from './romimage.mjs';
 const i=process.argv.indexOf('--top');
 if(i<0) throw new Error('--top compatible development runtime JSON required');
 const original=JSON.parse(fs.readFileSync(process.argv[i+1],'utf8'));
+const physical=process.argv.includes('--physical');
+if(physical) for(const card of ['gpu','io','storage','wifi','eink'])
+ assert.equal(original.runtime.card_slot_links[card].miso_pulldown,true,`${card}: actual routed pull-down required`);
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cupc8-miso-boot-'));
 const saved=process.env.CUPC8_COSIM_TOP;
 try {
@@ -18,7 +21,7 @@ try {
    {name:'fitted-active-00',slots:{1:'hdmi'},gpu:1},
    {name:'fitted-unbooted-00',slots:{1:'hdmi'},gpu:0,unbooted:true}]) {
   const top=structuredClone(original);
-  top.runtime.card_slot_links.gpu.miso_pulldown=true;
+  if(!physical) top.runtime.card_slot_links.gpu.miso_pulldown=true;
   if(scenario.unbooted) top.runtime.qspi_boot_connected.gpu=false;
   const fixture=path.join(dir,'top.json');fs.writeFileSync(fixture,JSON.stringify(top));
   process.env.CUPC8_COSIM_TOP=fixture;
