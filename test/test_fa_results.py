@@ -16,6 +16,8 @@ GOOD_CAP = {'c_5v5_uf': 9.0, 'c_3v6_uf': 12.5, 'esr_max_mohm': 6.0}
 def record(test='WC-103', board='wifi', unit='u1', measurements=None, **extra):
     rec = dict(schema=fa.SCHEMA, test=test, board=board, unit=unit, date='2026-10-10',
                measurements=dict(GOOD_CAP if measurements is None else measurements))
+    if test == 'WC-103':
+        rec.update(part_lcsc='C602037', lot='fitted-lot-A')
     rec.update(extra)
     return rec
 
@@ -39,6 +41,23 @@ class FaResultsTests(unittest.TestCase):
             self.write(record(unit='s%d' % i))
         self.assertEqual(fa.status('WC-103', fa.records(self.dir))[0], 'pending')
         self.write(record(unit='s9'))
+        self.assertEqual(fa.status('WC-103', fa.records(self.dir))[0], 'green')
+
+    def test_wc103_rejects_wrong_or_missing_part_and_lot(self):
+        for field, bad in (('part_lcsc', 'C45783'), ('part_lcsc', None),
+                           ('lot', ''), ('lot', None), ('lot', 123)):
+            with self.subTest(field=field, bad=bad):
+                rec = record(**{field: bad})
+                self.assertEqual(fa.verdict(rec)[0], 'fail')
+                with self.assertRaisesRegex(ValueError, field):
+                    fa.load(self.write(rec))
+
+    def test_wc103_mixed_lots_do_not_close_ten_part_gate(self):
+        for i in range(10):
+            self.write(record(unit='s%d' % i, lot='A' if i < 5 else 'B'))
+        self.assertEqual(fa.status('WC-103', fa.records(self.dir))[0], 'pending')
+        for i in range(10, 15):
+            self.write(record(unit='s%d' % i, lot='A'))
         self.assertEqual(fa.status('WC-103', fa.records(self.dir))[0], 'green')
 
     def test_repeat_records_of_one_unit_count_once(self):

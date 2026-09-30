@@ -123,7 +123,7 @@ GATES = {
     'WC-102': dict(boards=('wifi',), units=3, m={
         'r_5v_ohm': ('>=', 10), 'r_3v3_ohm': ('>=', 10), 'i_5v_idle_ma': ('<=', 340),
         'v_3v3_v': ('range', 3.227, 3.411)}),
-    'WC-103': dict(boards=('wifi',), units=10, m={
+    'WC-103': dict(boards=('wifi',), units=10, part_lcsc='C602037', single_lot=True, m={
         'c_5v5_uf': ('>=', 7.80), 'c_3v6_uf': ('>=', 11.16), 'esr_max_mohm': ('<=', 150)}),
     'WC-104': dict(boards=('wifi',), units=2, m={
         'r_ret_buck_mohm': ('<=', 1000), 'r_ret_esp_mohm': ('<=', 1000)}),
@@ -159,6 +159,9 @@ def load(path):
         raise ValueError('%s: filed under %s, record says %s' % (path, Path(path).parent.name, rec['test']))
     if rec['board'] not in gate['boards']:
         raise ValueError('%s: board %r not covered by %s' % (path, rec['board'], rec['test']))
+    identity = identity_problems(rec)
+    if identity:
+        raise ValueError('%s: %s' % (path, '; '.join(identity)))
     for mid, value in rec['measurements'].items():
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError('%s: measurement %r is not a number' % (path, mid))
@@ -186,9 +189,24 @@ def within(v, limit):
     return limit[1] <= v <= limit[2]
 
 
+def identity_problems(rec):
+    """Reject unbound capacitor records before counting their numeric results."""
+    gate = GATES[rec['test']]
+    problems = []
+    expected = gate.get('part_lcsc')
+    if expected and rec.get('part_lcsc') != expected:
+        problems.append('part_lcsc must be %s (actual fitted part)' % expected)
+    if gate.get('single_lot') and (not isinstance(rec.get('lot'), str) or not rec['lot'].strip()):
+        problems.append('lot must identify the sampled fitted-part lot')
+    return problems
+
+
 def verdict(rec):
     """('pass'|'fail'|'incomplete', [problems])."""
     gate = GATES[rec['test']]
+    identity = identity_problems(rec)
+    if identity:
+        return 'fail', identity
     missing = [m for m in gate['m'] if m not in rec['measurements']]
     if missing:
         return 'incomplete', ['missing ' + m for m in missing]
@@ -203,15 +221,22 @@ def status(test, records):
     live = [r for r in records if r['test'] == test and not r.get('void')]
     lines, red = [], False
     passed = {b: set() for b in gate['boards']}
+    lots = {b: {} for b in gate['boards']}
     for rec in live:
         v, problems = verdict(rec)
         if v == 'fail':
             red = True
         if v == 'pass':
             passed[rec['board']].add(rec['unit'])
+            if gate.get('single_lot'):
+                lots[rec['board']].setdefault(rec['lot'], set()).add(rec['unit'])
         lines.append('  %s %s %s: %s%s' % (rec['board'], rec['unit'], rec['date'], v,
                                           ('; ' + '; '.join(problems)) if problems else ''))
-    short = ['%s %d/%d' % (b, len(u), gate['units']) for b, u in passed.items() if len(u) < gate['units']]
+    if gate.get('single_lot'):
+        # Ten parts from mixed lots do not qualify any single fitted-part lot.
+        passed = {b: max(lots[b].values(), key=len, default=set()) for b in gate['boards']}
+    short = ['%s %d/%d%s' % (b, len(u), gate['units'], ' from one lot' if gate.get('single_lot') else '')
+             for b, u in passed.items() if len(u) < gate['units']]
     if red:
         return 'red', lines
     if short:
@@ -237,6 +262,8 @@ def main(argv=None):
         for t in tests:
             g = GATES[t]
             print('%s: boards %s, %d unit(s) each' % (t, ', '.join(g['boards']), g['units']))
+            if g.get('part_lcsc'):
+                print('  part_lcsc must be %s; nonempty lot required; units from one lot' % g['part_lcsc'])
             for m, lim in g['m'].items():
                 rule = g.get('scale', {}).get(m)
                 note = ''

@@ -23,59 +23,60 @@ Standing direction: always use parallel agents for pending work when it fits
 and is independent. Preserve owners and frozen job inputs; do not duplicate
 runs or concurrently mutate the same stage/source files.
 
-#### Current follow-up: 2026-10-01 00:36 Israel
+#### Current follow-up: 2026-10-01 01:08 Israel
 
-All eight normal live-stock qty2 packages, fabrication, mechanical and strict
-DC checks are complete. Conditional SPI electrical evidence is complete;
-four early MOSI diagnostics and model/ESP limits remain visible. No new PCB
-fault requires Main rerouting. Source checkpoints pushed through 7b8c73e.
+All8 normal live-stock qty2 hardware builds, fabrication, mechanical and strict
+DC checks pass. Conditional fitted-stack3MHz SPI evidence is complete with
+four early MOSI diagnostics and all declared model/ESP limits retained. No
+new demonstrated board defect requires Main rerouting.
 
-Selected 800x480 eInk integration failed after System removal. Focused replay
-3019 and raw trace 97238 also exited 1; preserve all failures. Actual incoming
-SPI contains the complete HTTP reply, while the glass loses text after the
-32-entry command queue fills. A diagnostic full refresh does not restore it.
-This is a real firmware transport/flow-control fault; HTTP-server starvation
-is no longer the leading explanation. The standalone750 25/25 pass did not
-cover this unthrottled per-character kernel burst.
+First repaired software C passed both genuine fulltarget GPU39/39 and selected
+75039/39, actual newROM programming/full512KiB readback/System-removal boot,
+BASIC/keyboard/SD/realWiFi HTTP and complete display. Actual750 queue regression
+reproduces old17drops/max32/rasterdiff15110, firstfix0drops/max16/2066FREE0polls/
+exactraster. Ninety-six FF polls preserveINFO/READ. FreshIO49/storage88 and both
+panel25/25 suites pass. These results remain immutable C evidence.
 
-Root has prepared a minimal software repair: wait for graphics FREE before
-every PUTC, advertise zero graphics FREE at descriptor half-capacity, and
-discard status-only single-byte FF polls without queuing or changing unread
-responses. Other cards retain their status bitfields. This patch is unqualified
-until full GPU/750 native integration passes. Fresh six-RP firmware, ROM and
-native builds have now passed. The exact captured-stream counterexample
-reproduces 17 dropped frames/max32 descriptors/15110 differing pixels on old
-firmware; repaired firmware has zero drops/max16 descriptors/2066 FREE=0 polls
-and exact raster equality. Ninety-six FF polls consume no descriptors and
-preserve the INFO response/READ behavior. Old143 tests qualify the original
-assets, not the new patch.
+The prescribed astra/medium read-only whole-design critique is terminal EXIT0
+in build/firstarticle-final-astra-review-20261001. Ordinary all-green signoff
+is not claimed. It found another graphics host fault: ATTR/API/REFRESH paths
+ignored FREE. A real oldC CPU program loaded viaSD confirms2400ATTR calls,
+563ATTR sent withFREE0 and577allshortcommandsFREE0. Root has repaired MODEinit,
+ATTR, genericcommandopen (full headercredits/argument count preserved) and
+REFRESH. NewD source/ROM is immutable; its reused RP/native assets have exact
+source/hash carryproof, not a fictional freshfirmwarebuild. FullD integrations
+live64847GPU and64560eInk750; realAPI/regression followup also runs. Do not
+relabeled firstC78 passes as finalD qualification.
 
-Initial fresh integration attempts exited SIGABRT because the copied QEMU
-installation lacked its ESP ROM/share resources. Both failures are preserved.
-The actual 108 original resource files are now copied/hash-bound separately;
-unchanged integration retries are live: root87190 GPU and root93659 eink750,
-programming genuine new ROM and checking complete System-present/removed flow.
+Other critique findings: WC103 receiving plan namedoldC45783 while fittedWiFi
+part isC602037. Canonical docs/parser now require correctpart+lot, ten distinct
+samples from one lot, unchanged engineeringnumeric thresholds;15 tests pass.
+No physicalrecords invented. HistoricalWR10 antennaSKU/stock concatenation
+corrected; actualIDs C709347/C1509156 and externalparts instructions were valid.
 
-The IO verification-only omission is repaired: fitted C25 was already 4.7u,
-but the binder/model still expected 1u. Actual final binding,16 mutations,
-two wrong-BOM negatives and complete transient suite now pass. Hardware input
-maps/receipts are unchanged. Ceff1.6u/20nH/response assumptions remain explicit
-engineering inputs, not guaranteed supplier bounds.
+IO C25 checker/model alignment is repaired against alreadyfitted4.7uC23733:
+actualbinding16mutations/twoBOMnegatives/fullTItransients pass. Ceff1.6u/20nH/
+response remain engineering assumptions. Six-row physical risk disposition
+and independent review recommend controlled development samples with staged
+limits/stopconditions; root final disposition remains pending final repairs.
+No ordinary production waiver or vendor/David signature has been invented.
 
-Parallel owners: eink_network_diagnosis builds the queue/response regression;
-release_audit prepares isolated fresh software builds and integration; power_closure
-triages remaining power/thermal evidence. Root owns the firmware repair and
-full-access execution. Owned numerical SI qualifications are finished. Four legacy Sep28 SI workers
-and two old Claude-worktree HTTP servers remain idle/orphaned; they are not
-current qualification runs and have been recorded separately. No long SI
-solve is required for these software-only edits. Electrical input/source
-binding must still be reconciled explicitly.
+GitHub milestone-1 pushed throughcc9a993: firmware/checker fixes, permanent
+GPU010 regression/capturedfixture, and24MB manufacturingcandidate backup in
+release/firstarticle-20261001. That snapshot is explicitly pending. A newer
+C-pass handoff was independentlyverified; finalD/archive/review binding and
+backup still need refresh after tests.
 
-Ordering is not cleared. Remaining work includes corrected software qualification,
-updated firmware/handoff archive and independent hash audit, actionable power/
-thermal/current evidence or explicit conditional disposition, exact final
-critique, supplier preview and physical sample obligations. Qty2 does not
-satisfy retained three-unit qualification gates. card.img remains untouched.
+Parallel: release_audit owns Dtrial/fullintegration preparation+handoff;
+eink_network_diagnosis owns realAPI stress and transportregression;
+power_closure completed fittedpart/lot checks. Root owns kernelrepairs,
+full-access runs/adoption/review/backup. All owned numericalSIjobs finished.
+Legacy orphanSep28 SI workers/oldClaudeHTTPfixtures recorded separately.
+Remaining: DAPI/full39both proof, everyAstra disposition/test decision,
+currentpower-risk engineeringdecision, finalsource/firmware/archive/hashaudit
+andpush. Factorypreview/quote/purchase authorization are not performed;
+postdelivery receiving/physical/sample obligations remain explicit. Qty2
+cannot satisfy retained3unit/5or10part gates. card.img untouched/untracked.
 
 #### Current follow-up: 2026-09-30 23:38 Israel
 

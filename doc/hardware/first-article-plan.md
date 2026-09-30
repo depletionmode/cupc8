@@ -101,11 +101,12 @@ or waiver is made here. Contact coupons and spare boards require a separate
 bare-board quantity decision.
 
 Loose parts, ordered from LCSC at the same time as the batch (Stage 0):
-10 × C45783, 10 × C23733 (five for each CPU C21/C22 measurement role),
+10 × C602037 (the fitted WiFi C1/C2 lot), 10 × C23733 (five for each CPU C21/C22 measurement role),
 5 × C1525, 5 × MAX16054AZT and
 5 × HT7533-2 (the parts the main board fits), 1 × ESP32-C3-MINI-1U-N4
 (optional, WC-105b). Ask LCSC for a single date code if you can; record the
-lot/date code in each record's `notes`.
+lot/date code in each record's `notes`; WC-103 additionally requires the
+structured top-level `part_lcsc` and `lot` fields specified below.
 
 **Sample sizes** are in each measurement and in the tool
 (`python3 tools/fa_results.py --list`). Most board-level gates need 2 units. The tool requires 3 distinct units for
@@ -247,32 +248,45 @@ board**, which no handheld meter applies.
 
 These need no board, so they run while JLC builds.
 
-### WC-103: C45783 22 µF ESR and effective capacitance (POW-003 F5/F7, WC-005)
+### WC-103: fitted C602037 22 µF ESR and effective capacitance (POW-003 F5/F7, WC-005)
 
-- **Closes:** POW-003 **F5** ("C1/C2/C3 guaranteed ESR maximum",
-  `hw/power/buck.py` line 250) and **F7** ("minimum effective capacitance at
-  bias, temperature and age", line 253), and with them WC-005. The same part
-  is the IO card's boost output and the GPU card's buck-boost output
-  (`hw/power/design.py` lines 240, 278), so this lot result covers those too.
-- **Acceptance** (`doc/hardware/wifi-droop-fix-proposal.md` lines 140–141):
-  ESR ≤ 150 mΩ each; C1 ≥ 5.8 µF and C2 ≥ 8.3 µF effective. Those effective
-  values are after the guaranteed TCC (15 %) and life drift (12.5 %)
-  (`hw/power/wifi_parts.py` lines 56–58), so at 25 °C:
-  - `c_5v5_uf` (bias 5.5 V, C1's worst: `design.VBUS_MAX`) ≥ 5.8 / (0.85 × 0.875) = **7.80 µF**;
-  - `c_3v6_uf` (bias 3.6 V, above C2's DC-high 3.411 V) ≥ 8.3 / 0.744 = **11.16 µF**;
-  - `esr_max_mohm` (worst of both biases, 1–2 MHz) ≤ **150 mΩ**.
-- **Setup:** M-Z.
-- **Procedure:** for each sample: solder in the fixture; normalise; at 5.5 V
-  bias, read C at 100 kHz and ESR at 1.0, 1.5 and 2.0 MHz; repeat at 3.6 V;
-  record the lower-bias C for C2, the higher for C1, and the worst ESR.
-- **Sample:** 10 capacitors from one LCSC lot (`units=10`).
-- **Design change if:** any sample fails. ESR above 150 mΩ: fit the optional
-  second 22 µF at U1 pin 3 (tolerates 200 mΩ,
-  `wifi-droop-fix-proposal.md` lines 120–123) and rerun POW-003. Low C:
-  qualify the replacement CL21A226MAYNNN# (C602037, line 44) or a 1206
-  part and rerun POW-003, POW-007, POW-008. Typical data predict about
-  4 mΩ and 9.8/14.0 µF (`wifi_parts.py` lines 64–67), so a failure means the
-  lot is not what Samsung characterised.
+- **Fitted identity:** WiFi C1/C2 are C602037, Samsung
+  CL21A226MAYNNNE, the adopted successor to C45783/CL21A226MAQNNNE.
+  Measure the actual fitted supply lot or a traceably identical lot.
+  Other boards retaining C45783 need their own part/lot evidence; this
+  C602037 result does not qualify those different capacitors.
+- **Purpose:** supply measured capacitor inputs for POW-003 F5/F7 and
+  WC-005. The minimum capacitance and maximum switching-band ESR are not
+  guaranteed by the available vendor data. Passing ten samples records
+  engineering acceptance of that sampled lot, not an unmeasured supplier,
+  process-wide or lifetime guarantee; model closure requires review of its
+  temperature, bias, frequency, aging and uncertainty scope.
+- **Acceptance:** retain the engineering allocation of ESR ≤ **150 mΩ**,
+  C1 effective ≥ **5.8 µF** and C2 effective ≥ **8.3 µF**. The existing
+  25°C targets include the stated 15% TCC and 12.5% life-drift allowance:
+  - `c_5v5_uf` at 5.5 V bias ≥ **7.80 µF**;
+  - `c_3v6_uf` at 3.6 V bias ≥ **11.16 µF**;
+  - `esr_max_mohm`, worst of both biases at 1–2 MHz, ≤ **150 mΩ**.
+  These are unchanged measured acceptance thresholds, not a new guaranteed
+  DC-biased Samsung minimum.
+- **Setup/procedure:** M-Z. For each isolated sample, solder into the
+  calibrated biased fixture and normalise; at 5.5 V measure C at 100 kHz and
+  ESR at 1.0/1.5/2.0 MHz, then repeat at 3.6 V. Record fixture correction,
+  temperature, component age, measurement uncertainty and attachments.
+- **Record identity:** schema `cupc8-fa/1` additionally requires top-level
+  `"part_lcsc": "C602037"` and a nonempty `"lot"` string for WC-103.
+  Keep measurements numeric. Missing/wrong part or missing lot is rejected;
+  historical C45783 records are retained as historical evidence and cannot
+  pass the current fitted-part gate. Do not rewrite their identities.
+- **Sample:** **10 distinct capacitors from one fitted-part lot**.
+  Repeat records of one part count once; ten parts spread over several
+  lots cannot close a lot. Every production lot needs its own review.
+- **Design change if:** any sample fails, investigate measurement/identity
+  first and retain the failure. Requalify a suitable capacitor/lot or
+  additional local capacitance and rerun the actual power models.
+  C602037 is already fitted, so switching to it is not a future remedy.
+  Typical curves do not prove that an outlying sample is counterfeit or
+  that all unmeasured samples meet these limits.
 
 ### CC-105: the CPU card's 1V2 capacitors (CC-005)
 
@@ -1034,10 +1048,13 @@ doc/hardware/fa-results/
 - For the analysis rows that are red for want of these numbers (POW-003
   F5–F8, WC-010 T4c/T4p/T4r, MB-006/CC-006 F2, CC-005, the RP2040 -005/-006
   gaps in `boardcheck.py`), the follow-up is to make each check read its FA
-  gate: for example `wifi_parts.guaranteed('esr_max')` true when WC-103 is
-  green, `ICE40_CORE_MAX` set from the MB-111/CC-104 records, `boardcheck.py`
-  GAPS entries cleared by the matching -104/-103/-102 gates. That is a
-  source change in `hw/`, left for when the first records exist.
+  records with their explicit sampled part/lot/workload scope and measurement
+  uncertainty. A green WC-103 sampled-lot result must not turn a missing
+  manufacturer guarantee into `wifi_parts.guaranteed('esr_max') = True`.
+  An actual model amendment must bind the measured envelope and its limits;
+  similarly, `ICE40_CORE_MAX` and the regulator coverage rows require reviewed
+  actual workload/corner evidence. Such future `hw/` changes remain deferred
+  until genuine records exist; planned measurements are not gate passes.
 
 ## Proposed catalogue entries
 
@@ -1076,7 +1093,7 @@ and `cmd = "python3 tools/fa_results.py <ID>"`. Only `id`, `title` and
 | IC-103 | First article: IO RP2040 DVDD and rails under load | DVDD 1.067-1.133 V DC, <= 100 mV deviation; card 3V3 >= 3.135 V; 3V3 <= 50 mA; case rise <= 45 C (IC-005, IC-006) |
 | IC-104 | First article: keyboard port under load and short | VBUS >= 4.40 V at 500 mA; slot +5V <= 0.80 A; limit >= 0.50 A; fault flag on short; boost/switch rise <= 55 C (IC-005, POW-007) |
 | WC-102 | First article: Wi-Fi card shorts and first power | +5V, 3V3 to GND >= 10 ohm; idle +5V <= 340 mA; 3V3 3.227-3.411 V |
-| WC-103 | First article: C45783 22 uF under bias | at 25 C: >= 7.80 uF at 5.5 V, >= 11.16 uF at 3.6 V, ESR <= 150 mOhm at 1-2 MHz; 10 parts of the lot (POW-003 F5/F7) |
+| WC-103 | First article: fitted C602037 22 uF under bias | at 25 C: >= 7.80 uF at 5.5 V, >= 11.16 uF at 3.6 V, ESR <= 150 mOhm at 1-2 MHz; 10 parts of the lot (POW-003 F5/F7) |
 | WC-104 | First article: Wi-Fi return resistance through the slot | four-terminal U2.2 and U1.1 -> main-board slot GND tails <= 1 ohm each (POW-003 F6, WC-010 T4r) |
 | WC-105 | First article: ESP32 TX current and 3V3 envelope at 40 C | continuous TX at >= 38 C: V5 x I5 / V3 <= 0.50 A; bursty TX 3V3 within 3.074-3.537 V (POW-003 F8, WC-010 T4p) |
 | WC-106 | First article: Wi-Fi buck board temperature under TX | 30 min continuous TX: U2 GND-lead rise <= 50 C (WC-010 T4c) |
@@ -1099,7 +1116,7 @@ Example, for the TOML:
 ```toml
 [[test]]
 id = "WC-103"
-title = "First article: C45783 22 uF under bias"
+title = "First article: fitted C602037 22 uF under bias"
 checks = "at 25 C: >= 7.80 uF at 5.5 V, >= 11.16 uF at 3.6 V, ESR <= 150 mOhm at 1-2 MHz; 10 parts of the lot (POW-003 F5/F7)"
 method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-103/"
 kind = "hw"

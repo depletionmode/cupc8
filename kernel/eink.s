@@ -27,6 +27,10 @@ eink_refresh:
 	bzf .eink
 	b .none
 .eink:
+	mov r0, #1
+	push pch
+	push pcl
+	b gpu_wait_free
 	push pch
 	push pcl
 	b gpu_cs_on

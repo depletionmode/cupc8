@@ -42,6 +42,10 @@ gpu_init:
 	mov r1, #GPU_CFG_DIV2
 	st $f10f+r0, r1			; SPI config for this device
 
+	mov r0, #1
+	push pch
+	push pcl
+	b gpu_wait_free
 	push pch
 	push pcl
 	b gpu_cs_on
@@ -118,6 +122,18 @@ gpu_cmd_open:
 	ld r0, [gpu_spi]
 	eq r0, #0xff
 	bzf .none
+	; All command frames need credits, including short API calls. The
+	; wait uses gpu_n, so keep the argument count across it. For n argument
+	; bytes, ceil((n+1)/64) = floor(n/64)+1 (including the opcode).
+	ld r0, [gpu_n]
+	push r0
+	shr r0, #6
+	add r0, #1
+	push pch
+	push pcl
+	b gpu_wait_free
+	pop r0
+	st [gpu_n], r0
 	push pch
 	push pcl
 	b gpu_cs_on
@@ -225,8 +241,8 @@ gpu_query_from:
 ; wait until the console's FIFO has room for a frame of r0 x 64 bytes
 ; (gpu-protocol.md: FREE, the status byte, in 64s), asking with $FF frames
 ; (slot.md: never an opcode, so nothing is queued; a NOP would fill the FIFO
-; while an e-ink REFRESH holds it). A frame over 64 bytes checks first: the
-; card drops one that does not fit. With no console, at once.
+; while an e-ink REFRESH holds it). Every command checks first; long
+; streaming frames reserve their full size. With no console, at once.
 gpu_wait_free:
 	st [gpu_n], r0
 	ld r0, [gpu_spi]
@@ -312,6 +328,10 @@ gpu_attr:
 	ld r0, [gpu_spi]
 	eq r0, #0xff
 	bzf .none
+	mov r0, #1
+	push pch
+	push pcl
+	b gpu_wait_free
 	push pch
 	push pcl
 	b gpu_cs_on
