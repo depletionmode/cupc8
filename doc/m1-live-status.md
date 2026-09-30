@@ -23,6 +23,69 @@ Standing direction: always use parallel agents for pending work when it fits
 and is independent. Preserve owners and frozen job inputs; do not duplicate
 runs or concurrently mutate the same stage/source files.
 
+#### Current follow-up: 2026-10-01 01:43 Israel
+
+Final E full GPU39/eInk75039 terminalPASS, actualROMprogram/full512KiB readback,
+System-present then cold System-removed boot. E genuine storagepersistence18+18
+PASS, independentreleaseaudit PASS. All finalE display regressions PASS.
+Authenticring-wrap workload17000legalFFpolls/8fullfills/8011byteBLIT PASS4,
+maxpending106.64048ms, zero corruption/errors. Finiteproof only; universal
+rendering WCET/arbitrarylong-renderquery sequencing andDMAterminalendurance
+remain outsidefirstarticle proof, no demonstrated newtargetfailure.
+
+Final B adopted16 E runtime/regression/receiving source changes with all8exact
+hardwareinputs/receipts unchanged;207actual Ecompiledruntime source bridgePASS,
+nofictional freshB compilation. Final E delivery18assets/6verifiedUF2BINpairs,
+actualfull78/persistence36/IOstorage137carry proofs independentlyverified.
+Root individually acceptsP01–P06controlleddevelopmentrisks with realreceiving
+limits/uncertainties/remedies. Currentgates snapshot updated, selected750
+supplemental vendor-bound rail/wire/10MHz record explicit; legacy2.3Vnotalonepass.
+95actualAstra comments mapped yes/no with reason; physicalresults/samplecounts/
+ordinaryredgates notfabricated orwaived. Canonical decision/disposition docs
+prepared. Sourcepushed51539bc; new docs pendingcheckpointpush.
+
+Parallel: actualprescribed Astra/medium targetedfinalfollowup65048 LIVE,
+release_audit finalacceptance/profile/hand off/ZIP audit, power_closure read-only
+rootdecision review. Numerical/fullfunctional trials are done. Final archive
+andremoteartifactbackup stillpending theseauditattachments. Supplieractual
+preview/quote/purchaseauthorization notperformed; candidate is intendedfor
+controlledsamples andafterdeliveryreceiving, notordinaryallgreen. card.img
+untouched/untracked. Oldsource/trials/C/Darchives preservedhistorically.
+
+#### Current follow-up: 2026-10-01 01:37 Israel
+
+Final E: actual three newly compiled display ELFs; exact source-bound D ROM,
+native and unchanged remaining assets carried honestly. E boundary14/14,
+HTTP391/391, ATTR15191/15191 and both panel25/25 regressions pass. Actual CPU
+API2400ATTR/40REFRESH has zero credit violations,60POKE cells visible and zero
+panel/SD errors. Original D64-byte FIFO counterexample reproduced; E reserves
+next2-byte internal frame header. First cached-credit observer failure retained,
+observer polling repaired within existing50ms deadline; no target deadline
+relaxation. E source/assets immutable before/after.
+
+E full selected75039/39 PASS71796EXIT0, realROM programming/full512KiB readback,
+System-present then cold System-removed boot. GPU51907 still LIVE. Earlier
+D39+39 PASS preserved separately. E cold storage persistence69967/51244 both
+PASS18: originalSAVE survives destroyedwholemachine, firstLOAD/RUN before
+secondSAVE, independentPCFAT exactbytes and unchangedSD image. Independent
+release audit confirms36.
+
+Canonical receiving enforcement now requires actual C602037+one lot/ten unique
+samples forWC103 and uncertainC25lowerbound>=1.6u, U5INupperSTRICT<7V/boostOUT
+upperSTRICT<6V forIC104. Sixteen parser regressions pass; missingbounds remain
+incomplete. Eleven concrete receiving extensions recorded, no fabricated
+physical pass. GPU012/STO004 are permanent commands. Source pushed51539bc.
+
+Parallel final ring-backed FF polling review is investigating whether real
+rendering can hold frames long enough to wrap16KiB RX DMA; no established new
+normal-use failure yet. Root owns final E adoption/conditional engineering
+risk decision and95Astra dispositions; release_audit prepares separate final-E
+handoff/independent audit; power_closure reviews receiving thresholds. B still
+contains earlier C runtime until final E adoption succeeds. Remote24MB archive
+is older pending snapshot; final E archive backup still required. All8 hardware
+inputmaps/receipts remain exact; no heavy reroute. Factorypreview/purchase and
+postdelivery physical/sample gates remain unperformed. card.img untouched.
+
 #### Current follow-up: 2026-10-01 01:08 Israel
 
 All8 normal live-stock qty2 hardware builds, fabrication, mechanical and strict

@@ -1,0 +1,28 @@
+# First-article engineering decision — 2026-10-01
+
+Codex accepts the current eight-board candidate for controlled development sample preparation under David's delegated reasonable-decision instruction. The target is Main + CPU + IO + storage + WiFi + one HDMI/GPU or selected eInk750, with System for programming followed by cold boot without System. Initial map: display1 / IO2 / WiFi3 / storage4, 3 A supply and 3 MHz slot SPI. Quantity remains two assembled boards of each type.
+
+Both final E full integrations pass39 checks each, including actual512 KiB ROM readback and System removal. Both cold storage persistence tests pass18 each. Targeted queue, API, FIFO boundary, panel and ring-wrap evidence is recorded separately. All eight hardware input maps and authentic receipts remain unchanged after final software adoption. No heavy Main reroute is justified.
+
+This engineering decision accepts six specific development uncertainties below. Each retains its receiving limits, uncertainty handling, stop conditions and local diagnosis/remedy in the attached JSON and authoritative first-article plan. Successful emulation and conditional models do not supply silicon maximum currents or physical measurements.
+
+| Risk | Decision and required receiving evidence |
+|---|---|
+| P01 Main/CPU iCE40 core current and RT9013 heat | Accept for controlled samples. Normal full-workload current above assumption can sag 1V2, trigger resets/logic errors or overheat regulator; persistent heat can damage regulator. Current maximum/likelihood unknown. Required: MB-111, CC-104. Sustained full-load/hot acceptance of each used computer; wider release still needs model/sample closure. |
+| P02 CPU effective capacitors and socket/core feed | Accept for controlled samples. During ordinary bus switching/configuration inadequate Ceff or excessive feed/contact resistance can cause1V2 sag/reset/data corruption; poor contacts can heat. Required: CC-103, CC-105, CC-104, MB-110. Hot sustained operation on each accepted unit. CC-105 five-part sample gate remains unmet until its sample obligation is met. |
+| P03 Five RP2040 internal-regulator transients | Accept for controlled samples. Realistic SPI+USB/SD/panel/DVI load steps can cause core excursions and lockups or corrupted work; a persistent overvoltage/heat excursion can damage silicon. Required: GC-104, IC-103, SC-102, EC-102, YC-102. Unattended or sustained worst-workload/hot operation of each fitted card. All five measurement gates remain pending. |
+| P04 GPU TMDS dynamic GPIO current/package heat and overclock | Accept for controlled samples. Continuous ordinary HDMI activity can exceed total GPIO/package current or case temperature; output glitch/lockup or permanent RP damage is possible. Small conditional1.3C margin warrants early monitoring. Required: GC-102, GC-104. Accepting each GPU for sustained DVI use. Formal GC-102 requires third distinct unit; no automatic waiver. |
+| P05 IO keyboard-switch local C25 and actual transient envelope | Accept for controlled samples. Normal keyboard hot-plug/load release or short/recovery can excite overshoot beyond chip absolute limits if effective local capacitance/loop/response differs. Failure can damage switch/boost and remove keyboard power; normal no-fault steady load is separately modeled. Required: IC-104. Deliberate short/recovery tests and full500 mA/hot branch acceptance. Begin modest ordinary keyboard load with scope, not immediate hardshort. |
+| P06 WiFi real currents, capacitors, mated returns and heat coupling | Accept for controlled samples. Normal WiFi TX+SD burst/loadrelease can brownout/reset or overshoot ESP rail; bad mated return/cap ESR and local TX heat can overheat buck/module/buffers. Required: WC-102, WC-103, WC-104, WC-105, WC-106. Sustained TX+SD/hot use of each WiFi unit and broader release; ten-part capacitor lot obligation remains. |
+
+## Ordering and use
+
+The exact manufacturing files may be presented for quote, CAM and placement review. Actual factory settings and preview must be checked before production; no purchase, external upload or David/JLC signature has been performed here. Stock is a dated availability check and must be confirmed at ordering.
+
+On receipt, inspect and measure with power off, then bring up in stages with current and rail monitoring. Exercise ordinary functions before hot or deliberate fault stress. A peak or uncertainty interval reaching a stop limit fails acceptance; investigate before continuing. GPU overclock and the existing USB/CPU conditions retain their original scope. Current limiting cannot prevent every fast transient or guarantee no damage.
+
+Two samples do not fulfill three-unit or five/ten-part lot requirements. Those formal qualification obligations remain open. Ordinary full verification, any-slot/six-card operation and broad peripheral compatibility are not declared complete. Receiving measurements qualify actual units; all original failures and diagnostic limits remain available.
+
+## Selected750 supplemental receiving record
+
+Record actual panel part/generation,800×480 dimensions, HAT model/revision2.3, individual verification of all nine wires, and firmware SHA. Record module VCC and internal3V3_OUT/VCI/VDDIO minimum and maximum with measurement uncertainties,10MHz bus levels/timing and power-isolation GPIO review. Attach exact selected-module vendor document/revision and its operating limits. All measured intervals must fit those verified limits. Missing vendor limits or records are incomplete; the legacy EC1022.3V threshold cannot alone qualify this module. No new vendor minimum is assumed here.
