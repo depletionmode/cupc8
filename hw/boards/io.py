@@ -118,7 +118,9 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "Y1": (22.6, -8.2, 0),
     "C16": (20.5, -12.6, 90),
     "C17": (25.4, -8.2, 90),
-    "U4": (16.5, -18, 0),
+    "U4": (16.5, -18, 270),
+    "R60": (19, -20.5, 0),
+    "R61": (20.5, -21.01, 90),
     "C18": (13.3, -18, 90),
     "R5": (19, -38.5, 0),
     "D2": (19, -41, 0),
@@ -162,7 +164,7 @@ def prepare(board):
     # the 0.15 mm silk clearance from pad copper.
     # Adjust these instances after the common footprint pad clipper runs.
     edits = 0
-    for ref in ("U4", "L1"):
+    for ref in ("L1",):
         fp = next(f for f in board.GetFootprints() if f.GetReference() == ref)
         for i in range(fp.GraphicalItems().size()):
             g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
@@ -170,11 +172,7 @@ def prepare(board):
                 continue
             a, b = g.GetStart(), g.GetEnd()
             ax, ay, bx, by = map(pcbnew.ToMM, (a.x, a.y, b.x, b.y))
-            if ref == "U4" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ay + 18.88) < .001 and abs(by + 18.88) < .001:
-                g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(16.3), a.y))
-                g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(16.7), b.y))
-                edits += 1
-            elif ref == "L1" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ax - bx) < .001 and any(abs(ax - x) < .001 for x in (45.22, 49.78)):
+            if ref == "L1" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ax - bx) < .001 and any(abs(ax - x) < .001 for x in (45.22, 49.78)):
                 if abs(ay + 12.104999) < .001:
                     g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(-12.135)))
                 elif abs(by + 12.104999) < .001:
@@ -186,8 +184,8 @@ def prepare(board):
                 else:
                     continue
                 edits += 1
-    if edits != 5:
-        raise ValueError("U4/L1 silk geometry changed")
+    if edits != 4:
+        raise ValueError("L1 silk geometry changed")
     rc.io_preroute(board)
     at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
     vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)

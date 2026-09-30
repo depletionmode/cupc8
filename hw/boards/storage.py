@@ -100,7 +100,9 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up, by its finger
-    "U4": (14, -12.5, 0),
+    "U4": (14, -12.5, 270),
+    "R60": (16.5, -13.6, 0),
+    "R61": (18, -14.11, 90),
     "C18": (10.5, -12.5, 90),
     # ACT and CARD in the top-edge row with the power LED, resistors under them
     "D2": (17, -41, 0), "R5": (17, -38.5, 0),

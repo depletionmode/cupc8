@@ -172,7 +172,9 @@ PLACEMENT = dict(rc.core_placement(CX, CY, turn=180), **{
     "J1": (0, 0, 0),
     "C2": (3, -11.5, 90),                # the slot's +3V3 comes in at B4/A4
     "R3": (8.5, -12.5, 90),              # RUN (CARD_RST_n, B9) pull-up: by its finger, clear of the SWD pins
-    "U4": (14, -12.5, 0),
+    "U4": (14, -12.5, 270),
+    "R60": (16.5, -13.6, 0),
+    "R61": (18, -14.11, 90),
     "C18": (10.5, -12.5, 90),
     "J2": (HX, -44 + 6.90, 180),      # the drawing's board edge is 6.90 mm in front of the origin
     "U5": (HX - 3.25, -31.0, 90),     # pins 1-5 face the chip, 0.5 mm apart like the receptacle's
@@ -462,20 +464,6 @@ def preroute(board):
         changed += 1
     if changed != 4:
         raise ValueError("L1 clipped silk outline changed")
-    # U4's lower body mark is clipped to exactly 0.15 mm from two mask pads.
-    fp = next(f for f in board.GetFootprints() if f.GetReference() == "U4")
-    changed = 0
-    for i in range(fp.GraphicalItems().size()):
-        g = pcbnew.Cast_to_PCB_SHAPE(fp.GraphicalItems()[i])
-        if not g or g.GetLayer() != pcbnew.F_SilkS or g.GetShape() != pcbnew.SHAPE_T_SEGMENT:
-            continue
-        a, b = g.GetStart(), g.GetEnd()
-        if abs(pcbnew.ToMM(a.y) + 13.38) < .001 and abs(pcbnew.ToMM(b.y) + 13.38) < .001:
-            g.SetStart(pcbnew.VECTOR2I(pcbnew.FromMM(13.81), a.y))
-            g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(14.19), b.y))
-            changed += 1
-    if changed != 1:
-        raise ValueError("U4 clipped silk outline changed")
     rc.pocket_escapes(board)
     buck_boost(board)
     tmds_ground_escape(board)

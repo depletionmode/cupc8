@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The Wi-Fi card (doc/hardware/wifi-card.md): an ESP32-C3-MINI-1U on a slot
 card, powered from the slot's +5V through its own TLV62569 buck, with MISO
-released through a 74LVC1G125 whenever the card is not selected.
+released through an AHC buffer whenever the card is not selected; a 270 ohm
+source resistor and 10k ground bias damp the shared return.
 
     python3 hw/boards/wifi.py [outdir]      (default build/hw/wifi)
 """
@@ -14,8 +15,10 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
 import logo  # noqa: E402
+import rp2040card as rc  # noqa: E402
 
 G = kg.GRID
+R0402 = "Resistor_SMD:R_0402_1005Metric"
 R0603 = "Resistor_SMD:R_0603_1608Metric"
 C0603 = "Capacitor_SMD:C_0603_1608Metric"
 C0805 = "Capacitor_SMD:C_0805_2012Metric"
@@ -36,8 +39,8 @@ def schematic(path, footprint_libs):
                at=(70 * G, 18 * G), fields={"LCSC": "C141836"})
     l1 = s.add("Device:L", "L1", "2.2u", "jlc:IND-SMD_L3.0-W3.0_FNR30XXS", at=(82 * G, 12 * G), rot=90,
                fields={"LCSC": "C167747"})
-    u3 = s.add("jlc:74LVC1G125GW_C52140430", "U3", "74LVC1G125GW", "jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL",
-               at=(70 * G, 80 * G), fields={"LCSC": "C52140430"})
+    u3 = s.add("jlc:SN74AHC1G125DCKR_C151890", "U3", "SN74AHC1G125DCKR", "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR",
+               at=(70 * G, 80 * G), fields={"LCSC": "C151890"})
 
     def passive(kind, ref, val, fp, lcsc, at, rot=90):
         return s.add("Device:" + kind, ref, val, fp, at=at, rot=rot, fields={"LCSC": lcsc})
@@ -75,6 +78,9 @@ def schematic(path, footprint_libs):
                 rot=90)
     f1 = s.add("power:PWR_FLAG", "#FLG01", "PWR_FLAG", at=(50 * G, 12 * G))
     f2 = s.add("power:PWR_FLAG", "#FLG02", "PWR_FLAG", at=(56 * G, 12 * G))
+    # Regulated power crosses the passive inductor before the AHC VCC pin.
+    f3 = s.add("power:PWR_FLAG", "#FLG03", "PWR_FLAG", at=(120 * G, 12 * G))
+    s.connect(f3, 1, "3V3")
 
     # the slot (doc/hardware/slot.md)
     for p in ("B1", "B2", "A2"):
@@ -150,7 +156,13 @@ def schematic(path, footprint_libs):
     # MISO released unless this card is selected
     s.connect(u3, "~{OE}", "CS_n")
     s.connect(u3, "A", "MISO_INT")
-    s.connect(u3, "Y", "MISO")
+    s.connect(u3, "Y", "MISO_SRC")
+    r60 = passive("R", "R60", "270", R0402, "C25099", (70 * G, 100 * G))
+    r61 = passive("R", "R61", "10k", R0402, "C25744", (90 * G, 100 * G))
+    s.connect(r60, 1, "MISO_SRC")
+    s.connect(r60, 2, "MISO")
+    s.connect(r61, 1, "MISO")
+    s.connect(r61, 2, "GND")
     s.connect(u3, "VCC", "3V3")
     s.connect(u3, "GND", "GND")
 
@@ -192,7 +204,9 @@ PLACEMENT = {
     "D1": kg.IO_CARD_PWR_LED + (0,),           # the power LED: the same place on every board
     "R5": (-3, -38.5, 0),
     "J1": (0, 0, 0),
-    "U3": (26, -15, 90),
+    "U3": (26, -15, 0),
+    "R60": (22.5, -15.65, 180),
+    "R61": (21, -16.16, 90),
     "C4": (26, -18.5, 0),
     "U2": (4, -15, 0),
     "L1": (4, -20, 0),
@@ -230,6 +244,7 @@ def main():
                        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7, -29, 0)],
                        labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
                        title=TITLE, revision=REVISION, logo_keepout=True,    # bottom right
+                       prepare=lambda board: rc.miso_launch(board, "U3"),
                        pad_via_clear=0.1)      # no open via hole in the module's GND pads (audit I6)
     print("LCSC:", " ".join(sorted(lcsc)))
 

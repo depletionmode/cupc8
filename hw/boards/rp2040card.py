@@ -246,14 +246,18 @@ def core(s, gpios, leds=(), usb=False):
     p["R3"] = passive(s, "R", "R3", "10k", (150 * G, 90 * G))
     two(s, p["R3"], "3V3", "RUN")
 
-    # ---- MISO: a buffer enabled by CS_n, as on the Wi-Fi card, so this card
-    # never loads the shared line when it is not selected - not even in reset
-    # or blank, when the RP2040 pad has its default pull-down on
-    u4 = p["U4"] = s.add("jlc:74LVC1G125GW_C52140430", "U4", "74LVC1G125GW", "jlc:SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL",
-                         at=(30 * G, 80 * G), fields={"LCSC": "C52140430"})
+    # ---- MISO: CS_n isolates the MCU pad while deselected, including reset.
+    # The AHC output has 270 ohm source damping; a fitted card permanently
+    # contributes its 10k ground bias to the shared return.
+    u4 = p["U4"] = s.add("jlc:SN74AHC1G125DCKR_C151890", "U4", "SN74AHC1G125DCKR", "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR",
+                         at=(30 * G, 80 * G), fields={"LCSC": "C151890"})
     s.connect(u4, "~{OE}", "CS_n")
     s.connect(u4, "A", "MISO_OUT")
-    s.connect(u4, "Y", "MISO")
+    s.connect(u4, "Y", "MISO_SRC")
+    p["R60"] = passive(s, "R", "R60", "270", (60 * G, 80 * G), lcsc="C25099")
+    two(s, p["R60"], "MISO_SRC", "MISO")
+    p["R61"] = passive(s, "R", "R61", "10k", (80 * G, 80 * G))
+    two(s, p["R61"], "MISO", "GND")
     s.connect(u4, "VCC", "3V3")
     s.connect(u4, "GND", "GND")
     p["C18"] = passive(s, "C", "C18", "100n", (48 * G, 80 * G))
@@ -302,11 +306,14 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
     for fpid, *_ in graphics:
         if fpid.startswith("cupc8:KaplanLabs_Logo_"):
             logo.footprint(float(fpid.rsplit("_", 1)[1][:-2]))
+    def prepare(board):
+        miso_launch(board)
+        return (preroute or tie_testen)(board)
     lcsc = kg.pipeline(name, schematic, dict(placement, **OUTLINE_PLACEMENT), BODY,
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb), prepare=preroute or tie_testen, route_tries=6,
+                       fine_nets=u1_nets(gpios, usb), prepare=prepare, route_tries=6,
                        logo_keepout=True, pad_via_clear=PAD_VIA_CLEAR, pad_via_ok=("U1.57",),
                        # four layers: GND poured on both outer layers, In1 a
                        # solid GND plane; In2 routes signals
@@ -346,6 +353,30 @@ def pad_at(board, ref, num):
     fp = board.FindFootprintByReference(ref)
     p = [q for q in fp.Pads() if q.GetNumber() == str(num)][0].GetPosition()
     return pcbnew.ToMM(p.x), pcbnew.ToMM(p.y)
+
+
+def miso_launch(board, ref="U4"):
+    """Guard the TI pin map and lock its short source/bias output legs."""
+    fp = board.FindFootprintByReference(ref)
+    if fp.GetValue() != "SN74AHC1G125DCKR":
+        raise ValueError("MISO launch requires the qualified TI AHC buffer")
+    expected = {"1": "/CS_n", "2": "/MISO_INT" if ref == "U3" else "/MISO_OUT",
+                "3": "/GND", "4": "/MISO_SRC", "5": "/3V3"}
+    actual = {p.GetNumber(): p.GetNetname() for p in fp.Pads()}
+    if actual != expected:
+        raise ValueError("MISO launch buffer pin map changed")
+    for net, first, last in (("/MISO_SRC", (ref, 4), ("R60", 1)),
+                             ("/MISO", ("R60", 2), ("R61", 1))):
+        a, b = pad_at(board, *first), pad_at(board, *last)
+        if abs(a[1] - b[1]) > 1e-5:
+            # IO places the new resistors below its nearby IOVDD capacitor.
+            if first != ("U4", 4) or math.dist(a, (17.15, -19.1)) > 1e-5 or math.dist(b, (18.49, -20.5)) > 1e-5:
+                raise ValueError("MISO launch pad alignment or rotation changed")
+            bend = (b[0], a[1])
+            track(board, net, a, bend, width=0.2)
+            track(board, net, bend, b, width=0.2)
+        else:
+            track(board, net, a, b, width=0.2)
 
 
 def tie_testen(board):
