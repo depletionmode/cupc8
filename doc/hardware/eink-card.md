@@ -35,8 +35,10 @@ separately and plug into the header by cable (no soldering).
 | DESPI-C02 adapter at buy-lcd | $8.50 | out of stock |
 | DESPI-C02 at AliExpress (Good Display's store) | $49.90 + $6.80 | available |
 
-**M1's plan is the Waveshare 5.83" HAT** (David, 2026-09-26): one box, and
-its cable plugs straight into the card. Checked against Waveshare's and the
+**Earlier sourcing plan: Waveshare 5.83" HAT (superseded by the selected
+7.5" V2 above).** Its cable plugs straight into the card. The following
+5.83" analysis records why its full-refresh-only glass was set aside; it
+is not the current M1 purchase instruction. Checked against Waveshare's and the
 chip vendors' documents on 2026-09-26 (the sources are listed below):
 
 - **Cable and connector: fits, no board change.** The HAT's cable is a

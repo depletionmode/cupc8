@@ -23,6 +23,38 @@ Standing direction: always use parallel agents for pending work when it fits
 and is independent. Preserve owners and frozen job inputs; do not duplicate
 runs or concurrently mutate the same stage/source files.
 
+#### Current follow-up: 2026-10-01 00:17 Israel
+
+All8 normal live-stock qty2 packages, full fabrication, mechanical and strict
+DC checks are complete. Final intended-stack conditional SPI evidence is
+complete, with four early MOSI data diagnostics and all stated model/ESP
+limits preserved. No newly demonstrated PCB defect requires Main rerouting.
+Source checkpoint pushed on milestone-1 through a20f2c8 (5adfd72 source fixes
+and guarded routes; a20f2c8 preserves executable verification runner).
+
+Whole-design prereview found two real delivery faults. System bootstrap must
+use powered Main plus a separate System data cable: now corrected. The selected
+Waveshare7.5-inch V2/800x480 panel requires eink750 rather than the default583
+firmware: genuine750 ELF and six exact-derived RP UF2/BIN pairs now included.
+Correct750 native panel benchmark PASS25/25; genuine wrong583-as750 negative
+benchmark fails INFO/glass as required, and permanent regression passes.
+External peripheral/FAT-media instructions and all10 review dispositions exist.
+
+Root68805 full750 integrated test EXIT1: System-present programming/SD/display/
+WiFi phase completed; removed-System HTTP/display assertion failed. Preserve
+original143 and this failure. Root3019 focused removed-phase diagnostic LIVE,
+using actual full-chip readback and SD image, unchanged firmware/assertions/
+deadlines, extra machine/panel/network/UART capture. Read-only source review
+identified possible same-process HTTP-server starvation by synchronous native
+emulation; this is unconfirmed until diagnostics. No firmware/board repair or
+weakened deadline adopted. Candidate remains not cleared for ordering.
+
+Ordinary full-green readiness, unknown power/transient/current/Ceff/thermal
+bounds, exact final Astra critique, supplier production options/preview and
+physical sample obligations remain distinct and incomplete. Authorized qty2
+cannot silently satisfy retained three-unit qualification gates. card.img
+remains untouched and untracked.
+
 #### Current follow-up: 2026-09-30 23:38 Israel
 
 Final actual all-eight normal LIVE-STOCK qty2 packages, full fabrication,

@@ -1072,7 +1072,7 @@ checks = "the real eink.elf and eink750.elf on the native RP2040, the UC8179 mod
 method = "emu/machine/einkcard.cpp (build/emu-machine/einkcard), the panel model emu/machine/einkpanel.cpp over fw/test/epdmodel.c, busy times x 0.1"
 kind = "sim"
 vrow = "2.4"
-cmd = "tools/fw_rp2040.sh eink eink750 && tools/emu_machine_build.sh && build/emu-machine/einkcard --root . && build/emu-machine/einkcard --root . --panel 750"
+cmd = "tools/fw_rp2040.sh eink eink750 && tools/emu_machine_build.sh && build/emu-machine/einkcard --root . && build/emu-machine/einkcard --root . --panel 750 && python3 test/emu/test_eink_panel_delivery.py --root ."
 
 # ============================================================================
 # IOC: IO card firmware
