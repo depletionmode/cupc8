@@ -26,6 +26,9 @@ def inputs(board, root=ROOT):
                       'main_power_input_trial.py', 'main_power_corner.py', 'main_seed.py',
                       'main_fanout.py', 'main_handroute.py', 'main-route-seed.json',
                       'main-handroute-seed.json'))
+    if board == 'system':
+        paths.extend(root / 'hw' / 'boards' / name for name in
+                     ('main_seed.py', 'system-route-seed.json'))
     for directory in ('hw/tools', 'hw/lib', 'hw/parts'):
         paths.extend(p for p in (root / directory).rglob('*')
                      if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')

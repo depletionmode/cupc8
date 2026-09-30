@@ -24,6 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
 import logo  # noqa: E402
+import main_seed  # noqa: E402
 
 G = kg.GRID
 
@@ -259,7 +260,7 @@ PLACEMENT = {
     "Q1": (52, 34, 0), "R10": (52, 37, 0), "R22": (52, 39.5, 0), "R23": (52, 31, 0),
 }
 for _i, _n in enumerate(TERMINATED):
-    PLACEMENT["R%d" % (11 + _i)] = (21.5 + 3.3 * _i, 31, 90)   # over the fingers they drive
+    PLACEMENT["R%d" % (11 + _i)] = (round(21.5 + 3.3 * _i, 4), 31, 90)   # over the fingers they drive
 for _i, (_ref, _) in enumerate(TEST_PADS):
     PLACEMENT[_ref] = (2.5, 9 + 2.9 * _i, 0)
 
@@ -294,6 +295,71 @@ def prepare(board):
     return [pad.GetNetname()]
 
 
+_SYSTEM_SEEDED = False
+
+
+def _seeded_route(board, workdir):
+    """Reuse the completed System route, preserving its accepted USB copper.
+
+    The seed was extracted from the receipt-bound routed board, before fills
+    and stitching. All component placements and pin/net maps must match;
+    copper is then validated by the complete current pipeline. Never fall
+    back to rerouting an incompatible seed.
+    """
+    import pcbnew
+    global _SYSTEM_SEEDED
+    path = os.path.join(HERE, "system-route-seed.json")
+    _, items = main_seed.load(path)
+    recorded = {i[1]: i[2:] for i in items if i[0] == "footprint"}
+    actual = {}
+    for fp in board.GetFootprints():
+        position = fp.GetPosition()
+        actual[fp.GetReference()] = [position.x, position.y,
+                                    round(fp.GetOrientationDegrees(), 3),
+                                    sorted([p.GetNumber(), p.GetNetname()] for p in fp.Pads())]
+    if actual != recorded:
+        changed = sorted(r for r in actual.keys() | recorded.keys()
+                         if actual.get(r) != recorded.get(r))
+        raise ValueError("System route seed placement/pin map changed: " + ", ".join(changed))
+    tracks = board.Tracks()
+    existing = [tracks[i] for i in range(len(tracks))]
+    for item in existing:
+        board.Remove(item)
+    nets = board.GetNetsByName()
+    layers = {board.GetLayerName(l): l for l in board.GetEnabledLayers().CuStack()}
+    count = 0
+    for item in items:
+        if item[0] == "footprint":
+            continue
+        net = nets[item[1]]
+        if item[0] == "track":
+            t = pcbnew.PCB_TRACK(board)
+            t.SetLayer(layers[item[2]])
+            t.SetStart(pcbnew.VECTOR2I(*item[3:5]))
+            t.SetEnd(pcbnew.VECTOR2I(*item[5:7]))
+            t.SetWidth(item[7])
+        elif item[0] == "via":
+            t = pcbnew.PCB_VIA(board)
+            t.SetPosition(pcbnew.VECTOR2I(*item[2:4]))
+            t.SetWidth(item[4])
+            t.SetDrill(item[5])
+            t.SetLayerPair(pcbnew.F_Cu, pcbnew.B_Cu)
+        else:
+            raise ValueError("Unexpected System seed item: " + str(item[0]))
+        t.SetNet(net)
+        t.SetLocked(True)
+        board.Add(t)
+        count += 1
+    signal_nets = sorted({str(name) for name in nets} - {"", "/GND"})
+    opened = kg.open_escapes(board, signal_nets)
+    if opened:
+        raise ValueError("System recorded route is incomplete: " + ", ".join(opened))
+    _SYSTEM_SEEDED = True
+    print("System route seed: %d copper items; all signal connections closed; USB copper preserved" % count,
+          end=" ", flush=True)
+    return 0
+
+
 def post_route(board):
     """Remove J1 shell-pad fanout stubs after routing, before the GND fill.
 
@@ -310,6 +376,13 @@ def post_route(board):
         raise ValueError("J1 shell pads changed: review their GND fanout")
     tracks = board.Tracks()
     items = [tracks[i] for i in range(len(tracks))]
+    if _SYSTEM_SEEDED:
+        # The recorded route already had these stubs removed. Do not
+        # regenerate drill overlaps at the plated shell mounting slots.
+        if any(t.Type() == pcbnew.PCB_TRACE_T and t.GetNetname() == "/GND"
+               and t.GetStart() in shell_pads.values() for t in items):
+            raise ValueError("System seed unexpectedly contains a shell fanout stub")
+        return
     removed = 0
     for position in shell_pads.values():
         stubs = [t for t in items if t.Type() == pcbnew.PCB_TRACE_T and t.IsLocked()
@@ -335,7 +408,8 @@ def main():
         # no Power class (0.5 mm tracks): the RP2040's supply pins are 0.2 mm
         # wide at a 0.4 mm pitch, and the whole card draws under 100 mA
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
-        title="CUPC/8 system", revision=REVISION, prepare=prepare, post_route=post_route, route_tries=6,
+        title="CUPC/8 system", revision=REVISION, prepare=prepare, post_route=post_route,
+        seeded_route=_seeded_route, route_tries=6,
         logo_keepout=True, pad_via_clear=0.1, pad_via_ok=("U1.57",),
         # (no open via hole in a pad; U1.57, the RP2040 exposed pad, keeps its thermal via: audit I3, accepted)
         # the presence link crosses on In2.Cu just above the tab (the key notch
