@@ -1081,7 +1081,16 @@ checks = "the captured genuine CPU display stream contains the complete 98-byte 
 method = "emu/machine/einkqueue.cpp replays recorded CS intervals and MOSI at real 3 MHz slot pins; test/emu/fixtures/eink750-http-display-trace.provenance.json records the authentic capture; ELF SRAM counters and state are observed without injecting settle traffic; no substituted firmware or HTTP response"
 kind = "sim"
 vrow = "2.4"
-cmd = "tools/fw_rp2040.sh eink750 && tools/emu_machine_build.sh && python3 test/emu/test_eink_queue.py --elf build/rp2040/eink750.elf"
+cmd = "tools/fw_rp2040.sh eink750 && tools/emu_machine_build.sh && python3 test/emu/test_eink_queue.py --elf build/rp2040/eink750.elf && python3 test/emu/test_eink_queue.py --elf build/rp2040/eink750.elf --attr-bursts 40"
+
+[[test]]
+id = "GPU-011"
+title = "Actual kernel graphics APIs respect transport credits during 750 rendering"
+checks = "a genuine CPU executes an assembled PRG loaded through actual SD on the fitted750/IO/WiFi/storage stack:2400 API_ATTR calls in40-command bursts,60 API_POKE cells,40 direct API_EINK_REFRESH calls, MODE/CLS/CURSOR/GOTOXY/CLEOL/PUTS; all short-command incoming SPI statuses have FREE abovezero and all60 POKE cells reach glass; actual SD traffic has no violations and UC8179 has no errors; selectedROM/RP/ESP/native/source/top hashes remain unchanged; --expect-loss requires originalCROM ATTR calls at FREEzero rather than assuming a counterexample"
+method = "test/emu/test_eink_queue_api.mjs with tools/testdata/eink_queue_api.s; explicit immutable software source and its genuine strict-top.json; preserved separate output directory perattempt; GPU-010 ATTR stress also requires an oldPUTC-onlyprotocol drop counterexample (197drops observed) vszero drops withallshortcommand credits"
+kind = "sim"
+vrow = "2.4"
+cmd = "node test/emu/test_eink_queue_api.mjs --source $CUPC8_EINK_API_SOURCE --out $CUPC8_EINK_API_OUT"
 
 # ============================================================================
 # IOC: IO card firmware
@@ -2512,7 +2521,7 @@ cmd = "python3 tools/fa_results.py WC-102"
 
 [[test]]
 id = "WC-103"
-title = "First article: C45783 22 uF under bias"
+title = "First article: fitted C602037 22 uF under bias"
 checks = "at 25 C: >= 7.80 uF at 5.5 V, >= 11.16 uF at 3.6 V, ESR <= 150 mOhm at 1-2 MHz; 10 parts of the lot (POW-003 F5/F7)"
 method = "manual per doc/hardware/first-article-plan.md, recorded in doc/hardware/fa-results/WC-103/"
 kind = "hw"

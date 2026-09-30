@@ -10,7 +10,9 @@ int main(int argc, char **argv) {
     std::fprintf(stderr, "usage: einkqueue ELF TRACE_TSV ERRORS_ADDR QHEAD_ADDR QTAIL_ADDR QCOMMANDS_ADDR STEP_ADDR CHANGE_ADDR SHOWN_ADDR RESPONSE_READY_ADDR loss|fixed\n");
     return 2;
   }
-  const bool loss = std::string(argv[11]) == "loss";
+  const std::string mode = argv[11];
+  const bool attrStress = mode == "attr-loss" || mode == "attr-fixed";
+  const bool loss = mode == "loss" || mode == "attr-loss";
   auto address = [](const char *s) { return static_cast<uint32_t>(std::stoul(s, nullptr, 0)); };
   const uint32_t errorsAt = address(argv[3]), headAt = address(argv[4]);
   const uint32_t tailAt = address(argv[5]), commandsAt = address(argv[6]);
@@ -54,7 +56,9 @@ int main(int argc, char **argv) {
     for (auto &v : f) { in >> c; v = static_cast<uint8_t>(c); }
     if (!in || f.empty()) return 2;
     if (b.ns() < start) b.wait(start - b.ns());
-    if (!loss && f[0] == 0x10) {
+    const bool guarded = (mode != "loss" && f[0] == 0x10) ||
+                         (mode == "attr-fixed" && f[0] == 0x13);
+    if (guarded) {
       const double deadline = b.ns() + 10e9;
       for (;;) {
         uint8_t st = b.frame({0xff})[0] & 0x7f;
@@ -89,7 +93,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < want.size(); i++) diff += want[i] != pic.grey[i];
   const uint32_t dropped = word(errorsAt);
   if (loss) {
-    CHECK(dropped > 0 && diff > 0, "original firmware must reproduce transport loss and glass mismatch");
+    CHECK(dropped > 0 && (attrStress || diff > 0), "original flow must reproduce transport loss (and original HTTP glass mismatch)");
   } else {
     CHECK(dropped == 0, "corrected transport loses zero frames (%u)", dropped);
     CHECK(diff == 0, "corrected glass equals full command-stream raster (%zu pixels differ)", diff);
@@ -105,7 +109,7 @@ int main(int argc, char **argv) {
   const uint32_t beforeHead = word(headAt), beforeCommands = word(commandsAt);
   const uint32_t beforeErrors = word(errorsAt);
   for (int i = 0; i < 96; i++) b.frame({0xff});
-  if (!loss) {
+  if (mode != "loss") {
     CHECK(word(headAt) == beforeHead, "96 FF polls consume no descriptors");
     CHECK(word(commandsAt) == beforeCommands, "FF polls do not become queued commands");
     CHECK(word(errorsAt) == beforeErrors, "FF polls cause no transport errors");
@@ -115,6 +119,6 @@ int main(int argc, char **argv) {
   CHECK(observeUntil([&] { return !queued(); }), "READ frame completes through normal transport path");
   if (!loss) CHECK(word(errorsAt) == 0, "all corrected trace/poll/READ traffic has zero errors");
   std::printf("EINK-QUEUE %s: %zu captured frames, max descriptors %u, FREE=0 polls %u, dropped %u, raster diff %zu; %d checks, %d failures\n",
-              loss ? "original counterexample" : "repaired", frames, maxQueued, zeroCredits, dropped, diff, checks, failures);
+              mode.c_str(), frames, maxQueued, zeroCredits, dropped, diff, checks, failures);
   return failures ? 1 : 0;
 }
