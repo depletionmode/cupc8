@@ -23,6 +23,40 @@ Standing direction: always use parallel agents for pending work when it fits
 and is independent. Preserve owners and frozen job inputs; do not duplicate
 runs or concurrently mutate the same stage/source files.
 
+#### Engineering handoff complete: 2026-10-01 01:51 Israel
+
+Current deliverable: release/firstarticle-20261001/
+cupc8-firstarticle-QUALIFIED-development-E.zip (25,805,916bytes), SHA256
+9dceea73762156bdaeb9ef7d698b3ccbfbe427846dcec371e95497bbd7c1b8da.
+All218 manifestfiles,220outermembers and all8authenticfab/BOM/CPL/order/review
+packages verified independently and againbyroot beforebackup. Oldpending
+archive is preserved history, superseded bythis finalE candidate.
+
+Final E bothfullcomputer39/39 (78total), actualROMprogram/full512KiB readback,
+Systempresentthenremovedcoldboot; genuinecoldstoragepersistence18+18 PASS.
+HTTP391/391,ATTR15191/15191,API2400ATTR/40REFRESH/60POKEzeroFREEviolations,
+FIFOheaderboundary14/14,bothpanel25/25,authenticringwrap17000FF4checksPASS.
+ActualAstra/medium finalfollowupPASS: no supportedremainingengineeringblocker
+or heavyMainreroute; solehistoricalJSONpendingnote corrected. All207runtime
+sourcesexactE→B, all8hardwareinputmaps/receiptsunchanged, actualfreshEdisplay
+ELFs vs honestcarriedDROM/native/otherassets distinction preserved.
+
+RootP01–P06individualcontrolleddevelopmentrisks accepted withreceivinglimits,
+stopconditions/remedies;95Astra comments decided. Independentpoweraudit28gate
+snapshotscurrentparserexact, selected750vendorboundidentity/wire/inputinternal
+railuncertainty/10MHzrecordexplicit. SixteenparserregressionsPASS,11concrete
+manualreceivingextensions. No ordinaryallgreen, fabricatedphysicalpass,
+threeunit/5or10parts waiver, David/JLCsignature or purchase implied.
+
+All ownedbuild/numerical/fullfunctional/reviewjobs terminal; packageworkdone.
+Ready to present exactcandidate for supplierquote/CAM/placement review.
+Beforeproduction: actualfactoryoptions/preview andpurchaseapproval; refresh
+stock whenordering. Afterreceipt: genuineperunitstagedpower/fit/contact/
+functional/current/rail/Ceff/GPIO/thermal/physicalSPIandperipheral checks and
+retainedsamples. Generalanyslot/sixcard/arbitraryquery/endurance remainoutside
+this finitequalification. Noexternalupload/order/contactperformed. No heavy
+Mainreroute. card.img untouched/untracked. HistoricalC/Dandfailures preserved.
+
 #### Current follow-up: 2026-10-01 01:43 Israel
 
 Final E full GPU39/eInk75039 terminalPASS, actualROMprogram/full512KiB readback,

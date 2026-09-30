@@ -1,0 +1,12 @@
+{
+  "status": "PASS root independent finalarchive/backup verification",
+  "archive_sha256": "9dceea73762156bdaeb9ef7d698b3ccbfbe427846dcec371e95497bbd7c1b8da",
+  "archive_bytes": 25805916,
+  "manifest_files": 218,
+  "zip_members": 220,
+  "all_manifest_hashes_verified": true,
+  "exact_archive_member_set_verified": true,
+  "both_actual_full39_results_verified": true,
+  "copied_backup_bytes_verified": true,
+  "factory_preview_order_physical_results_claimed": false
+}

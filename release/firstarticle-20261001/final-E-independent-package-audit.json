@@ -1,0 +1,185 @@
+{
+  "scope": "Independent read-only actual candidate package audit against original genuine LIVE-STOCK normal receipt artifacts. ZIP contents, BOM/CPL/options/review exact; no uploaded/order claim. Package regeneration requires rerun tobind new manifest.",
+  "all8_receipts_valid": true,
+  "qty2_each": true,
+  "boards": [
+    {
+      "board": "main",
+      "qty": 2,
+      "bom_lines": 71,
+      "placements": 274,
+      "assembly_sides": [
+        "Top"
+      ],
+      "original_receipt_sha256": "8ae219c1454fd4f0e550880d809b9c4d15414a99969be81e81e1a2d8380bc983",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "cpu",
+      "qty": 2,
+      "bom_lines": 11,
+      "placements": 47,
+      "assembly_sides": [
+        "Top"
+      ],
+      "original_receipt_sha256": "6f910dfa7f823f69253b5ea0d371b9544351122d80f7e3aeb111908b9a2dc557",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "system",
+      "qty": 2,
+      "bom_lines": 19,
+      "placements": 48,
+      "assembly_sides": [
+        "Top"
+      ],
+      "original_receipt_sha256": "bee711b8e975ea77409199a0ec8cad34a55ce1072d1527affabeb9269da11029",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "gpu",
+      "qty": 2,
+      "bom_lines": 29,
+      "placements": 58,
+      "assembly_sides": [
+        "Top"
+      ],
+      "original_receipt_sha256": "03847e66952faa3785dec8816276c99100e91a375db0bff2455395e1a8c25320",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "io",
+      "qty": 2,
+      "bom_lines": 30,
+      "placements": 58,
+      "assembly_sides": [
+        "Top"
+      ],
+      "original_receipt_sha256": "592e2b618135f9280b6d66dfa9daa1db45d35d5ce229fb702fd88a3292f6ef39",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "storage",
+      "qty": 2,
+      "bom_lines": 21,
+      "placements": 48,
+      "assembly_sides": [
+        "Top"
+      ],
+      "original_receipt_sha256": "ef3d6aa51d2a6a48a7c9cb686bdff1cb4fbc91693cda0c05e9a1436f42b9315d",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "wifi",
+      "qty": 2,
+      "bom_lines": 22,
+      "placements": 47,
+      "assembly_sides": [
+        "Top",
+        "Bottom"
+      ],
+      "original_receipt_sha256": "c4d4c0d146bd38ac7bd425f84b9d236219a3d1433a4e3b9b942d508ceae5bc91",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    },
+    {
+      "board": "eink",
+      "qty": 2,
+      "bom_lines": 22,
+      "placements": 51,
+      "assembly_sides": [
+        "Top",
+        "Bottom"
+      ],
+      "original_receipt_sha256": "2308615519e2b9cd14436d79af1fd63a9e0341154a7c6b446cbc8ce232e5e022",
+      "BOM_CPL_options_engineering_review_byte_identity": true
+    }
+  ],
+  "gerber_zip_checks": [
+    {
+      "board": "main",
+      "members": 15,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "5eb9c05a2e7373ea5297a5f1a34bb8e157237c0fe2cdf536db541a2569ae4a43"
+    },
+    {
+      "board": "cpu",
+      "members": 15,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "ecf30364233708afdf59fcd4e6c8d684e04a5737f3cf422d3578bb886b85d69a"
+    },
+    {
+      "board": "system",
+      "members": 13,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "bc1026738a9f3e98a8cf4ca56bfb337097cbaf7abe031fbd234950628e7d32c1"
+    },
+    {
+      "board": "gpu",
+      "members": 13,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "8491546eec43b93b89e9a9715c8ada4550d2c2a50a6ff6c9b042bf20de75a902"
+    },
+    {
+      "board": "io",
+      "members": 13,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "b2402d8d8f203289ad08d5701d1c0833e1d0b62ebe03d8f6c2be52b0c66578aa"
+    },
+    {
+      "board": "storage",
+      "members": 13,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "d66729238b91f8dd0b14533195e2f4379d3fe56195aef7c76ecadaabc37cb4b6"
+    },
+    {
+      "board": "wifi",
+      "members": 11,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "9f7a0553a923d125ff510410c1fb9cabc15414781b18d13658f06dc75d583cdd"
+    },
+    {
+      "board": "eink",
+      "members": 13,
+      "all_actual_receipt_member_hashes_match": true,
+      "zip_sha256": "196c1ce92386376a3455aa7927c51005bd173db41d426fac646d0ef89be560d9"
+    }
+  ],
+  "manifest_sha256": "fa59745d767372d1152a76e141d0843e1a251ba2150c7599ecdf8809076d492e",
+  "manifest_file_count": 218,
+  "remaining_assembly_actions": [
+    "Main8THTconnectors plus J1mixedUSB-C fourPTHshelltabs need soldering and StandardPCBA quote;J3postsNPTH",
+    "WiFi/eInk Top+Bottom assembly must be quoted exactly; others Top",
+    "Loose WiFi C709347lead and C1509156antenna quantity2each not in mounted118SKU BOM; separate live stock/quote and manualplug-in",
+    "Final factoryplacement/CAMproduction preview not yet seen; confirm files/rails/ENIGfingers/bevel/no-finger-trimming beforeproduction",
+    "No reservations, purchase, supplier upload or final manufacturing order approval performed"
+  ],
+  "actual_main_parts_with_soldered_PTH_pads": [
+    "J1",
+    "J11",
+    "J12",
+    "J13",
+    "J14",
+    "J15",
+    "J16",
+    "J2",
+    "J4"
+  ],
+  "mixed_SMT_PTH_part": "J1USB-C requires four platedshelltabs soldered alongside SMTcontacts;8otherTHTconnectors;J3postsNPTH",
+  "native_attribute_only_THT_mislabel_with_SMD_pads": [
+    "U7"
+  ],
+  "attribute_note": "U7nativeTHTattribute is metadataonly; actual144padsSMD/no drill, genuineprimary/supplier/CPLcorrect. NoTHTquote/physicalrepairneeded.",
+  "loose_part_live_stock": {
+    "date": "2026-09-30",
+    "C709347": {
+      "required": 2,
+      "stock": 157
+    },
+    "C1509156": {
+      "required": 2,
+      "stock": 334
+    },
+    "source_log_sha256": "17703b6c83d3dc786e2c0808a304a3e8b7e4deccdc5a4e9612b588c967551f2a",
+    "snapshot_not_reservation": true
+  }
+}

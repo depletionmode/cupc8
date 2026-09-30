@@ -1,0 +1,7 @@
+{
+  "status": "PASS archive exactly reproduces verified candidate; not manufacturing approval",
+  "sha256": "9dceea73762156bdaeb9ef7d698b3ccbfbe427846dcec371e95497bbd7c1b8da",
+  "bytes": 25805916,
+  "files": 220,
+  "candidate_manifest_sha256": "fa59745d767372d1152a76e141d0843e1a251ba2150c7599ecdf8809076d492e"
+}
