@@ -158,7 +158,8 @@ def prepare(board):
     reach: VIN and EN to the input cap, SW to the inductor, VOUT to the
     output caps, FB to its divider (TPS61023 layout guide: short loops)."""
     import pcbnew
-    # U4 body marks touch the mask-clearance limit.
+    # The body marks are clipped with the 0.01 mm mask expansion beyond
+    # the 0.15 mm silk clearance from pad copper.
     # Adjust these instances after the common footprint pad clipper runs.
     edits = 0
     for ref in ("U4", "L1"):
@@ -174,13 +175,13 @@ def prepare(board):
                 g.SetEnd(pcbnew.VECTOR2I(pcbnew.FromMM(16.7), b.y))
                 edits += 1
             elif ref == "L1" and g.GetShape() == pcbnew.SHAPE_T_SEGMENT and abs(ax - bx) < .001 and any(abs(ax - x) < .001 for x in (45.22, 49.78)):
-                if abs(ay + 12.094999) < .001:
+                if abs(ay + 12.104999) < .001:
                     g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(-12.135)))
-                elif abs(by + 12.094999) < .001:
+                elif abs(by + 12.104999) < .001:
                     g.SetEnd(pcbnew.VECTOR2I(b.x, pcbnew.FromMM(-12.135)))
-                elif abs(ay + 9.505) < .001:
+                elif abs(ay + 9.495) < .001:
                     g.SetStart(pcbnew.VECTOR2I(a.x, pcbnew.FromMM(-9.465)))
-                elif abs(by + 9.505) < .001:
+                elif abs(by + 9.495) < .001:
                     g.SetEnd(pcbnew.VECTOR2I(b.x, pcbnew.FromMM(-9.465)))
                 else:
                     continue
@@ -199,6 +200,22 @@ def prepare(board):
     rc.track(board, "/BOOST_SW", corner, (corner[0], lsw[1]), width=0.3)
     rc.track(board, "/VBOOST", vout, at("C23", 1), width=0.3)
     rc.track(board, "/VBOOST", at("C23", 1), at("C24", 1), width=0.3)
+    # Take the supply around the right side of the port switch. Its IN
+    # moved to pin 1 with TPS2553; leaving this last branch to the router
+    # strands VBOOST in every tested ordering. Keep clear of C21 and U5's
+    # output/limit pads, and finish at the actual IN pad.
+    boost_in = at("U5", 1)
+    boost_cap = at("C24", 1)
+    if boost_in != (50.95, -23.15) or boost_cap != (47.9, -14.05):
+        raise ValueError("TPS2553 VBOOST escape geometry changed")
+    rc.track(board, "/VBOOST", boost_cap, (51.8, boost_cap[1]), width=0.3)
+    rc.track(board, "/VBOOST", (51.8, boost_cap[1]), (51.8, boost_in[1]), width=0.3)
+    rc.track(board, "/VBOOST", (51.8, boost_in[1]), boost_in, width=0.3)
+    local_cap = at("C25", 1)
+    if local_cap != (52.6, -25.12):
+        raise ValueError("TPS2553 local input capacitor moved")
+    rc.track(board, "/VBOOST", local_cap, (51.8, local_cap[1]), width=0.3)
+    rc.track(board, "/VBOOST", (51.8, local_cap[1]), (51.8, boost_in[1]), width=0.3)
     rc.track(board, "/BOOST_FB", fb, at("R16", 2), width=0.2)
     rc.track(board, "/BOOST_FB", at("R16", 2), at("R17", 1), width=0.2)
 

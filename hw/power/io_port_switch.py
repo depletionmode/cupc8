@@ -56,7 +56,7 @@ R_ILIM_DT = 60.0                     # resistor at 0..85 C: <= 60 K from the 25 
 R_PULLUP = 10e3                      # FAULT to 3V3 (C25744), GPIO8
 R_EN = 100e3                         # R11, kept
 C_IN_LOCAL = 1e-6                    # new C25 1 uF at IN (7.3 asks >= 0.1 uF; 100 nF rings to 8.5 V, T5)
-L_IN = 10e-9                         # assumed: boost caps C23/C24 to U5 IN, ~10 mm of track
+L_IN = 20e-9                         # engineering bound: 13.85 mm C24-to-U5 route, with ground return
 C_PORT = (120e-6, 10e-6)             # C21 100 uF +20 %, and a USB device's 10 uF maximum
 C_BOOST = 26e-6                      # C23/C24 2 x 22 uF derated at 5 V (power.md)
 
