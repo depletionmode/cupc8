@@ -76,3 +76,11 @@ target_compile_options(einkcard PRIVATE -O2 -Wall -Wextra)
 target_compile_options(einkcard PRIVATE -Wno-stringop-overflow)
 target_link_options(einkcard PRIVATE -Wno-stringop-overflow)
 target_link_libraries(einkcard PRIVATE machine)
+
+# Transport regression reuses GPU-009's genuine pin-level card bench.
+add_executable(einkqueue einkqueue.cpp "${FW}/eink/core/eink.c" "${FW}/eink/core/uc8179.c" "${FW}/gpu/core/gpu.c"
+  "${FW}/common/cardproto.c" "${FW}/common/font8x8_cp437.c")
+target_include_directories(einkqueue PRIVATE "${FW}/eink/core" "${FW}/gpu/core" "${FW}/common")
+target_compile_definitions(einkqueue PRIVATE GPU_GFX_BYTES=96000)
+target_compile_options(einkqueue PRIVATE -O2 -Wall -Wextra -Wno-stringop-overflow)
+target_link_libraries(einkqueue PRIVATE machine)

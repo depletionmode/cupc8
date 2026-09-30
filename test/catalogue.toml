@@ -1074,6 +1074,15 @@ kind = "sim"
 vrow = "2.4"
 cmd = "tools/fw_rp2040.sh eink eink750 && tools/emu_machine_build.sh && build/emu-machine/einkcard --root . && build/emu-machine/einkcard --root . --panel 750 && python3 test/emu/test_eink_panel_delivery.py --root ."
 
+[[test]]
+id = "GPU-010"
+title = "E-ink 750 transport descriptors preserve real HTTP console bursts"
+checks = "the captured genuine CPU display stream contains the complete 98-byte HTTP response in 60 and 38 byte receive bursts; real eink750.elf with per-PUTC FF status waits exercises FREE zero, loses zero frames, and produces glass identical to the independent core raster; 96 FF polls consume no transport descriptors or queued commands, preserve unread INFO, and subsequent READ returns the original nine bytes through its normal transport path; --expect-loss requires the original firmware counterexample, with transport drops and a glass mismatch"
+method = "emu/machine/einkqueue.cpp replays recorded CS intervals and MOSI at real 3 MHz slot pins; test/emu/fixtures/eink750-http-display-trace.provenance.json records the authentic capture; ELF SRAM counters and state are observed without injecting settle traffic; no substituted firmware or HTTP response"
+kind = "sim"
+vrow = "2.4"
+cmd = "tools/fw_rp2040.sh eink750 && tools/emu_machine_build.sh && python3 test/emu/test_eink_queue.py --elf build/rp2040/eink750.elf"
+
 # ============================================================================
 # IOC: IO card firmware
 # ============================================================================

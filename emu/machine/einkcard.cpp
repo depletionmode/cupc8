@@ -97,8 +97,9 @@ struct Bench {
   // a command, if FREE allows it (retrying while it does not); also to the reference
   void send(const std::vector<uint8_t> &f) {
     for (int tries = 0;; tries++) {
-      // the status byte comes back during the opcode: a NOP frame asks
-      const uint8_t st = frame({0x00})[0];
+      // $FF is a status-only poll; unlike NOP it consumes no descriptor or
+      // command FIFO space while the renderer is occupied.
+      const uint8_t st = frame({0xff})[0];
       if (static_cast<size_t>(st) * 64 >= f.size()) break;
       if (tries > 100000) {
         CHECK(false, "FREE never allowed a %zu-byte frame", f.size());
@@ -136,7 +137,7 @@ struct Bench {
     const double end = ns() + limit;
     while (ns() < end) {
       wait(5e6);
-      frame({0x0B});
+      send({0x0B});  // EPD_STATUS is a command and must respect FREE too.
       auto st = read(3);
       if (st.size() == 3 && !st[0] && !st[1] && !panel.m.busy_op) return true;
     }

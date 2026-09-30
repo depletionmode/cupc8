@@ -1,0 +1,8 @@
+{
+  "captured_trace": "build/firstarticle-integrated-750-render-trace-20261001/eink750-wifi3/raw-slot1-before-recovery.json",
+  "captured_trace_sha256": "24fec9cd05cc04130df58f29718c37b0563ab35f9abcd864b497f93bbf867304",
+  "original_elf_sha256": "61739be9f4c08e0b46588aa3217d61f04bcb651a88e30fc37d63a200d96d9410",
+  "fixture_sha256": "6ee4348c245cf8daa05282a09ead024ca3158111009dc004ac4d18ce2f9f5e2c",
+  "frames": 377,
+  "scope": "Actual CPU-driven slot1 display SPI CS start/end times and MOSI bytes, from failed System-removed genuine750 integrated run. Full98byteHTTP arrived on display input. Pin replay preserves recorded CS interval and3MHz clocks; byte instruction gaps are distributed evenly because originaltrace has no per-edge timestamps. No synthesizedHTTPserver orfirmware."
+}
