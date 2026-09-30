@@ -1,0 +1,11 @@
+# TI SN74AHC1G125DCKR, single 3-state buffer, SC-70-5/DCK
+datasheet: https://www.ti.com/lit/ds/symlink/sn74ahc1g125.pdf
+source: "TI SN74AHC1G125 SCLS377M (Feb 2024), section 4 Pin Configuration and Functions: DCK top view"
+package: SC-70-5
+pins:
+  1: "~{OE}"
+  2: A
+  3: GND
+  4: Y
+  5: VCC
+ccw: [1, 5]

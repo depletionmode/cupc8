@@ -121,6 +121,9 @@ jlc:RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL:
 jlc:RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL (C25508)'
+jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR:
+  rotation: 0
+  source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR (C151890)'
 jlc:SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL:
   rotation: 0
   source: 'derived by bomcheck.py: the KiCad pads onto EasyEDA''s SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL (C179173)'
