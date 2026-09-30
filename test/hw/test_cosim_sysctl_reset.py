@@ -105,8 +105,19 @@ def main():
                            args.cpu_board)
             assert mutant['runtime']['sysctl_manual_reset_connected'] is False
             assert mutant['runtime']['routed_top'] is False
-            assert len(mutant['unmodeled_nets']) == len(top['unmodeled_nets']) + 2
-            assert {'main:nMR', 'system:SYS_nRST'} <= set(mutant['unmodeled_nets'])
+            expected_extra = {'main:nMR', 'system:SYS_nRST'}
+            if board_name == 'main':
+                # U6 MR launch also disconnects both rail-monitor diode paths.
+                # Whole-monitor coverage remains strict, even though the native
+                # supervisor correctly uses its internal MR pull-up at nominal.
+                assert mutant['runtime']['reset_monitor']['core_complete']
+                assert not mutant['runtime']['reset_monitor']['diode33']
+                assert not mutant['runtime']['reset_monitor']['complete']
+                expected_extra.update('main:' + net for net in
+                    ('VREF25', 'MON_T33', 'MON_T12', 'MON33_P', 'MON12_P',
+                     'MON33_OK', 'MON12_OK', '+3V3', '3V3_STBY', 'GND'))
+                expected_extra.update(f'main:SLOT{slot}_RST_n' for slot in range(1, 7))
+            assert set(mutant['unmodeled_nets']) == set(top['unmodeled_nets']) | expected_extra
             changed_top = temporary / f'open-{board_name}.json'
             changed_top.write_text(json.dumps(mutant))
             bad = pulse(changed_top)

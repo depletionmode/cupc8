@@ -456,6 +456,80 @@ def extract(board_path, kind, net, pins):
             for at, span, _, size in via_items:
                 if layer in span and end != at and math.dist(end, at) <= size * 1e4 / 2:
                     uf.join((end, layer), (at, layer))
+    # Finite track copper can touch a pad/via annulus while its centreline
+    # misses that shape. Require native zero-clearance intersection and retain
+    # a finite centre-to-centreline stub at the connecting track width.
+    contact_shapes = [(pad.GetEffectiveShape(getattr(pcbnew, layer.replace('.', '_'))),
+                       layer, at) for pad, layer, at in pad_shapes]
+    for at, span, drill, size in via_items:
+        via = pcbnew.PCB_VIA(board)
+        via.SetPosition(pcbnew.VECTOR2I(int(at[0]*100), int(at[1]*100)))
+        via.SetWidth(pcbnew.FromMM(size))
+        via.SetDrill(pcbnew.FromMM(drill))
+        via.SetLayerPair(getattr(pcbnew, span[0].replace('.', '_')),
+                         getattr(pcbnew, span[-1].replace('.', '_')))
+        for layer in span:
+            contact_shapes.append((via.GetEffectiveShape(getattr(pcbnew, layer.replace('.', '_'))),
+                                   layer, at))
+    pad_stubs = []
+    native_tracks = []
+    for a, b, layer, width in list(raw):
+        native = pcbnew.PCB_TRACK(board)
+        native.SetStart(pcbnew.VECTOR2I(int(a[0]*100), int(a[1]*100)))
+        native.SetEnd(pcbnew.VECTOR2I(int(b[0]*100), int(b[1]*100)))
+        native.SetWidth(pcbnew.FromMM(width))
+        native.SetLayer(getattr(pcbnew, layer.replace('.', '_')))
+        shape = native.GetEffectiveShape(native.GetLayer())
+        native_tracks.append((a, b, layer, width, shape))
+        for contact, player, at in contact_shapes:
+            if player != layer:
+                continue
+            if any(uf.root((end, layer)) == uf.root((at, layer)) for end in (a, b)):
+                continue  # Existing ideal joins already prove this contact.
+            if not shape.Collide(contact, 0):
+                continue
+            dx, dy = b[0]-a[0], b[1]-a[1]
+            length2 = dx*dx+dy*dy
+            if not length2:
+                continue
+            t = max(0., min(1., ((at[0]-a[0])*dx+(at[1]-a[1])*dy)/length2))
+            q = (a[0]+t*dx, a[1]+t*dy)
+            anchors[layer].add(q)
+            if q != at:
+                pad_stubs.append((at, q, layer, width))
+    # Track widths also meet away from either centreline. Split both real
+    # tracks at the closest centreline points and retain their finite bridge;
+    # exact copper intersection remains the sole connection authority.
+    def projection(q, a, b):
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        length2 = dx*dx+dy*dy
+        t = max(0., min(1., ((q[0]-a[0])*dx+(q[1]-a[1])*dy)/length2)) if length2 else 0.
+        return (a[0]+t*dx, a[1]+t*dy)
+
+    for i, (a, b, layer, width, shape) in enumerate(native_tracks):
+        for c, d, other_layer, other_width, other_shape in native_tracks[i+1:]:
+            if layer != other_layer or not shape.BBox().Intersects(other_shape.BBox()):
+                continue
+            if not shape.Collide(other_shape, 0):
+                continue
+            choices = [(math.dist(q, projection(q, c, d)), q, projection(q, c, d))
+                       for q in (a, b)]
+            choices += [(math.dist(q, projection(q, a, b)), projection(q, a, b), q)
+                        for q in (c, d)]
+            ux, uy = b[0]-a[0], b[1]-a[1]
+            vx, vy = d[0]-c[0], d[1]-c[1]
+            determinant = ux*vy-uy*vx
+            if determinant:
+                t = ((c[0]-a[0])*vy-(c[1]-a[1])*vx)/determinant
+                u = ((c[0]-a[0])*uy-(c[1]-a[1])*ux)/determinant
+                if 0 <= t <= 1 and 0 <= u <= 1:
+                    q = (a[0]+t*ux, a[1]+t*uy)
+                    choices.append((0., q, q))
+            length, p, q = min(choices)
+            anchors[layer].update((p, q))
+            if length and uf.root((p, layer)) != uf.root((q, layer)):
+                pad_stubs.append((p, q, layer, min(width, other_width)))
+    raw.extend(pad_stubs)
     for a, b, layer, width in raw:
         dx, dy = b[0] - a[0], b[1] - a[1]
         length2 = dx * dx + dy * dy

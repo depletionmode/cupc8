@@ -1,0 +1,15 @@
+# Genuine exact supplier APIs acquired2026-09-30; offline conversion only.
+# See ../authentic-cache-origin.json for immutable exact source/UUID/JLC package hashes.
+lcsc: C25083
+jlc_package: '0402'
+easyeda_footprint: R0402
+pins:
+  '1': '1'
+  '2': '2'
+pads:
+- - '2'
+  - 0.43
+  - 0.0
+- - '1'
+  - -0.43
+  - 0.0

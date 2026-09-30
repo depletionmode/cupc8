@@ -830,7 +830,7 @@ def normalize_silk_strokes(board, minimum_mm=0.15):
 
 def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graphics=(), edge=None,
                 zone_outline=None, labels=None, plane=False, silk_text=None, logo_keepout=False,
-                label_side=None, power_nets=()):
+                label_side=None, power_nets=(), designator_reach=None):
     """A pcbnew BOARD with every footprint placed and every pad on its net.
 
     placement: {ref: (x_mm, y_mm, rot_deg[, "B" for the bottom side])}
@@ -927,7 +927,7 @@ def build_board(comps, nets, placement, outline, layers=2, zones=("GND",), graph
 
     clip_silk_to_board(board, outline)
     clip_silk_to_pads(board)
-    place_designators(board, outline, labels or {}, silk_text=silk_text, label_side=label_side)
+    place_designators(board, outline, labels or {}, silk_text=silk_text, label_side=label_side, reach_mm=designator_reach)
 
     copper = [pcbnew.F_Cu, pcbnew.B_Cu]
     if plane and layers == 4:
@@ -1175,7 +1175,7 @@ def _ink_box(text, grow=0.0):
     return _mm_box(text.GetEffectiveTextShape().BBox(), grow)
 
 
-def silk_keepouts(board):
+def silk_keepouts(board, surface=None):
     """What a designator must stay off (mm boxes): every pad (grown by JLC's
     0.15 mm silk-to-mask clearance plus the mask expansion), every via (a tented via under a letter is a bump
     in it, and JLC clips silk off an untented one), and each part's
@@ -1184,20 +1184,27 @@ def silk_keepouts(board):
     courtyard}, {ref: body}); board-only artwork (the logo) has its outline
     as its courtyard."""
     import pcbnew
+    if surface not in (None, pcbnew.F_Cu, pcbnew.B_Cu):
+        raise ValueError("silk keepout surface must be F.Cu or B.Cu")
     fps = list(board.GetFootprints())
-    pads = [_mm_box(p.GetBoundingBox(), 0.15 + SOLDER_MASK_EXPANSION) for fp in fps for p in fp.Pads()]
+    pads = [_mm_box(p.GetBoundingBox(), 0.15 + SOLDER_MASK_EXPANSION)
+            for fp in fps for p in fp.Pads() if surface is None or p.IsOnLayer(surface)]
     tr = board.Tracks()
     vias = [(_mm_box(t.GetBoundingBox()), t.GetNetname()) for t in [tr[i] for i in range(len(tr))]
             if t.Type() == pcbnew.PCB_VIA_T]
     courts, bodies = {}, {}
     for fp in fps:
-        side = pcbnew.B_CrtYd if fp.IsFlipped() else pcbnew.F_CrtYd
+        side = (pcbnew.B_CrtYd if surface == pcbnew.B_Cu else pcbnew.F_CrtYd) if surface is not None else (pcbnew.B_CrtYd if fp.IsFlipped() else pcbnew.F_CrtYd)
         cy = fp.GetCourtyard(side)
-        courts[fp.GetReference()] = _mm_box(cy.BBox()) if cy.OutlineCount() else _mm_box(fp.GetBoundingBox(False))
+        if cy.OutlineCount():
+            courts[fp.GetReference()] = _mm_box(cy.BBox())
+        elif surface is None or fp.IsFlipped() == (surface == pcbnew.B_Cu):
+            courts[fp.GetReference()] = _mm_box(fp.GetBoundingBox(False))
         gi = fp.GraphicalItems()             # indexed: iterating it breaks on Python 3.14
         # the body: its F.Fab outline, and its own silkscreen marks with it
-        fab = pcbnew.B_Fab if fp.IsFlipped() else pcbnew.F_Fab
-        silk = pcbnew.B_SilkS if fp.IsFlipped() else pcbnew.F_SilkS
+        back = fp.IsFlipped() if surface is None else surface == pcbnew.B_Cu
+        fab = pcbnew.B_Fab if back else pcbnew.F_Fab
+        silk = pcbnew.B_SilkS if back else pcbnew.F_SilkS
         boxes = [_mm_box(g.GetBoundingBox()) for g in [gi[i] for i in range(len(gi))]
                  if g.GetLayer() in (fab, silk) and g.Type() == pcbnew.PCB_SHAPE_T]
         if boxes:
@@ -1210,17 +1217,19 @@ def silk_designators(board, labels=None):
     reference or, for a part in `labels`, the board text that stands for it."""
     import pcbnew
     labels = labels or {}
+    mixed = any(fp.IsFlipped() for fp in board.GetFootprints())
     dr = board.Drawings()
     words = {}
     for d in [dr[i].Cast() for i in range(len(dr))]:
         if d.Type() == pcbnew.PCB_TEXT_T:
-            words.setdefault(d.GetText(), d)
+            words.setdefault((d.GetText(), d.GetLayer()) if mixed else d.GetText(), d)
     out = []
     for fp in sorted(board.GetFootprints(), key=lambda f: f.GetReference()):
         if fp.GetAttributes() & pcbnew.FP_BOARD_ONLY:
             continue
-        if labels.get(fp.GetReference()) in words and not fp.Reference().IsVisible():
-            out.append((fp, words[labels[fp.GetReference()]]))
+        label_key = (labels.get(fp.GetReference()), pcbnew.B_SilkS if fp.IsFlipped() else pcbnew.F_SilkS) if mixed else labels.get(fp.GetReference())
+        if label_key in words and not fp.Reference().IsVisible():
+            out.append((fp, words[label_key]))
         elif fp.Reference().IsVisible():
             out.append((fp, fp.Reference()))
     return out
@@ -1248,7 +1257,7 @@ def run_together(a, a_up, b, b_up, gap=WORD_GAP):
     return a[1] < b[3] and b[1] < a[3] and max(b[0] - a[2], a[0] - b[2]) < gap
 
 
-def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, reseat=False, label_side=None):
+def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, reseat=False, label_side=None, reach_mm=None):
     """Put every reference designator horizontal, in the first spot around its
     part that clears all pads and vias, every other part's courtyard, every
     part's body, the other designators and board texts, board-only graphics
@@ -1265,6 +1274,7 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
     mm = pcbnew.FromMM
     labels = labels or {}
     label_side = label_side or {}
+    mixed = any(fp.IsFlipped() for fp in board.GetFootprints())
     if not reseat:
         for fp in board.GetFootprints():
             if fp.GetReference() in labels and fp.Reference().IsVisible() and \
@@ -1272,10 +1282,13 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
                 fp.Reference().SetVisible(False)
                 t = pcbnew.PCB_TEXT(board)
                 t.SetText(labels[fp.GetReference()])
-                t.SetLayer(pcbnew.F_SilkS)
+                t.SetLayer(pcbnew.B_SilkS if mixed and fp.IsFlipped() else pcbnew.F_SilkS)
+                if mixed and fp.IsFlipped():
+                    t.SetMirrored(True)
                 board.Add(t)
     items = silk_designators(board, labels)
     pads, vias, courts, bodies = silk_keepouts(board)
+    by_surface = {side: silk_keepouts(board, side) for side in (pcbnew.F_Cu, pcbnew.B_Cu)} if mixed else {}
     # a via right at a letter reads as part of it: 0.25 mm clear of the ring
     vias = [(v[0] - 0.15, v[1] - 0.15, v[2] + 0.15, v[3] + 0.15) for v, _ in vias]
     x0, y0, x1, y1 = outline
@@ -1287,10 +1300,28 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
               if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == pcbnew.F_SilkS and
               d.GetText() not in labels.values()]
 
+    side_placed = {side: [(_ink_box(d), _upright(d))
+                         for d in [dr[i].Cast() for i in range(len(dr))]
+                         if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == silk and
+                         d.GetText() not in labels.values()]
+                   for side, silk in ((pcbnew.F_Cu, pcbnew.F_SilkS), (pcbnew.B_Cu, pcbnew.B_SilkS))} if mixed else {}
+    item_sides = {id(ref): pcbnew.B_Cu if fp.IsFlipped() else pcbnew.F_Cu for fp, ref in items}
+
+    def surface(fp):
+        return pcbnew.B_Cu if fp.IsFlipped() else pcbnew.F_Cu
+
+    def words_for(fp):
+        return side_placed[surface(fp)] if mixed else placed
+
+    def current_for(fp, excluding=None):
+        return [b for k, b in current.items() if k != excluding and
+                (not mixed or item_sides[k] == surface(fp))]
+
     def clear(fp, t, up, others, word_gap=0.1):
         if t[0] < inside[0] or t[1] < inside[1] or t[2] > inside[2] or t[3] > inside[3]:
             return False
-        near = pads + vias + [c for r, c in courts.items() if r != fp.GetReference()] + list(bodies.values())
+        local_pads, _, local_courts, local_bodies = by_surface[surface(fp)] if mixed else (pads, None, courts, bodies)
+        near = local_pads + vias + [c for r, c in local_courts.items() if r != fp.GetReference()] + list(local_bodies.values())
         return not any(overlap(t, o, 0.1) for o in near) and \
             not any(overlap(t, o, word_gap) or run_together(t, up, o, o_up) for o, o_up in others)
 
@@ -1339,6 +1370,9 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
             tw, th = (w, h) if angle == 0 else (h, w)
             grid = []
             reach = max(RESEAT_REACH, RESEAT_REACH_BIG * max(cx1 - cx0, cy1 - cy0))
+            if reach_mm is not None:
+                if not math.isfinite(reach_mm) or reach_mm <= 0:raise ValueError("designator reach must be finite and positive")
+                reach = max(reach, reach_mm)
             steps = int((reach + max(w, h)) / 0.2)
             for i in range(-steps, steps + 1):
                 for j in range(-steps, steps + 1):
@@ -1378,11 +1412,11 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
     moved = []
     for fp, ref in items:
         if reseat:
-            others = placed + [b for k, b in current.items() if k != id(ref)]
+            others = words_for(fp) + current_for(fp, id(ref))
             if clear(fp, *current[id(ref)], others):
                 continue
         else:
-            others = placed
+            others = words_for(fp)
             size, stroke = silk_text or SILK_TEXT   # a board of 0402s may ask for JLC's 0.8 mm minimum
             ref.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
             ref.SetTextThickness(mm(stroke))
@@ -1391,7 +1425,7 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
             ref.SetVertJustify(pcbnew.GR_TEXT_V_ALIGN_CENTER)
         got = seat(fp, ref, others)
         if got and not reseat:
-            placed.append(got[:2])
+            words_for(fp).append(got[:2])
             continue
         if got:
             current[id(ref)] = got[:2]
@@ -1405,16 +1439,17 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
             current.pop(id(ref), None)            # its old spot is no obstacle to itself
             court = courts[fp.GetReference()]
             cx, cy = (court[0] + court[2]) / 2, (court[1] + court[3]) / 2
-            others_items = [(q, r) for q, r in items if id(r) in current and r is not ref]
+            others_items = [(q, r) for q, r in items if id(r) in current and r is not ref and
+                            (not mixed or surface(q) == surface(fp))]
             others_items.sort(key=lambda qr: math.hypot((current[id(qr[1])][0][0] + current[id(qr[1])][0][2]) / 2 - cx,
                                                         (current[id(qr[1])][0][1] + current[id(qr[1])][0][3]) / 2 - cy))
             ok = None
             for q, r in others_items[:6]:
                 saved_r, saved_box = state(r), current.pop(id(r))
-                got = seat(fp, ref, placed + list(current.values()))
+                got = seat(fp, ref, words_for(fp) + current_for(fp))
                 if got:
                     current[id(ref)] = got[:2]
-                    got_r = seat(q, r, placed + [b for k, b in current.items() if k != id(r)])
+                    got_r = seat(q, r, words_for(q) + current_for(q, id(r)))
                     if got_r:
                         current[id(r)] = got_r[:2]
                         ok = (got, q, got_r)
@@ -1444,6 +1479,12 @@ def place_designators(board, outline, labels=None, gap=0.3, silk_text=None, rese
         for d in [dr[i].Cast() for i in range(len(dr))]:
             if d.Type() != pcbnew.PCB_TEXT_T or " rev " not in d.GetText():
                 continue
+            if mixed:
+                if d.GetLayer() not in (pcbnew.F_SilkS, pcbnew.B_SilkS):
+                    continue
+                side = pcbnew.B_Cu if d.GetLayer() == pcbnew.B_SilkS else pcbnew.F_Cu
+                local_pads, _, local_courts, local_bodies = by_surface[side]
+                near = local_pads + vias + list(local_courts.values()) + list(local_bodies.values()) + [b for k, (b, _) in current.items() if item_sides[k] == side]
             if not any(overlap(_ink_box(d), o, 0.1) for o in near):
                 continue
             x, y = pcbnew.ToMM(d.GetPosition().x), pcbnew.ToMM(d.GetPosition().y)
@@ -1467,13 +1508,23 @@ def check_designators(board, labels=None):
     silkscreen. Returns problems."""
     import pcbnew
     items = silk_designators(board, labels)
+    mixed = any(fp.IsFlipped() for fp in board.GetFootprints())
+    by_surface = {side: silk_keepouts(board, side) for side in (pcbnew.F_Cu, pcbnew.B_Cu)} if mixed else {}
+    text_sides = {fp.GetReference(): t.GetLayer() for fp, t in items}
     _, vias, courts, bodies = silk_keepouts(board)
     dr = board.Drawings()
     words = [(d.GetText(), _ink_box(d)) for d in [dr[i].Cast() for i in range(len(dr))]
              if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == pcbnew.F_SilkS]
+    side_words = {side: [(d.GetText(), _ink_box(d)) for d in [dr[i].Cast() for i in range(len(dr))]
+                         if d.Type() == pcbnew.PCB_TEXT_T and d.GetLayer() == side]
+                  for side in (pcbnew.F_SilkS, pcbnew.B_SilkS)} if mixed else {}
     bad = []
     boxes = [(fp.GetReference(), t.GetText(), _ink_box(t), _upright(t)) for fp, t in items]
     for i, (ref, text, t, up) in enumerate(boxes):
+        if mixed:
+            silk = text_sides[ref]
+            _, vias, courts, bodies = by_surface[pcbnew.B_Cu if silk == pcbnew.B_SilkS else pcbnew.F_Cu]
+            words = side_words[silk]
         what = "designator %s" % ref if text == ref else "label %r (%s)" % (text, ref)
         for v, net in vias:
             if overlap(t, v):
@@ -1485,14 +1536,16 @@ def check_designators(board, labels=None):
             if overlap(t, b):
                 bad.append("%s over the body of %s" % (what, r))
         for r, other, o, o_up in boxes:
-            if r != ref and overlap(t, o):
+            if r != ref and (not mixed or text_sides[r] == text_sides[ref]) and overlap(t, o):
                 bad.append("%s over the designator of %s" % (what, r))
         for r, other, o, o_up in boxes[i + 1:]:
-            if not overlap(t, o) and run_together(t, up, o, o_up):
+            if (not mixed or text_sides[r] == text_sides[ref]) and not overlap(t, o) and run_together(t, up, o, o_up):
                 bad.append("%s runs into %r: under %.1f mm apart in one line" % (what, other, WORD_GAP))
         for word, o in words:
             if word != text and " rev " in word and overlap(t, o):
                 bad.append("%s over %r" % (what, word))
+    if mixed:
+        words = side_words[pcbnew.F_SilkS] + side_words[pcbnew.B_SilkS]
     for word, o in words:                        # the board's name and revision
         if " rev " in word:
             bad += ["%r over a via of %s" % (word, net) for v, net in vias if overlap(o, v)]
@@ -1859,11 +1912,18 @@ def fixed_violations(dsn, env):
     items: pads, pre-routed tracks and vias), from Freerouting's own DRC."""
     import json
     report = dsn + ".drc.json"
-    subprocess.run(["freerouting", "-de", dsn, "-drc", report, "--gui.enabled=false"], capture_output=True, env=env)
+    subprocess.run(["freerouting", "-de", dsn, "-drc", report, "--gui.enabled=false",
+                    _freerouting_state_arg(dsn)], capture_output=True, env=env)
     try:
         return sum(1 for v in json.load(open(report))["violations"] if "learance" in v["type"])
     except (OSError, ValueError, KeyError):
         return None
+
+
+def _freerouting_state_arg(dsn):
+    """Keep router state writable and local to this build, including in a sandbox."""
+    state = os.path.join(os.path.dirname(os.path.abspath(dsn)), "freerouting-state")
+    return "--user_data_path=" + state
 
 
 def _freerouting_cmd(dsn, ses, max_passes, fanout=True):
@@ -1873,7 +1933,8 @@ def _freerouting_cmd(dsn, ses, max_passes, fanout=True):
     a board that pre-places its own fan-out vias (main.py) gains nothing from
     it, and on the seeded main board it took 6.5-11 minutes a pass without the
     unrouted count ever falling."""
-    return ["freerouting", "-de", dsn, "-do", ses, "-mp", str(max_passes), "-mt", "1", "--gui.enabled=false"] + \
+    return ["freerouting", "-de", dsn, "-do", ses, "-mp", str(max_passes), "-mt", "1", "--gui.enabled=false",
+            _freerouting_state_arg(dsn)] + \
            ([] if fanout else ["--router.fanout.enabled=false"])
 
 
@@ -2856,6 +2917,7 @@ def jlc_fab(sch, pcb, comps, fab):
     run(["kicad-cli", "pcb", "export", "pos", "--format", "csv", "--units", "mm", "--side", "both",
          "-o", raw, pcb])
     import bomcheck
+    import assembly_geometry as assembly
     turn = bomcheck.rotations()           # JLC's footprint zero vs KiCad's (hw/parts/jlc_rotation.yaml)
     shift = bomcheck.offsets()            # and its origin, where it is not KiCad's (a pin header's pin 1)
     with open(raw) as f, open(os.path.join(fab, "cpl.csv"), "w", newline="") as g:
@@ -2864,12 +2926,15 @@ def jlc_fab(sch, pcb, comps, fab):
         for row in csv.DictReader(f):
             if row["Ref"] in placed:
                 fp = placed[row["Ref"]]["footprint"]
-                rot = (float(row["Rot"]) + turn.get(fp, 0)) % 360
+                side = {"top": "Top", "bottom": "Bottom"}.get(row["Side"])
+                if side is None:
+                    raise ValueError("unknown native placement side: " + row["Side"])
+                rot = assembly.rotation(float(row["Rot"]), turn.get(fp, 0), side)
                 mid = (row["PosX"] + "mm", row["PosY"] + "mm")
                 if fp in shift:
-                    mx, my = bomcheck.cpl_mid(float(row["PosX"]), -float(row["PosY"]), float(row["Rot"]), shift[fp])
+                    mx, my = assembly.midpoint(float(row["PosX"]), -float(row["PosY"]), float(row["Rot"]), shift[fp], side)
                     mid = ("%.6fmm" % mx, "%.6fmm" % my)
-                w.writerow([row["Ref"], mid[0], mid[1], "Top" if row["Side"] == "top" else "Bottom", "%.6f" % rot])
+                w.writerow([row["Ref"], mid[0], mid[1], side, "%.6f" % rot])
     os.remove(raw)
     counts = {}
     for (_, _, code), refs in groups.items():
@@ -2905,7 +2970,7 @@ FINGER_ORDER_NOTE = ("Gold fingers follow PCIe CEM r3.0 geometry. Do not trim, n
                      "contact us before production.")
 
 
-def order_spec(layers, card_edge):
+def order_spec(layers, card_edge, assembly_sides=("Top",)):
     """The JLC order options, written next to the Gerbers as order.json.
     Cards (card_edge) are 1.6 mm with ENIG gold fingers (JLC offers gold
     fingers only on ENIG: David, 2026-09-28) and a 30 degree chamfer
@@ -2913,9 +2978,14 @@ def order_spec(layers, card_edge):
     asks JLC for its post-CAM files before production (Confirm Production
     File). Cards go to JLC one per panel (JLC's PCBA minimum counts panels);
     the panel's geometry is not generated here yet (doc/m1-live-status.md)."""
+    if not assembly_sides or any(s not in ("Top", "Bottom") for s in assembly_sides):
+        raise ValueError("assembly sides must be nonempty Top/Bottom selection")
+    sides = [s for s in ("Top", "Bottom") if s in assembly_sides]
+    text = "top and bottom sides" if len(sides) == 2 else sides[0].lower() + " side"
     spec = {"layers": layers, "thickness_mm": 1.6, "surface_finish": "ENIG", "min_hole_mm": 0.3,
             "finished_outer_copper_oz": 1,
-            "assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC",
+            "assembly": "PCBA " + text + ", parts from bom.csv/cpl.csv, all LCSC",
+            "assembly_sides": sides,
             "pcba_type": "Standard",       # gold fingers and THT parts rule out Economic
             "confirm_production_file": True,
             "solder_mask_colour": "green",  # black/white need a 0.13 mm web; main U2 is exactly there
@@ -2939,8 +3009,17 @@ def order_spec(layers, card_edge):
     return spec
 
 
-def check_order(spec, card_edge):
+def check_order(spec, card_edge, assembly_sides=None):
     bad = []
+    sides = spec.get("assembly_sides", ["Top"])
+    if not isinstance(sides, list) or not sides or len(set(sides)) != len(sides) or any(s not in ("Top", "Bottom") for s in sides):
+        bad.append("assembly sides must identify physical Top/Bottom selection")
+    else:
+        text = "top and bottom sides" if len(sides) == 2 else sides[0].lower() + " side"
+        if spec.get("assembly") != "PCBA " + text + ", parts from bom.csv/cpl.csv, all LCSC":
+            bad.append("assembly order description differs from selected sides")
+        if assembly_sides is not None and set(sides) != set(assembly_sides):
+            bad.append("assembly order sides differ from fitted CPL sides")
     if spec["thickness_mm"] != 1.6:
         bad.append("thickness %s mm, cards must be 1.6" % spec["thickness_mm"])
     if spec.get("finished_outer_copper_oz") != 1:
@@ -2967,7 +3046,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
              io_card=False, prepare=None, presence=None, fine_nets=(), plane=False, route_tries=3,
              tab=IO_CARD_TAB, silk_text=None, logo_keepout=False, route_parallel=0, fanout_margin=0.0, route_fanout=True,
              fine_power_nets=(), label_side=None, route_timeout=None, route_heap=None, zone_min_width=None, dense_nets=(),
-             post_route=None, replay=None, seeded_route=None, pad_via_clear=None, pad_via_ok=()):
+             post_route=None, replay=None, seeded_route=None, pad_via_clear=None, pad_via_ok=(), post_fill=None, designator_reach=None):
     """Schematic -> ERC -> netlist -> board -> Freerouting -> zones -> silk and
     3D-model checks -> DRC with schematic parity -> Gerbers, drill, JLC BOM and
     CPL -> BOM check (bomcheck.py) -> JLC stock for `boards` assembled -> 3D
@@ -3065,7 +3144,7 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
     def build():
         b = build_board(state["c"], state["n"], placement, outline, layers=layers, zones=zones,
                         graphics=graphics, edge=edge, zone_outline=zone_outline, labels=labels,
-                        label_side=label_side,
+                        label_side=label_side, designator_reach=designator_reach,
                         plane=plane, silk_text=silk_text, logo_keepout=logo_keepout, power_nets=power_nets)
         state["silk_widened"] = normalize_silk_strokes(b)
         mark_revision(b, title, revision, revision_at)
@@ -3193,6 +3272,14 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             fill_zones(state["b"])
         moved += place_designators(state["b"], outline, labels, silk_text=silk_text, reseat=True,
                                    label_side=label_side)
+        if post_fill is not None:
+            # This hook edits actual filled polygons. Do not refill afterward:
+            # DRC, plotted proof and electrical qualification inspect these fills.
+            import json
+            audit = post_fill(state["b"])
+            with open(os.path.join(out, "post-fill-audit.json"), "w") as stream:
+                json.dump(audit, stream, indent=2)
+                stream.write("\n")
         pcbnew.SaveBoard(pcb, state["b"])
         return "%d stitching vias" % n + ("; designators moved off vias: " + " ".join(moved) if moved else "") + \
             ("; NOT JOINED: " + "; ".join(UNJOINED) if UNJOINED else "")
@@ -3235,12 +3322,20 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
         import bomcheck
         return bomcheck.check(name, out)
     step("BOM: parts, pins, rotations", parts)
-    step("JLC stock", lambda: check_stock(state["lcsc"], boards))
+    def stock():
+        result = check_stock(state["lcsc"], boards)
+        state["stock_result"] = result
+        state["stock_skipped"] = bool(os.environ.get("CUPC8_OFFLINE"))
+        return result
+    step("JLC stock", stock)
 
     def order():
         import json
-        spec = order_spec(layers, card_edge)
-        check_order(spec, card_edge)
+        import csv
+        with open(os.path.join(fab, "cpl.csv"), newline="") as placement_file:
+            sides = {row["Layer"] for row in csv.DictReader(placement_file)}
+        spec = order_spec(layers, card_edge, sides)
+        check_order(spec, card_edge, sides)
         with open(os.path.join(fab, "order.json"), "w") as f:
             json.dump(spec, f, indent=2)
     step("fab order spec", order)
@@ -3250,6 +3345,21 @@ def pipeline(name, schematic, placement, outline, out=None, zones=("/GND",), pow
             run(["kicad-cli", "pcb", "render", "--width", "1200", "--height", "800", "--quality", "high",
                  "--side", side, "-o", os.path.join(out, "%s-%s.png" % (name, side)), pcb])
     step("3D render", render)
+    # Provenance permits digital/power development with the existing offline
+    # option. Bind its missing live-stock check to the generated artifacts so
+    # stdout cannot be mistaken for manufacturing approval.
+    import json
+    with open(os.path.join(out, "pipeline-scope.json"), "w") as stream:
+        json.dump({"version": 1,
+                   "pipeline_mode": "development-offline" if state["stock_skipped"] else "live-stock-checked",
+                   "live_stock_check": {"status": "skipped" if state["stock_skipped"] else "passed",
+                                        "result": state["stock_result"]},
+                   "manufacturing_release_approved": False,
+                   "release_requirements": "doc/hardware/verification.md"}, stream, indent=2)
+        stream.write("\n")
     boardevidence.record(name, out, evidence_inputs, boards)
-    print("all steps passed; outputs in", out)
+    if state["stock_skipped"]:
+        print("development outputs recorded; live stock skipped; manufacturing release remains open; outputs in", out)
+    else:
+        print("pipeline steps passed; remaining release checks in doc/hardware/verification.md; outputs in", out)
     return state["lcsc"]

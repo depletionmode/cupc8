@@ -8,6 +8,13 @@ There is no hardware prototype, so simulation and test must cover everything
 that can be covered. The last section lists what physically cannot be
 simulated, and how each item is mitigated.
 
+Pre-order and physical scopes are separate: `tools/fabready.py` and
+`test/catalogue.toml` exclude `kind = "hw"` first-article measurements from
+the pre-order gate. Those measurements require real parts or delivered
+boards, retain their limits and sample counts, and govern bring-up and any
+later run as described in `first-article-plan.md`. A development-offline
+receipt does not satisfy live stock, human review or this ordering rule.
+
 Rules for the matrix:
 - Every row names the **artifact under test**, **how** it is tested, and
   **what "green" means**.
@@ -46,7 +53,7 @@ Rules for the matrix:
 
 | # | Artifact | Method | Green when |
 |---|---|---|---|
-| 3.1 | **The schematics themselves** | The co-sim's top level is **generated from the KiCad netlists** of all five boards. Every connection between FPGA netlists, SRAM/ROM timing models, connectors and card models comes from the schematic. Pull-ups become weak pulls, and series resistors become delays. A swapped or missing wire fails the simulation. | the end-to-end tests below pass on the netlist-generated top level |
+| 3.1 | **The schematics themselves** | The co-sim's top level is **generated from the KiCad netlists** of all eight board types. Every connection between FPGA netlists, SRAM/ROM timing models, connectors and card models comes from the schematic. Pull-ups become weak pulls, and series resistors become delays. A swapped or missing wire fails the simulation. | the end-to-end tests below pass on the netlist-generated top level |
 | 3.2 | End-to-end | Blank ROM → program over modelled USB → boot → BASIC → type a program → run it → Wi-Fi join → TCP fetch from a local test server → golden HDMI frame | all pass |
 | 3.3 | Negative end-to-end | Empty slots, a card removed between power cycles, corrupt kernel (bad header, bad body checksum), interrupted ROM programming, low-power USB source. Out of scope: a missing CPU card (broken hardware) and cards plugged or pulled while powered (cards change only with the power off, `slot.md`) | each behaves as specified |
 | 3.4 | Pin consistency | `pins.yaml` ↔ `.pcf` ↔ firmware `pins.h` ↔ KiCad netlists, and iCE40 pin roles ↔ the Lattice pinout CSV | zero differences |

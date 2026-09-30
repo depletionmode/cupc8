@@ -1,8 +1,8 @@
 # JLCPCB order checklist (Milestone 1)
 
 How to order the eight M1 boards from JLCPCB, one field at a time. **David
-places the order.** Claude prepares the files and this checklist and never
-uploads or pays for anything.
+places the order.** The assistant prepares and reviews the files under the
+user's delegation; no upload, reservation, purchase or order approval is implied.
 
 JLC renames and moves fields on its order form now and then. The field names
 below are the ones the form used when this was written (2026-09-28). If a
@@ -14,6 +14,22 @@ Sources: each board's `build/hw/<board>/fab/order.json` (written by
 thickness), `parts.md` (quantities, stock risks), `fab-readiness.md` /
 `fab-waivers.md` (the gate and the hand checks), the card-notch decision
 (`card-notch-decision-applied-20260928.md`) and `m1-live-status.md`.
+
+Current final candidate audit (2026-09-30): all eight genuine normal
+LIVE-STOCK packages have valid original receipts, two assembled boards of
+each design. The exact selected source and outputs are
+`build/firstarticle-final-candidate-20260930/source-tree/build/hw`; the
+reviewed handoff is `build/firstarticle-manufacturing-handoff-20260930/candidate`.
+These packages and stock snapshots do not constitute order approval.
+Wi-Fi and e-ink require Top + Bottom assembly; the other six designs are
+Top only. Codex completed the user-delegated engineering placement review
+of all 127 focus rows, bound to the final native PCB, BOM, CPL and renders;
+all eight complete fabrication checks passed. See
+`build/firstarticle-final-candidate-20260930/engineering-review/index.html`.
+Factory placement and production-file previews have not yet been seen.
+The final mounted ROM is C632854 (SST39VF040-70-4I-NHE-T); the -T suffix is
+carrier packaging only, with genuine exact supplier CAD separately checked.
+Any subsequent source or artifact change requires fresh evidence/review binding.
 
 ## Before you order: David's notes (2026-09-28)
 
@@ -29,33 +45,35 @@ thickness), `parts.md` (quantities, stock risks), `fab-readiness.md` /
   revision. `order_spec` now writes `"finger_finish": "ENIG"`.
 - **Panels: one card per panel** (David). JLC's PCBA minimum counts panels,
   so 2-up would assemble four cards. `order_spec` writes
-  `"cards_per_panel": 1`. The panel geometry itself (rails, frame, slots,
-  tabs; live status, "Panel plan") is **not generated yet**: until it is,
-  the "Delivery format" row below cannot be completed.
+  `"cards_per_panel": 1`. The accepted 2026-09-29 plan is **panel by JLC**, one card per panel.
+  Review JLC's rails, tabs, finger clearance and production preview before payment;
+  no customer panel generator is required by that decision.
 - **Impedance control:** Yes on every 4- and 6-layer board, with the stackup
   named in each board's `fab/order.json` (JLC04161H-7628 / JLC06161H-3313),
   once the SI rows confirm our trace geometry hits the targets on it.
 - **Confirm Production File:** Yes, then run `tools/jlc_production_diff.py`
   on JLC's files (section 4).
 - **First run: 2 assembled boards of each type** (David, 2026-09-28).
-- **Reserve scarce parts early** (bom-risk-audit-20260928.md), in JLC's
-  Parts Manager (private inventory), before the first-article order: the
-  main board's SST39VF040 ROM C645939 (11 in stock): **3** (2 + 1 spare);
-  the iCE40HX4K C1521989 (51 at JLC; main + CPU card): **5** (4 + 1 spare).
-  At PCBA time, check both BOM lines draw from your inventory.
+- **Check scarce parts before payment**: the final aggregate live snapshot
+  (2026-09-30 20:04 UTC) covers all 118 mounted SKUs at twice the shared
+  fitted demand; C632854 ROM stock was 9 against a required stock floor of
+  4. The original C645939 was short and is not in the final BOM. This is
+  not a reservation or a new spare-purchase authorization. Use the exact
+  final BOM, recheck on ordering day, and obtain approval before reserving
+  or paying for parts.
 
 ## 0. Mismatches and gaps found while writing this (resolve before ordering)
 
 | # | What | Where | Proposed resolution |
 |---|---|---|---|
-| M1 | **Fixed in source 2026-09-29 (rebuild pending):** `order.json` gets `confirm_production_file`, `order_note` (cards), `pcba_type`, `solder_mask_colour`, `stencil_remark`. Was: no **Confirm Production File** field and no **order note**. Both were agreed with David (live status A.3). | `kicadgen.order_spec` (hw/tools/kicadgen.py:2722), queued until the main-board agent finishes | Add `"confirm_production_file": true` and, for cards, `"order_note": "<the text in section 3>"` to `order_spec`, then rebuild. Until then this checklist is the only record. |
-| M2 | **Fixed in source 2026-09-29 (rebuild pending):** `impedance_control: true` on 4- and 6-layer boards. Was: `order.json` names a stackup (JLC04161H-7628 / JLC06161H-3313) but has no **impedance control** field. `verification.md` (the TMDS row) says the GPU is a "4-layer board with controlled impedance", and the SI models (`si-models.md`) use this stackup's dielectric. | order.json, 4- and 6-layer boards | Order **Impedance control: Yes** with the named stackup on every 4- and 6-layer board (section 2). Add `"impedance_control": true` to `order_spec`. |
-| M3 | **Fixed in source 2026-09-29 (rebuild pending):** `outline_tolerance_mm: 0.1` on cards. Was: `order.json` has no **outline tolerance**. MECH-101's acceptance, a gap of at least 0.10 mm from notch wall to finger, is "JLC's 0.20 less their **±0.10 high-precision** edge tolerance" (card-notch decision, step 1). At the regular ±0.2 mm, the nominal 0.20 mm gap can go to zero. | order.json, all seven cards | Order **Board outline tolerance: ±0.1 mm (high precision)** on every card. Add it to `order_spec`. |
-| M4 | **Resolved by David, 2026-09-28: ENIG fingers accepted; source and docs changed to match.** Was: `order.json` and `milestone-1.md` said **hard gold** fingers. JLC's form offers "Gold fingers: Yes" plus a bevel. It is not clear from the form whether the fingers are electroplated hard gold or the board's ENIG. | all seven cards | Before ordering, ask JLC (chat or order note) whether "Gold fingers: Yes" is hard gold, and how thick. If it is only ENIG, David decides: accept it (with a waiver in `fab-waivers.md`) or change fabs. It is not a silent substitution. |
-| M5 | `order.json` says `"assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC"`, but the main board has **9 through-hole connectors** (J2 CPU socket C404111, J11-J16 slot sockets C404113, J4 2x5 header C42431818; J3 C19188869 is SMD with posts). So it needs JLC's through-hole assembly as well. | main | Order **Standard PCBA** (section 2). The THT lines appear, with their fee, on the BOM step. Check that all 8 are listed as placed. |
+| M1 | **Implemented in source and genuine development rebuilds (2026-09-30):** `order.json` gets `confirm_production_file`, `order_note` (cards), `pcba_type`, `solder_mask_colour`, `stencil_remark`. Was: no **Confirm Production File** field and no **order note**. Both were agreed with David (live status A.3). | `kicadgen.order_spec` and each actual `fab/order.json` | These fields are present in the current package. Check the final selected package again before ordering; implementation does not constitute supplier confirmation. |
+| M2 | **Implemented in source and genuine development rebuilds (2026-09-30):** `impedance_control: true` on 4- and 6-layer boards. Was: `order.json` names a stackup (JLC04161H-7628 / JLC06161H-3313) but has no **impedance control** field. `verification.md` (the TMDS row) says the GPU is a "4-layer board with controlled impedance", and the SI models (`si-models.md`) use this stackup's dielectric. | order.json, 4- and 6-layer boards | Order **Impedance control: Yes** with the named stackup on every 4- and 6-layer board (section 2). The field is present; verify the supplier order uses that final package's named stackup. |
+| M3 | **Implemented in source and genuine development rebuilds (2026-09-30):** `outline_tolerance_mm: 0.1` on cards. Was: `order.json` has no **outline tolerance**. MECH-101's acceptance, a gap of at least 0.10 mm from notch wall to finger, is "JLC's 0.20 less their **±0.10 high-precision** edge tolerance" (card-notch decision, step 1). At the regular ±0.2 mm, the nominal 0.20 mm gap can go to zero. | order.json, all seven cards | Order **Board outline tolerance: ±0.1 mm (high precision)** on every card. The field is present; retain it on the final selected package. |
+| M4 | **Resolved by David, 2026-09-28: ENIG fingers accepted; source and docs changed to match.** Was: `order.json` and `milestone-1.md` said **hard gold** fingers. JLC's form offers "Gold fingers: Yes" plus a bevel. It is not clear from the form whether the fingers are electroplated hard gold or the board's ENIG. | all seven cards | ENIG fingers are already accepted. Confirm the actual supplier finish and thickness for the final order; a different finish/process needs a recorded decision. |
+| M5 | `order.json` says `"assembly": "PCBA top side, parts from bom.csv/cpl.csv, all LCSC"`, but the main board has **8 through-hole connectors** (J2 CPU socket C404111, J11-J16 slot sockets C404113, J4 2x5 header C42431818; J3 C19188869 is SMD with posts). J1 USB-C also has four plated through-hole shell tabs alongside SMT contacts. So it needs JLC's through-hole assembly and USB-C shell-tab soldering as well. | main | Order **Standard PCBA** (section 2). The THT lines appear, with their fee, on the BOM step. Check that all 8 are listed as placed and J1's plated shell tabs are soldered. |
 | M6 | No material or TG in `order.json`. | all | FR-4, **TG155** on the 4- and 6-layer boards. JLC's multilayer stackups are defined in TG155 FR-4. For Wi-Fi (2-layer), use JLC's default FR-4 TG135, or TG155 if the form prices it the same. Not significant for these boards: record the choice. |
-| M7 | **David: fix in the design, not accept** (live status). On the **Wi-Fi** card, 13 of the 190 via hits (0.3 mm) fall inside solder-mask openings, around U1 (ESP32-C3 module, X 34.8-46.0, Y 24.0-34.2 mm in Gerber coordinates). They are vias in pads, not tented. A via under a module pad can wick solder away in reflow, and JLC may raise an EQ about it. | wifi Gerbers | Confirm they are intentional (the module's GND pad stitching). If so, either ask for them to be plugged (Via covering: "Epoxy filled & capped", if the 2-layer form offers it) or accept the EQ. No other board has vias in mask openings (checked on cpu, main and wifi; the others were built by the same pipeline). **Fixed in the source 2026-09-29 (Via-in-pad agent, not yet in build/hw): `pipeline(pad_via_clear=0.1)` keeps every Wi-Fi GND via's drill 0.1 mm outside the module's mask openings, so no plug and no EQ; the scratch build has 0 open holes, DRC 0. Re-check on the coordinated rebuild (`python3 test/hw/test_via_in_pad.py`).** |
-| M8 | The CPL reviews do not exist yet (`build/hw/*/fab/cpl-review.json`: none). `fab-readiness.md` is red. The boards read "stale" until the coordinated rebuild. | gate | Section 1 is the gate: do not order before it passes. |
+| M7 | **Historical Wi-Fi via-in-pad defects repaired; genuine normal development builders pass the mandatory no-open-via-in-pad check.** David required design fixes. | Wi-Fi native PCB and Gerbers | No plugging or module-pad waiver was adopted. Preserve that check on the final selected build. The separate accepted RP2040 U1.57 exposed-pad via applies only to GPU, IO, storage, e-ink and system (`fab-waivers.md`). |
+| M8 | **Final current engineering reviews completed:** all eight final `fab/cpl-review.json` files name reviewer Codex under explicit user delegation, bind current artifact hashes, and pass full fabrication checks. | gate | This closes the engineering placement review; preserve broader release/verification gates and the final supplier previews. No order approval is implied. |
 
 What matches: layers (main 6, cpu 6, gpu/io/storage/eink/system 4, wifi 2)
 agree between `order.json`, the Gerber job files and the drill files.
@@ -63,12 +81,16 @@ Thickness is 1.6 mm everywhere. The finish is ENIG. Outer copper is 1 oz and
 inner copper 0.5 oz, both JLC's defaults. The smallest hole on every board
 is 0.300 mm (the drill files' first tool), which matches `min_hole_mm`. The
 fingers and the 30° chamfer are on all seven cards and not on the main board.
-Every CPL row is `Top`, and every BOM line has an LCSC number.
+Wi-Fi and e-ink have both `Top` and `Bottom` CPL rows; the other six
+boards have `Top` rows only. Every BOM line has an LCSC number.
 
-## 1. The pre-order gate (all must pass, in this order)
+## 1. The pre-order gate (complete the evidence tasks, then the final gate)
 
 1. **Coordinated rebuild done** (live status A.6): all eight boards rebuilt
-   into `build/hw` one at a time, receipts re-pinned, then:
+   into the selected release build, with fresh receipts generated by real
+   pipelines. Never rehash or re-pin an old receipt. `make verify` may
+   collect results at this stage, but its final green run must follow
+   the reviews, live stock and dated hand checks below:
    ```sh
    make verify JOBS=2          # runs test/run.py --gate, then tools/fabready.py
    ```
@@ -81,36 +103,37 @@ Every CPL row is `Top`, and every BOM line has an LCSC number.
    python3 tools/board_review_packet.py --output build/review-packet/cupc8-boards.pdf
    python3 tools/cpl_focus.py build/review-packet/cupc8-boards-checklist.csv   # the risky rows
    ```
-   David checks every row `cpl_focus.py` lists (ICs, diodes/LEDs,
-   transistors, connectors, crystals, switches, resistor networks), fills
-   in each board's template and saves it as `build/hw/<board>/fab/cpl-review.json`
-   with `"result"` approved. MB-009 and each card's -009 then pass.
-3. **Fresh stock check** on the day of ordering. The 2x-stock check that ran
-   at build time is stale by now. The ROM (C645939, 11 in stock at the last
-   check) and the FPGAs (C1521989) are the risks (`parts.md`, Risks):
+   The delegated engineering reviewer checks every focus row (ICs,
+   diodes/LEDs, transistors, connectors, crystals, switches and resistor
+   networks), and records their own name and evidence. The final snapshot
+   has authentic Codex approvals for all eight boards; no David/JLC
+   signature or factory preview is claimed. A changed build requires new
+   current review binding; never copy or rehash an old review.
+3. **Fresh stock check** on the day of ordering. The final normal packages
+   used genuine live stock checks, and the independent aggregate snapshot
+   passed all 118 mounted SKUs. Recheck the selected ROM C632854 and shared
+   FPGA C1521989 with the whole fitted demand; availability can change:
    ```sh
-   python3 - <<'EOF'
-   import collections, csv, sys
-   sys.path.insert(0, 'hw/tools')
-   import kicadgen
-   ASSEMBLED = {'main': 3, 'cpu': 2, 'gpu': 2, 'io': 2, 'storage': 2, 'wifi': 2, 'eink': 2, 'system': 2}
-   for board, n in ASSEMBLED.items():
-       counts = collections.Counter()
-       for row in csv.DictReader(open(f'build/hw/{board}/fab/bom.csv')):
-           counts[row['LCSC Part #']] += len(row['Designator'].split(','))
-       try:
-           print(board, kicadgen.check_stock(counts, n))
-       except SystemExit as short:
-           print(board, 'SHORT:', short)
-   EOF
+   python3 tools/aggregate_stock.py --board-root build/hw \
+       --output build/release/aggregate-stock.json
    python3 hw/tools/jlcparts.py check C709347 C1509156 --min-stock 2   # the loose antenna lead and antenna
    ```
-   Change `ASSEMBLED` to the quantities actually being ordered (section 5).
+   This mandatory gate validates current receipts for all eight board types,
+   exactly **2 assembled of each**, and requires stock ≥2× the **sum** of
+   shared-part demand across all16 assembled boards. Separate per-board
+   stock checks cannot establish that total. Offline/skipped or replayed
+   supplier answers fail this release gate. The result is a dated live
+   snapshot, not a reservation; repeat on ordering day. A quantity change
+   requires matching newly generated receipts and a reviewed gate change.
    Anything short: reserve it in the JLC parts inventory first (`parts.md`,
    Risks 1-2), or use the listed fallback. A fallback part is a board change
    and needs a rebuild.
-4. **Hand checks** in `fab-waivers.md` all dated, and David signs
-   `fab-readiness.md`.
+4. **Hand checks** in `fab-waivers.md` all dated. Run the final
+   `make verify` against the selected source/build after steps 1–3; it
+   must produce the green report required by `verification.md`. David
+   then signs `fab-readiness.md`. Physical `kind = "hw"` measurements
+   belong to first-article bring-up; their limits and minimum sample
+   counts remain unchanged.
 5. **Gerber zips made** (section 2.1) from the same build that passed 1-4.
    Every file in the zip must have the SHA-256 recorded for it under
    `artifacts` in `build/hw/<board>/evidence.json` (the zip step copies
@@ -155,13 +178,13 @@ boards into a panel.
 
 | Board | Layers | Size (mm, job file) | Stackup | Fingers | BOM lines / placements | THT | Rev |
 |---|---|---|---|---|---|---|---|
-| main | 6 | 131.1 x 188.1 | JLC06161H-3313 | no | 58 / 254 | 8 THT (sockets, header) + J3 SMD with posts | A |
-| cpu | 6 | 62.1 x 47.55 | JLC06161H-3313 | x8, ENIG gold, 30° | 12 / 47 | none | A |
-| gpu | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 26 / 48 | none | A |
-| io | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 28 / 48 | none | A |
-| storage | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 18 / 38 | none | A |
-| wifi | 2 | 62.1 x 47.55 | (2-layer, none) | x1, ENIG gold, 30° | 14 / 23 | none | A |
-| eink | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 19 / 41 | none | A |
+| main | 6 | 131.1 x 188.1 | JLC06161H-3313 | no | 71 / 274 | 8 THT (sockets, header); J1 SMT + PTH shell; J3 SMD + NPTH posts | A |
+| cpu | 6 | 62.1 x 47.55 | JLC06161H-3313 | x8, ENIG gold, 30° | 11 / 47 | none | A |
+| gpu | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 29 / 58 | none | A |
+| io | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 30 / 58 | none | A |
+| storage | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 21 / 48 | none | A |
+| wifi | 2 | 62.1 x 47.55 | (2-layer, none) | x1, ENIG gold, 30° | 22 / 47 | none | A |
+| eink | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 22 / 51 | none | A |
 | system | 4 | 56.1 x 56.5 | JLC04161H-7628 | x4, ENIG gold, 30° | 19 / 48 | none | A |
 
 (The "sockets" row in `fab-readiness.md` is not built and is not part of
@@ -179,10 +202,10 @@ not, stop: the zip is wrong.
 | Base material | FR-4 | FR-4 | FR-4 | |
 | Layers | 6 | cpu 6; others 4 | 2 | `layers` |
 | Dimensions | auto (131.1 x 188.1) | auto (2.2) | auto | from the Gerbers: check it |
-| PCB qty | section 5 | section 5 | section 5 | JLC's minimum is 5 |
+| PCB qty | section 5 | section 5 | section 5 | historical planning minimum 5; confirm current supplier quotation |
 | Product type | Industrial/Consumer electronics | same | same | |
 | Different design | 1 | 1 | 1 | one board per zip |
-| Delivery format | Single PCB (main) | **Panel by customer**, one card per panel (`cards_per_panel`), fingers on the panel's outer edge | same | PENDING: the panel generator does not exist yet. A 62 x 47 mm card is under JLC's 70 x 70 mm Standard PCBA minimum and the 50 mm gold-finger minimum |
+| Delivery format | Single PCB (main) | **Panel by JLC**, one card per panel (`cards_per_panel`), fingers on the panel's outer edge | same | Supplier production preview remains pending; verify rails/tabs preserve fingers. A 62 x 47 mm card is under JLC's 70 x 70 mm Standard PCBA minimum and the 50 mm gold-finger minimum |
 | PCB thickness | 1.6 mm | 1.6 mm | 1.6 mm | `thickness_mm`; CEM card 1.57 ± 0.13 (`milestone-1.md`) |
 | PCB colour | Green | Green | Green | not specified anywhere; green is the cheapest and quickest |
 | Silkscreen | White | White | White | |
@@ -192,7 +215,7 @@ not, stop: the zip is wrong.
 | Inner copper weight | 0.5 oz | 0.5 oz | n/a | `finished_inner_copper_oz` |
 | Specify layer sequence | Yes if asked: L1 F_Cu (.gtl), L2 In1 (.g1), L3 In2 (.g2), L4 In3 (.g3), L5 In4 (.g4), L6 B_Cu (.gbl) | same for cpu; 4-layer: .gtl, .g1, .g2, .gbl | n/a | the SI and power models assume In1 is the ground plane under the top layer |
 | Impedance control | **Yes**, JLC06161H-3313 | **Yes**, cpu JLC06161H-3313; others JLC04161H-7628 | No | `stackup`; M2 |
-| Via covering | Tented | Tented | Tented (see M7) | our mask files cover every via on these boards, once the cards are rebuilt with `pad_via_clear` (M7); the RP2040 exposed-pad via U1.57 on gpu, io, storage, eink and system stays open in its pad (audit I3, accepted) |
+| Via covering | Tented | Tented | Tented (see M7) | the genuine normal builds enforce no unapproved open via in pad (M7); the RP2040 exposed-pad via U1.57 on gpu, io, storage, eink and system stays open in its pad (audit I3, accepted) |
 | Min via hole size / diameter | 0.3 mm / (0.4/0.45 mm), the free default | same | same | our smallest via is 0.3 mm drill with a 0.6 mm or larger pad |
 | Board outline tolerance | ±0.2 mm (regular) | **±0.1 mm (high precision)** | **±0.1 mm** | M3; the MECH-101 0.10 mm gap assumes it |
 | Confirm production file | **Yes** | **Yes** | **Yes** | David, 2026-09-28 (live status A.3): JLC's CAM may trim fingers or move the notch; we check their files first (section 4) |
@@ -210,7 +233,7 @@ not, stop: the zip is wrong.
 | Field | Value | Why |
 |---|---|---|
 | PCBA type | **Standard** | the main board has THT parts and 6 layers, the cards have gold fingers and ENIG, and several parts are extended. Economic PCBA does not cover all of that, and one type for every board keeps them alike |
-| Assembly side | **Top side** | every CPL row is `Top` (`order.json` `assembly`) |
+| Assembly side | **Top + Bottom for Wi-Fi and e-ink; Top for the other six boards** | match the exact `assembly_sides` and actual CPL rows in each final `order.json`; quote and review both faces |
 | PCBA qty | **2 of every board** (David, 2026-09-28; JLC's minimum is 2) | `parts.md`, Build quantity; the build-time stock check assumed these |
 | Tooling holes / edge rails | **Added by JLCPCB**, on rails only | our cards have no room for tooling holes. If the form or an EQ proposes holes or rails **on the board** or on the **finger edge**, refuse and ask for another way |
 | Confirm parts placement | **Yes** | JLC's engineers send placement images to approve. This is a second check after our CPL review, not a replacement for it |
@@ -221,7 +244,11 @@ Then **Next** → upload `bom.csv` and `cpl.csv` → the parts page:
 - Every BOM line must be matched to exactly the LCSC number in the file,
   with none "not selected" and no shortfall. Count them against 2.2.
 - On the main board, check that the THT connectors (J2, J4, J11-J16) and J3
-  are selected as placed, with the THT fee shown.
+  are selected as placed, with the THT fee shown. Also confirm soldering
+  of J1 USB-C's four plated shell tabs, not only its SMT contacts. J3
+  support posts are NPTH mechanical features. Main U7 is physically SMD
+  LQFP144 despite its erroneous native footprint THT attribute; quote
+  assembly from the actual package and pads, not that metadata flag.
 - JLC's placement preview: if a part looks rotated, **do not fix it in JLC's
   tool.** Fix the CPL at the source and rebuild, because a hand edit there
   bypasses BRD-001 and the CPL review. If time forces a JLC-side fix, record
@@ -230,6 +257,12 @@ Then **Next** → upload `bom.csv` and `cpl.csv` → the parts page:
   BOM. Add them as loose parts to the same order (JLC parts, "order
   components"), quantity 2 each. Check that the lead is **SMA female (jack)**
   and the antenna **SMA male**, not RP-SMA (`fab-waivers.md`, hand checks).
+  Ordinary live loose-part query passed on 2026-09-30: C709347 stock 157
+  and C1509156 stock 334, against minimum 2 each (dated log
+  `build/firstarticle-manufacturing-handoff-20260930/loose-antenna-live-stock.log`).
+  They are not included in the 118 mounted-SKU aggregate and are not
+  reserved. Plug the RF lead into the module by hand and attach the SMA
+  antenna; JLC does not assemble these loose cable parts.
 
 ## 3. Order note (the "Remark" or "Order notes" field)
 
@@ -244,8 +277,9 @@ These are proposed additions for David to approve, not yet agreed. Without
 approval, paste only the sentence above:
 
 - "No tooling holes or edge rails on the gold-finger edge." (2.4)
-- Wi-Fi only, if M7 is resolved as "plug": "Please plug the vias inside the
-  module's ground pad."
+- The historical Wi-Fi via-plug proposal was not adopted: actual via-in-pad
+  defects were repaired, and the final required no-open-via-in-pad check
+  passed. Do not request plugging as a substitute for the approved geometry.
 
 ## 4. Checking JLC's production files (Confirm Production File)
 
@@ -302,9 +336,8 @@ against themselves. It also compares them as JLC might return them: X2
 stripped, renamed, zipped and moved 5 mm. Then it checks mutated copies:
 fingers trimmed 0.5 mm (reported as EDGE removed, both faces), the notch
 moved 0.3 mm (a profile difference), a via dropped (missing), and a
-0.1 mm plating enlargement (not a difference). It is **not yet in
-`test/catalogue.toml`**. Proposed row: `HOST-00x`, kind `sim`, vrow 2.8,
-cmd `python3 test/host/test_jlc_production_diff.py`. It has not been run on
+0.1 mm plating enlargement (not a difference). It is catalogued as **HOST-004**, kind `static`, vrow 4.9, command
+`python3 test/host/test_jlc_production_diff.py`. It has not been run on
 a real JLC production file, so the first order's files are its real test:
 also do 4.2 on that order.
 
@@ -328,14 +361,18 @@ alongside theirs:
 
 ## 5. Order sequencing
 
-M1 builds only two machines (`parts.md`: 5 bare PCBs of each design, 2 of
-every board assembled; David, 2026-09-28). The first order is therefore the
+The authorized assembled batch is two of each board type (`parts.md`,
+David, 2026-09-28); the historical five-bare-PCB planning quantity requires
+a current supplier quote. The unchanged three-unit first-power and GPU
+qualification gates cannot be closed by this two-unit batch: an extra
+assembled sample or explicitly approved qualification scope is required. The first order is therefore the
 first article. What matters is what gates the *next* order. Recommended:
 
-1. **Reserve the risky parts** in the JLC parts inventory: 3 x ROM C645939
-   (2 + 1 spare; fallback C632851), and 5 x FPGA C1521989 (2 main + 2 CPU +
-   1 spare) (`parts.md`, Risks).
-   Paid by David, and possible before the gate passes.
+1. **Check the actual final scarce parts**, C632854 ROM and C1521989 FPGA,
+   against aggregate demand and a current supplier quote. Any paid private
+   inventory reservation or spare purchase requires David's approval;
+   historical C645939/fallback/spare figures are not the final BOM.
+
 2. **Optional, cheap, early: a bare-PCB fit order.** 5 bare PCBs (no
    assembly) each of **io** (x1 notch), **cpu** (x8) and **system** (x4),
    with every option in 2.3 including Confirm production file and the
@@ -345,9 +382,10 @@ first article. What matters is what gates the *next* order. Recommended:
    answers the notch question for about the cost of bare boards. It also
    gives `jlc_production_diff.py` its first real production files.
 3. **First-article assembled order, all eight boards:** 5 PCBs / 2
-   assembled per card, 5 PCBs / 3 assembled main boards (the spare main
-   board is `parts.md`'s "no prototype" margin). Every board goes through
-   section 4.
+   assembled of **each of all eight designs, including main**. Every board
+   goes through section 4. The earlier suggestion of three assembled main
+   boards is an unadopted spare-board proposal; current authorized demand
+   and receipts remain two per design.
 4. **Bring-up and measurement before any further order:** MECH-101 on two
    of each card, the `kind = "hw"` rows, and the first-article measurements
    in live status B (C45783 ESR and capacitance, mated-slot return

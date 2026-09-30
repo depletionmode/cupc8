@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import logo  # noqa: E402
 import main_seed  # noqa: E402
 
@@ -298,7 +299,54 @@ def prepare(board):
 _SYSTEM_SEEDED = False
 
 
+def _repair_seed_ground_vias(board):
+    """Move three historical open pad vias, preserving all signal/USB copper."""
+    import pcbnew
+    import route_seed
+    signal_before = [row for row in route_seed.copper(board) if row[1] != "/GND"]
+    moves = (
+        ("U2", "4", (8029296, 15373990), (8382118, 15752759)),
+        ("Y1", "2", (20891285, 26461447), (21050000, 26700000)),
+        ("Y1", "4", (17108714, 23538552), (18033886, 23159003)),
+    )
+    for ref, pin, old, new in moves:
+        footprint = board.FindFootprintByReference(ref)
+        pads = [p for p in footprint.Pads() if p.GetNumber() == pin] if footprint else []
+        if len(pads) != 1 or pads[0].GetNetname() != "/GND":
+            raise ValueError("System ground-via repair: pad changed " + ref + "." + pin)
+        rows = route_seed.items(board)
+        vias = [t for t in rows if t.GetClass() == "PCB_VIA" and t.GetNetname() == "/GND"
+                and (t.GetPosition().x, t.GetPosition().y) == old]
+        stubs = [t for t in rows if t.GetClass() == "PCB_TRACK" and t.GetNetname() == "/GND"
+                 and t.GetStart() == pads[0].GetPosition()
+                 and (t.GetEnd().x, t.GetEnd().y) == old]
+        if len(vias) != 1 or len(stubs) != 1:
+            raise ValueError("System ground-via repair: historical copper changed " + ref + "." + pin)
+        if (vias[0].GetWidth(pcbnew.F_Cu) != 600000 or vias[0].GetDrillValue() != 300000
+                or stubs[0].GetWidth() != 300000 or stubs[0].GetLayer() != pcbnew.F_Cu):
+            raise ValueError("System ground-via repair: width/drill/layer changed " + ref + "." + pin)
+        vias[0].SetPosition(pcbnew.VECTOR2I(*new))
+        stubs[0].SetEnd(pcbnew.VECTOR2I(*new))
+    if [row for row in route_seed.copper(board) if row[1] != "/GND"] != signal_before:
+        raise ValueError("System ground-via repair changed signal/USB copper")
+
+
 def _seeded_route(board, workdir):
+    """Reuse the genuinely completed, repaired route with exact geometry guards."""
+    import route_seed
+    global _SYSTEM_SEEDED
+    _SYSTEM_SEEDED = False
+    result = route_seed.apply(
+        board, os.path.join(HERE, "system-full-route-seed.json"),
+        board_name="system", pour_nets=("/GND",),
+        post_route_contract="system-shell-and-pad-via-repairs-v1")
+    _SYSTEM_SEEDED = True
+    print("System full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
+
+
+def _legacy_seeded_route(board, workdir):
     """Reuse the completed System route, preserving its accepted USB copper.
 
     The seed was extracted from the receipt-bound routed board, before fills
@@ -350,6 +398,7 @@ def _seeded_route(board, workdir):
         t.SetLocked(True)
         board.Add(t)
         count += 1
+    _repair_seed_ground_vias(board)
     signal_nets = sorted({str(name) for name in nets} - {"", "/GND"})
     opened = kg.open_escapes(board, signal_nets)
     if opened:
@@ -377,6 +426,8 @@ def post_route(board):
     tracks = board.Tracks()
     items = [tracks[i] for i in range(len(tracks))]
     if _SYSTEM_SEEDED:
+        import route_seed
+        route_seed.verify_installed(board, os.path.join(HERE, "system-full-route-seed.json"))
         # The recorded route already had these stubs removed. Do not
         # regenerate drill overlaps at the plated shell mounting slots.
         if any(t.Type() == pcbnew.PCB_TRACE_T and t.GetNetname() == "/GND"
@@ -410,6 +461,7 @@ def main():
         power_nets=(), edge=EDGE, card_edge=True, layers=4, plane=True, fine_nets=FINE_NETS, passes=100,
         title="CUPC/8 system", revision=REVISION, prepare=prepare, post_route=post_route,
         seeded_route=_seeded_route, route_tries=6,
+        post_fill=(lambda board: ff.round_board_fills(board, "system")),
         logo_keepout=True, pad_via_clear=0.1, pad_via_ok=("U1.57",),
         # (no open via hole in a pad; U1.57, the RP2040 exposed pad, keeps its thermal via: audit I3, accepted)
         # the presence link crosses on In2.Cu just above the tab (the key notch

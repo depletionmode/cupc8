@@ -1,5 +1,17 @@
 # Milestone 1 — A real CUPC/8
 
+## First-article acceptance target (David, 2026-09-30)
+
+**Main + system + CPU + IO + storage + WiFi + either HDMI/GPU or eInk.**
+CPU and IO are always present; WiFi and storage are fitted, and GPU/eInk
+are alternatives. The target is a working integrated computer: in-system
+programming, real ROM/kernel/BASIC boot, keyboard, display, microSD SAVE/LOAD
+and WiFi networking. Qualify each graphics alternative separately.
+See the [first-article plan](hardware/first-article-plan.md#first-article-acceptance-target--confirmed-by-david-2026-09-30)
+for acceptance scope and physical checks. Broader any-slot/missing-card and
+six-card-capacity requirements remain documented separately; no failed test
+is removed and no ordinary full release is claimed by this narrower target.
+
 ## Requirements (as given by David, 2026-09-22)
 
 - The first milestone is a **completely working CUPC/8 computer**, designed in

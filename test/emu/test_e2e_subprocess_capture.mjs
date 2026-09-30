@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import vm from 'node:vm';
+const D = path.dirname(new URL(import.meta.url).pathname);
+const ROOT = path.resolve(D, '../..');
+const text = fs.readFileSync(path.join(ROOT, 'test/emu/test_e2e.mjs'), 'utf8');
+const start=text.indexOf('function captureLocalFile(');
+const end=text.indexOf('// ------------------------------------------------------------------ E2E-002',start);
+const context=vm.createContext({fs,path,ROOT,execFileSync});
+vm.runInContext(text.slice(start,end),context);
+const capture=context.captureLocalFile;
+fs.mkdirSync(path.join(ROOT, 'build'), {recursive:true});
+const dir=fs.mkdtempSync(path.join(ROOT,'build','e2e-filefd-regression-'));
+const img=path.join(dir,'card.img');
+const SDK=process.env.CUPC8_SDK ?? path.join(process.env.HOME, '.local/share/cupc8-sdk');
+const python=path.join(SDK,'pyfat/bin/python');
+const fat=(...args)=>capture(python,[path.join(ROOT,'test/emu/fatimg.py'),...args]);
+fat('mkfs',img,'2','12');
+const bytes=Buffer.from([0,255,128,13,10,0,1,200]);
+const source=path.join(dir,'binary');fs.writeFileSync(source,bytes);
+fat('put',img,'DATA.BIN',source);
+assert.ok(fat('get',img,'DATA.BIN').equals(bytes),'binary file stdout must be preserved exactly');
+assert.ok(JSON.parse(fat('ls',img).toString()).some(([name])=>name==='DATA.BIN'),'real FAT listing remains parseable without stderr');
+let rejected=false;
+try {fat('get',img,'MISSING.BIN');} catch(error) {
+ rejected=true;assert.notEqual(error.status,0,'real FAT failure status must propagate');
+ assert.ok(error.stderr.length>0,'real error diagnostics must remain available');
+}
+assert.ok(rejected,'missing FAT file must not pass');
+console.log('PASS actual FAT binary bytes, JSON stdout/stderr separation and real failing child status');

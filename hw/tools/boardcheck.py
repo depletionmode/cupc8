@@ -19,9 +19,10 @@ ROOT = boardevidence.ROOT
 BOARDS = ('main', 'cpu', 'gpu', 'io', 'wifi', 'storage', 'eink', 'system')
 POWER = {
     'main': [('buck.py',), ('ldo.py', '1v2'), ('inrush.py',), ('cc.py',), ('budget.py',),
-             ('main_bind.py', '{out}'), ('main_input_heat.py', '{out}')],
+             ('main_bind.py', '{out}'), ('main_input_heat.py', '{out}', '--solver', 'amg',
+              '--dump-results', '{out}/../main-thermal-results.json')],
     'cpu': [('ldo.py', 'cpu-card')], 'wifi': [('buck.py', 'wifi-card')],
-    'gpu': [('hdmi.py',)], 'io': [('boost.py',)],
+    'gpu': [('hdmi.py',)], 'io': [('boost.py',), ('io_switch_bind.py', '{out}'), ('io_port_switch.py',)],
     'storage': [('budget.py',)], 'eink': [('budget.py',)], 'system': [('budget.py',)],
 }
 # These are contract gaps, not accepted waivers. Retain failed rows until
@@ -30,7 +31,7 @@ GAPS = {
     'power': {
         'cpu': 'bound socket 3V3 feed, minimum finished copper/contact resistance, effective C22/C1-C4 capacitance and ESR, and FPGA maximum core current',
         'gpu': 'RP2040 VREG 1.20 V transient/droop model at 252 MHz',
-        'io': 'TPS2553-1 short/fault flag and current-limit transient model',
+        'io': 'RP2040 internal regulator transient/droop model',
         'storage': 'SD-card load-step and RP2040 internal regulator model',
         'eink': 'panel load-step and RP2040 internal regulator model',
         'system': 'RP2040 internal regulator transient model',
@@ -105,7 +106,7 @@ def check(board, mode, out):
     elif mode == 'power':
         for command in POWER[board]:
             args = [sys.executable, 'hw/power/' + command[0],
-                    *(out if a == '{out}' else a for a in command[1:])]
+                    *(out if a == '{out}' else str(a).replace('{out}', str(out)) for a in command[1:])]
             if board in ('wifi', 'cpu'):
                 args.append(out)
             run(args)

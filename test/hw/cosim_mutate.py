@@ -40,14 +40,25 @@ def open_pad(source, target, ref, pin, net):
     """Remove every track segment ending on pad ref.pin of `net`; returns the count."""
     board = pcbnew.LoadBoard(str(source))
     pad = next(p for p in board.FindFootprintByReference(ref).Pads() if p.GetNumber() == pin)
-    pos = pad.GetPosition()
-    xy = (round(pcbnew.ToMM(pos.x), 4), round(pcbnew.ToMM(pos.y), 4))
+    # Fanout may start anywhere inside a pad, including beyond a short centre
+    # stub. Removing only the centre stub leaves that physical launch intact.
+    # The full track stroke matters too: a rounded track end can touch the pad
+    # even when its centre lies just outside it. Use the same zero-clearance
+    # native shape collision as routed_connectivity, without a distance halo.
+    launch_ids = set()
+    tracks = board.Tracks()
+    for index in range(len(tracks)):
+        track = tracks[index].Cast()
+        if (type(track) is pcbnew.PCB_TRACK and track.GetNetname() == net and
+                pad.IsOnLayer(track.GetLayer()) and
+                track.GetEffectiveShape(track.GetLayer()).Collide(
+                    pad.GetEffectiveShape(track.GetLayer()), 0)):
+            launch_ids.add(track.m_Uuid.AsString())
     tree = parse(Path(source).read_text())
     matches = [item for item in tree[1:]
                if isinstance(item, list) and item and item[0] == 'segment' and
                find1(item, 'net') and find1(item, 'net')[1] == net and
-               xy in (tuple(round(float(v), 4) for v in find1(item, end)[1:])
-                      for end in ('start', 'end'))]
+               find1(item, 'uuid') and find1(item, 'uuid')[1] in launch_ids]
     if not matches:
         raise AssertionError(f'{ref}.{pin} {net}: no launch track to open')
     for item in matches:

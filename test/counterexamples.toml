@@ -1472,3 +1472,24 @@ fixed_in = "hw/boards/main.py _node_joins (2026-09-29)"
 revert = [["hw/boards/main.py", "                if target is not None and math.hypot(x - target[0], y - target[1]) > 1:\n                    links.append", "                if False and target is not None and math.hypot(x - target[0], y - target[1]) > 1:\n                    links.append"]]
 cmd = "python3 test/hw/test_main_seeded.py NodeJoins"
 must_fail = ["test_a_track_ending_in_anothers_body_gets_a_node_and_a_link"]
+
+[[bug]]
+name = "System route reuse: historical ground vias overwrite safe fanout and leave U2.4/Y1.2/Y1.4 drills in pad mask openings"
+fixed_in = "hw/boards/system.py guarded local ground-via migration and strong full-route seed (2026-09-30)"
+revert = [["hw/boards/system.py", "        vias[0].SetPosition(pcbnew.VECTOR2I(*new))\n        stubs[0].SetEnd(pcbnew.VECTOR2I(*new))", "        pass  # historical seed leaves all three vias unmoved"]]
+cmd = "python3 test/hw/test_system_seed_vias.py SystemVias.test_old_seed_has_pad_holes_and_repair_preserves_all_usb_copper"
+must_fail = ["test_old_seed_has_pad_holes_and_repair_preserves_all_usb_copper"]
+
+[[bug]]
+name = "Fab text-height coverage: universal Gerber-only identity rejection blocks source-bound independently measured valid glyphs"
+fixed_in = "hw/tools/silk_glyph_coverage.py actual delivered glyph scale proof (2026-09-30)"
+revert = [["hw/tools/silk_glyph_coverage.py", "def certify(board, silk):\n import silktextaudit", "def certify(board, silk):\n raise ValueError('Gerber-only silkscreen text-height coverage incomplete')\n import silktextaudit"]]
+cmd = "python3 test/hw/test_silk_glyph_coverage.py GlyphTests.test_real_export_measures_height_instead_of_nominal_only"
+must_fail = ["test_real_export_measures_height_instead_of_nominal_only"]
+
+[[bug]]
+name = "Wi-Fi SPI ISR bulk ring copy loses bytes after a ring boundary wrap"
+fixed_in = "fw/wifi/port/esp32c3/main/frames.c two-part RAM memcpy (2026-09-30)"
+revert = [["fw/wifi/port/esp32c3/main/frames.c", "memcpy(ring, mosi + first, (uint32_t)len - first);", "(void)0; /* lost wrapped remainder */"]]
+cmd = "python3 -m unittest test.test_wifi_frames"
+must_fail = ["test_real_queue_wrap_overflow_and_preload"]

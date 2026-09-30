@@ -7,6 +7,7 @@ resistors and weak pulls so a simulator can assign delay and idle levels.
 This is the wiring prerequisite for E2E-001; it does not itself run RTL.
 """
 import argparse
+import hashlib
 import importlib.util
 import json
 import re
@@ -92,95 +93,21 @@ def resistor_between(circuit, a, b):
 
 
 def card_miso_network(circuit, card):
-    """Recognize only the two supported, pin-exact external buffer networks."""
-    ref = 'U3' if card == 'wifi' else 'U4'
-    family = circuit.components[ref][0]
-    internal = 'MISO_INT' if card == 'wifi' else 'MISO_OUT'
-    if family not in ('74LVC1G125GW', 'SN74AHC1G125DCKR'):
-        raise ValueError(f'{card}: unsupported MISO buffer {family}')
-    expected = {'1': '/CS_n', '2': f'/{internal}', '3': '/GND', '5': '/3V3'}
-    for pin, net in expected.items():
-        if node(circuit, ref, pin) != net:
-            raise ValueError(f'{card}: MISO buffer {ref}.{pin} must be {net}')
-    if family == '74LVC1G125GW':
-        path(circuit, (ref, '4'), ('J1', 'B16'))
-        return False
-    if node(circuit, ref, '4') != '/MISO_SRC':
-        raise ValueError(f'{card}: AHC MISO output must be /MISO_SRC')
-    if path(circuit, (ref, '4'), ('J1', 'B16'), '270') != 'R60':
-        raise ValueError(f'{card}: AHC MISO requires R60 270 ohms')
-    path(circuit, (ref, '4'), ('R60', '1'))
-    path(circuit, ('R60', '2'), ('J1', 'B16'))
-    path(circuit, ('R61', '1'), ('J1', 'B16'))
-    path(circuit, ('R61', '2'), (ref, '3'))
-    pulls = [(r.ref, r.value) for r, other in circuit.pulls('/GND')
-             if other == '/MISO']
-    if pulls != [('R61', '10k')]:
-        raise ValueError(f'{card}: AHC MISO requires sole R61 10k ground bias')
+    """Require the complete pin-exact current external TI/RC network."""
+    from slot_spi import network
+    network(circuit,card)
     return True
 
 
 def card_slot_routes(cards, board_paths):
-    """Bind each slot card's GPIO and buffered MISO legs to its PCB copper."""
-    rows, paths, missing = {}, [], []
-    contacts = {'sck': ('SCK', 'B13'), 'mosi': ('MOSI', 'B15'),
-                'cs': ('CS_n', 'A14'), 'irq': ('IRQ_n', 'B10')}
-    for card in ('gpu', 'io', 'storage', 'wifi', 'eink'):
-        circuit = cards[card]
-        board = board_paths.get(card) if board_paths else None
-        routed = board is not None and Path(board).is_file()
-        if routed:
-            sys.path.insert(0, str(ROOT / 'hw/si'))
-            from ibis_bus import routed_distances
-        links = {}
-
-        def leg(name, net, first, last):
-            path(circuit, first, last)
-            length = None
-            if routed:
-                length = routed_distances(Path(board), f'/{net}', first, [last])[
-                    f'{last[0]}.{last[1]}']
-            paths.append({'from': f'{card}.{first[0]}.{first[1]}',
-                          'to': f'{card}.{last[0]}.{last[1]}',
-                          'route_mm': length, 'runtime': f'{card}_{name}_connected'})
-            return length is not None
-
-        for signal, (net, contact) in contacts.items():
-            targets = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
-                       if ref == 'U1' and attached == f'/{net}']
-            if len(targets) != 1:
-                raise ValueError(f'{card}:{net}: expected one MCU GPIO')
-            links[signal] = leg(signal, net, ('J1', contact), targets[0])
-        buffer_ref = 'U3' if card == 'wifi' else 'U4'
-        internal = 'MISO_INT' if card == 'wifi' else 'MISO_OUT'
-        source = [(ref, pin) for (ref, pin), attached in circuit.pins.items()
-                  if ref == 'U1' and attached == f'/{internal}']
-        if len(source) != 1:
-            raise ValueError(f'{card}:{internal}: expected one MCU MISO output')
-        biased = card_miso_network(circuit, card)
-        miso_input = leg('miso', internal, source[0], (buffer_ref, '2'))
-        if biased:
-            output_source = leg('miso', 'MISO_SRC', (buffer_ref, '4'), ('R60', '1'))
-            output_bus = leg('miso', 'MISO', ('R60', '2'), ('J1', 'B16'))
-            bias_bus = leg('miso_pulldown', 'MISO', ('R61', '1'), ('J1', 'B16'))
-            grounds = [pin for (ref, pin), net in circuit.pins.items()
-                       if ref == 'J1' and net == '/GND']
-            if not grounds:
-                raise ValueError(f'{card}: MISO bias lacks connector ground')
-            bias_ground = leg('miso_pulldown', 'GND', ('R61', '2'), ('J1', grounds[0]))
-            links['miso_pulldown'] = bias_bus and bias_ground
-            miso_output = output_source and output_bus
-        else:
-            links['miso_pulldown'] = False
-            miso_output = leg('miso', 'MISO', (buffer_ref, '4'), ('J1', 'B16'))
-        miso_enable = leg('miso', 'CS_n', ('J1', 'A14'), (buffer_ref, '1'))
-        links['cs'] &= miso_enable
-        links['miso'] = miso_input and miso_output and miso_enable
-        rows[card] = links
-        for signal, connected in links.items():
-            if not connected and (signal != 'miso_pulldown' or biased):
-                missing.append(f'{card}:{signal}_slot_copper')
-    return rows, paths, missing
+    """Functional DC links through actual fitted passives/TI stages; SI separate."""
+    from slot_spi import routed
+    sys.path.insert(0,str(ROOT/'hw/si'))
+    rows,paths,missing={ },[],[]
+    for kind in ('gpu','io','storage','wifi','eink'):
+        links,legs,gaps,_=routed(cards[kind],kind,(board_paths or {}).get(kind))
+        rows[kind]=links;paths.extend(legs);missing.extend(gaps)
+    return rows,paths,missing
 
 
 def qspi_boot_routes(cards, card_boards, system_board):
@@ -1441,10 +1368,161 @@ def prog_port_routes(main, cards, main_board, system_board, card_boards):
     return config, paths, missing, whole
 
 
+def reset_monitor_source_binding(main):
+    """Bind the fitted rail monitor branch; do not claim analog runtime coverage."""
+    packages = {
+        'D7': ('BAT54A', ('jlc', 'BAT54ALT1G')),
+        'U17': ('REF3425', ('jlc', 'REF3425IDBVR')),
+        'U18': ('OPA376', ('jlc', 'OPA376AIDBVR')),
+        'U20': ('OPA376', ('jlc', 'OPA376AIDBVR')),
+        'C52': ('1u', ('Device', 'C')),
+    }
+    resistor_values = {'R110': '7.5k 0.1%', 'R111': '4.12k 0.1%',
+                       'R112': '10k 0.1%', 'R113': '9.53k 0.1%',
+                       'R114': '10k 0.1%', 'R115': '6.8M',
+                       'R116': '1k', 'R117': '2.7M'}
+    packages.update({ref: (value, ('Device', 'R'))
+                     for ref, value in resistor_values.items()})
+    if any(main.components.get(ref) != value for ref, value in packages.items()):
+        raise ValueError('reset monitor: wrong fitted reference, amplifiers, diode or divider')
+    nets = {
+        'VREF25': {('C52', '1'), ('R110', '1'), ('U17', '5'), ('U17', '6')},
+        'MON_T33': {('R110', '2'), ('R111', '1'), ('U18', '4')},
+        'MON_T12': {('R111', '2'), ('R112', '1'), ('U20', '4')},
+        'MON33_P': {('R113', '2'), ('R114', '1'), ('R115', '2'), ('U18', '3')},
+        'MON12_P': {('R116', '2'), ('R117', '2'), ('U20', '3')},
+        'MON33_OK': {('D7', '1'), ('R115', '1'), ('U18', '1')},
+        'MON12_OK': {('D7', '2'), ('R117', '1'), ('U20', '1')},
+    }
+    if any(set(main.nets.get('/' + net, ())) != nodes or
+           any(main.net(*pin) != '/' + net for pin in nodes)
+           for net, nodes in nets.items()):
+        raise ValueError('reset monitor: reference, sensing, hysteresis or output topology changed')
+    pins = {
+        ('D7', '1'): ('K', '/MON33_OK'), ('D7', '2'): ('K', '/MON12_OK'),
+        ('D7', '3'): ('A', '/nMR'),
+        ('U17', '1'): ('GND_F', '/GND'), ('U17', '2'): ('GND_S', '/GND'),
+        ('U17', '3'): ('ENABLE', '/+3V3'), ('U17', '4'): ('IN', '/+3V3'),
+        ('U17', '5'): ('OUT_S', '/VREF25'), ('U17', '6'): ('OUT_F', '/VREF25'),
+    }
+    for ref, out, inp, threshold in (('U18', '/MON33_OK', '/MON33_P', '/MON_T33'),
+                                     ('U20', '/MON12_OK', '/MON12_P', '/MON_T12')):
+        pins.update({(ref, str(i)): (name, net) for i, name, net in
+                     ((1, 'OUT', out), (2, 'V-', '/GND'), (3, 'IN+', inp),
+                      (4, 'IN-', threshold), (5, 'V+', '/+3V3'))})
+    if any(main.pin_names.get(pin) != name or main.net(*pin) != net
+           for pin, (name, net) in pins.items()):
+        raise ValueError('reset monitor: wrong diode polarity, reference or amplifier pin map')
+    ends = {('R112', '2'): '/GND', ('R113', '1'): '/+3V3',
+            ('R114', '2'): '/GND', ('R116', '1'): '/+1V2', ('C52', '2'): '/GND'}
+    if any(main.net(*pin) != net for pin, net in ends.items()):
+        raise ValueError('reset monitor: divider rail or return changed')
+    return tuple(nets)
+
+
+def reset_monitor_runtime(main, main_board):
+    """Actual DC/hysteretic native model, with individually proven physical legs.
+
+    Slot RUN device response remains the existing card_control model boundary;
+    these outputs execute as open-drain wired-AND levels at U13, not MCU resets.
+    """
+    monitor_nets=reset_monitor_source_binding(main)
+    if main.components.get('U19') != ('SN74LVC07A', ('jlc','SN74LVC07APWR')) or \
+       main.components.get('U6') != ('MAX811TEUS', ('jlc','MAX811TEUS+T')):
+        raise ValueError('reset monitor: wrong supervisor or open-drain buffers')
+    if main.components.get('R118') != ('100k', ('Device','R')) or \
+       main.net('R118','1') != '/nPOR' or main.net('R118','2') != '/GND':
+        raise ValueError('reset monitor: unpowered nPOR pull-down changed')
+    pins={('U19','14'):('VCC','/3V3_STBY'),('U19','7'):('GND','/GND'),
+          ('U6','4'):('VCC','/+3V3'),('U6','1'):('GND','/GND'),
+          ('U6','3'):('~{MR}','/nMR'),('U6','2'):('~{RESET}','/nPOR')}
+    for slot,(a,y) in enumerate(((1,2),(3,4),(5,6),(9,8),(11,10),(13,12)),1):
+        pins[('U19',str(a))]=(f'{slot}A','/nPOR')
+        pins[('U19',str(y))]=(f'{slot}Y',f'/SLOT{slot}_RST_n')
+        expected={(f'J{10+slot}','B9'),(f'R{104+100*slot}','2'),
+                  ('U13',str(3+slot)),('U19',str(y))}
+        pull=f'R{104+100*slot}'
+        if main.components.get(pull)!=('10k',('Device','R')) or \
+           main.net(pull,'1')!='/+3V3' or \
+           main.pin_names.get(('U13',str(3+slot)))!=f'P0{slot-1}':
+            raise ValueError('reset monitor: wrong slot pull-up or expander bit')
+        if set(main.nets.get(f'/SLOT{slot}_RST_n',())) != expected:
+            raise ValueError('reset monitor: unexpected slot reset load')
+    if any(main.pin_names.get(pin)!=name or main.net(*pin)!=net
+           for pin,(name,net) in pins.items()):
+        raise ValueError('reset monitor: U19 power, polarity or channel changed')
+    paths,missing=[],[]
+    query_cache={}
+    supply_targets={
+        '/GND': [('U17','1'),('U17','2'),('U18','2'),('U20','2'),('U19','7'),
+                 ('R112','2'),('R114','2'),('C52','2'),('R118','2')],
+        '/+3V3': [('U17','3'),('U17','4'),('U18','5'),('U20','5'),('R113','1'),
+                   *((f'R{104+100*slot}','1') for slot in range(1,7))],
+        '/+1V2': [('R116','1')], '/3V3_STBY': [('U19','14')],
+    }
+    def prove(net,first,last):
+        connected=False
+        if main_board is not None and Path(main_board).is_file():
+            sys.path.insert(0,str(ROOT/'hw/si'))
+            from ibis_bus import routed_connectivity
+            key=(net,first)
+            if key not in query_cache:
+                receivers=supply_targets.get(net,main.nets[net])
+                receivers=sorted(set(receivers)-{first})
+                # Reuse only within this single immutable board-binding call.
+                # Native filled-plane connectivity is not an SI path length.
+                query_cache[key]=routed_connectivity(Path(main_board),net,first,receivers)
+            connected=query_cache[key][f'{last[0]}.{last[1]}']
+        paths.append({'from':f'main.{first[0]}.{first[1]}',
+                      'to':f'main.{last[0]}.{last[1]}','route_mm':None,
+                      'connected':connected,'proof':'native same-net copper connectivity',
+                      'runtime':'reset_monitor'})
+        if not connected: missing.append(f'main:{net}:{first}->{last}')
+        return connected
+    for net in monitor_nets:
+        nodes=sorted(main.nets['/'+net])
+        for target in nodes[1:]:prove('/'+net,nodes[0],target)
+    for ref in ('U17','U18','U20','U19'):
+        for pin,net in ((p,n) for (r,p),n in main.pins.items() if r==ref):
+            if net in ('/+3V3','/GND','/3V3_STBY'):
+                anchor={'/+3V3':('U6','4'),'/GND':('U6','1'),'/3V3_STBY':('U15','3')}[net]
+                prove(net,anchor,(ref,pin))
+    for net,first,last in (
+            ('/GND',('U6','1'),('R112','2')),
+            ('/GND',('U6','1'),('R114','2')),
+            ('/GND',('U6','1'),('C52','2')),
+            ('/GND',('U6','1'),('R118','2')),
+            ('/nPOR',('U6','2'),('R118','1')),
+            ('/+3V3',('U6','4'),('R113','1')),
+            ('/+1V2',('R8','2'),('R116','1'))):
+        prove(net,first,last)
+    core_complete=not missing
+    diode33=prove('/nMR',('D7','3'),('U6','3'))
+    diode12=diode33
+    slots=[]
+    for slot,(a,y) in enumerate(((1,2),(3,4),(5,6),(9,8),(11,10),(13,12)),1):
+        good=prove('/nPOR',('U6','2'),('U19',str(a)))
+        for target in (('U13',str(3+slot)),(f'J{10+slot}','B9')):
+            good=prove(f'/SLOT{slot}_RST_n',('U19',str(y)),target) and good
+        pull=f'R{104+100*slot}'
+        good=prove('/+3V3',('U6','4'),(pull,'1')) and good
+        good=prove(f'/SLOT{slot}_RST_n',('U19',str(y)),(pull,'2')) and good
+        slots.append(good)
+    return {'model':'fitted-dc-hysteresis-max811-v1',
+            'source_sha256':{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
+                             for name in ('emu/machine/resetmonitor.h','hw/power/reset_supervisor.py')},
+            'baseline':'explicit settled powered rails; not cold-start timing proof',
+            'scope':'DC KCL, feedback hysteresis, diode MR, 560ms recovery, U19 electrical slot levels; card RUN whole-chip response excluded by existing card_control boundary',
+            'diode33':diode33,'diode12':diode12,'slots':slots,
+            'core_complete':core_complete,
+            'complete':not missing},paths,missing,monitor_nets
+
+
 def sysctl_manual_reset_route(main, system, main_board, system_board):
     """Bind the system MCU's reset GPIO across J2/J3 to supervisor MR."""
     system_nodes = {('U1', '35'), ('J2', 'B4')}
-    main_nodes = {('J3', '36'), ('SW1', '1'), ('TP14', '1'), ('U6', '3')}
+    reset_monitor_source_binding(main)
+    main_nodes = {('J3', '36'), ('SW1', '1'), ('TP14', '1'), ('U6', '3'), ('D7', '3')}
     if set(system.nets.get('/SYS_nRST', ())) != system_nodes or \
             set(main.nets.get('/nMR', ())) != main_nodes or \
             system.pin_names.get(('U1', '35')) != 'GPIO23' or \
@@ -1649,9 +1727,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
                 card_net = node(cards[card], 'J1', contact)
                 if card_net.lstrip('/') != card_expected[contact]:
                     raise ValueError(f'{card}.J1.{contact}: expected {card_expected[contact]}, got {card_net}')
-                target_net = ('/MISO_INT' if card == 'wifi' else '/MISO_OUT') if contact == 'B16' else card_net
-                pins = [pin for (component, pin), attached in cards[card].pins.items()
-                        if component == 'U1' and attached == target_net]
+                from slot_spi import network
+                signal={'B13':'sck','B15':'mosi','A14':'cs','B16':'miso','B10':'irq'}[contact]
+                target=network(cards[card],card)['signals'][signal]
+                pins=[target[1]]
                 if len(pins) != 1:
                     raise ValueError(f'{card} {card_net}: card model pin missing or duplicated')
                 if contact == 'B16':
@@ -1666,16 +1745,26 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
                     if r == 'U7' and attached == f'/{source}']
             if len(pins) != 1:
                 raise ValueError(f'{source}: chipset model pin missing')
-            resistor = path(main, ('U7', pins[0]), (ref, contact), '33')
+            if contact=='A14':
+                from slot_spi import main_select
+                main_select(main,slot)
+            value='68' if contact=='A14' else '33'
+            resistor = path(main, ('U7', pins[0]), (ref, contact), value)
+            expected_ref=f'R{36+slot}' if contact=='A14' else ('R36' if contact=='B13' else 'R35')
+            if resistor != expected_ref:raise ValueError('slot control series reference changed')
             manifest['paths'].append({'from': f'main.U7.{pins[0]}', 'to': f'main.{ref}.{contact}',
-                                      'series': resistor, 'ohms': 33})
-    # The shared SPI return needs an idle high level when no card drives it.
-    miso = node(main, 'J11', 'B16')
-    pulls = [(r.ref, r.value) for r, other in main.pulls('/+3V3') if other == miso]
-    if not any(v == '47k' for _, v in pulls):
-        raise ValueError('SPI MISO lacks a 47k pull-up on the main board')
-    manifest['pulls'].append({'net': 'SPI_MISO', 'rail': '+3V3', 'resistors': pulls,
-                              'idle': 1, 'strength': 'weak'})
+                                      'series': resistor, 'ohms': int(value)})
+    # Actual permanent low-idle passive bias, not an assumed floating level.
+    from slot_spi import main_bias
+    main_bias(main)
+    miso=node(main,'U7','48')
+    if (node(main,'R107','1'),node(main,'R107','2')) != ('/+3V3',miso) or main.components['R107'] != ('100k',('Device','R')):
+        raise ValueError('Main MISO requires exact R107 100k pullup')
+    if (node(main,'R109','1'),node(main,'R109','2')) != (miso,'/GND') or main.components['R109'] != ('4.7k',('Device','R')):
+        raise ValueError('Main MISO requires exact R109 4.7k pulldown')
+    if [(r.ref,r.value)for r,n in main.pulls('/+3V3')if n==miso] != [('R107','100k')] or [(r.ref,r.value)for r,n in main.pulls('/GND')if n==miso] != [('R109','4.7k')]:
+        raise ValueError('Unexpected parallel Main MISO bias')
+    manifest['pulls'].append({'net':'SPI_MISO','idle':0,'pullup_ohms':100000,'pulldown_ohms':4700,'scope':'functional/DC powered baseline; leakage/SI separate'})
     # Memory models attach to actual SRAM/ROM pins on the same electrical
     # nodes as the FPGA, rather than to an independently typed bus list.
     for i in range(19):
@@ -1746,7 +1835,22 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
             'sck': output_bits[signals['sck']], 'mosi': output_bits[signals['mosi']],
             'cs': output_bits[signals['cs']], 'irq': int(signals['irq'].removeprefix('SLOT_nIRQ')),
             'miso': signals['miso'] == 'SPI_MISO'})
-    manifest['runtime']['miso_idle'] = 1  # verified 47k pull-up above
+    manifest['runtime']['miso_idle'] = 0  # fitted 100k pullup / 4.7k pulldown
+    # Physical bias branches affect the native bus's actual idle choice.
+    sys.path.insert(0,str(ROOT/'hw/si'))
+    from ibis_bus import routed_connectivity
+    bias_ok={}
+    for label,ref,pin,net in (('pullup','R107','1','/+3V3'),('pulldown','R109','2','/GND')):
+        anchors=[(r,p)for(r,p),n in main.pins.items()if r=='U7' and n==net]
+        if not anchors:raise ValueError('Main bias supply reference absent')
+        for first,last,n in ((('U7','48'),(ref,'2' if pin=='1' else '1'),'/SPI_MISO'),((ref,pin),anchors[0],net)):
+            ok=bool(pcb and Path(pcb).is_file() and routed_connectivity(Path(pcb),n,first,[last])[f'{last[0]}.{last[1]}'])
+            bias_ok[label]=bias_ok.get(label,True) and ok
+            manifest['paths'].append({'from':f'main.{first[0]}.{first[1]}','to':f'main.{last[0]}.{last[1]}','net':n,'connected':ok,'runtime':'miso_idle_bias'})
+            if not ok:manifest.setdefault('miso_bias_missing',[]).append(f'main:{ref}_{pin}_bias_copper')
+    manifest['runtime']['miso_idle']=0 if bias_ok['pulldown'] else 1
+    manifest['runtime']['miso_bias_connected']=all(bias_ok.values())
+
     # 10-90 % of the larger CPU-bus series R (card RN1-8 68 ohm; main R21-R34 are
     # 56) into 15 pF: the same bound as hw/timing/cpubus_budget.py
     manifest['runtime']['series_delay_ns'] = round(2.2 * 68 * 15e-12 * 1e9, 3)
@@ -1837,10 +1941,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         if not connected:
             manifest['runtime']['missing_routes'].append(name)
     manifest['runtime']['missing_routes'].sort()
+    manifest['runtime']['missing_routes'].extend(manifest.pop('miso_bias_missing',[]))
     manifest['runtime']['routed_top'] = not manifest['runtime']['missing_routes']
     manifest['runtime']['routed_timing'] &= all(write_links.values()) and \
         manifest['runtime']['rom_read_d0_connected']
-    # Each slot-select source crosses one 33-ohm resistor. Verify both copper
+    # Each slot-select source crosses its fitted 68-ohm resistor. Verify both copper
     # legs from the actual package pads, then use the result to gate the
     # native card select. Net-level route length alone can miss an open pad.
     for slot, wiring in enumerate(manifest['runtime']['slots'], 1):
@@ -1851,8 +1956,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         if source is None:
             raise ValueError(f'{source_net}: chipset source pad missing')
         resistor = main.series(source, (f'J{10+slot}', 'A14'))
-        if resistor is None or resistor.value != '33':
-            raise ValueError(f'{source_net}: slot-select series resistor missing')
+        if resistor is None or resistor.value != '68' or resistor.ref != f'R{36+slot}':
+            raise ValueError(f'{source_net}: exact slot-select 68-ohm resistor missing')
         base_ref = resistor.ref.split('.')[0]
         source_pad = next(((base_ref, pad) for (ref, pad), net in main.pins.items()
                            if ref == base_ref and net == source_net), None)
@@ -2272,6 +2377,11 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
     manual_reset, manual_reset_paths, manual_reset_missing = sysctl_manual_reset_route(
         main, cards['system'], pcb, system_board)
     manifest['paths'].extend(manual_reset_paths)
+    monitor, monitor_paths, monitor_missing, monitor_nets = reset_monitor_runtime(main, pcb)
+    manifest['runtime']['reset_monitor'] = monitor
+    manifest['paths'].extend(monitor_paths)
+    manifest['runtime']['missing_routes'].extend(monitor_missing)
+    manifest['runtime']['routed_top'] &= not monitor_missing
     manifest['runtime']['sysctl_manual_reset_connected'] = manual_reset['sysctl']
     manifest['runtime']['button_manual_reset_connected'] = manual_reset['button']
     manifest['runtime']['missing_routes'].extend(manual_reset_missing)
@@ -2311,6 +2421,10 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         if key[1] not in available_nets[board]:
             raise ValueError(f'{board}:{name}: runtime signal missing from netlist')
         executed.add(key)
+    if monitor['complete']:
+        for name in (*monitor_nets,'+3V3','3V3_STBY','GND'):
+            runtime_net('main',name)
+        for slot in range(1,7):runtime_net('main',f'SLOT{slot}_RST_n')
     for i in range(19):
         runtime_net('main', f'MEM_A{i}')
     for i in range(8):
@@ -2386,6 +2500,9 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         manifest['runtime']['eink_panel_link'] = False
         manifest['runtime']['eink_panel_copper_connected'] = False
     for card in ('gpu', 'io', 'storage', 'wifi', 'eink'):
+        from slot_spi import network
+        if all(manifest['runtime']['card_slot_links'][card].values()):
+            for fitted_net in network(cards[card],card)['nets']:runtime_net(card,fitted_net)
         if card_miso_network(cards[card], card):
             runtime_net(card, 'MISO_SRC')
         for name in ('SCK', 'MOSI', 'CS_n', 'IRQ_n', 'MISO',

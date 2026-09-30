@@ -55,6 +55,7 @@ class Geometry:
         self.shapes = []
         self.overfill = {}
         self.circles = {}
+        self.strokes = {}
         self.obrounds = {}
         self.flashes = {}
         self.repaired = set()
@@ -124,6 +125,54 @@ class Geometry:
             dx = Decimal(x0-x1) / Decimal(1000000)
             dy = Decimal(y0-y1) / Decimal(1000000)
             return (dx*dx + dy*dy).sqrt() - (Decimal(str(d0)) + Decimal(str(d1))) / 2
+
+    def capsule_clearance(self, first, second, minimum):
+        """Exact rule predicate for circles, obrounds and straight round strokes.
+
+        Gerber centres/endpoints retain integer coordinate units. Squared
+        segment distances and the aperture radii are rational, so a plot at
+        the rule boundary passes without a tessellation tolerance. Curves,
+        regions and other apertures retain the existing bounded GEOS proof.
+        """
+        def capsule(shape):
+            if shape in self.strokes:
+                return self.strokes[shape]
+            if shape in self.circles:
+                x, y, diameter = self.circles[shape]
+                return ((x, y), (x, y)), diameter
+            return None
+        a, b = capsule(first), capsule(second)
+        if a is None or b is None:
+            return None
+        def orientation(p, q, r):
+            return (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0])
+        def point_segment2(p, q, r):
+            vx, vy = r[0]-q[0], r[1]-q[1]
+            wx, wy = p[0]-q[0], p[1]-q[1]
+            length2, projection = vx*vx+vy*vy, wx*vx+wy*vy
+            if not length2 or projection <= 0:
+                return Fraction(wx*wx+wy*wy)
+            if projection >= length2:
+                return Fraction((p[0]-r[0])**2+(p[1]-r[1])**2)
+            return Fraction((wx*vy-wy*vx)**2, length2)
+        (p, q), da = a
+        (r, s), db = b
+        pq_r, pq_s = orientation(p, q, r), orientation(p, q, s)
+        rs_p, rs_q = orientation(r, s, p), orientation(r, s, q)
+        intersects = (min(pq_r, pq_s) <= 0 <= max(pq_r, pq_s) and
+                      min(rs_p, rs_q) <= 0 <= max(rs_p, rs_q) and
+                      all(max(min(p[i], q[i]), min(r[i], s[i])) <=
+                          min(max(p[i], q[i]), max(r[i], s[i])) for i in (0, 1)))
+        squared = Fraction(0) if intersects else min(
+            point_segment2(p, r, s), point_segment2(q, r, s),
+            point_segment2(r, p, q), point_segment2(s, p, q))
+        radius = (Fraction(str(da)) + Fraction(str(db))) * 500000
+        required = radius + Fraction(str(minimum)) * 1000000
+        with localcontext() as context:
+            context.prec = 60
+            clearance = ((Decimal(squared.numerator) / Decimal(squared.denominator)).sqrt() -
+                         Decimal(radius.numerator) / Decimal(radius.denominator)) / Decimal(1000000)
+        return squared >= required*required, clearance
 
     def covers(self, outer, inner):
         result = self.call('GEOSCovers_r', ctypes.c_byte,
@@ -394,6 +443,9 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                     radius = params[0] / 2
                     shape = geometry.buffer(geometry.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' %
                                                          (*position, *target)), radius)
+                    geometry.strokes[shape] = (
+                        tuple((round(px*1e6), round(py*1e6)) for px, py in (position, target)),
+                        params[0])
                     bounds = (min(x, position[0])-radius, min(y, position[1])-radius,
                               max(x, position[0])+radius, max(y, position[1])+radius)
                 elif kind == 'C':
@@ -421,6 +473,12 @@ def plotted_copper(path, geometry, minimum_track=None, require_net=True, feature
                         shape = geometry.buffer(geometry.wkt('LINESTRING (%.9f %.9f, %.9f %.9f)' %
                                                              (*ends[0], *ends[1])), radius)
                     geometry.obrounds[shape] = (round(x*1e6), round(y*1e6), width, height)
+                    center = (Fraction(round(x*1e6)), Fraction(round(y*1e6)))
+                    half_axis = abs(Fraction(str(width))-Fraction(str(height))) * 500000
+                    axis = 0 if width >= height else 1
+                    exact_ends = tuple(tuple(center[i] + (sign*half_axis if i == axis else 0)
+                                              for i in (0, 1)) for sign in (-1, 1))
+                    geometry.strokes[shape] = (exact_ends, min(width, height))
                     bounds = (x-width/2,y-height/2,x+width/2,y+height/2)
                 elif kind.startswith('FreePoly'):
                     turned = _turned(free_polys[kind], params[0])
@@ -1471,6 +1529,14 @@ def check_clearance(paths, minimum, minimum_track=None):
                         continue
                     distance = engine.distance(shape, other)
                     if distance < minimum:
+                        capsule = engine.capsule_clearance(shape, other, minimum)
+                        if capsule is not None:
+                            meets_rule, clearance = capsule
+                            if meets_rule:
+                                continue
+                            raise ValueError('%s: %s to %s round-stroke copper clearance below rule: '
+                                             '%s mm < %.9f mm' %
+                                             (Path(path).name, net, other_net, clearance, minimum))
                         # The expanded 64-chord arcs guarantee a lower bound.
                         # The largest possible excess over the true plotted arc
                         # is the buffer radius inflation at each object, plus

@@ -42,6 +42,7 @@
 #include "emu.h"
 #include "fpgaconfig.h"
 #include "sdcard.h"
+#include "resetmonitor.h"
 #include "tmds.h"
 #include "usb/cdchost.h"
 #include "usb/usbkbd.h"
@@ -341,6 +342,9 @@ class Machine {
     bool sysctlResetConnected = true; // system GPIO23 reaches supervisor MR
     bool resetButtonConnected = true; // SW1 reaches supervisor MR
     bool resetButtonPressed = false;  // held physical reset switch
+    bool resetMonitorEnabled = false; // true for source-bound electrical co-sim
+    ResetMonitor::Config resetMonitorConfig;
+    bool resetMonitorSourceComplete = true;
     bool chipsetClockConnected = true; // oscillator's R17 branch reaches chipset clock pad
     std::string root;                  // the repository (build/rp2040/*.elf, the font)
     int espTx = -1, espRx = -1;        // the Wi-Fi card's pipes
@@ -411,6 +415,12 @@ class Machine {
     bool chipsetConfigured, cpuConfigured, cdoneLed;
   };
   State state() const;
+  ResetMonitor railMonitor;
+  bool resetMonitorEnabled = false;
+  bool resetMonitorSourceComplete = true;
+  double rail33=3.3, rail12=1.2, standbyRail=3.3;
+  void setResetRails(double v33, double v12, double standby);
+  const ResetMonitor::State &resetMonitorState();
   TmdsCapture::Frame frame();
   // the text on screen (80x30); empty with `error` set if there is no picture
   std::vector<std::string> screen(std::string *error);

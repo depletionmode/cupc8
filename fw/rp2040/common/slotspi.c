@@ -134,6 +134,8 @@ static void cs_rose(uint gpio, uint32_t events)
 
 void slotspi_init(card_t *c, slotspi_status_fn status)
 {
+	/* This board uses nominal 3.3 V GPIO thresholds. */
+	hard_assert(pads_bank0_hw->voltage_select == 0);
 	card = c;
 	status_fn = status;
 	prog = pio_add_program(pio, &slotspi_program);
@@ -161,6 +163,11 @@ void slotspi_init(card_t *c, slotspi_status_fn status)
 	gpio_init(PIN_SLOT_SCK);
 	gpio_init(PIN_SLOT_MOSI);
 	gpio_init(PIN_SLOT_NCS);
+	/* Keep the receiver hysteresis used by the slot signal qualification
+	 * explicit, even if earlier pad setup changes the reset defaults. */
+	gpio_set_input_hysteresis_enabled(PIN_SLOT_SCK, true);
+	gpio_set_input_hysteresis_enabled(PIN_SLOT_MOSI, true);
+	gpio_set_input_hysteresis_enabled(PIN_SLOT_NCS, true);
 	gpio_pull_up(PIN_SLOT_NCS);                     /* no host: not selected */
 	pio_sm_init(pio, sm, prog + slotspi_offset_start, &cfg);
 

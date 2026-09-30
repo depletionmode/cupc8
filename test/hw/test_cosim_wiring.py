@@ -367,11 +367,10 @@ def main_cli():
         del missing.pins[('J13', 'A14')]
         rejected(cards, missing, 'missing slot 3 select')
 
-        absent_pull = copy.deepcopy(main)
-        miso = absent_pull.net('J11', 'B16')
-        absent_pull.resistors = tuple(r for r in absent_pull.resistors
-                                      if not (r.value == '47k' and miso in r.ends))
-        rejected(cards, absent_pull, 'missing MISO idle pull')
+        for ref in ('R107', 'R109'):
+            absent_pull = copy.deepcopy(main)
+            absent_pull.resistors = tuple(r for r in absent_pull.resistors if r.ref != ref)
+            rejected(cards, absent_pull, f'missing actual MISO idle bias {ref}')
 
         broken_policy = copy.deepcopy(main)
         del broken_policy.pins[named_pin(broken_policy, 'U5', 'OUT')]

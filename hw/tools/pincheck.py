@@ -310,11 +310,39 @@ def read_netlist(path):
     return comps, pin_net, func
 
 
+def approved_main_cs68(ref, comps, pin_net):
+    """Only the six fitted Main 68-ohm CS terminations may join their nets.
+
+    Require exact numbered FPGA/socket endpoints and the existing test pad;
+    another 68-ohm load, swapped slot, extra load or renamed part grants no
+    connectivity. The legacy termination policy is otherwise unchanged.
+    """
+    pins = (34, 38, 39, 47, 52, 56)
+    if ref not in {"R%d" % n for n in range(37, 43)}:
+        return False
+    index = int(ref[1:]) - 37
+    if comps.get(ref) != ("Device", "R", "68"):
+        return False
+    if not comps.get("U7", ("", "", ""))[1].startswith("ICE40HX4K"):
+        return False
+    socket, probe = "J%d" % (11 + index), "TP%d" % (59 + 8 * index)
+    if comps.get(socket, ("", "", ""))[1] != "CUPC8_Slot" or \
+            comps.get(probe, ("", "", ""))[1] != "TestPoint":
+        return False
+    a, b = pin_net.get((ref, "1")), pin_net.get((ref, "2"))
+    if a != "SPI_nCS%d_SRC" % index or b != "SLOT%d_CS_n" % (index + 1):
+        return False
+    actual_a = {key for key, net in pin_net.items() if net == a}
+    actual_b = {key for key, net in pin_net.items() if net == b}
+    return actual_a == {(ref, "1"), ("U7", str(pins[index]))} and \
+        actual_b == {(ref, "2"), (socket, "A14"), (probe, "1")}
+
+
 def check_mainboard(pins, path=MAINBOARD_NET):
     """The connectors of the main board (hw/boards/main.py) against the pinout
     docs and pins.yaml: every contact of every socket must reach the part the
     doc and the pin map say, directly or through one series resistor (the
-    33/56 ohm terminations). Returns the number of contacts checked."""
+    33/56 ohm terminations and the exact approved six 68-ohm CS branches). Returns the number of contacts checked."""
     if not os.path.exists(path):
         print("pincheck: %s not built, main board netlist not checked" % os.path.relpath(path, ROOT))
         return 0
@@ -344,7 +372,8 @@ def check_mainboard(pins, path=MAINBOARD_NET):
             n = parent[n]
         return n
     for ref, (lib, part, value) in comps.items():
-        if part == "R" and value in ("56", "33", "22", "0"):
+        if part == "R" and (value in ("56", "33", "22", "0") or
+                            approved_main_cs68(ref, comps, pin_net)):
             a, b = pin_net.get((ref, "1")), pin_net.get((ref, "2"))
             if a and b and value != "0":
                 parent[root(a)] = root(b)

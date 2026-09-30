@@ -14,6 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import rp2040card as rc  # noqa: E402
 
 G = kg.GRID
@@ -428,6 +429,9 @@ def tmds_ground_escape(board):
 
 
 def preroute(board):
+    import route_seed
+    route_seed.normalize_placement(board, "C13", (20800000, -6199999), (20800000, -6200000))
+    route_seed.normalize_placement(board, "F1", (4099999, -34950000), (4100000, -34950000))
     """GND the router can't give room to, between the TMDS lines:
     - the receptacle's shield and DDC-ground pins (2, 5, 8, 11, 17) sit
       between signal pins: each gets a via 2 mm behind its pad, under the
@@ -499,6 +503,45 @@ def preroute(board):
             rc.track(board, "/GND", (x3, y3), (x3, y3 + 1.4), width=0.2)
 
 
+    # Exact nanometre placement from the isolated DRC-qualified filter candidate.
+    for ref, (x, y) in {'R62': (31187500, -20850000), 'R63': (34437500, -19500000), 'R64': (32437500, -21800000), 'C60': (31187500, -22850000), 'C61': (34437500, -17500000), 'C62': (31957500, -24320000), 'C63': (11850000, -10650000)}.items():
+        board.FindFootprintByReference(ref).SetPosition(pcbnew.VECTOR2I(x, y))
+    # 45 degree relief avoids the actual starved C60 ground spoke.
+    board.FindFootprintByReference("C60").FindPadByNumber("2").SetThermalSpokeAngle(pcbnew.EDA_ANGLE(45.0, pcbnew.DEGREES_T))
+    board.FindFootprintByReference("R65").SetPosition(pcbnew.VECTOR2I(12100000, -13150000))
+    _pin_spi_designators(board)
+
+
+def _pin_spi_designators(board):
+    import pcbnew
+    for ref, (x, y, angle, size, stroke) in {'R61': (16800000, -15710000, 90.0, 800000, 150000), 'R64': (35437500, -24199999, 0.0, 800000, 150000), 'R22': (38600000, -25025000, 0.0, 1000000, 150000), 'R27': (8000000, -29174999, 0.0, 1000000, 150000), 'C14': (17045000, -8000000, 0.0, 1000000, 150000), 'Q2': (44000000, -21854999, 0.0, 1000000, 150000), 'C15': (40700000, -15955000, 0.0, 1000000, 150000), 'R60': (19700000, -16000000, 0.0, 800000, 150000), 'R3': (8500000, -10625000, 0.0, 1000000, 150000), 'R20': (37200000, -32814999, 0.0, 1000000, 150000), 'Y1': (14500000, -22695000, 0.0, 1000000, 150000), 'C17': (14745000, -17400000, 0.0, 1000000, 150000), 'R1': (43315000, -10000000, 0.0, 1000000, 150000), 'R26': (11200000, -29174999, 0.0, 1000000, 150000), 'R62': (28872500, -20850000, 0.0, 800000, 150000), 'TP3': (-1055001, -21999999, 0.0, 1000000, 150000), 'U6': (30595000, -30000000, 0.0, 1000000, 150000), 'U4': (11000000, -15100000, 0.0, 800000, 150000), 'C21': (5350000, -32305000, 0.0, 1000000, 150000), 'TP5': (-1055001, -28999999, 0.0, 1000000, 150000), 'F1': (2099999, -32325000, 0.0, 1000000, 150000), 'H1': (52001264, -35602474, 0.0, 1000000, 150000), 'U7': (9000000, -32670000, 0.0, 800000, 150000), 'C20': (33400000, -26545000, 0.0, 1000000, 150000), 'C18': (8194999, -15500000, 0.0, 1000000, 150000), 'C4': (33699999, -21600000, 90.0, 800000, 150000), 'R63': (36752500, -22500000, 0.0, 1000000, 150000), 'C12': (36200000, -19600000, 0.0, 800000, 150000), 'C9': (18199999, -12000000, 90.0, 1000000, 150000), 'C63': (10050000, -8250000, 0.0, 1000000, 150000), 'C8': (24500000, -6395000, 0.0, 1000000, 150000), 'C3': (35000000, -14799999, 0.0, 800000, 150000), 'R24': (40600000, -21224999, 0.0, 1000000, 150000), 'C62': (30557500, -26920000, 90.0, 1000000, 150000), 'TP2': (-4001240, -16453762, 0.0, 1000000, 150000), 'R21': (37200000, -28384999, 0.0, 1000000, 150000), 'C2': (175000, -11500000, 0.0, 1000000, 150000), 'C23': (13700000, -37595000, 0.0, 1000000, 150000), 'J2': (17404999, -38705000, 0.0, 1000000, 150000), 'C60': (27382500, -22850000, 0.0, 1000000, 150000), 'J1': (11500000, -6395000, 0.0, 1000000, 150000), 'TP6': (-1055001, -32499999, 0.0, 1000000, 150000), 'RN1': (24000000, -24505000, 0.0, 1000000, 150000), 'C6': (20400000, -19400000, 90.0, 800000, 150000), 'C10': (27900000, -7800000, 0.0, 1000000, 150000), 'C7': (20799999, -14805000, 0.0, 1000000, 150000), 'R23': (47500000, -30875000, 0.0, 1000000, 150000), 'TP1': (-1055001, -35999999, 0.0, 1000000, 150000), 'L1': (9000000, -41845000, 0.0, 1000000, 150000), 'TP4': (-1055001, -25499999, 0.0, 1000000, 150000), 'C13': (22599999, -7600000, 90.0, 1000000, 150000), 'U3': (35500000, -6155000, 0.0, 1000000, 150000), 'R2': (19200000, -24075000, 0.0, 1000000, 150000), 'C16': (12495000, -20000000, 0.0, 1000000, 150000), 'C5': (37500000, -15005000, 0.0, 1000000, 150000), 'R4': (324999, -38500000, 0.0, 1000000, 150000), 'C61': (37037500, -16700000, 0.0, 1000000, 150000), 'C22': (11650000, -32305000, 0.0, 1000000, 150000), 'C11': (22400000, -10600000, 90.0, 800000, 150000), 'U5': (20904999, -31000000, 0.0, 1000000, 150000), 'RN2': (27800000, -24505000, 0.0, 1000000, 150000), 'R25': (47500000, -26375000, 0.0, 1000000, 150000), 'U1': (29000000, -10924999, 0.0, 1000000, 150000), 'Q1': (44000000, -31645000, 0.0, 1000000, 150000), 'R65': (14900000, -15550000, 90.0, 800000, 150000)}.items():
+        word = board.FindFootprintByReference(ref).Reference()
+        word.SetPosition(pcbnew.VECTOR2I(x, y))
+        word.SetTextAngleDegrees(angle)
+        word.SetTextSize(pcbnew.VECTOR2I(size, size))
+        word.SetTextThickness(stroke)
+        word.SetVisible(True)
+
+# Exact local filters; original component positions retained.
+PLACEMENT.update({'R62': (31.1875, -20.85, 90.0), 'R63': (34.4375, -19.5, -90.0), 'R64': (32.4375, -21.8, 90.0), 'C60': (31.1875, -22.85, 90.0), 'C61': (34.4375, -17.5, -90.0), 'C62': (31.9575, -24.32, 180.0), 'C63': (11.85, -10.65, -90.0)})
+
+# Exact qualified additional local OE resistor placement.
+PLACEMENT.update({"R65": (12.1, -13.15, -90.0)})
+
+
+def _seeded_route(board, workdir):
+    import route_seed
+    result = route_seed.apply(
+        board, os.path.join(HERE, "gpu-full-route-seed.json"),
+        board_name="gpu", pour_nets=("/GND",),
+        post_route_contract="gpu-ahc-tmds-preroute-v1")
+    _pin_spi_designators(board)
+    print("GPU full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
+
+
 if __name__ == "__main__":
     rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
-             layers=LAYERS, passes=90, preroute=preroute)
+             layers=LAYERS, passes=90, designator_reach=4, preroute=preroute, seeded_route=_seeded_route,
+             post_fill=(lambda board: ff.round_board_fills(board, "gpu")))

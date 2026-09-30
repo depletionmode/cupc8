@@ -1,0 +1,12 @@
+# TI SN74LVC1G125DCKR; LCSC C7833 identity independently confirmed by supplier catalogue.
+# This manufacturer pin table does not certify supplier CAD or CPL rotation.
+datasheet: https://www.ti.com/lit/ds/symlink/sn74lvc1g125.pdf
+source: "TI SN74LVC1G125 SCES223U (August 2026), section 4, page 3: DCK top view and Pin Functions"
+package: SC-70-5
+pins:
+  1: "~{OE}"
+  2: A
+  3: GND
+  4: Y
+  5: VCC
+ccw: [1, 5]

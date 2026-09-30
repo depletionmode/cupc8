@@ -18,6 +18,7 @@
 
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import net from 'node:net';
 import os from 'node:os';
 import { createRequire } from 'node:module';
@@ -228,6 +229,17 @@ export class Machine {
       throw new Error('machinenative: missing routed crystal boot prerequisites');
     // The FPGA configuration chain (emu/machine/fpgaconfig.h): CRESET_B,
     // CDONE and both configuration flashes, each link from routed copper.
+    const monitor = netlistTop?.runtime.reset_monitor;
+    if (netlistTop && (!monitor || monitor.model !== 'fitted-dc-hysteresis-max811-v1' ||
+        typeof monitor.complete !== 'boolean' || typeof monitor.core_complete !== 'boolean' || typeof monitor.diode33 !== 'boolean' ||
+        typeof monitor.diode12 !== 'boolean' || !Array.isArray(monitor.slots) ||
+        monitor.slots.length !== 6 || !monitor.slots.every(x => typeof x === 'boolean')))
+      throw new Error('machinenative: missing fitted electrical reset-monitor model');
+    if (monitor) for (const name of ['emu/machine/resetmonitor.h','hw/power/reset_supervisor.py']) {
+      const digest=createHash('sha256').update(fs.readFileSync(path.join(ROOT,name))).digest('hex');
+      if (monitor.source_sha256?.[name] !== digest)
+        throw new Error('machinenative: stale reset monitor source '+name);
+    }
     const FPGA_LINKS = ['chipsetConfigCopper', 'cpuConfigCopper', 'chipsetCreset', 'cpuCreset',
       'chipsetCdoneSysctl', 'cpuCdoneSysctl', 'cpuCdoneCard', 'cpuCdoneMain', 'cpuCdonePullup',
       'fl0Sysctl', 'fl1Sysctl', 'cdoneLed'];
@@ -309,6 +321,8 @@ export class Machine {
       sysctlResetConnected: netlistTop?.runtime.sysctl_manual_reset_connected ?? true,
       resetButtonConnected: netlistTop?.runtime.button_manual_reset_connected ?? true,
       resetButtonPressed,
+      resetMonitorEnabled: Boolean(netlistTop?.runtime.reset_monitor),
+      ...(netlistTop?.runtime.reset_monitor ? {resetMonitor: netlistTop.runtime.reset_monitor} : {}),
       chipsetClockConnected: netlistTop?.runtime.chipset_clock_connected ?? true,
       memoryWiring,
       ...(fpgaLinks ? { fpga: fpgaLinks } : {}),
@@ -462,6 +476,12 @@ export class Machine {
   }
 
   // sysctl's expanders now: [{address, pins: [port0, port1]}] (a test hook)
+  resetMonitor() { return native.resetMonitor(this.h); }
+
+  setResetRails(v33, v12, standby = 3.3) {
+    return native.setResetRails(this.h, v33, v12, standby);
+  }
+
   expanders() {
     return native.expanders(this.h);
   }

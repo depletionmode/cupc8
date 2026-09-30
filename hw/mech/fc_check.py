@@ -143,7 +143,10 @@ def assign(comps, fps, mid, name=""):
 
         def miss(f):
             return min(math.dist(a, (pos.x, pos.y)) for a in f["model_at"] + [step_xy(f["pos"])])
-        fp = min(same, key=miss)
+        # A legend can share a connector origin without having any 3D model.
+        # Resolve equal-distance matches using the declared exported model
+        # anchors, rather than assigning real geometry to the first graphic.
+        fp = min(same, key=lambda f: (miss(f), not bool(f["model_at"])))
         if miss(fp) > 0.01:
             raise SystemExit("%s: 3D model at (%.2f, %.2f) matches no footprint" % (name, pos.x, pos.y))
         parts[fp["ref"]] = Part.makeCompound([parts[fp["ref"]], shape]) if fp["ref"] in parts else shape

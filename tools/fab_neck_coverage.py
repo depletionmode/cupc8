@@ -310,7 +310,10 @@ def corner_caps(engine, ink_prepared, vertices, box, radius):
             continue
         leg = outer / math.tan(angle / 2)
         bisector = first + second
-        bisector /= numpy.hypot(*bisector)
+        length = numpy.hypot(*bisector)
+        if length == 0:
+            continue
+        bisector /= length
         center = v + bisector * (outer / math.sin(angle / 2))
         # Tangent coordinates rounded for GEOS can land infinitesimally
         # outside a diagonal edge. Move the unchanged full-size disk and
@@ -327,6 +330,17 @@ def corner_caps(engine, ink_prepared, vertices, box, radius):
                 engine.prepared_test('GEOSPreparedCovers_r', ink_prepared, disk)):
             caps.append(triangle)
     return caps
+
+
+def covering_corner_caps(engine, ink_prepared, vertices, box, radius):
+    """Find full-size certified caps that can reach the residue box."""
+    # For qualifying angles >= 90 degrees the contact-leg length is no
+    # greater than outer. A corner can cover residue without its vertex
+    # lying in that residue's bounding box.
+    reach = radius / math.cos(math.pi / (4 * QUAD)) + 1e-7 + TOLERANCE_MM
+    x0, y0, x1, y1 = box
+    return corner_caps(engine, ink_prepared, vertices,
+                       (x0-reach, y0-reach, x1+reach, y1+reach), radius)
 
 
 def ring_vertices(engine, ink_parts):
@@ -421,9 +435,8 @@ def _prove(engine, source, origin, arcs, minimum, silk):
         leftovers = []
         for part in engine.parts(residue):
             x0, y0, x1, y1 = engine.bounds(part)
-            caps = corner_caps(engine, ink_prepared, vertices,
-                               (x0-TOLERANCE_MM, y0-TOLERANCE_MM,
-                                x1+TOLERANCE_MM, y1+TOLERANCE_MM), radius)
+            caps = covering_corner_caps(engine, ink_prepared, vertices,
+                                        (x0, y0, x1, y1), radius)
             if caps:
                 allowed = engine.styled_buffer(engine.union_all(caps), TOLERANCE_MM, 8)
                 part = engine.binary('GEOSDifference_r', part, allowed)

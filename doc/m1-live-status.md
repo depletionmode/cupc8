@@ -5,7 +5,1921 @@ update it after every finding, commit, decision or agent result (David,
 2026-09-28). Background and the release definition:
 `doc/m1-handoff-2026-09-28.md`.
 
-## DECISION NEEDED FROM DAVID: CPU-bus overshoot (bus SI agent, 2026-09-29)
+## Resume 2026-09-30: recovered history and current work
+
+### Active continuation after David went AFK
+
+Confirmed first-article acceptance target (David, 2026-09-30): Main + system
++ CPU + IO + storage + WiFi + either HDMI/GPU or eInk. CPU and IO always
+fitted; exactly one graphics option. Both alternatives need working system
+programming, real ROM/kernel/BASIC, keyboard, display, microSD and WiFi.
+Keep MainR36=33; original mixed128PASS supports the normal configuration,
+not complete functional acceptance. Sole/general tests remain visible as
+separate limitations; no further sole-only resistor repair required for this
+target. All8 coherent output270/cap15 normal builds authorized to proceed;
+source/native finalization and timing/full verification remain pending.
+
+Standing direction: always use parallel agents for pending work when it fits
+and is independent. Preserve owners and frozen job inputs; do not duplicate
+runs or concurrently mutate the same stage/source files.
+
+#### Current follow-up: 2026-09-30 23:38 Israel
+
+Final actual all-eight normal LIVE-STOCK qty2 packages, full fabrication,
+mechanical and strict routed DC checks are terminal PASS. Aggregate stock
+covers 118 SKUs and 16 assembled boards; it is not a reservation. The 143
+functional checks and verified hardware flashing assets are bound to the
+final sources. FPGA configuration intact/prior-six and remaining-three
+native counterexamples now pass; the two earlier false-open fixture failures
+are preserved, and the helper uses exact copper-stroke contact.
+
+The actual final CS1280 numerical replay passes. Final SCK192 input and
+SCK1280 output deck comparisons pass. The MOSI bridge rejected an old extra
+0.053 mm track absent from the final board; the SI owner is preparing a
+necessary actual-final MOSI128 replay, without rerouting Main or normalizing
+the model difference. MISO256 and U6-output48 comparisons continue separately.
+
+Manufacturing candidate assembled at
+`build/firstarticle-manufacturing-handoff-20260930/candidate`: eight separate
+Gerber/drill ZIPs, unchanged BOM/CPL/order/review files, receipts, manufacturing
+and functional evidence, verified firmware/UF2/BIN/programmer, ROM prefix and
+programming quickstart. Its verifier passes all 97 delivered-file hashes and
+all ZIP-member hashes. Final acceptance and an independent packaging audit
+are underway; this candidate does not claim order approval or all-green
+ordinary release. Unknown power/current/Ceff/contact/thermal bounds and
+broader capacity/any-slot gaps remain visible. Factory preview and physical
+receiving measurements remain outstanding. No heavy Main reroute performed.
+
+#### Current follow-up: 2026-09-30 23:15 Israel
+
+Both actual integrated firstarticle graphics variants PASS39checks each,
+Systemprogramming present then genuinecoldbootremoved withrealfullROMreadback.
+Total143 realfunctionalchecks bound unchangedcompiledsources/assets, plus
+routedRPprogrammingfaulttests PASS. FullFPGA faultretry68582 live after genuine
+pad-contact launchfixturefix; preserveoriginalfalse-openfailure. All75placement
+reviews acceptedunchanged; exactall127finalreviewrebind and realCodex engineering
+CPL records complete. Supplierfactorypreview/Davidorderapproval notclaimed.
+
+ALL8freshfinalnormal LIVE-STOCK qty2 builders terminalPASS53295. Source/native
+rootadoption preserved originals; routeguards reused actualqualified copper,
+no heavy reroute. Exactfinalall8 copper/pads/rawfills equal working-M1; only
+MainU10 sameROM tape-and-reelC632854 field changed. Finalcombinedstock118parts
+PASS >=2x total16boarddemand, noreservation. Freshfullfab90102 ownerlive;
+rootfreshfinalmechanical16756 andstrictDC66850 running. Existingcorrectedfull
+previousgeometry replayPASS, including realJ2plug11.41mm clear.
+
+FinalverificationDC checker initiallycaughtmissingcanonicaldependencyadoption;
+qualified270/cap15checker and exactsupplieridentityparser nowcopied canonical
+andfinalsource with explicitsource-amendmentmanifests. All8hardwareinputmaps/
+receipts remainvalid, no rehash. Previouscoherent source/stage preserved.
+
+FinalSI exactdeckbridge624 underway; olderoutputCS study hasreal0.05mm dangling
+cap-netstub absent inactualfinalboard. Exactreuse rejected. Necessaryscoped
+actualfinalCS replay authorized, no boardrepair forunproven modelingdifference.
+UnchangedSCK outputbridge separatelyunderway; retainallscope/ESPnumeric and
+power/current/Ceff/thermalunknowns. Freshpowerreview found no newin-M1 copper
+fault; unwaivedanalysisredrows preserved. Nextfulluserstatus23:30 Israel.
+
+#### Current follow-up: 2026-09-30 22:42 Israel
+
+Root Full access genuineUSB002 PASS8/WiFi003 PASS7. Prior restricted failures
+preserved. Full actual eInk/IO/WiFi3/storage4 with System programming passes
+39 integrated checks, then genuine cold reboot with System removed using full
+actual chip readback also passes. GPU counterpart43614 live. No physical
+power/SI/thermal or universal slot guarantee inferred from native execution.
+
+Mixed MISO256 terminal qualifiedfailures0, immutablehash/raw owner auditPASS;
+RP3MHz conditionalturnaround43.564ns, ESP unpublished numericbound unknown.
+TI localnegativevoltage allowance is genuine current-bound footnote, maxinput
+14.379mA<50mA, not guaranteedlogicnegativevoltage. MOSI-output48 sample/stress
+observation terminal; fourearlyinputdata diagnostics remain preserved.
+
+Actual full mechanical seven groupsPASS; MECH004 fails eInkJ2 missing3Dmodel
+classification although authenticmodel bytes and STEPproduct present. SIowner
+investigates genuineexport/importer fault; do not suppress gate. ActualFPGA
+program intact56routes/nativeflash/hold/bootPASS; sysctlCDONE deliberateopen
+counterexample notdetected, releaseownerinvestigating coverage. Rootprog_port
+80457 stilllive. Frozenstage remains untouched.
+
+Livecombinedstock118queried117PASS; C645939stock3<required4. Authentic same
+512KB/70ns/industrialPLCCROM C632854 tape-and-reelstock9, supplier32pads and
+functions match actualMainU10/CPL. Packaging-only adoption qualified, no
+reroute; finalcoherent8normalrebuild/stockrecheck stillpending. All8formerly
+missing supplierCAD gaps nowgenuinely downloaded/qualified. Placement74/75
+acceptedunchanged, finalHDMI independentnumberedview underengineeringreview.
+No order/signature/productionpreview claimed. Nextfullstatus22:56 Israel.
+
+#### Current follow-up: 2026-09-30 22:19 Israel
+
+Root executor Full access verified: localhost socket/bind/listen and EasyEDA
+DNS PASS. Existing agents still observe prior restrictions; root runs socket
+checks/downloads and shares authentic outputs. Official Holtek Rev1.91 PDF
+and exact C7833 EasyEDA component response downloaded successfully; supplier
+review resumed. No manufacturing approval or order claimed.
+
+Actual mixed original33 SCK64 true3MHz eight-pulse/passive-tolerance screen
+terminal64/64 PASS, owner source/raw hash audit PASS. Actual mixedMOSI128
+terminal: four early WiFi data-band ripples2.1–4.3mV retained; RP setup/hold
+PASS. They settle150ns before clock sampling; genuine output-model cascade
+classification underway, ESP numeric bounds remain unknown. Root MISO256
+session19389 live:128 mixed selected cases plus128 localRP-bufferA cases.
+
+Fresh functional50 checks PASS: storage24 via isolated fileFD candidate,
+eInk/ROM/BASIC14, HDMI6, eInk greyscale6; direct CDC/VBUS subset PASS.
+Canonical minimal subprocess logging fix authorized, frozen stage preserved.
+Full USB/network tests now retry through root executor. All8 normalqty2
+receipts and source/artifact maps remain valid; complete integrated acceptance
+is not yet proved. Placement64/75 accepted unchanged,11 evidence gaps under
+fresh supplier review. Main33 and WiFi input220/5.6 unchanged, output270/cap15
+selected. No heavy reroute. Status cadence30min, next22:25 Israel.
+
+#### Current follow-up: 2026-09-30 22:00 Israel
+
+Active acceptance target is explicitly Main + system + CPU + IO + storage +
+WiFi + either GPU/HDMI or eInk, with CPU and IO always present. MainR36=33,
+WiFi inputR64=220/C63=5.6 remain. No further sole-card resistor repair.
+OutputR63/R65=270,R69/R70=15 candidate is the selected working-M1 build.
+All8 genuine fresh normal qty2 builds terminal PASS under
+build/spi-development-working-m1-firstarticle-20260930/source-tree/build/hw.
+Strict actual digital992paths/535nets,44 boundaries/six modeled resets PASS;
+permanent actual8 mutation groups PASS. Native copper/pads/rawfills bridge
+matches prior qualified boards/new WiFi candidate. No complete release claim.
+
+Root general full5760 session16941 deliberately stopped EXIT130 after index3308
+under confirmed fixed first-article priority: remaining homogeneous/sole MISO
+cases do not establish intended mixed-machine timing. Partial raw evidence and
+known general failures retained; whole catalogue is incomplete/red. Root's
+prospective Main47 deck dependency proof5760 terminal PASS but47 rejected.
+Actual mixed input eight-byte/tolerance64 owner90080 live32/64 PASS at last
+owner poll (about16min remaining then); root actual mixedMOSI128 session54496
+live through55, raw edge diagnostics await proper received sampling. Target
+mixedMISO128+RPpad local128 prepared; do not equate raw reversals with sampled
+failure or claim broader untested axes passed.
+
+Fresh genuine HDL/native and cached pinnedSDK RP firmware644steps PASS;
+ESP/QEMU tool identity and FPGA bitstreams built/validated. Fresh normal
+E2E00814checks PASS is ROM/BASIC/keyboard/eInk, with no WiFi/storage/system in
+that fixture. Fresh sysctl-VBUS/direct CDC subset PASS; full target stillneeds
+host/storage/network functional evidence. User selected Full access but root
+fresh localhost bind stillEPERM and supplier DNS stillfails; current executor
+permissions did not change. E2E002 TCPblocked; E2E007 captured-pipe failure
+being investigated with samecommands/assertions and supported regularfile I/O,
+not an invented transport or fabricated pass. Normal dependencyfetch wrappers
+alsohit read-only Git/lock locations; genuine supported cachedSDK builds recorded
+separately. All prior failure logs remain.
+
+User delegated actual placement engineering review to Codex. Of original75,
+55 acceptedunchanged by fab agent plus9 ofroot10semiconductors accepted on
+actualfreshnative/pin/geometry/primaryevidence; remaining11 are8C7833 supplier
+placement-origin gaps,2 connector primary numbering-view gaps,1 Holtek exact
+SOT23-5 variant check. No demonstrated physical mismatch in those75. Real
+supplier production preview notseen; no David/JLC signature forged. All8fresh
+unsigned side-aware reviewpack has127 focus entries/zero physical mismatch.
+ExactCAD/live stock and final assembly/order reviews remain. Next full user
+status every30min (replaces earlier10min request), ledger reporting.json.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 21:13 Israel
+
+Parallel ownership: root retains original full SPI session16941; SI owns
+Main47/original WiFi220 focused44 session91939; release audit investigates
+supported functional execution without the blocked TCP transport; fabrication
+agent checks exact resistor identities/CAD and outstanding manufacturing work.
+Do not restart another owner's job or mutate frozen inputs.
+
+Actual normal Main33/WiFi220 baseline192 terminal and hash audited: four
+GPU/eInk mixed maps128/128 PASS, six sole-WiFi strict falling reversals.
+Focused local270 trial44 had10 failures; local390 trial44 had6 failures
+(all sole J13), both rejected. These changed candidates do not invalidate the
+original mixed passes. Next bounded hypothesis changes MainR36 to47 only,
+keeps original WiFiR64=220/C63=5.6 and all native copper unchanged. No reroute.
+Its44 focused points are not a full population qualification.
+
+WiFi output270/cap15 bounded studies2560 PASS with independent raw/source
+checks. Genuine candidate source/schematic/ERC/native guard26 tests PASS.
+Digital mixed-development preflight21696 terminal PASS:992paths/535nets,
+zero unmodeled paths, six reset chains, same runtime wiring as actual15.
+All8 normal final builds remain pending an acceptable input/source choice.
+No candidate has been canonically adopted and no full release is green.
+
+Original full5760 job16941 confirmed live through3032 at18:13UTC; early
+MISO edge diagnostics await final sampler/RP-pad prerequisites. Preserve all
+six-WiFi capacity fixture failures. First-article four-map scope does not prove
+all1861 legal maps or all passive/ground/lot corners. Remaining work includes
+actual intended-machine checks, coherent all8 qty2 packages, full verification,
+exact supplier CAD/live stock,75 human placement decisions and assembly/order
+sign-offs. Physical lot characterization remains postdelivery. Last full user
+report21:13 Israel was late against the standing ten-minute interval.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 20:50 Israel
+
+Current-normalactualMain33 firstarticle192 filescomplete: fourGPU/eInkmixed
+maps128/128PASS; soleWiFiJ13/J14 has6strictfallingbandreversals, noM1mixed
+failures. SIowner4449terminal/rawauditpending. Solebringupscope needslimited
+WiFicard inputresistor assessment, not Mainreroute. OriginalMain33 andWiFi
+R64=220/C63=5.6 baseline; currentblock issolecases only. Preserveallfailuredata.
+
+Bothoutput270/cap15 studies terminal2560scopedPASS+raw/sourceaudits.
+Genuineoutputcandidate659ca325 schematic/ERC/preroute829guardsPASS,
+26TRUEgeneratedexport/nativepad/value/SKUmutationsPASS. Qualifiedhandoff
+build/wifi-output270-cap15-firstarticle-prep-20260930/qualified-generator-handoff.json.
+No canonicaladoption/fullall8build untilnecessaryinput choice settled.
+Allcopper/pads/rawfills exact; sourceconstructor/rootaffine/newpartsidentity
+futureall8inputmaps prepared. Current16-boardprospectivepartsdeltas and8CAD
+remaininggaps independentlyaudited; cachedC25099authentic0402CAD exists,
+C25083exactCAD unverified. All75humanplacement decisions preserved.
+
+FulloriginalSPI16941 files2781/5760, finalMISO samplerprerequisitespending.
+Generalall6WiFi failures remainrequiredoriginalreport, notordinaryfullgreen.
+Conditionalworking-firstarticleprofile reflectsusergoal, no fakeanyslotclaim
+orblanketfaultwaiver. Remainingnecessarysoleinputcheck/finalcoherentbuild/
+verification, humanCPL/optionsapproval,liveaggregate stock/exactCAD evidence,
+and documented postdeliverymeasurementobligations/acceptedfirstarticlelimits.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 20:37 Israel
+
+Working-firstarticle currentM1 isactiveusergoal; heavymainreroute lastresort,
+smalllocalokay. Current-normal directSI-owned4449 baseline192 LIVE: firsttwo
+GPUmixedmaps64/64PASS (files), eInk+soleWiFi remain. NativeMain33/WiFi220/5.6,
+nooverrides, sixactualplannedprofiles×all32originalIBISaxes, defaultparasites,
+one3MHzedgepair. Notanyslot/all1861 orexpandedground/passivesguarantee.
+
+RootSCKbody43219 terminal896/896PASS, terminalraw/sourceaudit50933PASS.
+Bothoutput270/cap15 candidates now1280scopedcasesPASS each, combined2560;
+manifest build/wifi-output270-cap15-scoped-qualification-20260930/qualification.json.
+Actualvalue-onlynativecandidate659ca325... preparedfromnormal145bc3; allcopper,
+pads, guards, rawfills andotherpropertiesEXACT. R63/R65→270/C25099,
+R69/R70→15/C25083, Main33/input220/5.6 unchanged. Noadoption/currentgenerated
+exportclaim. Releasepreparinggenuinegenerator/ERC/preroute+26actualexport
+value/SKU/open regressions whileactualbaselinefinishes. All8futurecoherent
+buildrequiredforrootaffine/newidentityinputmaps. Originalsimmutable.
+
+Rootfull16941 LIVEpast2464/5760, finalsamplerprerequisitespending. Failedinput
+candidates93/384 and148/192NOTadopted. SixWiFi generalcapacityfixture retained;
+not intendedfour-cardfirstarticlepopulation. Ordinaryall-greenfullmanufacturing
+contractstillred; nofakePASS. Explicitconditionalfirstarticlechecklistauditedin
+ doc/hardware/first-article-m1-scope-audit-20260930.md. ActualM1faultsrequire
+repair; actualpostdelivery lot/Ceff/contact/thermalcharacterization stayslater.
+RemainingnecessaryM1 proof/finalfreeze/coherentbuild/verify,75humanplacement,
+exactCAD/liveaggregate stock, documented firstarticlecharacterizationrisks.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 20:25 Israel
+
+David's latest goal clarification: get a first article that works with currentM1
+load; avoidheavyMainreroute unlessabsolutelynecessary, smalllocalrepairsokay.
+Scopeaudit underway; originallegacy fixtures/failures retained, no manufactured
+PASS/newblanketwaiver. Correctevidence: originalfull352SCK covers5homogeneous
+loads+storageonly6slots, NOmixedM1. Its14failures allsixWiFi. Historicalmixed32
+actualv127passesdoNOTprove currentnormalmixed; oldboard/source differs.
+SI assigneddirectoriginalMain33/WiFi220/5.6 actualnormal128 forfourplanned
+GPU/eInk plusIO/WiFi/storage maps, WiFi/storage slot3/4 swaps; launchpending.
+
+All8candidateDEV/scoped digital/mechanical/ground remainPASS; currentM1budget
+andMainfaultthermalPASS. CS270/15 nowterminal1280scopedPASS(128MAX+256min/typ
++896body), allraw/source/cacheappendonlyaudited. SCK270/15 endpoint384PASS,
+root43219 body752/896 live/no failures. Rootinput51531 terminal93/384FAIL,
+rootcombined5796 terminal148/192FAIL, notadopted. These failedchanged-input
+candidates cannot be used to infer originalM1fails/passes.
+Rootfull16941 livepast2464/5760; sampledMISO finalprerequisitespending.
+Root33908 exacttypedall4outputvalue5760 modeldependencyPASS independentaudit
+PASS, frozenoriginalsource40821...; no current043ahelper/nativephysical/current/
+couplingguarantee. SIpermanentcorrectedclockregressionPASS; MB007cascade7added.
+
+TIofficialSN74LVC1G17DCK pincompatible U5 prospect (1NC2A3GND4Y5Vcc), noMain
+reroute neededforpartswap ifqualified. TrueSchmittspecification avoids125strict
+monotonic premise, notgatewaiver. Datasheetthreshold/temp/rail scope, genuine
+newIBIS(PSpice)model, supplierC10425CAD andnewoutputqualification stillrequired.
+No localauthenticmodel found, no125modelalias/newhardwareadoption.
+Remainingfirstarticleacceptanceaudit, exactnecessaryM1signalproof, finalfreeze/
+all8normalbuilds/currentverify,75humanplacementreview,supplierCAD/liveaggregate
+stock, unwaivedpowerbounds vsdocumentedpostdeliverycharacterization.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 20:03 Israel
+
+David reiterated: avoid heavyMainreroute unlessabsolutelynecessary; smalllocalized
+repairs acceptable. NothingcurrentlyprovesheavyMainreroutenecessary. Prioritize
+valuechanges andboundedlocalrepairs. Currentcombinedhypothesis usesexistingcopper.
+
+All8candidateDEV builds/scoped digital/mechanical/ground evidence remainPASS.
+CurrentM1budget/MainfaultthermalPASS. BothSPIoutputcandidates270/15 pass384
+fast/min/typ endpoints each. SI-ownedCSbody48884 file896/no failures,
+terminalowner/rawauditpending. RootSCKbody43219 live344/896/no failures.
+FulloriginalSPI16941 live2251/5760; finalMISO samplerprerequisitespending.
+Originalfilter/Main47 focusedSI71265 file45/48 has28failures; notrepair.
+Root5796 combinedMain68/localWiFi470/C2.2 with±26 actualassembledcapscreen
+focused192 LIVE, existingroutes. Rootinput51531 live251/384,89failures;
+failedcandidate only, noadoption. Root33908 model-onlyexactfrozen5760 output
+all4valuecomparison terminalEXIT0PASS5760,360s; releaseindependentauditpending.
+No physical/sharedrail/current/coupling independence orcurrentroothelper identity
+claim. ChangedMain/inputaffectsoriginalupstreamSCKsubset andrequiresnewsolves.
+Remainingunwaivedpowertransient/currentbounds, selectedfreeze/coherentall8
+rebuild/fullcurrentverify,75humanplacementreview, exactCAD/liveaggregate stock.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 19:52 Israel
+
+All8 candidateDEV builds/scoped digital/mechanical/ground proofs remainPASS.
+CurrentM1 POW006 actualrerun ALLchecksPASS; Mainfaultthermal unchangedPASS.
+Clock270/15 fast128+min/typ256 terminalhashauditsPASS; root43219 body144/896
+live/no failures sofar. CS270/15 fast128PASS; min/typ256 terminalEXIT0PASS withall256raw/sourcehashesaudited,
+generatedcacheadditionsonly; body48884 file429/896/no failures, ownerlive.
+FulloriginalSPI16941 live2141/5760; finalMISO samplerprerequisitespending,
+14knownstrictoriginalupstreamSCK failures retained. Input470/2.2 root51531
+live136/384,84rawdiagnostic failingcases; candidateNOTqualified/adopted.
+SI preparedoriginalfilter/Main47 focused48tradeoff trial, reviewpending; releaseindependentreview
+requiresbothCinbounds and bothM1slotmap slowextrema. No reroute or waiver.
+Power owner proved currentM1budgetPASS; unwaivedpreorder dynamic-current,
+RPdroop and unprovenmax bounds are distinct fromexcludedpostdeliveryFArecords.
+Exactgateclassificationbeingupdated againstactualdocs, notblanketFAdeferral.
+Remaining75humanplacementreview, actualCAD/stock, selectedpartfreeze,
+coherentall8rebuildincludingaffineinputmapping andfullcurrentverify.
+
+- SI71265 originalfilter/Main47 focused48 LIVE, fastcounterexamplesalready
+  fail (J12rise12.2mV/J11rise8.1mV). Not adopted; selectedslowpointscontinue.
+  Root33908 exactfrozenoriginal5760 outputR63/R65=270/R69/R70=15 emitteddeck
+  dependency proof live1664/5760 equalsofar. No electrical/physicalindependence
+  or currenthelpermoduleequivalence claim.
+- Powerphaseclassification34exactrows confirms HWFAexcluded but corresponding
+  rednonHWanalyses unwaived; no blanketFAdeferral. RPdroopaudit binds5actual
+  normalreceipts/firmware125MHz1.10V orGPU252MHz1.20V andactual1.2u nominal
+  percore. No genuineinternalVREG model found; Ceff_min/ESR/L/corewaveform/
+  regulatorI(t) missing, so DCbudget/startup doNOTprove transientdroop.
+  Evidence:build/power-gap-audit-20260930/rp-droop/qualification.json.
+
+Previous checkpoint follows.
+
+#### Current follow-up: 2026-09-30 19:42 Israel
+
+Manufacturing release remains open. All eight candidate DEV/offline qty2 builds
+and scoped digital, physical, mechanical and ground checks pass; hardware values
+remain unadopted while strict SPI failures are repaired.
+
+- CS source270 / cap-damping15 terminal128/128 PASS, root hash/raw audit PASS.
+  SCK source270 / cap-damping15 fast true3MHz128/128 PASS; min/typ complement
+  root6554 terminal256/256 PASS, hash/raw audit PASS, raw SHA
+  931fb923a59d00310b59c9a1a04f2227096a67528f93a3e9b37cc19a4ef66600.
+  Root43219 complementarybody896 live; SI-owned CS52389/48884 live.
+- Full original sharedSPI root16941 confirmed live at16:41UTC, at least2024/5760
+  completed. Final sampled MISO verdict waits for remaining prerequisites;
+  raw early data reversals are not final sampled failures.14 strict upstream SCK
+  failures remain unwaived in this original-value run.
+- Local upstream WiFi470ohm/2.2pF root51531 confirmed live,32/384 completed,
+  12 raw reversal diagnostics; candidate not qualified. Main remains33ohm.
+  Primary capacitor research requires26% normal assembly/temperature screening
+  for C85938; current15% engineering discriminator cannot qualify that part.
+- Actual-native15 numerical bridge terminal12 solves PASS as a bridge: four
+  passing cases and two genuine failing cases preserved on both grids; refinement
+  arrival delta at most7.5ps. It does not clear existing4/384 or14/6144 failures.
+- SI owner assigned complementary CS min/typ256 and body896 jobs in parallel
+  and upstream failure diagnosis. No reroute, new waiver, order or signature.
+- Remaining manufacturing gates include75 human placement decisions, authentic
+  supplier CAD gaps, live aggregate stock, power/thermal bounds, post-delivery
+  first-article measurements and final coherent source/build/verification freeze.
+
+- Main68 independent terminal audit verifies192 unique cases, all source/board/raw
+  NPZ hashes and512 TI receiver classifier replays.76 genuine failures retained;
+  worst14.130ns against12ns. Actual scope is one3MHz rise/fall pair, threeprofiles
+  x32 original IBIS axes xsourceRtol2, not a full catalogue or sampler2560 claim.
+  Proof:build/main-source68-terminal-audit-20260930/terminal-proof-index.json.
+- MB007 chain now includes7 standalonecascade regressions, allPASS. Root92
+  slowbus regressions had91PASS and one obsolete assertion; genuine storage
+  rejection changed to physical RP Schmitt wording. SI owner repaired assertion
+  to require actual >=200mV adverse or fullband recross; focused39766 pending.
+- Power owner reconciled exploratory IO margin with actual authoritativeB10:
+  current keyboard500mA M1 baseline0.767976A PASS vsaccepted0.80A zero-margin
+  slotincrease; B8/B10b independently retain10% fuse margins. No new IO failure.
+
+Previous checkpoint follows for scoped historical evidence.
+
+#### Current follow-up: 2026-09-30 19:28 Israel
+
+**Manufacturing readiness is NOT proved.** Current actual candidate package set:
+`build/spi-development-r70-15-20260930/source-tree/build/hw/`.
+All8 genuine DEV/offline qty2 normal builds and independent physical bridges PASS.
+WiFi actualPCB145bc3d3abb52183264e95f825ae7fbda7bd2daa6d69a5e05a7c856587d5fe97.
+No final hardware adoption, stock reservation, ordering or human signatures.
+
+- Actual15 strict topology95922 and7mutationgroups11133 PASS:992paths/535nets,
+  no unmodeled,44 existingacceptedboundaries, sixslotresets modeled, idleLOW.
+  Realvalue/SKU/privatebranch18counterexamples PASS. All8receipts validate.
+- Prior currentgeometry mechanical proofs linked via exactall8physicalbridges;
+  no fresh15mechanicalexecution claim. WiFi15fabgeometry PASS; finalmandatory
+  humanplacementreview FAILonly. Exactactual15groundbinding and affine numeric
+  criteria PASS; operatingcurrent/contact/package/transient guarantees separate.
+- Selected15 highC16/128 and4refinementchecks PASS, but EXPANDED studies FAIL:
+  true3MHz8pulse384 root77265 terminalFAIL4/384; independent6144 root25030
+  terminalFAIL14/6144 (10CS-max/4SCK-max). LowC/highESR/highL/negativeground
+  producesbandreversals; CS worst98.271mV (bothCendsfail), SCK worst11.6mV. Therefore15 isNOT
+  fullyqualified/adopted. Original10/22/15scope proofs retainedimmutable.
+- MainR36=68 sourcehypothesis root71933 terminalFAIL76/192. Some sixWiFi
+  fast reversals remain, and actualM1mixed slowfall12.49–13.10ns exceeds12ns
+  TI wholeTTLband criterion (authoritative worst14.130ns). NativeMain still33;68 NOTadopted. SI owner
+  diagnosing joint upstreaminputfilter/source termination tradeoff without
+  reroute/gate waiver or six-loadedfixture deletion.
+- FulloriginalsharedSPI root16941 confirmed LIVE, about1700/5760 cases,
+  currentlyMISO. Raw263diagnostic failingcases at1693 includes data transitions
+  BEFORE finalsample qualification; do NOTequate with finalwholecatalogue verdict.
+  UpstreamSCK sixWiFi14 failures arestrict/unwaived, distinctfromR70output.
+- Root20306 joint SCKsourceR65=270/R70=15 true3MHz128 terminalPASS128/128.
+  RawSHAa00530f82272f62d3680a156f36c3012daf6f992a676eadadebd0f72ab4edb88.
+  Allsource/physical/rawNPZhashesverified, generatedcacheadditionsonly.
+  CSsourceR63=270/R69=10 root82001 terminalFAIL12/128, allLOWESR/Cin0,
+  worst12.6mV; highESR30allpass. RawSHA92459ad32ec5ff51ebed28e2480620a1c8a1e1a1c79a7f49cf995838b5cba97a.
+  CSR69quantitativejointdampingselection pending, noadoption. Quantified lowC
+  highESR firstdip belowVIH motivates higheradjacentsourceR; realbranches/native
+  geometry retainedvia value-only hypotheses, no adoption. CS source/filter
+  remedy and upstream source remedy being diagnosed independently.
+- Exact6144 old10scale1.5-to-real15scale1 model bridge60007 PASS under exact
+  physicalanchor/node/edge/pad/xsec and ALLRLC/source/rail/probe bijection.
+  Rawbyte equality fails due nativeelementordering; originalmismatchdecks kept.
+  Numerical ordering replay/convergence remains separate and beingprepared.
+- Readiness fix adopted with13postadoptiontestsPASS and actualisolatedrunner
+  integration. Stableordering/FApolicy addon adopted,14isolatedtests plusactual
+  newpolicytestPASS. Optional affinecoppermesh source/sink reference adopted,
+  fiveactualproductiontestsPASS. It isINall8boardinputmaps: copying into current
+  frozen15stage would invalidateall8receipts; stage hasnotbeenmidbuildedited.
+- Cascade preparation requirements-v4/observer/history180points plus20tests
+  complete. IBISforcedoutputKu doesNOTmodelinternalA-to-Y/sharedrailtransfer;
+  TI4.7ns fixture's fast2.5ns inputcondition notinheritedfromlooser12nsoperating
+  gate. OpposedMain/TI genuinecorner fix coveredby19/20targetedtests. Actual
+  numericalcascadeexecution helduntil strictinput/output repairs qualify.
+- Manufacturingpreparation actual15pack:16boards/1262mounted/118SKUs,
+  127focusrefs (49auto/3priorresolved/75human),0knownoverlaysmismatch plus
+  R63/R69/R70supplement. 9missing exactlocalCADrecords; presence notapproval.
+  Allstockexplicitoffline, no supplierCAD/cache/signature or liveproof invented.
+
+Remaining: close outputCS/SCK and upstreamSCK issues; terminal fullSPI and
+expanded timing/population/cascade scope; coherent final source/package adoption
+including numericrepair; fullverify; authentic supplier/aggregate-live-stock and
+humanplacement/productionoptions reviews. Two-per-typecurrentauthorization versus
+existingthree-distinct-unit FArequirements unresolved. Physical FA measurements
+and documented current/droop/package guarantees remain explicitlyunclosed.
+
+#### Superseded follow-up: 2026-09-30 17:18 Israel
+
+
+**Manufacturing readiness is not yet proved.** Current actual coherent package
+root: `build/spi-development-output-damping-round2-20260930/source-tree/build/hw/`.
+All eight genuine normal development builds and quantity-two receipts PASS;
+independent exact physical identity checks PASS. No final shared-source adoption,
+order, stock reservation or human signatures.
+
+- Strict digital top31565 and seven mutation groups54714 terminal PASS:
+  992 paths/535 runtime nets, no unmodeled nets; 44 existing boundaries and
+  six modeled slot resets preserved.
+- Actual WiFi 3MHz eight-clock screen24/24 and separate body/return192/192
+  PASS within their declared scopes. Differential driver/receiver/cap ground
+  and rail reference screen96842 terminal **FAIL4/96**. All failures are SCK,
+  max/lowCin/opposed1, both package and reference signs: 3.8–4.3mV falling
+  threshold-band reversals. CS48/48 PASS. Raw SHA
+  `53ae93a31f64ca208dc69a6a2a6b1a197cd859cc48fa6e3372a7237afbd49120`;
+  proof `build/scratch-si/wifi-normal-output-differential-reference96-run-v1/terminal-summary.json`.
+  Explicit engineering reference envelopes are conditional, not guaranteed
+  physical bounds. SI owner diagnosed independent low intrinsic ESR/high capbody + Rbody +
+  return inductance combination; both reference signs fail. Selected same-footprint
+  R70=22ohm hypothesis root31763 terminal FAIL8/128, worst17.9mVfall. All8
+  at capESR30/capbodyL2nH/RbodyL2nH/excessreturnL2nH across both package,
+  reference signs and Rtol endpoints; other120pass. Complete independent
+  endpoint study at offending fast lowCin highC point. Raw SHA
+  `c6d3ff53de5ae9991aceadb1e2f16ec4d6b9880175a52bfd0a7d00d98b4f863f`.
+  Genuine C25092 primary identity; actual10ohm nativefootprint retained via
+  value-only model hypothesis. Not adopted. SI diagnosis continues; limits unchanged. No whole Main reroute.
+- Matched actual native10ohm independent128 root11252 terminalFAIL8/128,
+  all LOW capESR.01/highthreeL2nH, both packages/reference signs/Rtol endpoints;
+  worst7.7mV. HIGH capESR30/highL allpass, opposite rejected22 failures.
+  RawSHAd3484d33b92badddd564c6264a16c2e2080a43e3713a8100c9597d0acb8dc1b5.
+  All physical/model/source/rawNPZhashes verified; generated xsec cache23new
+  entries only, originals/solver unchanged (originalmanifest retained).
+  Diagnostic matched waveforms in build/wifi-damping-tradeoff-20260930;
+  no manufacturingadoption or guaranteedphysicalbounds inferred.
+- Quantitative waveform secant selects R70=15ohm hypothesis: lowESR secondary
+  slope zero predicted~12.06ohm/highESR firstdip VIH crossing~17.09ohm;
+  prediction is not qualification. Selected16 actualfailure-point replay
+  root80400 terminalPASS16/16, rawSHA02eb4b308715f224a0d8ab50f23a8f4958bb43a8e7333d656c60c3231c4c1208.
+  +/-3%/bothpackages/signs/ESRendpoints/allthreeL2nH, primary C25083identity;
+  nativecopper retained via value-onlyscale, not adopted. Fullindependent128
+  root16923 terminalPASS128/128 rawSHA308b6f09a866f174a0824683090ea3a380bb36412add086d3ee79ca5135aa256.
+  Actualsource/physical/model/allNPZhashes verified; generatedcache additions
+  preservedseparately. Convergence4 root35433 terminalPASS/sameverdict, maximum
+  reportedarrivaldelta7.5ps, baselinehashverified. Root77265 true3MHz384 and
+  root25030 combinedCS10/SCK15 independent6144 nowLIVE; engineeringenvelopes
+  declared, notnewreleasewaiver/universalbodyguarantee.
+  Actual15 native/source/strong829itemguard handoff frozen546be6…; value/SKU
+  only, copper/pads/guards/fills exact. FreshWiFi-first normal80011 LIVE,
+  genuine15source/nativevalue+SKU/mutations92604 inprogress. FreshWiFinormal
+  80011 terminalPASS andexactphysicalbridge; remaining7runner28811 LIVE.
+  All8newinputmapsfrozen; originalResearchScope scratchproperty absentnormal
+  source is documentednonphysicaldifference, fittedvalue/SKU separatelybound.
+  Newlyadoptedcopper_mesh APIisINall8boardinputmaps; stagingNOTmidbuildedited.
+  Futurecoherentall8freshreceiptsneededfornewsolver+anyselectedMainR36value.
+  Unadoptedcandidate,
+  upstreamsharedclockfails separatefromoutput15 remedy.
+- Actual WiFi ground contacts98511 PASS48rows/worst2.128%; all16 matched
+  self terms converge <=7.332%. Matched6290 terminal exits2 solely unresolved
+  tiny remote C61/C64 transfer terms: no full-transfer PASS. Disabled-layer
+  audit55232 terminal PASS.
+- Actual WiFi fab26549 geometry gates PASS; terminal exit1 is mandatory
+  missing human CPL review. Unsigned standard pack94239 PASS, 10 focus refs
+  (2 automatic/8 human). Supplemental R63/R69/R70 panels and current all8
+  demand/review index complete:1262 mounted/117SKUs for16 boards,127 focus refs
+  (49automatic/3priorresolved/75human), zero known overlay mismatches.
+  Supplier CAD remains UNKNOWN.
+- All8 current mechanical71505 terminal PASS MECH001–008. Independent
+  postcheck validates all8 quantity-two receipts and actual STEP PCB hashes;
+  proof `build/spi-development-output-damping-round2-20260930/mechanical-all8-qualification.json`.
+  This is current candidate scope, prior storage-only proof remains historical.
+- Updated exact literal-deck enumeration13295 terminal PASS9732decks/9732
+  unique classes, current receipt-validated coherent sources. Covers1861legal
+  M1 maps/5970selected-driver instances/3722shareddecks plus40six-loadedfixture
+  decks. Hashes independently verified; ZERO waveforms. Proof
+  `build/spi-population-fingerprints-output-damping-20260930/qualification.json`.
+  Fixed default parameter scope only; no waveform/PVT PASS implied.
+- Full original shared-SPI finite catalogue prepared:5760 cases (SCK352,
+  MOSI352, CS960, MISO3840, RPpad-to-A256). Root16941 execution launched
+  after dependency separation proof. Default
+  parasitic cases do not replace separate body/reference/cascade obligations.
+- Full5760 root16941 LIVE: genuinefixture replayPASS/66routednets extraction.
+  All5760 dry-reach/resistorcall proof separates WiFi R65/R70/C64 outputbranch;
+  exact literal-deck comparison under value-only mutation underway byrelease.
+  Exactproductionprefix deckproof68344 terminalPASS5760 for typedR70=22
+  andR65=100/R70=22 variations; every emittedline/probe/net/note/rail identical.
+  Proof build/scratch-si/full-shared-spi-emitted-output-equivalence-v1/qualification.json.
+  Actualphysicalfutureboard/fields/railbridge still mandatory. Root16941
+  EXTRACT_DONE, actualwaveforms running. At199completed14rawSCK failures
+  ALLsixWiFiMAX atJ11/J12 U5.A, worst27.2mVbandreversal, distinctupstream
+  issueunaffectedR70. SIownerprioritizinglimitedvalue-onlydiagnosis; explicit
+  six-loadedfixturecontract retained evenoutsidelegalM1maps. Partialcounterexample
+  artifact current-counterexamples.json inactualrunroot. Originalreceipts retained,
+  physicalsharedreturn independence not inferred.
+- Upstreamfast six-WiFi reflection diagnosis: slow-source TTLband worst7.88ns
+  leaves4.12ns to unchanged12ns gate. Selected value-only MainR36=68ohm
+  source termination hypothesis root71933 LIVE192cases (original32axes/profile
+  xRtol +/-3% for sixWiFi plus two currentM1mixed maps). NativeR36 remains33,
+  scalarhypothesis only, no route/C/vendorwaveform/threshold changes. Broader
+  wholeSCK/source/current proofs neededifviable; no manufacturingadoption.
+- Actual host trace PASS12frames: minimum held CS lead12.250us and last
+  sample hold16.083us. Analog received skew remains to qualify. Primary C3
+  numerical pad timing bounds unavailable; short-frame silicon DMA-tail
+  checks remain explicit first-article requirements.
+
+- Release audit found readiness checker trusts stale/DEV result rows and Makefile
+  ignores final readiness exit. Exactreviewed readinessfix adoptedtools/test/Make
+  plusBRD008 andcorrected existingpanel-by-JLC/qty2 checklist;13postadoption
+  regressions root66104 PASS. Real tinyrunnerintegration PASSinproposal.
+  Physicalboardstaging/receipts unchanged. Stableorderpolicybinding addon
+  adopted andactualnewpolicyregressionPASS;14testaddonisolatedPASS.
+  No actualmanufacturing-readiness claim.
+- Tiny remote ground probes connect to both electrodes (no exact-zero certificate).
+  Maximum observed transfer4.142e-10V/A, sign changes consistent with CG error
+  floor, not a guaranteed error bound. Tighter residual study85800 terminal
+  PASS10 diagnosticrows, not transfer qualification; local/contact resistances
+  invariant<=1.108e-12 relative, remote observed floor2.372e-13V/A at1e-13
+  residual still fails passive signs/relative10%gate. Affine-equivalent reference
+  formulation now being prepared to avoid1-minus-nearly1 cancellation;
+  originaloperator/geometry/gates preserved. Affine84356 terminalPASSbothcaps/
+  bothgrids/bothtolerances, worst8.7899% using PREEXISTING1e-9mOhm denominator
+  floor and10%threshold. Allprobesnonnegative; self/contactinvariancePASS.
+  Merged qualification-with-affine.json legitimately closesall16declarednumeric
+  checks; physicalcurrent/package/contact/transientguarantees stillseparate.
+  Durableoptinproductionimplementation adopted1045e4f98d17bcf9e197791fca093796034455a9e848cff27ceadda680cb7602;
+  fiveactualpermanentregressionsPASS0.047s, defaultsource reference preserved.
+  Adoptionproof affine-gauge/production-adoption.json. Stagednormalbuilder
+  sources remain frozen; laterfullverifystage will carrynewsolver API.
+
+Remaining: close WiFi electrical issue; full SPI/cascade/population/timing
+qualification; mechanical proof for any later adopted geometry; coherent source adoption and full
+verification; supplier CAD/live aggregate stock/order options and signed human
+placement review. Current two-units/type development scope conflicts with ten
+existing three-distinct-unit first-article gates; no count waiver or fabricated
+measurement. FPGA current, RP droop and other documented physical bounds remain
+open. Main current-M1 MB005/MB051 and repaired storage scoped proofs PASS.
+
+#### Superseded follow-up: 2026-09-30 16:21 Israel
+
+
+**Manufacturing readiness is not yet proved.** Current actual package set:
+`build/spi-development-storage-r65-v4-20260930/source-tree/build/hw/`.
+All eight development receipts validate for two assembled boards per type;
+seven reference the unchanged v138 normal outputs, storage is a genuine new
+build. No shared-source/canonical adoption, order, signatures or stock reservation.
+
+Completed evidence:
+
+- Storage local R65 tab-clearance repair: native/sourceguard, genuine normal
+  build, exact candidate copper/pads/fills, strict digital top, fabrication
+  geometry, fresh ground/contact/cap/disabled-layer checks all PASS.
+  Actual affected CS/OE replay:192/192 PASS across six slots. All eight
+  mechanical checks MECH001–008 PASS with fresh STEP provenance and
+  receipt validation. Human placement review remains unsigned.
+- Main actual MB005 copper/thermal and MB051 current-M1 reset PASS.
+  All90 slot ground contacts converge (maximum5.982%); scoped self upper
+  bound5.0785mOhm. Neither copper nor model results guarantee operating
+  current/package/contact bounds absent the required supporting evidence.
+- Final Main/eInk circuit binding:26 exact emitted ladders plus actual
+  MainCS6 replay128/128 and selected half-section/half-step convergence PASS.
+  WiFi v138 externalOE64/64 PASS. These are explicitly bounded scopes.
+- Final strict digital route/coverage and six-group real source/native
+  mutation checks PASS; no unmodeled nets,44 existing boundary waivers,
+  six slot resets still modeled. Updated storage top also PASS.
+- Exact-deck enumeration completed9732 decks/9732 unique hashes, covering
+  1861 legal M1 populations and explicit six-loaded fixtures at declared
+  fixed parameters. ZERO waveforms run. It is scoped to the earlier
+  v138 storage/WiFi geometry; new physical changes require requalification.
+- Combined WiFi damping HYPOTHESIS passes768/768 genuine min/typ/max
+  cases with independent component endpoints and added10ohm branches
+  +/-4%. Full Cartesian coverage/hash audit:
+  `build/wifi-combined-damping-viability-20260930/qualification.json`.
+  Only CS R63 is ideally source-adjacent; SCK R65 stays in its native
+  location. This is isolated edge quality at333.33ns separation, not actual
+  3MHz byte/cascade sampling or real new-pad/lead/return qualification.
+
+Latest actual WiFi and host evidence:
+
+- Real WiFi v7 native/source-compatible freeze `fa477e831753a47f3a668ab8b0110e948b3ec39a9df57de40247ee23e3424a0a`, true net `c35615ec30d57a20522b8b1c108b0f3d4365a23a0d040ff1e2f0dbb974bcea01`: native0/opens0/829-item source seedguardPASS, unrelated original copper/pads exact. RealR63 lead2.215mm/onevia, R69caplead5.057mm, R70caplead1.29mm; newC61groundvia required and connected.
+- Actual routed SCK eight-clock3MHz screen46754 terminalPASS24/24,384 half-periods. RawSHA1e85d2c5daf34150dc0fc1df6ac60bda1dddada659e63b1c238c8b5c49f97d21. Adaptive-time integrated pulse observation155.895797ns minimum; original sample-count duration only approximation, originalraw/summary retained and separate postprocess proof. Strict edge/stress verdict unchanged; no unpublished ESP AC guarantee inferred.
+- Real host boot/kernel byte trace78987 terminalPASS,12 observedframes: minactualCSlead12.250us/last-samplehold16.083us; conservative heldsourcebounds333.333ns. Auto-only166.667ns lead distinct, not actualbootuse. Analogreceivedskew still requires actualtimingqualification.
+- Root actualnative body/return192 screen12173 live; newR bodyL separatefromcapL andactualtraces, fixed engineeringreturn sensitivity. Fab freshWiFiground98511/cappairs6290 live; finalnormal-source staging/strictbranch+inputmap regressions byrelease; all8freshbuilders follow. No finalphysical manufacturingadoption.
+
+- Actual native body/return192 root12173 terminalPASS192/192, rawSHA20a0894eb6c36ca8eb9d31021ec452ee6931715f6d2befce3e18d83139a9c1f2. This is common-reference/fixed engineeringreturn screen, not differentialground/rail or universalPVT proof.
+- Genuine coherent correctedround2 WiFi normal55138 terminalPASS; actualPCB4a1e9168ac7de3ae6a6351421331e0d57ee7bdfa2c1801f5503fc1ebf9d14819/receipt3603389f455daa622541276b8d15a1136e8b47957b1df331bc28de671de96417, exactnativecopper/pads/guards/fillidentityPASS. Firststage identityYAML schemafailed atBOM and preserved; primaryidentity nowhonest JSON, no inventedmanufacturerpins/CAD. Remaining7 normal90699 live; all8inputmaps affectednewmetadata andgenuinefreshreceipts required.
+- FreshWiFi groundcontact98511 terminalPASS48rows/worst2.128%. Matchedcappairs6290 stilllive; all16self converged, tinyremotetransfers notfulljointPASS. Actualnormal fullfab26549/unsignedWiFiCPL94239 live, no signatures or overrides. SI preparing true normalgraphbinding/separatecomponent/capgroundgauges; numericalgates preserve unchangedvendorwaveforms/strictlimits.
+
+- All8 genuine corrected damping-round2 normalbuilders terminalPASS qty2/DEVoffline; exact8copper/pads/fillidentity96626 PASS. Actualsource root build/spi-development-output-damping-round2-20260930/source-tree. Strictall8top31565/permanent7groups54714 and newall8mechanical71505 live; no sharedadoption.
+- Root newactualnormal differentialreference96 screen96842 live: independent driver/ESP/capgroundgauges, untouchedgenuineIBIS tables, explicitconditional current/reference/return/VDD engineeringenvelopes only. Productiongauge63testsPASS; finalnormalfieldsextractafresh, no inferredladderequivalence.
+- Root updated9732literaldeckenumeration13295 live on receipt-validatedall8freshnormal andcurrentfrozenSI. Includesdeclared1861M1maps+sixloadedfixtures atfixedparams; no waveform/SIpass inferred. Earlier enumeration historical pre-damping scope retained.
+
+Active work and remaining requirements:
+
+- Fab owner completed actual isolated WiFi R63 front/source-local layout
+  and new R69/R70 cap-branch10ohm resistors. V7 native/sourceguard freeze now PASS; final normal build and affected
+  electrical/ground/fab proofs remain pending. Real via,
+  lead, component body and return effects must be extracted and qualified.
+  No whole Main reroute is underway.
+- SI owner preparing actual private cap-node/resistor traversal, genuine
+  3MHz byte/pulse and sampling qualification. C3 timing audit preserves
+  unavailable numerical pad setup/hold/clock-to-output bounds and the
+  unresolved short-frame DMA-tail evidence question. Exact C3 driver
+  accepts byte alignment; generic multiple-of-four guidance alone is not
+  a proven malfunction. Actual one-byte IDENT/six-byte READ silicon checks
+  remain required. Release owner independently auditing host RTL lead/hold.
+- Release owner has isolated strict R69/R70 helper ready for actual frozen
+  exports and meaningful broken-branch/component/copper counterexamples.
+  Final source integration plan is prepared, adoption withheld until the
+  necessary physical/electrical freeze. Full SPI catalogue and full verify
+  remain mandatory; limited slices do not substitute for them.
+- Latest actual unsigned all8 preparation uses repaired storage:
+ 1258 mounted components/116 SKUs for16 assembled boards. Final WiFi
+  addition changes that scope. Supplier CAD for TI C7833 remains UNKNOWN;
+  primary numeric pin/native maps PASS, identity alone is not supplierCAD.
+  Live aggregate stock, supplier/order options and final human CPL signoff
+  remain open. No manual supplier cache, offline-to-online relabel or
+  receipt rewrite.
+- First-article plan now explicitly preserves ten genuine three-unit gates
+  while current packages contain two units/type. Additional sample or an
+  explicitly approved qualification scope remains a final decision; no
+  sample-count reduction/quantity change is made. Outstanding RP droop,
+  FPGA/GPU dynamic-current and WiFi physical bounds/measurements are not
+  silently waived. Exact existing approvals remain limited to their named
+  first-article conditions.
+
+Rejected WiFi trials (all raw results/hashes retained under `build/scratch-si`):
+R27016/6 failures; C22 16/6; capR10 old-launch128/8; capR6.8 256/13;
+R100256/18; CS source adjacency alone128/12; original native SCK independent
+128/15. No rejected trial was adopted. Earlier fast +/-3 combined PASS is
+historical; the768-case +/-4 proof closes that declared tolerance scope.
+
+#### Previous follow-up: 2026-09-30 14:40 Israel
+
+- All seven fresh round2 normal builders PASS with validqty2 receipts: Main,
+  CPU, system, GPU, IO, storage, eInk. No shared source or canonical artifact
+  adoption yet. WiFi normal v127 builder failed genuine C69 via-in-pad gate;
+  owner v129 localized capacitor move has native0/0 and maskcheckPASS, held
+  for combined necessary externalOE source/seed freeze.
+- Actual generated Main MB005 copper/thermal and MB051 strictreset both
+  terminalPASS. Main ground73100 confirmedlive; last175grids/85converged.
+  All24 productionROI layer/pitch masks bitexact to generatedMain, original
+  copper/pads preserved and two new generatedGNDhubs outsideROI. Separate
+  actual supply/reset solves were necessary and performed, not assumed.
+- Corrected128 MISO stresscases terminalPASS; sampletiming not closed. Stage2
+  768 and actualCS4 128 historicalmandatoryscreensPASS. ProductionCS deck
+  equivalence finalv127:960exactpairs/5970structuralchecks/1861legalM1maps;
+  no physicalsharedrail/ground or transient pass inferred from equivalence.
+- WiFi realinput64 terminal no strictTI/stress/current/rate failures. Raw
+  MOSI RPdiagnostics separated by matchedSCK sampled qualification; actual
+  cascade deadlines stillpending. ExternalOE220/10 boundedhypothesis64
+  terminalPASS; fab preparing necessary isolatedR68/C6910p implementation.
+- Actual WiFi localESP CS/SCK edges remain unqualified. Rootvalue-onlyR270
+  andC22 trials each16/6strictfail, both NOTadopted; C22worstCS107.9mV
+  withbandrecross. SI investigating actual outputbranch resonance/damping.
+  ExistingoutputR220/C10 kept until justified physical solution qualifies.
+- FreshIO boost+TPS2553-1/C25 subchainPASS, wholeIC005 staysFAIL solelyRP
+  internalregulator transient/droop coverage. ActualCeff1.6u is engineering
+  target; corresponding FA measurements/physicalbounds remain required.
+- ActualgeneratedeInk properGND57 capselfterminalPASS; fullcontact37145 terminalPASS; actualdisabled-layer95560 live.
+  WiFi ground99941/74923 adaptive work retains coarseunresolved cases;
+  sometiny remote transfers require numerical/component-zero proof, not
+  a relaxed threshold. Final repaired physical geometry will need binding.
+- Root prepared failclosed actualeight-receipt exactmodel-fingerprint runner:
+ 9732decks atdeclaredfixedparameters, including all1861M1 populations and
+  six-loaded legacyfixtures. Preflight correctly rejects missingWiFi receipt.
+  Nothing launched/qualified from this prepared plan; fingerprints aren't
+  universalPVT, waveform, timing or stress evidence.
+- Main package thermal needs properlysource-bound synthesizedFPGA ASC asset.
+  FinalWiFi/combinedSI/body/return/timing, all-eightmechanical/digital/full
+  verify, suppliersCAD/stock and humanCPL review remainopen. Latestfullpublic
+  report14:13, nextcadence tracked in reporting.json. Manufacturingfalse;
+  goalactive with concreteprogress and necessary repairs only.
+
+
+- SI owneraudits ESP fractionalVIH/VIL vs coherentlocal3.0/3.6 rails;
+  nominal3.3 fixedthresholds were not correct for those cases. Preservedraw
+  waveforms re-evaluated before furtheroutputphysicalchanges; genuine3.3
+  nominal and differentiallocalrail obligations kept separate. Strictedge/
+  stress not waived, vendorV/T not rescaled. Fullreport14:13 delivered.
+
+- Releaseowner staged genuine current FPGA sources/wrapper and launchednormal
+  chipset26526/cpucard79255 builds, no old ASC/JSON/BIN copied. Freshchipset
+  logPASS77.3MHz/1452cells; ownerterminalreceipt/sourcebinding forthcoming.
+- ProductionESP threshold/ownrail correction now56focusedregressionsPASS.
+  Re-evaluated actual24 retains7failcases (CS/SCKstrict plus earlyMOSIdata),
+  no waivedclocks. Root nowlaunches genuine typ3.3+independentfastcapESR56
+  at build/scratch-si/wifi-actual-output-localrail-fast-esr-typ-v1.log.
+
+- Genuine normalFPGA builds bothterminalPASS (chipset77.3MHz1452LC,
+  CPU61.6MHz875LC). ActualMain/CPU thermal88333/10436 terminalFAILonlyF2
+  missingguaranteedmaxiCE40corecurrent; startupPASS,MainstandbyPASS. Initial
+  missingassetblocker resolved withoutinventingcurrentbound/oldASCownership.
+- Rootactuallocalrail56 outputstudy65703 terminal: fastESR.01 3/8fail,
+  10ohm0/8,22ohm0/8,47ohm2/8; genuineTyp3.3CS/SCKallPASS,6/24rawfails
+  allMOSIearlydata. Dampingdiagnosis only, actualexplicitcapbranchresistor
+  needsfit/body/return/timingproof; no componentadoption or fakeESRmetadata.
+- Fresh actualMain/eInk SI graph comparisons rawunequal butcouplingequal;
+  owneraudits ladder/connectivity/fields beforebindingolderSI. FreshMain/eInk
+  fullfab+unsignedCPL packs requested fromreleaseowner, sourceunchanged.
+- ReadonlyC7833 supplierwebpageaccessible butreports crawled6daysago, not
+  live stockproof; EasyEDA CAD endpoint InternalError/no downloadedgeometry.
+  Honest status build/supplier-access-review-20260930/status.json. No supply
+  gate closed/orderperformed. Fullpublicreport14:25 delivered; goalactive.
+
+- Rootexplicit capbranchR10/body128 hypothesis70551 now live, includes real
+  resistor±3%, intrinsicbodyESR.01/30 (sum9.71..40.3ohm), ESLends andC/R/DCK/
+  Cin independentends. PriorfastESR10/22 pass isdiagnosis only, notcomponent
+  metadata or physicalfitproof; no nativeoutputchangeadopted.
+- FabcombinedexternalOE/DFM v137 native0/0; actualnormalguard revealscommon
+  miso_launch rawCS assumption. NecessaryisolatedoptionalOE adapter+exact
+  R68/C69 checks beingqualified. Currentround2 stage keptimmutable while
+  actualfabchecks run; newcoherent source stage/genuineaffected rebuilds
+  required aftercommonproposal, no receiptpatching/sharedmutation.
+- ActualeInk fullfab98735 reachesmissinghumanreview afterallGerber/drill/
+  clearance/ring/mask/paste/neck/glyphPASS, receiptstillvalid. Main70889 live;
+  unsignedexactcurrentCPLreviewpack88566 live outsideboardreceiptoutputs.
+
+- RootMain73100 genuinelyterminalEXIT0:90/90contacts,180retained.1/.07grids,
+  allconverged worst5.9818%. SelfRmax5.078456mohm retainedacrossbothgrids;
+  R109transfer1.191230mohm iscut-domain diagnostic, notexterior-removal bound.
+  Terminalqualification binds source/extraction/mesh/raster/actualROIproof;
+  no operatingcurrent, package/contact/ACguarantee invented. Earlierlive
+  counts above are historical checkpoints, superseded bythisterminalresult.
+- Root128capbranchR10hypothesis70551 terminal8CSstrictfail, allfastlowCin/
+  highC/highbodyESR, worst17.3mV. SCKall64passed; entirehypothesisNOTadopted.
+  Furtheroutputdamping/physicalqualification remainsSIowner task.
+- Bothnormal Main/eInk fabchecks nowgeometryPASS thenmissinghumanreview;
+  unsigned59-focuspartCPL packPASS0mismatch,37humanpending, no signatures.
+- Finalsourcecompatiblev138 commonadapter+WiFi candidate handedoff qualified
+  18mutation/defaulttests. Fresh25-target coherentstage actualnormalbuilds
+  WiFi/Main/GPU nowPASSVALID qty2; IO52492/storage21327 live, remainingthree
+  queued. Olderround2source/receipts immutable; no sharedsourceadoption yet.
+- ActualnormalWiFi fullcopper/pads/fills exactlymatchcandidatev138 despite
+  serializationSHAchange; exactcomparison artifact permits scopedground/SI
+  binding. FinalWiFi ground31532/60524 live. SIactualroute replay pending,
+  Main/eInk canonicalmodelcomparison25/27 exact,two differencesunderstudy.
+- Fullpublicstatus14:40 delivered, nextcadence reporting.json. Manufacturing
+  releasefalse; finalall8 mechanical/top/fullverify, finalSI/timing/body/
+  currentbounds, supplierCAD/stock andhumanreview stillopen.
+
+#### Historical follow-up: accumulated checkpoint 2026-09-30 14:03 Israel
+
+- Round1 seven isolated normal builders are terminal. CPU, system, GPU, IO,
+  storage and eInk pass overall; main physical pipeline completed but final
+  checker rejects the authorised six 68 ohm CS resistors. All seven generated
+  receipts independently validate; this does not override main's overall fail.
+- Narrow main pincheck repair passes 11 meaningful tests, including all 381
+  real contacts and rejection of wrong values, refs, pins, slots and loads.
+  Fresh immutable round2 staging contains corrected production tool paths
+  and the checker/test. Main54143 and GPU79379 launched by release owner,
+  max2 builders. GPU79379, IO26905 and storage17288 subsequently passed
+  with new valid29-artifact receipts each. Main live; eInk37057 launched;
+  CPU/system queued. Old round1 sources/receipts retained.
+- Corrected SI model has 53 passing regressions. Historical local-ground
+  handling was already correct and remains applied exactly once. The real
+  correction separates Main receiver/pullup rails from card source rails.
+  SI owner launched128 corrected MISO cases on handle85241; scoped sole-card
+  rail/offset/package screen, not complete population qualification.
+- Permanent pincheck regression additionally PASS11 on actual freshly generated
+  round2 Main net and staged checker; integration log preserved.
+- Root launched actual production CS emitted-deck equivalence proof63682:
+  960 sole/full deck pairs (30 type/slot topologies x32 original axes), plus
+  all1861 legal populations/5970 structural target checks. Frozen corrected
+  sources; actual WiFi v112 candidate, final thermal geometry still pending.
+  No transient or physical shared-ground independence claim.
+- Main ground73100 confirmed live. All four RP candidate ground proofs
+  complete. WiFi genuine normal generator/strong seed guards now pass;
+  native parity0, tiny new SCK capacitor dead stub being removed before freeze.
+- Full public report delivered13:42; cadence tracking file updated. Final
+  WiFi/rail/coupled population SI, main ground, coherent source adoption and
+  final packages, affected power/reset/mechanical/full verification, supplier
+  CAD/stock and human CPL review remain open. Manufacturing release false.
+
+
+- Subsequent authoritative checkpoints: all seven round2 builders now EXIT0
+  with independently valid qty2 receipts. Actual-output comparison finds two
+  extra legitimate Main GND stitches (128,77),(23,170), plus eInk (35,-21).
+  Other five boards exact; eInk fills exact, Main fills differ. Relevant ROI/
+  return-field identity must be proven before old physics can bind new boards.
+- Preliminary v112 CS deck proof63682 terminal PASS960 exact production pairs
+  and5970 structural target checks; final source-compatible WiFi v127 proof
+ 99618 running. WiFi actual materialized95996 has56 CS/output cases, not the
+  earlier estimated216; omitted SCK/MOSI selection caught and separate64-case
+  study being prepared. No missing control coverage pass inferred.
+
+- Full report13:52 delivered. Actual normal Main MB005 return ROI includes
+  new GND stitch(23,170); reset3V3 ROI touches(128,77), so genuine fresh power/
+  reset required and requested from release owner. Root all-slot ground ROI
+  identity being checked separately; do not restart its confirmed-live job.
+- WiFi95996 first8 CS cases find genuine TI U3 raw external OE reversal1.3–
+  4.4mV, strict monotonicity fails; no observed stress fail, U4 local CS stage
+  not failing so far. SI owner investigates minimal local damping; no new
+  Schmitt waiver for TI. v127 evidence preserved, final rawOE adoption held.
+
+- Final WiFi v127 actual production CS emitted-deck proof99618 now terminal
+  PASS960 exact pairs +5970 structural checks,296s. Source-handoff binding
+  recorded; still no transient or physical common-ground independence claim.
+- Actual WiFi56 terminal:12/32 CS cases fail rawU3OE strict edge shape,
+  worst55.8mV; localY->ESP strict early clock/CS reversals and MOSI sampled
+  timing need further investigation. No stress/rate/current failures.
+  Corrected SCK/MOSI64 genuinely launched61089; no omitted scope pass.
+- WiFi ground coarse mesh cannot resolve new C64.2; owner retains unresolved
+  result and refines, separating matched self/transfer probes. No guessed
+  return bound. Main ground completed154grids/64converged atlastcheck.
+
+- Release owner now launched fresh actual Main copper/thermal51884 and strict
+  reset39275 (AMG, BLAS/OMP1), exact root-GND raster mask identity89403 and
+  genuine normal WiFi45771. WiFi source/seed staging amendment proves all
+  prior seven input maps unchanged and receipts still valid.
+- Fab owner new adaptive WiFi ground handles99941 matchedpairs/74923 contacts
+  live; old unresolved coarse probe results retained. SI investigating R68
+  local220 ohm +C69=10p externalOE repair only; placement preparation before
+  bounded hypothesis passes, no new shared source adoption/waiver.
+
+- Fresh actual Main MB00551884 terminalPASS: loop26.962mohm, rise19.519C,
+  retained9.801% worst convergence/current3.288102A. Strictreset39275 live.
+- Corrected MISO128 terminal stressPASS (max3.6016V,0.220ns above3.6,
+  min-0.1732V); sampling qualification separate. Root launched16 genuine
+  WiFi outputR270 value-only hypothesis37147, no native/source mutation.
+- Root prepared exact model-fingerprint enumerator for9732 decks (1861M1
+  populations/shared3722+selected5970 plus40 six-loaded legacyfixtures).
+  Actual eight-board preflight correctly rejects missing WiFi receipt before
+  creating output. Not launched, no waveform/PVT/universal pass inferred.
+
+- Full public report14:03 delivered. Fresh actual Main strictreset39275 now
+  terminalPASS:3V3 margins16.290/10.916mV,1V2 margins7.962/7.178mV,
+  convergence7.497%, adaptive.035 retained. IO27050 live with genuine cached
+  vendor model assets; Main MB006 ASC source-binding asset still missing,
+  not an F2-only pass/fail claim. Root ground confirmedlive157grids/67contacts.
+
+- RootR270hyp37147 terminal16cases/6strictfail (fourfastCS up45.0mV,
+  twofastSCK1.3mV); not adopted. Root16outputC22hyp12306 launched instead,
+  same genuine native output branches/R220, no physical/source modification.
+- IO integrated power27050 terminalEXIT1 solely RP transient/droop coverage;
+  actual boost+boundTPS2553-1/C25 switchsuitePASS (U5IN6.273V/boost5.431V).
+  True647.4mA stress retained, documented numerical retry explicit. Actual
+  eInk generated capself23277 terminalPASS, fullcontacts37145 stilllive.
+- Rootmain ground160grids/70converged at14:08; two extra generatedMainvias
+  remain scopebound by all24 exactmask/evidence identity proof, no restart.
+
+#### Historical follow-up: 2026-09-30 13:12 Israel
+
+- WiFi native actualv112 SHA636666e9dd788e4db58bd03b1849590c5454d306b35cab64c9d1f58cffbbdb2d
+  now0violations/0opens plus genuine schematicERC and fullnativeparity0.
+  Exactinventory preservesallunrelatedoriginalcopper and everyoldpadposition;
+  only16localSPIlaunchremovals/samecenterlineCStrim/ESP16,20,21netchanges.
+  Authenticexport handedSIowner, no preemptive47pOEchange. Finalvisiblefab/
+  normalpre-route/fullseed guards and actualelectrical/ground remainpending.
+- BroaderCSstage2 live28441 last656/768zeroFAIL, estimated6–12minremaining.
+  Exact actualMainv3 changedCS4 recheck72268 terminalPASS128/128 in416s:
+  maxTIwholeband7.810ns,RPwholeadverse47.741mV. Other14controlgraphs andall16
+  aggressorbounds are exactsame currentmodelinputs. No copperrepair inferred.
+- Root CS slot-read/reachable-topology proof v2 now includesauthenticWiFi:
+  all1861legalpopulations,5970selectedcardtargets,30type/slotCS topologies.
+  Onlyselectedslot isread and reachednetsetequalssole ineachcase. This is
+  structuralcurrentmodelproof, NOTemitteddeck/physicalsharedpower/ground/
+  aggressorindependence. Emitteddeckproof stillpending beforededup reuse.
+- Main ground73100 live129grids/39convergedcontacts. AllfourRP actualground
+  proofs complete. RPinitial96, independentreturn128 casespass within scopes.
+- Combined sourceplan/runners at spi-combined-final-plan-20260930 prepared
+  failclosedWiFiattachment, no simulationslaunched. NaivefullyCartesian index
+  692480nominalcases is a planning uppercount, not an executedqualification
+  or an implied waiver. Staged6912screen explicitlyincomplete, no restricted
+  slots or forbidden GPU+eInk coexistence treated as requiredM1.
+- Releaseagent preparing genuine normaloffline isolatedcandidate pipelines
+  for7stableboards whileWiFi finalguards finish; no copied/hackedreceipt or
+  sharedcanonicaladoption. Trueparts pinmetadata/table incorporated, supplier
+  CAD/stock and human signatures unverified. Final wholebundleSI/canonical
+  packages/power/reset/mech/fullverify/runtimeenvironment remainopen.
+- Fullreport13:12 delivered; next13:22. Manufacturingreleasefalse.
+
+
+#### Historical follow-up: 2026-09-30 12:49 Israel
+
+- Scope correction from primary project requirements: eInk replaces HDMI;
+  doc/milestone-1.md explicitly forbids fitting them together. Supported M1
+  remains graphics(GPU OR eInk)+IO+WiFi+storage, arbitrary four of six slots.
+  There are360placements per graphics option (720full-M1 placements total),
+  not a required five-card graphics combination. Missing-card subsets/empty
+  boot also remain supported. No position restriction or invented coexistence
+  waiver. Release agent prepares combined runner/coverage on this contract.
+- SIowner launched actualMainv3 CS4 slice72268/128cases, because exactfield
+  audit isolates real changed reference fields to two CS4 graphs. Other14
+  controlgraphs/all16aggressorbounds equal. No full768restart or copperrepair
+  merely from that model difference.
+
+
+- Subsequent terminal progress: root55751 actualMainv3 storage/eInk
+  independent64 PASS64/64, maxTI6.04583ns/V, RP adverse41.0503mV/peak3.3324V,
+  actualcapreturnmax40.5922mV. All8independentbody/return combinations at8
+  selectedsourcepoints verified;64rawNPZ hashes retained in qualification.
+  GPU/IO4875 terminalPASS64/64, maxTI6.3317ns/V, RPadverse154.7mV/peak3.3635V.
+  Those useolderMain. Both engineering scopes and finalcoverage gaps retained.
+- Main control-model equality audit21242 terminal:14of16graphs exact and
+  all16aggressorbounds equal; CS4source/bus graphs differ and are being
+  examined by SIowner. No premature wholeMainfield equivalence claim.
+- WiFi latestv101 is1nativeviolation/1open: clippednewU6marker and C67GND
+  fragment. Allsignal/supplybranches genuinelyclosed; cleanup54967 running
+  atlastownercheck. Not yet frozen/qualified. Release agent prepares final
+  actual combined SCK/MOSI/MISO runner inparallel; requirescleanWiFi input.
+
+
+- Broader actual-card CS stage2 live28441 at196/768, zero failures last owner
+  check; recent~4s/case estimates35–50min remaining. Independent GPU/IO body
+  ESR/ESL/excessreturn-L selected64 live4875 at24/64 with no failures.
+- Root exact64 analogous storage/eInk study launched55751. Uses validated
+  actual GND57/U4.3 capself-R, independent body ESR .01/30ohm, bodyESL
+  .001/2nH and excessreturnL0/2nH, actual Mainv3 PCB plus genuine proposed
+  main.net, nativeCS68 with only ±3% resistor scaling. This addresses actual
+  changed local ground fill rather than inferring identical fields from
+  unchanged original control tracks. Prior48 worstpoint selection used
+  oldround3Main; final extreme/coverage comparison remains required.
+- Earlier actual-card96 and current768/GPU64 freezes oldround3Main geometry
+  with explicitly hypothetical68ohm CS scaling. Preserve their evidence and
+  scopes, no restart. Final Mainv3 replay/equivalence is needed before final
+  source freeze qualification; old nearby reference fill is not guaranteed
+  identical. Measured capR/excessL sensitivity does not guarantee physical L.
+- Main ground73100 confirmed live;115savedgrids/25convergedcontacts atlast
+  snapshot. Allfour newOE card ground convergence/Schur proofs complete.
+- WiFi strongest checkedv88 remains3violations/3GNDopens, allsignalsclosed.
+  Latestv92 trial was5violations/3opens including introduced capclearances
+  and an SCKopen, rejected. Local placement/ground/newroute search continues;
+  no live WiFi job atlastownercheck, no clean freeze yet.
+- Correct pin metadata and primary BOM record genuineproofs completeall4;
+  coherent21files at build/spi-integration-oe-metadata-bundle-20260930.
+  Supplier CAD/rotation still explicitlyuncheckedoffline, humanreviewunsigned.
+- Fullreport12:49 delivered; next12:59. WiFi/finalactualwholebundleSI,
+  coherentadoption/freshnormalpackages, power/reset/mech/fullverify,
+  supplierCAD/stock/runtime environment/humanreview remain open; releasefalse.
+
+
+#### Historical follow-up: 2026-09-30 12:33 Israel
+
+- Subsequent completed work: root storage/eInk full-contact meshes terminal
+  PASS34/33grids, all16contacts converge; exact disabled-layer audit/Schur
+  provenance now PASS at build/rp-spi-oe-root-ground-20260930/qualification.json.
+  Capself inputs supplied to SI owner are now valid for actual new copper.
+- Truthful manufacturer pin-name metadata fix passed allfour real ERC/
+  pre-route guards. Numeric circuit connectivity and physical copper remain
+  identical; fresh actual BOM primary-table checks pass with supplier CAD/
+  rotation explicitly unchecked offline. Four wrong-pin mutations reject
+  on each two-card proof. Allfour unsigned review overlays refreshed.
+- New coherent partial bundle21files includes authentic C7833 pin table and
+  common ee348eca at build/spi-integration-oe-metadata-bundle-20260930.
+  All proposal source/seed hashes and shared baselines verified. No shared
+  manufacturing adoption/receipt or supplier assurance is claimed.
+
+
+- Actual new OE electrical initial screens total 96/96 passing. Broader
+  768-case all-six-slot/opposed package-Cin/body corners screen is live28441;
+  38 passing reported, no failures. Throughput revised from baseline:
+  estimate 65–90 minutes remaining, conditional on measured rate.
+- All four new repaired card exported fabrication geometries pass genuine
+  merged-tool fabcheck through complete plotted DRC. Actual gate stops at
+  missing human CPL review. No completed normal pipeline receipt is claimed.
+  Root reports and checker-order audit retained in
+  build/rp-spi-oe-local-20260930/development-fab.
+- Genuine BOM/CPL checks exposed missing C7833 pin table. Primary part record
+  preparation then exposed empty numeric symbol pin names 1/2/4. Agent is
+  preparing a separate truthful OE/A/Y name annotation and genuine source/ERC/
+  guard reruns; frozen original source proofs remain immutable. No electrical
+  connectivity change intended; equivalence must be proved before rebinding.
+  Supplier CAD remains unavailable and stock was not queried in these runs.
+- New actual root GND57-only capacitor studies terminal/converged. Retained
+  all-mesh C60/61/62/63 self-R (mOhm): storage7.082574/7.154012/6.497167/
+  9.877321; eInk5.209103/5.866953/4.805582/7.836904. Actual disabled-layer
+  proof still pending complete contact studies. Original oldC63 values must
+  not be rebound to these changed physical routes.
+- Main ground73100 confirmed live109grids/19 converged contacts. Root new
+  full-contact studies34791storage32grids/14converged and15235eInk30/14
+  confirmed live. Cap jobs98867/25595 terminal exit0.
+- WiFi v84 connects all SPI signals, but native3GNDopens/7violations remain;
+  includes local C60/oldLED collision and moved branch clearance. Agent is
+  repairing locally. Trial is not a clean replacement/release candidate.
+- Fullstatus12:33 delivered; next12:43. Coherent newOE partial20-file bundle
+  awaits metadata refresh and WiFi, final broader SI/ground, normal final
+  package/receipt/power/reset/mech/fullverify, supplier CAD/stock, runtime
+  environment and human assembly review remain open. Manufacturing false.
+
+
+#### Historical follow-up: 2026-09-30 12:22 Israel
+
+- All four new local OE candidates pass native DRC with zero violations and
+  zero opens, strict preservation of unrelated copper, and genuine source/ERC/
+  generator qualification. Isolated frozen sources remain candidates, not adopted
+  manufacturing inputs. R65=220 C25091; C63=10p C32949; U4.1 uses CS_OE.
+- Actual new GPU/IO electrical replay completed 48/48 passing. Scope remains
+  the paired capacitor RF screen; independent parasitic axes, population and
+  package/return guarantees are not established by that result. Actual new
+  storage/eInk replay completed 48/48 passing (handle 49734 terminal).
+  All four actual initial screens now total 96/96 passing. Broader all-six-slot
+  opposed-corner screen of 768 cases is live under owner handle 28441.
+- Separate preferred-filter return sensitivity completed 48/48 passing,
+  with explicit series return R/L and measured capacitor current. Up to 4nH
+  total modeled inductance is an engineering sensitivity, not a guaranteed
+  physical bound. Old storage copper inputs are not rebound to new layouts.
+- New GPU/IO full-contact and GND57-only capacitor return calculations all
+  converged; actual disabled-layer audits pass. New storage/eInk matched
+  scripts and exact frozen PCB copies are prepared in
+  build/rp-spi-oe-root-ground-20260930. First launches failed because the
+  interpreter lacked SciPy; retained failed logs. Existing solver dependencies
+  were located and verified; all four corrected jobs are live under
+  /usr/bin/python3 with the existing solver-deps PYTHONPATH.
+- New partial coherent integration snapshot contains 20 hash-bound source,
+  seed and tool files at build/spi-integration-oe-bundle-20260930. Verified
+  common-source identity, all frozen root artifact hashes, genuine GPU/IO
+  source/seed bindings, and unchanged shared manufacturing source baselines.
+  WiFi/final qualification remain pending; no adoption or release claim.
+- Main all-six-slot ground extraction handle 73100 confirmed live; 105
+  grids completed (90 coarse and 15 fine), with 15 sinks converged so far.
+  Main power geometry identity remains separately proved, not a refreshed gate.
+- WiFi authority remains v76 with 3 violations and 4 opens. Agent confirmed
+  no live WiFi job at the status check and is preparing another local route
+  trial. No unqualified trim or route is adopted.
+- Full report delivered 12:22 Israel; next due 12:32. Final broader SI,
+  WiFi closure, coherent adoption/fresh normal packages, fabrication/power/
+  reset/mechanical/full verification, supplier CAD/stock, runtime environment
+  and human assembly review remain open. Manufacturing release is false.
+
+
+#### Historical follow-up: 2026-09-30 11:51 Israel
+
+- Root storage/eInk newOE nativeplacements complete onfront; all three signal
+  connections route successfully. R65/C63 placements storage(16.1,-9.9,90)/
+  (16.1,-11.9,90), eInk(12.1,-13.15,270)/(12.1,-15.15,90). R65=220C25091,
+  C63=10pC32949; U4.1 newCS_OE, MCU220/10 unchanged. Storage exact native
+  flagged oldOErawtailclearance afternet reassignment; trimmed only those
+  three duplicate100umtails, no unrelatedroute removal. Fill/designators
+  complete; finishednativeDRCs95834/49391 were placement checks, finalchecks
+  nowrunning. Newtreebuild/rp-spi-oe-local-20260930. Strict source/actualSI
+  qualification remains pending; no sharedmanufacturing adoption.
+- Manufacturer-scopedRPclassification of existing actualstorage72 now
+  SCK0/24 andsampledMOSI0/24 requiredfailures;18/24 TI OE failures remain.
+  Separate localOE48hypothesis zero requiredfailures after legitimate RP
+  receiver correction. Rawresults/diagnostics immutable, classifiedjsonbinds
+  source/FW/binary/raw hashes. LargerRPcaptrialsremain rejected.
+- Othercard216 actual37584 continues; release ownsGPU/IO localOEphysical
+  and independentWiFi diagnosis whilefull frozenbaseline replayruns.
+- Main all90coarsecontactgrids complete, .07fine studies nowlive73100.
+  Corrected actualGND57onlycap/selfR and exactdeadleafproofs passall4cards;
+  source/binaryfirmwarestatequalification retained. No totalground/ACbounce
+  or package/contact guaranteedclaim.
+- WiFi fullycheckedv76 still3violations/4opens. PreliminaryindependentCS
+  escape failed actualnativeDRC and wasrejected. Finerlocalsearch continues
+  unchanged clearance, newcopperonly. Final signal/groundclosurepending.
+- Fullstatusdelivered11:53for11:51checkpoint; next12:03Israel. Remaining
+  finalactualOE/SI/WiFi sourcefreeze+normalpipelines/fab/power/reset/mech/
+  verify, supplierCAD/live stock, runtimeenvironment and humanCPLreview open.
+
+
+#### Historical follow-up: 2026-09-30 11:39 Israel
+
+- Local OE hypothesis48 terminal PASS TI input/stress/rate for100/220ohm+10p.
+  Prefer220 C25091 reused identity; maxfullband7.160ns vs12ns, pin1.271mA.
+  Actual R65 placement/routes remain unqualified; root storage/eInk and
+  releaseagentGPU/IO repair locally. New isolated commonsource proposal under
+  build/rp-spi-oe-local-20260930/proposed-source, priorcandidatesimmutable.
+- GPU/IO/eInk216 actual replay37584 live74/216, all72SCKcomputed. Latest
+  whole-period diagnostic maxima73.458mV/no fullbandrecross; scoped RP0.2V
+  minimum receiver interpretation under primarynominalrail/TC−40..85 and
+  explicitSCHMITT1/VSEL0 firmware is being applied, notTI OE waived.
+- Shared slotspi.c now explicitly enables inputhysteresis SCK/MOSI/NCS and
+  hardassertsVSEL0. Genuine5targetbuildPASS; eachcompiledslotspi_init contains
+  threeenablecalls and releasehardassert failure edge. Source/binary/SDKbound
+  qualification atbuild/rp-spi-schmitt-enabled-20260930. No analogpassclaimed.
+- Primary pinmap caught capselfsource19+57 assumption wrong:19TESTEN,57GND.
+  AffectedC60-C62 pairs withdrawn and correctedGND57-only reruns PASS onall4
+  cards; C63U4.3 and original16contactstudies unaffected. Exactdisabledlayer
+  proofs refreshed tocorrectelectrodes. StaticselfRnotcapacitorACbounceproof.
+- Main finalshuntall6slots90contacts73100 productive,49gridscomplete when
+  checked11:40; candidateonly ground current/package/connector limits explicit.
+  WiFi bestv67 actual3violations/6opens: CS Ylead and fivegroundjoins remain.
+- Fullreport11:41delivered for11:39checkpoint, next11:51Israel. Final actual
+  OErepair/WiFi/SI, coherenthardwarefreeze+freshpackages/fab/power/reset/mech/
+  verification, supplierCAD/liveaggregate stock/runtime environment and human
+  CPLreview remain open. Firmware state repair adopted; hardwareSPIinputs frozen.
+
+
+#### Historical follow-up: 2026-09-30 11:29 Israel
+
+- Storage actual v5 full72 terminal exit0 in337s solverphase: SCK5/24 and
+  CS21/24 mandatory failures; sampled MOSI0/24 required failures. No RP full
+  VIL/VIH recross, but that diagnostic does not waive true TI OE behavior.
+  Bigger-cap trial48 terminal exit0/188s: SCK4/24 still fails, CS24/24 fails
+  including15 genuine TI finite-band transition-rate failures. Do not adopt
+  these bigger caps. SI owner investigates separately justified local OE
+  damping topology and primary guaranteed RP Schmitt acceptance scope.
+- All four actual repaired-card 16-contact ground studies terminal PASS:
+  storage48grids/maxlastpair5.142%, eInk33/8.052%, GPU34/6.940%, IO36/7.146%.
+  Native exact disabled-layer deadleaf audits/proofs pass all used pitches.
+  Added four per-cap selfR studies also terminal PASS; root storage/eInk
+  proof includes each actual cap/reference endpoint and source/PCB/model hash.
+  GPU/IO equivalents complete in release-agent evidence. DC pair resistance
+  alone does not prove capacitor AC return bounce; dynamic L/current slew,
+  package/contact and total-ground guarantees remain open.
+- Root final main v3 all-six-slot actual ground90contacts running73100,
+  minimum180coarse/fine grids plus refinements. Ten grids complete atreport;
+  ROI(10,25,114,145) containsJ16, insulating exterior removal, no grounded
+  boundary. Candidate-only, not manufactured receipt; likely ~hour or more.
+- WiFi latest v62 native3violations/8opens: one CS Y lead and seven GND
+  fragment/return connections remain. Exact filled-fragment graph identifies
+  eight components and three legal initial stitching candidates. No closure.
+- GPU/IO release agent reassigned to independent actual SPI/topology work
+  coordinated with SI owner after completing ground proof. No redundant
+  bigger-cap trial or shared adoption. Partial integration bundle has20
+  source/tool/seed files and normalizedIO4.7u matching the strict binder.
+- Final successful actual SPI/WiFi candidates, coherent shared freeze,
+  complete normal pipelines/fab/power/reset/mechanical/fullverification,
+  supplierCAD/livecombinedstock/runtime environment and human placement
+  approval remain open. Fullstatus delivered11:29, next11:39 Israel.
+
+
+#### Historical follow-up: 2026-09-30 11:18 Israel
+
+- Actual storage v5 live32281, 30/72 computed; SCK24 cases finished with5
+  strict failures (earlier8 included MOSI diagnostics; corrected), maximum40mV band reversal/37mV ringback. No voltage stress
+  failure reported so far. This actual routing differs materially from old
+  ideal-adjacent filters. Full72 retained before a bounded24-case C60=22p
+  value-only discriminator; no main reroute or threshold waiver.
+- Scientific extractor now handles native finite pad, via and track contacts;
+  seven length/contact/gap regressions pass. Failed v2-v4 preparations had
+  zero simulated cases and remain failed history, not qualification.
+- Both root candidate grounds terminal exit0: storage48 grids/16 contacts,
+  worst last-pair5.142%; eInk33 grids over16 individual contacts,
+  worst last-pair8.052%, max observed self10.0318mOhm. Actual disabled-layer deadleaf proof PASS for both
+  all used pitches; qualification.json binds completed results. GPU36611/IO41120 matched actual original-contract ground live.
+  Separate GPU extra-cap probe coarse raster open retained as diagnostic;
+  native real connectivity remains PASS, finer local investigation pending.
+  These DC extractions do not guarantee package/contact/transient totals.
+- GPU/IO strict source/physical proofs passed; final IO acceptedC25 upgrade
+  composed without copper change, immutable io/frozen-c25 SHA54268922….
+  C25 spelling normalized to4.7u matching qualified strict binder; new
+  frozen-c25-normalized0d531c57… passes refreshed real generator/native/strict
+  topology proofs. Exact old/new copper/pad/fill identity proves ongoing
+  ground equivalence; old running snapshot untouched.
+- WiFi latest v56 native4violations/8opens: one CS output-series toESP/cap,
+  seven GND fragments/stitches. All input stages and supplies connected;
+  actual full closure and SI replay remain required.
+- Root partial coherent integration snapshot validates17 source/tool/seed
+  files and five source indexes, then adds isolated IO power gate/binder/model
+  composition. Actual TPS2553 transient model replaces stale missing-model
+  claim; genuine RP internal-regulator droop gap remains red. No shared
+  adoption or final receipts; WiFi and successful actual SPI still pending.
+- Earlier clock2048/mainMISO256stress+192conditionalRPtiming completed results
+  stand within their scopes. Remaining final integration/pipelines/fab/power/
+  reset/mechanics/fullverification, supplierCAD/stock, blockedruntime and
+  human placement approval remain open. Last full report11:18 Israel.
+
+
+#### Historical follow-up: 2026-09-30 11:08 Israel
+
+- Genuine clock 2048/2048 and main MISO 256 stress / 192 conditional RP
+  timing cases remain completed passes; full final SPI qualification is open.
+- Actual storage v2 stopped before any case: scientific route extractor
+  missed a real finite-width pad contact. Focused repair passes three tests
+  including a genuine gap remaining open and the old centered path unchanged.
+  New 72-case storage v3 run live agent-owned 8485, frozen true export inputs.
+- GPU strict local physical candidate passes native DRC0/open0, original
+  footprint/pad/unrelated copper preservation and all visible designators.
+  IO audit caught six original capacitor zone settings changed by scratch
+  refill. Restored exactly, genuine refill and fresh DRC0/open0 completed;
+  strict preservation job3236 active. Genuine source proofs next; no adoption.
+- WiFi latest actual v44 native audit: four violations/ten opens. No shorts
+  or clearance violations; R4 silk and three isolated original ground vias
+  remain. Opens include CS-stage supply, MOSI filtered input and eight ground
+  return/region connections. Routing job90164 terminal; owner adding legal
+  access/stitches then rerunning full native checks, no closure claim.
+- Main v3 MB-005 local geometry comparison PASS: all four power-net/ROI
+  scopes, all six filled layers and routed/pad primitives exactly match the
+  receipt-qualified round3 board. All four model source hashes are unchanged.
+  Proof: build/main-shunt-power-scope-20260930/qualification.json. This is
+  scoped geometry evidence, not a final receipt or automatic rebinding.
+- GPU/IO now both strict physical plus genuine source/ERC/guard proofs PASS.
+  Frozen evidence: build/rp-spi-filter-local-20260930/{gpu,io}/frozen.
+  IO separate accepted C25 upgrade is being composed with final SPI source.
+- Storage v3 extraction exposed a second finite-width track-to-via contact
+  missed by the scientific extractor. Exact native contact extension passes
+  five gap/length regressions; actual v4 72 cases live agent-owned6399.
+  No cases passed from either failed preparation; no board rule was relaxed.
+- Root matched actual storage/eInk full-card ground runs are live11914/50464,
+  each16 independent contacts with self/transfer diagnostics and unchanged
+  .1/.07/refined convergence. Initial attempt lacked scipy; genuinely stopped
+  before results, then restarted with existing qualified solver dependencies.
+  Candidate-only evidence, no fabricated pipeline receipt or total package/
+  connector/transient guarantee. Output build/m1-ground-spi-candidates-20260930.
+- Shared manufacturing SPI inputs remain unchanged; final integration,
+  pipelines, SI/timing/ground, power/reset, mechanical, verification,
+  supplier CAD/stock, runtime environment and human CPL gates remain open.
+
+
+
+#### Historical follow-up: 2026-09-30 10:59 Israel
+
+- Both root card physical candidates and visible-reference variants pass
+  nativeDRC0/open0. Genuine storage/eInk proposed schematic/ERC/pre-route
+  exactguards and route-install proofs bothpass. C3 visibility correction:
+  original C3 wasVISIBLE, earlier scratchfinal hidit. New visible variants
+  restoreit with all7newrefsvisible and exactlyunchanged guards/copper.
+  Storage source optsinto4mm initial label search; commonrc/tooloptional
+  interface keepsdefaultunchanged. All8existingToppackages and side-silk
+  comparisons/mutations stillPASS afterthisaddition.
+- Bothsources pin actuallegallabel positions afterseedinstallation, avoiding
+  temporaryfanout reseating losinglabels. Isolatedartifactindexes bindnative,
+  visiblevariant, sources, trueexports/ERC, guards andseeds. No sharedadoption.
+- Storage actual72-case SI preparation made0computedcases andstalled. Owner
+  genuinely interrupted10515(exit130), retained failedphase, preparingrestart
+  withtrue circuitexports/no parentnativePCBbeforefork andinstrumentation.
+  No false modelresult claimed.
+- GPU/IO agent latestboth0opens/only3rawtrackdangling warnings; source-bound
+  trimmed-contact finalizationrunning95148/95331. Newrefsallvisible; IO
+  actual .8mm labels/4mm reach; GPU C60thermalangle45 preservesnormal
+  relief and fixes2spokes. WiFi explicitGPIOlaunchv28 exists; only3damped
+  outputnets route25567running, freshnativeDRC pending.
+- Mainclock2048pass andMISO256stress/192conditionalRPsamplepass remain
+  genuine; ESPresponse/matchednewground andfinalphysicalSI remainopen.
+
+
+#### Historical follow-up: 2026-09-30 10:47 Israel
+
+- Main v3 genuineMISO256 replay terminalPASS1326s/22.1min: maxFPGA3.6026V
+  for0.210ns above3.6, min-.1491, fixture-anchored buffer+line31.1794ns.
+  All192conditionalRPsample cases pass73.6594ns budget/~42.48ns margin;
+  ESPresponse unqualified, earlyMISO diagnostics retained, no fullSPIclaim.
+- Root storage/eInk now both nativeDRC0/open0 and strict originalphysical
+  footprint/pad/settings preservation except3requiredU1padnets andLVC/R
+  values. All unrelatedoriginal copper preserved; alteredSPI-only cuts.
+  Actual eInk1c669be0e78d8a4130c02cfdfde453319a0b417e63f5659fda00957735ea5d24;
+  storage82085b4137bb3a248981ac121ea3d8d5775b6ecefb50420a011b9bb563ee19bd.
+  Isolated candidates underbuild/root-rp-spi-filter-local-20260930, supplied
+  toSI; firstactualstorage72cases runningagent10515.
+- Genuine proposed eInk schematic/ERC/pre-route strict guards and route
+  seed installation pass. Commonrcisolatedproposal uses realgenericKiCad
+  LVCsymbol with exactTI1OE/2A/3GND/4Y/5VCC numericpinmap. Supplier C7833
+  CAD/placement still notverified. Storage schematic/ERC passes, initial
+  designator C3 cannotfitdefaultseating; testing standardminimum.8mmtext.
+  No hidden-newrefacceptance, no generatorcompatibilityclaim forstorageyet.
+- Rule-area thermalsettings are restored exactly to source afterfillhelper
+  changesunusedmetadata; exactgeometryguardnotrelaxed.
+- GPU/IO finalsilkchecks pass all7newrefsvisible, finalnativeDRCs and raw
+  stub/via fixes pending. WiFi clockrouting unresolved. All8shared inputs
+  stillfrozen, fullrelease/stock/CAD/CPL/network/analoguerequirements open.
+
+
+#### Historical follow-up: 2026-09-30 10:32 Israel
+
+- Genuine clock v7 terminal2048/2048 pass,4149s/69.15min. Whole TTL-band
+  maximum10.280ns<12ns; whole A current maximum2.0981mA; local Avalid19.315ns
+  and RP SCKfall23.005ns. Final actual local routes and all M1 subset states
+  remain pending; not a full SPI manufacturing qualification.
+- Exact-source-compatible main v3 MISO256 replay active, agent-owned94907;
+  last44/256 zero stress/simulation failures, earlyedge diagnostics retained.
+- Root took storage/eink local filters concurrently, releaseagentGPU/IO.
+  Both root cards have genuine all3 filtered+4 raw signal routes; new local
+  GND connections and visible references fitted, normal thermal/refill/silk.
+  Initial final DRC0opens/no clearances but unused altered-SPI stubs remain.
+  Overaggressive whole-stub deletion exposed connections: those scratch trials
+  were rejected; genuine connected finish candidates are regenerated from
+  original completed raw routes. No final all0/immutable/SI claim yet.
+  Native endpoint trimming must retain physical same-net branch contacts.
+  Candidate tree build/root-rp-spi-filter-local-20260930. Storage allfront;
+  eInk CS R64/C62 on back, needing actual double-side mechanical/review proof.
+- Placement fixes: capacitor C1 must face filteredR2; filledcourtyard union
+  must obstruct interiors; exactnative shape checks replace conservative
+  diagonal track bbox areas; reverse-order duplicate segments are same physical
+  branch, so canonical endpoint geometry is required for launch reuse.
+- Latest agent measurements: GPU allsignalsclosed1C62GNDopen; IO0opens but
+  one GNDvia hole-spacing error plus stubs/silk; WiFi finalnotyetqualified.
+- All shared manufacturing source/tool inputs remain frozen; all8 existing
+  round3 packages remain the original development baseline. Full integration,
+  stock/CAD/CPL, final verification and electrical assumption gaps remain open.
+
+
+#### Historical follow-up: 2026-09-30 09:52 Israel
+
+- Manufacturing readiness remains open. All eight unchanged round3 development
+  receipts remain valid; no final repaired-board receipt or human approval exists.
+- SPI v7 authoritative running job: 1235/2048 cases, zero observed failures;
+  approximately 25–40 minutes remain for this run, not the entire qualification.
+- Main shunt v3 native PCB SHA c863db75538ed7542ec5266afcb312af8415a2ca7d2b9909bb31287e100a1642
+  passes native DRC0/open0. Only new R109.2 thermal relief was corrected to match
+  normal generator policy; all v2 tracks/vias are exact. Fresh shunt ground mesh
+  converges 6.134%, observed upper 7.4874mOhm / conditional DC20.4676mV.
+  This supersedes v2 ground results and does not bound contact/package/transients.
+  Genuine proposed-source route guard proof passes: schematic/ERC/placement
+  and strict guarded installation of all8151items, no nonpour opens; no full
+  manufacturing pipeline claimed.
+- Combined isolated double-side assembly and side-aware silk candidates pass
+  all8 current Top packages, actual mixed-side native fixture, eight corrupt
+  CPL/order counterexamples, side-specific silk fixtures and exact all-Top WiFi
+  comparison. No shared hw/tools adoption or supplier CAD/human approval.
+- WiFi last isolated native routing: 9 opens (four signals/five ground), no new
+  clearance violations. GPU filter local routing is active; other RP cards follow.
+- Full status checkpoints requested every600s during active continuation; tracked
+  in build/project-status-checkpoints/reporting.json. No independent scheduler.
+
+
+#### Historical update: 2026-09-30 03:54 Israel
+
+David explicitly delegated reasonable engineering decisions while AFK.
+Manufacturing readiness is still open; no order or external upload is authorized.
+
+- Current M1 maximum 3V3 allocation is 625.3 mA, including reset-reference
+  and MISO-network operating current. Reset re-evaluation passes with minimum
+  3V3 margins 16.295/10.921 mV and core margins 7.962/7.178 mV. This is
+  archived-board analysis; a fresh receipt-bound gate remains required.
+- The TI AHC buffer, 270 ohm series resistor and 10 kohm pull-down are now
+  adopted in all five MISO-driving card sources. Genuine-model candidate
+  screens completed 640 + 640 + 160 cases with no voltage-stress failures.
+  The strongest screen peaks at 3.5881 V, leaving only 11.9 mV below the
+  3.6 V DC limit. Actual refreshed routing and the assumed 40 mV ground
+  envelope still require qualification. No MISO stress waiver exists.
+- Digital drive-versus-passive-bias resolution is repaired. Native ROM boot
+  fixtures and focused regressions pass; final current physical co-sim
+  and end-to-end verification remain pending.
+- The resumed sequential rebuild queue is active (tool session 52558).
+  Main and CPU completed physical DRC/parity stages, then failed live stock
+  checks because the managed environment now restricts network access.
+  IO is routing; no new complete current manufacturing receipts are claimed.
+  Older process handles are unavailable after the environment transition.
+- Router state now uses a writable build-local directory instead of the
+  read-only user state directory. A real headless help invocation succeeds;
+  all four existing router-command regressions pass. The active IO process
+  predates this change and has not been restarted merely for logging issues.
+- A verified cosmetic logo repair is being adopted. Guarded route reuse is
+  being integrated to preserve completed copper through cosmetic changes;
+  it never substitutes a seed for a new complete manufacturing pipeline.
+- Local core-fill corner repair passes actual DRC/connectivity and has
+  negligible mesh-resistance impact in scratch comparisons. Broad fill
+  repair remains experimental. Sustained fault-current thermal qualification
+  and complete plotted fabrication proof remain unresolved.
+- The environment permits project and /tmp writes but not .git writes;
+  recent verified changes therefore remain uncommitted. Keep `card.img`.
+
+The older continuation notes below describe earlier intermediate states.
+
+#### Historical follow-up: 2026-09-30 09:05 Israel
+
+- All eight genuine round3 offline pipelines complete with current, unchanged
+  source/artifact receipts and unsigned placement overlays. Final main exactly
+  reproduces the independently repaired candidate: all 8143 copper items,
+  every pad/setting and every filled-net/layer coordinate inventory. Final
+  main pin check covers 381 contacts with no issues. Supplier stock remains
+  skipped explicitly; no human review or release approval is recorded.
+- Final receipt-bound main heat and reset gates pass: 26.962 mOhm loop,
+  19.519 C worst full-current rise, 9.801% final convergence; 3V3 margins
+  16.295/10.921 mV and core margins 7.962/7.178 mV. Physical limits are
+  unchanged. Complete final main fabrication geometry passes; its only final
+  stop is the missing human CPL signature. All eight boards now have actual
+  complete fabrication geometry checks reaching that same review requirement.
+- Strict current-package co-sim top passes both route and coverage requirements:
+  no missing routes or uncovered nets. All 64 fitted monitor paths are bound.
+  Source/copper/native mutations distinguish an isolated MR/diode branch,
+  a broken sense core, and one disconnected slot clamp correctly.
+- Actual CPU data gate passes: all 24 branch opens detected, and all eight
+  source opens change native CPU execution. IRQ also passes all 12 copper
+  opens and four native counterexamples; timer passes six opens and two
+  native counterexamples. All eight package receipts validate afterward.
+  Full coverage/configuration/LED/programming gates
+  reach their required localhost TCP service and fail with listen EPERM;
+  network-dependent functional results are not claimed. Their source/route
+  phases and separate GPU crystal subset pass (intact 15 frames, both
+  deliberate crystal opens zero frames).
+- Local test ROM building now logs identical assembler commands through
+  ordinary private file descriptors because Node captured child-process pipes
+  fail EPERM here. Its real 524288-byte ROM exactly matches the standard shell
+  build: SHA256 3d013385e2af8503b8daee72eb23a91bb8347cd265d355580fff005c8415779a.
+  Socket restrictions are unchanged.
+- Proposed local SPI receiver filters close 224 combined and 128 Wi-Fi MOSI
+  bounded waveform cases. Modeled 3 MHz MISO margin is 39.065 ns including
+  the formerly omitted local pad-to-buffer flight. Independent Wi-Fi rail/VIH
+  and total ground remain open. A new isolated main 4.7k/card 47k/source 220ohm
+  hypothesis passes 120 genuine ±150mV stress cases; its four-load guaranteed
+  high floor is 2.0945 V. Actual native empty-bus-low regression confirms
+  safe absent-slot rejection: all six table entries zero, raw empty RX00,
+  IO still type2 and sparse GPU+IO BASIC executes42. Empty probing takes
+  731.195ms vs37.017ms high, adding694.177ms emulated delay, without a hang. No
+  LVC/filter/bias hardware is physically adopted.
+- Existing IO switch-model coverage is implemented but its unconditional
+  boardcheck gap is obsolete. A new actual receipt/topology/copper binder and
+  16 meaningful mutations pass; the original full model suite and eight
+  regressions pass. Shared tool integration waits for active receipt-bound
+  checks. Effective local capacitance is a real qualification gap: genuine
+  true-current short-spike sensitivity at 0.7uF reaches 7.081 V. A 0.75uF
+  case has only 1.15mV margin; the fitted nominal 1uF operating minimum is
+  unproved. The same-pad4.7uF C23733 candidate now passes actual DRC/parity,
+  preserves all copper/pads/fills, and passes the full engineering transient
+  suite at1.6uF effective target (6.273V). Adoption waits for the coordinated
+  source freeze. Vendor Ceff and full-window retry limits remain explicit.
+- Continued parallel work: SI agent broader independent-corner SPI matrices
+  and actual main-shunt branch with separate ground references; fab agent
+  isolated local Wi-Fi buffer placement/routing; release agent native absent-slot
+  zero-read boot regression. Main overall routing remains preserved. CPU/GPU
+  operating-current and Wi-Fi power/thermal evidence gaps remain visible;
+  existing first-article measurement obligations are retained.
+- Wi-Fi SPI input pulls are now explicitly disabled after pinned-IDF driver
+  setup, before arming. Actual firmware/QEMU flash images build and ELF
+  RAM/ROM closure checks pass; QEMU execution is socket-blocked. This prepares the low-DC-load guarantee for isolated local level
+  buffers; it does not qualify their input transition rate or adopt hardware.
+- Ground studies probe each actual return contact, retain removed-copper
+  insulating boundaries, and use conservative effective-resistance bounds.
+  Isolated min/max observations of unchanged solved pad potentials qualify
+  local buffer-to-bias ground differences separately. Connector resistance
+  and switching transient bounds are still required.
+- Ground studies are now complete: all60 main contacts and16 cases per card
+  converge within10%; worst main change5.229%, worst card7.056%. Actual
+  geometry and receipts validate at completion. Disabled-layer annuli are
+  proven electrically inert single-terminal leaves; no production mesh
+  repair is needed for these results. Contact/package/transient limits remain.
+- Current all-eight mechanical checks MECH001–008 pass with freshly exported
+  STEP geometry and before/after receipt validation. Explicit board-root
+  support avoids silently rebuilding stale canonical boards. Source-bound STEP
+  cache identity repair is implemented with 11 meaningful cache counterexamples
+  and four provenance checks; no duplicate full FreeCAD run is needed now.
+- Root scratch main4.7k shunt routes physically with DRC0/open0 and preserves
+  all8143 existing copper items/all existing pads. It adds seven copper items
+  and honestly refills the local zones. Actual U7.48-to-shunt path7.868mm,
+  not the straight-line3.2mm. Its separate ground DC extraction gives worst
+  5.449mOhm,0.9405% convergence and conditional14.897mV at2.7336A.
+- The newer Wi-Fi local-buffer candidate retains actual main SCK/MOSI33ohm,
+  uses220ohm/4.7pF input filters and220ohm/10pF outputs. Its initial64+32
+  screens pass; the larger independent-corner run exposes four small SCK
+  quality failures, so no physical adoption or full SI pass is claimed.
+  Active Samsung4.7pF also needs±12% rather than±10% tolerance allocation.
+  A sourced Murata5.6pF candidate is available for the targeted clock repair.
+- Actual main package thermal MB006 was run separately and remains F2-open
+  on unavailable worst-corner iCE40 current. Main copper MB005 passing does
+  not close that package gate. The release matrix and combined16-board parts
+  demand are in doc/hardware/release-gate-matrix-20260930.md and its proof index.
+
+- Targeted SCK5.6pF refinement finishes26/26 cases passing. MOSI4.7pF
+  ±12% finishes20/24, with four early data reversals only; published finite
+  transition/current/stress limits pass. These data reversals require actual
+  sampling-window proof, not silent diagnostic removal. Broader original
+  1536-case qualification remains active. Exact Murata4.7pF/5.6pF primary
+  sheets support normal ±10% allocations with explicit revision/aging limits.
+- Actual scratch main-shunt branch study completes128 voltage-stress cases
+  passing unchanged limits, with distinct card-driver, card-bias and main-shunt
+  ground offsets. Maximum FPGA3.6077V exceeds3.6V for only0.340ns within the
+  existing transient allowance; minimum−0.1487V. Maximum anchored buffer plus
+  actual line delay30.7474ns. Real SCK/local-RP routes still need sampling proof;
+  package/contact/switching ground bounds and full SI release remain open.
+- Actual generator audit finds no visible-reference room at the original
+  scratch R109 position (its scratch reference was hidden). Both source
+  reference checks pass revised(98.0,64.5,270), with other placements unchanged.
+  New local routing/refill/DRC and ground extraction are active. Original
+  branch7.868mm and14.897mV/128-case results remain historical candidate
+  evidence; they do not qualify the revised final placement.
+- Required BRD-006 now validates all eight receipts, sums demand for all16
+  boards, and requires live stock at least2x the aggregate. Eight meaningful
+  counterexamples pass. Actual current demand111 parts/1152 fitted units;
+  live attempt fails DNS before any answer, so no stock pass is claimed.
+- Isolated main generator proposal changes R107 to100k, adds physically
+  screened R1094.7k0402, and changes six slot CS resistors R37–R42 to68ohm
+  on their existing pads. SCK/MOSI/AUX source resistors stay33ohm. Supplier
+  identity C27592 is verified; CAD/live stock remain unverified. Shared main
+  source remains unchanged.
+  Local Wi-Fi backside buffer placement is permitted as a fallback within the
+  existing2.67mm solder-side envelope; it requires genuine bottom-side assembly
+  documentation and mechanical/route qualification if adopted.
+
+#### Historical follow-up: 2026-09-30 06:52 Israel
+
+- Genuine round2 main qualification passes the current M1 load: input-loop
+  resistance 26.962 mOhm, worst full-current temperature rise 19.519 C,
+  and worst final mesh convergence 9.801%. Strict reset margins also pass;
+  the generator exactly reproduces the qualified power geometry. No new
+  fault-current waiver is used.
+- Exact rational checks of actual Gerber circles, straight round tracks and
+  obrounds resolve a false CPU-pad clearance uncertainty. The full 32-test
+  fabrication suite passes, including nanometre-below-rule counterexamples.
+  An exhaustive 19,304-shape audit exposes two real existing main signal
+  clearances below 0.100 mm: MEM_A5/MEM_A4 at 0.099757751 mm and
+  CHIPSET_CDONE/MEM_nWE at 0.099924494 mm. A native DRC-clean candidate moves only two signal vertices by 1 micrometre,
+  touching four segments; all pads, vias, other copper and power fills are exact.
+  Its native DRC and complete plotted clearance, neck and silk proofs all pass.
+  The honest guarded seed is adopted; final main generation is active.
+- The Gerber checker source change makes round2 receipts stale. Genuine
+  round3 seven-card pipelines and complete independent fabrication geometry
+  checks now all pass. Seven fresh unsigned CPL overlays are ready; final main
+  generation waits for the two local corrections. No receipt is rehashed.
+  Live supplier stock and human CPL review remain open.
+- Fresh seven-card thermal baselines pass on System, IO, storage and e-ink.
+  CPU still needs a bounded maximum FPGA operating current; GPU still needs
+  the dynamic TMDS output-current bound. Wi-Fi power/thermal still require
+  capacitor ESR/effective capacitance, complete return/contact and load-current
+  bounds, and calibrated thermal coupling. Ordinary transient scenarios pass,
+  but these missing bounds keep the full rows red. An obsolete unconditional
+  IO switch-model gap is being repaired with actual receipt/topology binding;
+  existing qualified switch tests are not presented as absent coverage.
+- Actual route extraction now handles pad-interior contacts, track junctions
+  and separate filled-plane fragments. Nine disconnection counterexamples
+  pass; all 486 previously resolved lengths remain exact. The fitted reset
+  monitor now has a native functional model with rail faults, diode MR,
+  560 ms continuous recovery and six electrical slot clamps. The completed monitor requires 64 physical paths, including pull-up supplies;
+  all 64 are now physically proved using the separate supply-plane
+  connectivity API (13 actual contact/disconnection regressions pass).
+  Final current-package strict coverage and native probes remain required.
+- Local 220 ohm plus 10 pF clock receiver filtering passes 576 bounded cases
+  with unchanged strict clock and voltage gates. This remains an isolated
+  candidate: native TI control-input stress, Wi-Fi chip-select quality,
+  independent Wi-Fi rail/input bounds and complete ground-return bounds
+  remain unresolved. No filter or LVC buffer is physically adopted.
+
+#### Historical follow-up: 2026-09-30 06:25 Israel
+
+- All eight authentic final-source offline development pipelines now complete,
+  including real order specs, renders and immutable source/artifact provenance.
+  Each generated `pipeline-scope.json` is bound into the receipt and explicitly
+  records skipped live stock and no manufacturing approval. Seven card packages
+  in `build/development-offline-20260930/round2` revalidate, exactly reproduce
+  the checked copper/placement/fills, and pass complete fabrication geometry;
+  human CPL review remains open. Original generation is preserved as stale
+  after the necessary power-command argument interpolation fix.
+- The source generator reproduces every one of v19's 8143 tracks/vias,
+  every pad and all filled polygons exactly. Real regenerated main source
+  pin checks cover 381 contacts/memory chips with zero problems. Genuine
+  receipt-bound main heat/reset/fabrication runs are now active.
+- Strict current-board digital top generation found a stale reset binding:
+  its exact node set omitted the fitted D7 monitor diode branch on nMR.
+  The co-sim source binding is being repaired with explicit monitor topology
+  checks; no physical fault or new waiver is inferred from this diagnostic.
+- The expanded 192-case clock-filter discriminator clears bounded voltage
+  stress but fails RP2040 guaranteed hysteresis in several actual M1 and
+  six-loaded cases. Uniform 68 pF direct clock loading also misses six-loaded
+  timing. No filter hardware is adopted; local receiver resistor/capacitor
+  filtering is the next bounded hypothesis. GPU local CS 10 pF is a promising
+  bounded candidate, requiring complete qualification and physical integration.
+
+#### Historical follow-up: 2026-09-30 05:58 Israel
+
+- Frozen power-only main candidate v19 passes the complete development thermal
+  qualification: 26.962 mOhm input loop against 60 mOhm, maximum true
+  full-current rise 19.519 C against 20 C, and worst final mesh-pair
+  disagreement 9.801% against 10%. Every observed coarse-grid thermal and
+  resistance bound is retained during adaptive refinement. Real capacitor
+  short paths and power ground returns are included. The eFuse control
+  ground reference and regulator enable pin are not load-current paths;
+  they remain conservative resistance diagnostics, with their actual
+  thermal scope documented separately. No fault-current waiver was added.
+- Independent v19 DRC has zero violations/open connections, all six actual
+  copper Gerber layers pass complete neck checks, and every non-power
+  track/via and pad matches the original. Fresh production M1 reset proof
+  is running. Shared power source/seed adoption waits for this proof and
+  requires a fresh normal generator pipeline.
+- Fresh GPU/storage/Wi-Fi pipelines complete all physical stages using exact
+  guarded route reuse and stop at live stock DNS. All seven card pipelines
+  and complete direct fabrication geometry checks pass through the final
+  missing human CPL review. Fresh five-card placement overlays are prepared
+  in `build/cpl-development-20260930`; CPU/System overlays are in
+  `/tmp/cupc8-fab-release/fresh-card-cpl-overlays`. No human approval or
+  current manufacturing receipt is claimed.
+- Genuine TI LVC1G125 with 220 ohm series, 10 kohm card pull-down and 100 kohm
+  main pull-up is an isolated faster candidate. Sole-card and six-card
+  bounded screens pass at +/-40 mV ground offset. At +/-80 mV, eight fast
+  sole-card cases fail long-duration FPGA voltage stress; this is a real
+  unresolved ground-envelope requirement, not harmless ringing. No LVC
+  hardware adoption or stock/CAD/rotation qualification is claimed.
+- Wi-Fi real card and QEMU images build after cache-safe interrupt and
+  bulk-copy repairs. Firmware runtime scenarios cannot start because local
+  socket creation is denied. QEMU flash image was rebuilt after the final
+  source changes; static RAM/ROM evidence and sanitizer queue replay pass.
+
+#### Historical follow-up: 2026-09-30 05:24 Israel
+
+- The strict main M1 reset proof passes after exact raster acceleration:
+  difficult U7.131 terminal 29.4723848072/29.6072167925 mOhm at .050/.035 mm,
+  0.456% convergence; all strict 10% convergence and 5 mV margins pass.
+  Minimum margins remain 3V3 16.295/10.921 mV, core 7.962/7.178 mV.
+  Original slow solve was explicitly stopped (exit 130) after verified
+  replacement completed. No silent timeout/restart was used.
+- Production filled-feature cleanup, eight post-fill hooks and exact polygon
+  rasterization are adopted with source binding. Fresh CPU/System/IO/eink
+  full pipelines pass their physical stages and stop only at stock DNS.
+  CPU/System independent new-export neck and glyph proof pass. IO and e-ink complete
+  direct fabrication geometry checks reach only the missing human CPL
+  review; preceding geometry checks themselves pass.
+- E-ink now uses its actual 695-item routed-stage seed with exact geometry
+  guards. Five nominal placements are stated directly to remove one-nanometre
+  floating-arithmetic truncation; no guard tolerance or copper reroute.
+  All eight designs now have guarded route reuse, with honest incomplete-
+  pipeline provenance and mandatory fresh full builds.
+- Power-only thermal v11 passes three output branches on both mandatory
+  meshes with unchanged current/20 C limits, but full GND-return heating is
+  still under audit. The original classifier incorrectly used outer-layer
+  thickness for all density cutoffs; layer-specific correction and explicit
+  halo/body heat accounting are being checked before source adoption.
+  Fresh v11 strict reset and independent six-layer neck checks pass with
+  unchanged convergence and margins; full fault-return qualification is open.
+- Wi-Fi cache-safe SPI helper path and bulk ring copy/ROM tail clearing are
+  repaired. Real card/QEMU builds pass; byte/header wraps, overflow and 3000
+  varied real-queue replays pass ASan/UBSan. Omitting wrapped remainder is a
+  verified failing counterexample. Final helper direct calls resolve only in
+  RAM/ROM. Full WIFI-003 runtime remains blocked by denied local sockets.
+- Genuine cached TI LVC1G125 is being screened as a faster same-footprint
+  MISO candidate. No physical adoption yet: its greater disabled leakage
+  requires idle-level repair, and complete voltage/timing proof remains open.
+  Actual main SPI ringing still requires correction. A genuine local Schmitt
+  candidate is identified but its exact vendor model download is blocked.
+
+No new complete manufacturing receipt, full verify pass, CPL human signature,
+order or upload is claimed. Manufacturing readiness remains open.
+
+#### Current follow-up: 2026-09-30 04:53 Israel
+
+David reaffirmed autonomous reasonable decisions toward completing M1.
+
+- All five current routed cards completed 320 bounded MISO voltage-stress
+  screens without failures. Keep the physical AHC/270 ohm/10 kohm network.
+  These are development screens, not final receipt-bound qualification.
+- Main clock/control joint 270/330 ohm sensitivity completed 96 cases;
+  all fail strict edge quality despite clearing the bounded voltage stress.
+  No resistor-only change is adopted. Half-timestep replay preserves the
+  ringing and the genuine vendor source fixture matches; receiver-package
+  modeling and a justified local passive filter remain under investigation.
+- IO independently measured all 59 delivered plotted text objects and
+  passes. All eight actual board text inventories have now been checked.
+  No complete manufacturing receipt or human CPL approval is inferred.
+- Fill smoothing is prepared with exact raw-fill and routed-item equivalence
+  across eight boards and eight passing regressions. Adoption waits strict
+  main reset qualification, whose adaptive solve is still running.
+- Minimal power-only thermal candidates remain scratch trials. A trial
+  path overwrite was caught before adoption; subsequent candidates use
+  unique frozen paths. Both mandatory mesh pitches must meet the unchanged
+  20 C limit and actual DRC must pass. Their changed 3V3 plane requires a
+  fresh reset check; unchanged core copper can retain its matching proof.
+- Wi-Fi SPI cache service is repaired: helper code moves from flash to
+  RAM and the bus requests a cache-safe interrupt, with callback-only result
+  handling. Card/QEMU builds pass; actual ELF helper callees resolve in RAM.
+  WIFI-003 runtime was attempted but local socket creation is denied by the
+  environment, so no new runtime pass is claimed. A saved-NET_CONFIG polling
+  stress procedure is recorded in the first-article plan.
+- Fine reset rasterization was identified as trillions of unnecessary
+  contour tests. An isolated exact scanline prototype matches over 31 million
+  actual fixed-grid sites and 51,760 untouched-contour boundary/random sites;
+  accelerated strict qualification is now running with progress telemetry.
+  Original strict job remains live until its replacement is verified.
+- Combined route seed, System via, plotted glyph, fabrication integration
+  and fabrication regressions pass: 65 tests. Whitespace checks pass.
+- Development CPL placement overlays are regenerated for all eight actual
+  physical builds at `/tmp/cupc8-review-development-20260930`. They record
+  source artifact hashes and remain explicitly pending human review; any
+  subsequent physical change requires refreshing that board's overlay.
+- Supplier DNS restrictions still prevent complete current manufacturing
+  receipts. No order, upload, fake stock result or review signature exists.
+
+#### Current follow-up: 2026-09-30 04:39 Israel
+
+All eight designs now have genuine builds that completed the physical
+board checks. These are not complete current manufacturing receipts: live
+stock DNS remains blocked, and electrical/fabrication gates remain open.
+
+- IO's local repair is adopted with exact route guards. Two genuine
+  pipelines pass routing, fills, pad-opening, silk/3D, DRC/parity, plots and
+  BOM/CPL. Its pin-one silk circle moved 30 µm to fix a real 0.144 mm gap.
+  Details: `doc/m1-resume-io-2026-09-30.md`.
+- System's three historical ground vias were locally migrated; signal and
+  USB copper are preserved. Two genuine pipelines pass physical checks.
+  Guarded actual-stage seeds now cover main, CPU, GPU, IO, storage, Wi-Fi
+  and System; no seeds substitute for complete pipeline receipts.
+- Independent delivered-Gerber glyph-height proof is adopted. Source text
+  identity is associated with independently decoded font strokes, while
+  actual height comes from fitted plotted coordinates. Missing, ambiguous,
+  unsupported or too-small glyphs fail closed. Eight actual-export tests
+  and all seven initially available board inventories pass. See
+  `doc/hardware/silk-glyph-proof-20260930.md`.
+- All five refreshed cards' bounded MISO voltage screens pass. Physical
+  10 kohm bias is retained: an 8.2 kohm sensitivity improved overshoot but
+  reduced guaranteed static high-level margin. Ground-envelope and full
+  current-copper qualification remain open.
+- New strict clock/control simulations reveal edge/stress failures,
+  including SCK on e-ink alone. Existing series-resistor values are being
+  screened for correction without main rerouting. No clock or input-stress
+  waiver is inferred from the accepted CPU-bus exceptions.
+- Main fill-only repair passes exact DRC/connectivity and every copper
+  layer's plotted neck proof. Source adoption still waits the live strict
+  M1 reset refinement. Current card copper/silk surveys are running.
+- Fault-current thermal work is checking a conservative body/short-neck
+  decomposition under the unchanged 20 C limit, 3 mm neck cap and 0.5 mm
+  surrounding halo. It has no passing certificate yet.
+
+No full current verification or final release review is claimed. The goal
+remains active, and no manufacturing order/upload has been made.
+
+#### Rebuild follow-up: 2026-09-30 04:05 Israel
+
+The sequential queue has finished. Main, CPU, storage, Wi-Fi, GPU and e-ink
+completed physical DRC/parity/plot/BOM checks, then stopped at stock DNS
+failure. IO failed routing; a local scratch repair closes three supply nets
+without new DRC errors, and the flash-clock repair is in progress. System's
+historical seed restored three non-exempt vias in pad mask openings, so its
+pipeline stopped at that gate before final DRC. Local migration is assigned.
+
+The actual refreshed Storage copper passes its bounded 64-case MISO screen.
+Wi-Fi/GPU screens and current-main ground extraction are running. These are
+development results because complete current manufacturing receipts are absent.
+
+The all-zone main fill-only scratch candidate now proves every filled region
+on all six copper layers under the unchanged minimum-width rule. Actual DRC
+and connectivity pass; current-M1 reset mesh verification is still running.
+Source adoption waits that electrical check. No main signal routing changed.
+
+The real plotted copper/silk neck checker is now integrated into the
+fabrication gate, with 30 existing and seven real-geometry integration tests
+passing. Independent plotted text-height coverage remains open and fails
+closed; nominal source heights do not silently replace it.
+
+David delegated reasonable decisions toward completion. Main signal routing
+and the accepted first-article USB exceptions remain the working constraints.
+
+- Reset qualification and its SPICE cross-check pass for the current M1
+  load. Fresh canonical receipt binding remains pending the final rebuild.
+- GPU's local resistor-array launch repair is committed as `affd641`:
+  scratch DRC and the unchanged impedance/skew limits pass. The final
+  receipt-bound GPU check must run on its complete regenerated package.
+- `55bc0ab` makes the existing 3 MHz ROM/kernel SPI rate the required M1
+  timing gate; 6 MHz remains an explicitly unsupported diagnostic. This
+  changes qualification scope without reducing the current software speed.
+- A TI SN74AHC1G125DCKR with 270 ohm series resistance and a 10 kohm
+  per-card MISO pull-down is undergoing a frozen 640-case candidate sweep.
+  It is not adopted hardware yet. Temperature-adjusted resistor bounds,
+  ground offsets, distributed-load timing and actual regenerated routing
+  remain required. Native/co-sim changes must account for the new passive
+  idle level without masking active high bits.
+- One System router is active. The second sequential build queue waits
+  for both the first queue and an explicit source-freeze marker, preventing
+  builds against partially integrated shared parts. No receipt rehashing.
+- Filled-region proof work continues. The boundary-memory leak and a
+  numerical tangent-corner failure have bounded fixes; remaining unproved
+  regions are not evidence of thousands of real subnanometre copper necks.
+  Fault-current copper thermal qualification remains unresolved.
+- Four abandoned test simulators from older sessions were terminated,
+  including the QEMU holding localhost port 18080. Current jobs were kept.
+
+The earlier recovery details below describe intermediate snapshots. The last
+complete verify result is still 226 pass / 36 fail / 17 pending; no fabrication
+order or upload has been made.
+
+**David's decision, 2026-09-30:** accept the system-card USB routing for now
+and record it as a possible issue. Scope: first articles; YC-007 stays red
+on impedance/balance, with physical host/cable/orientation tests recorded in
+`doc/hardware/first-article-plan.md` and the acceptance in `fab-waivers.md`.
+No system USB reroute. Slot MISO voltage stress remains an unresolved repair/check.
+
+**David's constraint, 2026-09-30:** avoid rerouting the main board for a MISO
+fix; the existing route took days. Preserve the main signal-route seeds.
+Evaluate card-side edge control/damping in simulation before any PCB change.
+This constraint does not accept the MISO overshoot risk. Existing local
+power/reset repairs continue without a wholesale signal reroute.
+
+**David's target, 2026-09-30:** reset qualification should target the current
+M1 load; finish its checks and repair only where necessary without lengthy
+rerouting. The hypothetical extra load in slots 5–6 is a separate diagnostic.
+At the measured R7-to-U7.6 resistance 24.645 mOhm, the existing circuit's
+M1 3V3 threshold margins are 19.621 / 14.256 mV (required 5 mV each).
+This single path's calculation is encouraging, not complete board proof;
+all pins and sense taps still need bounds. Near-current-limit fault heating
+remains part of the power qualification. The external RILM tolerance and
+full rated temperature-coefficient corner were missing from the old current
+limit arithmetic; the corrected range is 2.565 / 2.956 / 3.288102 A.
+First-article fault-heating normalization now uses that same design bound.
+
+Normal M1 heating, scaled from the existing conservative copper-density
+solution at the budgeted branch currents, is about 4.04 C at the buck input,
+9.61 C at the slot 5V branch and 12.09 C for the worst return upper bound;
+all are below the 20 C rise requirement. These estimates do not close the
+sustained near-current-limit fault check and are not measured temperatures.
+
+David is offline overnight and requested autonomous continuation. Complete
+the authorized M1 checks and only justified short repairs, preserve main
+signal routing and the accepted USB exception, and leave unaccepted MISO
+risk visible. His latest instruction explicitly delegates reasonable engineering decisions toward
+a working M1. This authorizes selecting verified repairs; it does not turn a
+failed electrical limit into a passing result.
+
+Claude-personal session `5c66b0bc-3cde-4cbe-94c0-0355e82c5b48`
+stopped at the weekly API limit on 2026-09-29, 22:33–22:37 Jerusalem.
+Three Codex agents resumed main-board repair, high-speed SI, and co-sim/E2E.
+Dedicated reports: `doc/m1-resume-main-2026-09-30.md`,
+`doc/m1-resume-si-2026-09-30.md`, `doc/m1-resume-cosim-2026-09-30.md`.
+
+- Recovered main run8 fine mesh: loop 26.926 mOhm and convergence 9.908%
+  pass; sustained-fault output/return heating remains unresolved. The fresh
+  complete main pipeline at `/tmp/cupc8-canonical-rebuild-20260930/main`
+  passes DRC/parity, connectivity, silk, BOM/CPL, stock for two boards,
+  rendering, and 381 pincheck contacts. Its receipt validates against the
+  workspace. The all-terminal reset gate now finishes PASS with adaptive strict
+  convergence: U7.131 resolves at 0.05/0.035 mm (0.46% disagreement),
+  without a physical repair. Provisional routed margins are 16.552/11.186 mV
+  on 3V3 and 7.962/7.178 mV on 1V2, all above the unchanged 5 mV. The complete comparator-input-bias correction and SPICE recheck also
+  finish PASS; final 27 reset regressions pass. Canonical adoption remains
+  pending. The later Wi-Fi BOM step automatically added a missing supplier
+  record C602037, correctly invalidating earlier global-input receipts.
+  These packages require full pipeline regeneration after cache population;
+  no receipt will be manually refreshed.
+- Recovered scratch co-sim results: MB-052, CC/SC/EC/YC-051, E2E-001..004,
+  COSIM-004..006 passed. COSIM-003 failed a routing-dependent IO USB mutation
+  expectation; that test is repaired and its focused six-mutation rerun
+  passes. The first full rerun stopped at a sandbox localhost-listener
+  restriction; the fresh unrestricted COSIM-003 rerun completed PASS, exit 0. These
+  are scratch results; the
+  canonical gate correctly fails stale board receipts.
+  Deeper transcript audit found Claude manually refreshed private receipt
+  hashes and patched CPU/main resistor values and GPU RN values in these
+  scratch packages. These passes support digital development only; the
+  packages must never be adopted as complete pipeline provenance.
+- GPU recovered SI: skew passes, three launch impedance failures remain.
+  GPU v8 and manual candidate9 fail clearance checks; neither was adopted.
+  The bounded MISO audit is complete: nominal 3.3 V still predicts stress;
+  card-side AHC/resistor alternatives are promising but no tested pair
+  passed every unchanged corner/edge check. See
+  `doc/m1-miso-model-audit-2026-09-30.md`. System USB has impedance and capacitance
+  imbalance failures, with modeled cable cases passing; its first-article
+  acceptance is now authorized as noted above. IO USB acceptance carries forward.
+- Shared fixes: silk placement/checking now include the 0.01 mm mask
+  expansion above the 0.15 mm silk clearance; 14 focused checks pass and
+  restoring the bug fails both new boundary checks. D7/U17/U19 CPL rotation
+  entries were derived from cached JLC/EasyEDA pads (all zero); main's
+  full main check passes 69 BOM lines. The pin checker now recognizes the
+  approved 56-ohm terminations; its 1000-ohm negative mutation is rejected.
+  Fresh CPU and GPU full pipelines completed PASS before the supplier-cache
+  addition noted above; they now require regeneration for current receipts.
+  IO exhausted its routing rounds at the TPS2553 boost supply; a guarded
+  short 0.3 mm local supply track has no DRC clearance conflicts in the
+  pre-route diagnostic and awaits its full pipeline. Storage's mask-aware
+  silk guard is corrected. Wi-Fi completed its board checks but rejected
+  the receipt when its missing supplier record was fetched. Eink/system
+  continue sequentially; eink finished PASS with a valid two-board receipt, and system is
+  building. A second refresh queue waits for the first to finish,
+  avoiding simultaneous routers. The IO 20 nH input-inductance
+  short/fault model and all eight switch regressions pass; its full
+  geometry/pipeline remains pending. Fresh main
+  evidence was generated by the full pipeline, not manually rehashed.
+- Correction to the earlier SPI-clock decision: `rom/boot.s` and every
+  current kernel card driver already select divider 2, i.e. 3 MHz from
+  12 MHz. `slowbus_si.py` currently tests 6 MHz (the hardware maximum) and
+  separately reports 3 MHz timing. Keeping the existing software at 3 MHz
+  introduces no new throughput reduction. The pending question needs this
+  correction; a 4 MHz clock would require an RTL change.
+- Carry forward David's CPU-bus 68/56-ohm overshoot acceptance, notch
+  exception/first-article fit criterion, GPU overclock, co-sim waivers,
+  TPS2553 selection/model workaround, and exposed-pad open-via acceptance.
+  The historical CPU-bus decision request below was resolved later.
+- Manufacturing is not ready: canonical rebuild/re-pin/full verification,
+  power/thermal/fab gaps and final CPL/order checks remain. Last full
+  verification remains 226 pass / 36 fail / 17 pending; focused scratch
+  passes do not replace it. Paused sourcing/protection/neck-proof tasks have
+  not been relaunched. No fabrication order/upload was made. Shared mask,
+  pincheck and verified CPL fixes are committed as `355bcbd`; M1 reset
+  qualification as `4b42299`; corrected current bounds/hot FA checks as
+  `13d768b`/`67bfbb2`; routed USB mutation checks as `6854540`. Physical
+  candidate repairs remain subject to their own completed checks.
+
+## Historical CPU-bus overshoot options (resolved by David later on 2026-09-29)
 
 CPU bus (12 MHz; CPU card U1 -> RN 33 ohm -> J1/J2 -> ~110 mm 0.1 mm stripline -> main U7) overshoots the iCE40 input limit (3.6 V, AC 3.66 V / 1.6 ns): 4.23 V at every one of 32 IBIS corners as built. Not an SPI-bus issue. Timing is not the constraint (period 83.3 ns, setup slack ~52 ns; a 68 ohm array adds ~1.2 ns).
 - No drive-strength/slew setting exists for these I/O (DS Table 4.13; only a pull-up), so nothing to change in the bitstream.
@@ -831,3 +2745,10 @@ resistor removed and the EC cable doubled, a 100 ohm "pull-up" on the storage ca
 ## Decisions 2026-09-29 (David, RP2040 exposed-pad via)
 - I3: ACCEPT the one open GND via in the RP2040 exposed pad's paste gutter (U1.57, /GND, 1.0 mm from centre, on gpu/io/storage/eink/system). No plugging/epoxy fill. If first-article shows a dry joint or voiding on that pad, plug on the next run.
 - Via-in-pad fixes (Wi-Fi module GND vias, io J2 shell, system Y1, Y1/U3/storage J2 tabs) are in the source (kicadgen pad_via_clear, opt-in per card); six scratch card builds pass DRC/parity. Open: io U5 designator silk-to-mask 0.144 < 0.150 mm (proposed: 0.16 mm in silk_keepouts/check_silk, held until main gates finish since it touches every board's silk).
+- 21:0x Wired (uncommitted): hw/boards/main-route-seed.json = DeepPCB rev10 + our power copper (the merge seed), hw/boards/main-handroute-seed.json (390 items); main.py `_seeded_route` (kicadgen.pipeline `seeded_route=`): hand-route seed applied, `_unbridge_vias` + `kicadgen.remove_dangling(trim=True)` + `_node_joins`, open connections counted on main_handroute's connectivity, Freerouting skipped at 0 (else runs with all of it fixed); a bad seeded route raises instead of re-rolling the router for hours. Scratch build (not build/hw): unrouted 0, KiCad DRC 0/0/0 (boardcheck main drc PASS).
+- Fixes at the source: main_fanout (track box includes half width: R4's via no longer lands in the /+5V trunk; custom-shape pad stub width from its box: no 0.005 mm stubs), main_power_corner (finish()'s tapers and 2.4 mm VBUS joint drawn in lay(), finish() deleted; fan-out sees them: the 0.093 mm clearance is gone), fabrication gate gerberdrc.py accepts quarter-turn FreePoly apertures (U2 is turned 180).
+- 21:3x INTERIM (runs 7-10 of the scratch pipeline, out dirs run7..run10 in the session scratchpad; canonical build/hw untouched). run7: DRC 0/0/0 after adding `_node_joins`; scratch evidence written (scratch finish.py: the pipeline itself stops at the BOM step, see below) so the gates could run. run8 (= current tree, seeds as checked in): unrouted 0, KiCad DRC 0/0/0, `boardcheck main drc` PASS, Freerouting skipped. Gates on run8: rail_reset_window R0 FAIL (U7.6 +3V3 is open in copper_mesh at every pitch: the pin's 0.15 mm stub/via lands in a +3V3 In4 fill neck; pre-existing in the DeepPCB merge board and the old seed, other U7 pins solve at ~22 mOhm); fab (scratch harness, gerberdrc): hole-to-hole 1966 holes OK, via annular 9672 OK, PTH annular 0.20 OK, edge 19263 OK, copper clearance FAIL at 5 DeepPCB spots (0.0997-0.09999 vs 0.1: MEM_A5/MEM_A4 F.Cu 0.09977, CHIPSET_CDONE/MEM_nWE In2 0.09992, CPU_D7_SRC via/U7.9 pad, SLOT_nIRQ0 via/U7.42 pad, CPU_A15 In2 track/J2.B46 pad indeterminate), main_input_heat still running on run8 (single thread, 40+ min). run9: tried nudging those vias 0.02 mm: made new 0.08-0.094 violations in 3 places (channels are at the limit both sides): reverted. run10: dropped the offending vias + hand-routed the 5 cut connections: the hand-router routes pad-to-pad (54 mm CPU_A15, 77 mm SLOT_nIRQ0), rejected, seeds back to the merge seed. Nothing else changed in hw/boards seeds.
+- Also open, not mine: `bomcheck` stops the pipeline (jlc_rotation.yaml has no rows for D7/U17/U19: CPL agent's work), JLC stock needs network, `fab` also needs fab/cpl-review.json (David's CPL review).
+- 21:50 MISO series-R sweep DONE (David's decision 3; hw/si/miso_options.py, 128 cases per value = J11 and J16, GPU and storage cards, 32 IBIS corners, all-loaded and one-card; JSON build/si-slowbus/miso-tx.json). Result: **no series value passes; nothing is BOM-only** (the MISO net has no series R; R20/R35-R43 are other nets). Series R at each card's 74LVC1G125 output (a change on every MISO-driving card, extra part): U7.48 peak/trough and passing cases of 128: 0 ohm 4.60 V / -1.01 V / 0; 22 ohm 4.46/-0.87/16; 33 ohm 4.41/-0.82/32 (best); 47 ohm 4.31/-0.73/20; 68 ohm 4.14/-0.57/4; 100 ohm 3.98/-0.39/0 (100 ohm clears overshoot and undershoot but every corner rings back into the VIL..VIH band 1.26 V and is non-monotonic up to 0.98 V). Series R at the U7.48 pad (main-board change): 4.60 -> 4.48 V at 68 ohm, 0/128. Applied: nothing.
+- 21:50 MISO turnaround (timing check 'slot MISO turnaround, RP2040 cards'): -27.0 ns at 6 MHz, +56.3 ns at 3 MHz; T/2 - 110.4 ns used, so the slot SPI clock must be <= 4.5 MHz (e.g. 4 MHz: +14.6 ns before any series R). That is a chipset/firmware clock choice, not a BOM value. DECISION FOR DAVID: SPI clock 6 -> 4 MHz (or 3).
+- 22:2x Gates on run8 (current tree, scratch; numbers): unrouted 0; KiCad DRC 0 errors / 0 warnings / 0 unconnected / 0 parity (boardcheck main drc PASS). MB-005 at COARSE pitches 0.2/0.14 mm (the real 0.1/0.07 run, `main_input_heat.py`, was still running after 80 min): loop 28.9 mOhm at 115 C (limit 60; J1 B4A9->F1 10.4, F1->U2 6.1, GND return 7.4, solder/tails 5.0); rises at that pitch 45-79 C (U2 OUT->U3:1 78.8 C, ->R4:1 50.8, C5 return 45.6) so I3-I5 are red and the mesh disagrees 24 % between pitches (I2): not conclusive until the fine run finishes (0.5 mm tracks into U3.1/U3.4 are the likely hot bodies). The old canonical board gives 127.5 mOhm / 875 C at the same pitches. mb005_loop_sweep: board-independent, at 60 mOhm every check passes (tightest POW-006 B5 90.7 mOhm). Counterexamples for the five new fixes all fail-as-required (tools/counterexamples.py).

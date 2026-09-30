@@ -1173,7 +1173,7 @@ id = "WIFI-003"
 title = "Real binary in QEMU"
 checks = "the real ESP-IDF image (core, lwIP, esp-tls, DNS task, frame engine with the SPI slave's preload rules): IDENT, SCAN, JOIN with DHCP (10.0.2.15, gw, dns), LINK and RXREADY in the status byte, failed RESOLVE, TCP client both ways with PEER_CLOSED, LISTEN/ACCEPTED, UDP_SENDTO, CONNECT_HOST to an unresolvable name, and TLS refusing a self-signed certificate after a real handshake (SOCK_STATUS CLOSED after it: a failure stays reported to every status call, the status byte's included); NET_CONFIG_GET's power-up defaults; a UDP server: UDP_BIND, RECVFROM through a hostfwd (nothing waiting: n 0; a datagram with its sender 10.0.2.2), UDP_SENDTO back to the sender, and a second client still heard after that reply; an ICMP echo request the test built sent to 10.0.2.2 on a raw ICMP socket, the reply (QEMU's) from RECVFROM with id, sequence, payload and checksum intact and the IP header stripped; NET_CONFIG's DNS server in NET_STATUS over DHCP's; a static address (10.0.2.20) in use at once, TCP from it; saved: after a power cycle on the same flash NET_CONFIG_GET has it (saved 1) and JOIN comes up on it without DHCP, TCP from it; back to DHCP (saved) gets the lease 10.0.2.15 and DNS 10.0.2.3 again. Optional (CUPC8_ONLINE=1, not yet passing): verified TLS and an HTTPS GET to example.com"
 method = "Espressif QEMU 9.2.2 esp32c3, OpenCores Ethernet on user-mode NAT, frames over UART1 (QEMU has no SPI slave); tools/fw_esp32c3.sh qemu"
-cmd = "tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
+cmd = "python3 -m unittest test.test_wifi_frames && tools/fw_esp32c3.sh qemu && python3 test/emu/test_wifi_qemu.py"
 kind = "sim"
 vrow = "2.6"
 
@@ -1221,6 +1221,24 @@ method = "hw/tools/bomcheck.py (also a kicadgen.pipeline step after JLC BOM + CP
 cmd = "python3 hw/tools/bomcheck.py all"
 kind = "static"
 vrow = "4.3"
+
+[[test]]
+id = "BRD-006"
+title = "Live combined stock for the complete sixteen-board M1 order"
+checks = "All eight current receipt-validated BOMs, exactly two assembled of each; each shared LCSC part has live stock >=2x SUM fitted demand; missing/stale inputs, offline/replayed stock and input changes fail"
+method = "tools/aggregate_stock.py live JLC assembly library queries; dated snapshot, not reservation or manufacturing approval"
+cmd = "python3 tools/aggregate_stock.py"
+kind = "static"
+vrow = "4.8"
+
+[[test]]
+id = "BRD-007"
+title = "Aggregate stock rejects shared shortages and false live proofs"
+checks = "A shared scarce part passes all separate board gates but fails the combined order; exact margin, missing boards/quantities, duplicate references, foreign supplier identity, replay/offline, network failure and mid-query mutation are checked"
+method = "test/host/test_aggregate_stock.py synthetic stock and receipt fixtures; not a supplier stock pass"
+cmd = "python3 test/host/test_aggregate_stock.py"
+kind = "static"
+vrow = "4.8"
 
 # ============================================================================
 # SYS: sysctl firmware
@@ -1345,7 +1363,7 @@ cmd = "python3 test/host/test_jlc_production_diff.py"
 id = "E2E-001"
 title = "Netlist-generated co-sim builds"
 checks = "the top level is generated from the main board and all seven card KiCad netlists; every net is connected to an executed model or explicitly waived"
-method = "hw/cosim/gen_top.py"
+method = "hw/cosim/gen_top.py; hw/cosim/slot_spi.py; test/hw/test_cosim_slot_spi.py (exact fitted RP/WiFi control stages, main low idle bias, actual copper opens; functional DC only, SI separate)"
 kind = "sim"
 vrow = "3.1"
 cmd = "python3 hw/cosim/run.py E2E-001"
@@ -1789,7 +1807,7 @@ cmd = "python3 hw/tools/boardcheck.py main footprints"
 id = "MB-005"
 title = "Main board power"
 checks = "3V3 buck startup and load step; 1V2 LDO; USB-C inrush; 6-slot worst case within budget; CC divider thresholds"
-method = "ngspice decks in hw/mainboard/sim/"
+method = "ngspice decks; actual receipt-bound input copper heat via --solver amg, every mandatory/refined grid retained in main-thermal-results.json/npz"
 kind = "sim"
 vrow = "4.4"
 cmd = "python3 hw/tools/boardcheck.py main power"
@@ -1798,7 +1816,7 @@ cmd = "python3 hw/tools/boardcheck.py main power"
 id = "MB-005A"
 title = "Main input copper heat evidence classification"
 checks = "The routed input-loss model uses the eFuse maximum current and incomplete physical evidence stays red"
-method = "Synthetic resistance and stale-receipt cases in test/hw/test_main_input_heat.py"
+method = "Actual-thickness cutoff, full-power vs control-pin scope, boundary heat, conservative adaptive convergence and stale-receipt regressions in test/hw/test_main_input_heat.py"
 kind = "static"
 vrow = "4.4"
 cmd = "python3 test/hw/test_main_input_heat.py"
@@ -1819,7 +1837,7 @@ checks = "USB D+/D− 90 Ω ±10%; SPI bus with 6 slots loaded; SRAM/ROM bus; CP
 method = "openEMS + ngspice/IBIS"
 kind = "sim"
 vrow = "4.6"
-cmd = "python3 test/hw/test_slowbus_si.py && python3 hw/si/slowbus_si.py --row MB-007"
+cmd = "python3 test/hw/test_slowbus_si.py && python3 test/hw/test_spi_cascade.py && python3 hw/si/slowbus_si.py --row MB-007"
 
 [[test]]
 id = "MB-008"
@@ -1851,11 +1869,11 @@ cmd = "python3 hw/tools/boardcheck.py main connectors"
 [[test]]
 id = "MB-051"
 title = "Main board reset and power sequencing"
-checks = "Reset qualifies the current M1 load (617 mA on 3V3 and the core load), retaining 5 mV threshold margins; sysctl holds /CPU_RST and CARD_RST_n until valid rails and iCE40 power-up order is met. Two future 300 mA cards are advisory, explicitly required only with --future-slots"
-method = "ngspice (TI OPAx376 model) + datasheet-bound behavioural REF3425/MAX811T/LVC07 blocks: hw/power/reset_supervisor.py --spice (guaranteed windows and start-up, brown-out, fault sequences), test/hw/test_reset_supervisor.py, and hw/power/rail_reset_window.py (receipt/netlist-bound copper extraction for FPGA supplies and both sense taps at initial 0.1/0.07 mm, with affected terminals refined to 0.07/0.05 mm; separate load/sense currents and resistance limits preserve unchanged 5 mV threshold margins)"
+checks = "Reset qualifies the current M1 load (625.3 mA on 3V3 and the core load), retaining 5 mV threshold margins; sysctl holds /CPU_RST and CARD_RST_n until valid rails and iCE40 power-up order is met. Two future 300 mA cards are advisory, explicitly required only with --future-slots"
+method = "ngspice (TI OPAx376 model) + datasheet-bound behavioural REF3425/MAX811T/LVC07 blocks: hw/power/reset_supervisor.py --spice (guaranteed windows and start-up, brown-out, fault sequences), test/hw/test_reset_supervisor.py, and hw/power/rail_reset_window.py (receipt/netlist-bound copper extraction for FPGA supplies and both sense taps at initial 0.1/0.07 mm, with affected terminals adaptively refined through 0.05/0.035 mm and unchanged strict 10% convergence; bit-identical row-indexed polygon rasterization regressions; separate load/sense currents and resistance limits preserve unchanged 5 mV threshold margins)"
 kind = "sim"
 vrow = "4.4"
-cmd = "python3 hw/power/reset_supervisor.py --spice && python3 test/hw/test_reset_supervisor.py && python3 hw/power/rail_reset_window.py"
+cmd = "python3 test/hw/test_polygon_raster.py && python3 hw/power/reset_supervisor.py --spice && python3 test/hw/test_reset_supervisor.py && python3 hw/power/rail_reset_window.py"
 
 [[test]]
 id = "MB-052"
@@ -2925,6 +2943,33 @@ vrow = "4.2"
 cmd = "python3 test/hw/test_boardcheck.py"
 
 [[test]]
+id = "BRD-003"
+title = "Recorded full-route reuse rejects incompatible geometry"
+checks = "Exact pad geometry/layers/drill/net/placement, outline/stackup, origin state and post-route contract changes fail; incomplete copper fails before changing the target; silk changes preserve copper exactly"
+method = "test/hw/test_route_seed.py on small native KiCad boards; full fresh pipelines remain mandatory"
+kind = "static"
+vrow = "4.2"
+cmd = "python3 test/hw/test_route_seed.py"
+
+[[test]]
+id = "BRD-004"
+title = "System recorded-route ground vias stay outside mask openings"
+checks = "The three historical U2/Y1 open pad vias are relocated by guarded local edits, all USB and other signal copper remains exact, and changed old geometry or double application fails"
+method = "test/hw/test_system_seed_vias.py; actual completed route stage and full pipelines remain mandatory"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 test/hw/test_system_seed_vias.py"
+
+[[test]]
+id = "BRD-005"
+title = "Delivered silkscreen glyph height is independently measured"
+checks = "Actual Gerber stroke/font-data fit measures each source identity; small, moved, missing, ambiguous, unsupported and vertically unmeasurable text fails; rotated mirrored minimum-height back text passes"
+method = "test/hw/test_silk_glyph_coverage.py using actual KiCad exports and independent font decoder; source identity is bound by manufacturing receipt and export parity in fabcheck"
+kind = "static"
+vrow = "4.9"
+cmd = "python3 test/hw/test_silk_glyph_coverage.py"
+
+[[test]]
 id = "CC-005A"
 title = "CPU 1V2 netlist and routed rail mutation checks"
 checks = "RT9013/capacitor/FPGA pin swaps, narrower copper and a broken 1V2 route change or fail the extracted result"
@@ -3044,11 +3089,11 @@ cmd = "python3 tools/fab_profile_containment.py && python3 test/hw/test_fab_prof
 [[test]]
 id = "FAB-002"
 title = "Plotted filled copper and silk regions meet minimum neck width"
-checks = "every filled region on all eight receipt-bound boards' copper and silkscreen Gerbers has a conclusive minimum-neck proof; synthetic 80 um copper/silk necks fail, an exact orthogonal region passes, and a sloped region is deferred rather than passed; any deferred region keeps the gate red"
-method = "tools/fab_neck_coverage.py --require-complete plus synthetic regressions in test/hw/test_fab_neck_coverage.py; complex and holed fills are currently deferred (doc/hardware/filled-neck-and-silk-text-audit-20260928.md)"
+checks = "every filled region on all eight receipt-bound boards' copper and silkscreen Gerbers has a conclusive minimum-neck proof; actual parsed 80 um copper/silk necks and corrupt layers fail, exact-rule orthogonal regions and certified wide beveled corners pass; any unproved region keeps the gate red"
+method = "tools/fab_neck_coverage.py --require-complete, geometric regressions and real fabrication-gate integration checks; unchanged rules and fail-closed coverage (doc/hardware/filled-neck-and-silk-text-audit-20260928.md)"
 kind = "static"
 vrow = "4.9"
-cmd = "python3 test/hw/test_fab_neck_coverage.py && python3 tools/fab_neck_coverage.py --require-complete"
+cmd = "python3 test/hw/test_fillfeature.py && python3 test/hw/test_fab_neck_coverage.py && python3 test/test_fabcheck_neck_integration.py && python3 tools/fab_neck_coverage.py --require-complete"
 
 [[test]]
 id = "SI-005"
@@ -3085,3 +3130,57 @@ method = "test/hw/test_memory_budget.py"
 kind = "static"
 vrow = "1.7"
 cmd = "python3 test/hw/test_memory_budget.py"
+
+[[test]]
+id = "SIM-034A"
+title = "Fitted reset monitor functional native model"
+checks = "Independent ladder voltages; healthy rails; actual 3V3 and 1V2 faults; positive-feedback hysteresis; common-anode diode reset; exact continuous 560ms MR recovery and retrigger; six powered U19 sinks and unpowered Ioff; broken diode, output, reference and feedback counterexamples. Functional electrical scope only, no guaranteed propagation or whole-chip RUN claim."
+method = "Compile and execute the actual native ResetMonitor header, then exercise machine integration, real rail injection, U19-to-TCA9555 wired-AND and failclosed missing source binding."
+kind = "sim"
+vrow = "3.1"
+cmd = "tools/fw_rp2040.sh && tools/emu_machine_build.sh && python3 test/hw/test_native_reset_monitor.py && node test/hw/test_native_reset_monitor.mjs"
+
+[[test]]
+id = "IC-005A"
+title = "Fitted IO port switch binding regression"
+checks = "Exact latch-off switch,45.3kILIM,enable/faultGPIOs,local andportcaps,complete modelednetloads/returns and unchangedbehavioralmodelparameters; wrongpart/value/polarity/extra-load/model mutations rejected."
+method = "test/hw/test_io_switch_bind.py"
+kind = "static"
+vrow = "4.4"
+cmd = "python3 test/hw/test_io_switch_bind.py build/hw/io/io.net"
+
+[[test]]
+id = "SIM-034B"
+title = "Actual copper rail-monitor disconnection semantics"
+checks = "A provenance-checked actual main board proves all64 electrical legs; isolatedMR loses only diode coupling with nominalinternalpull-up, opened analogue sense failsclosedcore, openedU19 output affects exactlyone slot; everymutant retains strict incompletecoverage."
+method = "Actual PCB launch-removal mutations, independently parsed native filled copper connectivity, exactbranchflags; no inventedreceipts."
+kind = "sim"
+vrow = "3.1"
+cmd = "python3 test/hw/test_reset_monitor_copper.py --main-netlist build/hw/main/main.net --main-board build/hw/main/main.kicad_pcb"
+
+[[test]]
+id = "MECH-010"
+title = "Mechanical actual eight-board read-only provenance roots"
+checks = "Actual completed eight packages; partial selector ignored, missing board, stale source or changed copper evidence rejected without generators; STEP cache binds root, PCB, exporter/options and actual 3D models"
+method = "test/hw/test_mech_board_root.py: actual receipt counterexamples"
+kind = "static"
+vrow = "4.7"
+cmd = "python3 test/hw/test_mech_board_root.py && python3 test/hw/test_mech_step_cache.py"
+
+[[test]]
+id = "SIM-035"
+title = "Native boot survives declared passive-low absent-slot MISO"
+checks = "Authentic ROM probes all absent slots without false C8/card detection or hang; raw selected-empty byte is FF high vs00 low; fitted IO remains detected and real sparse GPU/IO kernel BASIC executes42. Declared digital bias fixture is not physical shunt/SI approval."
+method = "test/hw/test_miso_absent_boot.py with receipt-validated boards and copied routed top; source/native/ROM hashes and observed emulated retry duration"
+kind = "sim"
+vrow = "3.1"
+cmd = "python3 test/hw/test_miso_absent_boot.py --top doc/hardware/si-evidence/ibis-final-top.json --board-root build/hw --output-dir build/test/miso-absent-boot"
+
+[[test]]
+id = "BRD-008"
+title = "Manufacturing readiness rejects stale and development evidence"
+checks = "Content-bound complete required catalogue with unique IDs, actual log hashes, all eight current qty2 receipts and live-stock scope; stale source despite timestamps, changed placement/log, offline packages and unlisted failed/pending tests fail; Makefile propagates readiness failure"
+method = "test/host/test_verification_binding.py synthetic package/report counterexamples using the actual receipt validator; not a manufacturing pass"
+cmd = "python3 test/host/test_verification_binding.py"
+kind = "static"
+vrow = "4.8"

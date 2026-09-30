@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """The Wi-Fi card (doc/hardware/wifi-card.md): an ESP32-C3-MINI-1U on a slot
 card, powered from the slot's +5V through its own TLV62569 buck, with MISO
-released through an AHC buffer whenever the card is not selected; a 270 ohm
-source resistor and 10k ground bias damp the shared return.
+released through a TI LVC buffer whenever the card is not selected; a 220 ohm
+source resistor and 47k ground bias damp the shared return. Three permanently
+enabled local TI stages isolate the ESP clock/data/select input pads.
 
     python3 hw/boards/wifi.py [outdir]      (default build/hw/wifi)
 """
@@ -14,6 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import logo  # noqa: E402
 import rp2040card as rc  # noqa: E402
 
@@ -28,7 +30,7 @@ SLOT_GPIO = {"SCK": "IO6", "MOSI": "IO7", "MISO_OUT": "IO5", "CS_n": "IO10", "IR
 
 
 def schematic(path, footprint_libs):
-    s = kg.Schematic("wifi", "CUPC/8 Wi-Fi card")
+    s = kg.Schematic("wifi", "CUPC/8 Wi-Fi card", paper="A1")
     j1 = s.add("cupc8:CUPC8_Slot", "J1", "slot", "Connector_PCBEdge:BUS_PCIexpress_x1", at=(30 * G, 50 * G))
     u1 = s.add("jlc:ESP32-C3-MINI-1U-N4", "U1", "ESP32-C3-MINI-1U-N4",
                "jlc:WIFIM-SMD_61P-L13.2-W12.5-P0.80", at=(110 * G, 50 * G), fields={"LCSC": "C2911374"})
@@ -39,8 +41,29 @@ def schematic(path, footprint_libs):
                at=(70 * G, 18 * G), fields={"LCSC": "C141836"})
     l1 = s.add("Device:L", "L1", "2.2u", "jlc:IND-SMD_L3.0-W3.0_FNR30XXS", at=(82 * G, 12 * G), rot=90,
                fields={"LCSC": "C167747"})
-    u3 = s.add("jlc:SN74AHC1G125DCKR_C151890", "U3", "SN74AHC1G125DCKR", "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR",
-               at=(70 * G, 80 * G), fields={"LCSC": "C151890"})
+    # Generic KiCad logic graphics leave signal names blank. Annotate the
+    # actual TI DCK numeric pins for independent BOM/datasheet checks;
+    # numbers, locations, pin electrical types and circuit nets stay exact.
+    logic = s._symbol("74xGxx:74LVC1G125")
+    names = {"1": "~{OE}", "2": "A", "3": "GND", "4": "Y", "5": "VCC"}
+    seen = set()
+    for unit in kg.find(logic, "symbol"):
+        for pin in kg.find(unit, "pin"):
+            number = str(kg.find1(pin, "number")[1])
+            if number not in names:
+                raise ValueError("unexpected TI125 generic symbol pin " + number)
+            kg.find1(pin, "name")[1] = kg.Q(names[number])
+            seen.add(number)
+    if seen != set(names):
+        raise ValueError("TI125 generic symbol numeric pin set changed")
+    if not kg.find1(logic, "pin_names"):
+        logic.insert(2, ["pin_names", "hide"])
+    else:
+        kg.find1(logic, "pin_names").append("hide")
+    rc.hide_pin_numbers(s, "74xGxx:74LVC1G125")
+
+    u3 = s.add("74xGxx:74LVC1G125", "U3", "SN74LVC1G125DCKR", "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR",
+               at=(70 * G, 80 * G), fields={"LCSC": "C7833"})
 
     def passive(kind, ref, val, fp, lcsc, at, rot=90):
         return s.add("Device:" + kind, ref, val, fp, at=at, rot=rot, fields={"LCSC": lcsc})
@@ -78,7 +101,7 @@ def schematic(path, footprint_libs):
                 rot=90)
     f1 = s.add("power:PWR_FLAG", "#FLG01", "PWR_FLAG", at=(50 * G, 12 * G))
     f2 = s.add("power:PWR_FLAG", "#FLG02", "PWR_FLAG", at=(56 * G, 12 * G))
-    # Regulated power crosses the passive inductor before the AHC VCC pin.
+    # Regulated power crosses the passive inductor before the LVC VCC pin.
     f3 = s.add("power:PWR_FLAG", "#FLG03", "PWR_FLAG", at=(120 * G, 12 * G))
     s.connect(f3, 1, "3V3")
 
@@ -129,10 +152,10 @@ def schematic(path, footprint_libs):
             s.nc(u1, num)
     s.connect(u1, "3V3", "3V3")
     s.connect(u1, "EN", "EN")
-    s.connect(u1, SLOT_GPIO["SCK"], "SCK")
-    s.connect(u1, SLOT_GPIO["MOSI"], "MOSI")
+    s.connect(u1, SLOT_GPIO["SCK"], "WIFI_SCK_PAD")
+    s.connect(u1, SLOT_GPIO["MOSI"], "WIFI_MOSI_PAD")
     s.connect(u1, SLOT_GPIO["MISO_OUT"], "MISO_INT")
-    s.connect(u1, SLOT_GPIO["CS_n"], "CS_n")
+    s.connect(u1, SLOT_GPIO["CS_n"], "WIFI_CS_n_PAD")
     s.connect(u1, SLOT_GPIO["IRQ_n"], "IRQ_n")
     s.connect(u1, "RXD0", "U0RXD")
     s.connect(u1, "TXD0", "U0TXD")
@@ -154,11 +177,11 @@ def schematic(path, footprint_libs):
         s.connect(r, 2, net)
 
     # MISO released unless this card is selected
-    s.connect(u3, "~{OE}", "CS_n")
+    s.connect(u3, "~{OE}", "CS_OE")
     s.connect(u3, "A", "MISO_INT")
     s.connect(u3, "Y", "MISO_SRC")
-    r60 = passive("R", "R60", "270", R0402, "C25099", (70 * G, 100 * G))
-    r61 = passive("R", "R61", "10k", R0402, "C25744", (90 * G, 100 * G))
+    r60 = passive("R", "R60", "220", R0402, "C25091", (70 * G, 100 * G))
+    r61 = passive("R", "R61", "47k", R0402, "C25792", (90 * G, 100 * G))
     s.connect(r60, 1, "MISO_SRC")
     s.connect(r60, 2, "MISO")
     s.connect(r61, 1, "MISO")
@@ -188,6 +211,38 @@ def schematic(path, footprint_libs):
     # native USB-Serial/JTAG, for debugging only
     s.connect(tp1, 1, "USB_DN")
     s.connect(tp2, 1, "USB_DP")
+
+    # Permanent local TI stages isolate all three ESP input pads from the slot rail.
+    # Exact physical routes are a separate extracted SI qualification.
+    for i, (signal, uref, rin, rout, cin, cout, bypass, capval, capcode) in enumerate((
+            ("CS_n", "U4", "R62", "R63", "C60", "C61", "C62", "10p", "C32949"),
+            ("SCK", "U5", "R64", "R65", "C63", "C64", "C65", "5.6p", "C161329"),
+            ("MOSI", "U6", "R66", "R67", "C66", "C67", "C68", "4.7p", "C161327"))):
+        row = (30 + 50 * i) * G
+        a, y, pad = ("WIFI_" + signal + suffix for suffix in ("_A", "_Y", "_PAD"))
+        u = s.add("74xGxx:74LVC1G125", uref, "SN74LVC1G125DCKR",
+                  "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR", at=(230 * G, row), fields={"LCSC": "C7833"})
+        for pin, name in ((1, "GND"), (2, a), (3, "GND"), (4, y), (5, "3V3")):
+            s.connect(u, pin, name)
+        for ref, first, second, at in ((rin, signal, a, (200 * G, row)), (rout, y, pad, (260 * G, row))):
+            r = passive("R", ref, "270" if ref in ("R63", "R65") else "220", R0402,
+                        "C25099" if ref in ("R63", "R65") else "C25091", at, rot=0)
+            s.connect(r, 1, first); s.connect(r, 2, second)
+        for ref, value, code, name, at in ((cin, capval, capcode, a, (200 * G, row + 18 * G)),
+                (cout, "10p", "C32949", (pad + "_CAP" if cout in ("C61", "C64") else pad), (260 * G, row + 18 * G)),
+                (bypass, "100n", "C1525", "3V3", (230 * G, row + 18 * G))):
+            c = passive("C", ref, value, "Capacitor_SMD:C_0402_1005Metric", code, at)
+            s.connect(c, 1, name); s.connect(c, 2, "GND")
+    # Series damping in the capacitor shunt branches only; no change to
+    # the ESP endpoints or physical routes; R63/R65 have separate output damping.
+    for ref, net, at in (("R69", "WIFI_CS_n_PAD", (270 * G, 58 * G)),
+                         ("R70", "WIFI_SCK_PAD", (270 * G, 108 * G))):
+        r = passive("R", ref, "15", R0402, "C25083", at, rot=0)
+        s.connect(r, 1, net); s.connect(r, 2, net + "_CAP")
+    r68 = passive("R", "R68", "220", R0402, "C25091", (75 * G, 122 * G), rot=0)
+    s.connect(r68, 1, "CS_n"); s.connect(r68, 2, "CS_OE")
+    c69 = passive("C", "C69", "10p", "Capacitor_SMD:C_0402_1005Metric", "C32949", (90 * G, 122 * G))
+    s.connect(c69, 1, "CS_OE"); s.connect(c69, 2, "GND")
 
     left = s.unconnected()
     if left:
@@ -232,9 +287,58 @@ PLACEMENT = {
     "TP1": (34, -38, 0),
     "TP2": (28, -38, 0),
 }
+PLACEMENT.update({'R5': (-3.0, -38.5, 0.0), 'R4': (48.0, -20.0, 90.0), 'R9': (9.0, -16.0, 90.0), 'R62': (35.5, -20.8811, -90.0), 'U1': (41.0, -29.0, 0.0), 'H1': (52.0, -40.0, 0.0), 'R8': (16.0, -38.5, 0.0), 'L1': (4.0, -20.0, 0.0), 'D3': (10.0, -41.0, 0.0), 'C2': (11.0, -12.5, 90.0), 'R61': (21.0, -16.16, 90.0), 'C1': (-2.5, -9.0, 90.0), 'R6': (4.0, -38.5, 0.0), 'U3': (26.0, -15.0, 0.0), 'R67': (50.0, -23.0, 0.0), 'TP2': (28.0, -38.0, 0.0), 'C3': (32.5, -31.4, 0.0), 'R3': (50.0, -20.0, 90.0), 'D4': (16.0, -41.0, 0.0), 'C4': (26.0, -18.5, 0.0), 'R2': (52.0, -20.0, 90.0), 'R60': (22.5, -15.65, 180.0), 'C69': (25.5, -13.0, 0.0), 'C5': (32.0, -14.0, 90.0), 'J1': (0.0, 0.0, 0.0), 'D2': (4.0, -41.0, 0.0), 'U2': (4.0, -15.0, 0.0), 'D1': (-3.0, -41.0, 0.0), 'R10': (11.0, -16.0, 90.0), 'TP1': (34.0, -38.0, 0.0), 'R7': (10.0, -38.5, 0.0), 'R1': (30.0, -14.0, 90.0), 'C62': (36.25, -19.75, -90.0, 'B'), 'C66': (47.5, -19.25, 180.0, 'B'), 'U5': (47.75, -25.5, 0.0, 'B'), 'C63': (48.0, -28.75, 90.0, 'B'), 'C67': (43.75, -30.25, 90.0, 'B'), 'R65': (45.5, -25.0, 90.0, 'B'), 'R64': (41.5, -22.25, 180.0, 'B'), 'C60': (33.5, -23.0, 90.0, 'B'), 'R63': (34.0, -20.5, 180.0, 'B'), 'C64': (42.5, -25.5, 90.0, 'B'), 'U4': (36.5, -22.0, 90.0, 'B'), 'R66': (49.5, -20.25, -90.0, 'B'), 'C61': (39.5, -24.25, 0.0, 'B'), 'U6': (48.05, -22.1, -90.0, 'B'), 'C68': (49.0, -29.5, 90.0, 'B'), 'C65': (45.75, -29.5, 90.0, 'B')})
+PLACEMENT.update({'C63': (48.0, -28.0, 270.0, 'B'), 'C69': (25.5, -11.4, 0.0), 'R68': (27.8, -11.8, 90.0)})
 LOGO_MM = 12
 # doc/milestone-1.md, Board revision: bump for every board sent to be made
 TITLE, REVISION = "CUPC/8 Wi-Fi", "A"
+
+
+
+# Visible references are pinned to the independently checked two-sided layout.
+_SPI_REF_POSITIONS = {'R5': (-3.0, -36.825, 0.0, 1.0, 0.15, True), 'R4': (45.425, -19.0, 0.0, 1.0, 0.15, True), 'R9': (9.0, -13.575, 0.0, 1.0, 0.15, True), 'R62': (38.500001, -18.106099, 90.0, 0.8, 0.15, True), 'U1': (41.0, -36.845, 0.0, 1.0, 0.15, True), 'H1': (52.001264, -35.602474, 0.0, 1.0, 0.15, True), 'R8': (16.0, -36.825, 0.0, 1.0, 0.15, True), 'L1': (4.0, -22.445, 0.0, 1.0, 0.15, True), 'D3': (10.0, -42.43, 0.0, 1.0, 0.15, False), 'C2': (13.825, -12.5, 0.0, 1.0, 0.15, True), 'R61': (18.685, -16.16, 0.0, 1.0, 0.15, True), 'C1': (-2.5, -6.355, 0.0, 1.0, 0.15, True), 'R6': (4.0, -36.825, 0.0, 1.0, 0.15, True), 'U3': (29.85, -18.0, 0.0, 1.0, 0.15, True), 'R67': (52.775, -25.0, 0.0, 0.8, 0.15, True), 'TP2': (27.998759, -40.046236, 0.0, 1.0, 0.15, True), 'C3': (29.175, -31.4, 0.0, 1.0, 0.15, True), 'R3': (50.0, -17.575, 0.0, 1.0, 0.15, True), 'D4': (16.0, -42.43, 0.0, 1.0, 0.15, False), 'C4': (22.675, -18.5, 0.0, 1.0, 0.15, True), 'R2': (54.574999, -20.0, 0.0, 1.0, 0.15, True), 'R60': (19.724999, -12.649999, 0.0, 1.0, 0.15, True), 'R68': (27.8, -9.1, 0.0, 0.8, 0.15, True), 'C69': (22.745, -8.4, 0.0, 0.8, 0.15, True), 'C5': (34.574999, -13.0, 0.0, 1.0, 0.15, True), 'J1': (8.5, -6.395, 0.0, 1.0, 0.15, True), 'D2': (4.0, -42.43, 0.0, 1.0, 0.15, False), 'U2': (4.0, -17.395, 0.0, 1.0, 0.15, True), 'D1': (-3.0, -42.43, 0.0, 1.0, 0.15, False), 'R63': (35.75, -18.75, 0.0, 0.8, 0.15, True), 'R10': (13.575, -16.0, 0.0, 1.0, 0.15, True), 'G1': (7.0, -29.0, 0.0, 1.0, 0.15, False), 'TP1': (33.998759, -40.046236, 0.0, 1.0, 0.15, True), 'R7': (10.0, -36.825, 0.0, 1.0, 0.15, True), 'R1': (29.0, -11.575, 0.0, 1.0, 0.15, True), 'C62': (38.555, -18.75, 0.0, 0.8, 0.15, True), 'R69': (40.5, -25.25, 0.0, 0.8, 0.15, True), 'C66': (50.254999, -18.25, 0.0, 0.8, 0.15, True), 'U5': (43.0, -28.0, 0.0, 0.8, 0.15, True), 'C63': (45.695, -31.0, 0.0, 0.8, 0.15, True), 'C67': (41.445, -30.25, 0.0, 0.8, 0.15, True), 'R65': (44.9, -19.8, 0.0, 0.8, 0.15, True), 'R64': (40.7, -20.45, 0.0, 0.8, 0.15, True), 'C60': (31.195, -22.0, 0.0, 0.8, 0.15, True), 'C64': (42.5, -23.645, 0.0, 0.8, 0.15, True), 'U4': (36.5, -24.95, 0.0, 0.8, 0.15, True), 'R66': (51.815, -21.25, 0.0, 0.8, 0.15, True), 'C61': (39.5, -27.055, 0.0, 0.8, 0.15, True), 'U6': (51.199999, -25.1, 0.0, 0.8, 0.15, True), 'C68': (51.305, -28.5, 0.0, 0.8, 0.15, True), 'R70': (46.0, -27.5, 0.0, 0.8, 0.15, True), 'C65': (47.25, -32.754999, 0.0, 0.8, 0.15, True)}
+
+_SPI_REF_POSITIONS['R68'] = (27.8, -9.1, 0.0, 0.8, 0.15, True)
+
+def _pin_spi_designators(board):
+    import pcbnew
+    for ref, (x, y, angle, size, stroke, visible) in _SPI_REF_POSITIONS.items():
+        fp = board.FindFootprintByReference(ref)
+        if fp is None:
+            raise ValueError("SPI physical reference missing: " + ref)
+        text = fp.Reference()
+        text.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
+        text.SetTextAngleDegrees(angle)
+        text.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(size), pcbnew.FromMM(size)))
+        text.SetTextThickness(pcbnew.FromMM(stroke))
+        text.SetVisible(visible)
+        text.SetLayer(pcbnew.B_SilkS if fp.IsFlipped() else pcbnew.F_SilkS)
+        text.SetMirrored(fp.IsFlipped())
+
+def _finish_spi(board):
+    import pcbnew, route_seed
+    route_seed.verify_installed(board, os.path.join(HERE, "wifi-full-route-seed.json"))
+    # Remove only the new U6 marker clipped by its necessary local GND return.
+    fp = board.FindFootprintByReference("U6")
+    graphics = fp.GraphicalItems()
+    for item in [graphics[i].Cast() for i in range(len(graphics))]:
+        if item.GetLayer() == pcbnew.B_SilkS and item.GetShape() == pcbnew.SHAPE_T_CIRCLE:
+            fp.Remove(item)
+            item.thisown = False
+    kg.clip_silk_to_pads(board)
+    _pin_spi_designators(board)
+
+PLACEMENT.update({'R63': (37.25, -22.0, 90.0), 'R69': (40.5, -23.25, 180.0, 'B'), 'R70': (43.5, -25.25, 90.0, 'B')})
+
+def _seeded_route(board, workdir):
+    import route_seed
+    result = route_seed.apply(
+        board, os.path.join(HERE, "wifi-full-route-seed.json"),
+        board_name="wifi", pour_nets=("/GND",),
+        post_route_contract="wifi-lvc-permanent-local-spi-oe-v2")
+    print("Wi-Fi full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
 
 
 def main():
@@ -244,7 +348,11 @@ def main():
                        graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM, 7, -29, 0)],
                        labels={"D1": "PWR", "D2": "LINK", "D3": "TX", "D4": "RX"},
                        title=TITLE, revision=REVISION, logo_keepout=True,    # bottom right
-                       prepare=lambda board: rc.miso_launch(board, "U3"),
+                       prepare=lambda board: rc.miso_launch(board, "U3", oe_net="/CS_OE"),
+                       seeded_route=_seeded_route,
+                       post_route=_finish_spi,
+                       post_fill=(lambda board: ff.round_board_fills(board, "wifi")),
+                       designator_reach=4,
                        pad_via_clear=0.1)      # no open via hole in the module's GND pads (audit I6)
     print("LCSC:", " ".join(sorted(lcsc)))
 

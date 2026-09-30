@@ -79,6 +79,29 @@ async function waitFor(m, want, ns) {
   return found;
 }
 
+// Keep subprocess stdout and stderr distinct, including binary FAT file reads.
+// Regular file descriptors follow romimage.mjs's local build capture path.
+function captureLocalFile(command, args) {
+  fs.mkdirSync(path.join(ROOT, 'build/emu'), { recursive: true });
+  const dir = fs.mkdtempSync(path.join(ROOT, 'build/emu', 'subprocess-'));
+  const stdout = path.join(dir, 'stdout');
+  const stderr = path.join(dir, 'stderr');
+  const out = fs.openSync(stdout, 'w');
+  const err = fs.openSync(stderr, 'w');
+  try {
+    execFileSync(command, args, { stdio: ['ignore', out, err] });
+    return fs.readFileSync(stdout);
+  } catch (error) {
+    error.stdout = fs.readFileSync(stdout);
+    error.stderr = fs.readFileSync(stderr);
+    error.message += `\nSubprocess logs: ${dir}\n${error.stderr.toString()}`;
+    throw error;
+  } finally {
+    fs.closeSync(out);
+    fs.closeSync(err);
+  }
+}
+
 // ------------------------------------------------------------------ E2E-002
 async function e2e002() {
   log('E2E-002: blank ROM, program it over USB, boot to BASIC, run a program');
@@ -280,7 +303,7 @@ async function e2e007() {
   }
   const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-e2e007-'));
-  const fat = (...a) => execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
+  const fat = (...a) => captureLocalFile(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
   const img = path.join(dir, 'card.img');
   fat('mkfs', img, '16', '16');
   fs.writeFileSync(path.join(dir, 'host.bas'), '10 print 100+23\r\n20 print "FROM THE HOST"\r\n');
@@ -546,7 +569,7 @@ async function e2e011() {
   if (!expect(backend === 'native', 'E2E-011 needs the native emulator (CUPC8_EMU=native)')) return;
   const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-e2e011-'));
-  const fat = (...a) => execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
+  const fat = (...a) => captureLocalFile(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), ...a]);
   const img = path.join(dir, 'card.img');
   fat('mkfs', img, '16', '16');
   const prg = mkprg('tools/testdata/exec_prog.s');

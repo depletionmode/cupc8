@@ -41,7 +41,10 @@ PINNED_BOUNDARY = {**{net: 'card_control' for net in (
 
 
 def main():
-    args = board_args(__doc__).parse_args()
+    parser = board_args(__doc__)
+    parser.add_argument('--gpu-crystal-only', action='store_true',
+                        help='run local GPU crystal counterexamples; does not satisfy the full coverage gate')
+    args = parser.parse_args()
     main_circuit = read(args.main_netlist)
     boards = card_boards(args)
     implemented = implemented_checks()
@@ -53,21 +56,21 @@ def main():
 
         # --- 1. non-digital waivers
         waivers = reviewed_analog_waivers(circuits, implemented)
-        assert waivers['main:+3V3']['checks'] and 'POW-001' in waivers['main:+3V3']['checks']
+        assert waivers['main:3V3_BUCK']['checks'] and 'POW-001' in waivers['main:3V3_BUCK']['checks']
         for key, waiver in waivers.items():
             assert set(waiver['checks']) <= implemented, key
             board, net = key.split(':', 1)
             assert waiver['pins'] == [f'{r}.{p}' for r, p in circuits[board].nets['/' + net]], key
         logic = copy.deepcopy(main_circuit)
-        logic.nets['/+3V3'] = logic.nets['/+3V3'] + (('U7', '74'),)
-        logic.pins[('U7', '74')] = '/+3V3'
-        assert 'main:+3V3' not in reviewed_analog_waivers({**circuits, 'main': logic}, implemented)
-        assert 'main:+3V3' in audit({**circuits, 'main': logic}, set(), set(), implemented)['unmodeled_nets']
-        assert 'main:+3V3' not in reviewed_analog_waivers(circuits, implemented - {'POW-001'})
+        logic.nets['/3V3_BUCK'] = logic.nets['/3V3_BUCK'] + (('U7', '74'),)
+        logic.pins[('U7', '74')] = '/3V3_BUCK'
+        assert 'main:3V3_BUCK' not in reviewed_analog_waivers({**circuits, 'main': logic}, implemented)
+        assert 'main:3V3_BUCK' in audit({**circuits, 'main': logic}, set(), set(), implemented)['unmodeled_nets']
+        assert 'main:3V3_BUCK' not in reviewed_analog_waivers(circuits, implemented - {'POW-001'})
         driven = copy.deepcopy(main_circuit)
         driven.nets['/GND'] = driven.nets['/GND'] + (('U13', '4'),)  # a TCA9555 output, not a strap
         assert 'main:GND' not in reviewed_analog_waivers({**circuits, 'main': driven}, implemented)
-        print(f'{len(waivers)} non-digital waivers name implemented checks; a logic pin on +3V3, '
+        print(f'{len(waivers)} non-digital waivers name implemented checks; a logic pin on 3V3_BUCK, '
               'an expander output on GND, or an unimplemented check removes the waiver')
 
         # the Wi-Fi boot straps (WC-006) and the POWER switch / eFuse enable chain (MB-053)
@@ -93,7 +96,10 @@ def main():
             sorted(set(PINNED_BOUNDARY.items()) ^ {(k, v[0]) for k, v in BOUNDARY.items()})
         assert len(PINNED_BOUNDARY) == 50
         boundary = reviewed_boundary_waivers(circuits, implemented)
-        assert set(boundary) == set(PINNED_BOUNDARY), sorted(set(PINNED_BOUNDARY) ^ set(boundary))
+        runtime_resets = {f'main:SLOT{n}_RST_n' for n in range(1, 7)}
+        assert set(boundary) == set(PINNED_BOUNDARY) - runtime_resets, sorted(set(PINNED_BOUNDARY) ^ set(boundary))
+        assert not runtime_resets.intersection(boundary)
+        assert 'main:+3V3' not in waivers  # fitted REF enable and U19 logic require the monitor model
         catalogue_ids = {row['id'] for row in tomllib.loads((ROOT / 'test/catalogue.toml').read_text())['test']}
         for key, waiver in boundary.items():
             board, net = key.split(':', 1)
@@ -106,9 +112,9 @@ def main():
         # the decisions that name a verifying row: the GPU DDC/HPD first-article row, the reset and
         # boot-select bring-up rows, the Wi-Fi bring-up row
         assert boundary['gpu:DDC_SCL']['verified_by'] == ['GC-105'], boundary['gpu:DDC_SCL']
-        assert boundary['main:SLOT3_RST_n']['verified_by'] == ['MB-106', 'WC-101']
+        assert boundary['wifi:EN']['verified_by'] == ['MB-106', 'WC-101']
         assert boundary['wifi:LED_TX']['verified_by'] == ['WC-101']
-        for key, pin in (('main:SLOT1_RST_n', ('U7', '74')), ('gpu:HDMI_HPD', ('U1', '2')),
+        for key, pin in (('main:SLOT1_PROG_n', ('U7', '74')), ('gpu:HDMI_HPD', ('U1', '2')),
                          ('wifi:LED_TX', ('U1', '30')), ('io:UART_TX', ('U1', '3'))):
             board, net = key.split(':', 1)
             extra = copy.deepcopy(circuits[board])
@@ -116,16 +122,16 @@ def main():
             extra.pins[pin] = '/' + net
             assert key not in reviewed_boundary_waivers({**circuits, board: extra}, implemented), key
             assert key in audit({**circuits, board: extra}, set(), set(), implemented)['unmodeled_nets'], key
-        # a part swapped on a waived net (the 10k pull-up R204 of SLOT1_RST_n replaced by a transistor)
+        # a part swapped on a waived net (the 10k pull-up R205 of SLOT1_PROG_n replaced by a transistor)
         swapped = copy.deepcopy(circuits['main'])
-        swapped.nets['/SLOT1_RST_n'] = tuple(('Q9', '1') if r == 'R204' else (r, p)
-                                             for r, p in swapped.nets['/SLOT1_RST_n'])
-        assert 'main:SLOT1_RST_n' not in reviewed_boundary_waivers({**circuits, 'main': swapped}, implemented)
-        assert 'main:SLOT1_RST_n' not in reviewed_boundary_waivers(circuits, implemented - {'MB-004'})
+        swapped.nets['/SLOT1_PROG_n'] = tuple(('Q9', '1') if r == 'R205' else (r, p)
+                                             for r, p in swapped.nets['/SLOT1_PROG_n'])
+        assert 'main:SLOT1_PROG_n' not in reviewed_boundary_waivers({**circuits, 'main': swapped}, implemented)
+        assert 'main:SLOT1_PROG_n' not in reviewed_boundary_waivers(circuits, implemented - {'MB-004'})
         counts = {}
         for waiver in boundary.values():
             counts[waiver['family']] = counts.get(waiver['family'], 0) + 1
-        assert counts == {'boundary_test_access': 10, 'boundary_card_control': 18,
+        assert counts == {'boundary_test_access': 10, 'boundary_card_control': 12,
                           'boundary_unused_by_fw': 10, 'boundary_passive_loop': 2,
                           'boundary_external_header': 2, 'boundary_esp_pins': 8}, counts
         print(f'{len(boundary)} boundary waivers accepted by David 2026-09-29 ({counts}): pinned by name; '
@@ -149,12 +155,18 @@ def main():
 
         # --- 2. crystals: copper and the native machine
         good = check(cards, main_circuit, args.main_board, boards, args.system_board, args.cpu_board)
+        assert good['coverage_complete'] and good['runtime']['reset_monitor']['complete']
+        assert all(f'main:SLOT{n}_RST_n' not in good['unmodeled_nets'] for n in range(1, 7))
         good_top = temporary / 'good.json'
         good_top.write_text(json.dumps(good))
         frames = run(good_top, SLOT_PROBE)['frames']
-        assert frames > 0 and run(good_top, SYSTEM_BOOT_PROBE)['systemCard']
+        assert frames > 0
+        if not args.gpu_crystal_only:
+            assert run(good_top, SYSTEM_BOOT_PROBE)['systemCard']
         for board, ref, pin, net in (('gpu', 'U1', '20', '/XIN'), ('gpu', 'R2', '2', '/XTAL_OUT'),
                                      ('system', 'U1', '21', '/XOUT')):
+            if args.gpu_crystal_only and board != 'gpu':
+                continue
             source = args.system_board if board == 'system' else boards[board]
             opened = temporary / f'open-{board}-{ref}-{pin}.kicad_pcb'
             tracks = open_pad(source, opened, ref, pin, net)
@@ -175,7 +187,10 @@ def main():
                 shown = 'system card firmware absent'
             print(f'open {board} {ref}.{pin} {net} ({tracks} tracks): crystal link cleared, '
                   f'{net[1:]} a coverage gap again, {shown}')
-    print('coverage waivers and crystal boot prerequisites: all counterexamples detected')
+    if args.gpu_crystal_only:
+        print('GPU crystal subset PASS: actual source and both native copper counterexamples; full coverage gate still requires the system-card TCP probe')
+    else:
+        print('coverage waivers and crystal boot prerequisites: all counterexamples detected')
 
 
 if __name__ == '__main__':

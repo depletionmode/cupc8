@@ -74,6 +74,10 @@ std::string str(napi_env env, napi_value v) {
   return s;
 }
 
+napi_value boolean(napi_env env, bool b) {
+  napi_value v; napi_get_boolean(env,b,&v); return v;
+}
+
 napi_value num(napi_env env, double d) {
   napi_value v;
   napi_create_double(env, d, &v);
@@ -164,6 +168,25 @@ napi_value js_create(napi_env env, napi_callback_info info) {
     opt.sysctlResetConnected = flag("sysctlResetConnected", true);
     opt.resetButtonConnected = flag("resetButtonConnected", true);
     opt.resetButtonPressed = flag("resetButtonPressed", false);
+    opt.resetMonitorEnabled = flag("resetMonitorEnabled", false);
+    if (napi_value rm=prop(env,o,"resetMonitor"); isType(env,rm,napi_object)) {
+      napi_value complete=prop(env,rm,"core_complete");
+      if(!isType(env,complete,napi_boolean)||napi_get_value_bool(env,complete,&opt.resetMonitorSourceComplete)!=napi_ok)
+        throw std::runtime_error("resetMonitor: missing complete physical binding");
+      for (const auto &row: {std::pair<const char*,bool*>{"diode33",&opt.resetMonitorConfig.diodeConnected[0]},
+                            {"diode12",&opt.resetMonitorConfig.diodeConnected[1]}}) {
+        napi_value v=prop(env,rm,row.first);
+        if (!isType(env,v,napi_boolean)||napi_get_value_bool(env,v,row.second)!=napi_ok)
+          throw std::runtime_error("resetMonitor: missing diode connectivity");
+      }
+      napi_value a=prop(env,rm,"slots"); uint32_t n=0;
+      if (!a||napi_get_array_length(env,a,&n)!=napi_ok||n!=6)
+        throw std::runtime_error("resetMonitor: six slot clamps required");
+      for(uint32_t i=0;i<6;i++) {napi_value v; napi_get_element(env,a,i,&v);
+        if(!isType(env,v,napi_boolean)||napi_get_value_bool(env,v,&opt.resetMonitorConfig.clampConnected[i])!=napi_ok)
+          throw std::runtime_error("resetMonitor: invalid slot clamp");
+      }
+    }
     opt.chipsetClockConnected = flag("chipsetClockConnected", true);
     opt.threaded = flag("threaded", true);
     opt.spiLog = flag("spiLog", false);
@@ -505,6 +528,23 @@ ENTRY(js_ioVbus, {
 // sysctl's I2C expanders as they are now: [{address, pins: [port0, port1]}],
 // the level on each pin (an input pin: what the board puts on it; an output
 // pin: what it drives). Test hook for the presence and ID inputs.
+ENTRY(js_resetMonitor, {
+  const auto &s=m->resetMonitorState(); napi_value o; napi_create_object(env,&o);
+  for(const auto &v: {std::pair<const char*,double>{"vref",s.vref},{"tap33",s.tap33},
+      {"tap12",s.tap12},{"plus33",s.plus33},{"plus12",s.plus12},
+      {"out33",s.out33},{"out12",s.out12},{"mr",s.mr}}) set(env,o,v.first,num(env,v.second));
+  set(env,o,"por",boolean(env,s.por)); napi_value slots; napi_create_array_with_length(env,6,&slots);
+  for(uint32_t i=0;i<6;i++) napi_set_element(env,slots,i,boolean(env,s.slotHigh[i]));
+  set(env,o,"slots",slots); return o;
+})
+
+ENTRY(js_setResetRails, {
+  double v[3];
+  for(size_t i=0;i<3;i++) if(napi_get_value_double(env,a.argv[i+1],&v[i])!=napi_ok)
+    throw std::runtime_error("setResetRails requires three voltages");
+  m->setResetRails(v[0],v[1],v[2]); return nullptr;
+})
+
 ENTRY(js_expanders, {
   napi_value list;
   napi_create_array(env, &list);
@@ -903,6 +943,7 @@ napi_value init(napi_env env, napi_value exports) {
     const char *name;
     napi_callback fn;
   } fns[] = {
+      {"resetMonitor",js_resetMonitor}, {"setResetRails",js_setResetRails},
       {"create", js_create},   {"powerOn", js_powerOn},   {"runFor", js_runFor},     {"ns", js_ns},
       {"state", js_state},     {"leds", js_leds},     {"expanders", js_expanders},  {"progTarget", js_progTarget}, {"ioVbus", js_ioVbus},     {"frame", js_frame},       {"screen", js_screen},     {"type", js_type},
       {"press", js_press},     {"cdcWrite", js_cdcWrite}, {"cdcRead", js_cdcRead}, {"consoleOpen", js_consoleOpen},   {"setThreaded", js_setThreaded},

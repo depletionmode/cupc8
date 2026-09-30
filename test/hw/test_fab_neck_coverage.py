@@ -4,10 +4,12 @@
 from pathlib import Path
 import sys
 import tempfile
+import numpy
+import math
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
-from fab_neck_coverage import analyze_layer, ProofGeometry  # noqa: E402
+from fab_neck_coverage import analyze_layer, ProofGeometry, corner_caps, covering_corner_caps, ring_vertices  # noqa: E402
 
 
 def dumbbell(width):
@@ -90,6 +92,19 @@ def main():
             assert engine.boundary(shape) == boundary
             assert engine.distance(point, engine.boundary(shape)) == .5
         assert len(engine.shapes) == retained
+        # A certified cap reaches residue whose box excludes the corner.
+        vertices = ring_vertices(engine, [shape])
+        prepared = engine.prepare(shape)
+        radius = .05 / math.cos(math.pi / (4 * 128))
+        box = (.01, .01, .02, .02)
+        residue = engine.wkt('POLYGON ((.01 .01,.02 .01,.02 .02,.01 .02,.01 .01))')
+        assert not corner_caps(engine, prepared, vertices, box, radius)
+        caps = covering_corner_caps(engine, prepared, vertices, box, radius)
+        assert any(engine.covers(cap, residue) for cap in caps)
+        # Nearly pi by acos, but exactly opposite unit vectors: never emit NaN.
+        straight = (numpy.array([[.5, .5]]), numpy.array([[1.5, 2.5]]),
+                    numpy.array([[-.5, -1.5]]))
+        assert not corner_caps(engine, prepared, straight, (0, 0, 1, 1), radius)
     finally:
         engine.close()
     assert not engine._boundaries

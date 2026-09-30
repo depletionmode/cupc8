@@ -5,10 +5,26 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'hw/tools'))
 import boardevidence as evidence
 import boardcheck
+
+
+class PowerInvocationTests(unittest.TestCase):
+    def test_main_power_expands_dump_path_and_preserves_exact_out_argument(self):
+        out = Path('/tmp/development {braces}/main board')
+        with patch.object(evidence, 'validate', return_value={'boards': 2}), \
+             patch.object(boardcheck, 'run') as run:
+            boardcheck.check('main', 'power', out)
+        heat = next(call.args[0] for call in run.call_args_list
+                    if call.args[0][1] == 'hw/power/main_input_heat.py')
+        self.assertIs(heat[2], out)
+        self.assertEqual(heat[3:5], ['--solver', 'amg'])
+        self.assertEqual(heat[5:], ['--dump-results', str(out) + '/../main-thermal-results.json'])
+        self.assertNotIn('{out}', heat[-1])
+        self.assertIn('{braces}', heat[-1])
 
 
 class EvidenceTests(unittest.TestCase):
@@ -16,7 +32,10 @@ class EvidenceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for name in ('hw/boards/cpu.py', 'hw/boards/rp2040card.py', 'hw/pins.yaml', 'hw/tools/check.py'):
+        for name in ('hw/boards/cpu.py', 'hw/boards/cpu-full-route-seed.json',
+                     'hw/boards/rp2040card.py', 'hw/pins.yaml', 'hw/tools/check.py',
+                     'hw/power/copper_mesh.py', 'hw/power/polygon_raster.py',
+                     'tools/fab_neck_coverage.py'):
             p = self.root / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text('fixture')
@@ -39,6 +58,16 @@ class EvidenceTests(unittest.TestCase):
 
     def test_stale_source(self):
         (self.root / 'hw/boards/cpu.py').write_text('swapped pins')
+        with self.assertRaisesRegex(ValueError, 'stale board evidence'):
+            evidence.validate('cpu', self.out, self.root)
+
+    def test_changed_recorded_route_is_a_manufacturing_input(self):
+        (self.root / 'hw/boards/cpu-full-route-seed.json').write_text('different route')
+        with self.assertRaisesRegex(ValueError, 'stale board evidence'):
+            evidence.validate('cpu', self.out, self.root)
+
+    def test_changed_filled_geometry_checker_invalidates_receipt(self):
+        (self.root / 'tools/fab_neck_coverage.py').write_text('different neck proof')
         with self.assertRaisesRegex(ValueError, 'stale board evidence'):
             evidence.validate('cpu', self.out, self.root)
 

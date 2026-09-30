@@ -9,7 +9,8 @@ does). The footprint is board-only: no BOM line, no placement file entry.
 
     python3 hw/tools/logo.py [width_mm ...]    writes hw/lib/cupc8.pretty/
 
-Before writing, the smallest feature is checked against JLC's 0.15 mm
+Before writing, a 0.16 mm circular opening removes unprintable corner tips.
+Coordinates retain the KiCad 1 nm grid. The smallest feature is checked against JLC's 0.15 mm
 silkscreen line minimum on a 10 µm raster; a size that loses detail fails.
 """
 
@@ -162,6 +163,11 @@ def footprint(width_mm, layer="F.SilkS"):
             idx = ps.NewHole()
             for x, y in iu(hole):
                 ps.Append(x, y, -1, idx)
+    # Remove small convex projections from the existing artwork.
+    # A 0.16 mm opening provides margin above JLC's 0.15 mm line rule;
+    # preserve the 1 nm vertex grid so rounding cannot reintroduce necks.
+    ps.Deflate(pcbnew.FromMM(0.08), pcbnew.CORNER_STRATEGY_ROUND_ALL_CORNERS, 2)
+    ps.Inflate(pcbnew.FromMM(0.08), pcbnew.CORNER_STRATEGY_ROUND_ALL_CORNERS, 2)
     ps.Fracture()
 
     height = (max(ys) - min(ys)) * scale
@@ -174,7 +180,7 @@ def footprint(width_mm, layer="F.SilkS"):
              '(effects (font (size 1 1) (thickness 0.15))))' % name]
     for i in range(ps.OutlineCount()):
         ol = ps.Outline(i)
-        pts = " ".join("(xy %.4f %.4f)" % (pcbnew.ToMM(ol.CPoint(j).x), pcbnew.ToMM(ol.CPoint(j).y))
+        pts = " ".join("(xy %.6f %.6f)" % (pcbnew.ToMM(ol.CPoint(j).x), pcbnew.ToMM(ol.CPoint(j).y))
                        for j in range(ol.PointCount()))
         lines.append('\t(fp_poly (pts %s) (stroke (width 0) (type solid)) (fill solid) (layer "%s"))'
                      % (pts, layer))

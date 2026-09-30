@@ -107,7 +107,9 @@ V33_MIN, V12_MIN = d.V3V3_MIN, d.V1V2_MIN            # 3.135 V, 1.140 V: the val
 POW001_3V3_LOW = 3.238          # POW-001 P4h: 0->500 mA step minimum at the DC low corner
 POW002_1V2_LOW = 1.1715         # POW-002 same model/corner at conservative 46 mA: L6 1.171569 V,
                                # rounded down; includes core + auxiliary + loose sense bound
-I_3V3 = {"M1": 0.617, "slots 5-6 full": 1.22}       # power.md: M1 max; with 2 x 300 mA future cards
+I_3V3 = {"M1": sum(d.LOADS_3V3.values()),
+         "slots 5-6 full": math.ceil((sum(d.LOADS_3V3.values()) +
+                                      .300 * d.FUTURE_SLOTS) * 1000) / 1000}
 I_1V2 = d.I_1V2_MAX + 0.001     # the chipset core + the 1V2 LED base and sense branches
 R_LINK33 = 0.001 * 1.01 * (1 + 200e-6 * 95)          # R7 at 115 C: 1 % and 200 ppm/C
 R_LINK12 = R_LINK33             # R8, the same 1 mOhm shunt

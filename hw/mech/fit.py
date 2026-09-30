@@ -237,8 +237,24 @@ def within(v, nominal, tol):
 
 
 # --------------------------------------------------------------- the boards
-def discover():
+def discover(board_root=None):
     """{name: pcb path} for every board that exists or has a script."""
+    if board_root is not None:
+        # A release proof must use all eight actual completed packages. Never
+        # start a generator/router or accept a partial timestamp-only build.
+        from pathlib import Path
+        import boardevidence
+        base = Path(board_root).resolve()
+        names = ('main', 'cpu', 'gpu', 'io', 'wifi', 'storage', 'eink', 'system')
+        found = {}
+        for name in names:
+            out = base / name
+            try:
+                boardevidence.validate(name, out)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                raise SystemExit('%s: explicit mechanical board root: %s' % (name, error))
+            found[name] = str(out / (name + '.kicad_pcb'))
+        return found
     import kicadgen  # noqa: F401  (only to find its mtime)
     gen_mtime = os.path.getmtime(os.path.join(ROOT, "hw", "tools", "kicadgen.py"))
     names = {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(ROOT, "hw", "boards", "*.py"))
@@ -337,19 +353,31 @@ def read_board(name, path):
     return b
 
 
-def export_step(b):
+def step_command(b):
     step = os.path.join(OUT, b["name"] + ".step")
-    if os.path.exists(step) and os.path.getmtime(step) >= os.path.getmtime(b["pcb"]):
-        return step
     cmd = ["kicad-cli", "pcb", "export", "step", "--subst-models", "--force", "-o", step]
     if b["kind"] == "main":
         # the sockets are placed from their datasheets (SOCKETS), not from
         # whatever 3D model the footprint carries
         keep = [fp["ref"] for fp in b["fps"] if fp["lcsc"] not in SOCKETS]
         cmd += ["--component-filter", ",".join(keep) if keep else "NONE"]
+    return step, cmd
+
+
+def export_step(b):
+    step, cmd = step_command(b)
+    if b.get("source_bound_step"):
+        import step_cache
+        before = step_cache.identity(b["pcb"], cmd + [b["pcb"]])
+        if step_cache.reusable(step, before):
+            return step
+    elif os.path.exists(step) and os.path.getmtime(step) >= os.path.getmtime(b["pcb"]):
+        return step
     r = subprocess.run(cmd + [b["pcb"]], capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(step):
         raise SystemExit("%s: STEP export failed\n%s%s" % (b["name"], r.stdout, r.stderr))
+    if b.get("source_bound_step"):
+        step_cache.record(step, before, step_cache.identity(b["pcb"], cmd + [b["pcb"]]))
     return step
 
 
@@ -656,6 +684,15 @@ def inputs_key(boards):
             h.update(f.encode())
             with open(f, "rb") as fh:
                 h.update(hashlib.sha256(fh.read()).digest())
+    for name, board in sorted(boards.items()):
+        if board.get("source_bound_step"):
+            import step_cache
+            step, cmd = step_command(board)
+            identity = step_cache.identity(board["pcb"], cmd + [board["pcb"]])
+            h.update(json.dumps(identity, sort_keys=True).encode())
+            # Missing/unowned/tampered STEP cannot support a full-fit cache hit.
+            if not step_cache.reusable(step, identity):
+                h.update(b"unowned-or-changed-STEP")
     return h.hexdigest()
 
 
@@ -669,10 +706,13 @@ def antenna_lcsc():
     return None
 
 
-def run():
+def run(board_root=None):
     os.makedirs(OUT, exist_ok=True)
-    found = discover()
+    found = discover(board_root)
     boards = {n: read_board(n, p) for n, p in found.items()}
+    if board_root is not None:
+        for board in boards.values():
+            board["source_bound_step"] = True
     key = inputs_key(boards)
     cache = os.path.join(OUT, "results.json")
     if os.path.exists(cache):
@@ -722,6 +762,7 @@ def run():
         "io_pwr_led": IO_PWR_LED, "rail_keepout": RAIL_KEEPOUT, "tab_zone": TAB_ZONE,
         "standin": main is None, "standin_cfg": STANDIN,
     }
+    key = inputs_key(boards)  # Bind freshly exported, owned STEP inputs.
     job_path = os.path.join(OUT, "job.json")
     with open(job_path, "w") as f:
         json.dump(job, f, indent=1)
@@ -762,6 +803,8 @@ def run():
     if not io_cards:
         for cid in ("MECH-003", "MECH-004", "MECH-005", "MECH-006"):
             res.add(cid, False, "no I/O card found")
+    if board_root is not None and inputs_key(boards) != key:
+        raise SystemExit("mechanical exporter/model inputs changed during FreeCAD proof")
     out = {"key": key, "header": header, "checks": res.checks}
     with open(cache, "w") as f:
         json.dump(out, f, indent=1)
@@ -781,13 +824,18 @@ def report(out):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", help="exit with this check's status only (e.g. MECH-003)")
+    ap.add_argument("--board-root", help="read-only completed packages for all eight boards; validate hashes, never rebuild")
     args = ap.parse_args()
     if args.check and args.check not in CHECKS:
         sys.exit("unknown check %s" % args.check)
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, ".lock"), "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)          # parallel test runs share one run
-        out = run()
+        out = run(args.board_root)
+        if args.board_root is not None:
+            # A shared source edit or board mutation during STEP/fit execution
+            # invalidates the proof even if the geometry calculation succeeded.
+            discover(args.board_root)
     text = report(out)
     with open(os.path.join(OUT, "report.txt"), "w") as f:
         f.write(text + "\n")

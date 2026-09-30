@@ -119,14 +119,14 @@ def core_placement(cx, cy, turn=0):
 
 
 # the slot's pins on every RP2040 card (hw/pins.yaml)
-SLOT_GPIOS = {2: "SCK", 3: "MOSI", 4: "MISO_OUT", 5: "CS_n", 6: "IRQ_n"}
+SLOT_GPIOS = {2: "SCK_MCU", 3: "MOSI_MCU", 4: "MISO_OUT", 5: "CS_n_MCU", 6: "IRQ_n"}
 
 
 def u1_nets(gpios, usb):
     """Every net on the RP2040's pins but GND: they leave 0.4 mm pitch pads,
     so they take the "Fine" net class (0.15 mm tracks)."""
     nets = {"3V3", "1V1", "RUN", "SWCLK", "SWDIO", "XIN", "XOUT", "QSPI_SS", "QSPI_SCLK",
-            "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3"} | set(SLOT_GPIOS.values()) | set(gpios.values())
+            "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3"} | set(SLOT_GPIOS.values()) | {"SCK", "MOSI", "CS_n", "CS_OE"} | set(gpios.values())
     if usb:
         nets |= {"USB_DP", "USB_DM"}
     return tuple(sorted("/" + n for n in nets))
@@ -246,22 +246,57 @@ def core(s, gpios, leds=(), usb=False):
     p["R3"] = passive(s, "R", "R3", "10k", (150 * G, 90 * G))
     two(s, p["R3"], "3V3", "RUN")
 
+    # Generic KiCad logic graphics leave signal names blank. Annotate the
+    # actual TI DCK numeric pins for independent BOM/datasheet checks;
+    # numbers, locations, pin electrical types and circuit nets stay exact.
+    logic = s._symbol("74xGxx:74LVC1G125")
+    names = {"1": "~{OE}", "2": "A", "3": "GND", "4": "Y", "5": "VCC"}
+    seen = set()
+    for unit in kg.find(logic, "symbol"):
+        for pin in kg.find(unit, "pin"):
+            number = str(kg.find1(pin, "number")[1])
+            if number not in names:
+                raise ValueError("unexpected TI125 generic symbol pin " + number)
+            kg.find1(pin, "name")[1] = kg.Q(names[number])
+            seen.add(number)
+    if seen != set(names):
+        raise ValueError("TI125 generic symbol numeric pin set changed")
+    if not kg.find1(logic, "pin_names"):
+        logic.insert(2, ["pin_names", "hide"])
+    else:
+        kg.find1(logic, "pin_names").append("hide")
+    hide_pin_numbers(s, "74xGxx:74LVC1G125")
+
     # ---- MISO: CS_n isolates the MCU pad while deselected, including reset.
-    # The AHC output has 270 ohm source damping; a fitted card permanently
-    # contributes its 10k ground bias to the shared return.
-    u4 = p["U4"] = s.add("jlc:SN74AHC1G125DCKR_C151890", "U4", "SN74AHC1G125DCKR", "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR",
-                         at=(30 * G, 80 * G), fields={"LCSC": "C151890"})
-    s.connect(u4, "~{OE}", "CS_n")
-    s.connect(u4, "A", "MISO_OUT")
-    s.connect(u4, "Y", "MISO_SRC")
-    p["R60"] = passive(s, "R", "R60", "270", (60 * G, 80 * G), lcsc="C25099")
+    # The LVC output has220ohm source damping; each card contributes47k bias.
+    # The native DCK footprint is retained; exact C7833 supplier CAD/CPL is
+    # a separate release requirement, not proven by schematic generation.
+    u4 = p["U4"] = s.add("74xGxx:74LVC1G125", "U4", "SN74LVC1G125DCKR", "jlc:SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR",
+                         at=(30 * G, 80 * G), fields={"LCSC": "C7833"})
+    s.connect(u4, 1, "CS_OE")
+    s.connect(u4, 2, "MISO_OUT")
+    s.connect(u4, 4, "MISO_SRC")
+    p["R60"] = passive(s, "R", "R60", "220", (60 * G, 80 * G), lcsc="C25091")
     two(s, p["R60"], "MISO_SRC", "MISO")
-    p["R61"] = passive(s, "R", "R61", "10k", (80 * G, 80 * G))
+    p["R61"] = passive(s, "R", "R61", "47k", (80 * G, 80 * G), lcsc="C25792")
     two(s, p["R61"], "MISO", "GND")
-    s.connect(u4, "VCC", "3V3")
-    s.connect(u4, "GND", "GND")
+    s.connect(u4, 5, "3V3")
+    s.connect(u4, 3, "GND")
     p["C18"] = passive(s, "C", "C18", "100n", (48 * G, 80 * G))
     two(s, p["C18"], "3V3", "GND")
+
+    # Slot input filters. MISO OE has its own local RC, independent of MCU CS.
+    for i, (signal, rref, cref) in enumerate((("SCK", "R62", "C60"),
+                                             ("MOSI", "R63", "C61"),
+                                             ("CS_n", "R64", "C62"))):
+        p[rref] = passive(s, "R", rref, "220", (64 * G, (20 + 18 * i) * G), lcsc="C25091")
+        two(s, p[rref], signal, signal + "_MCU")
+        p[cref] = passive(s, "C", cref, "10p", (84 * G, (20 + 18 * i) * G), lcsc="C32949")
+        two(s, p[cref], signal + "_MCU", "GND")
+    p["R65"] = passive(s, "R", "R65", "220", (14 * G, 64 * G), lcsc="C25091")
+    two(s, p["R65"], "CS_n", "CS_OE")
+    p["C63"] = passive(s, "C", "C63", "10p", (30 * G, 96 * G), lcsc="C32949")
+    two(s, p["C63"], "CS_OE", "GND")
 
     # ---- LEDs (milestone-1.md, Indicator LEDs): the power LED, lit from the
     # card's own 3V3, in the same place on every card; then the card's own
@@ -300,7 +335,7 @@ PAD_VIA_CLEAR = 0.1
 
 
 def build(name, schematic, placement, power_nets, graphics, labels, gpios, title, revision, usb=False,
-          layers=2, passes=40, preroute=None):
+          layers=2, passes=40, preroute=None, seeded_route=None, post_fill=None, designator_reach=None):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
@@ -313,7 +348,9 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb), prepare=prepare, route_tries=6,
+                       fine_nets=u1_nets(gpios, usb), prepare=prepare, route_tries=6, designator_reach=designator_reach,
+                       seeded_route=seeded_route,
+                       post_fill=post_fill,
                        logo_keepout=True, pad_via_clear=PAD_VIA_CLEAR, pad_via_ok=("U1.57",),
                        # four layers: GND poured on both outer layers, In1 a
                        # solid GND plane; In2 routes signals
@@ -355,12 +392,20 @@ def pad_at(board, ref, num):
     return pcbnew.ToMM(p.x), pcbnew.ToMM(p.y)
 
 
-def miso_launch(board, ref="U4"):
+def miso_launch(board, ref="U4", *, oe_net=None):
     """Guard the TI pin map and lock its short source/bias output legs."""
     fp = board.FindFootprintByReference(ref)
-    if fp.GetValue() != "SN74AHC1G125DCKR":
-        raise ValueError("MISO launch requires the qualified TI AHC buffer")
-    expected = {"1": "/CS_n", "2": "/MISO_INT" if ref == "U3" else "/MISO_OUT",
+    if fp.GetValue() != "SN74LVC1G125DCKR":
+        raise ValueError("MISO launch requires the qualified TI LVC pin map")
+    if oe_net is not None:
+        if ref != "U3" or oe_net != "/CS_OE":
+            raise ValueError("explicit OE topology is only the WiFi local filtered branch")
+        for part, value, code, nets in (("R68", "220", "C25091", {"1": "/CS_n", "2": "/CS_OE"}),
+                                        ("C69", "10p", "C32949", {"1": "/CS_OE", "2": "/GND"})):
+            fitted = board.FindFootprintByReference(part)
+            if fitted is None or fitted.GetValue() != value or fitted.GetField("LCSC").GetText() != code or {q.GetNumber(): q.GetNetname() for q in fitted.Pads()} != nets:
+                raise ValueError("WiFi filtered OE branch part/pin/source identity changed: " + part)
+    expected = {"1": (oe_net or "/CS_n") if ref == "U3" else "/CS_OE", "2": "/MISO_INT" if ref == "U3" else "/MISO_OUT",
                 "3": "/GND", "4": "/MISO_SRC", "5": "/3V3"}
     actual = {p.GetNumber(): p.GetNetname() for p in fp.Pads()}
     if actual != expected:
@@ -380,7 +425,7 @@ def miso_launch(board, ref="U4"):
 
 
 def tie_testen(board):
-    """TESTEN (pin 19) is a GND pin between two signal pins: a track straight
+    """TESTEN (pin 19) is a test input tied to GND between two signal pins: a track straight
     in from its pad to the exposed GND pad, which the fan-out vias join to
     the pours (nothing else reaches it: the pour can't get between pins)."""
     tx, ty = pad_at(board, "U1", 19)

@@ -30,7 +30,7 @@ Per BOM line (one LCSC part):
      footprint, and kicadgen.jlc_fab adds it to KiCad's angle; this check
      derives each from the pads (the rotation taking the KiCad footprint onto
      EasyEDA's, pin 1 onto pin 1, cathode onto cathode) and the table must
-     agree. cpl.csv must be the board's angles plus the table, top side only
+     agree. cpl.csv must match the physical side and its mirrored geometry
   4. BOM <-> schematic: bom.csv is exactly the schematic's parts with an LCSC
      number, grouped by value, footprint and LCSC code, and cpl.csv places
      exactly those designators
@@ -50,6 +50,7 @@ With CUPC8_OFFLINE=1 a part not recorded yet is skipped, and the result says so.
 """
 
 import csv
+import assembly_geometry as assembly
 import importlib.util
 import math
 import re
@@ -414,19 +415,32 @@ def check_fab(fab, groups, pcb, table, problems):
     fps = {r: fp for (_, fp, _), refs in groups.items() for r in refs}
     board = board_rotations(pcb)
     with open(os.path.join(fab, "cpl.csv")) as f:
-        cpl = {r["Designator"]: r for r in csv.DictReader(f)}
+        cpl_rows = list(csv.DictReader(f))
+        cpl = {r["Designator"]: r for r in cpl_rows}
+    if len(cpl) != len(cpl_rows):
+        problems.append("cpl.csv repeats a designator")
     if set(cpl) != set(fps):
         problems.append("cpl.csv places %s; the BOM has %s" % (sorted(set(cpl) - set(fps)) or "no extra",
                                                                  sorted(set(fps) - set(cpl)) or "none missing"))
     for ref in sorted(set(cpl) & set(fps)):
         row = cpl[ref]
-        if row["Layer"] != "Top":
-            problems.append("%s: cpl.csv has it on the %s; JLC assembles the top side" % (ref, row["Layer"]))
-        mx, my = cpl_mid(board[ref][2], board[ref][3], board[ref][0], offsets().get(fps[ref]))
+        try:
+            assembly.finite(float(row["Mid X"].rstrip("mm")),
+                            float(row["Mid Y"].rstrip("mm")), float(row["Rotation"]))
+        except ValueError:
+            problems.append(ref + ": cpl.csv has invalid or nonfinite placement")
+            continue
+        side = {"F.Cu": "Top", "B.Cu": "Bottom"}.get(board[ref][1])
+        if side is None or row["Layer"] != side:
+            problems.append("%s: cpl.csv side %s differs from physical board layer %s" %
+                            (ref, row["Layer"], board[ref][1]))
+            continue
+        mx, my = assembly.midpoint(board[ref][2], board[ref][3], board[ref][0],
+                                   offsets().get(fps[ref]), side)
         if math.hypot(float(row["Mid X"].rstrip("mm")) - mx, float(row["Mid Y"].rstrip("mm")) - my) > 0.01:
             problems.append("%s: cpl.csv puts it at %s, %s; JLC's origin for it is at %.3f, %.3f"
                             % (ref, row["Mid X"], row["Mid Y"], mx, my))
-        want_rot = (board[ref][0] + table.get(fps[ref], 0)) % 360
+        want_rot = assembly.rotation(board[ref][0], table.get(fps[ref], 0), side)
         if abs((float(row["Rotation"]) - want_rot + 180) % 360 - 180) > 0.01:
             problems.append("%s: cpl.csv rotation %s, the board's %g plus jlc_rotation.yaml's %s is %g"
                             % (ref, row["Rotation"], board[ref][0], table.get(fps[ref], 0), want_rot))

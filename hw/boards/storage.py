@@ -14,6 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import rp2040card as rc  # noqa: E402
 
 G = kg.GRID
@@ -128,6 +129,8 @@ TITLE, REVISION = "CUPC/8 storage", "A"
 
 
 def prepare(board):
+    import route_seed
+    route_seed.normalize_placement(board, "C13", (20800000, -6199999), (20800000, -6200000))
     """rp2040card.pocket_escapes, with SWDIO's via a row further out and
     towards the fingers: from the first row Freerouting found no way past the
     SD lines to finger B7."""
@@ -147,8 +150,42 @@ def prepare(board):
     if edits != 1:
         raise ValueError("J2 card-side silk outline changed")
     rc.pocket_escapes(board, swdio=(2.26, -0.6))
+    _pin_spi_designators(board)
+
+
+
+def _pin_spi_designators(board):
+    import pcbnew
+    for ref, (x, y, angle, size, stroke) in {'R65': (16900000, -15300000, 90.0, 800000, 150000), 'C16': (12495000, -20000000, 0.0, 1000000, 150000), 'C63': (12700000, -8300000, 0.0, 800000, 150000), 'C2': (175000, -11500000, 0.0, 1000000, 150000), 'C61': (38737500, -15200000, 0.0, 800000, 150000), 'R6': (22000000, -36825000, 0.0, 1000000, 150000), 'U4': (9600000, -16100000, 0.0, 1000000, 150000), 'TP4': (-1055001, -25499999, 0.0, 1000000, 150000), 'TP5': (-1055001, -28999999, 0.0, 1000000, 150000), 'R64': (38187500, -19230000, 0.0, 1000000, 150000), 'R60': (13900000, -14800000, 0.0, 800000, 150000), 'TP1': (-1055001, -35999999, 0.0, 1000000, 150000), 'R5': (13674999, -38500000, 0.0, 1000000, 150000), 'C11': (23199999, -11000000, 0.0, 1000000, 150000), 'R2': (20200000, -24075000, 0.0, 1000000, 150000), 'U5': (33055000, -26500000, 0.0, 1000000, 150000), 'TP6': (-1055001, -32499999, 0.0, 1000000, 150000), 'Y1': (13555000, -23000000, 0.0, 1000000, 150000), 'J1': (11500000, -6395000, 0.0, 1000000, 150000), 'C18': (8500000, -14355000, 0.0, 1000000, 150000), 'C10': (27900000, -8400000, 0.0, 1000000, 150000), 'C17': (14745000, -17400000, 0.0, 1000000, 150000), 'U3': (38945000, -10400000, 0.0, 1000000, 150000), 'C5': (24355000, -23200000, 0.0, 1000000, 150000), 'C8': (24500000, -6395000, 0.0, 1000000, 150000), 'C6': (20400000, -19400000, 90.0, 800000, 150000), 'C20': (39900000, -22154999, 0.0, 1000000, 150000), 'C62': (36787500, -21849999, 90.0, 1000000, 150000), 'R63': (34437500, -21775000, 0.0, 800000, 150000), 'U6': (47500000, -27355000, 0.0, 1000000, 150000), 'R61': (12399999, -16110000, 0.0, 1000000, 150000), 'H1': (52001264, -35602474, 0.0, 1000000, 150000), 'R62': (27412499, -24100000, 0.0, 1000000, 150000), 'R3': (8500000, -10625000, 0.0, 1000000, 150000), 'C15': (40305000, -12600000, 0.0, 1000000, 150000), 'RN1': (50500000, -27495000, 0.0, 1000000, 150000), 'C14': (17999999, -7600000, 90.0, 800000, 150000), 'C60': (30787500, -23900000, 90.0, 1000000, 150000), 'C7': (19799999, -14805000, 0.0, 1000000, 150000), 'C3': (37200000, -16800000, 0.0, 800000, 150000), 'C4': (28600000, -21800000, 90.0, 800000, 150000), 'C13': (22599999, -8000000, 90.0, 1000000, 150000), 'TP2': (-4001240, -16453762, 0.0, 1000000, 150000), 'R4': (324999, -38500000, 0.0, 1000000, 150000), 'R21': (49800000, -32375000, 0.0, 1000000, 150000), 'R20': (30600000, -26200000, 0.0, 800000, 150000), 'TP3': (-1055001, -22999999, 0.0, 1000000, 150000), 'C9': (19250000, -12000000, 90.0, 1000000, 150000), 'J2': (30775000, -36820000, 0.0, 1000000, 150000), 'R1': (40315000, -8600000, 0.0, 1000000, 150000), 'U1': (27000000, -21975000, 0.0, 1000000, 150000), 'C21': (43099999, -21900000, 0.0, 1000000, 150000)}.items():
+        word = board.FindFootprintByReference(ref).Reference()
+        word.SetPosition(pcbnew.VECTOR2I(x, y))
+        word.SetTextAngleDegrees(angle)
+        word.SetTextSize(pcbnew.VECTOR2I(size, size))
+        word.SetTextThickness(stroke)
+        word.SetVisible(True)
+
+# Exact qualified local filter locations; original component positions retained.
+PLACEMENT.update({'R62': (30.1875, -21.1, 0.0), 'R63': (33.9375, -19.0, -90.0), 'R64': (35.1875, -17.05, 90.0), 'C60': (32.1875, -21.1, 0.0), 'C61': (33.9375, -17.0, -90.0), 'C62': (35.1875, -19.05, 90.0), 'C63': (12.1, -13.15, 90.0)})
+
+
+
+# Actual independently routed local OE passives, existing placements retained.
+PLACEMENT.update({'R62': (30.1875, -21.1, 0.0), 'R63': (33.9375, -19.0, -90.0), 'R64': (35.1875, -17.05, 90.0), 'R65': (17.75, -11.0, 90.0), 'C60': (32.1875, -21.1, 0.0), 'C61': (33.9375, -17.0, -90.0), 'C62': (35.1875, -19.05, 90.0), 'C63': (16.1, -11.9, 90.0)})
+
+
+def _seeded_route(board, workdir):
+    import route_seed
+    result = route_seed.apply(
+        board, os.path.join(HERE, "storage-full-route-seed.json"),
+        board_name="storage", pour_nets=("/GND",),
+        post_route_contract="storage-ahc-preroute-v1")
+    _pin_spi_designators(board)
+    print("storage full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
 
 
 if __name__ == "__main__":
     rc.build("storage", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "ACT", "D3": "CARD"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=150, preroute=prepare)
+             TITLE, REVISION, layers=LAYERS, passes=150, designator_reach=4, preroute=prepare, seeded_route=_seeded_route,
+             post_fill=(lambda board: ff.round_board_fills(board, "storage")))

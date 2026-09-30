@@ -80,7 +80,9 @@ this table.
 | Storage card microSD: ~1 mA idle, up to ~100 mA reading or writing | 3V3 | 5 | 100 |
 | I²C expanders, SWD mux | 3V3 | 1 | 5 |
 | LEDs (~16 at 1–2 mA) | 3V3 | 15 | 30 |
-| **3V3 total** | | **272** | **617** |
+| Reset reference and two op-amp supplies (sense currents separately modeled) | 3V3 | 1.8 | 2.3 |
+| Slot MISO buffers and bias, six-card operating allocation | 3V3 | 2 | 6 |
+| **3V3 total** | | **256.8** | **625.3** |
 | 3V3 buck input at 90% efficiency (5.0 V; 535 mA max at the worst-case 4.23 V) | 5V | 200 | 452 |
 | USB keyboard VBUS, through the IO card's boost (500 mA at the port: 746 mA from +5V at the worst corner) | 5V | 110 | 746 |
 | HDMI +5V pin (sink EDID power, 55 mA per spec), through the GPU card's PTC and buck-boost (95 mA from +5V at the worst corner) | 5V | 10 | 95 |

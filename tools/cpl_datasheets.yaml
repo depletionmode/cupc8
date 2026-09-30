@@ -252,3 +252,89 @@ C492417:
 C318884:
   result: could not determine
   why: 'tact switch: the drawing (pin-1 position, contact numbering, land pattern) was not read into a comparable record in this pass; the pad geometry against JLC''s footprint and the CPL rotation are still checked by number, but the datasheet leg needs a human look at the sheet close-up'
+
+# Primary pin/package drawings independently inspected by Codex, 2026-09-30.
+C42134:
+  url: https://www.ti.com/lit/ds/symlink/opa376.pdf
+  page: 3
+  crop:
+  - 0.08
+  - 0.1
+  - 0.59
+  - 0.28
+  seen: 'Codex visual review 2026-09-30: TI SBOS406G page 3 DBV/SOT23 top view, distinct
+    from DCK pinout: pin1 OUT at upper left, 2 V-, 3 +IN down left; 4 -IN and 5 V+
+    up right. Cached primary PDF SHA b6680ab9e59a53ed0b8b504e5b2d87b374552e1b77cbcde4f2c3145f2bcdcabf.'
+  numbering: ccw
+  pins:
+    1: OUT
+    2: V-
+    3: IN+
+    4: IN-
+    5: V+
+C187836:
+  url: https://www.ti.com/lit/ds/symlink/ref34.pdf
+  page: 4
+  crop:
+  - 0.08
+  - 0.08
+  - 0.73
+  - 0.29
+  seen: 'Codex visual review 2026-09-30: TI SBAS804G Figure5-1 REF34xx DBV top view
+    (not REF34xxT): pin1 GND_F upper left, 2 GND_S, 3 EN down left; 4 IN, 5 OUT_S,
+    6 OUT_F up right. Cached primary PDF SHA 444411d9cb6d1a2f1f244f1258fea565773506e5dcc27db2db46a834fdd519a1.'
+  numbering: ccw
+  pins:
+    1: GND_F
+    2: GND_S
+    3: EN
+    4: IN
+    5: OUT_S
+    6: OUT_F
+C7809:
+  url: https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf
+  page: 4
+  crop:
+  - 0.3
+  - 0.08
+  - 0.67
+  - 0.33
+  seen: 'Codex visual review 2026-09-30: TI SCAS595W page4 D/DB/DGV/NS/PW top view:
+    pin1 1A upper left beside notch, 1-7 down left, 8-14 up right; actual PW/TSSOP14
+    package. Cached primary PDF SHA 52e8588a17302bc7b299b08002bf80f9c06035f34374b75fdc33afa0a4e3dd9f.'
+  numbering: ccw
+  ring: 14
+  pins:
+    1: 1A
+    2: 1Y
+    3: 2A
+    4: 2Y
+    5: 3A
+    6: 3Y
+    7: GND
+    8: 4Y
+    9: 4A
+    10: 5Y
+    11: 5A
+    12: 6Y
+    13: 6A
+    14: VCC
+C111738:
+  url: https://www.ti.com/lit/ds/symlink/tps2553.pdf
+  page: 5
+  crop:
+  - 0.08
+  - 0.1
+  - 0.51
+  - 0.29
+  seen: 'Codex visual review 2026-09-30: TI SLVS841F page5 DBV top view (not DRV):
+    pin1 IN upper left with dot, 2 GND, 3 EN down left; 4 FAULT, 5 ILIM, 6 OUT up
+    right; -1 is latch-off, same DBV numbering. Cached primary PDF SHA 88e453700cea2b263cdb5b44fce1e883e0f6d3b975457f879ac1423eeea42071.'
+  numbering: ccw
+  pins:
+    1: IN
+    2: GND
+    3: EN
+    4: FAULT
+    5: ILIM
+    6: OUT

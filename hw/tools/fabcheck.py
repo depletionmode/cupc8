@@ -11,27 +11,55 @@ import tempfile
 
 import pcbnew
 import gerberdrc
+import boardevidence
 
 
 GERBER_EXTENSIONS = {'.gtl', '.gbl', '.gts', '.gbs', '.gtp', '.gbp',
                      '.gto', '.gbo', '.gm1', '.g1', '.g2', '.g3', '.g4', '.gbr'}
 TIMESTAMP = re.compile(r'^(?:%TF.CreationDate,|G04 Created by KiCad )')
-# These are missing checks over the plotted fabrication geometry. Keep the
-# fabrication gate red even when every implemented check and CPL review passes.
-# A source-board DRC result cannot substitute for these re-import checks.
-PLOTTED_DRC_GAPS = (
-    'minimum neck width in filled copper regions',
-    'minimum neck width in filled silkscreen regions',
-    'silkscreen text height (Gerber has no text objects or character grouping)',
-)
+def filled_region_checks(board, copper, silk):
+    """Run independent neck proofs on every already-parity-checked plot."""
+    import sys
+    # Resolve against the manufacturing source root, including in scratch
+    # checks. Importing this checker never writes receipt-owned artifacts.
+    sys.path.insert(0, str(Path(boardevidence.ROOT) / 'tools'))
+    from fab_neck_coverage import analyze_layer
+    minimum = pcbnew.ToMM(board.GetDesignSettings().m_TrackMinWidth)
+    if minimum <= 0:
+        raise ValueError('positive plotted copper minimum width required')
+    rows = {}
+    failures = []
+    for path, rule, is_silk in ([(p, minimum, False) for p in copper] +
+                                [(p, .15, True) for p in silk]):
+        row = analyze_layer(path, rule, silk=is_silk)
+        rows[path.name] = row
+        if row.get('complete_for_filled_regions') is not True:
+            failures.append('%s: %s/%s regions proved, %s unresolved witnesses; '
+                            'region lines %s' %
+                            (path.name, row.get('proved'), row.get('filled_regions'),
+                             row.get('failure_count'), row.get('failed_regions')))
+    if failures:
+        raise ValueError('plotted filled-region neck proof incomplete: ' + '; '.join(failures))
+    return rows
 
 
-def require_complete_plotted_drc(mask_width):
-    """Refuse fabrication approval until the remaining plotted rules exist."""
-    gaps = list(PLOTTED_DRC_GAPS)
+def require_complete_plotted_drc(mask_width, board=None, copper=None, silk=None):
+    """Require actual neck and source-bound independent glyph-height proof.
+
+    Source UUIDs identify text; independently decoded font data and delivered
+    stroke coordinates measure its height. Unsupported or ambiguous geometry
+    remains a concrete failure. See verification.md section 4.9.
+    """
     if mask_width <= 0:
-        gaps.append('positive solder-mask web rule is not configured')
-    raise ValueError('Gerber re-import DRC incomplete: ' + '; '.join(gaps))
+        raise ValueError('positive solder-mask web rule is not configured')
+    if board is None or copper is None or silk is None:
+        raise ValueError('plotted DRC coverage needs the parity-bound board and all copper/silk layers')
+    if len(copper) != board.GetCopperLayerCount() or len(silk) != 2:
+        raise ValueError('plotted DRC coverage needs all copper and both silk layers')
+    import silk_glyph_coverage
+    necks = filled_region_checks(board, copper, silk)
+    glyphs = silk_glyph_coverage.certify(board, silk)
+    return dict(filled_regions=necks, glyphs=glyphs)
 # Hole keys use millimetres rounded to 0.001. Reject finer Excellon
 # coordinates rather than silently changing the plotted drill geometry.
 DECIMAL_MM = r'-?\d+(?:\.\d{1,3})?'
@@ -338,7 +366,12 @@ def check_review(out):
     if review.get('result') != 'approved':
         raise ValueError('CPL overlay review is not approved')
     import hashlib
-    for name in ('fab/bom.csv', 'fab/cpl.csv', out.name + '.kicad_pcb', out.name + '-top.png'):
+    names = ['fab/bom.csv', 'fab/cpl.csv', out.name + '.kicad_pcb', out.name + '-top.png']
+    import csv
+    with (out / 'fab/cpl.csv').open(newline='') as placement_file:
+        if any(row['Layer'] == 'Bottom' for row in csv.DictReader(placement_file)):
+            names.append(out.name + '-bottom.png')
+    for name in names:
         digest = hashlib.sha256((out / name).read_bytes()).hexdigest()
         if review.get('sha256', {}).get(name) != digest:
             raise ValueError('CPL review is stale or incomplete: ' + name)
@@ -392,5 +425,6 @@ def check(out):
         raise ValueError('expected front and back silkscreen Gerbers')
     ink = (gerberdrc.check_silk_clearance(silk['.gto'], masks['.gts'], .15, .15) +
            gerberdrc.check_silk_clearance(silk['.gbo'], masks['.gbs'], .15, .15))
+    plotted_proof = require_complete_plotted_drc(mask_width, board, copper, list(silk.values()))
     check_review(out)
-    require_complete_plotted_drc(mask_width)
+    return dict(plotted_drc=plotted_proof)

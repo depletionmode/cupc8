@@ -34,6 +34,7 @@ class Circuit:
     pins: dict
     resistors: tuple[Resistor, ...]
     pin_names: dict | None = None
+    lcsc: dict | None = None
 
     def net(self, ref, pin):
         return self.pins.get((ref, str(pin)))
@@ -66,11 +67,21 @@ def read(path):
     tree = parse(path.read_text())
     if tree[0] != 'export':
         raise ValueError('expected a KiCad exported netlist')
-    components = {}
+    components, lcsc = {}, {}
     for comp in find(find1(tree, 'components') or [], 'comp'):
         ref = field(comp, 'ref')
         if ref in components:
             raise ValueError(f'duplicate component {ref}')
+        identities = [field(prop, 'value') for prop in find(comp, 'property')
+                      if field(prop, 'name') == 'LCSC']
+        for entry in find(find1(comp, 'fields') or [], 'field'):
+            if field(entry, 'name') == 'LCSC':
+                if len(entry) != 3 or not isinstance(entry[2], str):
+                    raise ValueError(f'{ref}: malformed LCSC field')
+                identities.append(entry[2])
+        if len(set(identities)) > 1:
+            raise ValueError(f'{ref}: conflicting LCSC identities')
+        if identities: lcsc[ref] = identities[0]
         source = find1(comp, 'libsource')
         components[ref] = (field(comp, 'value'),
                            (field(source, 'lib'), field(source, 'part')) if source else None)
@@ -117,4 +128,4 @@ def read(path):
     for ref, (_, source) in components.items():
         for number, name in library.get(source, {}).items():
             pin_names[(ref, number)] = name
-    return Circuit(components, nets, pins, tuple(resistors), pin_names)
+    return Circuit(components, nets, pins, tuple(resistors), pin_names, lcsc)

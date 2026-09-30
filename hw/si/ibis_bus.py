@@ -46,18 +46,9 @@ def routed_geometry(path):
     return pcbnew.LoadBoard(path), parse(Path(path).read_text())
 
 
-def routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None,
+def _endpoint_routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None,
                      pad_reach=False):
-    """Measure layer-aware shortest copper paths; report disconnected pads.
-
-    This measures planar track length only. It does not turn branches, vias, pad stubs or
-    changing reference planes into an electrical transmission-line model.
-
-    A track is on a pad when it ends at the pad's centre. With `pad_reach` it
-    is also on the pad when its end lies within the pad's copper (KiCad's own
-    connectivity: a router ends a track on the edge of a long edge finger);
-    the extra pad-to-endpoint distance is counted. Off by default: the pinned
-    receipts were measured without it.
+    """Original endpoint-only metric, never an authority for connectivity.
     """
     if loaded_board is None or parsed_tree is None:
         cached_board, cached_tree = routed_geometry(str(Path(board_path).resolve()))
@@ -118,12 +109,6 @@ def routed_distances(board_path, net, source, receivers, *, loaded_board=None, p
                      if pad.IsOnLayer(getattr(pcbnew, layer.replace('.', '_')))]
             for a, b in zip(nodes, nodes[1:]):
                 add_edge(a, b, 0.0)
-            if pad_reach:
-                for (point, layer) in list(graph):
-                    if point != xy and (xy, layer) in nodes and math.dist(point, xy) < 10.0 and pad.HitTest(
-                            pcbnew.VECTOR2I(pcbnew.FromMM(point[0]), pcbnew.FromMM(point[1])),
-                            pcbnew.FromMM(0.15)):
-                        add_edge((xy, layer), (point, layer), math.dist(point, xy))
 
     distances, pending = {}, []
     for node in pad_nodes(source):
@@ -145,6 +130,207 @@ def routed_distances(board_path, net, source, receivers, *, loaded_board=None, p
         result[f'{ref}.{number}'] = round(length, 3) if math.isfinite(length) else None
     return result
 
+
+def _contact_routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None,
+                     pad_reach=False, filled_connectivity=False):
+    """Track centerline lengths with exact native copper-contact qualification.
+
+    Existing endpoint paths retain their length. Missing endpoint paths are
+    recovered only when native same-layer copper shapes touch at zero clearance:
+    pad interiors, track T joins and via annuli. No pad reach margin is applied.
+    GND queries may use individual actual filled polygons (including their holes);
+    their returned length counts tracks/pad stubs only, NOT travel through pours.
+    Such ground lengths are connectivity evidence, never a transmission-line model.
+    """
+    if loaded_board is None or parsed_tree is None:
+        cached_board, cached_tree = routed_geometry(str(Path(board_path).resolve()))
+    board = loaded_board if loaded_board is not None else cached_board
+    layers = [(board.GetLayerName(i), i) for i in (pcbnew.F_Cu, pcbnew.In1_Cu,
+               pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu, pcbnew.B_Cu)
+              if board.IsLayerEnabled(i)]
+    graph, primitives, contacts, pad_keys, pad_counts = {}, [], [], {}, {}
+
+    def edge(a, b, length):
+        graph.setdefault(a, []).append((b, length))
+        graph.setdefault(b, []).append((a, length))
+
+    def point(v):
+        return (int(v.x), int(v.y))
+
+    def distance(a, b):
+        return math.dist(a, b) / 1e6
+
+    tracks = board.Tracks()
+    for i in range(len(tracks)):
+        item = tracks[i]
+        if item.GetNetname() != net:
+            continue
+        kind = item.Type()
+        if kind not in (pcbnew.PCB_TRACE_T, pcbnew.PCB_VIA_T):
+            raise ValueError(f'{net}: arc needs an explicit centerline-length parser')
+        if kind == pcbnew.PCB_VIA_T:
+            item = pcbnew.Cast_to_PCB_VIA(item)
+        a, b = point(item.GetStart()), point(item.GetEnd())
+        nodes = []
+        for name, layer in layers:
+            if not item.IsOnLayer(layer):
+                continue
+            nodes.append((a, name))
+            if kind == pcbnew.PCB_TRACE_T:
+                edge((a, name), (b, name), distance(a, b))
+            primitives.append({'shape': item.GetEffectiveShape(layer), 'layer': name,
+                               'a': a, 'b': b, 'events': {a, b},
+                               'track': kind == pcbnew.PCB_TRACE_T})
+        if kind == pcbnew.PCB_VIA_T:
+            for a_node, b_node in zip(nodes, nodes[1:]):
+                edge(a_node, b_node, 0.0)
+
+    for fp in board.GetFootprints():
+        for pad in fp.Pads():
+            if pad.GetNetname() != net:
+                continue
+            xy = point(pad.GetPosition())
+            nodes = [(xy, name) for name, layer in layers if pad.IsOnLayer(layer)]
+            key = (fp.GetReference(), pad.GetNumber())
+            pad_counts[key] = pad_counts.get(key, 0) + 1
+            pad_keys.setdefault(key, []).extend(nodes)
+            if pad.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
+                for a_node, b_node in zip(nodes, nodes[1:]):
+                    edge(a_node, b_node, 0.0)
+            for name, layer in layers:
+                if pad.IsOnLayer(layer):
+                    contacts.append({'shape': pad.GetEffectiveShape(layer), 'layer': name,
+                                     'a': xy, 'b': xy, 'events': {xy}, 'track': False})
+
+    def terminal(key):
+        if key not in pad_keys or pad_counts[key] != 1:
+            raise ValueError(f'{key[0]}.{key[1]}: missing or wrong {net} pad')
+        return pad_keys[key]
+
+    def measure():
+        distances, pending = {}, []
+        from itertools import count
+        serial = count()
+        for node in terminal(source):
+            distances[node] = 0.0
+            heapq.heappush(pending, (0.0, next(serial), node))
+        while pending:
+            d, _, node = heapq.heappop(pending)
+            if d > distances[node]:
+                continue
+            for neighbor, length in graph.get(node, ()):
+                nd = d + length
+                if nd < distances.get(neighbor, math.inf):
+                    distances[neighbor] = nd
+                    heapq.heappush(pending, (nd, next(serial), neighbor))
+        return {f'{ref}.{pin}': min((distances.get(n, math.inf)
+                                   for n in terminal((ref, pin))), default=math.inf)
+                for ref, pin in receivers}
+
+    before = measure()
+    if all(math.isfinite(v) for v in before.values()):
+        return {k: round(v, 3) for k, v in before.items()}
+
+    def project(xy, item):
+        a, b = item['a'], item['b']
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length2 = dx * dx + dy * dy
+        if not length2:
+            return a
+        t = max(0.0, min(1.0, ((xy[0] - a[0]) * dx + (xy[1] - a[1]) * dy) / length2))
+        return (a[0] + t * dx, a[1] + t * dy)
+
+    items = primitives + contacts
+    for i, left in enumerate(items):
+        for right in items[i + 1:]:
+            if left['layer'] != right['layer'] or not left['shape'].BBox().Intersects(right['shape'].BBox()):
+                continue
+            # This native zero-clearance test, not projected distance or rounded
+            # coordinates, is the only authority for adding a copper connection.
+            if not left['shape'].Collide(right['shape'], 0):
+                continue
+            # Nearest centerline points give only the planar stub length. Copper
+            # contact itself has been proved independently by the predicate above.
+            choices = []
+            la, lb, ra, rb = left['a'], left['b'], right['a'], right['b']
+            ux, uy = lb[0]-la[0], lb[1]-la[1]
+            vx, vy = rb[0]-ra[0], rb[1]-ra[1]
+            determinant = ux*vy - uy*vx
+            if determinant:
+                from fractions import Fraction
+                wx, wy = ra[0]-la[0], ra[1]-la[1]
+                t = Fraction(wx*vy-wy*vx, determinant)
+                u = Fraction(wx*uy-wy*ux, determinant)
+                if 0 <= t <= 1 and 0 <= u <= 1:
+                    xy = (float(la[0]+t*ux), float(la[1]+t*uy))
+                    choices.append((0.0, xy, xy))
+            for xy in (left['a'], left['b']):
+                q = project(xy, right); choices.append((distance(xy, q), xy, q))
+            for xy in (right['a'], right['b']):
+                q = project(xy, left); choices.append((distance(q, xy), q, xy))
+            _, a, b = min(choices)
+            left['events'].add(a); right['events'].add(b)
+            edge((a, left['layer']), (b, right['layer']), distance(a, b))
+
+    for item in items:
+        a, b = item['a'], item['b']; dx, dy = b[0]-a[0], b[1]-a[1]
+        events = sorted(item['events'], key=lambda q: (q[0]-a[0])*dx+(q[1]-a[1])*dy)
+        for x, y in zip(events, events[1:]):
+            edge((x, item['layer']), (y, item['layer']), distance(x, y))
+
+    if filled_connectivity or net in ('/GND', 'GND'):
+        # Fragments are separate vertices. A zone object may contain disconnected
+        # islands; treating the whole object as one conductor would be unsound.
+        for z in board.Zones():
+            if z.GetIsRuleArea() or z.GetNetname() != net:
+                continue
+            for name, layer in layers:
+                if not z.HasFilledPolysForLayer(layer):
+                    continue
+                polys = z.GetFilledPolysList(layer)
+                for i in range(polys.OutlineCount()):
+                    fragment = polys.UnitSet(i)
+                    hub = ('filled', len(graph), name)
+                    for item in items:
+                        if (item['layer'] == name and fragment.BBox().Intersects(item['shape'].BBox())
+                                and fragment.Collide(item['shape'], 0)):
+                            edge(hub, (item['a'], name), 0.0)
+
+    after = measure()
+    return {k: round(before[k] if math.isfinite(before[k]) else v, 3)
+            if math.isfinite(before[k]) or math.isfinite(v) else None
+            for k, v in after.items()}
+
+def routed_connectivity(board_path, net, source, receivers, *, loaded_board=None,
+                        parsed_tree=None):
+    """Prove physical continuity, including actual same-net filled fragments.
+
+    This API returns booleans only. It does not assign a trace length, impedance
+    or voltage-drop model to a plane. Each native filled fragment remains a
+    separate conductor, with holes and exact zero-clearance contacts respected.
+    """
+    values = _contact_routed_distances(board_path, net, source, receivers,
+        loaded_board=loaded_board, parsed_tree=parsed_tree, filled_connectivity=True)
+    return {key: value is not None for key, value in values.items()}
+
+
+def routed_distances(board_path, net, source, receivers, *, loaded_board=None, parsed_tree=None,
+                     pad_reach=False):
+    """Prove native copper connectivity while retaining existing trace metrics.
+
+    Previously resolved endpoint metrics are retained only after an independent
+    zero-clearance actual-copper proof succeeds. New paths use centerline/stub
+    lengths. GND filled-pour paths count track stubs only, never plane transit
+    length, and are unsuitable for transmission-line qualification. pad_reach
+    remains accepted for callers but never inflates a pad's copper boundary.
+    """
+    actual = _contact_routed_distances(board_path, net, source, receivers,
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree)
+    prior = _endpoint_routed_distances(board_path, net, source, receivers,
+                                      loaded_board=loaded_board, parsed_tree=parsed_tree,
+                                      pad_reach=False)
+    return {key: (prior[key] if prior[key] is not None else value)
+            if value is not None else None for key, value in actual.items()}
 
 def number(token):
     match = re.fullmatch(r'([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?)([munp]?)(?:[A-Za-z]*)', token)

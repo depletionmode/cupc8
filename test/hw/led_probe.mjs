@@ -14,7 +14,18 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../.
 const SDK = process.env.CUPC8_SDK ?? path.join(os.homedir(), '.local/share/cupc8-sdk');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-leds-'));
 const img = path.join(dir, 'card.img');
-execFileSync(path.join(SDK, 'pyfat/bin/python'), [path.join(ROOT, 'test/emu/fatimg.py'), 'mkfs', img, '16', '16']);
+const fixtureLog = path.join(dir, 'fixture-build.log');
+const fixtureFd = fs.openSync(fixtureLog, 'a');
+try {
+  execFileSync(path.join(SDK, 'pyfat/bin/python'),
+    [path.join(ROOT, 'test/emu/fatimg.py'), 'mkfs', img, '16', '16'],
+    { stdio: ['ignore', fixtureFd, fixtureFd] });
+} catch (error) {
+  error.message += `\nLED fixture log: ${fixtureLog}\n${fs.readFileSync(fixtureLog, 'utf8')}`;
+  throw error;
+} finally {
+  fs.closeSync(fixtureFd);
+}
 
 const text = (m) => { const s = m.screen(); return s.error ? '' : s.text.join('\n').replace(/\n+$/, ''); };
 const result = {};

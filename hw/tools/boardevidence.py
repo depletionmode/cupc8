@@ -21,14 +21,24 @@ def inputs(board, root=ROOT):
     paths = [root / 'hw' / 'boards' / (board + '.py'),
              root / 'hw' / 'boards' / 'rp2040card.py', root / 'hw' / 'pins.yaml']
     if board == 'main':
+        # main.py imports reset_supervisor, which imports design; their fitted
+        # circuit values are manufacturing inputs just like board sources.
+        paths.extend(root / 'hw' / 'power' / name for name in
+                     ('design.py', 'reset_supervisor.py'))
         paths.extend(root / 'hw' / 'boards' / name for name in
                      ('main_power_reinforce.py', 'main_power_trial5.py',
                       'main_power_input_trial.py', 'main_power_corner.py', 'main_seed.py',
                       'main_fanout.py', 'main_handroute.py', 'main-route-seed.json',
-                      'main-handroute-seed.json'))
+                      'main-handroute-seed.json', 'main-full-route-seed.json'))
+    if board in ('cpu', 'gpu', 'storage', 'wifi', 'io', 'eink'):
+        paths.append(root / 'hw' / 'boards' / (board + '-full-route-seed.json'))
+    paths.append(root / 'tools' / 'fab_neck_coverage.py')
+    # Exact filled-polygon rasterization is part of routed power qualification.
+    paths.extend(root / 'hw' / 'power' / name for name in
+                 ('copper_mesh.py', 'polygon_raster.py'))
     if board == 'system':
         paths.extend(root / 'hw' / 'boards' / name for name in
-                     ('main_seed.py', 'system-route-seed.json'))
+                     ('main_seed.py', 'system-route-seed.json', 'system-full-route-seed.json'))
     for directory in ('hw/tools', 'hw/lib', 'hw/parts'):
         paths.extend(p for p in (root / directory).rglob('*')
                      if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')

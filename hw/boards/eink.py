@@ -15,6 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import rp2040card as rc  # noqa: E402
 
 G = kg.GRID
@@ -132,6 +133,12 @@ CHIP_ORDER = ["EPD_PWR", "EPD_BUSY", "EPD_nRST", "EPD_DC", "EPD_DIN", "EPD_CLK",
 PLACEMENT.update({"R%d" % (10 + SIGNALS.index(net)): (29.0 + 2.1 * k, R_Y - 3.6 * (k % 2), 0)
                   for k, net in enumerate(CHIP_ORDER)})
 PLACEMENT.update({k: v + (0,) for k, v in PLACEMENT.items() if len(v) == 2})
+# State the nominal coordinates directly: the arithmetic above otherwise
+# truncates these placements one nanometre away from the saved routed board.
+# Route guards remain exact; no tolerance is added.
+PLACEMENT.update({"C13": (20.8, -6.2, 180), "C20": (50.56, -32.4, 90),
+                  "C21": (48.56, -30.0, 0), "U5": (41.56, -32.6, 0),
+                  "U6": (30.14, -32.6, 0)})
 LAYERS = 4
 LOGO_MM = 12
 LEGEND = "EInk_Header_Legend"
@@ -143,6 +150,7 @@ def preroute(board):
     """As the storage card: rp2040card.pocket_escapes, with SWDIO's via a
     row further out and towards the fingers, clear of the panel lines."""
     rc.pocket_escapes(board, swdio=(2.26, -0.6))
+    _pin_spi_designators(board)
 
 
 def legend(path):
@@ -169,7 +177,40 @@ def legend(path):
                 '(effects (font (size 1 1) (thickness 0.15))))\n%s)\n' % (LEGEND, LEGEND, "".join(texts)))
 
 
+
+def _pin_spi_designators(board):
+    import pcbnew
+    for ref, (x, y, angle, size, stroke) in {'U3': (38945000, -10400000, 0.0, 1000000, 150000), 'R10': (37400000, -26475000, 0.0, 1000000, 150000), 'C17': (12700000, -21400000, 0.0, 1000000, 150000), 'C61': (26987500, -6650000, 0.0, 800000, 150000), 'C3': (34400000, -19800000, 0.0, 800000, 150000), 'C16': (12495000, -20000000, 0.0, 1000000, 150000), 'R3': (8500000, -10625000, 0.0, 1000000, 150000), 'C5': (24355000, -24200000, 0.0, 1000000, 150000), 'R60': (14300000, -16400000, 0.0, 1000000, 150000), 'C21': (48560000, -28595000, 0.0, 1000000, 150000), 'TP4': (-1055001, -25499999, 0.0, 1000000, 150000), 'Y1': (14500000, -22695000, 0.0, 1000000, 150000), 'J2': (22895000, -42415000, 0.0, 1000000, 150000), 'R61': (16800000, -15710000, 90.0, 800000, 150000), 'J1': (11500000, -6395000, 0.0, 1000000, 150000), 'R2': (21200000, -24075000, 0.0, 1000000, 150000), 'C63': (9795000, -16149999, 0.0, 800000, 150000), 'H1': (54001264, -35602474, 0.0, 1000000, 150000), 'C13': (22599999, -7400000, 90.0, 1000000, 150000), 'U4': (13200000, -8100000, 0.0, 1000000, 150000), 'R63': (29787500, -6250000, 0.0, 800000, 150000), 'C15': (40305000, -12600000, 0.0, 1000000, 150000), 'R13': (35300000, -30075000, 0.0, 1000000, 150000), 'R11': (39500000, -30075000, 0.0, 1000000, 150000), 'C8': (24500000, -6395000, 0.0, 1000000, 150000), 'C4': (31200000, -20605000, 0.0, 1000000, 150000), 'R15': (32100000, -30075000, 0.0, 1000000, 150000), 'F1': (44965000, -32400000, 0.0, 1000000, 150000), 'C20': (53385000, -32400000, 0.0, 1000000, 150000), 'R65': (10700000, -8350000, 0.0, 800000, 150000), 'C9': (18199999, -12000000, 90.0, 1000000, 150000), 'C6': (19400000, -16000000, 0.0, 800000, 150000), 'TP6': (-1055001, -32499999, 0.0, 1000000, 150000), 'TP5': (-1401240, -30599999, 0.0, 1000000, 150000), 'R16': (29000000, -23124999, 0.0, 1000000, 150000), 'TP1': (-55001, -35999999, 0.0, 1000000, 150000), 'R4': (324999, -38500000, 0.0, 1000000, 150000), 'C2': (175000, -11500000, 0.0, 1000000, 150000), 'R5': (13674999, -38500000, 0.0, 1000000, 150000), 'C18': (8500000, -14355000, 0.0, 1000000, 150000), 'U6': (27384999, -30600000, 0.0, 1000000, 150000), 'TP2': (-4001240, -16453762, 0.0, 1000000, 150000), 'C10': (27700000, -9400000, 0.0, 800000, 150000), 'C14': (17045000, -8000000, 0.0, 1000000, 150000), 'C7': (20799999, -14805000, 0.0, 1000000, 150000), 'TP3': (-1055001, -21999999, 0.0, 1000000, 150000), 'R14': (33200000, -26675000, 0.0, 1000000, 150000), 'R62': (36962500, -19100000, 0.0, 1000000, 150000), 'R1': (40315000, -8600000, 0.0, 1000000, 150000), 'U5': (42560000, -30154999, 0.0, 1000000, 150000), 'C60': (38942499, -17100000, 0.0, 1000000, 150000), 'C11': (24599999, -11000000, 0.0, 800000, 150000), 'U1': (26000000, -21975000, 0.0, 1000000, 150000), 'R12': (41600000, -26475000, 0.0, 1000000, 150000), 'C62': (30737500, -15950000, 90.0, 1000000, 150000), 'R64': (34252500, -13550000, 0.0, 1000000, 150000)}.items():
+        word = board.FindFootprintByReference(ref).Reference()
+        word.SetPosition(pcbnew.VECTOR2I(x, y))
+        word.SetTextAngleDegrees(angle)
+        word.SetTextSize(pcbnew.VECTOR2I(size, size))
+        word.SetTextThickness(stroke)
+        word.SetVisible(True)
+
+# Exact qualified local filter locations; original component positions retained.
+PLACEMENT.update({'R62': (34.1875, -17.1, 0.0), 'R63': (30.1875, -8.25, 180.0), 'R64': (31.9375, -14.55, 90.0, 'B'), 'C60': (36.1875, -17.1, 0.0), 'C61': (28.1875, -8.25, 180.0), 'C62': (31.9375, -16.55, 90.0, 'B'), 'C63': (11.85, -10.9, -90.0)})
+
+
+
+# Actual independently routed local OE passives, existing placements retained.
+PLACEMENT.update({'R62': (34.1875, -17.1, 0.0), 'R63': (30.1875, -8.25, 180.0), 'R64': (31.9375, -14.55, 90.0, 'B'), 'R65': (12.1, -13.15, -90.0), 'C60': (36.1875, -17.1, 0.0), 'C61': (28.1875, -8.25, 180.0), 'C62': (31.9375, -16.55, 90.0, 'B'), 'C63': (12.1, -15.15, 90.0)})
+
+
+def _seeded_route(board, workdir):
+    import route_seed
+    result = route_seed.apply(
+        board, os.path.join(HERE, "eink-full-route-seed.json"),
+        board_name="eink", pour_nets=("/GND",),
+        post_route_contract="eink-ahc-panel-preroute-v1")
+    _pin_spi_designators(board)
+    print("EInk full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
+
+
 if __name__ == "__main__":
     legend(os.path.join(kg.PROJECT_FOOTPRINTS["cupc8"], LEGEND + ".kicad_mod"))
     rc.build("eink", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "REFRESH"}, GPIOS,
-             TITLE, REVISION, layers=LAYERS, passes=150, preroute=preroute)
+             TITLE, REVISION, layers=LAYERS, passes=150, designator_reach=4, preroute=preroute, seeded_route=_seeded_route,
+             post_fill=(lambda board: ff.round_board_fills(board, "eink")))

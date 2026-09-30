@@ -41,6 +41,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import cpl_autochecks as auto  # noqa: E402
+sys.path.insert(0, os.path.join(ROOT, 'hw', 'tools'))
+import assembly_geometry as assembly  # noqa: E402
 import cpl_codex  # noqa: E402
 import cpl_focus  # noqa: E402
 
@@ -64,10 +66,14 @@ def sha256(path):
 def bound_files(build_dir, board):
     """The four files check_review hashes, as check_review names them."""
     out = os.path.join(build_dir, board)
-    return {'fab/bom.csv': os.path.join(out, 'fab', 'bom.csv'),
+    files = {'fab/bom.csv': os.path.join(out, 'fab', 'bom.csv'),
             'fab/cpl.csv': os.path.join(out, 'fab', 'cpl.csv'),
             board + '.kicad_pcb': os.path.join(out, board + '.kicad_pcb'),
             board + '-top.png': os.path.join(out, board + '-top.png')}
+    with open(files['fab/cpl.csv'], newline='') as placement_file:
+        if any(row['Layer'] == 'Bottom' for row in csv.DictReader(placement_file)):
+            files[board + '-bottom.png'] = os.path.join(out, board + '-bottom.png')
+    return files
 
 
 def load_yaml(path):
@@ -143,12 +149,12 @@ def read_board(pcb_path, refs):
     return facts, (box.GetX() * mm, box.GetY() * mm, box.GetWidth() * mm, box.GetHeight() * mm)
 
 
-def plot_board(pcb_path, svg_path, outline):
+def plot_board(pcb_path, svg_path, outline, layers=LAYERS):
     """One SVG of the board (kicad-cli, niced); returns (its inner markup,
     (origin x, origin y) in board mm). kicad-cli's board-sized page starts at
     the outline polygon's corner; the polygon approximates arcs, so the
     plotted size is slightly smaller and the origin is centred by the difference."""
-    subprocess.run(['nice', '-n', '19', 'kicad-cli', 'pcb', 'export', 'svg', '--layers', LAYERS,
+    subprocess.run(['nice', '-n', '19', 'kicad-cli', 'pcb', 'export', 'svg', '--layers', layers,
                     '--mode-single', '--page-size-mode', '2', '--exclude-drawing-sheet',
                     '-o', svg_path, pcb_path], check=True, capture_output=True)
     with open(svg_path) as handle:
@@ -185,8 +191,11 @@ def analyse(ref, row, fact, turn_table, net_pins):
             'fpid': fact['fpid'], 'flags': flags, 'kicad_rot': fact['rot'],
             'cpl_rot': float(cpl['Rotation']) % 360, 'cpl_x': cpl['Mid X'], 'cpl_y': cpl['Mid Y'],
             'board_x': fact['x'], 'board_y': fact['y'], 'npads': len(pads)}
-    if fact['layer'] != 'F.Cu' or cpl['Layer'] != 'Top':
-        flags.append(('bad', 'not a Top-side part (pcb %s, CPL %s): this pack only handles Top' % (fact['layer'], cpl['Layer'])))
+    side = {'F.Cu': 'Top', 'B.Cu': 'Bottom'}.get(fact['layer'])
+    info['assembly_side'] = side
+    if side is None or cpl['Layer'] != side:
+        flags.append(('bad', 'CPL side differs from physical board layer (pcb %s, CPL %s)' % (fact['layer'], cpl['Layer'])))
+        return info
     # KiCad's pad 1 (or the cathode of a polarised 2-pad part)
     table = load_yaml(os.path.join(PARTS, lcsc + '.yaml')) or {}
     symbol_pins = {str(k): ([v] if isinstance(v, str) else list(v)) for k, v in (table.get('pins') or {}).items()}
@@ -222,7 +231,7 @@ def analyse(ref, row, fact, turn_table, net_pins):
     if turn is None:
         flags.append(('check', 'UNKNOWN: %s has no entry in hw/parts/jlc_rotation.yaml' % fact['fpid']))
     else:
-        want = (fact['rot'] + turn['rotation']) % 360
+        want = assembly.rotation(fact['rot'], turn['rotation'], info['assembly_side'])
         if abs((want - info['cpl_rot'] + 180) % 360 - 180) > 0.01:
             flags.append(('bad', 'CPL rotation %.1f but pcb %.1f + table %s = %.1f' % (info['cpl_rot'], fact['rot'], turn['rotation'], want)))
         if not turn.get('offset') and (abs(float(cpl['Mid X'][:-2]) - fact['x']) > 0.001
@@ -248,8 +257,7 @@ def analyse(ref, row, fact, turn_table, net_pins):
         match_key, epad_key = (lambda n: n), (lambda n: n)
     angle = math.radians(info['cpl_rot'])
     mid_x, mid_y = float(cpl['Mid X'][:-2]), float(cpl['Mid Y'][:-2])         # y up
-    world = [(n, mid_x + x * math.cos(angle) - y * math.sin(angle),
-              mid_y + x * math.sin(angle) + y * math.cos(angle)) for n, x, y in epads]
+    world = assembly.supplier_world(epads, info['cpl_rot'], mid_x, mid_y, info['assembly_side'])
     tol = table.get('pad_tolerance') or TOLERANCE
     worst = 0.0
     for pad in pads:
@@ -366,11 +374,15 @@ def auto_checks(info, row, fact, turn_table, net_pins, datasheets):
     cpl = row['cpl']
     pads = fact['pads']
     info['checks'] = checks
+    if info.get('assembly_side') is None or cpl['Layer'] != info['assembly_side']:
+        checks.append(auto.check('assembly side', 'fail', 'CPL side differs from native board layer'))
+        info['auto'] = 'bad'
+        return
     turn = turn_table.get(fact['fpid'])
     if turn is None:
         checks.append(auto.check('CPL rotation', 'unknown', 'no entry in hw/parts/jlc_rotation.yaml'))
     else:
-        want = (fact['rot'] + turn['rotation']) % 360
+        want = assembly.rotation(fact['rot'], turn['rotation'], info['assembly_side'])
         ok = abs((want - info['cpl_rot'] + 180) % 360 - 180) <= 0.01
         checks.append(auto.check('CPL rotation', 'pass' if ok else 'fail',
                                  'CPL %.0f = KiCad %.0f + package correction %s' % (info['cpl_rot'], fact['rot'], turn['rotation'])))
@@ -383,7 +395,7 @@ def auto_checks(info, row, fact, turn_table, net_pins, datasheets):
     kicad_names = {p['n']: info['names'][p['n']] for p in pads}
     jlc_names = {str(k): str(v) for k, v in easyeda['pins'].items()}
     mid_x, mid_y = float(cpl['Mid X'][:-2]), float(cpl['Mid Y'][:-2])
-    theirs = auto.jlc_world([(str(n), x, y) for n, x, y in easyeda['pads']], info['cpl_rot'], mid_x, mid_y)
+    theirs = auto.jlc_world([(str(n), x, y) for n, x, y in easyeda['pads']], info['cpl_rot'], mid_x, mid_y, info['assembly_side'])
     ours = {}
     for p in pads:
         ours[auto.unique_key(ours, p['n'])] = (p['x'], p['y'])
@@ -401,7 +413,7 @@ def auto_checks(info, row, fact, turn_table, net_pins, datasheets):
                                 by_nearest=bool(table.get('interchangeable_pins')), tol=tol)
     checks.append(geometry)
     record = (datasheets or {}).get(lcsc)
-    ring = {p['n']: (p['fx'], p['fy']) for p in exposed_free(pads)}
+    ring = {p['n']: (p['fx'], -p['fy'] if info['assembly_side'] == 'Bottom' else p['fy']) for p in exposed_free(pads)}
     checks.append(auto.datasheet_check(record, ring, kicad_names, datasheet_text_names(lcsc, record, kicad_names)))
     info['datasheet'] = record
     info['lcsc_for_ds'] = lcsc
@@ -565,8 +577,8 @@ def closeup(info, origin):
     marks.append('<rect x="%.3f" y="%.3f" width="1" height="%.3f" fill="#fff"/>' % (cx - w / 2 + 0.3, cy + h / 2 - 0.6, label * 0.4))
     marks.append('<text x="%.3f" y="%.3f" font-size="%.3f" fill="#fff">1 mm</text>' % (cx - w / 2 + 1.4, cy + h / 2 - 0.35, label))
     return ('<svg viewBox="%s" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s close-up">'
-            '<rect x="%.3f" y="%.3f" width="%.3f" height="%.3f" fill="#0a0f1a"/><use href="#board"/>%s</svg>'
-            % (view, html.escape(info['ref']), cx - w / 2, cy - h / 2, w, h, ''.join(marks)))
+            '<rect x="%.3f" y="%.3f" width="%.3f" height="%.3f" fill="#0a0f1a"/><use href="#%s"/>%s</svg>'
+            % (view, html.escape(info['ref'] + ' ' + info['assembly_side'] + ' (viewed from top)'), cx - w / 2, cy - h / 2, w, h, 'board-bottom' if info['assembly_side'] == 'Bottom' else 'board', ''.join(marks)))
 
 
 def codex_block(codex):
@@ -617,7 +629,7 @@ def part_row(info, origin):
                     '' if image else ' (crop not saved: run the datasheets command)', image))
     elif record:
         sheet = '<div class="mut">Datasheet: none available (%s)</div>' % html.escape(record.get('why', ''))
-    place = ('<div>board (%.2f, %.2f) mm, KiCad %.0f deg</div><div>CPL <code>%s, %s</code>, <b>rotation %.0f</b></div>'
+    place = ('<div><b>' + html.escape(info['assembly_side']) + ' assembly, viewed from top</b></div><div>board (%.2f, %.2f) mm, KiCad %.0f deg</div><div>CPL <code>%s, %s</code>, <b>rotation %.0f</b></div>'
              % (info['board_x'], info['board_y'], info['kicad_rot'], html.escape(info['cpl_x']),
                 html.escape(info['cpl_y']), info['cpl_rot']))
     pin1 = '<div><b>%s</b></div><div>%s</div>' % (html.escape(info.get('where', 'no pads')), html.escape(info.get('frame', '')))
@@ -644,6 +656,10 @@ def part_row(info, origin):
 
 
 def board_page(board, infos, board_svg, origin, hashes, pack_id, generated):
+    if isinstance(board_svg, dict):
+        svg_defs = '<g id="board">' + board_svg['Top'] + '</g><g id="board-bottom">' + board_svg['Bottom'] + '</g>'
+    else:
+        svg_defs = '<g id="board">' + board_svg + '</g>'
     refs = [i['ref'] for i in infos]
     pack = {'board': board, 'id': pack_id, 'refs': refs, 'sha256': hashes}
     rows = '\n'.join(part_row(info, origin) for info in infos)
@@ -656,7 +672,7 @@ def board_page(board, infos, board_svg, origin, hashes, pack_id, generated):
     return """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CPL review %(board)s</title><style>%(css)s</style></head><body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><g id="board">%(svg)s</g></defs></svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>%(svg)s</defs></svg>
 <h1>CPL review: %(board)s board, %(n)d parts</h1>
 <div class="warn"><b>Unsigned. Regenerate after the board rebuild.</b> This sheet was built %(generated)s from the
 build/hw/%(board)s files below, as they were. Any rebuild changes them: the sign helper then refuses this sheet.
@@ -688,7 +704,7 @@ picture against the part's datasheet and the actual silk pin-1 mark; the rings o
 </tbody></table>
 <script>const PACK = %(pack)s;
 %(js)s</script></body></html>
-""" % {'board': board, 'css': CSS, 'svg': board_svg, 'n': len(infos), 'generated': generated, 'hashes': html.escape(hash_lines),
+""" % {'board': board, 'css': CSS, 'svg': svg_defs, 'n': len(infos), 'generated': generated, 'hashes': html.escape(hash_lines),
        'flagged': flagged, 'nv': counts['verified'], 'nc': counts['codex-verified'], 'nr': counts['resolved'], 'nh': counts['human'], 'nb': counts['bad'], 'model': cpl_codex.MODEL, 'rows': rows, 'pack': json.dumps(pack), 'js': JS}
 
 
@@ -717,6 +733,13 @@ def build(args):
         pack_id = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:12]
         facts, outline = read_board(files[board + '.kicad_pcb'], [r['designator'] for r in rows])
         inner, origin = plot_board(files[board + '.kicad_pcb'], os.path.join(out, board + '.plot.svg'), outline)
+        bottom_plot = os.path.join(out, board + '.bottom.plot.svg')
+        if any(fact['layer'] == 'B.Cu' for fact in facts.values()):
+            lower, lower_origin = plot_board(files[board + '.kicad_pcb'], bottom_plot, outline,
+                                             'B.Cu,B.Silkscreen,B.Fab,B.Courtyard,Edge.Cuts')
+            if any(abs(a - b) > 0.001 for a, b in zip(origin, lower_origin)):
+                raise ValueError('top and bottom SVG origins differ')
+            inner = {'Top': inner, 'Bottom': lower}
         net_pins = netlist_pins(os.path.join(build_dir, board, board + '.net'))
         infos = []
         for row in rows:
@@ -737,9 +760,9 @@ def build(args):
             elif i['flags'] and i['auto'] == 'verified':
                 i['auto'] = 'human'
             key = cpl_codex.type_key(i['lcsc'], i['fpid'], (i.get('turn') or {}).get('rotation'))
-            codex = answers.get(key) if i['auto'] != 'verified' else None
+            codex = answers.get(key) if i['auto'] != 'verified' and i.get('assembly_side') == 'Top' else None
             i['codex'] = {k: codex[k] for k in ('verdict', 'summary', 'look_at', 'sources', 'model', 'timestamp')} if codex else None
-            i['resolution'] = resolutions.get('%s/%s' % (board, i['ref']))
+            i['resolution'] = resolutions.get('%s/%s' % (board, i['ref'])) if i.get('assembly_side') == 'Top' else None
             i['class'] = cpl_codex.classify(i['auto'], i['codex'], i['resolution'])
         infos.sort(key=lambda i: ({'bad': 0, 'human': 1, 'resolved': 2, 'codex-verified': 3, 'verified': 4}[i['class']],
                                   rank({'designator': i['ref']}), -i['npads'], natural(i['ref'])))
@@ -750,6 +773,8 @@ def build(args):
         with open(os.path.join(out, board + '.html'), 'w') as handle:
             handle.write(board_page(board, drawable, inner, origin, hashes, pack_id, generated))
         os.remove(os.path.join(out, board + '.plot.svg'))
+        if os.path.exists(bottom_plot):
+            os.remove(bottom_plot)
         manifest[board] = {'pack_id': pack_id, 'generated': generated, 'sha256': hashes,
                            'refs': sorted((i['ref'] for i in drawable), key=natural)}
         autos[board] = {i['ref']: {'lcsc': i['lcsc'], 'auto': i['auto'], 'class': i['class'],

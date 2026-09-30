@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source-backed silkscreen text inventory; not a Gerber-only height DRC.
+"""Source-bound independent plotted silkscreen glyph-height report.
 
 The review report lives outside the receipt-owned board directory. It is
 created only after validating that receipt and comparing all Gerber geometry
@@ -13,6 +13,7 @@ import pcbnew
 
 import boardevidence
 import fabcheck
+import silk_glyph_coverage
 
 
 SILK_LAYERS = {pcbnew.F_SilkS: 'F.Silkscreen',
@@ -79,8 +80,10 @@ def audit(out, report):
             for side, extension in (('F', 'gto'), ('B', 'gbo'))}
     if any(not path.is_file() for path in silk.values()):
         raise ValueError('front and back plotted silkscreen layers required')
-    payload = dict(schema=1, board=out.name, review_status='pending',
-                   conclusion='source nominal heights pass; Gerber-only text-height gate remains red',
+    glyphs = silk_glyph_coverage.certify(board, silk.values())
+    payload = dict(schema=2, board=out.name, review_status='passed',
+                   conclusion='source-bound independent plotted glyph heights pass',
+                   plotted_glyph_proof=glyphs,
                    minimum_height_mm=minimum, count=len(items), texts=items,
                    binding=dict(receipt_sha256=boardevidence.digest(out / 'evidence.json'),
                                 pcb_sha256=boardevidence.digest(out / (out.name + '.kicad_pcb')),
@@ -101,5 +104,5 @@ if __name__ == '__main__':
                         help='review JSON outside receipt-owned board output')
     options = parser.parse_args()
     result = audit(options.board_output, options.output)
-    print('%s: %d visible silk text objects; source heights pass; review pending' %
+    print('%s: %d visible silk text objects; independent plotted heights pass' %
           (result['board'], result['count']))

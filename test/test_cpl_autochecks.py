@@ -57,10 +57,13 @@ class NameTests(unittest.TestCase):
         self.assertEqual(auto.name_relation('~{WP}/IO_{2}', 'IO2', '3'), 'match')
         self.assertEqual(auto.name_relation('~{HOLD}/~{RESET}/IO_{3}', 'HOLD#orRESET#(IO3)', '7'), 'match')
         self.assertEqual(auto.name_relation('SWDIO', 'SWD', '25'), 'alias')
+        self.assertEqual(auto.name_relation('ENABLE', 'EN', '3'), 'alias')
+        self.assertEqual(auto.name_relation('EN', 'ENABLE', '3'), 'alias')
 
     def test_different_function_is_a_mismatch(self):
         self.assertEqual(auto.name_relation('IOL_2A', 'IOL_1A', '1'), 'mismatch')
         self.assertEqual(auto.name_relation('GND', 'VCC', '2'), 'mismatch')
+        self.assertEqual(auto.name_relation('ENABLE', 'IN', '3'), 'mismatch')
 
     def test_pad_numbers_as_names_are_not_comparable(self):
         self.assertEqual(auto.name_relation('I/O1', '1', '1'), 'generic')
@@ -168,11 +171,18 @@ class ResolutionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load('J4: {verdict: fine, justification: x, by: D, date: x}\n')
 
-    def test_the_shipped_file_carries_main_j4_verbatim(self):
+    def test_the_shipped_file_carries_only_authorized_resolutions(self):
         got = cpl_codex.load_resolutions(os.path.join(ROOT, 'tools', 'cpl_resolutions.yaml'))
-        self.assertEqual(list(got), ['main/J4'])
+        self.assertEqual(set(got), {'main/J4', 'cpu/U1', 'main/U7'})
         self.assertTrue(got['main/J4']['justification'].startswith('J4 is a plain, unkeyed vertical pin header'))
         self.assertTrue(got['main/J4']['justification'].endswith('the part is marked interchangeable_pins.'))
+        for key in ('cpu/U1', 'main/U7'):
+            resolution = got[key]
+            self.assertEqual(resolution['verdict'], 'fine')
+            self.assertEqual(str(resolution['date']), '2026-09-29')
+            self.assertTrue(resolution['by'].startswith('David Kaplan (instruction in Claude session'))
+            self.assertIn('all 144 pin functions', resolution['justification'])
+            self.assertIn('Still to confirm in JLC', resolution['justification'])
 
 
 if __name__ == '__main__':

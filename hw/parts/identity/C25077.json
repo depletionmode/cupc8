@@ -1,0 +1,32 @@
+{
+  "lcsc": "C25077",
+  "manufacturer": "UNI-ROYAL",
+  "mpn": "0402WGF100JTCE",
+  "package": "0402",
+  "resistance_ohm": 10,
+  "initial_tolerance_fraction": 0.01,
+  "tcr_ppm_per_C": 200,
+  "operating_temperature_C": [
+    -55,
+    155
+  ],
+  "power_W": 0.0625,
+  "voltage_rating_V": 50,
+  "identity_source": "https://www.lcsc.com/product-detail/C25077.html",
+  "provenance": "Supported web primary seller product page, reported crawled today, inspected exact attributes; this is a derived identity note, NOT downloaded supplierCAD/cache or manufacturer PDF.",
+  "inspected_utc": "2026-09-30T12:34:09.398930+00:00",
+  "tolerance_derivation": {
+    "reference_temperature_C": 25,
+    "largest_temperature_delta_C": 130,
+    "initial_plus_TCR_fraction": 0.036,
+    "conservative_simulation_fraction": 0.04,
+    "excludes": "long-term drift, pulse/frequency parasitics and physical lead/return geometry, which are separate obligations"
+  },
+  "datasheet_url": "https://datasheet.lcsc.com/datasheet/pdf/0a975aaa49b7c97f38a963127be4a823.pdf?productCode=C25077",
+  "datasheet_downloaded": false,
+  "datasheet_fetch_result": "Supported web official datasheet viewer/PDF inaccessible; no fabricated bytes/hash.",
+  "supplier_CAD_verified": false,
+  "live_assembly_stock_verified": false,
+  "part_reserved_or_ordered": false,
+  "shared_source_adopted": false
+}

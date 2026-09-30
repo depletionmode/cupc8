@@ -124,6 +124,7 @@ def main():
     e2e = lambda *cases: [run(['node', ROOT / 'test/emu/test_e2e.mjs', case], env=native)  # noqa: E731
                           for case in cases]
     if args.case == 'E2E-001':
+        test('test_cosim_slot_spi.py', BUILD)
         test('test_cosim_wiring.py', '--main-netlist', args.main_netlist,
              '--main-board', args.main_netlist.with_suffix('.kicad_pcb'), *boards[2:])
         test('test_cosim_runtime.py', *top)

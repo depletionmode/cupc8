@@ -13,6 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import rp2040card as rc  # noqa: E402
 
 G = kg.GRID
@@ -74,7 +75,7 @@ def schematic(path, footprint_libs):
     rc.two(s, c21, "VBUS", "GND")
     c22 = rc.passive(s, "C", "C22", "100n", (228 * G, 30 * G))
     rc.two(s, c22, "VBUS", "GND")
-    c25 = rc.passive(s, "C", "C25", "1u", (206 * G, 12 * G))         # at U5 IN: 100 nF rings IN to 8.5 V in a short (T5)
+    c25 = rc.passive(s, "C", "C25", "4.7u", (206 * G, 12 * G), lcsc="C23733")         # accepted same-pad upgrade; effective capacitance >=1.6 uF must be measured
     rc.two(s, c25, "VBOOST", "GND")
     # FAULT is open drain, active low: pulled up to the card's 3V3 for GPIO8
     r12 = rc.passive(s, "R", "R12", "10k", (200 * G, 46 * G))
@@ -131,7 +132,7 @@ PLACEMENT = dict(rc.core_placement(26.5, -17.5), **{
     "R14": (36.8, -19.6, 0),            # USB_DM, DP: by the ESD, over the cap column from pins 46/47
     "R15": (36.8, -22.6, 0),
     "U5": (50, -22, 180),                # TPS2553 (SOT-23-6): IN top right, as the old SY6280 kept IN on top
-    "C25": (52.6, -25.6, 90),            # 1 uF at U5 IN (pad 1), <= ~10 mm from C23/C24
+    "C25": (52.6, -25.6, 90),            # 4.7 uF nominal at U5 IN; operating effective >=1.6 uF required (pad 1), <= ~10 mm from C23/C24
     # the boost (TPS61023 layout guide: caps at VIN and VOUT, short SW loop)
     "U7": (43, -11.5, 180),
     "L1": (47.5, -10.8, 0),
@@ -186,6 +187,24 @@ def prepare(board):
                 edits += 1
     if edits != 4:
         raise ValueError("L1 silk geometry changed")
+    # The TI port-switch pin-one marker needs 30 um more space from its
+    # mask opening. Preserve the marker and its stroke width.
+    switch = next(f for f in board.GetFootprints() if f.GetReference() == "U5")
+    marks = switch.GraphicalItems()
+    marker_edits = 0
+    for i in range(len(marks)):
+        mark = marks[i].Cast()
+        if (mark.GetLayer() == pcbnew.F_SilkS and
+                mark.Type() == pcbnew.PCB_SHAPE_T and
+                mark.GetShape() == pcbnew.SHAPE_T_CIRCLE and
+                mark.GetWidth() == pcbnew.FromMM(.3) and
+                (mark.GetStart().x, mark.GetStart().y) == (51670000, -23300000) and
+                (mark.GetEnd().x, mark.GetEnd().y) == (51520000, -23300000)):
+            mark.SetStart(pcbnew.VECTOR2I(51700000, -23300000))
+            mark.SetEnd(pcbnew.VECTOR2I(51550000, -23300000))
+            marker_edits += 1
+    if marker_edits != 1:
+        raise ValueError("TPS2553 pin-one marker geometry changed")
     rc.io_preroute(board)
     at = lambda ref, n: rc.pad_at(board, ref, n)          # noqa: E731
     vin, en, fb = at("U7", 3), at("U7", 2), at("U7", 1)
@@ -216,8 +235,52 @@ def prepare(board):
     rc.track(board, "/VBOOST", (51.8, local_cap[1]), (51.8, boost_in[1]), width=0.3)
     rc.track(board, "/BOOST_FB", fb, at("R16", 2), width=0.2)
     rc.track(board, "/BOOST_FB", at("R16", 2), at("R17", 1), width=0.2)
+    # Match the intended nm-grid placements preserved by the design seed.
+    # Normalize after preparing the unchanged source keepouts: FromMM's
+    # float truncation otherwise leaves these two footprints at -8.199999.
+    for ref in ("C17", "Y1"):
+        fp = next(f for f in board.GetFootprints() if f.GetReference() == ref)
+        x, y = PLACEMENT[ref][:2]
+        fp.SetPosition(pcbnew.VECTOR2I(round(x * 1_000_000), round(y * 1_000_000)))
+
+
+    # Exact nanometre placement from the isolated DRC-qualified filter candidate.
+    for ref, (x, y) in {'R62': (18312500, -13900000), 'R63': (16812500, -20250000), 'R64': (16812500, -15450000), 'C60': (18312500, -15900000), 'C61': (14812500, -20250000), 'C62': (16812500, -13450000), 'C63': (14000000, -15649999)}.items():
+        board.FindFootprintByReference(ref).SetPosition(pcbnew.VECTOR2I(x, y))
+    board.FindFootprintByReference("R65").SetPosition(pcbnew.VECTOR2I(14350000, -14400000))
+    _pin_spi_designators(board)
+
+
+def _pin_spi_designators(board):
+    import pcbnew
+    for ref, (x, y, angle, size, stroke) in {'C20': (37475000, -9800000, 0.0, 1000000, 150000), 'C24': (50724999, -15000000, 0.0, 1000000, 150000), 'C7': (34700000, -21505000, 0.0, 1000000, 150000), 'R4': (324999, -38500000, 0.0, 1000000, 150000), 'R16': (37475000, -13300000, 0.0, 1000000, 150000), 'R62': (18512500, -12300000, 0.0, 800000, 150000), 'C18': (10995000, -18000000, 0.0, 1000000, 150000), 'TP3': (-1055001, -19999999, 0.0, 1000000, 150000), 'R15': (36800000, -24015000, 0.0, 1000000, 150000), 'Y1': (17654999, -8199999, 0.0, 1000000, 150000), 'H1': (52001264, -35602474, 0.0, 1000000, 150000), 'C17': (26400000, -6345000, 0.0, 1000000, 150000), 'C6': (32700000, -17705000, 0.0, 1000000, 150000), 'R2': (28500000, -9899999, 0.0, 1000000, 150000), 'R63': (14812500, -25050000, 0.0, 800000, 150000), 'C62': (14812500, -10694999, 0.0, 1000000, 150000), 'C23': (45700000, -18045000, 0.0, 1000000, 150000), 'R1': (15000000, -29375000, 0.0, 1000000, 150000), 'U6': (41400000, -22654999, 0.0, 1000000, 150000), 'R10': (45300000, -20724999, 0.0, 1000000, 150000), 'R14': (36800000, -18185000, 0.0, 1000000, 150000), 'J2': (28855000, -36755000, 0.0, 1000000, 150000), 'TP4': (-1001240, -23453763, 0.0, 1000000, 150000), 'C3': (25300000, -22300000, 0.0, 800000, 150000), 'C60': (22312500, -11500000, 0.0, 800000, 150000), 'L1': (51544999, -10800000, 0.0, 1000000, 150000), 'C8': (28800000, -29100000, 0.0, 1000000, 150000), 'C14': (28945000, -25500000, 0.0, 1000000, 150000), 'U1': (32475000, -14500000, 0.0, 1000000, 150000), 'C16': (23110000, -12600000, 0.0, 800000, 150000), 'R65': (11149999, -14599999, 0.0, 800000, 150000), 'C61': (11412500, -19650000, 0.0, 1000000, 150000), 'C9': (29700000, -23305000, 0.0, 1000000, 150000), 'R12': (33500000, -12375000, 0.0, 1000000, 150000), 'J1': (8500000, -6395000, 0.0, 1000000, 150000), 'C25': (50599999, -27455000, 0.0, 1000000, 150000), 'C12': (29905000, -12100000, 0.0, 1000000, 150000), 'U5': (53305000, -23000000, 0.0, 1000000, 150000), 'C22': (47205000, -25500000, 0.0, 1000000, 150000), 'C2': (175000, -11500000, 0.0, 1000000, 150000), 'C21': (50605000, -17500000, 0.0, 1000000, 150000), 'TP5': (-1055001, -28999999, 0.0, 1000000, 150000), 'C11': (35100000, -25700000, 0.0, 1000000, 150000), 'C10': (25600000, -26799999, 90.0, 1000000, 150000), 'U4': (19700000, -15400000, 0.0, 800000, 150000), 'TP1': (-55001, -35999999, 0.0, 1000000, 150000), 'R60': (15000000, -22100000, 0.0, 1000000, 150000), 'R5': (19000000, -36825000, 0.0, 1000000, 150000), 'R11': (40285000, -18299999, 0.0, 1000000, 150000), 'U3': (19500000, -33095000, 0.0, 1000000, 150000), 'R6': (25000000, -36825000, 0.0, 1000000, 150000), 'C13': (28945000, -27300000, 0.0, 1000000, 150000), 'R61': (23100000, -25209999, 90.0, 800000, 150000), 'R17': (36975000, -15500000, 0.0, 1000000, 150000), 'C5': (29205000, -6900000, 0.0, 1000000, 150000), 'C63': (10745000, -16149999, 0.0, 1000000, 150000), 'TP2': (-4001240, -16453762, 0.0, 1000000, 150000), 'TP6': (-1055001, -32499999, 0.0, 1000000, 150000), 'R64': (13612500, -13049999, 0.0, 800000, 150000), 'C4': (19900000, -9700000, 90.0, 800000, 150000), 'U7': (42500000, -9354999, 0.0, 1000000, 150000), 'C15': (26100000, -29355000, 0.0, 1000000, 150000), 'R3': (8500000, -14375000, 0.0, 1000000, 150000)}.items():
+        word = board.FindFootprintByReference(ref).Reference()
+        word.SetPosition(pcbnew.VECTOR2I(x, y))
+        word.SetTextAngleDegrees(angle)
+        word.SetTextSize(pcbnew.VECTOR2I(size, size))
+        word.SetTextThickness(stroke)
+        word.SetVisible(True)
+
+# Exact local filters; original component positions retained.
+PLACEMENT.update({'R62': (18.3125, -13.9, 90.0), 'R63': (16.8125, -20.25, 180.0), 'R64': (16.8125, -15.45, -90.0), 'C60': (18.3125, -15.9, 90.0), 'C61': (14.8125, -20.25, 180.0), 'C62': (16.8125, -13.45, -90.0), 'C63': (14.0, -15.649999, 180.0)})
+
+# Exact qualified additional local OE resistor placement.
+PLACEMENT.update({"R65": (14.35, -14.4, 180.0)})
+
+
+def _seeded_route(board, workdir):
+    import route_seed
+    result = route_seed.apply(
+        board, os.path.join(HERE, "io-full-route-seed.json"),
+        board_name="io", pour_nets=("/GND",),
+        post_route_contract="io-ahc-local-flash-power-v1")
+    _pin_spi_designators(board)
+    print("IO local repair seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
 
 
 if __name__ == "__main__":
     rc.build("io", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR", "D2": "KBD", "D3": "KEY"}, GPIOS,
-             TITLE, REVISION, usb=True, layers=4, passes=100, preroute=prepare)
+             TITLE, REVISION, usb=True, layers=4, passes=100, designator_reach=4, preroute=prepare, seeded_route=_seeded_route,
+             post_fill=(lambda board: ff.round_board_fills(board, "io")))

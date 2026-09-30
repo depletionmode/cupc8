@@ -29,6 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 sys.path.insert(0, HERE)
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
 import sesreplay  # noqa: E402
 import main_power_corner  # noqa: E402
 import main_seed  # noqa: E402
@@ -81,7 +82,7 @@ POWER = {
 }
 
 # LCSC numbers of the passives (JLC basic parts unless noted)
-R0603 = {"0": "C21189", "33": "C23140", "56": "C25196", "100": "C22775", "1k": "C21190", "2.2k": "C4190", "3k": "C4211",
+R0603 = {"0": "C21189", "33": "C23140", "56": "C25196", "68": "C27592", "100": "C22775", "1k": "C21190", "2.2k": "C4190", "3k": "C4211",
          "4.7k": "C23162", "5.1k": "C23186", "10k": "C25804", "22k": "C31850", "27k": "C22967",
          "47k": "C25819", "100k": "C25803", "1M": "C22935"}
 C0603 = {"100n": "C14663", "1u": "C15849", "4.7u": "C19666", "10u": "C19702"}
@@ -399,8 +400,11 @@ def build_parts():
     for i, sig in enumerate(s for s in sorted(set(chip.values()), key=str) if s and s.endswith("_SRC")):
         base = sig[:-4]
         # the 14 CPU-bus lines (R21-R34) are 56 ohm to hold the overshoot at the
-        # CPU card's FPGA inside its limit (hw/si/cpubus_options.py); SPI and BR_MISO stay 33 ohm
-        R("R%d" % (20 + i), "56" if sig.startswith("CPU_") else "33", sig, far_net(base))
+        # CPU card's FPGA inside its limit (hw/si/cpubus_options.py).
+        # Only six fitted slot CS sources use68; AUX CS, SCK/MOSI and BR_MISO stay33.
+        value = "56" if sig.startswith("CPU_") else (
+            "68" if sig in {"SPI_nCS%d_SRC" % j for j in range(6)} else "33")
+        R("R%d" % (20 + i), value, sig, far_net(base))
     # VCC 1V2: one 100 nF per pin, and bulk; VCCIO: one per pin; PLL filter
     for i, net in enumerate(["+1V2"] * 4 + ["+3V3"] * 10):
         C("C%d" % (20 + i), "100n", net)
@@ -450,7 +454,7 @@ def build_parts():
     rom = {"A%d" % i: "MEM_A%d" % i for i in range(19)}
     rom.update({"DQ%d" % i: "MEM_D%d" % i for i in range(8)})
     rom.update({"~{CE}": "MEM_nCE_ROM", "~{OE}": "MEM_nOE", "~{WE}": "MEM_nWE", "VDD": "+3V3", "VSS": "GND"})
-    part("U10", "jlc:SST39VF040-70-4I-NHE", "SST39VF040", "Package_LCC:PLCC-32_11.4x14.0mm_P1.27mm", "C645939", rom)
+    part("U10", "jlc:SST39VF040-70-4I-NHE", "SST39VF040", "Package_LCC:PLCC-32_11.4x14.0mm_P1.27mm", "C632854", rom)
     C("C41", "100n", "+3V3")
     # both chips deselected, and no ROM write, while the chipset configures
     for i, net in enumerate(("MEM_nCE_RAM", "MEM_nCE_ROM", "MEM_nWE")):
@@ -513,9 +517,13 @@ def build_parts():
     C("C49", "100n", "+3V3")
     C("C50", "100n", "+3V3")
 
-    # ---- the shared SPI bus: MISO pulled up so an empty slot reads $FF; aux header (dev 6)
+    # ---- shared SPI bias: bounded LVC card outputs; empty bus reads zero.
+    # The native ROM retries absent slots and rejects zero-length / missing C8 identity.
+    # Qualification remains tied to actual receiver branch and separate shunt ground.
     group("spi")
-    R("R107", "47k", "+3V3", "SPI_MISO")
+    R("R107", "100k", "+3V3", "SPI_MISO")
+    R("R109", "4.7k", "SPI_MISO", "GND",
+      fp="Resistor_SMD:R_0402_1005Metric", lcsc="C25900")
     part("J4", "Connector_Generic:Conn_02x05_Odd_Even", "AUX SPI", "Connector_PinHeader_2.54mm:PinHeader_2x05_P2.54mm_Vertical",
          "C42431818", {1: "+3V3", 2: "GND", 3: "SPI_SCK", 4: "GND", 5: "SPI_MOSI", 6: "GND", 7: "SPI_MISO",
                        8: "AUX_CS_n", 9: "+5V", 10: "GND"})
@@ -946,6 +954,7 @@ def wanted(parts):
     for r, u in (("C49", "U13"), ("C50", "U14"), ("C47", "U11"), ("C48", "U12")):
         at[r] = (at[u][0] + 6.0, at[u][1], 90)
     at["R107"] = (70.0, row_slot(5), 0)
+    at["R109"] = (98.0, 64.5, 270)
     # power: south edge, around the USB-C inlet
     y, dx = H - 9.0, -40.0                      # the south-west corner
     # MB-005 (main_power_corner): U2 half turned, its IN bar towards F1 and
@@ -1113,7 +1122,7 @@ def placement():
 # the parts this revision moves from where the route seed has them
 # (MB-005 input corner, MB-051 1V2 LDO), and those that must land exactly
 RELAID = ("U2", "R3", "R58", "R59", "C15", "C3", "C5", "C6", "R1", "U4", "C9", "C10", "R8", "TP105", "TP106")
-PINNED = {"U2": (18.0, 160.0, 180), "C3": (11.0, 160.0, 270), "R1": (26.0, 174.0, 0), "C5": (34.0, 160.0, 270),
+PINNED = {"R109": (98.0, 64.5, 270), "U2": (18.0, 160.0, 180), "C3": (11.0, 160.0, 270), "R1": (26.0, 174.0, 0), "C5": (34.0, 160.0, 270),
           "C15": (13.2, 159.6, 270), "R3": (13.2, 163.0, 90), "R58": (23.8, 159.8, 90), "R59": (25.7, 161.8, 90),
           "TP105": (23.0, 154.3, 0),
           "C6": (36.3, 162.4, 0)}
@@ -1302,6 +1311,15 @@ def prepare(board):
     _five_volt_bus(board)
     signal = _spi_ncs6_escape(board)
     _label_keepouts(board)
+    # A complete guarded design seed already carries the qualified fan-out.
+    # Do not attempt to reconstruct the older partial seed around new local
+    # components. Every physical guard and all non-pour connectivity must match
+    # before copper is installed; mismatch raises and never starts a router.
+    if os.path.isfile(_FULL_ROUTE_PATH):
+        import route_seed
+        route_seed.apply(board, _FULL_ROUTE_PATH, board_name="main",
+                         pour_nets=PLANE_NETS, post_route_contract="main-finish-seeded-v1")
+        return []
     added, dropped = main_seed.apply(board, SEED_RIPUP, SEED_RIPUP_NETS)
     print("route seed: %d items kept, dropped %s" % (added, dropped), end=" ", flush=True)
     fanned = _fan_out(board)
@@ -1542,7 +1560,29 @@ def _node_joins(board, skip=()):
     return len(links)
 
 
+_FULL_ROUTE_REUSED = False
+_FULL_ROUTE_PATH = os.path.join(HERE, "main-full-route-seed.json")
+
+
 def _seeded_route(board, workdir):
+    """Reuse guarded recorded physical routing, including its post-route repairs.
+
+    The complete current pipeline still recreates pours, fabrication outputs,
+    checks and receipts. An incompatible design seed raises without rerouting.
+    """
+    import route_seed
+    global _FULL_ROUTE_REUSED
+    _FULL_ROUTE_REUSED = False
+    result = route_seed.apply(
+        board, _FULL_ROUTE_PATH, board_name="main",
+        pour_nets=PLANE_NETS, post_route_contract="main-finish-seeded-v1")
+    _FULL_ROUTE_REUSED = True
+    print("main full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
+
+
+def _legacy_seeded_route(board, workdir):
     """The route needs no router: main-route-seed.json (DeepPCB rev10's copper
     plus this revision's own power copper, applied in prepare()) and
     main-handroute-seed.json (main_handroute.py's copper for what those leave
@@ -1939,6 +1979,14 @@ def _finish_route(board, replay_salt=None):
     """
     import pcbnew
     mm, to = pcbnew.FromMM, pcbnew.ToMM
+    if _FULL_ROUTE_REUSED:
+        # The recorded route already includes the guarded 0.27 mm U7.6
+        # repair. It is not idempotent; verify the entire installed route.
+        import route_seed
+        route_seed.verify_installed(board, _FULL_ROUTE_PATH)
+        # The current source's silk is new, so perform its guarded cleanup.
+        _clear_main_silk_mask(board)
+        return
     if ROUTE_SEEDED:
         # the route starts from main_seed's copper, which already carries
         # the salt-9 repairs below (the input corner's escape joints are
@@ -2252,6 +2300,8 @@ def _plane_pads(board):
 
 
 def main():
+    global _FULL_ROUTE_REUSED
+    _FULL_ROUTE_REUSED = False
     parser = argparse.ArgumentParser(description='Generate the CUPC/8 main board')
     parser.add_argument('outdir', nargs='?')
     parser.add_argument('--replay-manifest', help='content-bound completed main-board SES snapshot')
@@ -2284,6 +2334,7 @@ def main():
                        prepare=prepare,
                        seeded_route=_seeded_route,
                        post_route=(lambda board: _finish_route(board, replay['salt'] if replay else None)),
+                       post_fill=(lambda board: ff.round_board_fills(board, "main")),
                        replay=replay,
                        power_nets=POWER_NETS, fine_power_nets=FINE_POWER_NETS, graphics=_graphics(), labels=LABELS,
                        label_side=LABEL_SIDE,

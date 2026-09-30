@@ -327,6 +327,18 @@ LOADS_3V3 = {
     "I2C expanders, SWD mux": 0.005,
     "LEDs": 0.030,
     "1V2 LDO (chipset core)": I_1V2_MAX,
+    # Explicit reset-monitor supply allocation, excluding the monitor sense
+    # currents separately bounded by reset_supervisor.effective_copper:
+    # 2 x OPA376 IQ <= 1 mA, REF3425 IQ <= 95 uA + EN <= 2 uA,
+    # reference ladder <= 116.1 uA and output feedback <= 1.9 uA.
+    "reset reference + op-amp supplies": 0.0023,
+    # AHC/270-ohm/10k MISO repair: shared allowance even with six cards.
+    # Six 9.7k shunts at 3.64V consume <= 2.252mA; six ICC bounds add
+    # 60uA. An 80pF bus at 3MHz adds 0.874mA; twice the typical 14pF
+    # Cpd allocation on all six buffers adds 1.835mA. Cpd is typical,
+    # so this is an operating allocation requiring first-article checking,
+    # not a vendor-guaranteed total-current limit. Sum < 5.1mA; use 6mA.
+    "slot MISO buffer + bias allowance": 0.006,
 }
 # power.md's Typ column, same rows: what B6/B7 check on a default USB source
 LOADS_3V3_TYP = {
@@ -335,6 +347,8 @@ LOADS_3V3_TYP = {
     "GPU card TMDS": 0.030, "IO card RP2040 + flash": 0.025, "storage card RP2040 + flash": 0.025,
     "storage card microSD (writing)": 0.005, "I2C expanders, SWD mux": 0.001, "LEDs": 0.015,
     "1V2 LDO (chipset core)": 0.015,
+    "reset reference + op-amp supplies": 0.0018,
+    "slot MISO buffer + bias allowance": 0.002,
 }
 I_KEYBOARD_TYP = 0.100      # power.md Typ: an ordinary keyboard
 I_HDMI_5V_TYP = 0.010       # power.md Typ

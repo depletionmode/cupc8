@@ -61,6 +61,9 @@ def main():
         print("\n%d tests, %d implemented" % (len(tests), sum("cmd" in t for t in tests)))
         return 0
 
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    import verification_binding as binding
+    before = binding.capture(ROOT)
     os.makedirs(OUT, exist_ok=True)
 
     def execute(cmd, log):
@@ -86,15 +89,23 @@ def main():
             print("%-9s %-58s %s (%.0fs)%s" % (t["id"], t["title"][:58], status, secs,
                                                "" if rc == 0 else "  log: " + os.path.relpath(log, ROOT)))
             outcome[t["id"]] = {"id": t["id"], "status": status, "title": t["title"],
-                                "seconds": round(secs, 1)}
+                                "seconds": round(secs, 1), "log": os.path.relpath(log, ROOT),
+                                "log_sha256": binding.sha(log)}
     results = [outcome.get(t["id"], {"id": t["id"], "status": "pending", "title": t["title"]})
                for t in tests]
 
     counts = {s: sum(r["status"] == s for r in results) for s in ("pass", "FAIL", "pending")}
+    after = binding.capture(ROOT)
+    complete_gate = args.gate and {t['id'] for t in tests} == {t['id'] for t in load() if t['kind'] != 'hw'}
     with open(os.path.join(OUT, "results.json"), "w") as f:
         json.dump({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "counts": counts,
-                   "results": results}, f, indent=1)
+                   "results": results, "binding": {"version": 1, "full_gate_run": complete_gate,
+                   "before": before, "after": after,
+                   "commands": {t["id"]: t.get("cmd") for t in tests}}}, f, indent=1)
     print("\n%(pass)d passed, %(FAIL)d failed, %(pending)d pending" % counts)
+    if args.gate and before != after:
+        print('gate: source or board content changed during verification; freeze and rerun')
+        return 1
     if counts["FAIL"]:
         return 1
     if args.gate and any(r["status"] == "pending" for r, t in zip(results, tests) if t["kind"] != "hw"):

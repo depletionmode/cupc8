@@ -26,10 +26,12 @@ def result(milliohms, j=0.4, j_term=1.0, vias=()):
 
 
 class MainInputHeat(unittest.TestCase):
-    def report(self, pos, ret, out):
-        def extract(board, cases):
+    def report(self, pos, ret, out, heat_by_name=None):
+        def extract(board, cases, solver='cg'):
             table = {id(gate.POSITIVE): pos, id(gate.RETURN): ret, id(gate.OUTPUT): out}[id(cases)]
-            return {name: (table, 0.01, result(table, **KW[0])) for name, *_ in cases}
+            return {name: (table, 0.01, [result(table, **((heat_by_name or {}).get(name, KW[0]))),
+                                       result(table, **((heat_by_name or {}).get(name, KW[0])))])
+                    for name, *_ in cases}
         output = StringIO()
         with patch.object(sys, 'argv', ['main_input_heat.py', 'unused']), \
              patch.object(gate, 'inspect', return_value=None), \
@@ -73,8 +75,128 @@ class MainInputHeat(unittest.TestCase):
         # the salt-9 J1-F1 track: 0.5 mm drawn, 80 % etched, 24.9 um
         rise = cm.ipc_rise(d.insw_ilim()[2], 0.4 * 0.0249)
         self.assertGreater(rise, 100)
-        # 1.75 mm drawn is the derivation's 20 C width
-        self.assertLess(cm.ipc_rise(d.insw_ilim()[2], 1.75 * 0.8 * 0.0249), 20.5)
+        # The earlier 1.75 mm estimate no longer meets 20 C at the current
+        # full temperature/tolerance 3.288102 A limit; 1.80 mm does.
+        self.assertGreater(cm.ipc_rise(d.insw_ilim()[2], 1.75 * 0.8 * 0.0249), 20.0)
+        self.assertLess(cm.ipc_rise(d.insw_ilim()[2], 1.80 * 0.8 * 0.0249), 20.0)
+
+    def test_actual_layer_thickness_sets_the_same_15_c_cut(self):
+        amps = d.insw_ilim()[2]
+        for thickness in (gate.CORNER.outer_mm, gate.CORNER.inner_mm):
+            cut = gate.cut_density(amps, thickness)
+            self.assertAlmostEqual(cm.ipc_rise(amps, thickness / cut), 15.0, places=8)
+        self.assertLess(gate.cut_density(amps, gate.CORNER.inner_mm),
+                        gate.cut_density(amps, gate.CORNER.outer_mm))
+
+    def test_neck_boundary_heat_is_counted_in_body(self):
+        amps = d.insw_ilim()[2]
+        cut = gate.cut_density(amps)
+        grid = np.full((7, 7), cut * .99)
+        grid[3, 3] = cut * 2
+        r = result(1)
+        r.grids = {'F.Cu': (grid, np.zeros(grid.shape, bool))}
+        body, _, neck, _ = gate.rises(r, amps)
+        self.assertAlmostEqual(body, cm.ipc_rise(amps, gate.CORNER.outer_mm / (cut * .99)))
+        self.assertGreater(neck, 0)
+
+    def test_control_ground_excluded_only_from_full_current_thermal(self):
+        self.assertTrue(any(src == [('U2', '8')] for _, _, src, _, _ in gate.RETURN))
+        self.assertFalse(any(name.startswith('U2:8') for name in gate.THERMAL_RETURN_NAMES))
+        expected = {name for name, _, src, _, _ in gate.RETURN
+                    if src[0][0] in ('C3', 'C5', 'U3')}
+        self.assertEqual(gate.THERMAL_RETURN_NAMES, expected)
+        self.assertEqual(len(expected), 6)
+
+    def test_control_stub_heat_cannot_fail_but_each_power_ground_can(self):
+        control = {name: {'j': 2.5} for name, *_ in gate.RETURN if name.startswith('U2:8')}
+        status, text = self.report(5.0, 3.0, 5.0, control)
+        self.assertEqual(status, 0, text)
+        for ref in ('C3', 'C5', 'U3'):
+            with self.subTest(power_ground=ref):
+                heat = {name: {'j': 2.5} for name, *_ in gate.RETURN if name.startswith(ref + ':')}
+                status, text = self.report(5.0, 3.0, 5.0, heat)
+                self.assertEqual(status, 1)
+                self.assertIn('FAIL I3', text)
+
+    def test_enable_pin_is_not_the_buck_power_input(self):
+        self.assertEqual(gate.INPUT_PINS[('U3', '1')], '/5V_SYS')
+        self.assertEqual(gate.THERMAL_OUTPUT_NAMES, {'U2 OUT -> R4:1', 'U2 OUT -> U3:4',
+                                                   'U2 OUT -> C3:1', 'U2 OUT -> C5:1'})
+        status, text = self.report(5.0, 3.0, 5.0, {'U2 OUT -> U3:1': {'j': 2.5}})
+        self.assertEqual(status, 0, text)
+        status, text = self.report(5.0, 3.0, 5.0, {'U2 OUT -> U3:4': {'j': 2.5}})
+        self.assertEqual(status, 1)
+        self.assertIn('FAIL I3', text)
+
+    def test_each_capacitor_positive_escape_is_mandatory(self):
+        for name in ('U2 OUT -> C3:1', 'U2 OUT -> C5:1'):
+            with self.subTest(shorted_capacitor=name):
+                status, text = self.report(5.0, 3.0, 5.0, {name: {'j': 2.5}})
+                self.assertEqual(status, 1)
+                self.assertIn('FAIL I3', text)
+
+    def test_coarse_pitch_failure_cannot_hide_behind_fine_pass(self):
+        calls = 0
+        def bound(r, amps):
+            nonlocal calls
+            calls += 1
+            return (21.0 if calls == 1 else 1.0, 1.0, 0.0, 0.0)
+        with patch.object(gate, 'rises', side_effect=bound):
+            status, text = self.report(5.0, 3.0, 5.0)
+        self.assertEqual(status, 1)
+        self.assertIn('FAIL I3', text)
+        self.assertEqual(calls, 2 * (len(gate.POSITIVE) + len(gate.THERMAL_RETURN_NAMES) + len(gate.THERMAL_OUTPUT_NAMES)))
+
+    def test_adaptive_convergence_retains_all_coarse_bounds(self):
+        case = [gate.OUTPUT[0]]
+        with patch.object(cm, 'solve', side_effect=[result(100), result(80), result(75)]) as solve:
+            maximum, disagreement, runs = gate.extract(None, case, solver='amg')[case[0][0]]
+        self.assertEqual(maximum, 100)
+        self.assertAlmostEqual(disagreement, 5 / 80)
+        self.assertEqual(len(runs), 3)
+        self.assertEqual([call.args[5] for call in solve.call_args_list], [.1, .07, .05])
+        caches = [call.kwargs['geometry_cache'] for call in solve.call_args_list]
+        self.assertTrue(all(cache is caches[0] for cache in caches))
+        self.assertTrue(all(call.kwargs['solver'] == 'amg' for call in solve.call_args_list))
+
+    def test_nonconverged_refinement_remains_a_failure(self):
+        case = [gate.OUTPUT[0]]
+        with patch.object(cm, 'solve', side_effect=[result(100), result(80), result(60), result(40)]):
+            maximum, disagreement, runs = gate.extract(None, case)[case[0][0]]
+        self.assertEqual(maximum, 100)
+        self.assertGreater(disagreement, gate.CONVERGENCE_LIMIT)
+        self.assertEqual(len(runs), 4)
+
+    def test_dump_binds_receipt_model_and_every_grid_without_mutating_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            receipt = root / 'board'
+            receipt.mkdir()
+            (receipt / 'main.kicad_pcb').write_text('real PCB placeholder for digest regression')
+            (receipt / 'evidence.json').write_text('{}')
+            path = root / 'report.json'
+            hashes = gate.model_sources()
+            grids = [result(10), result(8)]
+            grids[1].pitch = .07
+            cases = {'case': (10, .2, grids)}
+            with patch.object(gate.boardevidence, 'validate') as validate:
+                gate.dump_results(path, receipt, (cases,), 1, hashes)
+            validate.assert_called_once_with('main', receipt)
+            report = json.loads(path.read_text())
+            self.assertEqual(report['gate_exit_status'], 1)
+            self.assertFalse(report['manufacturing_release'])
+            self.assertEqual(report['pcb_sha256'], gate.boardevidence.digest(receipt / 'main.kicad_pcb'))
+            self.assertEqual(report['model_sources'], hashes)
+            self.assertEqual([r['pitch_mm'] for r in report['cases'][0]['meshes']], [.1, .07])
+            with np.load(path.with_suffix('.npz')) as arrays:
+                for mesh in report['cases'][0]['meshes']:
+                    np.testing.assert_equal(arrays[mesh['layers']['F.Cu']['density']], grids[0].grids['F.Cu'][0])
+            self.assertEqual(sorted(p.name for p in receipt.iterdir()), ['evidence.json', 'main.kicad_pcb'])
+            with patch.object(gate, 'model_sources', return_value={}):
+                with self.assertRaisesRegex(ValueError, 'changed during qualification'):
+                    gate.dump_results(path, receipt, (cases,), 1, hashes)
+            with self.assertRaisesRegex(ValueError, 'outside'):
+                gate.dump_results(receipt / 'report.json', receipt, (cases,), 1, hashes)
 
     def test_invalid_receipt_fails_before_route_report(self):
         output = StringIO()

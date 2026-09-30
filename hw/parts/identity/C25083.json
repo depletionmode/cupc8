@@ -1,0 +1,17 @@
+{
+  "lcsc": "C25083",
+  "manufacturer": "UNI-ROYAL",
+  "mpn": "0402WGF150JTCE",
+  "resistance_ohm": 15,
+  "package": "0402",
+  "initial_tolerance": 0.01,
+  "tcr_ppm_per_c": 100,
+  "temperature_c": [
+    -55,
+    155
+  ],
+  "conservative_full_temperature_tolerance": 0.03,
+  "source": "https://www.lcsc.com/product-detail/C25083.html",
+  "source_checked_date": "2026-09-30",
+  "limits": "Primary supplier HTML verified; CAD/liveJLC/manufacturerPDFnotclaimed. Hypothesis only, not adopted."
+}

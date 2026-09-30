@@ -15,8 +15,39 @@ Results go into `doc/hardware/fa-results/` as JSON (see
 applies the limits (which live in the tool, not in the records) and reports
 each gate green, red or pending.
 
+## First-article acceptance target — confirmed by David, 2026-09-30
+
+The first article must be a working computer with **Main + system + CPU +
+IO + storage + WiFi + either HDMI/GPU or eInk**. CPU and IO are always
+fitted. WiFi and storage are fitted. Exactly one graphics card is fitted;
+qualify both alternatives in separate configurations.
+
+Acceptance means in-system programming through the system board, booting
+the real ROM/kernel/BASIC, USB keyboard input through IO, working display,
+microSD SAVE/LOAD and working WiFi networking in that integrated machine.
+Use the specified 5 V USB-C source advertising 3 A for full M1 loads and
+retain the existing power/reset, receiving-pin, thermal and functional limits.
+Pre-order simulation/build evidence and the after-delivery measurements in
+this plan are distinct; a clock-only pass is not complete machine acceptance.
+
+The first-article repair priority is this fitted configuration. Sole-WiFi,
+other missing-card populations, general six-card capacity and unqualified
+slot maps remain separately documented project limitations. Preserve their
+failed/pending tests; they do not justify a resistor change solely to meet
+this confirmed first-article target. This scope is not an all-green general
+release, a new electrical-limit waiver or authorization to place an order.
+System-card removal remains a separate original M1 requirement.
+
+Current Main SPI clock resistor R36 remains **33 ohms**. All128 tested
+clock cases for the four GPU/eInk mixed maps passed with that value;
+Main47 and local WiFi270/390 trials were rejected. Further changes require
+an observed issue relevant to the target or another necessary design check.
+Initial tested slot maps and outstanding timing/coverage are recorded in
+[first-article scope audit](first-article-m1-scope-audit-20260930.md).
+
 ## Contents
 
+- [First-article acceptance target](#first-article-acceptance-target--confirmed-by-david-2026-09-30)
 - [How to use this plan](#how-to-use-this-plan)
 - [Equipment](#equipment)
 - [Common methods](#common-methods): M-K Kelvin resistance, M-S scope on
@@ -51,23 +82,36 @@ shown that it seats and that reversed insertion is blocked (Stage 3). The
 measurements that can destroy a board (MB-109 at 3.2 A) come last, and run
 on one designated unit.
 
-**The first-article batch.** JLC's minimums give 5 bare PCBs of each board,
-of which you choose how many to assemble. Proposed:
+**The current development batch.** The genuine development package receipts
+specify **2 assembled boards of each of the eight types** (16 assembled boards).
+This is the authorized package quantity, not an order or manufacturing approval.
+Bare-board quantities and supplier minimums still need a current supplier quote.
 
-| Board | Assembled | Bare kept | Use of the bare PCBs |
-|---|---:|---:|---|
-| main | 3 (unit 1: the measurement board, may be reworked; unit 2: clean reference; unit 3: the spare `debugging.md` §3 plans) | 2 | none |
-| cpu, gpu, io, wifi, storage, eink, system | 3 each | 2 each | MB-110 contact coupons (a bare card's finger traces reach pads you can probe) |
+| Board | Current assembled quantity | Remaining sample obligation |
+|---|---:|---|
+| main | 2 | MB-107 and MB-101 require 3 distinct units; the third unit is not included |
+| cpu, gpu, io, wifi, storage, eink, system | 2 each | each type's first-power gate requires 3 distinct units; GC-102 also requires 3 GPU units |
+
+The earlier proposal of 3 assembled boards per type would provide a measurement
+unit, a clean reference and a spare. It is not the quantity in the current
+packages. Two units can be screened and used for development, but cannot close
+these unchanged three-unit gates. Closing them requires an additional assembled
+sample or an explicitly approved change to the qualification scope; no change
+or waiver is made here. Contact coupons and spare boards require a separate
+bare-board quantity decision.
 
 Loose parts, ordered from LCSC at the same time as the batch (Stage 0):
-10 × C45783, 5 each of C23733, C52923 and C1525, 5 × MAX16054AZT and
+10 × C45783, 10 × C23733 (five for each CPU C21/C22 measurement role),
+5 × C1525, 5 × MAX16054AZT and
 5 × HT7533-2 (the parts the main board fits), 1 × ESP32-C3-MINI-1U-N4
 (optional, WC-105b). Ask LCSC for a single date code if you can; record the
 lot/date code in each record's `notes`.
 
 **Sample sizes** are in each measurement and in the tool
-(`python3 tools/fa_results.py --list`). A board-level gate needs 2 units
-(3 for the first-power screens, which every assembled unit gets anyway);
+(`python3 tools/fa_results.py --list`). Most board-level gates need 2 units. The tool requires 3 distinct units for
+MB-107, MB-101, CC-102, GC-102, GC-103, IC-102, WC-102, SC-101, EC-101 and
+YC-101. Every assembled unit still receives its applicable safety and first-power
+screens; screening the two current units does not satisfy a three-unit minimum;
 part-lot gates need 5 or 10 samples; the destructive MB-109 and the long
 MB-112 need 1. GC-102 is a per-unit qualification: every GPU card that is
 ever used, not just the first articles (`power.md` "GPU card RP2040
@@ -245,13 +289,16 @@ These need no board, so they run while JLC builds.
   - `esr_c22_mohm` ≥ **5 mΩ**: RT9013 stability needs output ESR above 5 mΩ
     (`cpu-power-proof-gaps-20260928.md` line 65). In circuit the trace to the
     capacitor adds to it, so this is conservative.
-  - `c21_3v3_uf`: C21 (C52923, 1 µF 0402 X5R 25 V) at 3.3 V ≥ **1.0 µF**
-    (Richtek recommends an input capacitor above 1 µF, line 64). **Likely to
-    fail:** nameplate tolerance alone allows 0.90 µF (line 67), before bias.
-    Decide before ordering whether to change C21 to a 2.2 µF part.
+  - `c21_3v3_uf`: fitted C21 is C23733, 4.7 µF 0402 X5R, the same
+    supplier part as C22 (`hw/boards/cpu.py` and the current CPU BOM). At
+    3.3 V it must still measure ≥ **1.0 µF**: the acceptance limit is
+    unchanged. The earlier 1 µF C52923 identity and proposed 2.2 µF
+    replacement are historical; the source already uses 4.7 µF. Nominal
+    capacitance does not establish the capacitance after DC bias.
 - **Setup/procedure:** M-Z at the stated bias; C at 100 kHz, ESR at
   100 kHz–1 MHz (the LDO's loop region), lowest reading.
-- **Sample:** 5 of each (`units=5`).
+- **Sample:** 5 for each C21/C22 measurement role (`units=5`); both
+  fitted positions now use C23733. Preserve both bias-condition records.
 - **Design change if:** C22 fails: a larger 0603 capacitor and rerun
   CC-005. ESR below 5 mΩ: an RT9013 stability review (a small series
   resistance or a different LDO; `cpu-ldo-replacement.md` already notes the
@@ -318,9 +365,9 @@ Short screen (all boards): DMM resistance from each rail to GND, both probe
 polarities, after the reading settles (capacitors charge); record the
 lower. **Proposed limit ≥ 10 Ω:** a solder bridge or a reversed part reads
 well under 1 Ω; every rail on these boards has only CMOS loads and should
-read hundreds of Ω or more. Also compare the three units: a rail that
-differs by more than 3× from the other two is worth a look even if it
-passes.
+read hundreds of Ω or more. Also compare the available units: a rail that differs by more than 3× from
+the other readings is worth a look even if it passes. The three-unit gate
+minimum remains unchanged; the current two-unit batch cannot close it.
 
 ### MB-107: main board, pre-power and first power
 
@@ -642,6 +689,21 @@ The test firmware needs, per card, a **worst-case load mode** and a
   3V3 envelope is outside 3.074–3.537 V: the second 22 µF at U1 pin 3
   (`wifi-droop-fix-proposal.md` lines 120–123) and rerun POW-003.
 
+### Wi-Fi SPI service during saved settings writes
+
+On both Wi-Fi first articles, scope SCK, CS and MISO at the existing 3 MHz
+M1 rate and 20 us minimum interframe gap while polling status and transferring
+network data. Issue at least 100 saved NET_CONFIG updates so NVS erases/writes
+occur during traffic. Check every received status has bit 7 clear and agrees
+with protocol state, identify truncated/missing frames, and record the maximum
+observed re-arm time and MISO setup. Power-cycle twice and verify the last saved
+settings survived. Repeat under concurrent Wi-Fi traffic and the hot first-
+article condition. No corrupted frame or lost service is acceptable.
+
+The firmware now requests a cache-safe RAM interrupt and puts its helper call
+path in RAM. QEMU uses an alternative transport and cannot prove GPSPI silicon
+service or its cache-disable timing. See `doc/m1-resume-wifi-2026-09-30.md`.
+
 ### MB-111 and CC-104: iCE40 1V2 core current, hot (MB-006/CC-006 F2, CC-005)
 
 - **Closes:** the iCE40 core-current envelope for both FPGAs: the main
@@ -757,9 +819,32 @@ IC-005's switch is the TPS2553DBVR-1 (David approved the proposal,
 - **Procedure:** 0 → 500 mA steps, read VBUS; 30 min at 500 mA for heat;
   ramp in 10 mA steps to the trip; then a short (load at max) for 1 s,
   check the fault flag over SPI/UART and recovery.
+- **Input transient confirmation:** capture U5 IN at C25 pad 1 and U7
+  VOUT at C24 pad 1 during port attachment and hard-short/recovery, using
+  ≥100 MHz scope bandwidth and a ground spring at the adjacent capacitor
+  ground. Save the actual setup, probe attenuation, load, cable and waveform
+  files. Repeat a short at the receptacle and through the tested cable,
+  including the 500 mA steady load and measured actual current-limit corner.
+  `v_u5_in_peak_v` must remain **<7 V** (TPS2553-1 absolute maximum), and
+  `v_u7_out_peak_v` **<6 V** (TPS61023 absolute maximum), with measurement
+  uncertainty accounted for. This measures the actual capacitance, switch
+  response and loop together; the nominal 1 µF model and engineering
+  20 nH/20 µs scenarios do not establish guaranteed production corners.
+  Inspect C25 fitted identity, and record rail temperature and sample age.
+- **Prepared C25 upgrade qualification:** for the proposed 4.7 µF C23733
+  same-pad substitution, require measured operating C25 capacitance
+  **≥1.6 µF** at the actual rail bias/temperature. This is an engineering
+  target, not a guaranteed Samsung minimum. Measure the isolated fitted
+  component or calibrated biased fixture, not the combined in-circuit
+  C23/C24/C25 bank; record frequency dependence, fixture correction,
+  temperature and age. Confirm waveforms at the required 40°C loaded
+  ambient and nominal bench conditions. See
+  `io-c25-capacitor-upgrade-20260930.md`; no physical result is yet recorded.
 - **Sample:** 2 IO cards.
 - **Design change if:** trip under 0.5 A or no fault flag: the IC-005
-  replacement.
+  replacement. Input/boost peak at or above its absolute limit, or
+  uncertainty overlapping that limit: stop that stress and repair the
+  local capacitor/loop or switch protection before repeating.
 
 ### MB-113: reset thresholds (MB-051 confirmation)
 
@@ -882,8 +967,8 @@ For the fitted MB-051 dual-rail qualifier (`hw/power/reset_supervisor.py`).
   for the capture's compression) and counts frames that differ
   (`glitches`) and lost signal (`dropouts`). The script is a follow-up; until
   it exists, record the video and review it at 4×.
-- **Sample:** **every** GPU card that will be used; the first articles are
-  the first three. A card that fails is not used as a GPU card.
+- **Sample:** **every** GPU card that will be used; the tool still requires three distinct first-article units; the current
+  two-unit batch cannot close that minimum. A card that fails is not used as a GPU card.
 - **Design change if:** failures on more than one unit of three: the
   overclock is not safe as a requirement. Options: lower resolution / a
   pixel-doubled mode at a lower clk_sys, or a different GPU part.

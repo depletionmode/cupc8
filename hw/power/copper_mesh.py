@@ -22,6 +22,10 @@ layer's other islands is simply absent, which can only raise the resistance
 
 from dataclasses import dataclass
 import math
+import os
+import time
+
+from polygon_raster import grid_poly
 
 import numpy as np
 from matplotlib.path import Path
@@ -92,18 +96,9 @@ class Grid:
         self.X, self.Y = np.meshgrid(xs, ys)
 
     def poly(self, mask, poly_set):
-        pts = np.column_stack([self.X.ravel(), self.Y.ravel()])
-        for outline, holes in _shape_paths(poly_set):
-            (bx0, by0), (bx1, by1) = outline.vertices.min(0), outline.vertices.max(0)
-            sel = (pts[:, 0] >= bx0) & (pts[:, 0] <= bx1) & (pts[:, 1] >= by0) & (pts[:, 1] <= by1)
-            if not sel.any():
-                continue
-            inside = outline.contains_points(pts[sel])
-            for h in holes:
-                inside &= ~h.contains_points(pts[sel])
-            flat = mask.ravel()
-            idx = np.flatnonzero(sel)[inside]
-            flat[idx] = True
+        # Exact Matplotlib crossing parity on row-indexed contour edges.
+        # No geometry simplification, division or grid change is performed.
+        grid_poly(self, mask, poly_set, _shape_paths)
 
     def segment(self, mask, a, b, half):
         x0, x1 = min(a[0], b[0]) - half, max(a[0], b[0]) + half
@@ -228,11 +223,29 @@ def _geometry(board, net, window, pitch, corner):
     return grid, copper, ids, ea, eb, eg, ek, offset, hubs
 
 
+def _progress(stage, **fields):
+    """Opt-in numerical telemetry; does not change solver state or limits."""
+    if os.environ.get('CUPC8_MESH_PROGRESS') != '1':
+        return
+    import json
+    try:
+        import resource
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    except ImportError:
+        rss = None
+    print('mesh progress ' + json.dumps(dict(stage=stage, pid=os.getpid(),
+          monotonic_seconds=time.monotonic(), max_rss_kib=rss, **fields)), flush=True)
+
+
 def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), terminal_mm=1.0,
-          tol=1e-9, max_iter=200000, solver='cg', geometry_cache=None, probes=()):
+          tol=1e-9, max_iter=200000, solver='cg', geometry_cache=None, probes=(),
+          voltage_reference='source'):
     """Resistance (mOhm) between two groups of pads [(ref, number)], each group
     tied to one ideal potential, through all of `net`'s copper in `window`.
     geometry_cache may be reused only while the supplied board is immutable."""
+    if voltage_reference not in ('source', 'sink'):
+        raise ValueError('voltage_reference must be source or sink')
+    _progress('geometry_begin', net=net, sinks=sinks, pitch=pitch)
     key = (id(board), net, tuple(window), pitch, corner)
     if geometry_cache is not None and key in geometry_cache:
         geometry = geometry_cache[key]
@@ -241,6 +254,7 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
         if geometry_cache is not None:
             geometry_cache[key] = geometry
     grid, copper, ids, ea, eb, eg, ek, offset, hubs = geometry
+    _progress('geometry_complete', net=net, sinks=sinks, pitch=pitch, sites=grid.nx * grid.ny)
 
     def terminal(group):
         nodes = []
@@ -264,7 +278,10 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
     fixed = np.zeros(n, dtype=bool)
     fixed[src] = fixed[snk] = True
     v = np.zeros(n)
-    v[src] = 1.0
+    # Source reference preserves the existing voltage gauge. Sink reference
+    # solves w = 1 - v with exactly the same operator and electrodes, reading
+    # tiny source-to-probe drops directly instead of subtracting near-one volts.
+    v[src if voltage_reference == 'source' else snk] = 1.0
 
     # restrict to the component joining the source (floating islands make the
     # Laplacian singular) and require that it reaches the sink
@@ -318,14 +335,23 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
                         np.concatenate((np.arange(nodes.size), ib, ia)))),
                        shape=(nodes.size, nodes.size)).tocsr()
         iterations = [0]
-        def counted(_):
+        def counted(x):
             iterations[0] += 1
+            if iterations[0] % 50 == 0 and os.environ.get('CUPC8_MESH_PROGRESS') == '1':
+                _progress('cg_iteration', net=net, sinks=sinks, pitch=pitch,
+                          iteration=iterations[0],
+                          relative_residual=float(np.linalg.norm(rhs[nodes] - a @ x) /
+                                                  np.linalg.norm(rhs[nodes])))
         preconditioner = diags(inv[nodes])
         if solver == 'amg':
             from pyamg import smoothed_aggregation_solver
+            _progress('amg_begin', net=net, sinks=sinks, pitch=pitch, nodes=a.shape[0], nonzeros=a.nnz)
             preconditioner = smoothed_aggregation_solver(a, symmetry='symmetric').aspreconditioner()
+            _progress('amg_complete', net=net, sinks=sinks, pitch=pitch)
+        _progress('cg_begin', net=net, sinks=sinks, pitch=pitch, nodes=a.shape[0], rtol=tol, maxiter=max_iter)
         xf, status = cg(a, rhs[nodes], rtol=tol, atol=0, maxiter=max_iter,
                         M=preconditioner, callback=counted)
+        _progress('cg_complete', net=net, sinks=sinks, pitch=pitch, iterations=iterations[0], status=int(status))
         if status != 0:
             raise ValueError('%s: mesh solve did not converge' % net)
         x = np.zeros(n)
@@ -365,7 +391,8 @@ def solve(board, net, sources, sinks, window, pitch=0.1, corner=Corner(), termin
             raise ValueError('%s: open copper to qualified probe %s' % (net, probe))
         # Do not draw current at a qualified probe. Its worst finite-pad
         # cell gives a conservative drop rather than an averaged potential.
-        transfers[probe] = 1000 * float((1 - volts[nodes]).max()) / total
+        drop = 1 - volts[nodes] if voltage_reference == 'source' else volts[nodes]
+        transfers[probe] = 1000 * float(drop.max()) / total
     current /= total                                 # per ampere of terminal current
 
     # sheet current density per unit width at each cell, outside and inside

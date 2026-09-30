@@ -87,6 +87,10 @@ def parse_ibis(text, name):
                 fixture = {'t': [], 'v': {c: [] for c in CORNERS}}
                 model.fixtures.setdefault('rise' if section.startswith('rising') else 'fall',
                                           []).append(fixture)
+            elif section == 'temperature_range':
+                values = head[2].split()
+                model.params['temperature_range'] = {
+                    c: number(values[_COLUMN[c]]) for c in CORNERS}
             elif section == 'voltage_range':
                 values = head[2].split()
                 model.vcc = {c: number(values[_COLUMN[c]]) for c in CORNERS}
@@ -347,12 +351,38 @@ def _ti_zip(url, digest, cache, member):
 def load_lvc125(cache):
     """TI SN74LVC1G125 IBIS (scem270, File Rev 1.3): 3.3 V 3-state output.
 
-    A same-function, same-family proxy for fitted MDD 74LVC1G125GW
-    (C52140430), whose electrical behavior is not characterized here.
-    These TI tables do not establish guaranteed bounds for the MDD part."""
+    Genuine TI characterization for explicitly identified SN74LVC1G125DCKR.
+    For legacy MDD 74LVC1G125GW (C52140430), these same tables are only a
+    family proxy: they do not establish guaranteed bounds for that part."""
     text = _ti_zip(LVC125_URL, LVC125_ZIP_SHA256, cache, 'sn74lvc1g125.ibs')
     return {'out': parse_ibis(text, 'LVC1G125_OUT_33'), 'in': parse_ibis(text, 'LVC1G125_IN_33'),
             'oe': parse_ibis(text, 'LVC1G125_NOE_33')}
+
+
+AHC125_URL = 'https://www.ti.com/lit/ibs/SCLM008'
+AHC125_SHA256 = 'd3da7c3da68e8aa1e0531424c49b2419197530a8527d0248b276fc00eae4c971'
+DCK_PACKAGE = ((.017, .881e-9, .118e-12), (.025, 1.069e-9, .205e-12))
+
+
+def load_ahc125(cache):
+    """Genuine TI SN74AHC1G125 SCLM008, revision 1.0; fitted DCK part.
+
+    The vendor file has one trailing 0xff byte. Hash the original bytes;
+    strip that byte only for the ASCII parser.
+    """
+    import urllib.request
+    cache = Path(cache)
+    if not cache.is_file() or sha256(cache) != AHC125_SHA256:
+        req = urllib.request.Request(AHC125_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=60) as response:
+            data = response.read()
+        if hashlib.sha256(data).hexdigest() != AHC125_SHA256:
+            raise ValueError('TI SCLM008 changed; review before use')
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(data)
+    text = cache.read_bytes().rstrip(b'\xff').decode('ascii')
+    return {key: parse_ibis(text, name) for key, name in {
+        'out': 'AHC1G125_Y_33', 'in': 'AHC1G125_A_33', 'oe': 'AHC1G125_NOE_33'}.items()}
 
 
 def fixture_check(model, corner, edge):

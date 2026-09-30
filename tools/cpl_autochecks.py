@@ -19,7 +19,7 @@ import re
 TOLERANCE = 0.2      # mm, bomcheck.PAD_TOLERANCE
 POLAR = {'K': 'K', 'A': 'A', 'CATHODE': 'K', 'ANODE': 'A', '-': 'K', '+': 'A', 'C': 'K'}
 # names two vendors write differently for the same pin (normalised, see norm)
-ALIASES = {'SWDIO': 'SWD', 'VREGVIN': 'VREGIN', 'G': 'GND', 'VSS': 'GND', 'QSPISS': 'QSPISSN', 'CRESET': 'CRESETB'}
+ALIASES = {'SWDIO': 'SWD', 'VREGVIN': 'VREGIN', 'G': 'GND', 'VSS': 'GND', 'QSPISS': 'QSPISSN', 'CRESET': 'CRESETB', 'ENABLE': 'EN'}
 
 
 def check(name, status, detail):
@@ -35,11 +35,15 @@ def unique_key(table, number):
     return key
 
 
-def jlc_world(jlc_pads, rotation, mid_x, mid_y_up):
+def jlc_world(jlc_pads, rotation, mid_x, mid_y_up, assembly_side="Top"):
     """{pad: (x, y down)} of EasyEDA's pads turned by the CPL rotation."""
+    if assembly_side not in ("Top", "Bottom"):
+        raise ValueError("assembly side must be Top or Bottom")
     angle = math.radians(rotation)
     out = {}
     for number, x, y in jlc_pads:
+        if assembly_side == "Bottom":
+            y = -y
         wx = mid_x + x * math.cos(angle) - y * math.sin(angle)
         wy = mid_y_up + x * math.sin(angle) + y * math.cos(angle)
         out[unique_key(out, number)] = (wx, -wy)

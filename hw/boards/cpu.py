@@ -32,6 +32,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(ROOT, "hw", "tools"))
 import kicadgen as kg  # noqa: E402
+import fillfeature as ff  # noqa: E402
+import route_seed  # noqa: E402
 
 G = kg.GRID
 
@@ -570,6 +572,11 @@ def presence_ring(board, layer="In3.Cu", width=0.2, via=0.6, drill=0.3, rise=3.0
 def prepare(board):
     """The card's own pre-routing, run after the pad fan-out."""
     import pcbnew
+    # FromMM truncates these decimal placements by one nanometre, while the
+    # SES roundtrip writes the intended exact coordinate. Make the source
+    # placement explicit before applying an exact-geometry recorded route.
+    route_seed.normalize_placement(board, "C8", (38650000, -33049999), (38650000, -33050000))
+    route_seed.normalize_placement(board, "R8", (799999, -28400000), (800000, -28400000))
     # U2's pin-one dot clears the plotted pad-1 mask by only 0.145 mm.
     # Move this instance's dot 0.04 mm away from the pad after pad clipping.
     fp = next(f for f in board.GetFootprints() if f.GetReference() == "U2")
@@ -588,6 +595,17 @@ def prepare(board):
     plane_pins(board)
 
 
+def _seeded_route(board, workdir):
+    """Reuse the actual completed CPU route; incompatible geometry fails closed."""
+    result = route_seed.apply(
+        board, os.path.join(HERE, "cpu-full-route-seed.json"),
+        board_name="cpu", pour_nets=("/GND", "/3V3"),
+        post_route_contract="cpu-no-post-route-v1")
+    print("CPU full-route seed: %d copper items; origin %s; fresh full pipeline required" %
+          (result['added'], result['origin_state']), end=" ", flush=True)
+    return 0
+
+
 def main():
     import pcbnew  # noqa: F401 - first, so its start-up noise comes before the step lines
     import logo
@@ -600,6 +618,8 @@ def main():
         fine_nets=FINE_NETS,
         labels={"D1": "PWR", "D2": "1V2"}, title=TITLE, revision=REVISION, prepare=prepare,
         presence=presence_ring,         # round the edge, before the pad fan-out places its vias
+        seeded_route=_seeded_route,
+        post_fill=(lambda board: ff.round_board_fills(board, "cpu")),
         passes=40, route_tries=8,       # Freerouting converges early; what differs is each try's ordering
         silk_text=SILK_TEXT,
         graphics=[("cupc8:KaplanLabs_Logo_%gmm" % LOGO_MM,) + LOGO_AT + (0,)])

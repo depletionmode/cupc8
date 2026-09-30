@@ -16,6 +16,16 @@ Checks per receiver pin and edge (`evaluate`):
   * the edge completes within the half period of the bus clock;
   * timing: arrival (last threshold crossing) feeds the row's setup/hold
     budget (`timing_*`).
+For genuine fitted TI AHC MISO sampled data, early monotonicity/ringback is
+reported separately: stress remains required, and the final VIH/VIL crossing
+must precede the fixture-anchored setup deadline with no later recrossing.
+RP2040 SPI SCK/CS use the published 0.2V Schmitt minimum only with a
+source-bound enabled state, default voltage mode and rated supply/case-
+temperature scope. Whole-period coverage and adverse excursion replace the
+uniform 1mV diagnostic for those receivers; stress and timing remain required.
+RP2040 MOSI likewise requires the final crossing before the routed SCK setup
+deadline and mandatory setup/hold budgets. ESP32 MOSI sampling timing remains
+unqualified. Other clocks and asynchronous control retain uniform-edge checks.
 Cases sweep the IBIS corners, the bracketed-model bounds, the TQ144 package
 envelope, +/-15 % line impedance and the connector bounds. The case with the
 worst overshoot is re-run with half the RLGC section length and half the
@@ -37,6 +47,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -56,6 +67,14 @@ RAILS = {'/GND': 0.0, 'GND': 0.0, '/+3V3': 3.3, '/3V3': 3.3, '/3V3_STBY': 3.3,
          '/+5V': 5.0, '/5V': 5.0}
 SLOTS = tuple(f'J{n}' for n in range(11, 17))
 CARD_KINDS = ('gpu', 'io', 'storage', 'eink', 'wifi')
+AHC125 = 'SN74AHC1G125DCKR'
+AHC125_OUTPUT = AHC125 + ':Y'
+TI_LVC125 = 'SN74LVC1G125DCKR'
+TI_LVC125_OUTPUT = TI_LVC125 + ':Y'
+TI_LVC125_HIZ_OUTPUT = TI_LVC125 + ':Y-Z'
+DCK_BUFFERS = (AHC125, TI_LVC125)
+DCK_OUTPUTS = (AHC125_OUTPUT, TI_LVC125_OUTPUT, TI_LVC125_HIZ_OUTPUT)
+BUFFER125 = ('74LVC1G125GW', *DCK_BUFFERS)
 
 
 # --------------------------------------------------------------- part data
@@ -78,6 +97,16 @@ class Part:
     ac_lo: float | None = None
     ac_width: float = 0.0
     source: str = ''
+    input_range_only: bool = False  # published valid-input range, not an IO stress rating
+    vih_ratio: float | None = None
+    vil_ratio: float | None = None
+
+    def thresholds(self, vdd):
+        """Published rail fractions use the receiver's own local supply."""
+        if not np.isfinite(vdd) or vdd <= 0:
+            raise ValueError('receiver rail must be finite and positive')
+        return (self.vih if self.vih_ratio is None else self.vih_ratio * vdd,
+                self.vil if self.vil_ratio is None else self.vil_ratio * vdd)
 
     def abs_max(self, vdd):
         return self.abs_hi if self.abs_hi is not None else vdd + self.abs_hi_over_vdd
@@ -89,12 +118,17 @@ class Part:
 
 
 SOURCES = {
+    'ti_lvc125': 'TI SN74LVC1G125 SCES223U (Aug 2026), genuine SCEM270 revision1.3; '
+                 'SN74LVC1G125DCKR C7833; 3.3±0.3V,50pF/500ohm fixture,125C tpd4.7ns',
     'rp2040': 'Raspberry Pi RP2040 Datasheet, build-date 2025-02-20 3184e62 '
               '(datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf)',
     'ice40': 'Lattice FPGA-DS-02029-4.3 iCE40 LP/HX (Feb 2025) Tables 4.1, 4.5, 4.13',
     'lvc125': 'Nexperia 74LVC1G125 Rev. 17.1 (3 Sep 2024) Tables 5, 7, 8 '
               '(family limits proxy; fitted MDD C52140430 is uncharacterized)',
-    'esp32c3': 'Espressif ESP32-C3-MINI-1 datasheet v2.2 Table 6-3',
+    'ahc125': 'TI SN74AHC1G125 SCLS377M (Feb 2024), sections 5.1, 5.3, 5.5, 5.6; '
+              'genuine TI SCLM008 revision 1.0, DCK package, C151890',
+    'esp32c3': 'Espressif ESP32-C3-MINI-1 datasheet v2.2 Table 6-3 valid GPIO input '
+               'range; Table6-1 rates the supply only, not a separate IO absolute maximum',
     'sd': 'Kingston SDCIT microSDHC spec sheet 4900180-001.A00 Tables 6-1, 6-2, 6-6, 7-1 '
           '(the SD Association simplified spec leaves these blank)',
     'sram': 'ISSI IS62/65WV5128EALL/EBLL/ECLL Rev. A4 (Apr 2017) p4, p6',
@@ -104,6 +138,12 @@ SOURCES = {
 }
 
 PARTS = {
+    TI_LVC125: Part(2.0, .8, -.5, None, abs_hi=6.5, source='ti_lvc125'),
+    TI_LVC125_OUTPUT: Part(2.0, .8, -.5, .5, source='ti_lvc125'),
+    # SCES223U 5.1 distinguishes disabled/power-off Y from driven Y.
+    TI_LVC125_HIZ_OUTPUT: Part(2.0, .8, -.5, None, abs_hi=6.5, source='ti_lvc125'),
+    AHC125: Part(2.52, .9, -.5, None, abs_hi=7, source='ahc125'),
+    AHC125_OUTPUT: Part(2.0, .8, -.5, .5, source='ahc125'),
     # Table 622 VPIN -0.5 .. IOVDD+0.5; Table 625 VIH 2.0 / VIL 0.8 @ 3.3 V.
     # No pin capacitance, edge rate or IBIS is published: C and drive bracketed.
     'RP2040': Part(2.0, 0.8, -0.5, 0.5, c_in=(1e-12, 10e-12), source='rp2040'),
@@ -118,7 +158,8 @@ PARTS = {
     # no IO-pin abs max is published: VIH max VDD+0.3 / VIL min -0.3 are used;
     # C_IN 2 pF typ (bracketed 1..10 pF)
     'ESP32-C3-MINI-1': Part(0.75 * 3.3, 0.25 * 3.3, -0.3, 0.3, c_in=(1e-12, 10e-12),
-                            source='esp32c3'),
+                            source='esp32c3', input_range_only=True,
+                            vih_ratio=.75, vil_ratio=.25),
     # VIH 0.625 VDD, VIL 0.25 VDD; peak voltage on all lines -0.3 .. VDD+0.3;
     # CCARD <= 10 pF (bracket 1..10 pF, including the card's own contact)
     'microSD': Part(0.625 * 3.3, 0.25 * 3.3, -0.3, 0.3, c_in=(1e-12, 10e-12),
@@ -212,6 +253,7 @@ class Probe:
     part: str
     role: str = 'rx'
     group: int = 0
+    vdd: float | None = None
 
 
 @dataclass
@@ -362,15 +404,21 @@ class Assembler:
                     continue
                 if ref.startswith('R'):
                     other, rvalue = resistor_pins(circuit, ref, pin)
+                    resistance = self.resistance(kind, ref, rvalue)
                     onet = circuit.net(ref, other)
                     if onet in RAILS:
                         if not dry:
-                            self.deck.lines.append(f'R{self.uid("p")} {node} {self.rail(onet)} '
-                                                   f'{ohms(rvalue):g}')
+                            ground = (self.card_ground(shunt=ref == 'R61')
+                                      if kind in CARD_KINDS and RAILS[onet] == 0
+                                      else self.main_miso_shunt_ground()
+                                      if kind == 'main' and ref == 'R109' and RAILS[onet] == 0
+                                      else self.rail(onet, kind))
+                            self.deck.lines.append(f'R{self.uid("p")} {node} {ground} '
+                                                   f'{resistance:g}')
                     elif onet is None:
                         raise ValueError(f'{inst}:{ref}.{other} unconnected')
                     else:
-                        links.append(('R', (inst, ref, pin), (inst, ref, other), ohms(rvalue)))
+                        links.append(('R', (inst, ref, pin), (inst, ref, other), resistance))
                         queue.append((inst, kind, onet))
                 elif ref.startswith('C'):
                     other = {'1': '2', '2': '1'}[pin]
@@ -378,7 +426,7 @@ class Assembler:
                     if onet not in RAILS:
                         raise ValueError(f'{inst}:{ref} couples two signal nets')
                     if not dry:
-                        self.deck.lines.append(f'C{self.uid("c")} {node} 0 {farads(value):g}')
+                        self.signal_capacitor(kind, ref, value, node, onet)
                 elif ref.startswith('J'):
                     mated = self.mate(inst, kind, ref, pin)
                     if dry and mated in ('unmodelled', None):
@@ -415,7 +463,7 @@ class Assembler:
                 raise ValueError(f'{b} not reached')
             na, nb = pads[a], pads[b]
             if kind_ == 'R':
-                self.deck.lines.append(f'R{self.uid("s")} {na} {nb} {value:g}')
+                self.resistor_body(a[0].rsplit(':', 1)[-1], a[1], na, nb, value)
                 shunt = self.cfg.get('tx_shunt_c')
                 if shunt and a[1].startswith('RN'):
                     # what-if: a capacitor on the line side (pads 5-8) of a series
@@ -431,9 +479,141 @@ class Assembler:
                                     f'C{self.uid("k")} {nb} 0 {k["c"] / 2:g}']
         return self.deck
 
-    def rail(self, net):
-        node = 'rail_' + re.sub(r'\W', '_', net)
-        line = f'V{node} {node} 0 {RAILS[net] if RAILS[net] != 3.3 else self.vdd:g}'
+    def resistance(self, kind, ref, value):
+        """Scale existing physical passives for explicit sensitivity studies."""
+        option = ('miso_series_scale' if kind in CARD_KINDS and ref == 'R60' else
+                  'miso_shunt_scale' if kind in CARD_KINDS and ref == 'R61' else
+                  'spi_series_scale' if kind == 'main' and ref in
+                      ('R35', 'R36', 'R37', 'R38', 'R39', 'R40', 'R41', 'R42')
+                      and self.cfg.get('spi_series_scale', None) is not None else
+                  'sck_series_scale' if kind == 'main' and ref == 'R36' else
+                  'miso_pullup_scale' if kind == 'main' and ref == 'R107' else None)
+        scale = self.cfg.get(f'resistor_scale_{kind}_{ref}',
+                             self.cfg.get(option, 1.0) if option else 1.0)
+        if not math.isfinite(scale) or scale <= 0:
+            raise ValueError('physical resistor scale must be finite and positive')
+        return ohms(value) * scale
+
+    def resistor_body(self, kind, ref, na, nb, resistance):
+        """Explicit body inductance sensitivity; routed leads remain separate."""
+        inductance = self.cfg.get(f'resistor_esl_{kind}_{ref}', 0.)
+        if not math.isfinite(inductance) or inductance < 0:
+            raise ValueError('resistor body inductance must be finite and nonnegative')
+        end = self.uid('resistor_body') if inductance else nb
+        self.deck.lines.append(f'R{self.uid("s")} {na} {end} {resistance:g}')
+        if inductance:
+            self.deck.lines.append(f'L{self.uid("resistor_body")} {end} {nb} {inductance:g}')
+
+    def signal_capacitor(self, kind, ref, value, node, rail):
+        """A physical shunt capacitor, with explicit optional RF sensitivity.
+
+        Ref-specific settings override the common signal-cap settings. ESR
+        and ESL include only the declared engineering envelope, not an
+        inferred vendor guarantee or an idealized proof of the ground leg.
+        """
+        def setting(name, default):
+            return self.cfg.get(f'{name}_{kind}_{ref}',
+                                self.cfg.get(f'{name}_{ref}', self.cfg.get(name, default)))
+        scale = setting('signal_cap_scale', 1.)
+        esr = setting('signal_cap_esr', 0.)
+        esl = setting('signal_cap_esl', 0.)
+        return_r = setting('signal_cap_return_r', 0.)
+        return_l = setting('signal_cap_return_l', 0.)
+        if (not all(math.isfinite(x) for x in (scale, esr, esl, return_r, return_l))
+                or scale <= 0 or min(esr, esl, return_r, return_l) < 0):
+            raise ValueError(f'{kind}:{ref}: invalid capacitor sensitivity')
+        ground = self.card_ground(kind=kind, ref=ref) if kind in CARD_KINDS and RAILS[rail] == 0 else self.rail(rail, kind)
+        if return_r or return_l or setting('signal_cap_return_probe', False):
+            # The explicit local return adds to body ESR/ESL; it is never a
+            # static ground-offset substitution. Extra L is a declared excess
+            # beyond signal TL loop inductance, not derived from the DC mesh.
+            base = ground
+            ground = current = self.uid('cap_return')
+            for prefix, magnitude in (('R', return_r), ('L', return_l)):
+                if magnitude:
+                    after = self.uid('cap_return')
+                    self.deck.lines.append(f'{prefix}{self.uid("return")} {current} {after} {magnitude:g}')
+                    current = after
+            sense, monitor = self.uid('cap_sense'), self.uid('cap_current')
+            self.deck.lines += [f'V{sense} {current} {base} 0',
+                                f'B{monitor} {monitor} 0 V=i(V{sense})']
+            label = f'{kind}:{ref}:{sense}'
+            self.deck.probes += [Probe(label, monitor, 'capacitor', 'cap_return_current', self.group),
+                                 Probe(label, f'{ground},{base}', 'capacitor', 'cap_return_voltage', self.group)]
+        for prefix, magnitude in (('R', esr), ('L', esl)):
+            if magnitude:
+                after = self.uid('cap_' + prefix.lower())
+                self.deck.lines.append(f'{prefix}{self.uid("cap")} {node} {after} {magnitude:g}')
+                node = after
+        self.deck.lines.append(f'C{self.uid("c")} {node} {ground} {farads(value) * scale:g}')
+
+    def local_ground_offset(self, kind=None, ref=None):
+        offset = self.cfg.get('card_ground_offset', 0.)
+        if kind is not None and kind not in CARD_KINDS:
+            return 0.
+        delta = self.cfg.get(f'ground_delta_{kind}_{ref}', 0.) if ref is not None else 0.
+        if not math.isfinite(offset) or not math.isfinite(delta):
+            raise ValueError('local ground reference must be finite')
+        return offset + delta
+
+    def card_ground(self, shunt=False, *, kind=None, ref=None):
+        """Constant card-ground sensitivity, relative to the main FPGA ground.
+
+        This is an explicitly selected engineering envelope, not a measured
+        transient bound. The local IBIS supply/corner remains unchanged.
+        """
+        offset = self.local_ground_offset(kind, ref)
+        delta = self.cfg.get('miso_shunt_ground_delta', 0.0) if shunt else 0.0
+        node = 'card_shunt_ground' if delta else 'card_ground'
+        if ref is not None and self.cfg.get(f'ground_delta_{kind}_{ref}', 0.):
+            node += '_' + kind + '_' + ref
+        line = f'V{node} {node} 0 {offset + delta:g}'
+        if line not in self.deck.lines:
+            self.deck.lines.append(line)
+        return node
+
+    def buffer_reference(self, physical_die, kind, ref, model, corner, *, ground_is_local=False):
+        """Keep genuine fixed-corner IBIS tables in their local rail frame.
+
+        A voltage gauge translates the physical die to local ground; it
+        does not rescale vendor I/V or V/T data. Supply is the selected
+        characterization voltage, independent of the main driver's rail.
+        """
+        offset = self.local_ground_offset(kind, ref)
+        if not math.isfinite(offset) or corner not in model.vcc:
+            raise ValueError(f'{kind}:{ref}: invalid local IBIS reference')
+        local = physical_die
+        if offset and not ground_is_local:
+            local = self.uid('ibis_local_die')
+            self.deck.lines.append(f'V{self.uid("ibis_ground_gauge")} {physical_die} {local} {offset:g}')
+        rail = self.uid('ibis_local_rail')
+        self.deck.lines.append(f'V{rail} {rail} 0 {model.vcc[corner]:g}')
+        self.deck.notes.append(f'{kind}:{ref} genuine {corner} rail {model.vcc[corner]:g}V '
+                               f'local-ground offset {offset:g}V')
+        return local, rail, model.vcc[corner]
+
+    def main_miso_shunt_ground(self):
+        """R109's independently bounded reference, relative to FPGA ground.
+
+        A selected constant offset is a DC sensitivity, not a package or
+        connector transient bound. The actual signal branch is still routed.
+        """
+        offset = self.cfg.get('main_miso_shunt_ground_offset', 0.0)
+        if not offset:
+            return '0'
+        node = 'main_miso_shunt_ground'
+        line = f'V{node} {node} 0 {offset:g}'
+        if line not in self.deck.lines:
+            self.deck.lines.append(line)
+        return node
+
+    def rail(self, net, kind=None):
+        node = 'rail_' + (kind + '_' if kind else '') + re.sub(r'\W', '_', net)
+        voltage = RAILS[net] if RAILS[net] != 3.3 else self.vdd
+        if kind == 'main' and RAILS[net] == 3.3 and hasattr(self, 'ice40'):
+            corner = self.cfg.get('ice40_receiver_corner', self.cfg.corner)
+            voltage = self.ice40['lvc330io'].vcc[corner]
+        line = f'V{node} {node} 0 {voltage:g}'
         if line not in self.deck.lines:
             self.deck.lines.append(line)
         return node
@@ -444,11 +624,12 @@ class Assembler:
             model = self.ice40[self.bench.ice40_model(pin)]
             node = self.receiver_options(node)
             die = self.package(node, label)
-            self.deck.lines += models.ibis_device_lines(self.uid('i'), model, self.cfg.corner,
-                                                        die, 'vcc_ibis')
+            corner = self.cfg.get('ice40_receiver_corner', self.cfg.corner)
+            die, rail, local_vdd = self.buffer_reference(die, kind, ref, model, corner)
+            self.deck.lines += models.ibis_device_lines(self.uid('i'), model, corner, die, rail)
             # thresholds and stress at the die pad, behind the package, as
             # for every other receiver model here
-            self.deck.probes.append(Probe(label, die, value, group=self.group))
+            self.deck.probes.append(Probe(label, die, value, group=self.group, vdd=local_vdd))
             return
         if value == 'TPD4E05U06DQAR':
             if pin not in ('1', '2', '4', '5'):
@@ -464,29 +645,66 @@ class Assembler:
         if value.startswith('ESP32-C3-MINI-1'):
             value = 'ESP32-C3-MINI-1'
         part = PARTS.get(value)
-        if value == '74LVC1G125GW':
-            # TI SN74LVC1G125 IBIS as the family proxy (models.load_lvc125):
+        if value in BUFFER125:
+            # Genuine TI characterization for exact TI parts; family proxy
+            # only for the legacy MDD part (models.load_lvc125).
             # pin 4 a de-selected 3-state output, pins 1 (OE) and 2 (A) inputs
-            model = self.lvc[{'4': 'out', '1': 'oe', '2': 'in'}[pin]]
+            family = self.ahc if value == AHC125 else self.lvc
+            model = family[{'4': 'out', '1': 'oe', '2': 'in'}[pin]]
             die = self.uid('lv')
-            corner = self.cfg.corner
+            corner = self.cfg.get(f'buffer_corner_{kind}_{ref}',
+                                 self.cfg.get(f'buffer_corner_{kind}', self.cfg.corner))
             if pin == '4' and self.cfg.get('tx_series'):
                 # what-if (hw/si/miso_options.py): a resistor in series with the
                 # buffer output, on the card, before the connector
                 after = self.uid('ts')
                 self.deck.lines.append(f'R{self.uid("ts")} {node} {after} {self.cfg.get("tx_series"):g}')
                 node = after
-            self.deck.lines.append(f'L{self.uid("ll")} {node} {die} {LVC125_L_PKG:g}')
-            self.deck.lines += models.ibis_device_lines(self.uid('v'), model, corner, die, 'vcc_ibis')
+            if value in DCK_BUFFERS:
+                if self.cfg.get('tx_series') or self.cfg.get('tx_shunt_ohms'):
+                    raise ValueError('fitted TI DCK network: candidate TX/shunt insertion would double count')
+                if value == TI_LVC125 and pin in ('1', '2'):
+                    # Sense the entire external pin current, including package
+                    # and C_comp, rather than just the static clamp I-V table.
+                    inside, sense, monitor = (self.uid(n) for n in ('ip', 'is', 'im'))
+                    self.deck.lines.append(f'V{sense} {node} {inside} 0')
+                    self.deck.lines.append(f'B{monitor} {monitor} 0 V=i(V{sense})')
+                    self.deck.probes.append(Probe(label, monitor, value, 'input_current', self.group))
+                    node = inside
+                die = self.buffer_package(node, kind, ref)
+            else:
+                self.deck.lines.append(f'L{self.uid("ll")} {node} {die} {LVC125_L_PKG:g}')
+            die, rail, local_vdd = self.buffer_reference(die, kind, ref, model, corner,
+                                                        ground_is_local=value in DCK_BUFFERS)
+            self.deck.lines += models.ibis_device_lines(self.uid('v'), model, corner, die, rail)
             if pin != '4':
-                self.deck.probes.append(Probe(label, die, value, group=self.group))
+                self.deck.probes.append(Probe(label, die, value, group=self.group, vdd=local_vdd))
+            elif value in DCK_BUFFERS:
+                output_part = TI_LVC125_HIZ_OUTPUT if value == TI_LVC125 else AHC125_OUTPUT
+                self.deck.probes.append(Probe(label, die, output_part, group=self.group, vdd=local_vdd))
             return
         if part is None:
             raise ValueError(f'{label}: part {value} has no receiver model')
         die = self.uid('rx')
-        self.deck.lines += [f'L{self.uid("l")} {node} {die} {part.l_pkg:g}',
-                            f'C{self.uid("r")} {die} 0 {part.c_in[self.cfg.rx_c]:g}']
-        self.deck.probes.append(Probe(label, die, value, group=self.group))
+        self.deck.lines.append(f'L{self.uid("l")} {node} {die} {part.l_pkg:g}')
+        offset = self.local_ground_offset(kind, ref)
+        if kind in CARD_KINDS and offset:
+            # Bracketed MCU inputs have no IBIS. Keep the physical package
+            # voltage and local logic reference distinct in ground studies.
+            local = self.uid('rx_local')
+            self.deck.lines.append(f'V{self.uid("rx_ground_gauge")} {die} {local} '
+                                   f'{offset:g}')
+            die = local
+        self.deck.lines.append(f'C{self.uid("r")} {die} 0 {part.c_in[self.cfg.rx_c]:g}')
+        local_vdd = None
+        if value == 'ESP32-C3-MINI-1':
+            local_vdd = self.cfg.get('esp_receiver_vdd', self.vdd)
+            if not np.isfinite(local_vdd) or not 3.0 <= local_vdd <= 3.6:
+                raise ValueError('ESP receiver local rail outside 3.0..3.6 V')
+            basis = ('configured' if self.cfg.get('esp_receiver_vdd') is not None
+                     else 'driver-rail proxy, independent supply qualification required')
+            self.deck.notes.append(f'{label}: ESP local rail {local_vdd:g} V; {basis}')
+        self.deck.probes.append(Probe(label, die, value, group=self.group, vdd=local_vdd))
 
     def receiver_options(self, node):
         """What-if parts at an iCE40 receiver pad (fix studies, cfg.extra keys;
@@ -514,6 +732,21 @@ class Assembler:
             self.deck.lines.append(f'R{self.uid("rs")} {node} {after} {cfg.get("rx_series"):g}')
             node = after
         return node
+
+    def buffer_package(self, node, kind=None, ref=None):
+        """TI DCK R/L/C envelope, independent of the FPGA package corner."""
+        r, l, c = models.DCK_PACKAGE[self.cfg.get('buffer_package', 0)]
+        die, mid = self.uid('ahc_die'), self.uid('ahc_pkg')
+        ground = self.card_ground(kind=kind, ref=ref)
+        self.deck.lines += [f'C{self.uid("ahc_c")} {node} {ground} {c:g}',
+                            f'L{self.uid("ahc_l")} {node} {mid} {l:g}',
+                            f'R{self.uid("ahc_r")} {mid} {die} {r:g}']
+        # Voltage gauge: tables see die voltage relative to card ground,
+        # while extracted copper remains referenced to the main ground.
+        local = self.uid('ahc_local_die')
+        self.deck.lines.append(f'V{self.uid("ahc_ground_gauge")} {die} {local} '
+                               f'{self.local_ground_offset(kind, ref):g}')
+        return local
 
     def package(self, node, label):
         pkg = models.TQ144_ENVELOPE[self.cfg.package]
@@ -548,29 +781,59 @@ class Assembler:
 
 
 # ------------------------------------------------------------ drivers
+def genuine_driver_corner(config, kind, ref, value):
+    """Select a fixed vendor corner, independent of unrelated main drivers."""
+    corner = config.corner
+    if value in DCK_BUFFERS or value in DCK_OUTPUTS:
+        corner = config.get(f'buffer_corner_{kind}_{ref}',
+                            config.get(f'buffer_corner_{kind}', corner))
+    if corner not in models.CORNERS:
+        raise ValueError('unsupported genuine buffer driver corner')
+    return corner
+
+
 def ibis_driver(edges, t_end, level=0.0):
     def attach(asm, node, kind, ref, pin, value):
         if value == 'ICE40HX4K-TQ144':
             name = asm.bench.ice40_model(pin)
             model = asm.ice40[name]
             die = asm.package(node, f'{ref}.{pin}')
-        elif value == '74LVC1G125GW' and pin == '4':
-            name, model = 'TI SN74LVC1G125 LVC1G125_OUT_33 (proxy)', asm.lvc['out']
-            die = asm.uid('lvd')
+        elif value in BUFFER125 and pin == '4':
+            if value in DCK_BUFFERS:
+                if asm.cfg.get('tx_series') or asm.cfg.get('tx_shunt_ohms'):
+                    raise ValueError('fitted TI DCK network: candidate TX/shunt insertion would double count')
+                name, model = (('TI SN74AHC1G125 AHC1G125_Y_33 (genuine)', asm.ahc['out'])
+                               if value == AHC125 else
+                               ('TI SN74LVC1G125 LVC1G125_OUT_33 (genuine)', asm.lvc['out']))
+                die = asm.buffer_package(node, kind, ref)
+                value = value + ":Y"
+            else:
+                name, model = 'TI SN74LVC1G125 LVC1G125_OUT_33 (proxy)', asm.lvc['out']
+                die = asm.uid('lvd')
             if asm.cfg.get('tx_series'):     # what-if (hw/si/miso_options.py): R at the buffer output
                 after = asm.uid('ts')
                 asm.deck.lines.append(f'R{asm.uid("ts")} {after} {node} {asm.cfg.get("tx_series"):g}')
                 node = after
-            asm.deck.lines.append(f'L{asm.uid("ll")} {die} {node} {LVC125_L_PKG:g}')
+            if value not in DCK_OUTPUTS:
+                asm.deck.lines.append(f'L{asm.uid("ll")} {die} {node} {LVC125_L_PKG:g}')
         else:
             raise ValueError(f'{ref}.{pin}: no IBIS driver for {value}')
-        ku, kd = models.ku_schedule(model, asm.cfg.corner, edges, t_end, level)
+        rail, local_vdd = 'vcc_ibis', None
+        corner = genuine_driver_corner(asm.cfg, kind, ref, value)
+        if value in DCK_OUTPUTS:
+            # A local TI package can have an independent genuine corner from
+            # the main FPGA. Use the same per-package selection as its A/OE
+            # receivers; never rescale a vendor waveform to another supply.
+            die, rail, local_vdd = asm.buffer_reference(die, kind, ref, model, corner,
+                                                        ground_is_local=True)
+        ku, kd = models.ku_schedule(model, corner, edges, t_end, level)
         nku, nkd = asm.uid('ku'), asm.uid('kd')
         asm.deck.lines += [models.pwl_source(nku, nku, ku), models.pwl_source(nkd, nkd, kd)]
-        asm.deck.lines += models.ibis_device_lines(asm.uid('drv'), model, asm.cfg.corner, die,
-                                                   'vcc_ibis', nku, nkd)
-        asm.deck.probes.append(Probe(f'driver {ref}.{pin}', die, value, 'tx', asm.group))
-        asm.deck.notes.append(f'driver {ref}.{pin} IBIS {name} {asm.cfg.corner}')
+        asm.deck.lines += models.ibis_device_lines(asm.uid('drv'), model, corner, die,
+                                                   rail, nku, nkd)
+        asm.deck.probes.append(Probe(f'driver {ref}.{pin}', die, value, 'tx', asm.group,
+                                    vdd=local_vdd))
+        asm.deck.notes.append(f'driver {ref}.{pin} IBIS {name} {corner}')
     return attach
 
 
@@ -618,7 +881,7 @@ def run_deck(deck, vdd, t_end, step, workdir):
 def evaluate(t, v, part_name, edges, t_end, vdd, driver_t=None):
     """Per-edge checks at one receiver; returns (metrics, failures)."""
     part = PARTS[part_name]
-    vih, vil = part.vih, part.vil
+    vih, vil = part.thresholds(vdd)
     fails = []
     vmax, vmin = float(np.max(v)), float(np.min(v))
     hi = part.abs_max(vdd)
@@ -629,7 +892,8 @@ def evaluate(t, v, part_name, edges, t_end, vdd, driver_t=None):
             continue
         peak = vmax if sign > 0 else vmin
         if ac is None:
-            fails.append(f'{label} {peak:.3f} V beyond abs max {dc:.3f} V')
+            basis = 'published DC input range' if part.input_range_only else 'abs max'
+            fails.append(f'{label} {peak:.3f} V beyond {basis} {dc:.3f} V')
             continue
         edges_ = np.flatnonzero(np.diff(beyond.astype(int)))
         starts = [0] if beyond[0] else []
@@ -682,6 +946,316 @@ def evaluate(t, v, part_name, edges, t_end, vdd, driver_t=None):
             'overshoot_margin_v': round(hi - vmax, 4),
             'undershoot_margin_v': round(vmin - part.abs_lo, 4),
             'edges': arrivals}, fails
+
+
+def hysteresis_edge_diagnostics(t, v, edges, t_end, vil, vih, hysteresis_min):
+    """Diagnostic only: bound all possible Schmitt trip pairs for each edge.
+
+    Clip to the published indeterminate band before measuring the largest
+    adverse excursion over the WHOLE edge, including later re-entry. A
+    reversal smaller than guaranteed hysteresis cannot reset any possible
+    threshold pair. Applicability of the supplied limits, Schmitt enable,
+    voltage stress and sampling timing must be proven separately. This
+    helper does not replace the strict clock/control gate.
+    """
+    if not (vil < vih and math.isfinite(hysteresis_min) and hysteresis_min > 0):
+        raise ValueError('valid input band and guaranteed positive hysteresis required')
+    items = []
+    for index, (launch, edge) in enumerate(edges):
+        end = edges[index + 1][0] if index + 1 < len(edges) else t_end
+        wave = np.asarray(v)[(t >= launch) & (t < end)]
+        if not len(wave):
+            items.append({'edge': edge, 'coverage_ok': False, 'ok': False})
+            continue
+        directed = wave if edge == 'rise' else -wave
+        low, high = (vil, vih) if edge == 'rise' else (-vih, -vil)
+        band = np.clip(directed, low, high)
+        adverse = float(np.max(np.maximum.accumulate(band) - band))
+        done = np.flatnonzero(directed >= high)
+        full_recross = bool(len(done) and np.any(directed[done[0]:] <= low))
+        coverage = bool(directed[0] <= low and directed[-1] >= high)
+        items.append({'edge': edge, 'coverage_ok': coverage,
+                      'whole_band_adverse_mv': adverse * 1e3,
+                      'full_valid_band_recross': full_recross,
+                      'hysteresis_min_v': hysteresis_min,
+                      'ok': coverage and adverse < hysteresis_min})
+    return {'ok': bool(items) and all(item['ok'] for item in items), 'edges': items,
+            'scope': 'diagnostic only; manufacturer conditions and stress/timing separate'}
+
+
+def rp_schmitt_firmware_scope():
+    """Bind the M1 GPIO state assertion to the actual firmware source.
+
+    Real compiled-image verification is a separate firmware gate. This
+    binding fails closed if the required startup assertions disappear.
+    """
+    path = ROOT / 'fw/rp2040/common/slotspi.c'
+    try:
+        source = path.read_text()
+    except OSError:
+        return None
+    source = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
+    pins = ('SCK', 'MOSI', 'NCS')
+    enabled = all(re.search(r'gpio_set_input_hysteresis_enabled\s*\(\s*'
+                           rf'PIN_SLOT_{pin}\s*,\s*true\s*\)', source) for pin in pins)
+    safe_mode = bool(re.search(r'hard_assert\s*\(\s*pads_bank0_hw->voltage_select\s*==\s*0\s*\)', source))
+    pin_assert = bool(re.search(r'_Static_assert\s*\(\s*PIN_SLOT_SCK\s*==\s*2\s*&&\s*'
+                               r'PIN_SLOT_MOSI\s*==\s*3\s*&&\s*PIN_SLOT_MISO\s*==\s*4\s*&&\s*'
+                               r'PIN_SLOT_NCS\s*==\s*5\b', source))
+    if not (enabled and safe_mode and pin_assert):
+        return None
+    # An application state change elsewhere invalidates the reviewed startup
+    # binding. New hysteresis users need a source audit rather than an implicit
+    # assumption that the SPI pins keep their state.
+    source_hashes = {}
+    candidates = (p for p in (ROOT / 'fw/rp2040').rglob('*')
+                  if p.is_file() and p.suffix in ('.c', '.h', '.cpp', '.cc', '.s', '.S'))
+    for candidate in sorted(candidates):
+        code = re.sub(r'/\*.*?\*/|//[^\n]*', '', candidate.read_text(), flags=re.S)
+        calls = re.findall(r'gpio_set_input_hysteresis_enabled\s*\(([^)]*)\)', code)
+        if calls and (candidate != path or len(calls) != 3
+                      or any(not re.fullmatch(r'\s*PIN_SLOT_(SCK|MOSI|NCS)\s*,\s*true\s*', c)
+                             for c in calls)):
+            return None
+        if re.search(r'voltage_select\s*=(?!=)', code):
+            return None
+        source_hashes[str(candidate.relative_to(ROOT))] = sha(candidate)
+    return {'schmitt_enabled': True, 'voltage_select': 0, 'nominal_iovdd': 3.3,
+            'case_temperature_min': -40., 'case_temperature_max': 85.,
+            'firmware_source_sha256': sha(path),
+            'reviewed_application_source_sha256': source_hashes,
+            'qualification': 'nominal 3.3V GPIO class; actual case temperature -40..85C '
+                             'and input state require firmware/first-article qualification'}
+
+
+def qualify_rp_schmitt_clock(metrics, failures, t, v, edges, t_end, *, scope,
+                             reference, pin, gpio, iovdd):
+    """Receiver-specific clock/control qualification; stress stays required.
+
+    Table625's 0.2V minimum applies to the nominal 2.5/3.3V pad class,
+    under the PVT scope of sections5.5.3/5.6. Preserve uniform-edge
+    diagnostics while bounding adverse excursions over the ENTIRE period.
+    This does not grant Schmitt behaviour to TI OE or another receiver.
+    """
+    metrics['uniform_edge_failures'] = list(failures)
+    valid_pin = reference == 'U1' and (pin, gpio) in (('4', 2), ('7', 5))
+    valid_scope = (isinstance(scope, dict) and scope.get('schmitt_enabled') is True
+                   and scope.get('voltage_select') == 0 and scope.get('nominal_iovdd') == 3.3
+                   and scope.get('case_temperature_min', -math.inf) >= -40
+                   and scope.get('case_temperature_max', math.inf) <= 85
+                   and scope.get('case_temperature_min', math.inf)
+                       <= scope.get('case_temperature_max', -math.inf)
+                   and math.isfinite(iovdd) and 2.5 <= iovdd <= 3.63)
+    if not valid_pin or not valid_scope:
+        metrics['schmitt_qualification'] = {'ok': False, 'scope': scope}
+        return metrics, list(failures) + ['RP Schmitt clock state/pin/rail/temperature scope absent or invalid']
+    diagnostic = hysteresis_edge_diagnostics(t, v, edges, t_end, .8, 2., .2)
+    # A nominal equality cannot establish a strict positive hysteresis margin.
+    diagnostic['ok'] = diagnostic['ok'] and all(
+        e['whole_band_adverse_mv'] < 200. - 1e-9 and not e['full_valid_band_recross']
+        for e in diagnostic['edges'])
+    diagnostic['scope'] = scope
+    metrics['schmitt_qualification'] = diagnostic
+    required = [f for f in failures if 'non-monotonic in threshold band' not in f
+                and 'rings back' not in f]
+    if not diagnostic['ok']:
+        required.append('RP Schmitt clock fails whole-period coverage, 0.2V adverse excursion or valid-band recross')
+    return metrics, required
+
+
+def sampled_data_failures(metrics, failures, deadlines_ns):
+    """Keep stress checks; require final threshold crossing before each deadline.
+
+    `evaluate` records the last bad VIH/VIL crossing over the entire interval
+    until the next data transition. Thus settling before the setup deadline
+    also proves no later band recrossing through the sampling interval.
+    Only early monotonicity/ringback diagnostics are separated from the gate.
+    """
+    early = [f for f in failures if 'non-monotonic in threshold band' in f or
+             'rings back' in f]
+    required = [f for f in failures if f not in early]
+    if not metrics['edges']:
+        required.append('sampled data: missing edge coverage')
+    samples = []
+    for e in metrics['edges']:
+        if e is None:
+            required.append('sampled data: missing valid threshold crossing')
+            continue
+        deadline = float(deadlines_ns[e['edge']])
+        good = bool(deadline >= 0 and e['settled_ns'] <= deadline)
+        samples.append({'edge': e['edge'], 'last_crossing_ns': e['settled_ns'],
+                        'deadline_ns': round(deadline, 4), 'ok': good})
+        if not good:
+            required.append(f"sampled data {e['edge']}: final crossing {e['settled_ns']:.3f} ns "
+                            f'after setup deadline {deadline:.3f} ns')
+    return required, {'uniform_edge_failures': early, 'sample_windows': samples,
+                      'ok': not required}
+
+
+def evaluate_sampled(t, v, part_name, edges, t_end, vdd, deadlines_ns):
+    """Waveform entry point used by sampled-data regressions."""
+    metrics, strict = evaluate(t, v, part_name, edges, t_end, vdd)
+    required, sampling = sampled_data_failures(metrics, strict, deadlines_ns)
+    metrics['sampling'] = sampling
+    return metrics, required
+
+
+def qualify_sampled_mosi(results):
+    """RP2040 MOSI is sampled on SCK, not an asynchronous clock/control.
+
+    Use the earliest routed rising-clock crossing and worst published pad
+    delay skew. Last data crossing covers the entire interval to the next
+    transition; timing_checks still requires setup and hold. ESP32 timing is
+    unpublished, so this function does not qualify its input sampling.
+    """
+    sck = _span(_edges(results, 'MB spi SCK',
+                      lambda label: label.endswith(':U1.4') and 'wifi' not in label, 'rise'))
+    if not sck:
+        return
+    deadline_ns = (.5 / QUALIFIED_SPI_HZ + sck[0] - (RP_IN_MAX - RP_IN_MIN)) * 1e9
+    for result in results:
+        if result['group'] != 'MB spi MOSI':
+            continue
+        result.setdefault('uniform_edge_failures', list(result['failures']))
+        for label, metrics in result['receivers'].items():
+            if not label.endswith(':U1.5') or 'wifi' in label or metrics.get('part') != 'RP2040':
+                continue
+            prefix = label + ': '
+            strict = [f[len(prefix):] for f in result['failures'] if f.startswith(prefix)]
+            required, sampling = sampled_data_failures(metrics, strict,
+                                                       dict(rise=deadline_ns, fall=deadline_ns))
+            result['failures'] = [f for f in result['failures'] if not f.startswith(prefix)]
+            result['failures'] += [prefix + f for f in required]
+            metrics['sampling'] = sampling
+        result['mosi_sampling_basis'] = {
+            'qualified_hz': QUALIFIED_SPI_HZ, 'setup_deadline_ns': deadline_ns,
+            'qualification': 'RP2040 PIO input sampled by routed rising SCK; '
+                             'earliest clock minus worst input-pad skew; setup/hold remain mandatory',
+            'wifi_sampling_qualified': False}
+
+
+@lru_cache(maxsize=12)
+def ahc_fixture50_crossing(corner, package, edge):
+    """Model's 50% crossing into the datasheet 50pF propagation fixture, ns.
+
+    Aligning this crossing to the guaranteed 14ns125°C maximum gives a
+    simulation qualification of excess routed-load delay. It is not a
+    datasheet-only delay guarantee for a distributed load exceeding 50pF.
+    """
+    model = models.load_ahc125(OUT_DIR / 'cache/sclm008.ibs')['out']
+    launch, end = 2e-9, 60e-9
+    ku, kd = models.ku_schedule(model, corner, [(launch, edge)], end)
+    r, l, c = models.DCK_PACKAGE[package]
+    lines = [models.pwl_source('ku', 'ku', ku), models.pwl_source('kd', 'kd', kd),
+             f'Lpkg die mid {l:g}', f'Rpkg mid pad {r:g}', f'Cpkg pad 0 {c:g}',
+             'Cfixture pad 0 50p']
+    lines += models.ibis_device_lines('driver', model, corner, 'die', 'vcc_ibis', 'ku', 'kd')
+    deck = Deck(lines=lines, probes=[Probe('50pF pad', 'pad', AHC125_OUTPUT)])
+    with tempfile.TemporaryDirectory(prefix='cupc8-ahc50pf-') as work:
+        t, w = run_deck(deck, model.vcc[corner], end, 5e-12, work)
+    v, threshold = w[:, 0], .5 * model.vcc[corner]
+    reached = v >= threshold if edge == 'rise' else v <= threshold
+    found = np.flatnonzero((t >= launch) & reached)
+    if not len(found):
+        raise ValueError('AHC50pF fixture never crosses its propagation threshold')
+    i = found[0]
+    crossing = t[i - 1] + (threshold - v[i - 1]) * (t[i] - t[i - 1]) / (v[i] - v[i - 1])
+    return float((crossing - launch) * 1e9)
+
+
+@lru_cache(maxsize=12)
+def ti_lvc_fixture50_crossing(corner, package, edge):
+    """Genuine LVC datasheet fixture:50pF/500ohm, threshold1.5V, ns."""
+    model = models.load_lvc125(OUT_DIR / 'cache/scem270.zip')['out']
+    launch, end = 2e-9, 60e-9
+    ku, kd = models.ku_schedule(model, corner, [(launch, edge)], end)
+    r, l, c = models.DCK_PACKAGE[package]
+    lines = [models.pwl_source('ku', 'ku', ku), models.pwl_source('kd', 'kd', kd),
+             f'Lpkg die mid {l:g}', f'Rpkg mid pad {r:g}', f'Cpkg pad 0 {c:g}',
+             'Cfixture pad 0 50p', 'Rfixture pad 0 500']
+    lines += models.ibis_device_lines('driver', model, corner, 'die', 'vcc_ibis', 'ku', 'kd')
+    deck = Deck(lines=lines, probes=[Probe('LVC50pF pad', 'pad', TI_LVC125_OUTPUT)])
+    with tempfile.TemporaryDirectory(prefix='cupc8-lvc50pf-') as work:
+        t, w = run_deck(deck, model.vcc[corner], end, 5e-12, work)
+    v, threshold = w[:, 0], 1.5
+    found = np.flatnonzero((t >= launch) & (v >= threshold if edge == 'rise' else v <= threshold))
+    if not len(found):
+        raise ValueError('LVC50pF/500ohm fixture never crosses its propagation threshold')
+    i = found[0]
+    crossing = t[i - 1] + (threshold - v[i - 1]) * (t[i] - t[i - 1]) / (v[i] - v[i - 1])
+    return float((crossing - launch) * 1e9)
+
+
+TI_LVC125_TPD50_MAX = 4.7e-9  # TI SCES223U,3.3±0.3V,CL50pF/RL500ohm,−40..125°C
+AHC125_TPD50_MAX = 14e-9  # TI SCLS377M, 3.3±0.3V, CL50pF, −40..125°C
+
+
+def miso_controller_kind(result):
+    """Controller identity, independent of other fitted cards in the name."""
+    kind = result.get('driver_kind')
+    if kind is None:
+        # Historical research results predate the explicit source field.
+        match = re.search(r'\bMISO J1[1-6] (gpu|io|storage|eink|wifi)\b',
+                          result.get('case', ''))
+        kind = match[1] if match else None
+    return kind if kind in CARD_KINDS else None
+
+
+def qualify_sampled_miso(results):
+    """Apply anchored data deadlines only to genuine fitted TI DCK MISO cases."""
+    sck = _span(_edges(results, 'MB spi SCK',
+                        lambda label: label.endswith(':U1.4') and 'wifi' not in label, 'fall'))
+    if not sck:
+        return  # No routed clock timing: leave strict failures and timing gate intact.
+    local_input = _span(_edges(results, 'MB spi MISO input',
+                              lambda label: label.endswith(':U4.2') and 'wifi' not in label,
+                              'rise') + _edges(results, 'MB spi MISO input',
+                              lambda label: label.endswith(':U4.2') and 'wifi' not in label,
+                              'fall'))
+    if not local_input:
+        return  # RP pad-to-buffer-A flight is separate from buffer A-to-Y tpd.
+    sys.path.insert(0, str(ROOT / 'hw/timing'))
+    from cpubus_budget import ALLOW
+    base = (ALLOW['clk_insertion'] * 1e-9 + sck[1] + RP_IN_MAX +
+            PIO_RESPONSE_CYCLES * T_SYS + RP_OUT_MAX + local_input[1] +
+            (ALLOW['in_pad'] + ALLOW['setup']) * 1e-9)
+    available_ns = (.5 / QUALIFIED_SPI_HZ - base) * 1e9
+    for result in results:
+        if result['group'] != 'MB spi MISO' or result.get('buffer_driver') not in DCK_BUFFERS:
+            continue
+        controller = miso_controller_kind(result)
+        if controller is None:
+            continue  # Unknown response source cannot inherit the RP bound.
+        cfg = result['config']
+        fixture = ahc_fixture50_crossing if result['buffer_driver'] == AHC125 else ti_lvc_fixture50_crossing
+        tpd_max_ns = (AHC125_TPD50_MAX if result['buffer_driver'] == AHC125 else TI_LVC125_TPD50_MAX) * 1e9
+        anchors = {e: fixture(result.get('driver_corner', cfg['corner']),
+                             cfg.get('buffer_package', 0), e)
+                   for e in ('rise', 'fall')}
+        deadlines = {e: available_ns - tpd_max_ns + anchors[e] for e in anchors}
+        result['uniform_edge_failures'] = list(result['failures'])
+        for label, metrics in result['receivers'].items():
+            if not label.endswith('U7.48'):
+                continue
+            prefix = label + ': '
+            strict = [f[len(prefix):] for f in result['failures'] if f.startswith(prefix)]
+            required, sampling = sampled_data_failures(metrics, strict, deadlines)
+            result['failures'] = [f for f in result['failures'] if not f.startswith(prefix)]
+            result['failures'] += [prefix + f for f in required]
+            metrics['sampling'] = sampling
+            result['anchored_buffer_valid_ns'] = max((
+                tpd_max_ns + max(0, e['settled_ns'] - anchors[e['edge']])
+                for e in metrics['edges'] if e), default=None)
+        result['sampling_basis'] = {
+            'qualified_hz': QUALIFIED_SPI_HZ, 'available_buffer_and_line_ns': available_ns,
+            'datasheet_tpd50_max_ns': tpd_max_ns,
+            'local_miso_input_settled_ns': local_input[1] * 1e9,
+            'model_fixture50_cross_ns': anchors,
+            'qualification': 'IBIS excess routed-load delay anchored to vendor50pF maximum; '
+                             'model assumptions require first-article measurement',
+            'controller_response_qualified': controller != 'wifi',
+            'controller_limit': 'ESP32 SPI slave maximum response timing unpublished'
+                                if controller == 'wifi' else 'RP2040 PIO response bound'}
 
 
 # ------------------------------------------------------ off-board loads
@@ -762,19 +1336,100 @@ class Case:
     couple: tuple = ()            # (pin a, pin b, k) cable wire coupling
 
 
+def qualify_ti_input_current(metrics, failures, part_name, voltage, current):
+    """Apply SCES223U table 5.1 footnote 2 only with complete pin-current evidence.
+
+    This is an absolute-rating check, not a guarantee of logic operation at
+    negative voltage. Positive voltage and all edge-quality checks remain.
+    Conservatively bound the entire pin waveform by |I| <= 50 mA, although
+    the manufacturer's IIK limit specifically concerns negative injection.
+    """
+    if part_name != TI_LVC125 or float(np.min(voltage)) >= -.5:
+        return metrics, failures
+    if current is None or np.shape(current) != np.shape(voltage) or not np.isfinite(current).all():
+        return metrics, failures + ['negative TI input requires complete pin-current evidence']
+    peak = float(np.max(np.abs(current)))
+    metrics = dict(metrics, input_pin_current_peak_a=peak,
+                   negative_input_rating_basis='TI SCES223U table 5.1 footnote 2, IIK 50 mA')
+    if peak > .05:
+        return metrics, failures + [f'TI input pin current {peak * 1e3:.3f} mA exceeds 50 mA']
+    if float(np.max(voltage)) > 6.5:
+        return metrics, failures
+    return metrics, [f for f in failures if not f.startswith('undershoot ') and
+                     f != 'quiet victim beyond abs max']
+
+
+def qualify_ti_input_transition(metrics, failures, part_name, t, voltage, edges, t_end):
+    """SCES223U recommended 10 ns/V over the complete TTL input transition.
+
+    SLLA364A defines a finite rise/fall interval divided by voltage change;
+    SDYA002 identifies VIL(max)..VIH(min). Conservatively use first entry
+    through final exit, including re-entry. Instantaneous sample slopes
+    remain diagnostics, not an invented manufacturer rating. Existing
+    recross/monotonic checks and the absolute-current condition are separate.
+    """
+    if part_name != TI_LVC125:
+        return metrics, failures
+    rates, required = [], list(failures)
+    for index, (launch, edge) in enumerate(edges):
+        end = edges[index + 1][0] if index + 1 < len(edges) else t_end
+        mask = (t >= launch) & (t < end)
+        tt, vv = np.asarray(t)[mask], np.asarray(voltage)[mask]
+        if len(tt) < 2:
+            required.append('TI input transition: missing waveform coverage')
+            continue
+        in_band = (vv[:-1] >= .8) & (vv[:-1] <= 2.0) & (vv[1:] >= .8) & (vv[1:] <= 2.0)
+        if not in_band.any():
+            continue  # An instantaneous jump, or a separately failed logic edge.
+        speed = np.diff(vv)[in_band] / np.diff(tt)[in_band] * 1e-9
+        if edge == 'fall':
+            speed = -speed
+        minimum = float(np.min(speed))
+        normalized, lo, hi = (vv, .8, 2.0) if edge == 'rise' else (-vv, -2.0, -.8)
+        entry = np.flatnonzero(normalized >= lo)
+        invalid = np.flatnonzero(normalized < hi)
+        if not len(entry) or len(invalid) and invalid[-1] == len(tt) - 1:
+            required.append('TI input transition: missing complete band exit')
+            continue
+        finish = int(invalid[-1]) + 1 if len(invalid) else 0
+        transit_ns = max(0.0, float((tt[finish] - tt[entry[0]]) * 1e9))
+        rate = transit_ns / 1.2
+        rates.append({'edge': edge, 'whole_band_transit_ns': transit_ns,
+                      'whole_band_ns_per_v': rate,
+                      'diagnostic_minimum_v_per_ns_in_band': minimum})
+        if rate > 10:
+            required.append(f'TI input {edge} whole-band transit {transit_ns:.3f} ns '
+                            f'({rate:.3f} ns/V) exceeds recommended 10 ns/V')
+    return dict(metrics, input_transition= {
+        'maximum_ns_per_v': 10.0, 'region_v': [.8, 2.0], 'edges': rates}), required
+
+
 def simulate(case, bench_dir, dump=None):
     bench = Bench(bench_dir)
     ice40 = models.load_ice40()
     corner = case.config.corner
     lvc = models.load_lvc125(OUT_DIR / 'cache/scem270.zip')
     first = case.drives[0]
+    first_corner = corner
     if first.model == 'ibis':
         value = bench.circuit(first.start[1]).components[first.start[2]][0]
-        vdd = (lvc['out'] if value == '74LVC1G125GW' else ice40['lvc330io']).vcc[corner]
+        first_corner = genuine_driver_corner(case.config, first.start[1], first.start[2], value)
+        ahc = models.load_ahc125(OUT_DIR / 'cache/sclm008.ibs') if value == AHC125 else None
+        vdd = (ahc['out'] if ahc else lvc['out'] if value in ('74LVC1G125GW', TI_LVC125)
+               else ice40['lvc330io']).vcc[first_corner]
     else:
-        vdd = 3.3
+        # The non-IBIS driver is an explicit engineering bracket. A selected
+        # rail endpoint changes that source, never a vendor IBIS corner.
+        vdd = case.config.get('bracket_vdd', 3.3)
+        if not 3.0 <= vdd <= 3.6:
+            raise ValueError('bracket source rail outside reviewed 3.0..3.6 V range')
     asm = Assembler(bench, case.config, vdd)
     asm.ice40, asm.lvc = ice40, lvc
+    participating_cards = set(k for k in case.config.slots if k) | {
+        drive.start[1] for drive in case.drives if drive.start[1] in CARD_KINDS}
+    if any(v == AHC125 for kind in participating_cards
+           for v, _ in bench.circuit(kind).components.values()):
+        asm.ahc = models.load_ahc125(OUT_DIR / 'cache/sclm008.ibs')
     asm.tpd = models.load_tpd(OUT_DIR / 'cache/slvm741a.zip')
     asm.txb = models.load_txb(OUT_DIR / 'cache/scem518.zip')
     for index, drive in enumerate(case.drives):
@@ -800,23 +1455,56 @@ def simulate(case, bench_dir, dump=None):
                             labels=np.array([p.label for p in deck.probes]))
     result = {'group': case.group, 'case': case.name, 'config': _cfg_json(case.config),
               'vdd': vdd, 'notes': deck.notes, 'receivers': {}, 'drivers': {}, 'failures': []}
+    result['capacitor_returns'] = {}
+    result['buffer_driver'] = bench.circuit(first.start[1]).components[first.start[2]][0]
+    result['driver_kind'] = first.start[1]
+    result['driver_corner'] = first_corner
+    input_currents = {p.label: v for p, v in zip(deck.probes, waves.T)
+                      if p.role == 'input_current'}
     for probe, v in zip(deck.probes, waves.T):
         drive = case.drives[probe.group]
+        probe_vdd = probe.vdd if probe.vdd is not None else vdd
+        if probe.role == 'input_current':
+            continue
+        if probe.role in ('cap_return_current', 'cap_return_voltage'):
+            key = 'current_a' if probe.role == 'cap_return_current' else 'local_return_v'
+            result['capacitor_returns'].setdefault(probe.label, {})[key] = {
+                'min': float(np.min(v)), 'max': float(np.max(v)),
+                'max_abs': float(np.max(np.abs(v)))}
+            continue
         if probe.role == 'tx':
             info = {'vmax': round(float(v.max()), 4), 'vmin': round(float(v.min()), 4)}
             part = PARTS.get(probe.part)
             if part is not None:        # reflections back into the driving pad
-                hi = part.abs_max(vdd)
-                if v.max() > (part.ac_max(vdd) or hi) or v.min() < (part.ac_lo or part.abs_lo):
+                hi = part.abs_max(probe_vdd)
+                if v.max() > (part.ac_max(probe_vdd) or hi) or v.min() < (part.ac_lo or part.abs_lo):
                     result['failures'].append(f'{probe.label}: driver pad {v.min():.3f}..'
                                               f'{v.max():.3f} V beyond its limits')
             result['drivers'][probe.label] = info
             continue
-        if drive.edges:
-            metrics, fails = evaluate(t, v, probe.part, drive.edges, case.t_end, vdd)
+        if probe.part in DCK_OUTPUTS:
+            # A deselected output is a physical stress probe, not a logic sampler.
+            metrics, fails = evaluate(t, v, probe.part, (), case.t_end, probe_vdd)
+        elif drive.edges:
+            metrics, fails = evaluate(t, v, probe.part, drive.edges, case.t_end, probe_vdd)
         else:
-            metrics, fails = quiet(t, v, probe.part, drive.level, vdd)
+            metrics, fails = quiet(t, v, probe.part, drive.level, probe_vdd)
+        metrics, fails = qualify_ti_input_current(metrics, fails, probe.part, v,
+                                                 input_currents.get(probe.label))
+        metrics, fails = qualify_ti_input_transition(metrics, fails, probe.part, t, v,
+                                                    drive.edges, case.t_end)
+        if (probe.part == 'RP2040' and drive.edges
+                and case.group in ('MB spi SCK', 'MB spi CS')):
+            reference, pin = probe.label.rsplit(':', 1)[-1].split('.')
+            scope = rp_schmitt_firmware_scope()
+            if scope is not None:
+                scope = dict(scope, case_temperature_min=case.config.get('rp_case_temperature_min', -40.),
+                             case_temperature_max=case.config.get('rp_case_temperature_max', 85.))
+            metrics, fails = qualify_rp_schmitt_clock(metrics, fails, t, v, drive.edges, case.t_end,
+                scope=scope, reference=reference, pin=pin, gpio={'4': 2, '7': 5}.get(pin), iovdd=vdd)
         metrics['part'] = probe.part
+        if probe.vdd is not None:
+            metrics['local_ibis_vdd'] = probe_vdd
         result['receivers'][probe.label] = metrics
         result['failures'] += [f'{probe.label}: {f}' for f in fails]
     result['nets'] = deck.nets
@@ -826,19 +1514,21 @@ def simulate(case, bench_dir, dump=None):
 def quiet(t, v, part_name, level, vdd):
     """A victim held at `level` must stay out of its receiver's threshold band."""
     part = PARTS[part_name]
+    vih, vil = part.thresholds(vdd)
     fails = []
     if level == 0:
         peak = float(np.max(v))
-        margin = part.vil - peak
+        margin = vil - peak
         if margin <= 0:
-            fails.append(f'quiet-low victim reaches {peak:.3f} V >= VIL {part.vil:.3f} V')
+            fails.append(f'quiet-low victim reaches {peak:.3f} V >= VIL {vil:.3f} V')
     else:
         peak = float(np.min(v))
-        margin = peak - part.vih
+        margin = peak - vih
         if margin <= 0:
-            fails.append(f'quiet-high victim falls to {peak:.3f} V <= VIH {part.vih:.3f} V')
+            fails.append(f'quiet-high victim falls to {peak:.3f} V <= VIH {vih:.3f} V')
     if np.max(v) > part.abs_max(vdd) or np.min(v) < part.abs_lo:
-        fails.append('quiet victim beyond abs max')
+        fails.append('quiet victim beyond ' + ('published DC input range'
+                     if part.input_range_only else 'abs max'))
     return {'vmax': round(float(np.max(v)), 4), 'vmin': round(float(np.min(v)), 4),
             'noise_margin_v': round(margin, 4)}, fails
 
@@ -939,6 +1629,17 @@ def slot_configs(kinds=CARD_KINDS, singles=('storage',)):
 
 
 def driver_pin(bench, kind, net, part):
+    if part == '74LVC1G125GW':
+        fitted = [(r, '4') for r, (v, _) in bench.circuit(kind).components.items()
+                  if v in DCK_BUFFERS]
+        if fitted:
+            # Local level buffers may share the same genuine part family.
+            # Identify the MISO source by its electrical net, rather than
+            # assuming the card contains exactly one TI buffer.
+            sources = [p for p in fitted if bench.circuit(kind).net(*p) == '/MISO_SRC']
+            if len(sources) != 1:
+                raise ValueError(f'{kind}: TI DCK output must drive the extracted /MISO_SRC network')
+            return sources[0]
     pins = [(r, p) for r, p in bench.circuit(kind).nets[net]
             if bench.circuit(kind).components[r][0] == part]
     if len(pins) != 1:
@@ -992,9 +1693,24 @@ def mb_spi_cases(bench, kinds=CARD_KINDS, singles=('storage',)):
             buf = driver_pin(bench, kind, '/MISO', '74LVC1G125GW')
             for label, slots in ((f'all {kind}', (kind,) * 6),
                                  (f'{kind} alone', tuple(kind if i == n else None for i in range(6)))):
-                cases += cases_for('MB spi MISO', f'MISO J{11 + n} {label}',
+                axes = LVC_AXES
+                if bench.circuit(kind).components[buf[0]][0] in DCK_BUFFERS:
+                    axes = dict(LVC_AXES, package=(0, 1))
+                miso_cases = cases_for('MB spi MISO', f'MISO J{11 + n} {label}',
                                    (Drive((f'J{11 + n}:{kind}', kind, *buf), 'ibis', data),),
-                                   LVC_AXES, Config(slots), t_data)
+                                   axes, Config(slots), t_data)
+                if bench.circuit(kind).components[buf[0]][0] in DCK_BUFFERS:
+                    miso_cases = extra_sweep(miso_cases, buffer_package=(0, 1))
+                cases += miso_cases
+    for kind in kinds:
+        if kind == 'wifi':
+            continue  # ESP output waveform/timing is not invented from RP2040.
+        ref, pin = driver_pin(bench, kind, '/MISO_OUT', 'RP2040')
+        local_cases = cases_for('MB spi MISO input', f'{kind} RP pad to buffer A',
+                               (Drive((kind, kind, ref, pin), 'RP2040', data),),
+                               dict(BRACKET_AXES, corner=('min', 'max')),
+                               Config(EMPTY), t_data)
+        cases += extra_sweep(local_cases, buffer_package=(0, 1))
     return cases
 
 
@@ -1157,9 +1873,17 @@ ASSUMPTIONS = [
     '1 nH package, no clamp diodes (overstates overshoot)',
     'ESP32-C3 (wifi slot): no IBIS or IO abs max; VIH max VDD+0.3 / VIL min -0.3 used as limits; '
     'inputs 1..10 pF; no SPI-slave AC timing is published, so wifi-slot SPI timing is not verified',
-    '74LVC1G125GW (card MISO buffer): fitted MDD C52140430 has no characterized model here; '
+    'Legacy 74LVC1G125GW card MISO circuits: MDD C52140430 has no characterized model here; '
     'TI SN74LVC1G125 IBIS and Nexperia limits (VI -0.5..6.5 V, tpd <= 4.5 ns) are family '
     'proxies, not verified electrical bounds for the fitted MDD part',
+    'SN74AHC1G125DCKR uses genuine TI SCLM008 with the DCK R/L/C envelope; actual TX/pull '
+    'resistors are traversed from the netlist, with no hypothetical series/shunt double count; '
+    '50pF vendor timing anchors modeled excess distributed-load delay, requiring first-article '
+    'sampling/release measurements; ESP32 slave maximum response timing remains unpublished',
+    'TI AHC SCLM008 temperatures are typ40/min100/max−40°C. The 125°C datasheet delay '
+    'anchor does not establish a 125°C routed-load model. M1 qualification requires the '
+    '40°C ambient current/thermal allocation and first-article temperature checks; '
+    'Cpd14pF is typical and ICC10µA applies to rail-level inputs, not arbitrary input bias',
     'M1 slot SPI qualification targets the ROM/kernel divider-2 rate, 3 MHz; the 6 MHz '
     'digital hardware maximum is an unsupported analog-timing diagnostic',
     'SRAM/ROM/oscillator/SD card/TXB0108 outputs: behavioural bracket drivers (DRIVE)',
@@ -1231,7 +1955,7 @@ def timing_checks(row, results):
     def need(name, *spans):
         if all(spans):
             return True
-        add(name, None, 'arrival data missing (a case failed to simulate)')
+        add(name, None, 'required arrival coverage missing or no valid threshold crossing')
         return False
 
     if 'MB spi SCK' in groups:
@@ -1253,20 +1977,31 @@ def timing_checks(row, results):
                 '+ pad skew after SCK')
         miso = _span(_edges(results, 'MB spi MISO', lambda l: l.endswith('U7.48'), 'rise') +
                      _edges(results, 'MB spi MISO', lambda l: l.endswith('U7.48'), 'fall'))
-        if need('slot MISO turnaround', sck_f, miso):
+        local_input = _span(_edges(results, 'MB spi MISO input',
+                                  lambda l: l.endswith(':U4.2') and 'wifi' not in l, 'rise') +
+                            _edges(results, 'MB spi MISO input',
+                                  lambda l: l.endswith(':U4.2') and 'wifi' not in l, 'fall'))
+        if need('slot MISO turnaround including RP pad-to-buffer input route', sck_f, miso, local_input):
             sys.path.insert(0, str(ROOT / 'hw/timing'))
             from cpubus_budget import ALLOW
             for hz in (QUALIFIED_SPI_HZ, SPI_HARDWARE_MAX_HZ):
                 half_ = .5 / hz
+                anchored = [r.get('anchored_buffer_valid_ns') for r in results
+                            if r['group'] == 'MB spi MISO' and r.get('buffer_driver') in DCK_BUFFERS]
+                buffer_line = (max(anchored) * 1e-9 if anchored and all(v is not None for v in anchored)
+                               else AHC125_TPD50_MAX + miso[1] if anchored
+                               else LVC125_TPD_MAX + miso[1])
                 used = (ALLOW['clk_insertion'] * 1e-9 + sck_f[1] + RP_IN_MAX +
-                        PIO_RESPONSE_CYCLES * T_SYS + RP_OUT_MAX + LVC125_TPD_MAX + miso[1] +
+                        PIO_RESPONSE_CYCLES * T_SYS + RP_OUT_MAX + local_input[1] + buffer_line +
                         (ALLOW['in_pad'] + ALLOW['setup']) * 1e-9)
                 diagnostic = hz == SPI_HARDWARE_MAX_HZ
                 add(f'slot MISO turnaround, RP2040 cards at {hz / 1e6:g} MHz' +
                     (' (unsupported hardware maximum diagnostic)' if diagnostic else ''),
                     half_ - used,
                     'clock insertion + SCK fall settled + pad in + PIO response '
-                    f'({PIO_RESPONSE_CYCLES} clk_sys) + pad out + 74LVC1G125 tpd + MISO settled '
+                    f'({PIO_RESPONSE_CYCLES} clk_sys) + pad out + local buffer input route + ' +
+                    ('exact TI vendor50pF delay plus modeled excess last-crossing delay '
+                     if anchored else '74LVC1G125 tpd + MISO settled ') +
                     '+ iCE40 in-pad/setup <= T/2; ' +
                     ('budget-only diagnostic, not 6 MHz analog qualification' if diagnostic
                      else 'required M1 firmware operating rate'), required=not diagnostic)
@@ -1534,6 +2269,14 @@ def main():
     models.load_txb(OUT_DIR / 'cache/scem518.zip')
     fixtures_ok, fixtures = fixture_report(ice40, lvc)
     bench = Bench(args.board_dir)
+    ahc = None
+    if any(v == AHC125 for kind in ROW_BOARDS[args.row]
+           for v, _ in bench.circuit(kind).components.values()):
+        ahc = models.load_ahc125(OUT_DIR / 'cache/sclm008.ibs')
+        replay = {f'TI AHC125 {corner} {edge}': models.fixture_check(ahc['out'], corner, edge)
+                  for corner in models.CORNERS for edge in ('rise', 'fall')}
+        fixtures.update(replay)
+        fixtures_ok = fixtures_ok and all(v['ok'] for v in replay.values())
     cases = build_cases(bench, args.row)
     if args.group:
         cases = [c for c in cases if c.group in args.group]
@@ -1545,6 +2288,8 @@ def main():
     print(f'{args.row}: {len(cases)} ngspice cases on {args.jobs} workers', flush=True)
     results = run_cases(cases, args.board_dir, args.jobs,
                         progress=lambda m: print(m, flush=True))
+    qualify_sampled_miso(results)
+    qualify_sampled_mosi(results)
     groups = summarise(results)
     # discretisation check on each group's worst-overshoot case
     by_name = {c.name: c for c in cases}
@@ -1571,6 +2316,9 @@ def main():
                         ('slowbus_si.py', 'slowbus_models.py', 'slowbus_route.py')},
         'receipts': receipts, 'stale_evidence': stale,
         'models': {'ice40_ibis_sha256': models.ICE40_SHA256,
+                   'ti_ahc125_ibis_sha256': models.AHC125_SHA256,
+                   'ti_ahc125_temperatures_c': ahc['out'].params['temperature_range']
+                                               if ahc else None,
                    'ti_zip_sha256': {'slvm741a': models.TPD_ZIP_SHA256,
                                      'scem518': models.TXB_ZIP_SHA256,
                                      'scem270': models.LVC125_ZIP_SHA256},

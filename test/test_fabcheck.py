@@ -66,10 +66,12 @@ class FabCheckTests(unittest.TestCase):
                 (fab / name).write_text(name)
             report = Path(tmp) / 'text-review.json'
             with patch.object(silktextaudit.boardevidence, 'validate', return_value={'version': 1}), \
-                 patch.object(silktextaudit.fabcheck, 'export_parity', return_value=(board, 9)):
+                 patch.object(silktextaudit.fabcheck, 'export_parity', return_value=(board, 9)), \
+                 patch.object(silktextaudit.silk_glyph_coverage, 'certify', return_value={'complete': True, 'font_ascii_sha256': 'a'*64}):
                 payload = silktextaudit.audit(out, report)
             self.assertEqual(payload['count'], 4)
-            self.assertEqual(payload['review_status'], 'pending')
+            self.assertEqual(payload['review_status'], 'passed')
+            self.assertTrue(payload['plotted_glyph_proof']['complete'])
             self.assertEqual(payload['binding']['receipt_sha256'],
                              boardevidence.digest(out / 'evidence.json'))
             self.assertEqual(payload['binding']['parity_layer_count'], 9)
@@ -214,6 +216,7 @@ class FabCheckTests(unittest.TestCase):
             with patch.object(fabcheck, 'export_parity', return_value=(board, 9)), \
                  patch.object(fabcheck, 'check_drills', return_value=(218, Counter({(1., 1., .3): 1}), Counter())), \
                  patch.object(fabcheck, 'check_review'), \
+                 patch.object(fabcheck, 'require_complete_plotted_drc', side_effect=ValueError('plot proof incomplete')) as complete, \
                  patch.object(fabcheck.gerberdrc, 'check_clearance', return_value=123) as clearance, \
                  patch.object(fabcheck.gerberdrc, 'check_via_annular', return_value=12) as annular, \
                  patch.object(fabcheck.gerberdrc, 'check_pth_annular', return_value=4) as pth, \
@@ -223,8 +226,12 @@ class FabCheckTests(unittest.TestCase):
                  patch.object(fabcheck.gerberdrc, 'check_mask_alignment', return_value=10) as align, \
                  patch.object(fabcheck.gerberdrc, 'check_paste_registration', return_value=5) as paste, \
                  patch.object(fabcheck.gerberdrc, 'check_silk_clearance', return_value=8) as silk:
-                with self.assertRaisesRegex(ValueError, 'Gerber re-import DRC incomplete.*filled copper regions'):
+                with self.assertRaisesRegex(ValueError, 'plot proof incomplete'):
                     fabcheck.check(out)
+                complete.assert_called_once()
+                self.assertIs(complete.call_args.args[1], board)
+                self.assertEqual(len(complete.call_args.args[2]), 2)
+                self.assertEqual(len(complete.call_args.args[3]), 2)
                 clearance.assert_called_once()
                 annular.assert_called_once()
                 pth.assert_called_once()
@@ -235,16 +242,11 @@ class FabCheckTests(unittest.TestCase):
                 self.assertEqual(paste.call_count, 2)
                 self.assertEqual(silk.call_count, 2)
 
-    def test_plotted_drc_coverage_stays_closed_with_or_without_mask_rule(self):
-        for width in (0, .1):
-            with self.subTest(mask_width=width):
-                with self.assertRaisesRegex(ValueError, 'minimum neck width in filled copper') as caught:
-                    fabcheck.require_complete_plotted_drc(width)
-                message = str(caught.exception)
-                self.assertIn('filled silkscreen regions', message)
-                self.assertIn('silkscreen text height', message)
-                self.assertEqual('positive solder-mask web rule is not configured' in message,
-                                 width == 0)
+    def test_plotted_drc_coverage_needs_positive_mask_and_bound_inputs(self):
+        with self.assertRaisesRegex(ValueError, 'positive solder-mask web'):
+            fabcheck.require_complete_plotted_drc(0)
+        with self.assertRaisesRegex(ValueError, 'parity-bound'):
+            fabcheck.require_complete_plotted_drc(.1)
 
     @unittest.skipUnless(shutil.which('kicad-cli'), 'KiCad Gerber exporter unavailable')
     def test_silk_text_and_graphic_can_have_identical_plot_commands(self):
@@ -332,6 +334,47 @@ class FabCheckTests(unittest.TestCase):
                 gerberdrc.check_clearance([path], .15)
             path.write_text(gerber(1351000, '/A'))
             self.assertEqual(gerberdrc.check_clearance([path], .15), 2)
+
+    def test_exact_circle_to_stroke_clearance_and_five_nanometre_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sample-F_Cu.gtl'
+            def plot(via_x, obround=False):
+                return ('%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n'
+                        '%ADD10C,0.700000*%\n' +
+                        ('%ADD11O,1.800000X0.280000*%\n' if obround else '%ADD11C,0.280000*%\n') +
+                        '%TO.N,/CPU_D7_SRC*%\nD10*\n'
+                        f'X{via_x}Y-44292100D03*\n'
+                        '%TO.N,/CPU_D4_SRC*%\nD11*\n' +
+                        ('X90050000Y-44250000D03*\n' if obround else
+                         'X89290000Y-44250000D02*\nX90810000Y-44250000D01*\n') + 'M02*\n')
+            # Real main-board pair: exact gap .100003949... mm. Outward
+            # buffer chords give a lower bound below .1 mm.
+            for obround in (False, True):
+                with self.subTest(obround=obround):
+                    path.write_text(plot(91398500, obround))
+                    self.assertEqual(gerberdrc.check_clearance([path], .1), 2)
+                    path.write_text(plot(91398495, obround))
+                    with self.assertRaisesRegex(ValueError, 'round-stroke copper clearance below rule'):
+                        gerberdrc.check_clearance([path], .1)
+
+    def test_exact_round_strokes_boundary_crossing_and_endpoint_gap(self):
+        engine = gerberdrc.Geometry()
+        try:
+            first, second = 1, 2
+            engine.strokes[first] = (((0, 0), (1000000, 0)), .2)
+            engine.strokes[second] = (((0, 300000), (1000000, 300000)), .2)
+            self.assertTrue(engine.capsule_clearance(first, second, .1)[0])
+            engine.strokes[second] = (((0, 299999), (1000000, 299999)), .2)
+            self.assertFalse(engine.capsule_clearance(first, second, .1)[0])
+            engine.strokes[second] = (((500000, -500000), (500000, 500000)), .2)
+            self.assertFalse(engine.capsule_clearance(first, second, .1)[0])
+            engine.strokes[second] = (((1300000, 0), (2000000, 0)), .2)
+            self.assertTrue(engine.capsule_clearance(first, second, .1)[0])
+            engine.strokes[second] = (((1299999, 0), (2000000, 0)), .2)
+            self.assertFalse(engine.capsule_clearance(first, second, .1)[0])
+            self.assertIsNone(engine.capsule_clearance(first, 3, .1))
+        finally:
+            engine.close()
 
     def test_kicad_freepoly_flash_and_unsupported_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:

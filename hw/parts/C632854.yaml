@@ -1,0 +1,50 @@
+datasheet: https://ww1.microchip.com/downloads/en/DeviceDoc/20005023E.pdf
+source: 'Microchip DS20005023E Figure2-1 PLCC pin assignment and p28 Product Identification
+  System: SST39VF040-70-4I-NHE-T differs only tape-and-reel shipping carrier T from
+  SST39VF040-70-4I-NHE. Exact authentic C632854 supplier CAD pins independently match
+  every original active pin.'
+package: PLCC-32(11.4x14)
+footprints:
+- PLCC-32_11.4x14.0mm_P1.27mm
+pins:
+  1: A18
+  2: A16
+  3: A15
+  4: A12
+  5: A7
+  6: A6
+  7: A5
+  8: A4
+  9: A3
+  10: A2
+  11: A1
+  12: A0
+  13: DQ0
+  14: DQ1
+  15: DQ2
+  16: VSS
+  17: DQ3
+  18: DQ4
+  19: DQ5
+  20: DQ6
+  21: DQ7
+  22:
+  - CE#
+  - ~{CE}
+  23: A10
+  24:
+  - OE#
+  - ~{OE}
+  25: A11
+  26: A9
+  27: A8
+  28: A13
+  29: A14
+  30: A17
+  31:
+  - WE#
+  - ~{WE}
+  32: VDD
+ccw:
+- 1
+- 32

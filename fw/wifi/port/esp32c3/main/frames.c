@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "esp_attr.h"
 #include "freertos/FreeRTOS.h"
 
 #define RING 4096                   /* bytes of queued frames, 2-byte length each */
@@ -25,12 +26,12 @@ void frames_status(void)
 	status_now = (uint8_t)(card->ops->status(card) & 0x7f);
 }
 
-static void put(uint32_t at, uint8_t b)
+static void IRAM_ATTR put(uint32_t at, uint8_t b)
 {
 	ring[at % RING] = b;
 }
 
-bool frames_received(const uint8_t *mosi, int len)
+bool IRAM_ATTR frames_received(const uint8_t *mosi, int len)
 {
 	if (len <= 0)
 		return true;
@@ -39,8 +40,15 @@ bool frames_received(const uint8_t *mosi, int len)
 	uint32_t h = head;
 	put(h, (uint8_t)len);
 	put(h + 1, (uint8_t)(len >> 8));
-	for (int i = 0; i < len; i++)
-		put(h + 2 + i, mosi[i]);
+	/* At most two RAM memcpy calls, including a ring-boundary wrap. A
+	 * per-byte put() call burns the host's 20 us re-arm allowance. */
+	uint32_t at = (h + 2) % RING;
+	uint32_t first = RING - at;
+	if (first > (uint32_t)len)
+		first = (uint32_t)len;
+	memcpy(ring + at, mosi, first);
+	if (first < (uint32_t)len)
+		memcpy(ring, mosi + first, (uint32_t)len - first);
 	portENTER_CRITICAL_SAFE(&lock);
 	head = h + 2 + (uint32_t)len;
 	if (mosi[0] != CARD_OP_READ)
@@ -49,7 +57,7 @@ bool frames_received(const uint8_t *mosi, int len)
 	return true;
 }
 
-int frames_preload(uint8_t *miso, int max)
+int IRAM_ATTR frames_preload(uint8_t *miso, int max)
 {
 	int n = 0;
 	miso[n++] = status_now;          /* not status(): the SPI ISR calls this, and it asks lwIP */

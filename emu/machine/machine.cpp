@@ -569,6 +569,16 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
   sysctlResetConnected = o.sysctlResetConnected;
   resetButtonConnected = o.resetButtonConnected;
   resetButtonPressed = o.resetButtonPressed;
+  resetMonitorEnabled = o.resetMonitorEnabled;
+  railMonitor.config = o.resetMonitorConfig;
+  resetMonitorSourceComplete = o.resetMonitorSourceComplete;
+  // Explicit settled-powered functional baseline. Dynamic MR releases still
+  // wait the actual 560ms maximum; cold-start propagation is a physical gate.
+  if (resetMonitorEnabled) {
+    railMonitor.update(0,rail33,rail12,standbyRail);
+    railMonitor.update(2500000,rail33,rail12,standbyRail);
+    railMonitor.update(562500000,rail33,rail12,standbyRail);
+  }
   if (o.sysctl) {
     sysctl = std::make_unique<SysctlCard>(root + "/build/rp2040/sysctl.elf");
     // GPIO29 is pulled high when the host's VBUS is absent or its sense
@@ -677,6 +687,25 @@ void Machine::powerOn() {
       }
 }
 
+void Machine::setResetRails(double v33, double v12, double standby) {
+  if (!std::isfinite(v33)||!std::isfinite(v12)||!std::isfinite(standby)||
+      v33<0||v12<0||standby<0) throw std::invalid_argument("invalid reset rails");
+  rail33=v33; rail12=v12; standbyRail=standby;
+  resetMonitorState();
+}
+
+const ResetMonitor::State &Machine::resetMonitorState() {
+  const bool mrLow=(sysctl && sysctlResetConnected && sysctl->sysReset()) ||
+    (resetButtonConnected && resetButtonPressed);
+  const auto &s=railMonitor.update(board->ns()+562500000,rail33,rail12,standbyRail,mrLow || !resetMonitorSourceComplete);
+  // U13 P00..P05 are wired-AND with the six U19 open-drain outputs.
+  if (sysctl) for (auto &x:sysctl->expanders) if(x.address==0x20) {
+    x.in[0] |= 0x3f;
+    for(size_t i=0;i<6;i++) if(!s.slotHigh[i]) x.in[0]&=~(1u<<i);
+  }
+  return s;
+}
+
 uint32_t Machine::inputs(bool por) {
   const uint32_t out = board->outputs();
   MisoBus miso(misoIdle);
@@ -689,6 +718,7 @@ uint32_t Machine::inputs(bool por) {
   }
   const bool reset = (sysctl && sysctlResetConnected && sysctl->sysReset()) ||
                      (resetButtonConnected && resetButtonPressed);
+  const bool electricalPor=!resetMonitorEnabled || resetMonitorState().por;
   // Open source pads have undefined voltage; fixed idle levels expose the
   // disconnected digital path without predicting the physical voltage.
   const uint32_t bridge = (bridgeSourceConnected[0] ? br.sck : 0) |
@@ -698,7 +728,7 @@ uint32_t Machine::inputs(bool por) {
          (((bridge >> bridgeInputs[1]) & 1u) << 8) | (((bridge >> bridgeInputs[2]) & 1u) << 9) |
          ((pwrHi ? 1u : 0u) << 10) |
          ((cpuCdoneAtChipset() ? 1u : 0u) << 11) |
-         ((por && porConnected && !reset && fpgaCfg[0].configured ? 1u : 0u) << 12);
+         ((por && electricalPor && porConnected && !reset && fpgaCfg[0].configured ? 1u : 0u) << 12);
 }
 
 // the CPU card's CDONE at chipset U7.33: an open main-board leg leaves the pad
