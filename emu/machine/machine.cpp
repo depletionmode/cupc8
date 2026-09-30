@@ -1,6 +1,7 @@
 // The whole machine, natively: see machine.h. Every function here is the
 // machine.mjs / tmds.mjs function of the same name, in the same order.
 #include "machine.h"
+#include "miso_bus.h"
 
 #include <linux/futex.h>
 #include <sys/syscall.h>
@@ -96,7 +97,11 @@ void Rp2040Card::drive(uint32_t sck, uint32_t mosi, bool selected) {
 
 uint32_t Rp2040Card::miso() {
   GPIOPin &p = e.mcu->gpio[P::MISO];
-  return p.outputEnable() ? (p.outputValue() ? 1 : 0) : 1;  // released: the main board's pull-up
+  // The external buffer is enabled by CS, even while the MCU pad is input.
+  if (p.outputEnable()) return p.outputValue() ? 1 : 0;
+  if (p.pulldownEnabled() && !p.pullupEnabled()) return 0;
+  if (p.pullupEnabled() && !p.pulldownEnabled()) return 1;
+  return p.inputValue() ? 1 : 0;
 }
 
 bool Rp2040Card::irq() {
@@ -674,10 +679,11 @@ void Machine::powerOn() {
 
 uint32_t Machine::inputs(bool por) {
   const uint32_t out = board->outputs();
-  uint32_t miso = misoIdle, nirq = 0x3f;
+  MisoBus miso(misoIdle);
+  uint32_t nirq = 0x3f;
   for (auto &[slot, card] : cards) {
     if (slot <= 6 && selected(slot, out) && slotWiring[slot - 1].miso &&
-        slotWiring[slot - 1].misoConnected) miso &= card->miso();
+        slotWiring[slot - 1].misoConnected) miso.drive(true, card->miso());
     if (slot <= 6 && slotWiring[slot - 1].irqConnected && card->irq())
       nirq &= ~(1u << slotWiring[slot - 1].irq);
   }
@@ -688,7 +694,7 @@ uint32_t Machine::inputs(bool por) {
   const uint32_t bridge = (bridgeSourceConnected[0] ? br.sck : 0) |
                           ((bridgeSourceConnected[1] ? br.mosi : 0) << 1) |
                           ((bridgeSourceConnected[2] ? br.ncs : 1) << 2);
-  return miso | (nirq << 1) | (((bridge >> bridgeInputs[0]) & 1u) << 7) |
+  return miso.level() | (nirq << 1) | (((bridge >> bridgeInputs[0]) & 1u) << 7) |
          (((bridge >> bridgeInputs[1]) & 1u) << 8) | (((bridge >> bridgeInputs[2]) & 1u) << 9) |
          ((pwrHi ? 1u : 0u) << 10) |
          ((cpuCdoneAtChipset() ? 1u : 0u) << 11) |

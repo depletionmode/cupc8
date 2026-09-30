@@ -91,6 +91,35 @@ def resistor_between(circuit, a, b):
     return resistor
 
 
+def card_miso_network(circuit, card):
+    """Recognize only the two supported, pin-exact external buffer networks."""
+    ref = 'U3' if card == 'wifi' else 'U4'
+    family = circuit.components[ref][0]
+    internal = 'MISO_INT' if card == 'wifi' else 'MISO_OUT'
+    if family not in ('74LVC1G125GW', 'SN74AHC1G125DCKR'):
+        raise ValueError(f'{card}: unsupported MISO buffer {family}')
+    expected = {'1': '/CS_n', '2': f'/{internal}', '3': '/GND', '5': '/3V3'}
+    for pin, net in expected.items():
+        if node(circuit, ref, pin) != net:
+            raise ValueError(f'{card}: MISO buffer {ref}.{pin} must be {net}')
+    if family == '74LVC1G125GW':
+        path(circuit, (ref, '4'), ('J1', 'B16'))
+        return False
+    if node(circuit, ref, '4') != '/MISO_SRC':
+        raise ValueError(f'{card}: AHC MISO output must be /MISO_SRC')
+    if path(circuit, (ref, '4'), ('J1', 'B16'), '270') != 'R60':
+        raise ValueError(f'{card}: AHC MISO requires R60 270 ohms')
+    path(circuit, (ref, '4'), ('R60', '1'))
+    path(circuit, ('R60', '2'), ('J1', 'B16'))
+    path(circuit, ('R61', '1'), ('J1', 'B16'))
+    path(circuit, ('R61', '2'), (ref, '3'))
+    pulls = [(r.ref, r.value) for r, other in circuit.pulls('/GND')
+             if other == '/MISO']
+    if pulls != [('R61', '10k')]:
+        raise ValueError(f'{card}: AHC MISO requires sole R61 10k ground bias')
+    return True
+
+
 def card_slot_routes(cards, board_paths):
     """Bind each slot card's GPIO and buffered MISO legs to its PCB copper."""
     rows, paths, missing = {}, [], []
@@ -128,14 +157,28 @@ def card_slot_routes(cards, board_paths):
                   if ref == 'U1' and attached == f'/{internal}']
         if len(source) != 1:
             raise ValueError(f'{card}:{internal}: expected one MCU MISO output')
+        biased = card_miso_network(circuit, card)
         miso_input = leg('miso', internal, source[0], (buffer_ref, '2'))
-        miso_output = leg('miso', 'MISO', (buffer_ref, '4'), ('J1', 'B16'))
+        if biased:
+            output_source = leg('miso', 'MISO_SRC', (buffer_ref, '4'), ('R60', '1'))
+            output_bus = leg('miso', 'MISO', ('R60', '2'), ('J1', 'B16'))
+            bias_bus = leg('miso_pulldown', 'MISO', ('R61', '1'), ('J1', 'B16'))
+            grounds = [pin for (ref, pin), net in circuit.pins.items()
+                       if ref == 'J1' and net == '/GND']
+            if not grounds:
+                raise ValueError(f'{card}: MISO bias lacks connector ground')
+            bias_ground = leg('miso_pulldown', 'GND', ('R61', '2'), ('J1', grounds[0]))
+            links['miso_pulldown'] = bias_bus and bias_ground
+            miso_output = output_source and output_bus
+        else:
+            links['miso_pulldown'] = False
+            miso_output = leg('miso', 'MISO', (buffer_ref, '4'), ('J1', 'B16'))
         miso_enable = leg('miso', 'CS_n', ('J1', 'A14'), (buffer_ref, '1'))
         links['cs'] &= miso_enable
         links['miso'] = miso_input and miso_output and miso_enable
         rows[card] = links
         for signal, connected in links.items():
-            if not connected:
+            if not connected and (signal != 'miso_pulldown' or biased):
                 missing.append(f'{card}:{signal}_slot_copper')
     return rows, paths, missing
 
@@ -1611,12 +1654,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
                         if component == 'U1' and attached == target_net]
                 if len(pins) != 1:
                     raise ValueError(f'{card} {card_net}: card model pin missing or duplicated')
-                if card == 'wifi' and contact == 'B16':
-                    for value in ('/MISO_INT', '/MISO', '/CS_n'):
-                        # KiCad exports numeric pin identifiers for the buffer.
-                        matching = [p for (r, p), n in cards[card].pins.items() if r == 'U3' and n == value]
-                        if len(matching) != 1:
-                            raise ValueError(f'wifi MISO output enable: {value} missing at U3')
+                if contact == 'B16':
+                    card_miso_network(cards[card], card)
                 manifest['paths'].append({'from': f'{card}.J1.{contact}',
                                           'to': f'{card}.U1.{pins[0]}', 'net': card_net.lstrip('/')})
             manifest['paths'].append({'from': f'main.{ref}.{contact}', 'net': net,
@@ -2347,6 +2386,8 @@ def check(cards, main, pcb=None, card_boards=None, system_board=None, cpu_board=
         manifest['runtime']['eink_panel_link'] = False
         manifest['runtime']['eink_panel_copper_connected'] = False
     for card in ('gpu', 'io', 'storage', 'wifi', 'eink'):
+        if card_miso_network(cards[card], card):
+            runtime_net(card, 'MISO_SRC')
         for name in ('SCK', 'MOSI', 'CS_n', 'IRQ_n', 'MISO',
                      'MISO_INT' if card == 'wifi' else 'MISO_OUT'):
             runtime_net(card, name)

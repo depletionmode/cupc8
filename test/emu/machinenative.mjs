@@ -23,6 +23,7 @@ import os from 'node:os';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { kernelRom, ROOT } from './romimage.mjs';
+import { fittedSlotWiring } from './slotwiring.mjs';
 
 const native = createRequire(import.meta.url)(path.join(ROOT, 'build/emu-machine/machine.node'));
 
@@ -271,23 +272,7 @@ export class Machine {
       boots(boardKind[kind]))) : slots;
     const activeSysctl = sysctl && (!netlistTop || boots('system'));
     let memoryWiring = netlistTop?.runtime;
-    if (netlistTop) {
-      const links = netlistTop.runtime.card_slot_links;
-      const signals = ['sck', 'mosi', 'cs', 'miso', 'irq'];
-      if (!links || !['gpu', 'io', 'storage', 'wifi', 'eink'].every((kind) =>
-        signals.every((signal) => typeof links[kind]?.[signal] === 'boolean')))
-        throw new Error('machinenative: missing routed card slot links');
-      const slotWiring = netlistTop.runtime.slots.map((mainLink, index) => {
-        const installed = slots[index + 1];
-        if (!installed) return mainLink;
-        const kind = boardKind[installed];
-        if (!kind) throw new Error(`machinenative: unknown installed card ${installed}`);
-        const cardLink = links[kind];
-        return { ...mainLink, ...Object.fromEntries(signals.map((signal) =>
-          [`${signal}_connected`, mainLink[`${signal}_connected`] && cardLink[signal]])) };
-      });
-      memoryWiring = { ...netlistTop.runtime, slots: slotWiring };
-    }
+    if (netlistTop) memoryWiring = fittedSlotWiring(netlistTop.runtime, slots, boardKind);
     // the card programming port (emu/machine ProgPort): an SWD target in each
     // slot holding an RP2040 card, reachable through the muxes when the copper
     // is whole. Without the netlist top every wire is whole.
