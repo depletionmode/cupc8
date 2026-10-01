@@ -1,0 +1,55 @@
+{
+  "status": "PASS ZIP BYTES AND GENUINE RECONSTRUCTED OWNERS",
+  "scope": "Independent finalarchive member/hash verification and all8actualsource-owner reconstructed receipt plus directmanufacturingparity. Requirementsandmodelassumptions are explicitmanifest evidence; thisauditor doesnot independentlyrerunphysicalhardwareorallsolvers.",
+  "archive_sha256": "32a62df097e6b20d8e7e5822a61f5a2e11c2ef2674343454dbbd70e03eee69e7",
+  "archive_bytes": 97294451,
+  "direct_files": 692,
+  "source_objects": 622,
+  "programming_assets": 30,
+  "owners": {
+    "main": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "system": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "cpu": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "io": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "wifi": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "gpu": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "storage": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    },
+    "eink": {
+      "source_owner_receipt_valid": true,
+      "qty": 2,
+      "manufacturing_BOM_CPL_order_review_Gerber_drill_exact": true
+    }
+  },
+  "original_E_reference": {
+    "path": "release/firstarticle-20261001/cupc8-firstarticle-QUALIFIED-development-E.zip",
+    "sha256": "9dceea73762156bdaeb9ef7d698b3ccbfbe427846dcec371e95497bbd7c1b8da"
+  }
+}

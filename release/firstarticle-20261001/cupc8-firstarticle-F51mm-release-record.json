@@ -1,0 +1,375 @@
+{
+  "status": "FILES_READY_FOR_CONTROLLED_DEVELOPMENT_FIRST_ARTICLES",
+  "archive": "cupc8-firstarticle-QUALIFIED-development-F51mm.zip",
+  "archive_sha256": "32a62df097e6b20d8e7e5822a61f5a2e11c2ef2674343454dbbd70e03eee69e7",
+  "archive_bytes": 97294451,
+  "independent_audit": "cupc8-firstarticle-F51mm-independent-audit.json",
+  "source_commit": "801dc7e",
+  "boards": [
+    "main",
+    "system",
+    "cpu",
+    "io",
+    "wifi",
+    "gpu",
+    "storage",
+    "eink"
+  ],
+  "programming_assets": 30,
+  "requirements": [
+    {
+      "id": "A01",
+      "requirement": "Full top enlargement of six cards to62\u00d751mm; move perimeter connectors/LEDs/H1 upward3.55mm; preserve seating/fingers/notch",
+      "status": "PASS_SCOPED",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/actual-mechanical-datums.json",
+          "sha256": "6f2b60baa12dbe163794ca3578d8d9ab70c02b6a56173efa14ace21cb01f7abe"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/placement-delta-audit.json",
+          "sha256": "3f14d6c0311b6035dde3a8ec8342d11b89e5b7a5d2ea9790947cfb7f25f0c0be"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/mechanical/qualification.json",
+          "sha256": "d039fd136e355267aa78c593c187748dd9ed775a9d73721084b5523d412f4b31"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/eink-final-digital-delta-qualification.json",
+          "sha256": "c3f4663f68120e4a7d2d6ccf85b02fc81b2f429e87844b08b0899bbf59fb8c51"
+        }
+      ],
+      "verified": "Inspected all8datums: six62.1\u00d751.1 stroke-inclusive bboxes, H1(52,-43.55), D1(-3,-44.55); exact requested old/newplacements and padgeometry verified on completed baseline.",
+      "remaining": "Actual final eInk retains all 52 existing STEP shapes and all existing CPL rows exactly; current storage/GPU carry also preserves qualified outlines and datums. Physical receiving must provide the documented 3.55 mm added headroom."
+    },
+    {
+      "id": "A02",
+      "requirement": "Keep Main/System hardware/order compatibility; avoid heavyMainreroute",
+      "status": "PASS",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/main-system-order-compatibility.json",
+          "sha256": "c9282d234e825bd03aa957e7d8f647a41d6f8ef78246fcf62b251859fec5d520"
+        }
+      ],
+      "verified": "Actual PCB/pads/outline/track-via/filledzones/BOM/CPL semantic equality report PASS; no Main/System geometrysource changes planned.",
+      "remaining": ""
+    },
+    {
+      "id": "A03",
+      "requirement": "Genuine all8qty2 normal builds with live parts",
+      "status": "PASS_PER_OWNER",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/source-tree/build/hw/main/evidence.json",
+          "sha256": "044552c0df52136bb147ef5ca15ec36411c02c8595c42c5344d156f8fd78cc7a"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/source-tree/build/hw/system/evidence.json",
+          "sha256": "b2674b7f4f428cab436309d33db79813b5aceebd82a2a55d89c6adc3bd6b702f"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/source-tree/build/hw/cpu/evidence.json",
+          "sha256": "2d8c8e019eba994b7bee1158908f8ac3b10b9aa13857f73aaeecc7f2ba7eec25"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/gpu-tail-028-source-tree/build/hw/gpu/evidence.json",
+          "sha256": "ca2a3a09c2a5fc8db8a36b005a50d16cd0054da2b42064291e1841afd8a36782"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/source-tree/build/hw/io/evidence.json",
+          "sha256": "2fb71651df85e6df3b42937beaea6908759b53062803b33eab8a16aabb72ff44"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/source-tree/build/hw/storage/evidence.json",
+          "sha256": "15e22e7895cad8ac1aa374876af8e557e0efb32921e999092e6689aff847c9fb"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/source-tree/build/hw/wifi/evidence.json",
+          "sha256": "c163a68bc8d449408412460f00588fb5143e091b43172efaa1debd06d7cff9ea"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/source-tree/build/hw/eink/evidence.json",
+          "sha256": "8c2efbe70facf8862e0c782e5d7890908c5e243db035972d04efd6d9575aabcc"
+        }
+      ],
+      "verified": "Independently validated all8genuine receipts against actual original per-board source owners and actual artifactmaps; GPU, current 68/47\u03a9 storage and final RC eInk are the actual repaired owners.",
+      "remaining": "Canonical adopted sources are exact, while these unchanged receipts remain genuine per-owner receipts. Future consolidated reproduction requires genuine new pipelines."
+    },
+    {
+      "id": "A04",
+      "requirement": "Actual full fabrication and placement review for finalmanufacturingfiles",
+      "status": "PASS_SCOPED",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/fabrication-review/all8-results.json",
+          "sha256": "ebd231d524d10ef34820b485875669c7df7db4789d024477f5222f161f43e91c"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/qualification/gpu-028-full-fab.json",
+          "sha256": "527434eed1924d5a3ed163ff3094eb2d8b10ca481d62f23b0812fb585eb0d8e2"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-68-fab-review.json",
+          "sha256": "7d4706fcd09af570b7275f1e6d5e7bf84be7ed19d22bebc93dbf3729d3e8779b"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/placement-engineering-review.json",
+          "sha256": "b39d51e0639928797291eb79a6a8e55ec98d587e762498917125ab75db8c90d1"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/full-fab-check.json",
+          "sha256": "67b80f21050f27d5a37bd38de75bd27f2cda7b23550a7f934befd575dad17b55"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/fab-qualification.json",
+          "sha256": "6543ba088801c2438720e2771e2762b09ef319015abdbfd7ed61329652c56b10"
+        }
+      ],
+      "verified": "Baseline all eight fabrication and 127 placement reviews pass. Actual GPU, storage and final eInk fabrication and placement reviews pass; the complete current eInk fabcheck is captured and receipt-bound. Engineering review does not imply factory approval.",
+      "remaining": "Actual supplier CAM and placement preview remain receiving/order actions; final archive must preserve these exact qualified bytes."
+    },
+    {
+      "id": "A05",
+      "requirement": "Actual full8board fit, correctsupportrail/headroom and connectors; newparts fit",
+      "status": "PASS_SCOPED",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/mechanical-qualification.json",
+          "sha256": "296400eed454e55b869854fd55535269c265f6d79308d3764bf898022748f35f"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/gpu-mechanical-bridge/qualification.json",
+          "sha256": "3fe96ead0b664ff3cc8b1d4f5d43c2aefbe7a2a298d78c76d2293dd027c01360"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/mechanical/qualification.json",
+          "sha256": "985e639d206b4836610f052602814c96055fddf282a8b03994d59746c3cb67da"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/mechanical/qualification.json",
+          "sha256": "d039fd136e355267aa78c593c187748dd9ed775a9d73721084b5523d412f4b31"
+        }
+      ],
+      "verified": "FullMECH001\u2013008 baselinePASS; GPU59exactshapecarry; storagefreshsourceboundSTEP49unchangedshapes/41680addedpartchecks PASS.",
+      "remaining": "Actual eInk fresh STEP proves 52 unchanged shapes and 10,450 C22 clearances, including the four added storage resistors. No enclosure CAD was supplied; 3.55 mm added headroom and support height remain documented physical requirements."
+    },
+    {
+      "id": "A06",
+      "requirement": "GPU extendedHDMI routes work with localizedrepair",
+      "status": "PASS",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/qualification/gpu-tmds-028-final-bound.json",
+          "sha256": "3e1afb6882459589ffed5ad4219071fcc97506f5f7bfdfc10465625e6e215ce2"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/qualification/gpu-028-full-fab.json",
+          "sha256": "527434eed1924d5a3ed163ff3094eb2d8b10ca481d62f23b0812fb585eb0d8e2"
+        }
+      ],
+      "verified": "Currentreceipt-boundactual0.28mm repairedtails pass fourlanes; normal/fab/mechanical pass.",
+      "remaining": "Finalreleaseidentities mustretainqualifiedGPUgeometry."
+    },
+    {
+      "id": "A07",
+      "requirement": "IOUSB accepteddevelopmentissue retainedhonestly",
+      "status": "PASS_WITH_RESIDUAL",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/qualification/io-old-new-SI-comparison.json",
+          "sha256": "8fc7c6e267b1bf8e2ba9b33d1f6ea1e062a24d1b09aeb8a4380dc6e5b69adb1b"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/qualification/io-usb-fs.json",
+          "sha256": "dce9e21d298da0e34b65f99cb605d4e6bf2a152139f06fdc8b59864f3fa97f68"
+        }
+      ],
+      "verified": "ActualfunctionalUSB32/32cases passed; strictimpedance residual remains explicit, not strictSIpass.",
+      "remaining": "Carry explicitUSBdevelopmentdisposition and receivingcheck, not a fabricatedallgreenUSBgate."
+    },
+    {
+      "id": "A08",
+      "requirement": "Storage works afterSDsocketmove and smallnecessaryrepair",
+      "status": "PASS_SCOPED",
+      "evidence": [
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-68-peripheral-qualification.json",
+          "sha256": "c3424c97dddce5e0931bfa38a84ed09fa0f18283292bcacf84a52071461d370e"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/SC-storage-68-actual.json",
+          "sha256": "0abc828d0d66077c0611657b2b5ff22ab222d1f398586845b3001d2833186fa1"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-68-SI-source-ownership.json",
+          "sha256": "99bafd1a0d1ad6df7dbec4af1b71c0ecb6726dc7d0aaa5219ffe93b86110044d"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/critical-copper-preservation.json",
+          "sha256": "3cb9a8252e1f389414f0e2bccabae2bbb73bf4f751ef5b98861d0b897e8fbdd3"
+        }
+      ],
+      "verified": "ActualR31=68\u03a9/R32\u201334=47\u03a9route40/40peripheralcases/timing/convergencePASS; actualclock8.928571MHz/readmargin6ns.16slotbuscoppernets exact.",
+      "remaining": "No freshfullSCrowclaim; canonical/sourceintegration/currentreceiptbindings remain."
+    },
+    {
+      "id": "A09",
+      "requirement": "Selected eInk750 works with the fitted local RC repair",
+      "status": "PASS_WITH_MODEL_BOUNDARIES",
+      "evidence": [
+        {
+          "path": "build/firstarticle-eink-filter-20261001/electrical-qualification.json",
+          "sha256": "f06c1f8fa99cbd4b4270e6922f8d9cb046d925af1c1288a632d25bae11b7f486"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/actual-interface-qualification/GPIO14-BUSY-schmitt-qualification.json",
+          "sha256": "390ba8e90c5ed8670c4e97d8ab2c316faad4736cc82d3a4560356e9a999d390a"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/mechanical/qualification.json",
+          "sha256": "d039fd136e355267aa78c593c187748dd9ed775a9d73721084b5523d412f4b31"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/eink-final-digital-delta-qualification.json",
+          "sha256": "c3f4663f68120e4a7d2d6ccf85b02fc81b2f429e87844b08b0899bbf59fb8c51"
+        }
+      ],
+      "verified": "Actual fitted six outgoing 68\u03a9 resistors, BUSY 1k\u03a9 and receiver-side C22 100pF pass 296 nominal cases and 1,184 qualified envelope cases. The 19 original uniform reversal diagnostics are preserved; 128 BUSY cases pass the actual GPIO14 0.2V guaranteed Schmitt criterion. Fresh actual mechanical and digital delta proofs pass.",
+      "remaining": "Retain typical TXB drive architecture assumptions, exact compiled firmware/SDK cold-boot Schmitt scope and selected-panel/cable physical receiving gates. This is a controlled development model qualification, not a guaranteed vendor drive envelope or physical hardware test."
+    },
+    {
+      "id": "A10",
+      "requirement": "Working first-article digital connectivity, including changed local storage and eInk nets",
+      "status": "PASS_SCOPED",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/strict-dc/qualification.json",
+          "sha256": "fd0adb5fc905d99277984e84e36e863b8450638439029e20704e4bae32983d1a"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-final-digital-delta-qualification.json",
+          "sha256": "9198a3e9a6a01713a2cf58d2d054e2a7624e3c87db0693a9ca70cfeb3a101ab4"
+        },
+        {
+          "path": "build/firstarticle-eink-filter-20261001/eink-final-digital-delta-qualification.json",
+          "sha256": "c3f4663f68120e4a7d2d6ccf85b02fc81b2f429e87844b08b0899bbf59fb8c51"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/critical-copper-preservation.json",
+          "sha256": "3cb9a8252e1f389414f0e2bccabae2bbb73bf4f751ef5b98861d0b897e8fbdd3"
+        }
+      ],
+      "verified": "Baseline 992 paths and 535 nets pass. Current storage adds four verified unique resistor paths; current eInk verifies all seven RP/header resistor paths plus receiver-side BUSY capacitance and its filled-plane ground return. Both final boards pass isolated no-pour signal connectivity, PCB/netlist parity, zero DRC violations and 16 unchanged slot-bus copper nets.",
+      "remaining": "This is an explicit baseline-plus-delta proof, not a new full 992-path run against consolidated canonical source. Preserve the actual source owners, qualified waveform/firmware evidence and boundary waivers during final integration."
+    },
+    {
+      "id": "A11",
+      "requirement": "Firmware/programmingassets supportCPU+IO+storage+WiFi withHDMIor eInk; persistenceworks",
+      "status": "PASS_SCOPED",
+      "evidence": [
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-firmware-functional-qualification.json",
+          "sha256": "c96e85c7e5ad7bc401568592ac16666a3076d9c80be77f4d000b79394b99837a"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-flash-packaging-qualification.json",
+          "sha256": "bcabf579aa97c602a4ef4360658b077ba1315bd8cf2df84f1e290925ee625253"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/storage-persistence-new-firmware/qualification.json",
+          "sha256": "d5a8eab22f6b0ded48dc52160624bd9a6ec24b86b3676a85bd0a75b8d0031e66"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/programming-draft/programming-staging-audit.json",
+          "sha256": "eb67681758aad8aca1d39a5b7fd60b5a1413cbf39b2a1eef39be4604394cafa6"
+        }
+      ],
+      "verified": "FreshstorageELF88nativechecks and36wholemachinepersistencechecksPASS; ELF/BIN/UF2payloadsexact;206sourcesunchanged+oneexpectedrebuiltstorageclock.",
+      "remaining": "No eInk firmware change was adopted. The actual receiver proof binds the existing compiled firmware and pinned SDK cold-boot Schmitt configuration. Final archive must retain the source bridge and all 30 exact programming assets."
+    },
+    {
+      "id": "A12",
+      "requirement": "Final order instructions match all eight actual manufacturing folders",
+      "status": "PASS_SETTINGS_BINDING",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/ORDERING-51MM.md",
+          "sha256": "18ed01807ab4db24c530165497fbf9646305798ccc623edb6e12f4f57afee768"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/final-order-settings-audit.json",
+          "sha256": "9a719ee7ccb01763547a63e5ebbee9f39b6ffa62a9cc43529fb4c527c430c136"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/final-order-settings-audit.md",
+          "sha256": "da34ad5fea99cf7ec6ec3cf4e2fa59d850fc011200fc7e8b67ce83d325cbf42e"
+        }
+      ],
+      "verified": "All eight owner receipts and staged BOM/CPL/order/review files verified exact, including nested Gerber/drill members. Exact stackups, real BOM counts, assembly sides and owned FPGA sourcing are recorded. WiFi/eInk use both sides; other six use top. WiFi has two layers, TG135 and no inner copper or specified stackup.",
+      "remaining": "Final archive must carry these exact instructions. Actual supplier CAM/placement, removable rails, bevel, finger thickness and physical receiving actions occur after upload; no supplier approval is claimed."
+    },
+    {
+      "id": "A13",
+      "requirement": "Integrate exact approved canonical source and preserve genuine receipt ownership",
+      "status": "PASS_EXACT_ADOPTION",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/canonical-adoption/adoption-result.json",
+          "sha256": "1b58d56435b3ff21f8321c302101afaab7eea7c67082a6f83e577759f7c77b43"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/canonical-adoption/helper-default-audit.json",
+          "sha256": "eada617bf650c772a3ba44d289d602427cab6fe6378240618667c903b1993735"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/staging-source-map.json",
+          "sha256": "69c18527917cca5a8e18b10744a929ec2022be3924301f658d1410ded9ebfcce"
+        }
+      ],
+      "verified": "All 22 adopted canonical files independently match the recorded qualified source hashes. Current board receipts remain unchanged and valid against their genuine original per-board source owners. No receipt was rewritten to imply a fresh consolidated pipeline.",
+      "remaining": "Final archive must retain those exact source owners and the canonical adoption proof. Future canonical reproduction requires genuine new pipelines; default helper compatibility does not make copied receipts canonical-valid."
+    },
+    {
+      "id": "A14",
+      "requirement": "Complete finalmanufacturingarchive, independentaudit, periodiccommit/push",
+      "status": "ARCHIVE_AND_INDEPENDENT_AUDIT_PASS_PUBLICATION_VERIFIED_SEPARATELY",
+      "evidence": [
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/candidate-draft/STAGING-STATUS.json",
+          "sha256": "7d0e5db00df3a78c76d49bd97b574e33f2dffdf15e15285ec98cdbc00953af73"
+        },
+        {
+          "path": "build/firstarticle-outline-51mm-20261001/staging-source-map.json",
+          "sha256": "69c18527917cca5a8e18b10744a929ec2022be3924301f658d1410ded9ebfcce"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/storage-qualified-checkpoint-archive.json",
+          "sha256": "e4f139d114de1edbc68616fe8f8af6f544f3c65d62717fdfaf6ec6ed80606f0a"
+        }
+      ],
+      "verified": "All eight actual manufacturing sets are staged exactly. Canonical 22-file integration commit 801dc7e is pushed; original E and failed trials remain preserved. The final archive has not yet been built or independently audited.",
+      "remaining": "Verify archive commit/push after writing this publication record.",
+      "finding": "Final F51mm archive exists; independent member/hash and all-eight reconstructed owner audit passed. Final source commit801dc7e is already remote; archive publication is verified after this record is committed."
+    },
+    {
+      "id": "A15",
+      "requirement": "PreservehistoricalqualifiedE andfailedtrials",
+      "status": "PASS",
+      "evidence": [
+        {
+          "path": "release/firstarticle-20261001/cupc8-firstarticle-QUALIFIED-development-E.zip",
+          "sha256": "9dceea73762156bdaeb9ef7d698b3ccbfbe427846dcec371e95497bbd7c1b8da"
+        },
+        {
+          "path": "build/firstarticle-storage-damping-20261001/historical-47ohm-build/SC-storage-actual.json",
+          "sha256": "92467e54e30496bdd0faff70565b9c3debb342abf224bd00c10c9de9d60ad6b3"
+        }
+      ],
+      "verified": "OriginalEarchivehash exact; original47\u03a939/40failurepreserved, not rewritten.",
+      "remaining": ""
+    }
+  ],
+  "publication": "Repository commit and push verified separately after writing this record",
+  "limits": "Supplier CAM/placement review and documented physical receiving conditions remain. IO strict impedance residual and typical TXB assumptions are explicitly retained. Original E archive unchanged."
+}
