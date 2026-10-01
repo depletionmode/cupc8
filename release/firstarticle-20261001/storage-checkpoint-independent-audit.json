@@ -1,0 +1,6 @@
+{
+  "status": "PASS",
+  "scope": "Independent ZIP member bytes and external manifest agreement; checkpoint only",
+  "archive_sha256": "a1ed326e02497cd4bd63c0c6ed856dd9746e7ff46c1cfe16525365471b6605c5",
+  "manifest_files": 977
+}

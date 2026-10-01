@@ -1,0 +1,3914 @@
+{
+  "status": "CHECKPOINT; NOT FINAL MANUFACTURING RELEASE",
+  "scope": "Repaired storage actualR31=68\u03a9 andR32\u201334=47\u03a9 source, genuine build/fab/placement/SI/mechanical proof, firmware and explicit Main evidence source ownership. Otherboards/finalintegration notreleased by thisarchive.",
+  "files": {
+    "baseline-mechanical/cpu.step.provenance.json": {
+      "sha256": "721b06bbfe88019123d98a4bed97949e362160dc583162e20df91426fac25661",
+      "bytes": 22124
+    },
+    "baseline-mechanical/eink.step.provenance.json": {
+      "sha256": "545d291358d0243cf2262d783d7a6a691d121716249cee83cd04acec59f93859",
+      "bytes": 21300
+    },
+    "baseline-mechanical/geometry.json": {
+      "sha256": "79d173d9e6405ef47c3c9de7b32c6bdc76b687d3c7db404438f948c822219560",
+      "bytes": 9338
+    },
+    "baseline-mechanical/gpu.step.provenance.json": {
+      "sha256": "e3de9a830fc91252a28d0aa1101488db4630d3f273761da2a14355364f54b2bb",
+      "bytes": 23234
+    },
+    "baseline-mechanical/io.step.provenance.json": {
+      "sha256": "9b75817feadf694125a31681b450f5d78ec508f2f4ef3b86dcdcf8d2c34bb200",
+      "bytes": 23904
+    },
+    "baseline-mechanical/job.json": {
+      "sha256": "7d460305b275853e77481addfd75f80dcb974424f8a3c08763c962ba7ad0ac53",
+      "bytes": 368188
+    },
+    "baseline-mechanical/main.step.provenance.json": {
+      "sha256": "5874362433cc70a2c3e3d0ffb98600947c6a0f567c0833259a6cb1dabff40d41",
+      "bytes": 39920
+    },
+    "baseline-mechanical/mechanical-exit.json": {
+      "sha256": "7983593470e2be0be4c9dd114531680c63f102dde82722bf8e58ce3660ffeee2",
+      "bytes": 56
+    },
+    "baseline-mechanical/mechanical-qualification.json": {
+      "sha256": "296400eed454e55b869854fd55535269c265f6d79308d3764bf898022748f35f",
+      "bytes": 1158
+    },
+    "baseline-mechanical/results.json": {
+      "sha256": "8a9ae096169e7f8aef8a9546a1006399d0f2d0ca4e4e16d39699b436e150bb18",
+      "bytes": 24361
+    },
+    "baseline-mechanical/storage.step.provenance.json": {
+      "sha256": "61f84a2dafb84c80149601c145f999f87bcbc30d7fc3ee66880064e604776a57",
+      "bytes": 21273
+    },
+    "baseline-mechanical/system.step.provenance.json": {
+      "sha256": "87891706ef903d683d2d96e166371eae3f3d4d5500f7e9c29827adebeb2dedf4",
+      "bytes": 20972
+    },
+    "baseline-mechanical/wifi.step.provenance.json": {
+      "sha256": "0422493bbca3397804293214d4eb79909dbfddd64037928678b3372cb239f082",
+      "bytes": 22455
+    },
+    "delivery/rp2040/storage.bin": {
+      "sha256": "9534891a40f30536ce746683fa6b345d5084e6f6d898174450ce942f6c1cb3b1",
+      "bytes": 35684
+    },
+    "delivery/rp2040/storage.elf": {
+      "sha256": "41862b63fdf394fc769003526f2eb2c8c115448a65e88aafb332cbde85057be0",
+      "bytes": 719112
+    },
+    "delivery/rp2040/storage.uf2": {
+      "sha256": "7a528d75e6195ff720b1ed1814f8695061a832cc8fad3173adb434699ee23763",
+      "bytes": 71680
+    },
+    "evidence-owners/main-source/build/hw/main/drc-routed.json": {
+      "sha256": "0a0b9dd3982bb3736b82a2fa1cc0048769ecf554a0b0adf2b04d8e49cddfe868",
+      "bytes": 488821
+    },
+    "evidence-owners/main-source/build/hw/main/drc.json": {
+      "sha256": "2c8b460a9aa1b8ac1c252362ace2051ce38646615f7fae3569b708b8b6581bb7",
+      "bytes": 1217
+    },
+    "evidence-owners/main-source/build/hw/main/erc.json": {
+      "sha256": "51b3494486da78abe0f17afdca743c8d2657ad33a0eb597785a2a14789259000",
+      "bytes": 998
+    },
+    "evidence-owners/main-source/build/hw/main/evidence.json": {
+      "sha256": "044552c0df52136bb147ef5ca15ec36411c02c8595c42c5344d156f8fd78cc7a",
+      "bytes": 42976
+    },
+    "evidence-owners/main-source/build/hw/main/fab/bom.csv": {
+      "sha256": "90e26e04b8e98999bac3567d4f620c0599d1259812eaf31c3ca8c077aac9624e",
+      "bytes": 4006
+    },
+    "evidence-owners/main-source/build/hw/main/fab/cpl-review.json": {
+      "sha256": "1d38fd38cfe331f0f23bb30470ae337cfdccc014a039ba557139e8d80571f305",
+      "bytes": 27137
+    },
+    "evidence-owners/main-source/build/hw/main/fab/cpl.csv": {
+      "sha256": "96cec070b6e5dc7e958f836205817d1c28642470c5ea5a05aee4b3aefbeece83",
+      "bytes": 12065
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-B_Cu.gbl": {
+      "sha256": "1509c2712edaf108b1a1f3ec535c86a0b947600901b78073daf2f288f1ca01e4",
+      "bytes": 6035399
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-B_Mask.gbs": {
+      "sha256": "179777123f26579c202a0fd3f229a45eaad8732dd694a30594b442813d4ef307",
+      "bytes": 292930
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-B_Paste.gbp": {
+      "sha256": "a035b8e15ac821238b8d7d42f7bcbf77381deadd4ce6f0cea33f4ba06a82edd4",
+      "bytes": 446
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-B_Silkscreen.gbo": {
+      "sha256": "70613c34979a76d95fd009d6137e924f65bb9672324131a5325b524c1d488578",
+      "bytes": 447
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-Edge_Cuts.gm1": {
+      "sha256": "128ed80ec691fd5b946d9c181cd7aaa8627f604dcc1e9398c150c593d021d653",
+      "bytes": 616
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-F_Cu.gtl": {
+      "sha256": "25d2caf771b4fa9f2c137223d36d87107cad1f0bace42e2a71c4b644702e0e98",
+      "bytes": 9112254
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-F_Mask.gts": {
+      "sha256": "4bb18d79137692efd521000246e6e2e633f1cc1e831add6fc4f378d62f975461",
+      "bytes": 1115923
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-F_Paste.gtp": {
+      "sha256": "d553b6ac731ead00c83424f5d78d40b2a55df398fe21304a1cf216cdb0129a9a",
+      "bytes": 34536
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-F_Silkscreen.gto": {
+      "sha256": "7ccd997add8db0688f65afbae5bf64e105c88a5a281016367d88c98a747770ec",
+      "bytes": 1174792
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-In1_Cu.g1": {
+      "sha256": "e19260212f18332b39e32926f72d6eea4e6b7e825213867b8a96f07e28efaa21",
+      "bytes": 4087808
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-In2_Cu.g2": {
+      "sha256": "4fefbb197db1f2c2f0b466a1e9f0f7452d57870747b4fea33ffe7ce052ad0cb8",
+      "bytes": 130175
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-In3_Cu.g3": {
+      "sha256": "22bcaaba61902c0cce183e5047d865bdcff81b9f243fb5e1e0ae75d3962cd39d",
+      "bytes": 113923
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-In4_Cu.g4": {
+      "sha256": "faaed6169c9e68c24b20186f1dcb5cd5235b2fceee80e96ed95313cf16619212",
+      "bytes": 8349110
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main-job.gbrjob": {
+      "sha256": "ed3c725f135479e8d08fe7ff2c79dbdf32fd3f21de53056a430bc4e8df800aa3",
+      "bytes": 4410
+    },
+    "evidence-owners/main-source/build/hw/main/fab/main.drl": {
+      "sha256": "ef5393b4d2cd1fe5e43d65fb906923dca0a0185f42e495ec737e000332c58a9a",
+      "bytes": 29090
+    },
+    "evidence-owners/main-source/build/hw/main/fab/order.json": {
+      "sha256": "eee7e8d8e795c16adfdd308db9eeba9ea5deab61c1298449e55db9d57776409f",
+      "bytes": 688
+    },
+    "evidence-owners/main-source/build/hw/main/main-bottom.png": {
+      "sha256": "15d3db9e56086b735845571091d4c3dbb516383eaf21dee5eeee1544d855b61c",
+      "bytes": 188312
+    },
+    "evidence-owners/main-source/build/hw/main/main-routed.kicad_pcb": {
+      "sha256": "284d88bbfe732628ce0e4d2aa6d79a635ca610d10bf491c2602c0689b4937f8f",
+      "bytes": 3141514
+    },
+    "evidence-owners/main-source/build/hw/main/main-routed.kicad_pro": {
+      "sha256": "da084e57604399d3e47f1ad9a7ad773a88f69528b34137ed0a5adbefb58d4a78",
+      "bytes": 21735
+    },
+    "evidence-owners/main-source/build/hw/main/main-top.png": {
+      "sha256": "647446cf06c5c9be76224e3451466eac1159e82ca2883cfe8e43f0ef2561a888",
+      "bytes": 395669
+    },
+    "evidence-owners/main-source/build/hw/main/main.kicad_pcb": {
+      "sha256": "78203fdfd2fae518b26394ea57ceacb28dcc16963a65bdd7819d3d0c0d1361ba",
+      "bytes": 32108082
+    },
+    "evidence-owners/main-source/build/hw/main/main.kicad_pro": {
+      "sha256": "adb4eeac89ddf6d7efb23949c6e52912381e56cd54ef31b4e985b52016c3ab31",
+      "bytes": 21728
+    },
+    "evidence-owners/main-source/build/hw/main/main.kicad_sch": {
+      "sha256": "e05962dff729c207ebc943896326618732d17e27d2843c8ebc0f03780c31f898",
+      "bytes": 1095988
+    },
+    "evidence-owners/main-source/build/hw/main/main.net": {
+      "sha256": "f8684cb454b200b76cd7344df010c9a557b5b56fbed6847e0b46091d13c7129e",
+      "bytes": 600443
+    },
+    "evidence-owners/main-source/build/hw/main/pipeline-scope.json": {
+      "sha256": "92aed9c55eda41407df33206f9a171e4f721c76fe506d8a59274fbad45731fb8",
+      "bytes": 262
+    },
+    "evidence-owners/main-source/build/hw/main/post-fill-audit.json": {
+      "sha256": "ea15d440148cbec9d6d23ff3adff51646a5f24f6ac95db48d8df3f3e30cd8422",
+      "bytes": 1096
+    },
+    "evidence-owners/main-source/hw/boards/main-full-route-seed.json": {
+      "sha256": "1e888bae5ef37cd16ca133c1fe48509ca20659c787405ad2f8bb42a54fd330f7",
+      "bytes": 2402193
+    },
+    "evidence-owners/main-source/hw/boards/main-handroute-seed.json": {
+      "sha256": "a66bac094f51b9307fea95b6e59ccdce4da48f776857ad71c44e0f11859526a7",
+      "bytes": 27587
+    },
+    "evidence-owners/main-source/hw/boards/main-route-seed.json": {
+      "sha256": "3fcf9884e4514ac7d9bbeed1ba668e9b7c1e2d77d86d99dd7cb4d7ce0e58481c",
+      "bytes": 476008
+    },
+    "evidence-owners/main-source/hw/boards/main.py": {
+      "sha256": "f39258de2fc6dae2f09f0d855966946a4dfbd3fdf8023e0ecb60f1a7e7c42430",
+      "bytes": 116534
+    },
+    "evidence-owners/main-source/hw/boards/main_fanout.py": {
+      "sha256": "270101f46b3e0ee08fff9829f9d93b356b88c8dfc425705f9076324715d218a8",
+      "bytes": 19928
+    },
+    "evidence-owners/main-source/hw/boards/main_handroute.py": {
+      "sha256": "c60a2f6ff744bb198f060f9dde7d71f83dfe1f0c1293010521f95edd5cb2b98c",
+      "bytes": 58780
+    },
+    "evidence-owners/main-source/hw/boards/main_power_corner.py": {
+      "sha256": "1b1c979cda9a6d2221d431c09caca169c9b5425368d419f601d52b6825965425",
+      "bytes": 11490
+    },
+    "evidence-owners/main-source/hw/boards/main_power_input_trial.py": {
+      "sha256": "d3d7f256a5541f5d50a7fca8f8c15cc2ae332e5010d477a6998ff946c3092ceb",
+      "bytes": 1549
+    },
+    "evidence-owners/main-source/hw/boards/main_power_reinforce.py": {
+      "sha256": "26f90a5fb58faf7672d84603560db14cfa58bb105c571be5d38d55d60f655ac3",
+      "bytes": 8329
+    },
+    "evidence-owners/main-source/hw/boards/main_power_trial5.py": {
+      "sha256": "b0a0caf815f508b0fb1990132f679449556fd3e78b8c69dc390c330dc225bacd",
+      "bytes": 4787
+    },
+    "evidence-owners/main-source/hw/boards/main_seed.py": {
+      "sha256": "58c12fd9d40b6c4f935fe00e968eb585fea2faf31122cc064cf6d6d42a13fad7",
+      "bytes": 14905
+    },
+    "evidence-owners/main-source/hw/boards/rp2040card.py": {
+      "sha256": "c1701899bdeb4078d46506231b0eec90ff31842681510e601faf1c603a34efa2",
+      "bytes": 23734
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.kicad_sym": {
+      "sha256": "0a6d9b44f623ca4645df754096ed9d5b319911ded9e6de1874bfb587edca8ca3",
+      "bytes": 51684
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/D_SOD-123FL.kicad_mod": {
+      "sha256": "c0f9c166402ea5d6d3c29f8e5e0b98e98c0a1e9c91412d71f5aec8fe8d1da288",
+      "bytes": 1512
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/EInk_Header_Legend.kicad_mod": {
+      "sha256": "9098eb3bc7bce044edae42f215d5ee1fd1c5e0e7be493111d38d5c3ce3a4a45f",
+      "bytes": 1670
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/HDMI_A_SHOUHAN_HDMI-19PIN-043.kicad_mod": {
+      "sha256": "2e78285fc24e9a00bb2ad3b6f8ca25c1cddc5d3d7e2f3f6882b5dc5d0a233e86",
+      "bytes": 4397
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/KaplanLabs_Logo_10mm.kicad_mod": {
+      "sha256": "c6f88e09cbd380370077130e9f4213225334b314230bb195eac017c6c685b634",
+      "bytes": 395744
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/KaplanLabs_Logo_12mm.kicad_mod": {
+      "sha256": "b3e883ab92da058bb510d12ffbdec2486fd350a0406af63201937ad69c90c3ac",
+      "bytes": 389198
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/SOFNG_PCIE-64P11L.kicad_mod": {
+      "sha256": "6ee9ee690ad1f8d133a1180e76ec96058d10fe28f9d66c0ea546966c273e40b7",
+      "bytes": 7965
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/TestPad_D1.0mm.kicad_mod": {
+      "sha256": "8cf710f96aebcf0e08814e92db8fc7bcac11d20b978fede15c7aede26acbff3d",
+      "bytes": 797
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/UMAX_3183-10112P1T.kicad_mod": {
+      "sha256": "3dde14b9c1e3cf90eba3f8a7f45fd4857d7a1cfcaa50f8b2a718169405eb6f1f",
+      "bytes": 11526
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/UMAX_3183-10200P1T.kicad_mod": {
+      "sha256": "e587964a9b7d8a85b0acf42a074026c75f20ddce795f7dc514507ff31c091199",
+      "bytes": 8018
+    },
+    "evidence-owners/main-source/hw/lib/cupc8.pretty/USB_A_SOFNG_USB-302S-T.kicad_mod": {
+      "sha256": "8c95f9b6e851c6014d8fac5c097ec7e0f8b113b8019584fbdfaabc1858fd8bc9",
+      "bytes": 2874
+    },
+    "evidence-owners/main-source/hw/lib/cupc8_main.kicad_sym": {
+      "sha256": "c6da9de1c8bf447ab754ff99522c89a72d9b66d09af9454f555996fa6cd1b27c",
+      "bytes": 56102
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/CONN-TH_36P-P1.00-V_3183-XXXXXPXT.step": {
+      "sha256": "9afcad8bf2bff71791af4e52318b1c011ebac9b98b9be986ff78a583fd0a999f",
+      "bytes": 3005633
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/CONN-TH_36P-P1.00-V_3183-XXXXXPXT.wrl": {
+      "sha256": "0c022bba65661ea572bcc49d3a06b3494df357bf06ccfb9a13d6de8d39ed92df",
+      "bytes": 354348
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/CONN-TH_98P-P1.00-V_3183-XXXXXPXT.step": {
+      "sha256": "2f5edb803ffa27f78a1418c1417b6a5229ab259a3e7eecda90a015b3e8aff5ec",
+      "bytes": 7275543
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/CONN-TH_98P-P1.00-V_3183-XXXXXPXT.wrl": {
+      "sha256": "8c30815d8477f40333f0e0b1ec77490cb5fec7d91f7155ff7353ec2c08d1e64c",
+      "bytes": 975188
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/CRYSTAL-SMD_4P-L3.2-W2.5-BL.step": {
+      "sha256": "46e80157d859ee18098fd27c351039895d29a036f1c1dfadefaf26fa56124a8d",
+      "bytes": 1285348
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/CRYSTAL-SMD_4P-L3.2-W2.5-BL.wrl": {
+      "sha256": "44a3909b050bdb95f8ce007f9dbbda4a81ea6842b089ab23bbc1283ff45bd0aa",
+      "bytes": 121771
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.step": {
+      "sha256": "d2fd1887ec716a722aced41062f9fbac26e1527132965059b307952f8ac7d12c",
+      "bytes": 1639670
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.wrl": {
+      "sha256": "24acb14ffb37129dfa47b6ff7b466bc277db03baa3cf519f7d0edc7acd7d689d",
+      "bytes": 186451
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/HDR-TH_9P-P2.54-M-WI-1X9P.step": {
+      "sha256": "7d24c8dd1c1770d17dea764b9a57b5b91bd19c81e760cd306741a9963440866c",
+      "bytes": 1044753
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/HDR-TH_9P-P2.54-M-WI-1X9P.wrl": {
+      "sha256": "e0d607f4aff1d48df2a542ec0113696268092063bdeb7a1f90bf5bb07922b04c",
+      "bytes": 69573
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/IND-SMD_L3.0-W3.0-H1.5_FNR30XXS.step": {
+      "sha256": "ba081492e99dfd8ba5bc7f455aa66903e1a9a788cdee7f6555acba176340e47d",
+      "bytes": 1398211
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/IND-SMD_L3.0-W3.0-H1.5_FNR30XXS.wrl": {
+      "sha256": "f24cee21b56f8d74cef9a2e495f3a104140646c6ed7618886192c79cc65f0a17",
+      "bytes": 128010
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/IND-SMD_L4.2-W4.4-H2.0.step": {
+      "sha256": "55f719de55b9bf6cd6cd0f98998fbbd4722a4469b20dd9cd70d47c6756aeb5b6",
+      "bytes": 1725939
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/IND-SMD_L4.2-W4.4-H2.0.wrl": {
+      "sha256": "479f1c215c0c2e95e5c0b77df8884b95dc87aa70189ddf3c1aa2e5056f82961e",
+      "bytes": 61250
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/IND-SMD_L5.0-W5.0-H2.1.step": {
+      "sha256": "ee798af8e2f6665d9680faf71356a2cddec4efd09ba1a7ced8cd7d5457e47a98",
+      "bytes": 2548981
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/IND-SMD_L5.0-W5.0-H2.1.wrl": {
+      "sha256": "e68c89145d7290de5a5ffaac4185738f8de1f060d7051c70a5ba09094d3757b1",
+      "bytes": 250042
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE.step": {
+      "sha256": "8bcf4d183d3147aea68863bb8059a9f046e83c9789b578278de22b3d8b3c56a0",
+      "bytes": 1373072
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE.wrl": {
+      "sha256": "dc0d3319bd80c6a48bd2caa66a2e3599a7f29679e8b8cdff344c5d2c1e9e106b",
+      "bytes": 147355
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/PCIE-SMD_PCIE-64P11L.step": {
+      "sha256": "826b50759f09ff037b2df4d7f330b0c0ee472a7050c25313c90d6ec414f64158",
+      "bytes": 3333994
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/PCIE-SMD_PCIE-64P11L.wrl": {
+      "sha256": "730274d0f8600da47771630514f33b8f64a016cee4d1d9e83a48702b40fe6b90",
+      "bytes": 478132
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/PLCC-32_L14.0-W11.5-P1.27-T.step": {
+      "sha256": "ccdfaecb59be289a477891e8e1410b3c91bd5456e10b22bb9dfc3d552fd38137",
+      "bytes": 1577821
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/PLCC-32_L14.0-W11.5-P1.27-T.wrl": {
+      "sha256": "2195310263122622a06017286f253375fc748fe10abcacc172ffc7fbcea71326",
+      "bytes": 190680
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/R0402-8P_L2.0-W1.0-H0.5.step": {
+      "sha256": "5447f0e2f557ef5d92d2b1afd4a43c51a09671742a92ebdaa7e35fca8dc2740b",
+      "bytes": 1402182
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/R0402-8P_L2.0-W1.0-H0.5.wrl": {
+      "sha256": "7fcc4454ac652cf6267a586fa4eaed57a069833df81eeab901d70fce760baaaf",
+      "bytes": 30301
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/R0603-8P_L3.2-W1.6-H0.6.step": {
+      "sha256": "707b409dad0bc81e342cde3bc884afdeaa6dc1df7afd711ff034d174afc105ad",
+      "bytes": 1401820
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/R0603-8P_L3.2-W1.6-H0.6.wrl": {
+      "sha256": "1b58f30a43579f1f638c23bb471f99cfb734ef9decece1d3aee98f478e715dda",
+      "bytes": 30113
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SC-70-5_L2.1-W1.3-H1.0-LS2.1-P0.65.step": {
+      "sha256": "80e42aa0781e4ef1b4e14ad0d3b8a699f43cb31bb43c1aa2f219343ad9dfbceb",
+      "bytes": 2208816
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SC-70-5_L2.1-W1.3-H1.0-LS2.1-P0.65.wrl": {
+      "sha256": "c8940a540bc4f76c965abcf56790d1de3b3571c9339d0d9042c7d1f377acdee8",
+      "bytes": 95729
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOIC-8_L5.3-W5.3-H1.9-LS7.9-P1.27.step": {
+      "sha256": "9fa02890c7a92d7c26a0182382a0505c3ed2e075ce1ecbf7c6dda419d5ca0ae1",
+      "bytes": 3307579
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOIC-8_L5.3-W5.3-H1.9-LS7.9-P1.27.wrl": {
+      "sha256": "ca10a7dd660f5c145b727a3f65f6e1fc81503c72ca4442e7a3cd64fd5ff71e40",
+      "bytes": 566523
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-143-4P_L3.0-W1.3-H1.0-LS2.3-P1.70.step": {
+      "sha256": "ef9d34fab517812d310b8982d2adfeaa2e0d1281578a8fe9fb91b196d2e77475",
+      "bytes": 1246401
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-143-4P_L3.0-W1.3-H1.0-LS2.3-P1.70.wrl": {
+      "sha256": "e3d7e2cd19c4540be9696af581373bf88612613bc344d9c2e0801b4df4973d59",
+      "bytes": 130147
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-223-4P_L6.5-W3.5-H1.6-LS7.0-P2.30.step": {
+      "sha256": "626f754b8234c4be995185bb4b6227759060a36e52c567a0dae6a2f3182eb889",
+      "bytes": 2956913
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-223-4P_L6.5-W3.5-H1.6-LS7.0-P2.30.wrl": {
+      "sha256": "031133c022ba286194f6fefa35a371bd9d3eef551fc674fbfe589a16a854c38a",
+      "bytes": 256083
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-23-3L_L2.9-W1.6-H1.1-LS2.8-P0.95.step": {
+      "sha256": "5dcb6e5e088c8891b321686a6eb872c57d71b75753aac8519a866feb21821607",
+      "bytes": 1214930
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-23-3L_L2.9-W1.6-H1.1-LS2.8-P0.95.wrl": {
+      "sha256": "1ae883fdd848a10e526ae21b24f579cb50aab0aad75ef6857588e18a24ad2afa",
+      "bytes": 118701
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-23-5_L2.9-W1.6-H1.1-LS2.8-P0.95.step": {
+      "sha256": "428abdfbc472055993422a992aaa8df42fe862d74021d8cd7cbee9d7277f41b1",
+      "bytes": 2944507
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-23-5_L2.9-W1.6-H1.1-LS2.8-P0.95.wrl": {
+      "sha256": "a31f19311654f993ffb94fb7fcd835845aabb3e184ee28f9c23578d347cbf660",
+      "bytes": 379986
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95.step": {
+      "sha256": "f24d05dd87ac04518fdaed88a57d135441fe22452089387784c4deda2bc09d61",
+      "bytes": 3277159
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95.wrl": {
+      "sha256": "3da95a191588d286e5c8ef4e2d1f8ea807bca93fb0b1a235252b68e1511ec5cb",
+      "bytes": 450670
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.step": {
+      "sha256": "11100b2dda71dd37a1c2d41349f80ca631c4710f2fa6d007c41aa9b00c7f33a2",
+      "bytes": 811001
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.wrl": {
+      "sha256": "6d478e1984c481a5e741c4d24ba06067b1d2eb026a8e1695bba5689f4d123dfd",
+      "bytes": 84389
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-563-6P_L1.6-W1.2-H0.6-LS1.6-P0.50.step": {
+      "sha256": "2ca3bdb69ee8a5f8cf104acb20bdf0da884fd8b5bb51859a2c34817e3e8e168d",
+      "bytes": 2388560
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SOT-563-6P_L1.6-W1.2-H0.6-LS1.6-P0.50.wrl": {
+      "sha256": "db34bfebae9aa5f9411b81ed6d6db8cd900ea05ea1f552d718d2d43e15d72017",
+      "bytes": 97724
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/STSOP-32_L8.0-W11.8-H1.2-LS13.4-P0.50.step": {
+      "sha256": "b0ab367328ed4f51fe5097ebb84693da28bf4f6ceb696feb431a50f2b14d620e",
+      "bytes": 7393966
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/STSOP-32_L8.0-W11.8-H1.2-LS13.4-P0.50.wrl": {
+      "sha256": "9c51de638b636dff9978c6c95e748e67b0117094b0327e1f3746f8fd32cd7f06",
+      "bytes": 1832902
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5.step": {
+      "sha256": "2b1a5886304dd712e477739b62a80c5f568d59d1771f5a236c6ebefee5b2f5b1",
+      "bytes": 1555846
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5.wrl": {
+      "sha256": "13e20049f53e02cf9f1f562663a79da851fd1d7df3139be1fdf219862bcd8f91",
+      "bytes": 155256
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TF-SMD_TF-01A.step": {
+      "sha256": "c8adafc89d4299c188edf65906ef5205d14e60c42a22fa6bf97c5af92f0bdcc9",
+      "bytes": 3576373
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TF-SMD_TF-01A.wrl": {
+      "sha256": "7f8feef573fc23cf764c6b851df98dfdde038e4667604c0da8f971c5931122f9",
+      "bytes": 3121191
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL.step": {
+      "sha256": "84d6f51aaa7db1dd0a4307231b1a6ceb7c0afc2f08269245aea8e88a364f54d3",
+      "bytes": 5588925
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL.wrl": {
+      "sha256": "467826074db02ff27531c64b2b90a9e35738df3e06a666db74d9f2c65504d32c",
+      "bytes": 566984
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSOT-23-5_L2.9-W1.6-H1.00-LS2.8-P0.95.step": {
+      "sha256": "97059e3d687fbdcc15f53b7e35bdf0682068de607573cada3eaf9552b57c8ea6",
+      "bytes": 2975895
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSOT-23-5_L2.9-W1.6-H1.00-LS2.8-P0.95.wrl": {
+      "sha256": "576856ffd58483b51e2e8f651d079ea4b96e51bb168539a16a61165875fbcdbc",
+      "bytes": 405533
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSOT-23-6_L2.9-W1.6-H1.1-LS2.8-P0.95.step": {
+      "sha256": "dd29784c04129b052f7e155281493d618169bcca7010a3be75a40dc34da74ce1",
+      "bytes": 3189520
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSOT-23-6_L2.9-W1.6-H1.1-LS2.8-P0.95.wrl": {
+      "sha256": "77d83aef6d336c2a54adc5ad5f8491f9bcf72077a083d5031fc446acc45e5312",
+      "bytes": 474401
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSSOP-14_L5.0-W4.4-H1.0-LS6.4-P0.65.step": {
+      "sha256": "edee5bac5c525e4702e736c9feddb2dfb6a645ff5f964a7829aa48781736f168",
+      "bytes": 4412556
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSSOP-14_L5.0-W4.4-H1.0-LS6.4-P0.65.wrl": {
+      "sha256": "ef505f9dae99da4494ef73ebfdca2ed0520697eac9abc0d76e6bedb45a668156",
+      "bytes": 951369
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSSOP-16_L5.0-W4.4-H1.0-LS6.4-P0.65.step": {
+      "sha256": "684b2d11f7a055c38254eef824e203106e06c3dc151b194d126a8ebd59075f52",
+      "bytes": 4857396
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSSOP-16_L5.0-W4.4-H1.0-LS6.4-P0.65.wrl": {
+      "sha256": "6932970628cac61b308f90d5689e626eea7ff90e877b785eed6be262e746c881",
+      "bytes": 925247
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSSOP-24_L7.8-W4.4-H1.0-LS6.4-P0.65.step": {
+      "sha256": "696ed4df071ff20fce3b951423c783f4e0abcca3b61550c8da872baec990982e",
+      "bytes": 6119105
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/TSSOP-24_L7.8-W4.4-H1.0-LS6.4-P0.65.wrl": {
+      "sha256": "817b2c2ca20e4851a503907c58326f3c8ff3a27b047ed084776c76833e44a2d0",
+      "bytes": 1354968
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/USB-A-SMD_4P-L14.3-W13.7-H8.2.step": {
+      "sha256": "ffa9c6f2e06922142179189448b6d7bbd374e331ea7e928aaf3812ca5c1f3397",
+      "bytes": 1532245
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/USB-A-SMD_4P-L14.3-W13.7-H8.2.wrl": {
+      "sha256": "abd3136bc0264a027be014565a8cbfb8d024d7d93ce192c277984530271ca8d1",
+      "bytes": 195943
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.step": {
+      "sha256": "8e2740d91e1fef9c16bc8d316463ca6b3839f7c4f3ea068128ae1feb5b6c300e",
+      "bytes": 1377567
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.wrl": {
+      "sha256": "0457a14076c3c2f9d16ed2a995ac1f248173ab9ac1c200f99988a33d97d111b5",
+      "bytes": 548426
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/VQFN-10_L2.0-W2.0-P0.45-TL.step": {
+      "sha256": "d7a805b97e8c24cc388b72ed83b5ae958a63b7f9920c710381bf13da05fc5dd2",
+      "bytes": 1363307
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/VQFN-10_L2.0-W2.0-P0.45-TL.wrl": {
+      "sha256": "091397b6220840b422eabf3ad483514adfc1dba0ca097d1b5114318c4b0e7f44",
+      "bytes": 112092
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/VSON-10_L3.0-W2.0-P0.50-TL.step": {
+      "sha256": "0b7e4c915ebc03bd8f3e774e15c7fe1735bc16ce53746dda86b17af4fac6f750",
+      "bytes": 823310
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/VSON-10_L3.0-W2.0-P0.50-TL.wrl": {
+      "sha256": "5239ee6927982eaa17558413b5f5250b21a03fce03a5e50d92ed0ff171a7fe0d",
+      "bytes": 55840
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/WIFIM-SMD_61P-L13.2-W12.5-P0.80.step": {
+      "sha256": "f81a6f3de7b0356d862e5d1a1b5a9f5dc8b0924925902afdb4aa11e35eb07604",
+      "bytes": 1101159
+    },
+    "evidence-owners/main-source/hw/lib/jlc.3dshapes/WIFIM-SMD_61P-L13.2-W12.5-P0.80.wrl": {
+      "sha256": "b4cd95b9964a8736d91e8fff1a583357b40c856f70646f5f94eb314ff4fa7f76",
+      "bytes": 111216
+    },
+    "evidence-owners/main-source/hw/lib/jlc.kicad_sym": {
+      "sha256": "419dcd7c66ea7e573840c67d588d7b39fc09d0acce135db3f2ce06c04834b704",
+      "bytes": 227571
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/CONN-TH_36P-P1.00-V_3183-XXXXXPXT.kicad_mod": {
+      "sha256": "cb1ca9725b47ace22e8144f866555ef6835aec2f632619304c3533c7e661bdef",
+      "bytes": 8510
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/CONN-TH_98P-P1.00-V_3183-XXXXXPXT.kicad_mod": {
+      "sha256": "da7b534dff5f280eb3c98c29495a23aa01ca2df131b437c89fed78d8e2776396",
+      "bytes": 12586
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/CRYSTAL-SMD_4P-L3.2-W2.5-BL.kicad_mod": {
+      "sha256": "753a29af0fbe361963ee328f31f30561a061fe5d2babc4fd8bfb8a6667e6da20",
+      "bytes": 1865
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/HDMI-SMD_HDMI-19PIN-043.kicad_mod": {
+      "sha256": "18956f41d228c5b73211094749537f2100fc6a643b55f310c9bf708a7323ec81",
+      "bytes": 3754
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/HDR-TH_9P-P2.54-H-M-W10.4.kicad_mod": {
+      "sha256": "96780d44be7f1adc701ae8e8416176cad49e712e49279b7edea83a94a07036bc",
+      "bytes": 6405
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/IND-SMD_L3.0-W3.0_FNR30XXS.kicad_mod": {
+      "sha256": "eac81d00c9eb9b8227b546ebabbb609ce02a47d6f5b7debd3f2ebc3b1ab9cb86",
+      "bytes": 1255
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/IND-SMD_L4.4-W4.2.kicad_mod": {
+      "sha256": "b03c7885e65fad5d9ca787fab35a8fafc411977da561475d0a2334727b69943b",
+      "bytes": 1615
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/IND-SMD_L5.0-W5.0.kicad_mod": {
+      "sha256": "e0b6890b20ac4c7d61b2da99aa7e815eba9bd0709688d960f64495c08b5a59a6",
+      "bytes": 1305
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE.kicad_mod": {
+      "sha256": "c94def716cb7261b0d29ca73b42924f6850cdeab43bcc463b172917bfce435c1",
+      "bytes": 1681
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/PCIE-SMD_PCIE-64P11L.kicad_mod": {
+      "sha256": "f21e479cb930b2e38cdc25c00f0d6d71330f5a6c0a0c58b66ad87f57878374a6",
+      "bytes": 7988
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/PLCC-32_L14.0-W11.5-P1.27-T.kicad_mod": {
+      "sha256": "105c9209a79a0629483745bed2e03a966fa42ec72847f48c52a0fcce3b425d22",
+      "bytes": 6585
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL.kicad_mod": {
+      "sha256": "de7a519781d8a21442dd0c215e2f270d4254fe4bb6ec65fe30047c6576603efd",
+      "bytes": 2140
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL.kicad_mod": {
+      "sha256": "f514fd642a4eeef867f55d8f5540eaf817d38cee8d9d1d83cb3324308e6466c6",
+      "bytes": 2045
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR.kicad_mod": {
+      "sha256": "315d93c33910b062f26af2cb37541af5976cfc1728f460ca6b7e065c75b7a9b9",
+      "bytes": 1773
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.kicad_mod": {
+      "sha256": "d862611798d2904cd07f412ca93c9abd13c4d50c32f295b715a2f622f8a4a8bf",
+      "bytes": 2100
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-143_L2.9-W1.3-P1.92-LS2.3-BR.kicad_mod": {
+      "sha256": "4a1c9f4b0211f88b1ffed81b1ed5208b0178b1f1daeb9f5531b0f697cf89b2a8",
+      "bytes": 1765
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR.kicad_mod": {
+      "sha256": "f4502f56c6dcedf4499b842cab7f3387a07e940835abcce0fe5549b178d0acaf",
+      "bytes": 1754
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR.kicad_mod": {
+      "sha256": "e4625b942e4cfae10ab0cc907670a7648139531c0ec02358abf8433a60300440",
+      "bytes": 1672
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL.kicad_mod": {
+      "sha256": "b602e38f60132a90fcabdc7246b3e43a06e8bde71c39a77696395e779eb89145",
+      "bytes": 1843
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR.kicad_mod": {
+      "sha256": "0f87d053f5439e9a22383313f38c34b747fbadf45dafd1f0897b614253ccfc8a",
+      "bytes": 1847
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL.kicad_mod": {
+      "sha256": "776b2c6b862a64d3d2a01c9788a526db6accbab10c72ffb65138210894b8ae17",
+      "bytes": 1850
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR.kicad_mod": {
+      "sha256": "12c693853b820ab46405e1ed515a405c124a60b17a201c3fd4f448b177cb91ab",
+      "bytes": 1769
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.kicad_mod": {
+      "sha256": "df35a20c85048e831327a41a8cdb5860e4e5d2d2a615f22fb2093f663be33bd1",
+      "bytes": 1768
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SOT-563_L1.6-W1.2-P0.50-LS1.6-BR.kicad_mod": {
+      "sha256": "a6a54b3a0a52a27b5b6a22aff7fad3f22941388df1c76fbdd4fb89bc6389ddcd",
+      "bytes": 1775
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/STSOP-32_L8.0-W11.8-P0.50-LS13.4-TL.kicad_mod": {
+      "sha256": "82125f2986683c8cbd82345020bdcca8b428f74c46e4d23f50c6641402835d78",
+      "bytes": 4294
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5.kicad_mod": {
+      "sha256": "6168707309100a47d6fd0431294a3a9ee97b8b70335af9a68d30038307df182c",
+      "bytes": 3034
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TF-SMD_TF-01A.kicad_mod": {
+      "sha256": "e33cb674853a4f83c5204fc16210ab6a825a25eb05a263069460fcfd2a7195ac",
+      "bytes": 3072
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL.kicad_mod": {
+      "sha256": "9170b22d5ab75dbe12565fbff90c16c81e5c96f1ff00f70262ab3332c2423d9b",
+      "bytes": 15731
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL.kicad_mod": {
+      "sha256": "acb4da8e931489b1f6bfc6243902a12dc5cba045756bd0b5e74200f8429510de",
+      "bytes": 1848
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-TL.kicad_mod": {
+      "sha256": "384e64773c39e93fd81c2fa18c387518d264d946a115e5466ab6da862133fc25",
+      "bytes": 1785
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TSSOP-14_L5.0-W4.4-P0.65-LS6.4-BL.kicad_mod": {
+      "sha256": "d6aecf86b7fda4ceeb28289a0c2d0892a5801ccf353b9d6b03cbe2a930636df9",
+      "bytes": 2680
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TSSOP-16_L5.0-W4.4-P0.65-LS6.4-BL.kicad_mod": {
+      "sha256": "76df0940875618cde55fade2d5564f3f9f90ff8f1d5a0b847077f1a2caf882a3",
+      "bytes": 2813
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL.kicad_mod": {
+      "sha256": "13762a344f606c2c7586356a9a833bcc0a8ffa26ec7aff841eab049b2a558631",
+      "bytes": 3764
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/USB-A-SMD_USB-302S.kicad_mod": {
+      "sha256": "298481fb9ba8a3d8601a967d47912bad57e3efd26cd97864e72bdff17f87b920",
+      "bytes": 11983
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/USB-C_SMD-TYPE-C-31-M-12_1.kicad_mod": {
+      "sha256": "61a03dea590107f59c316d71c619db7d9abf5565a79f6e348d4a601fa574fd12",
+      "bytes": 3198
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/VQFN-10_L2.0-W2.0-P0.45-TL.kicad_mod": {
+      "sha256": "a1b54b3e687ec796d99a721746f9721d8f3ff0a24fb59107863227c1c9c29dc1",
+      "bytes": 4496
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/VSON-10_L3.0-W2.0-P0.50-TL.kicad_mod": {
+      "sha256": "1eeca6ff7ac5d56e67c65fb9ccfdc528ff83a2b0e1465c98c3ba3d473bcca0d7",
+      "bytes": 2209
+    },
+    "evidence-owners/main-source/hw/lib/jlc.pretty/WIFIM-SMD_61P-L13.2-W12.5-P0.80.kicad_mod": {
+      "sha256": "debea5a20804212c5e963a49a99dc6b6d354110ac684f81119b7aa8bb7c695ae",
+      "bytes": 7082
+    },
+    "evidence-owners/main-source/hw/lib/models/HRO_TYPE-C-31-M-12.step": {
+      "sha256": "b083e67ce4d06850a2c3835a6366f4012b2def64f8f2781636381ebcaa33e9a0",
+      "bytes": 3046649
+    },
+    "evidence-owners/main-source/hw/lib/models/HRO_TYPE-C-31-M-12.wrl": {
+      "sha256": "0457a14076c3c2f9d16ed2a995ac1f248173ab9ac1c200f99988a33d97d111b5",
+      "bytes": 548426
+    },
+    "evidence-owners/main-source/hw/parts/C111738.yaml": {
+      "sha256": "f8ffe1f759fbcec30b078c7829f4cdb0307300f7203f8cbb2646b50a5369f2c0",
+      "bytes": 405
+    },
+    "evidence-owners/main-source/hw/parts/C112455.yaml": {
+      "sha256": "23c1b1fdfb278c8594700a3589b53e57ef32dc3d6dbed7d7b284c6a0d1c1e058",
+      "bytes": 478
+    },
+    "evidence-owners/main-source/hw/parts/C131025.yaml": {
+      "sha256": "fea6998fdd2387cc5580d92da808adf601879f24214cb51762bf70237538a0e5",
+      "bytes": 648
+    },
+    "evidence-owners/main-source/hw/parts/C1348955.yaml": {
+      "sha256": "b3991f06b8ba6bd22d7385b2e0e365f5cc5b5e36e3aed954426bd3f8f8ba56a3",
+      "bytes": 824
+    },
+    "evidence-owners/main-source/hw/parts/C138714.yaml": {
+      "sha256": "4b1c410d89be4115eefa6d84f26a587e7f89c198913bc2c679e0765562678676",
+      "bytes": 548
+    },
+    "evidence-owners/main-source/hw/parts/C141836.yaml": {
+      "sha256": "0426c4db3276e2283236ab9d8063774ab0dff8c78e94948b1b07c6957c50be7a",
+      "bytes": 402
+    },
+    "evidence-owners/main-source/hw/parts/C151890.yaml": {
+      "sha256": "605b2cdf30694e36f62ab91231a86207a4c36c56e33898b89ae9d5a9f50d4aa2",
+      "bytes": 303
+    },
+    "evidence-owners/main-source/hw/parts/C1521989.yaml": {
+      "sha256": "476f10058a2c7cfcff36339643f5193b864146fa2e49c81d5c55074c9375cc9a",
+      "bytes": 3030
+    },
+    "evidence-owners/main-source/hw/parts/C160457.yaml": {
+      "sha256": "93c6a2ca35529b74b0f74086da43ea5720fb5ac203337e632c82da289d819c08",
+      "bytes": 485
+    },
+    "evidence-owners/main-source/hw/parts/C165948.yaml": {
+      "sha256": "be30a357b5772168aef1e7ecca8053c1da5a4a9b9cb0697c8f98243ea21c1b38",
+      "bytes": 604
+    },
+    "evidence-owners/main-source/hw/parts/C179173.yaml": {
+      "sha256": "91bcea20a7111ccd77de48e696a3a304ba4b1f3ebe27783e4a5e2edaf9b144ed",
+      "bytes": 624
+    },
+    "evidence-owners/main-source/hw/parts/C182716.yaml": {
+      "sha256": "cbf92a122739846c8447cde7d59b586048820baa58f84b5a60a6328211e96948",
+      "bytes": 572
+    },
+    "evidence-owners/main-source/hw/parts/C187836.yaml": {
+      "sha256": "8ca835143fea8819dccc5e7d0212bb80430c7d835cefbdf202646f23bd8bf52a",
+      "bytes": 387
+    },
+    "evidence-owners/main-source/hw/parts/C19188869.yaml": {
+      "sha256": "9ab68d19008304e5910c029253cd621cc482d6c012a656eade146bc1c7415cb0",
+      "bytes": 2160
+    },
+    "evidence-owners/main-source/hw/parts/C2040.yaml": {
+      "sha256": "9274136cf193085f17d3c38bb69a40f719e7c6b8cd4800b604a50cdf56ca398e",
+      "bytes": 1388
+    },
+    "evidence-owners/main-source/hw/parts/C20526.yaml": {
+      "sha256": "1b548aad18665db80120f064cd530397d196d41d3a12f3e8ff8fca898ae7a710",
+      "bytes": 322
+    },
+    "evidence-owners/main-source/hw/parts/C25501.yaml": {
+      "sha256": "daebf8dae15e4e3a0dc78caeaca124d2f2f9f2b08f58a886606734be86b7feb4",
+      "bytes": 756
+    },
+    "evidence-owners/main-source/hw/parts/C25508.yaml": {
+      "sha256": "0da147ce99fde07f26762ccd97250dc76d6f069b3a2f91b0718448f642c33ce7",
+      "bytes": 454
+    },
+    "evidence-owners/main-source/hw/parts/C2845237.yaml": {
+      "sha256": "c4329f6b9d03f916f5e9362cf528b5deb31575e969c4585178dfa5f8ffff2d10",
+      "bytes": 528
+    },
+    "evidence-owners/main-source/hw/parts/C2858275.yaml": {
+      "sha256": "62584640b912f69f5da94b6abfc611fdc494012498df7728906eb45fee457628",
+      "bytes": 900
+    },
+    "evidence-owners/main-source/hw/parts/C2911374.yaml": {
+      "sha256": "1c345fe80c55bf1bbd2edbe9d7cd184be6d9c51437bf43a96b6e8d8a2790b5d8",
+      "bytes": 1246
+    },
+    "evidence-owners/main-source/hw/parts/C29718.yaml": {
+      "sha256": "b9f6ed366bfc2dbb6773bba1bffc87db50cd80efbd0b23048b2286535376bd14",
+      "bytes": 571
+    },
+    "evidence-owners/main-source/hw/parts/C318884.yaml": {
+      "sha256": "422f77dd4a04412d39a6e809ac848fdb0d189f97e9491a18adc01058a45f90ce",
+      "bytes": 578
+    },
+    "evidence-owners/main-source/hw/parts/C352826.yaml": {
+      "sha256": "b3f5d83e1d5c87a6c22b8cd1aaacfc50d764b8cc6c7d10ed50bc0f3a808ec6bf",
+      "bytes": 518
+    },
+    "evidence-owners/main-source/hw/parts/C3662799.yaml": {
+      "sha256": "a98e077c941c973e2189ef0bdd2fe2e90db453a2f6e26acc3fb526d957423bb6",
+      "bytes": 510
+    },
+    "evidence-owners/main-source/hw/parts/C398365.yaml": {
+      "sha256": "da086f23dec874090511f2bf4c72e62baf5352147e1ec449d0fe1ef32e5418b5",
+      "bytes": 478
+    },
+    "evidence-owners/main-source/hw/parts/C404111.yaml": {
+      "sha256": "fc848490d94e7cb24b283deb5367a0e601296c92409f3fde0783c24a6348e48e",
+      "bytes": 3019
+    },
+    "evidence-owners/main-source/hw/parts/C404113.yaml": {
+      "sha256": "c7dd1332b891cc1b9a71cb3b52ef4d9e4312333e12868e4e59af99d9621f4716",
+      "bytes": 1470
+    },
+    "evidence-owners/main-source/hw/parts/C42134.yaml": {
+      "sha256": "9caa346dab80f3ddd938c7088843e2a98d73bd33b14ca351fcfcfc95c2ef47bc",
+      "bytes": 385
+    },
+    "evidence-owners/main-source/hw/parts/C42431818.yaml": {
+      "sha256": "78bb30d75327509823a1e3b26bd625ebc5760c2992f635c7f30613aa8c92f2f2",
+      "bytes": 798
+    },
+    "evidence-owners/main-source/hw/parts/C425067.yaml": {
+      "sha256": "d11c2c80faf18be414f0a8dcda54bf32264b40eac81abd2d09e1da4014066473",
+      "bytes": 577
+    },
+    "evidence-owners/main-source/hw/parts/C465732.yaml": {
+      "sha256": "43a3495312077e5b9838b41c86c8f19aee9c17b0db5734d1a73c73b1ef66c534",
+      "bytes": 570
+    },
+    "evidence-owners/main-source/hw/parts/C46970911.yaml": {
+      "sha256": "477e9c23df4926b806f32eac95e9bd2e378113c83ed46d308b0660b2799bb339",
+      "bytes": 555
+    },
+    "evidence-owners/main-source/hw/parts/C492417.yaml": {
+      "sha256": "4fd81f49959bf470d00c67e9c5f2cec9a0e72a009a6a84d247d0d6573735d4c2",
+      "bytes": 531
+    },
+    "evidence-owners/main-source/hw/parts/C52140430.yaml": {
+      "sha256": "ba17146eba924ea7a0adb450acc020d6e38adc2dea1af9e264aabc544f1ad6c4",
+      "bytes": 481
+    },
+    "evidence-owners/main-source/hw/parts/C52984.yaml": {
+      "sha256": "3b405cad10cad57c5a4d6c78bbaa406d0dfd86e603fe7a6484bfde75e410fff7",
+      "bytes": 760
+    },
+    "evidence-owners/main-source/hw/parts/C55136.yaml": {
+      "sha256": "40819eeaa43b34c6bc373afe03d7f71d81301b1d38962ff041a40b12192273db",
+      "bytes": 362
+    },
+    "evidence-owners/main-source/hw/parts/C58464.yaml": {
+      "sha256": "5c2f77d6f6c228bfb50cecb9a0631c0369c770c021805fa2976f8f20abe15310",
+      "bytes": 431
+    },
+    "evidence-owners/main-source/hw/parts/C6186.yaml": {
+      "sha256": "ccc2508b5e758b00ac2dce72fd4ddbc61a0eb3a286e687e7c5fcd4f0dad14754",
+      "bytes": 518
+    },
+    "evidence-owners/main-source/hw/parts/C632854.yaml": {
+      "sha256": "e1b1de226ddf2eec8989e2ef7879cef9600ed83c6fddec2eba25f52cc316ec3c",
+      "bytes": 797
+    },
+    "evidence-owners/main-source/hw/parts/C645939.yaml": {
+      "sha256": "3276f8245271d2c76a23ca197cd8f216b7954b518caaa890fec2a99c163a0d19",
+      "bytes": 801
+    },
+    "evidence-owners/main-source/hw/parts/C702117.yaml": {
+      "sha256": "cb69f4288d8cf61e7e1476a618eb7412d737b7da0328863da6e44b4bc648fea7",
+      "bytes": 458
+    },
+    "evidence-owners/main-source/hw/parts/C7272.yaml": {
+      "sha256": "2865ab2cde7769669b95e430078e8072ea9b50441ac0f64405758ec394be6e7b",
+      "bytes": 375
+    },
+    "evidence-owners/main-source/hw/parts/C7519.yaml": {
+      "sha256": "5c9599ed84c9a231b75e1e0afa7a9ff15a49cf31e4774e0aeba1379fe9e30681",
+      "bytes": 391
+    },
+    "evidence-owners/main-source/hw/parts/C7809.yaml": {
+      "sha256": "6750143bf8367a1dd0510b24c562b3ea63023f6026b857f7ac3a4eb85ae67a16",
+      "bytes": 394
+    },
+    "evidence-owners/main-source/hw/parts/C7833.yaml": {
+      "sha256": "54f1bd1863b8999269481723c6a9362e3d38b274983d914c8c675fed48f6f68d",
+      "bytes": 409
+    },
+    "evidence-owners/main-source/hw/parts/C79401.yaml": {
+      "sha256": "d4413eb249c9256ae8432887ebddf4c23ade303935a6758ff9e61aa1952acf0c",
+      "bytes": 471
+    },
+    "evidence-owners/main-source/hw/parts/C82217.yaml": {
+      "sha256": "59c40f5b2682e85005c9917423656fd24d1ba82760fcde5ba35a9c8496884a65",
+      "bytes": 428
+    },
+    "evidence-owners/main-source/hw/parts/C8545.yaml": {
+      "sha256": "aa4702909126f80cd691c2a32e71150034023cc8c0bd5d52b4e541511701e6da",
+      "bytes": 292
+    },
+    "evidence-owners/main-source/hw/parts/C9002.yaml": {
+      "sha256": "e8636d078b2ff40a8397e9f9328bad2e64c5f4d12118db88c4e9f24602d9be57",
+      "bytes": 510
+    },
+    "evidence-owners/main-source/hw/parts/C91145.yaml": {
+      "sha256": "5354dc4c1465dcd17d9f982413f452536d5746515858230674161bfff134334e",
+      "bytes": 793
+    },
+    "evidence-owners/main-source/hw/parts/C919459.yaml": {
+      "sha256": "3800c68b545b7530ef1cd75a4097a0d4a5f7ec9a24125ec4a81c8e6896cfd2a1",
+      "bytes": 373
+    },
+    "evidence-owners/main-source/hw/parts/C92068.yaml": {
+      "sha256": "07a6a5ca21c856a4052bacdfe9d7fdc0cd32cbe79d9657e05136c5ae3c8cd9c8",
+      "bytes": 328
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C107055.yaml": {
+      "sha256": "35ef7558da928d2c5475b446fbfb96747596d3cfc77a4172a307bd3037a0bc04",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C111738.yaml": {
+      "sha256": "e8c60f9cf368b37b71892e16c05ca0d5fedc7d33017ab7e2e54a60b7f811b663",
+      "bytes": 518
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C112455.yaml": {
+      "sha256": "0d39ca1bffe437603880261cb2c0746a2c4038494c9ba6a1c7b1b4cfb45282a5",
+      "bytes": 492
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C11702.yaml": {
+      "sha256": "eafc0655ce3be516bd42c1d79e97630c2ea3c9a4237df06baaba6589b366154c",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C122538.yaml": {
+      "sha256": "6695632e74865c5b355336457f9907c664e413ab9c39a6c538aa74c7bf9f15b2",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C12624.yaml": {
+      "sha256": "c2de52dbb99be61845ef4a6f4c95bc88e22b0a530ec8374713ccbca3f66d9e4c",
+      "bytes": 357
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C127691.yaml": {
+      "sha256": "8ab8173d18d71525c75601dd16156418c55ce8b014dadd06d4d76c41e8de0296",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C131025.yaml": {
+      "sha256": "45bc52fe1ad952dc89e98e9c503e9adc04120de990bcf2e637a7cba6a5c1217b",
+      "bytes": 582
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C1348955.yaml": {
+      "sha256": "42d909f4dc810f69806a00eb210adc60e1ce1081fd1287852d6765eba02f01f8",
+      "bytes": 1390
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C138714.yaml": {
+      "sha256": "f773f33b65d1c877393832af449f07281d2806e73027734a88f3e614408eae72",
+      "bytes": 615
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C141836.yaml": {
+      "sha256": "665ff35f4739f958539ff6a6abd5515c7c5d9d4bec6ed53d7dc59767fe973750",
+      "bytes": 474
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C143975.yaml": {
+      "sha256": "c3679ff6ff4a069eed4d2f8de4574a4236d14d41a8f2c3560d3758394eaca2cb",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C14663.yaml": {
+      "sha256": "8232305d8ef9aeef52330f9d7cd7259de21b7c406deeb7ba190b8b3041173a6f",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C15008.yaml": {
+      "sha256": "e82191dcccede2707e3d82a987173ad03dac0f68068980391237acd8e173ebcd",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C151890.yaml": {
+      "sha256": "e8f2f3f7d8ee6f6f4a220f461d146e9b3fb017149b0e7263d0b054a847f876ac",
+      "bytes": 475
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C1521989.yaml": {
+      "sha256": "159a1d31fa2e8bc219d0b9121ff27aa57d8abf744e27a02254299fd58d204ffc",
+      "bytes": 5736
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C1525.yaml": {
+      "sha256": "b7c14f8ea0ff24ab655c7289c460ac9151a392f3bfab841d24ec64bed4e4a0b6",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C1562.yaml": {
+      "sha256": "9b64200a4e7aa0b24b939deb963ec17391e158ac0524b6d0ca5cf50e043f1b90",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C15849.yaml": {
+      "sha256": "39a4954af5a8a10193f628e6a09c4d072e367f69b078c60a7230902645693228",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C15850.yaml": {
+      "sha256": "882c2c6f7f9338f5c2cbea4a10453ef27510271eb311ac59d5d4be7cac23ce28",
+      "bytes": 352
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C160457.yaml": {
+      "sha256": "17ed36c63f74c33da530dd444c1dbcb867294ce1cbb0e3b84d1539b85f5d0731",
+      "bytes": 451
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C161327.yaml": {
+      "sha256": "bf0f4f3fe116310f32e61a2c7f71b39b262388f72638e2ec64b9b2d1f54b5937",
+      "bytes": 308
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C161329.yaml": {
+      "sha256": "239ce1d9e33a69c3c61dfc300b53f731caf8ef8cc3f31d8a92f674ed2daf3116",
+      "bytes": 308
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C165948.yaml": {
+      "sha256": "cc01a0ab3dfcd2c67f56ca37bca057ef9008abf67159c514064d9d0247e2ff7c",
+      "bytes": 799
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C1663.yaml": {
+      "sha256": "043c9fa0ec6e77b9d51bf4bea9715b2f5ef1350005eb59544a6d374ce04aa5d7",
+      "bytes": 352
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C167200.yaml": {
+      "sha256": "c0801a10a66a02600cf61b58889efe3c8ba16f27ae14e14d4360f2689e5c4ad5",
+      "bytes": 377
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C167203.yaml": {
+      "sha256": "ea0ebc22e1fb54854f4bb60d6c1a33854626d327f20813324535eeac8c8901f6",
+      "bytes": 377
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C167747.yaml": {
+      "sha256": "d6813450ac2448f1b423f06108f3bb40a0176aebcdfa3e64d231cdcf0d96a8c0",
+      "bytes": 382
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C17477.yaml": {
+      "sha256": "62a801c41d169b68de8f2989900fd3e4bb6409eb7dd39df35fa8ec7a4a2d4819",
+      "bytes": 352
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C17888.yaml": {
+      "sha256": "83d66a6f424cb19da3d61b44660e11bc862842215885be9709f6ad7a19f3c357",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C179173.yaml": {
+      "sha256": "2ed2c471d1117e22f5216b313636a6ce5a687b89fb330254f1a0ffe2951bd12b",
+      "bytes": 608
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C182716.yaml": {
+      "sha256": "57619eae6a96235f73d9abe4df9b5727a8be4faedb9906390cb63294a72b8665",
+      "bytes": 560
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C187836.yaml": {
+      "sha256": "6133d07adb817e80dba29ce1cd70a7f907c9cc36f961c55183eeac62eb38ef18",
+      "bytes": 522
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C19188869.yaml": {
+      "sha256": "e22d31705272231cb34d2924e0b8d85926e1f769260be6712afc47f3abb57dcd",
+      "bytes": 2348
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C193402.yaml": {
+      "sha256": "feb84aab13b3c0ea803244777d5ceed094a6fbae8f1adc61a63df4bfa85d3d1f",
+      "bytes": 380
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C19666.yaml": {
+      "sha256": "9f2a3306b4e071bbeb871e1adaf643916ef0fdf29f8fe6882292c19e93b92eda",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C19702.yaml": {
+      "sha256": "0a596d7fec0affe6139ae201100c9825f250c0103dcd9cba070bc648a25b450d",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C2040.yaml": {
+      "sha256": "37408525a18a8a7ade7911f0a317fd9ff284aae2022d7cefea23c2e0c6dfb3e3",
+      "bytes": 2306
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C20526.yaml": {
+      "sha256": "f1986b4d118b03bd981e26a888cb976a33c07655e09bb4140cb244e40fd24d9a",
+      "bytes": 407
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C20812.yaml": {
+      "sha256": "a4a409e6dbfd49b99292fdbf5d79c69343f40254f4524bc199c09c1c706df579",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C20975.yaml": {
+      "sha256": "0d219025de001e22d516c96bf3cea092f9e13bc5da708235fcdf985237b33bb5",
+      "bytes": 352
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C20976.yaml": {
+      "sha256": "9c176ea0f652b62fccd5cae2426d2ad87caa042b2b0078a2c42683530b9587ee",
+      "bytes": 352
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C21189.yaml": {
+      "sha256": "39eaba2f927c9bbd4208294d6d6bccfd9ccec44431ee3376ef610ac4f7ee75c7",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C21190.yaml": {
+      "sha256": "b6115022e67548dbebfc19e1a43f4ac834a0e2570ea513aa7a1ab7bac756fc28",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C22775.yaml": {
+      "sha256": "0d0001ca8dc6460c82aa92e3e6e207938abfe488db28e83080200b55587e1814",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C22833.yaml": {
+      "sha256": "7195d60dc714044df84c7d55d848461ce994873f6bc81b214136c784c64dcb9d",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C2286.yaml": {
+      "sha256": "b60a7dc304845262c04434dc6d83dd1d3f8f6e3c3ce4e8b5bbc1e4c847e62e09",
+      "bytes": 367
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C22935.yaml": {
+      "sha256": "74ee4893b26b31577bde1621a7aeb4a596eb36aa4b47a6182d0db05ebecea484",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23024.yaml": {
+      "sha256": "96d1ebe8b09bea3f929910183eed344d990b005c543c7d44695867ba97867f0a",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23140.yaml": {
+      "sha256": "f34f3dd2804ecd21439a3b950dea21479b3f1901930c8be5a6f604d153895799",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23162.yaml": {
+      "sha256": "a333c454f58e349216d43085047fd0769368874be65564fc1d8959af2bb473e6",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23166.yaml": {
+      "sha256": "8572d174f325c3cc63af1d14ccb5b9a4f4ff776c56442908b68d39f87e07d30f",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23186.yaml": {
+      "sha256": "470cc92496f8c8c1aa9aadbe2a91607bdbeb7023de40c3bc682bc7cfa9a6a0f0",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23213.yaml": {
+      "sha256": "01e3fd1b14f48a2c1eb2c57a9b3ade06d5c338ca5e3089abad01cdff31bac14e",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23240.yaml": {
+      "sha256": "f02b81cb0a67b5c999f0a5d158a02fab29fbcc58a45679aab5bedf515c5d5779",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23265.yaml": {
+      "sha256": "c1aaefcb970768142f5833f5dc98b4da38e72b969896684bad6dad380771758c",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C23733.yaml": {
+      "sha256": "540d28ecee5f274aacc7e62c609766939eb805aa574f49276962f56de11ab01d",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25076.yaml": {
+      "sha256": "0625c33cfbe0504bbf29d693d99aa32fd78b23cb7a9443d2975da334b04f7c92",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25083.yaml": {
+      "sha256": "753415a68a9a873925a4a2d7393e9a8b2faa1ce37ba3f36555c5ae77a528d2ce",
+      "bytes": 307
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25091.yaml": {
+      "sha256": "5298cdf89b578a483c97493b8e1d8420440e208182635f9878753d451425e21b",
+      "bytes": 307
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25099.yaml": {
+      "sha256": "566791c55f76577162b7a55fb8ec0be4695299d1994d35d81ec32925e900706b",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25100.yaml": {
+      "sha256": "e172a2c89bf8519c50ddb3feadecc49615c601cc705fcadc41a8160171bb08ca",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25190.yaml": {
+      "sha256": "1e6eb183d2f94a8dba895f5b77c7a65921eae8e430079ed4f9f89397ffd8de2b",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25196.yaml": {
+      "sha256": "338178195eb9a94181631b62f56cfbdb21bed32d71e8accde3424cf0d78714cd",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25501.yaml": {
+      "sha256": "6270e92df9c1262925ada69a9608dc5e743ebd35a2c9f3c64186ffd702d941e1",
+      "bytes": 574
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25508.yaml": {
+      "sha256": "1304e4ce1703a4d3df7f1e07de89e4dc426a21ae861c48d3b8303ba8e6867ead",
+      "bytes": 558
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25741.yaml": {
+      "sha256": "6951ff7ed84a242638d60f24de18b9a2f8b0ebef0ee283086c977c0b6bc613b8",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25744.yaml": {
+      "sha256": "8262f0ca8e0d083ce24aedcc41cf71f4b16964080fe066cea15ac5a9031326db",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25752.yaml": {
+      "sha256": "b78834b2f25a783497118b47f5029a6fd2db097f71fa967b9c5f2541ed861d44",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25756.yaml": {
+      "sha256": "f37d38944edded76de8cf2dcc20a45b73fb73497e16ebb56aeeaf9b7b57d4278",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25768.yaml": {
+      "sha256": "5fecd7ca164b356f55036434e8a16bb4c3cfd0116d4a1af009e9a0134f7d5143",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25779.yaml": {
+      "sha256": "3826ca529916519f9eb1d1b43261e798ab184cecaec7b5da0c1ac8b9e468e8b4",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25792.yaml": {
+      "sha256": "aeb5289eda9ea7201ca85ee4aabf80fc70aa3bed6011949fdeae4653d48f5942",
+      "bytes": 307
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25803.yaml": {
+      "sha256": "0f49e7abda09b645543f42fecd09abee064065a035c9f64df2c759c2a900eee2",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25804.yaml": {
+      "sha256": "c8eaafd74e9eb51ee004ba3c4a565501f0de66cc0ebf93d4631227dd84e0ca19",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25818.yaml": {
+      "sha256": "afa7c8021a2fbbc019055c117ddda4e7329da873780abf761d9738da745b52ee",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25819.yaml": {
+      "sha256": "f3b0bc94acc22f384368f8b0dc6b36e2bd5476d69eacbbbae8353732695bbd13",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25823.yaml": {
+      "sha256": "7cd6aa1e348db16d8c148381c3de130a000d6d7c2a4cd392f892f51fe4af8deb",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25879.yaml": {
+      "sha256": "88ce91e0294b86e69ee18f6b0477b5074740966d01888aafca4ba35206a49c9b",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C25900.yaml": {
+      "sha256": "ecd9e802ec90e0597d3b63d33822575b397170ed7d7d358b8218bb5b3374afcb",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C26095.yaml": {
+      "sha256": "6eaf25841ff4b52abeaeadacdc85e6586379eb2f771666b8d4ccdf410dfb40b8",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C26980.yaml": {
+      "sha256": "4c80091472a532b3dd5de5b64433b81e00572e0d6a3876f7974ff0c3e2edad96",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C27592.yaml": {
+      "sha256": "614511a9703c33c7ce9f02f57ff115466c0f5ae0464aef2c597f1602c7647d6c",
+      "bytes": 307
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C2845237.yaml": {
+      "sha256": "dbb1769a7bec2d4ecced87bfabae3abf603aa2092bbf35aef4ea22c8b7452257",
+      "bytes": 627
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C2858275.yaml": {
+      "sha256": "6f0a641831716aba393b7318cfc2c7e3857d60737c773c74853219ad13842e02",
+      "bytes": 1134
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C2911374.yaml": {
+      "sha256": "1b72c4638f81b4750a7cae8c22865e0989dc98414be8a0512fcbb2ad44c9d5cd",
+      "bytes": 2220
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C2912578.yaml": {
+      "sha256": "9ae044d9e7e0aa945f2f62b24893629db8543e7ad67df023901a76b41c8d2cdc",
+      "bytes": 360
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C29718.yaml": {
+      "sha256": "76916080cd65acea2f8968f9da4a5f68511e607581d80c018e7bc60a8f39db90",
+      "bytes": 558
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C318884.yaml": {
+      "sha256": "0d5b3f241721f0734a5713ad4c6449edc2e0815a8f9f7543722b90565bdb77eb",
+      "bytes": 455
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C326727.yaml": {
+      "sha256": "425ffa61c1a5caf1b6e869f16299e442a8233822eb26c4a9594def862712a3ee",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C32949.yaml": {
+      "sha256": "a3d303f951398aa8bb51cf4c31d63a68a60f494732ee1750676ee485a6f7555f",
+      "bytes": 307
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C352826.yaml": {
+      "sha256": "d2d409e6b6e0ba576ad0d622f6ffee0a8b92739d10553e51cd4f32842f51fe07",
+      "bytes": 829
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C357060.yaml": {
+      "sha256": "8196b59ef5b51165301c75ebec02fed23f7787755b1b004c200dcb2645da1a45",
+      "bytes": 371
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C3662799.yaml": {
+      "sha256": "3c044a84abc0483530af288e72171bbdd24c6ed919f9c5a9b0dda2108dd6f024",
+      "bytes": 663
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C393098.yaml": {
+      "sha256": "b3cad704d66394a171ee92ce000f8f70f3c4ad483511fc514dc01413d6a0ced3",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C398365.yaml": {
+      "sha256": "e033dcd7e637100f3f62e267f06e4bfdba77e730771d94bec499d18a6fdff71e",
+      "bytes": 513
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C404111.yaml": {
+      "sha256": "d8d4fca0852da22f7168d04f8b9418dab30909f747f0e69f9af75f280505b60e",
+      "bytes": 3284
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C404113.yaml": {
+      "sha256": "2b38cc03edc660cfd1e17433d87db72219d3ba473cc8dcf05a0d2e49aca7bc0d",
+      "bytes": 1363
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C408767.yaml": {
+      "sha256": "1bd54ce11170e915c03f5b311f5fc7ccdebb92e31209f5dd1d372b54f2f1d940",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C4190.yaml": {
+      "sha256": "2e4e68849a7381cae1b43b3a5963e4cd10feb1f7db59519c6fa55b5c17c86ed8",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C42134.yaml": {
+      "sha256": "5f182633c8fef168f78a761293698b8bd9688f3b2c187560fc4f34c9f9d4c9de",
+      "bytes": 473
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C4216.yaml": {
+      "sha256": "cdf6ec0d76d095b1580e0edc3c1370fede4af41bf19243b1ec47a21dffe5d730",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C42431818.yaml": {
+      "sha256": "6cb8f9c1d9a66d6b91e90573ea1ba70194537ae261efbe1dd7fced0e5f95caee",
+      "bytes": 651
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C425067.yaml": {
+      "sha256": "a33acb917914aa1f4384358f976bdb376137252960cdfaeb2c0dd9f890897d18",
+      "bytes": 560
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C45783.yaml": {
+      "sha256": "5ab8913c432f37a86be0cedb4990b969e0b1a3c913fa4c15027bc363d1cab140",
+      "bytes": 352
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C465732.yaml": {
+      "sha256": "21435b79f4ee9f4d71d27421225455607a7add0286a8a6e836472be3dd9a9f90",
+      "bytes": 1107
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C46970911.yaml": {
+      "sha256": "fe9a58a6a935ebf0de2baf8a788a96b18d6d9d7476cccf6997384df33a59c4f1",
+      "bytes": 362
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C492417.yaml": {
+      "sha256": "4f0165739c013dbe5f246cf5263e476528f79e1dbb5f7125120a8ca2d19e97dc",
+      "bytes": 597
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C52140430.yaml": {
+      "sha256": "63e0543bcf44a63fb442d7fff444017077384b86ca5b05dba31cda5e7a299fab",
+      "bytes": 482
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C52923.yaml": {
+      "sha256": "c7759e3e51a5bb01a52fd72e3f54a6c1d0af34e36e2c95b7abf5bfab8ab8a322",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C52984.yaml": {
+      "sha256": "520a24e63d9b2b61cee13e097d4e1487983722520ab43e7346b8c2d46e5ca7b7",
+      "bytes": 574
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C55136.yaml": {
+      "sha256": "fea35b81306f505945b4e5e3f02002a94cb3464530ec4ee9a6a879d036be5bdc",
+      "bytes": 480
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C58464.yaml": {
+      "sha256": "ef4d9692a0f9961b4cebe81ba5d58339ef3e634f798e3ab11f487ff1a2bc8897",
+      "bytes": 474
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C602037.yaml": {
+      "sha256": "5c4883fb641afb33cf2567b417eb143ec43a54143b4a21c1c77a879f8429b411",
+      "bytes": 354
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C6186.yaml": {
+      "sha256": "1fc5fb8598a627d9709692dd9eae02bd5f52bec040493af1007464272a6527fd",
+      "bytes": 445
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C632854.yaml": {
+      "sha256": "b4570c12983f00da7a5e1ae869d4d3b5c9faf384a8dd836a7a22190da282949b",
+      "bytes": 1512
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C645939.yaml": {
+      "sha256": "ee9c4b7c0a0fd3ac5748a4067b934db904413fef6381d94ccd01fc63af9d0e39",
+      "bytes": 1349
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C702117.yaml": {
+      "sha256": "34344a07710904919d39dd0a45649b414bea40494ec392479fc7d432787331fb",
+      "bytes": 483
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C705800.yaml": {
+      "sha256": "eafbbb435bdf2b68be4a740c4c14023ebb50079d36681e0586d2e2c84bc5270b",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C7272.yaml": {
+      "sha256": "ff945b2681836cac5952510ab82fc2c3a4237a0fb5757897cf26f271088ff426",
+      "bytes": 454
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C7519.yaml": {
+      "sha256": "22f6e715e2ac39b4d7c4d1a7a5b27ea2b17223a393da61587360941be1ad9781",
+      "bytes": 509
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C7809.yaml": {
+      "sha256": "155d6ea6ceb0ad0fd682610a58df3af8754cb53a16a01b6e67c1ec892284b61a",
+      "bytes": 736
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C7833.yaml": {
+      "sha256": "e46dedb7a191457eea6f6793b4077385b6ee591ed44028bccf53ac23c03cd182",
+      "bytes": 447
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C79401.yaml": {
+      "sha256": "ac6597355dd33a12959b495b047d2998d00152ac33d63e2117a0ce3522d134e7",
+      "bytes": 510
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C82217.yaml": {
+      "sha256": "4d2093ae1306a685c4884208a8208e25aaa4e77c21b4f06d052e35ad36b13bcd",
+      "bytes": 474
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C8545.yaml": {
+      "sha256": "dea3153d1be1b5fc8052c67191fef219673d4d3038d63b6c5a13259e757fbc8d",
+      "bytes": 405
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C8598.yaml": {
+      "sha256": "2daa5b7a12640741b99279dc58afc2cae132e4789791be63897410f9f64ed455",
+      "bytes": 374
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C860067.yaml": {
+      "sha256": "3f375875edc1a385e0fa87a7930b20b011e7640c264048e9d93775240ada5cac",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C861412.yaml": {
+      "sha256": "01d03514d70a6fdf1c663cf7545ced1578746211ffc936661d1e62befaff871f",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C861436.yaml": {
+      "sha256": "f7262d69ed9e21a9607ae7e8251b1b6a3851e9bc56ac4f4a4417f7744272269d",
+      "bytes": 358
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C9002.yaml": {
+      "sha256": "4cdd0c32a50cb2f79c60e8a6f3350a6b86c46407a7519b4fc1b772d9df7ea8ba",
+      "bytes": 443
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C91145.yaml": {
+      "sha256": "e6b2209bba932bd1d10c45592181be072ca13fd5595e202f42db19e7d82ba042",
+      "bytes": 743
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C919459.yaml": {
+      "sha256": "d32c55a70946f41e7b3402fccffe69470c1f31d49cd5e66dcfe6ed6f6d1233a5",
+      "bytes": 504
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C92068.yaml": {
+      "sha256": "f8e120a21864d07915b5f2b1e5f5304ea920efed193e8466238fe2b6ad35de11",
+      "bytes": 410
+    },
+    "evidence-owners/main-source/hw/parts/easyeda/C95204.yaml": {
+      "sha256": "1b2805c87e71b5e203a5a6f5cab7929bb9a12d3d3ebe603a769ac5d90903cba2",
+      "bytes": 356
+    },
+    "evidence-owners/main-source/hw/parts/identity/C25077.json": {
+      "sha256": "de6da5de4a5f0b7cfdf47be716fd7f03805d24d45a8cbedbbe435574fbff973f",
+      "bytes": 1351
+    },
+    "evidence-owners/main-source/hw/parts/identity/C25083.json": {
+      "sha256": "8b83998a76552296a979ad7648c4125272a68819fb2a43aa4384a9914a617204",
+      "bytes": 491
+    },
+    "evidence-owners/main-source/hw/parts/identity/C25099.json": {
+      "sha256": "a686295df0082ebf9940cd3fe219c8b644196b1669ba5fbfcc57c06df90028f6",
+      "bytes": 549
+    },
+    "evidence-owners/main-source/hw/parts/jlc_rotation.yaml": {
+      "sha256": "7889e136f3e787c6469178b16358c7b6ed64df1fb7d8164de00b3c4158636455",
+      "bytes": 9670
+    },
+    "evidence-owners/main-source/hw/pins.yaml": {
+      "sha256": "e17da629bc33ee89325d6edabb8496755a39b0eb6579bdbf524ae991117a3ba7",
+      "bytes": 13883
+    },
+    "evidence-owners/main-source/hw/power/copper_mesh.py": {
+      "sha256": "1045e4f98d17bcf9e197791fca093796034455a9e848cff27ceadda680cb7602",
+      "bytes": 20234
+    },
+    "evidence-owners/main-source/hw/power/design.py": {
+      "sha256": "f8019e6ae4b4ea431a67db23ec307fb9d699e0cf9d17dbc9f7c66fcd83fdcfb4",
+      "bytes": 32620
+    },
+    "evidence-owners/main-source/hw/power/polygon_raster.py": {
+      "sha256": "1da7926aa0db1a9b8b4520ca4a6029e36299a49bd57e0f5072f08486075b84c2",
+      "bytes": 3457
+    },
+    "evidence-owners/main-source/hw/power/reset_supervisor.py": {
+      "sha256": "fd96d30aed184954fe9c6b8d9fc78fe9adf296f94b6b8c8cf09a36b48f91be2c",
+      "bytes": 17624
+    },
+    "evidence-owners/main-source/hw/tools/assembly_geometry.py": {
+      "sha256": "bde646b9a64368cb1135de3b490d7a2db073cbfd73f9ea637600cd543c650dfb",
+      "bytes": 1540
+    },
+    "evidence-owners/main-source/hw/tools/boardcheck.py": {
+      "sha256": "c8934724314de2882cd2035827d3edb63b0dc817fc7712c332c15aa06b6b0b31",
+      "bytes": 7230
+    },
+    "evidence-owners/main-source/hw/tools/boardevidence.py": {
+      "sha256": "54d71a8169e51b375690cbc02f467b50cdaec098539d47b14892e04f811fe024",
+      "bytes": 4531
+    },
+    "evidence-owners/main-source/hw/tools/bomcheck.py": {
+      "sha256": "e89609e0eb6aa9514ab0fc0ca2415b864d031c7f10ed079b7bf46e1718f3581b",
+      "bytes": 27807
+    },
+    "evidence-owners/main-source/hw/tools/connectorcheck.py": {
+      "sha256": "31c1b835539f76b7fba5c0f40d6020425d67741e88660e8b470a5eb65186eafe",
+      "bytes": 8511
+    },
+    "evidence-owners/main-source/hw/tools/cploverlay.py": {
+      "sha256": "7091a602fc741d59113083834f2afcef324be8432f79facd23efba2fc4fce772",
+      "bytes": 6831
+    },
+    "evidence-owners/main-source/hw/tools/crosstalk.py": {
+      "sha256": "a8afd862b5d3c8d3742b4d48440399607059a262eb7729383335e6e0154d5c28",
+      "bytes": 4438
+    },
+    "evidence-owners/main-source/hw/tools/edgesym.py": {
+      "sha256": "eaf007676970846ce2f9efcc0c89a689e9f012a9187fd3a363f958ca2dbb2541",
+      "bytes": 3983
+    },
+    "evidence-owners/main-source/hw/tools/fabcheck.py": {
+      "sha256": "d4076291e6047e7b4a24304b61b64e150874ea6eda54f6ca49692753deb21e11",
+      "bytes": 21295
+    },
+    "evidence-owners/main-source/hw/tools/fillfeature.py": {
+      "sha256": "3a966336cfa43d1019e59ddf5beafa18b26b33c20219c484e5a91f6f803923ba",
+      "bytes": 8002
+    },
+    "evidence-owners/main-source/hw/tools/genpins.py": {
+      "sha256": "421795084c4ffcda798e0d81d21cdd3ebb4e826b54831b464cf8acfd0372fef2",
+      "bytes": 4536
+    },
+    "evidence-owners/main-source/hw/tools/gerberdrc.py": {
+      "sha256": "4c84939e6c1fd552e87678dd318817ff26884305e518287c2ab6ae74ec10abf4",
+      "bytes": 82128
+    },
+    "evidence-owners/main-source/hw/tools/jlcimport.py": {
+      "sha256": "1ae6564e00ab678fc28632031377eae88edc855342bbe63edb50e2c85985376b",
+      "bytes": 13275
+    },
+    "evidence-owners/main-source/hw/tools/jlcparts.py": {
+      "sha256": "b6d5195e594b704c7fa1be8e3fbc765ba091ed30d5e771aeb4f467b6be8ff172",
+      "bytes": 3234
+    },
+    "evidence-owners/main-source/hw/tools/kicadgen.py": {
+      "sha256": "e92c0677b97b855477172d63b4bcaece01afea4bb709fedace9ed2431798f33a",
+      "bytes": 171468
+    },
+    "evidence-owners/main-source/hw/tools/logo.py": {
+      "sha256": "32a375e831f0f63d5a33a1707dbfe579f6957f0d075d739ec56cc684a4afaaa2",
+      "bytes": 8564
+    },
+    "evidence-owners/main-source/hw/tools/modelcheck.py": {
+      "sha256": "267b5b42f634b6fb6d64a4cedd61201ce768a18840dd8b639e00e438666c1c49",
+      "bytes": 4379
+    },
+    "evidence-owners/main-source/hw/tools/pincheck.py": {
+      "sha256": "b2688b34bc861fdfff91104414ebf7a613d78e395c1be54629b54abe7d01aee4",
+      "bytes": 29645
+    },
+    "evidence-owners/main-source/hw/tools/route_seed.py": {
+      "sha256": "30e8c754bbc0154192b7a4c26eb2757eb6cd1080e39a4c4fcd89e907ece7deec",
+      "bytes": 10607
+    },
+    "evidence-owners/main-source/hw/tools/sesreplay.py": {
+      "sha256": "62f40877a87b3cbc001cbf986e315880bfbd3db08ee9fc7fa72f791fa0303404",
+      "bytes": 12674
+    },
+    "evidence-owners/main-source/hw/tools/silk_glyph_coverage.py": {
+      "sha256": "365363b236c8b3d73748de30c47428b1ed7dfbf744b27693d491484c1260b8c2",
+      "bytes": 6172
+    },
+    "evidence-owners/main-source/hw/tools/silktextaudit.py": {
+      "sha256": "491638a9298bb360a435a7611af9bf463df6a299c2cebae76658f1391c8c8367",
+      "bytes": 5162
+    },
+    "evidence-owners/main-source/hw/tools/strapcheck.py": {
+      "sha256": "4d42a984241218b4a506b1d1803edc585d369bd08696607a93a5c3369ecb78e7",
+      "bytes": 5860
+    },
+    "evidence-owners/main-source/tools/fab_neck_coverage.py": {
+      "sha256": "9ccbfc2c92ee070ed78a9e71dddf1d304efa194a3388596411f717557c32cc7f",
+      "bytes": 28332
+    },
+    "evidence/R31-value-only-physical-audit.json": {
+      "sha256": "49baee4b084863c8d47c3cf94fb04cb22e9a0e7593f701d57bd8874b8f549a11",
+      "bytes": 416
+    },
+    "evidence/SC-storage-68-actual.json": {
+      "sha256": "0abc828d0d66077c0611657b2b5ff22ab222d1f398586845b3001d2833186fa1",
+      "bytes": 96484
+    },
+    "evidence/SC-storage-SCK-hypothetical-values.json": {
+      "sha256": "4157b98db1730612395e0c3176f7a2f643b96ece22d692fac72db5043951616d",
+      "bytes": 69655
+    },
+    "evidence/SC-storage-actual.json": {
+      "sha256": "92467e54e30496bdd0faff70565b9c3debb342abf224bd00c10c9de9d60ad6b3",
+      "bytes": 97108
+    },
+    "evidence/critical-copper-preservation.json": {
+      "sha256": "3cb9a8252e1f389414f0e2bccabae2bbb73bf4f751ef5b98861d0b897e8fbdd3",
+      "bytes": 2476
+    },
+    "evidence/firmware-runtime-source-bridge.json": {
+      "sha256": "2c4510de036817efdb9cff512a239ef3d4183c359049dad65f6c39841b04a1c3",
+      "bytes": 21013
+    },
+    "evidence/package-storage-flash.py": {
+      "sha256": "aabc11b447734fd15d33786978d4179e3d20c6bedbb18417c3b76b2f704e5bef",
+      "bytes": 2341
+    },
+    "evidence/placement-engineering-review.json": {
+      "sha256": "b39d51e0639928797291eb79a6a8e55ec98d587e762498917125ab75db8c90d1",
+      "bytes": 29993
+    },
+    "evidence/placement-independent-audit.json": {
+      "sha256": "df7704529a6c27cb1a96e4fc46cb84c0a4e1db53b9b7162553511142ae8b206e",
+      "bytes": 6297
+    },
+    "evidence/placement-independent-audit.py": {
+      "sha256": "0f8efb914971136c43b9e4cad6d41cdd6aeacefe1b281205061725435fcc4164",
+      "bytes": 2922
+    },
+    "evidence/review-placements.py": {
+      "sha256": "c8afa54b5391e8a69648249ead0b640b64fcc0950535d1202dedd6d014cffd6d",
+      "bytes": 1849
+    },
+    "evidence/storage-68-SI-source-ownership.json": {
+      "sha256": "99bafd1a0d1ad6df7dbec4af1b71c0ecb6726dc7d0aaa5219ffe93b86110044d",
+      "bytes": 89454
+    },
+    "evidence/storage-68-actual-si.log": {
+      "sha256": "b739c2943a14162d3d4678874fa14d5acac0e4a98185cd68ed7aebddb4ec14d3",
+      "bytes": 4390
+    },
+    "evidence/storage-68-fab-review.json": {
+      "sha256": "7d4706fcd09af570b7275f1e6d5e7bf84be7ed19d22bebc93dbf3729d3e8779b",
+      "bytes": 19345
+    },
+    "evidence/storage-68-fab-review.log": {
+      "sha256": "40ac92bac5a3bca61711101300d65b43da6ac970d266a5573613cfc65f7a33dd",
+      "bytes": 482
+    },
+    "evidence/storage-68-normal-retry.log": {
+      "sha256": "758c6ac54ed351cc804c8531cf0d26babf80dc36d72ef2a276088b7ad4dcd6f3",
+      "bytes": 3587
+    },
+    "evidence/storage-68-normal.log": {
+      "sha256": "6129d0c2722f4bc7812baf6dfd5bd0f12a40a91beef9c61e3d6f0e2d8ba554f0",
+      "bytes": 5197
+    },
+    "evidence/storage-68-peripheral-qualification.json": {
+      "sha256": "c3424c97dddce5e0931bfa38a84ed09fa0f18283292bcacf84a52071461d370e",
+      "bytes": 2334
+    },
+    "evidence/storage-SI-source-ownership.json": {
+      "sha256": "5bfcca0a0eab103519bc127265df6a5e596dbe32f6ea5f456f8224dec90d98d9",
+      "bytes": 89664
+    },
+    "evidence/storage-actual-si.log": {
+      "sha256": "c1f0d5964a6105f3657c5ebdbfe07a3fa7099ba1c83ea6c2ff30ab31a6222117",
+      "bytes": 4650
+    },
+    "evidence/storage-fab-review.json": {
+      "sha256": "b6303da4aa6908123c06de308bb8faa8d06b85cf5f9a3fa343c0f0e11ebf6621",
+      "bytes": 19345
+    },
+    "evidence/storage-fab-review.log": {
+      "sha256": "9eb71e447120554a8abd78eb3589e50908e3df7562643087be9247d09307d5b8",
+      "bytes": 480
+    },
+    "evidence/storage-firmware-build.log": {
+      "sha256": "56bd00d7b597fc07c32c66ebf2235fdb077bf7a0b525874001cbf0adaffbfb15",
+      "bytes": 13205
+    },
+    "evidence/storage-firmware-functional-qualification.json": {
+      "sha256": "c96e85c7e5ad7bc401568592ac16666a3076d9c80be77f4d000b79394b99837a",
+      "bytes": 865
+    },
+    "evidence/storage-flash-packaging-qualification.json": {
+      "sha256": "bcabf579aa97c602a4ef4360658b077ba1315bd8cf2df84f1e290925ee625253",
+      "bytes": 1141
+    },
+    "evidence/storage-native-addon-source-carry.json": {
+      "sha256": "2ec2b60559420802e6a77c139f2c5b81d19afaa9138e2bc0eeb0bbb26c5cf43e",
+      "bytes": 4943
+    },
+    "evidence/storage-native-functional.log": {
+      "sha256": "715a5692ed64db88d5e9a0048ce70253f6baed57d56586c9e6ef9cf8adecad25",
+      "bytes": 100
+    },
+    "evidence/storage-normal-root-retry.log": {
+      "sha256": "2436a4446689fd3136a0fbbb122103a87d95f8d74f113ed0e35c6da5feff6a30",
+      "bytes": 3580
+    },
+    "evidence/storage-sck-value-sensitivity.log": {
+      "sha256": "e73b2ffaa6f9b9292e083ade828520a4af613a2be9f52c37635c729ecfcbfc35",
+      "bytes": 3911
+    },
+    "historical-47ohm-build/SC-storage-actual.json": {
+      "sha256": "92467e54e30496bdd0faff70565b9c3debb342abf224bd00c10c9de9d60ad6b3",
+      "bytes": 97108
+    },
+    "historical-47ohm-build/build/hw/storage/drc-routed.json": {
+      "sha256": "436a5bd41527a6383a531023155009b15bf6accb41a6402ddb8e2f72590c572e",
+      "bytes": 186442
+    },
+    "historical-47ohm-build/build/hw/storage/drc.json": {
+      "sha256": "ee327a8f7e2a08d94fddbd4e1541235967823dd14883fe409e2a5d64a585447b",
+      "bytes": 1220
+    },
+    "historical-47ohm-build/build/hw/storage/erc.json": {
+      "sha256": "798c0e30bc23c6def53f2b2b70b0b1250aadfd37ccf8fa608a98c8b3b36c122a",
+      "bytes": 1001
+    },
+    "historical-47ohm-build/build/hw/storage/evidence.json": {
+      "sha256": "38f7c3e89bb261647fe295e45eb9b6dc22191bf279d64a76482fd8432b3e0a94",
+      "bytes": 41817
+    },
+    "historical-47ohm-build/build/hw/storage/fab/bom.csv": {
+      "sha256": "33bc0fd6ed3fa7eb12d3801cbefe99df8e57c47fb75b0db98ee46eabd6b07919",
+      "bytes": 1011
+    },
+    "historical-47ohm-build/build/hw/storage/fab/cpl-review.json": {
+      "sha256": "8b033fc6328f1e9e4d62b7067b61b169aac11f0fea4174de1d75bac2d59dd7f8",
+      "bytes": 12011
+    },
+    "historical-47ohm-build/build/hw/storage/fab/cpl.csv": {
+      "sha256": "5c2ddc53feccf304a6e0a4f7575eacc5dae097a4ceae1f741264c440de300649",
+      "bytes": 2235
+    },
+    "historical-47ohm-build/build/hw/storage/fab/order.json": {
+      "sha256": "f739bfcc6843decf12a7baea4192b764d0c47029ff06e881dae5c7b15eccb92e",
+      "bytes": 876
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-B_Cu.gbl": {
+      "sha256": "a6d9dd9e169ea9516d625bd384da239e1c5c0b25e3fcf43dc8e90c77e6b75dfa",
+      "bytes": 523151
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-B_Mask.gbs": {
+      "sha256": "d379b8ab55e9843ff7a52d02a748a6ce7128953c3cbb66365e45703b60523bcf",
+      "bytes": 11117
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-B_Paste.gbp": {
+      "sha256": "22f1da12011e378329797bfa05c6d8dc3427925209ec929ba605cc2fe82878b5",
+      "bytes": 449
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-B_Silkscreen.gbo": {
+      "sha256": "e8e1c8fd9c9b1f8b6636586aff3cf20e4fdeb0883b58800e52751a22f0709590",
+      "bytes": 450
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-Edge_Cuts.gm1": {
+      "sha256": "1fd29555c0a3f42d206721a0c95733bf6ca1dc4e6ae94d9b4bcedb7902a3ce8b",
+      "bytes": 1238
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-F_Cu.gtl": {
+      "sha256": "10ac140a7389b27d98d9020f4cc37c2cd9a5ec6e76939456eb0e3ee4086ef2ff",
+      "bytes": 1099010
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-F_Mask.gts": {
+      "sha256": "a1dd6e2bf158f815ba210cc9228896fe9e44291a223ad2c8e50c6cd61ca36dad",
+      "bytes": 139841
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-F_Paste.gtp": {
+      "sha256": "73b90edb02280daa6d798dbb9ae309f9cffd2fb393fdd9d55643a55839f60bd9",
+      "bytes": 8887
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-F_Silkscreen.gto": {
+      "sha256": "83cc4fc78c443777d4873a2dc6beb2ab12dbc01bb4548689c721db807139bce9",
+      "bytes": 450654
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-In1_Cu.g1": {
+      "sha256": "24abaf5ff1d833d9f5a3973106f7fca9d0714f285ddadaeb16c6e0c10eed6865",
+      "bytes": 333073
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-In2_Cu.g2": {
+      "sha256": "8fd6225e2b7989948cdd78fe9c9b35722e1e226fd99855d0b085e762cc185810",
+      "bytes": 14656
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage-job.gbrjob": {
+      "sha256": "6ee093295acc64ec6f324abeda0fbf1cd26f7af2e6215ce1510daefee59ae7ff",
+      "bytes": 3665
+    },
+    "historical-47ohm-build/build/hw/storage/fab/storage.drl": {
+      "sha256": "f2272209564acf320702fc8bcc63135c2e6c97c52bde7ffe999a567afeb85779",
+      "bytes": 3575
+    },
+    "historical-47ohm-build/build/hw/storage/fp-lib-table": {
+      "sha256": "d615fcb45c8ee8cdcb60ce2b4117d5c711fd169d7fad051baec9b5fc513f424a",
+      "bytes": 1603
+    },
+    "historical-47ohm-build/build/hw/storage/pipeline-scope.json": {
+      "sha256": "866a6472da1a469573ba4bd8a7ffa37a0f842c528c98bc79c8b4a1b12d7f2d14",
+      "bytes": 262
+    },
+    "historical-47ohm-build/build/hw/storage/post-fill-audit.json": {
+      "sha256": "c8af93057854c1db5b60d5e9adb18dfbedfb89a8752dcc0af460ecb275bf8916",
+      "bytes": 522
+    },
+    "historical-47ohm-build/build/hw/storage/storage-bottom.png": {
+      "sha256": "c23ce8f1cd0d1673ebf356290ffb750d9b178d9ded9fa9ffa2e0bb9a69c29b62",
+      "bytes": 82625
+    },
+    "historical-47ohm-build/build/hw/storage/storage-routed.kicad_pcb": {
+      "sha256": "95dfb7db15b3d956f3780009c5e26c86e3e074f9cd711b253e6f1e0bddb9c126",
+      "bytes": 786402
+    },
+    "historical-47ohm-build/build/hw/storage/storage-routed.kicad_prl": {
+      "sha256": "682d0b0dda72efc0d50158af03d96364cc29a7a0db261cc1f5aa081a6461b0f8",
+      "bytes": 2301
+    },
+    "historical-47ohm-build/build/hw/storage/storage-routed.kicad_pro": {
+      "sha256": "770eea706b07cc47953fe720626f8957cf1f926e056e61610d73a535b0084c9c",
+      "bytes": 13696
+    },
+    "historical-47ohm-build/build/hw/storage/storage-top.png": {
+      "sha256": "080aa785262524979fce229cffd3e90e9e5dba9284573ad87672cfacab8ad41d",
+      "bytes": 196744
+    },
+    "historical-47ohm-build/build/hw/storage/storage.kicad_pcb": {
+      "sha256": "84cbefb58c4417661ea80ecd579112d2042592836af5d48a9f6b3fe72bd782cc",
+      "bytes": 2986066
+    },
+    "historical-47ohm-build/build/hw/storage/storage.kicad_prl": {
+      "sha256": "12bbe78d415b78fdc87436337768164361544427cb5f937911c0c37c356ba38a",
+      "bytes": 2294
+    },
+    "historical-47ohm-build/build/hw/storage/storage.kicad_pro": {
+      "sha256": "78b879716e2580f18c0af67cd88f5231a977d5c632da72ebf0048ca67307a007",
+      "bytes": 13689
+    },
+    "historical-47ohm-build/build/hw/storage/storage.kicad_sch": {
+      "sha256": "ea332fd28c639265286b166dd25d6cdaf5287c23917fdf8bbb0399058b33f8e0",
+      "bytes": 216939
+    },
+    "historical-47ohm-build/build/hw/storage/storage.net": {
+      "sha256": "8dbcae9259d5f173fe3393a3166fe0e9e7f89aa1ebeed59052a8e0eb6a267af8",
+      "bytes": 110678
+    },
+    "historical-47ohm-build/build/hw/storage/sym-lib-table": {
+      "sha256": "d987a4edd230043a444e5c4aabb00f48eacecf10c52dfb9951add2b2d387ca93",
+      "bytes": 1448
+    },
+    "historical-47ohm-build/critical-copper-preservation.json": {
+      "sha256": "3cb9a8252e1f389414f0e2bccabae2bbb73bf4f751ef5b98861d0b897e8fbdd3",
+      "bytes": 2476
+    },
+    "historical-47ohm-build/hw/boards/storage-full-route-seed.json": {
+      "sha256": "f72e3373a5a73cd1422147967b09cc98f7337226d91fde4f4ff3acc7a8716b56",
+      "bytes": 346409
+    },
+    "historical-47ohm-build/hw/boards/storage.py": {
+      "sha256": "e334b4ec6feedc2539820d024270aef2acc1ab07d549219a3863f985d66c628d",
+      "bytes": 12642
+    },
+    "historical-47ohm-build/placement-engineering-review.json": {
+      "sha256": "cbf5fa616115a199ca7ae6c0d8303a5d90a889a0933e02746fbdb12ac6d05207",
+      "bytes": 29806
+    },
+    "historical-47ohm-build/placement-independent-audit.json": {
+      "sha256": "447a60f6aee80bea2846fae338fec80077238d6fb14d3b57bbd0d9b02856be06",
+      "bytes": 6297
+    },
+    "historical-47ohm-build/storage-SI-source-ownership.json": {
+      "sha256": "5bfcca0a0eab103519bc127265df6a5e596dbe32f6ea5f456f8224dec90d98d9",
+      "bytes": 89664
+    },
+    "historical-47ohm-build/storage-fab-review.json": {
+      "sha256": "b6303da4aa6908123c06de308bb8faa8d06b85cf5f9a3fa343c0f0e11ebf6621",
+      "bytes": 19345
+    },
+    "historical-47ohm-build/storage-fab-review.log": {
+      "sha256": "9eb71e447120554a8abd78eb3589e50908e3df7562643087be9247d09307d5b8",
+      "bytes": 480
+    },
+    "mechanical/export-retry.log": {
+      "sha256": "015ab54daba996fcd29c209392445ad3b918a092d349bcc46a475e05a3545fe0",
+      "bytes": 134
+    },
+    "mechanical/export.log": {
+      "sha256": "f7e7294c7726045de2015270eb755907e0f819ce59cacce32ddac5c02b45d5d6",
+      "bytes": 134
+    },
+    "mechanical/focused-fit-retry.log": {
+      "sha256": "0946c4d1ccb3695f1abab695b021ac1963e685c5c3b422ecacf5e2a29fbc519a",
+      "bytes": 244
+    },
+    "mechanical/focused-fit.json": {
+      "sha256": "143d0d88e7d2e5ad7df8f06602e40ffc37782ddd0218a8e9359d15e9618b1d21",
+      "bytes": 9368990
+    },
+    "mechanical/focused-fit.log": {
+      "sha256": "028ed8573e69facb20e71b99909fcb8d067fe24b72a7cd4d26b3cf81fb733bf4",
+      "bytes": 297
+    },
+    "mechanical/job.json": {
+      "sha256": "5881adc3e82bfc20468de066ebfbafe88e4e4db7164d6a3281dd9ee03c4d90f6",
+      "bytes": 516474
+    },
+    "mechanical/qualification.json": {
+      "sha256": "985e639d206b4836610f052602814c96055fddf282a8b03994d59746c3cb67da",
+      "bytes": 1298
+    },
+    "mechanical/storage.step": {
+      "sha256": "099811f352a202d6a692eca427fadf3a291771e01c0a7503f3be0f841ba2eba9",
+      "bytes": 6693312
+    },
+    "mechanical/storage.step.provenance.json": {
+      "sha256": "da10e1fdc6030eb2a14844aa15d59d3d57790dd1611feeec01190ddfc093dd77",
+      "bytes": 21306
+    },
+    "mechanical/verify.py": {
+      "sha256": "8cb9d63c2da70b9b4d5632a1f172431fb1c38bce23c21a62d071213029dba21b",
+      "bytes": 3422
+    },
+    "placement-review/auto-checks.json": {
+      "sha256": "d6a265b007c309d7f020062ecd399745c5e8002ee1a4cfa9a8259f4222aba8c1",
+      "bytes": 15490
+    },
+    "placement-review/index.html": {
+      "sha256": "52b1839972e6469f2b3178e38f2d4354724f679cb387dafd55b0818d69e9286c",
+      "bytes": 3420
+    },
+    "placement-review/manifest.json": {
+      "sha256": "d8a98c22d833df549b4057b45eb11d67ca5ec9baa0722ec6d3a86bd4f20f4055",
+      "bytes": 631
+    },
+    "placement-review/storage-decisions.json": {
+      "sha256": "91160b5883ab26f8a134edf15adaea6d1ff701bb0fad8d67d292bc82c93d40ca",
+      "bytes": 11962
+    },
+    "placement-review/storage.html": {
+      "sha256": "f04b844b17b7fc763659f12dfab5009422ec43ef9053396b8e4962f51854795d",
+      "bytes": 1557059
+    },
+    "source-tree/build/hw/storage/drc-routed.json": {
+      "sha256": "a443a35538fe97807b7d3ebe8d8ea1e8f3d84cca28374f5a2620088ce4f68e88",
+      "bytes": 186570
+    },
+    "source-tree/build/hw/storage/drc.json": {
+      "sha256": "2d58e238616ed6484110048ce36232a0a46cb43aebdf3eadebe788ca04518185",
+      "bytes": 1220
+    },
+    "source-tree/build/hw/storage/erc.json": {
+      "sha256": "9a78ae477119457bb3cdaf1d0963dace1350dacd0f3784f315aae98992bad46e",
+      "bytes": 1001
+    },
+    "source-tree/build/hw/storage/evidence.json": {
+      "sha256": "15e22e7895cad8ac1aa374876af8e557e0efb32921e999092e6689aff847c9fb",
+      "bytes": 41921
+    },
+    "source-tree/build/hw/storage/fab/bom.csv": {
+      "sha256": "21a1f3d0fc8ef5671d58f0f97d7167945a9769609472d723d8126f59e05b941c",
+      "bytes": 1040
+    },
+    "source-tree/build/hw/storage/fab/cpl-review.json": {
+      "sha256": "1db2b8974cffdc81923e79592ca3e8b965ff59d13bf8808a86714fc2da685483",
+      "bytes": 12198
+    },
+    "source-tree/build/hw/storage/fab/cpl.csv": {
+      "sha256": "5c2ddc53feccf304a6e0a4f7575eacc5dae097a4ceae1f741264c440de300649",
+      "bytes": 2235
+    },
+    "source-tree/build/hw/storage/fab/order.json": {
+      "sha256": "f739bfcc6843decf12a7baea4192b764d0c47029ff06e881dae5c7b15eccb92e",
+      "bytes": 876
+    },
+    "source-tree/build/hw/storage/fab/storage-B_Cu.gbl": {
+      "sha256": "f58ad251e9f82a2072356694684b06b58ce43a4fa76fa7e46723f7e41df8ff27",
+      "bytes": 523161
+    },
+    "source-tree/build/hw/storage/fab/storage-B_Mask.gbs": {
+      "sha256": "987fb126bc9cf119eeeae462705ba98cffa16c2c095049280d8d5a570ac9ce16",
+      "bytes": 11117
+    },
+    "source-tree/build/hw/storage/fab/storage-B_Paste.gbp": {
+      "sha256": "56748c1f97bbef8f236e644377bf2a76f8d829daa3dd5fe7f9f9f363e1bc6014",
+      "bytes": 449
+    },
+    "source-tree/build/hw/storage/fab/storage-B_Silkscreen.gbo": {
+      "sha256": "395f41a26b8782c1a2a9cdcc80d7ab88926f2d2c340831337a256c35a8b2203d",
+      "bytes": 450
+    },
+    "source-tree/build/hw/storage/fab/storage-Edge_Cuts.gm1": {
+      "sha256": "0881acae4c55f87b429e72d7b6e6d7f1451934c259e7387d2e1fdaa301c0d1dd",
+      "bytes": 1238
+    },
+    "source-tree/build/hw/storage/fab/storage-F_Cu.gtl": {
+      "sha256": "acb58e7c7f4c65d097419dfe86a104b0194e3dcca61c991e9e8ee23646774992",
+      "bytes": 1099030
+    },
+    "source-tree/build/hw/storage/fab/storage-F_Mask.gts": {
+      "sha256": "1748a58e8714066b9a4fd72b81205e5529741b59dd3941450091a2f06f362178",
+      "bytes": 139841
+    },
+    "source-tree/build/hw/storage/fab/storage-F_Paste.gtp": {
+      "sha256": "bb4ecbe2a22e9da4fa01087c97c9fe8fd1f30fd7c6470e5a88b02f6e9a5fa178",
+      "bytes": 8882
+    },
+    "source-tree/build/hw/storage/fab/storage-F_Silkscreen.gto": {
+      "sha256": "5c64a824e90d61375f8d234488248dd052ecc8ff4dd059895700422f28f0b53e",
+      "bytes": 450649
+    },
+    "source-tree/build/hw/storage/fab/storage-In1_Cu.g1": {
+      "sha256": "c28668251986ceb07f6d83a0fa2410cae3eed13af4439f5620155a3080ab576a",
+      "bytes": 333078
+    },
+    "source-tree/build/hw/storage/fab/storage-In2_Cu.g2": {
+      "sha256": "90e120cffce3f56b04d268ba0cbaef1df8dad27ea7edcc646b30b5e33bb1222b",
+      "bytes": 14666
+    },
+    "source-tree/build/hw/storage/fab/storage-job.gbrjob": {
+      "sha256": "d5a2534dc6a5b3d6bb8d6efc6e07dc6fe543fb4246d5a7ff00951ed238546cdb",
+      "bytes": 3665
+    },
+    "source-tree/build/hw/storage/fab/storage.drl": {
+      "sha256": "8300bac363c4e4f886e97f00963fa6435fc33d2b04cc4a4fd14a2c2ee95ef7fd",
+      "bytes": 3575
+    },
+    "source-tree/build/hw/storage/pipeline-scope.json": {
+      "sha256": "51edea216c9b6ade3eb8a9293d7e92f03dae7e70a25ac8be5773ab9ab7be9597",
+      "bytes": 262
+    },
+    "source-tree/build/hw/storage/post-fill-audit.json": {
+      "sha256": "c8af93057854c1db5b60d5e9adb18dfbedfb89a8752dcc0af460ecb275bf8916",
+      "bytes": 522
+    },
+    "source-tree/build/hw/storage/storage-bottom.png": {
+      "sha256": "dbe88849bae6c03b54a7067f3616245a8bc77f6407d12b1f367d1885fbba99b4",
+      "bytes": 83398
+    },
+    "source-tree/build/hw/storage/storage-routed.kicad_pcb": {
+      "sha256": "59e3019b7bd93180e3df99a9612cd43d94feea3872217a2f8002411d553a840d",
+      "bytes": 786402
+    },
+    "source-tree/build/hw/storage/storage-routed.kicad_pro": {
+      "sha256": "770eea706b07cc47953fe720626f8957cf1f926e056e61610d73a535b0084c9c",
+      "bytes": 13696
+    },
+    "source-tree/build/hw/storage/storage-top.png": {
+      "sha256": "4fcf35bd340b82d03a17f09076b98c6fc4bd71f4e9226fdcf202c62428aee057",
+      "bytes": 196580
+    },
+    "source-tree/build/hw/storage/storage.kicad_pcb": {
+      "sha256": "00a5eef1ac1e99510e2f8655b9dcb0cac658c149ee0dd866cfb30332269bb5e7",
+      "bytes": 2986066
+    },
+    "source-tree/build/hw/storage/storage.kicad_pro": {
+      "sha256": "78b879716e2580f18c0af67cd88f5231a977d5c632da72ebf0048ca67307a007",
+      "bytes": 13689
+    },
+    "source-tree/build/hw/storage/storage.kicad_sch": {
+      "sha256": "183ec2aab5e8640d60af228e6d680fd8f58f25608dee8a056bbb1639e6f09ed4",
+      "bytes": 216939
+    },
+    "source-tree/build/hw/storage/storage.net": {
+      "sha256": "2046ffbe640df82254852d057075195882a610e4379f260f1d82b6bcd2859f08",
+      "bytes": 110678
+    },
+    "source-tree/fw/Makefile": {
+      "sha256": "fb6232cb33f44e6fcef37481750045b6188634e5914ea277a90e9e5f466170cb",
+      "bytes": 3414
+    },
+    "source-tree/fw/common/cardproto.c": {
+      "sha256": "e833b1c470fb4916e71259d8b86c9a07300008efb00dd9abe1fe7432190ed2ee",
+      "bytes": 3490
+    },
+    "source-tree/fw/common/cardproto.h": {
+      "sha256": "baad5755b66bc2c60a39740092a1c14530147ba5cc3f39bf8dc0f4eac41c6f2b",
+      "bytes": 3232
+    },
+    "source-tree/fw/common/font8x8_cp437.c": {
+      "sha256": "1e31bea18a1180739b2b7ba0f050b48673b32507f0e49def228a8c8511a77da9",
+      "bytes": 15883
+    },
+    "source-tree/fw/common/font8x8_cp437.h": {
+      "sha256": "72006d915d8e6e3fcc946dd40d8d140411eac4f1f9919cda68d582e7150d87a3",
+      "bytes": 199
+    },
+    "source-tree/fw/eink/core/eink.c": {
+      "sha256": "81189d8cabd4c8d183f0c5a1fc3b0cad2b04d86cf0516bae1b4c1c18f1c6ea2e",
+      "bytes": 21192
+    },
+    "source-tree/fw/eink/core/eink.h": {
+      "sha256": "f0d3baf6cc8bb7eb81c02d1581e6d75ab92957aee233f315af68da8da5a8371b",
+      "bytes": 4733
+    },
+    "source-tree/fw/eink/core/uc8179.c": {
+      "sha256": "f77caad18441005f2be42fdf3f5fc8069e2d7ab6defd7a9b006d86024d6cccd4",
+      "bytes": 2328
+    },
+    "source-tree/fw/eink/core/uc8179.h": {
+      "sha256": "170f8d360aeaa712633d1de6b0bc2e3495491c921671581d81d94133e549e066",
+      "bytes": 2521
+    },
+    "source-tree/fw/eink/pins.h": {
+      "sha256": "70fbf3e75ea6e901659efdbfe80e72cddb5742f3a7f5b187ab5fa8bea0e945cc",
+      "bytes": 871
+    },
+    "source-tree/fw/gpu/core/gpu.c": {
+      "sha256": "b4c8f1dc543309a9a66a7d6517e15a2a0b5f0ef74cb5edb707618ffca8d58a07",
+      "bytes": 13204
+    },
+    "source-tree/fw/gpu/core/gpu.h": {
+      "sha256": "0e0c327f01f47cec40e34ef71bbfeb239c39b2e2d191ff3fd5887451738e0d07",
+      "bytes": 3232
+    },
+    "source-tree/fw/gpu/pins.h": {
+      "sha256": "c12daf29ce579a08f3dda20016d284ab7b42ea4e31982549fec9bd9c24aa9687",
+      "bytes": 856
+    },
+    "source-tree/fw/io/core/iocard.c": {
+      "sha256": "8f686f0d95b1a04f169ff5f51e7af06b02dfa714dc615a47bd883830f0df1d70",
+      "bytes": 7019
+    },
+    "source-tree/fw/io/core/iocard.h": {
+      "sha256": "118980ca125eea7bc0a239bd3cac36bf57c98b3da49068e1bc5e3b5882cde409",
+      "bytes": 1858
+    },
+    "source-tree/fw/io/pins.h": {
+      "sha256": "0c8910f9b3d3b74320bed3e78a1b4e829742a43d8ccb174d9b84799f3d529d9d",
+      "bytes": 715
+    },
+    "source-tree/fw/rp2040/CMakeLists.txt": {
+      "sha256": "882c7550a45ab203ec8e6d7c8e3549a16e778343c97ed4951ae640d7b72b8f7e",
+      "bytes": 5666
+    },
+    "source-tree/fw/rp2040/common/slotspi.c": {
+      "sha256": "771c1cd7a957c92de3c3e1519ae5420f8791ef6b2e1d88af0a5c4a595a50ff48",
+      "bytes": 10521
+    },
+    "source-tree/fw/rp2040/common/slotspi.h": {
+      "sha256": "c142fa20d6a02f916809bc8e9ade48935e45d29695d671aba38d7fcbb18c1f40",
+      "bytes": 1710
+    },
+    "source-tree/fw/rp2040/common/slotspi.pio": {
+      "sha256": "9419649cd3d4ceef2788d23a3932c7b18efa8781c7e1b111f6faa8440fb6a8e0",
+      "bytes": 1109
+    },
+    "source-tree/fw/rp2040/eink/main.c": {
+      "sha256": "d432b52f83d1ed524c4666d15da13f99451559908b89ca2008299d1b3477f01b",
+      "bytes": 3470
+    },
+    "source-tree/fw/rp2040/gpu/main.c": {
+      "sha256": "19add95f48bdaf5dd6fea803223966270dc5dc9191cac4932c5a9493cbc13576",
+      "bytes": 8297
+    },
+    "source-tree/fw/rp2040/io/main.c": {
+      "sha256": "de04b220c9507878a33263063d32b54a2a0bd025bccbe919effc214fad217020",
+      "bytes": 5114
+    },
+    "source-tree/fw/rp2040/io/tusb_config.h": {
+      "sha256": "10870740edbd0acbcbc225a163a95eabbfefbb7ce12388085cbc4001c709967c",
+      "bytes": 635
+    },
+    "source-tree/fw/rp2040/selftest/nested.c": {
+      "sha256": "0473f2c05c980160d57f5c64b50c53497b28e3e3866be4b900a3f0c950943600",
+      "bytes": 2104
+    },
+    "source-tree/fw/rp2040/selftest/sdspi.c": {
+      "sha256": "90b36a95c2f0b008cc2274c3bdb5c210d0ab17c05244cca321199a603b9c6e34",
+      "bytes": 5744
+    },
+    "source-tree/fw/rp2040/selftest/selftest.c": {
+      "sha256": "321d295e574d7ecd2cbf799f799f90b4662b1f25d89c274ce0af708e3320474c",
+      "bytes": 2849
+    },
+    "source-tree/fw/rp2040/storage/main.c": {
+      "sha256": "986011a944af59d16d31a3d63a4d298b9b3e94eae56f1ac0d0c87f8901dc459a",
+      "bytes": 3242
+    },
+    "source-tree/fw/rp2040/storage/sd_spi.c": {
+      "sha256": "14b1ba36eaacf6c65945d541ab8c214e257f3e8bc90408399ce2bad00031146f",
+      "bytes": 6957
+    },
+    "source-tree/fw/rp2040/storage/sd_spi.h": {
+      "sha256": "e9e40a16231806e48fdb45139b764a299c0ea90e0600faff5ef43f530b5408bc",
+      "bytes": 449
+    },
+    "source-tree/fw/rp2040/sysctl/main.c": {
+      "sha256": "1086086e7471ab5c67a31942c6926f45d109abadd7cf725798f99bcf58cf9c54",
+      "bytes": 13089
+    },
+    "source-tree/fw/rp2040/sysctl/tusb_config.h": {
+      "sha256": "bed06afb528848f262846b3fc065929dea9e1910a589851a6fd651b0e91424a8",
+      "bytes": 590
+    },
+    "source-tree/fw/rp2040/sysctl/uart.pio": {
+      "sha256": "8b714ea17caf3a97a6df6b6dca85e8e88c3eaa84d71a08c843041255a4685a03",
+      "bytes": 677
+    },
+    "source-tree/fw/rp2040/sysctl/usb_descriptors.c": {
+      "sha256": "e63b2532f8a32d537aff106ac3e6d8ff2b2bceb1b40a310308bb21adbd40c953",
+      "bytes": 2333
+    },
+    "source-tree/fw/sim/simcards.c": {
+      "sha256": "14d5f59a520cc0de2d5f72e0d86fd88a04c04e617dbde8a435e4a995997268bc",
+      "bytes": 8678
+    },
+    "source-tree/fw/sim/simcards.h": {
+      "sha256": "8e33f3474389b180cba2e448d01e64e8c276bfbdd395681a4ddfa779c6a56805",
+      "bytes": 2662
+    },
+    "source-tree/fw/storage/core/diskio.c": {
+      "sha256": "73b933000db765120e279b1954a42d9d64be6443f0e84a30930730b924bf93a3",
+      "bytes": 2123
+    },
+    "source-tree/fw/storage/core/stdiskio.h": {
+      "sha256": "027cc8686e1d6932d8f538f1bc41c08176a66ab81ab7cae2f00d029b9c78b6b7",
+      "bytes": 333
+    },
+    "source-tree/fw/storage/core/storage.c": {
+      "sha256": "8c8d677b230b972abfd07ca7db8db2b5781da6543eb431ee26c67e46e66589e7",
+      "bytes": 14271
+    },
+    "source-tree/fw/storage/core/storage.h": {
+      "sha256": "fbcdeaf909055806567e6d8273c470139c32ff53b04c5e6d8ef61dc88da67c40",
+      "bytes": 4547
+    },
+    "source-tree/fw/storage/host/imgdisk.c": {
+      "sha256": "d8ac5fd108014bc3880f855bfe0d8138f74240fec3a291a9b052202b43ef31cd",
+      "bytes": 2474
+    },
+    "source-tree/fw/storage/host/imgdisk.h": {
+      "sha256": "1c42f19bb4aecf18289ac1b34055bcde24bc4cc6e63610cb97befaa04ae30fef",
+      "bytes": 1245
+    },
+    "source-tree/fw/storage/pins.h": {
+      "sha256": "582da038a47dd54570ce9a31615c3270807d99f861501081fb178246d537f6fa",
+      "bytes": 1113
+    },
+    "source-tree/fw/sysctl/core/bridge.c": {
+      "sha256": "7f5b3fa4298cebe692fcef545e3e97f8f65d93e2487ce84136849ab87abd706a",
+      "bytes": 3960
+    },
+    "source-tree/fw/sysctl/core/console.c": {
+      "sha256": "b215f602a4778e855fc01566cf1402c9dfec8ada685da4bb55ae5d5ef1b0a286",
+      "bytes": 4645
+    },
+    "source-tree/fw/sysctl/core/fpga.c": {
+      "sha256": "1b6cd2731ac63fd45696216bcfbb055654285a1ad70b6af1b8593353071f74ab",
+      "bytes": 1258
+    },
+    "source-tree/fw/sysctl/core/power.c": {
+      "sha256": "d7b5e70661c1ed4bca3bea119862fdbbfe48fe77f6192570e393232377af4276",
+      "bytes": 1823
+    },
+    "source-tree/fw/sysctl/core/progport.c": {
+      "sha256": "a06353d5390321e1839daf11bcf054c2b7fdd2f62878e56bb765279419fd71fc",
+      "bytes": 2240
+    },
+    "source-tree/fw/sysctl/core/romflash.c": {
+      "sha256": "328b0e24e48db45dc8909668ad501e0ba26d91f08f156bcfe84419c8eabe044a",
+      "bytes": 2740
+    },
+    "source-tree/fw/sysctl/core/spiflash.c": {
+      "sha256": "57edad65e11a5fbb44b679d53c9c1534ad2756499d830f33616d7f5fb3b1b8f6",
+      "bytes": 2815
+    },
+    "source-tree/fw/sysctl/core/sysctl.c": {
+      "sha256": "e9dfdd0a227f50c4d6ce79185c83458c5584488303e5781aee7a3978356d9513",
+      "bytes": 9901
+    },
+    "source-tree/fw/sysctl/core/sysctl.h": {
+      "sha256": "eb72406ce9c030adf69b08f58f385860125d98c3feb1c1254a77360a5634ad46",
+      "bytes": 6861
+    },
+    "source-tree/fw/sysctl/pins.h": {
+      "sha256": "76b3f51ae0bb2b2f1f9591ba2a684b5456f14113defcaee7ed68a2eed3c696d7",
+      "bytes": 1576
+    },
+    "source-tree/fw/test/check.h": {
+      "sha256": "617d99ec30d51bd56428776ed45a5e27cd379b89538af4d9675844dce09fad4d",
+      "bytes": 1032
+    },
+    "source-tree/fw/test/epdmodel.c": {
+      "sha256": "a113eabc6d8d26678b7431b355350cdf1c7beff126c2becda7c4e495b5a3f8db",
+      "bytes": 12555
+    },
+    "source-tree/fw/test/epdmodel.h": {
+      "sha256": "0f1d73b3a6109055e56f7a181c5514ad32ff8875fff97798b2456f7bc84209cb",
+      "bytes": 4348
+    },
+    "source-tree/fw/test/gpu_golden.c": {
+      "sha256": "e7f93f28f3aed3ed990535d26db4df3eeeaf393dddb8b5a6e3ce2bd4d4323fd0",
+      "bytes": 1306
+    },
+    "source-tree/fw/test/swdtarget.c": {
+      "sha256": "4903f52b1b4efbb36d0e0aa928a2901f48e86c5aec203352f44107466f73cce2",
+      "bytes": 10581
+    },
+    "source-tree/fw/test/swdtarget.h": {
+      "sha256": "c04a5283edd4843b430fcf611c6c802b48cf4611d240317b271dc1aed1721adc",
+      "bytes": 2040
+    },
+    "source-tree/fw/test/sysctl_sim.c": {
+      "sha256": "be83e535da9d17c32c61b49e30292b60f1dad676e6e97cf104ae93706bb2ebd5",
+      "bytes": 6574
+    },
+    "source-tree/fw/test/sysmachine.c": {
+      "sha256": "6ea9294355128a9af495e72371d893e5ba4fd793fc8621e07f3807ef3e590ade",
+      "bytes": 6703
+    },
+    "source-tree/fw/test/sysmachine.h": {
+      "sha256": "60ad57cdce096b04d2984ced0dd9fc2bf462b7c32365a59106c4b378305150b1",
+      "bytes": 1889
+    },
+    "source-tree/fw/test/sysmodels.c": {
+      "sha256": "c14fa1f32842ea88db5567212321740e77c1581ff93efad83d8c58a2a6fbc31f",
+      "bytes": 10246
+    },
+    "source-tree/fw/test/sysmodels.h": {
+      "sha256": "8f1b4e5a10a3a4acfc308228a7ce2f93e9869a9b3962122c20e2b2444942b1a4",
+      "bytes": 3740
+    },
+    "source-tree/fw/test/test_cardproto.c": {
+      "sha256": "78752445ace2f3232bf19393e5e0f649e09022e208fcd2937b3a03fcce0ea433",
+      "bytes": 4387
+    },
+    "source-tree/fw/test/test_eink.c": {
+      "sha256": "1cc5d13139c88195b14433ca5524a01793ee0d82783f9ab0feee78216231cc35",
+      "bytes": 31201
+    },
+    "source-tree/fw/test/test_gpu.c": {
+      "sha256": "782d9197f80ad2cd377126f120be1bddbf3d77f0fd0003f55de91fd4539bfa41",
+      "bytes": 13435
+    },
+    "source-tree/fw/test/test_iocard.c": {
+      "sha256": "b0e782d055ba739eb32f6d4c3c2ed50de38c29dae20aefcd5c20d50c8e3af51b",
+      "bytes": 7434
+    },
+    "source-tree/fw/test/test_recorded.c": {
+      "sha256": "dfba86f58cf935cc63881e498145c42f5417493bfbfbdaba523a796f16903bfb",
+      "bytes": 3137
+    },
+    "source-tree/fw/test/test_storage.c": {
+      "sha256": "ba9ab58648ed2133a5e879d6466e024c6c69d6daaf1133820f4788f0c426664b",
+      "bytes": 26790
+    },
+    "source-tree/fw/test/test_sysctl.c": {
+      "sha256": "71c1a6c5227855e2c1de6871af617b02f876307ff2cad598174995f794354a55",
+      "bytes": 32563
+    },
+    "source-tree/fw/test/test_wifi.c": {
+      "sha256": "203619ccd95e529df38659236d06d1f6fada32de7801b77dffaacf9da9ca83eb",
+      "bytes": 21671
+    },
+    "source-tree/fw/third_party/fatfs/00history.txt": {
+      "sha256": "4ede9c612e34e90b03a14bf4a217247ad073af5c4d8b1a36eb947320713ad28f",
+      "bytes": 13585
+    },
+    "source-tree/fw/third_party/fatfs/00readme.txt": {
+      "sha256": "3fca752ba045c00269388250c64f7b9bffe9fae4272b6750de39a672b67a0af5",
+      "bytes": 861
+    },
+    "source-tree/fw/third_party/fatfs/LICENSE.txt": {
+      "sha256": "2576183a3e1c2d2f4b3628a7ef93c2f937879698abdd6d554dd718e79062e079",
+      "bytes": 1937
+    },
+    "source-tree/fw/third_party/fatfs/README.md": {
+      "sha256": "4144faae0c7e1be46d45ea7d5ea48e2dfe720d75460fd4f0b86034c0a13758c7",
+      "bytes": 982
+    },
+    "source-tree/fw/third_party/fatfs/diskio.h": {
+      "sha256": "43b63bc5d1c35b2aa4a57c4e1cd7b66ab318748b51e9c6b12aded2574896e73c",
+      "bytes": 2693
+    },
+    "source-tree/fw/third_party/fatfs/ff.c": {
+      "sha256": "2bed98e3f7708e4520cfcf69a855156458543ec9ea592d35630c501c2fd73e5f",
+      "bytes": 259830
+    },
+    "source-tree/fw/third_party/fatfs/ff.h": {
+      "sha256": "432bde036a1570d16de4716f9daf96fdeb04fb45726ca8560108222b625ee7a5",
+      "bytes": 16635
+    },
+    "source-tree/fw/third_party/fatfs/ffconf.h": {
+      "sha256": "797c30b39fb0ea4136846158948666af97612587a96986fba28355d31ba18b23",
+      "bytes": 12027
+    },
+    "source-tree/fw/wifi/core/wifi.c": {
+      "sha256": "02fd13cc917f9844934df4d2cf44debd37f4e717dabde479ab7a210b112ccec1",
+      "bytes": 12349
+    },
+    "source-tree/fw/wifi/core/wifi.h": {
+      "sha256": "5745a42c52a7a2adfecbda3b5803cf224bb0706d32a955f7842382e038ae2ad9",
+      "bytes": 4383
+    },
+    "source-tree/fw/wifi/host/netposix.c": {
+      "sha256": "6ceae6ffccb1ed0ca7fe702a25a451baafbc1490da6950479a2a865b68913418",
+      "bytes": 10386
+    },
+    "source-tree/fw/wifi/host/netposix.h": {
+      "sha256": "0565f213413b41e09a818ed8e71a5a0a3584881846cbf0a4dad255947f986b2a",
+      "bytes": 353
+    },
+    "source-tree/fw/wifi/pins.h": {
+      "sha256": "aa062e51e23069dfa8e8c1801fc5dac75f36e88229cc8a3b4b6ea1e9e59b55ab",
+      "bytes": 713
+    },
+    "source-tree/fw/wifi/port/esp32c3/CMakeLists.txt": {
+      "sha256": "9dc028fa5012164120b7a58f3ce3d84d8d6d0cd90309ffa20662576fb0cd47f7",
+      "bytes": 182
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/CMakeLists.txt": {
+      "sha256": "e6416629ec47899532fab18cc0a657f8aaae96a2d2e97e4e20601ea26d3a6e87",
+      "bytes": 493
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/Kconfig.projbuild": {
+      "sha256": "0f378531bcec3054bc67df9de064fc147e7597159dd498daeae3b0ca37af365c",
+      "bytes": 417
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/frames.c": {
+      "sha256": "92f18311c27c25905d3251f673fb4d01c7f9b550a5a072dfdac3876149160162",
+      "bytes": 2525
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/frames.h": {
+      "sha256": "e12c1492c2abc2c39d33fff6d99c62db620cc04d310ae5c7a55ab053f86cf3a1",
+      "bytes": 1500
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/main.c": {
+      "sha256": "0ebf5e8c2c83cef2e84f451d9435acbeeb449adfd09d248e08d6ced78c736254",
+      "bytes": 2208
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/netesp.c": {
+      "sha256": "5232bf35b6223f4d2538ae751cf8bffd47e5005339f4fe65ae841d9f3c4c0dd9",
+      "bytes": 17979
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/netesp.h": {
+      "sha256": "64a8daf0277a22fcb087f530949e6aa9eced6f79962543b5008e1676940f1d22",
+      "bytes": 270
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/transport.h": {
+      "sha256": "49166b18eeda5f2ac5b6a62d85bb4a97b2925ba0be74cf08cbe4d43577feab27",
+      "bytes": 526
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/transport_slotdev.c": {
+      "sha256": "6b0e80d40fe876da87aa415b40d479793e780972cd32880fdf2ff56405d1952f",
+      "bytes": 1594
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/transport_spi.c": {
+      "sha256": "cf201e54dd3d777ab1e3470a3d8f1c25f7cbd7cb355580f4e2c1748e7cc4e8c4",
+      "bytes": 2331
+    },
+    "source-tree/fw/wifi/port/esp32c3/main/transport_uart.c": {
+      "sha256": "a81f0b2ccca9378737c881f36af3742a608490dd16f82529938fcc6e215a055c",
+      "bytes": 2198
+    },
+    "source-tree/fw/wifi/port/esp32c3/sdkconfig.defaults": {
+      "sha256": "9f188a8956499fb267e889a3cfa9f048c2199904a2d64cff01021e920f3094f3",
+      "bytes": 433
+    },
+    "source-tree/fw/wifi/port/esp32c3/sdkconfig.qemu": {
+      "sha256": "18ef553a30e1c797ec042047d89b6f45c00b7e09395749d3e6d4c2cdd74e8aa3",
+      "bytes": 45
+    },
+    "source-tree/hw/boards/rp2040card.py": {
+      "sha256": "5bc7220543ab38aee0b88fb8ccfd62ddcaeba289e88134a924838c8855f55a56",
+      "bytes": 23797
+    },
+    "source-tree/hw/boards/storage-full-route-seed.json": {
+      "sha256": "8e8ae7605fa79a333f7f7344e8beba21a06053e02d67a80f88aa1b2f80beca24",
+      "bytes": 346569
+    },
+    "source-tree/hw/boards/storage.py": {
+      "sha256": "dc51efbc34ff0207e3eb023cd7650b4ee0fa808c4297d8fcd5eeffebe13fa5c9",
+      "bytes": 12690
+    },
+    "source-tree/hw/lib/cupc8.kicad_sym": {
+      "sha256": "0a6d9b44f623ca4645df754096ed9d5b319911ded9e6de1874bfb587edca8ca3",
+      "bytes": 51684
+    },
+    "source-tree/hw/lib/cupc8.pretty/D_SOD-123FL.kicad_mod": {
+      "sha256": "c0f9c166402ea5d6d3c29f8e5e0b98e98c0a1e9c91412d71f5aec8fe8d1da288",
+      "bytes": 1512
+    },
+    "source-tree/hw/lib/cupc8.pretty/EInk_Header_Legend.kicad_mod": {
+      "sha256": "9098eb3bc7bce044edae42f215d5ee1fd1c5e0e7be493111d38d5c3ce3a4a45f",
+      "bytes": 1670
+    },
+    "source-tree/hw/lib/cupc8.pretty/HDMI_A_SHOUHAN_HDMI-19PIN-043.kicad_mod": {
+      "sha256": "2e78285fc24e9a00bb2ad3b6f8ca25c1cddc5d3d7e2f3f6882b5dc5d0a233e86",
+      "bytes": 4397
+    },
+    "source-tree/hw/lib/cupc8.pretty/KaplanLabs_Logo_10mm.kicad_mod": {
+      "sha256": "c6f88e09cbd380370077130e9f4213225334b314230bb195eac017c6c685b634",
+      "bytes": 395744
+    },
+    "source-tree/hw/lib/cupc8.pretty/KaplanLabs_Logo_12mm.kicad_mod": {
+      "sha256": "b3e883ab92da058bb510d12ffbdec2486fd350a0406af63201937ad69c90c3ac",
+      "bytes": 389198
+    },
+    "source-tree/hw/lib/cupc8.pretty/SOFNG_PCIE-64P11L.kicad_mod": {
+      "sha256": "6ee9ee690ad1f8d133a1180e76ec96058d10fe28f9d66c0ea546966c273e40b7",
+      "bytes": 7965
+    },
+    "source-tree/hw/lib/cupc8.pretty/TestPad_D1.0mm.kicad_mod": {
+      "sha256": "8cf710f96aebcf0e08814e92db8fc7bcac11d20b978fede15c7aede26acbff3d",
+      "bytes": 797
+    },
+    "source-tree/hw/lib/cupc8.pretty/UMAX_3183-10112P1T.kicad_mod": {
+      "sha256": "3dde14b9c1e3cf90eba3f8a7f45fd4857d7a1cfcaa50f8b2a718169405eb6f1f",
+      "bytes": 11526
+    },
+    "source-tree/hw/lib/cupc8.pretty/UMAX_3183-10200P1T.kicad_mod": {
+      "sha256": "e587964a9b7d8a85b0acf42a074026c75f20ddce795f7dc514507ff31c091199",
+      "bytes": 8018
+    },
+    "source-tree/hw/lib/cupc8.pretty/USB_A_SOFNG_USB-302S-T.kicad_mod": {
+      "sha256": "8c95f9b6e851c6014d8fac5c097ec7e0f8b113b8019584fbdfaabc1858fd8bc9",
+      "bytes": 2874
+    },
+    "source-tree/hw/lib/cupc8_main.kicad_sym": {
+      "sha256": "c6da9de1c8bf447ab754ff99522c89a72d9b66d09af9454f555996fa6cd1b27c",
+      "bytes": 56102
+    },
+    "source-tree/hw/lib/jlc.3dshapes/CONN-TH_36P-P1.00-V_3183-XXXXXPXT.step": {
+      "sha256": "9afcad8bf2bff71791af4e52318b1c011ebac9b98b9be986ff78a583fd0a999f",
+      "bytes": 3005633
+    },
+    "source-tree/hw/lib/jlc.3dshapes/CONN-TH_36P-P1.00-V_3183-XXXXXPXT.wrl": {
+      "sha256": "0c022bba65661ea572bcc49d3a06b3494df357bf06ccfb9a13d6de8d39ed92df",
+      "bytes": 354348
+    },
+    "source-tree/hw/lib/jlc.3dshapes/CONN-TH_98P-P1.00-V_3183-XXXXXPXT.step": {
+      "sha256": "2f5edb803ffa27f78a1418c1417b6a5229ab259a3e7eecda90a015b3e8aff5ec",
+      "bytes": 7275543
+    },
+    "source-tree/hw/lib/jlc.3dshapes/CONN-TH_98P-P1.00-V_3183-XXXXXPXT.wrl": {
+      "sha256": "8c30815d8477f40333f0e0b1ec77490cb5fec7d91f7155ff7353ec2c08d1e64c",
+      "bytes": 975188
+    },
+    "source-tree/hw/lib/jlc.3dshapes/CRYSTAL-SMD_4P-L3.2-W2.5-BL.step": {
+      "sha256": "46e80157d859ee18098fd27c351039895d29a036f1c1dfadefaf26fa56124a8d",
+      "bytes": 1285348
+    },
+    "source-tree/hw/lib/jlc.3dshapes/CRYSTAL-SMD_4P-L3.2-W2.5-BL.wrl": {
+      "sha256": "44a3909b050bdb95f8ce007f9dbbda4a81ea6842b089ab23bbc1283ff45bd0aa",
+      "bytes": 121771
+    },
+    "source-tree/hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.step": {
+      "sha256": "d2fd1887ec716a722aced41062f9fbac26e1527132965059b307952f8ac7d12c",
+      "bytes": 1639670
+    },
+    "source-tree/hw/lib/jlc.3dshapes/HDMI-SMD_HDMI-9PIN-043.wrl": {
+      "sha256": "24acb14ffb37129dfa47b6ff7b466bc277db03baa3cf519f7d0edc7acd7d689d",
+      "bytes": 186451
+    },
+    "source-tree/hw/lib/jlc.3dshapes/HDR-TH_9P-P2.54-M-WI-1X9P.step": {
+      "sha256": "7d24c8dd1c1770d17dea764b9a57b5b91bd19c81e760cd306741a9963440866c",
+      "bytes": 1044753
+    },
+    "source-tree/hw/lib/jlc.3dshapes/HDR-TH_9P-P2.54-M-WI-1X9P.wrl": {
+      "sha256": "e0d607f4aff1d48df2a542ec0113696268092063bdeb7a1f90bf5bb07922b04c",
+      "bytes": 69573
+    },
+    "source-tree/hw/lib/jlc.3dshapes/IND-SMD_L3.0-W3.0-H1.5_FNR30XXS.step": {
+      "sha256": "ba081492e99dfd8ba5bc7f455aa66903e1a9a788cdee7f6555acba176340e47d",
+      "bytes": 1398211
+    },
+    "source-tree/hw/lib/jlc.3dshapes/IND-SMD_L3.0-W3.0-H1.5_FNR30XXS.wrl": {
+      "sha256": "f24cee21b56f8d74cef9a2e495f3a104140646c6ed7618886192c79cc65f0a17",
+      "bytes": 128010
+    },
+    "source-tree/hw/lib/jlc.3dshapes/IND-SMD_L4.2-W4.4-H2.0.step": {
+      "sha256": "55f719de55b9bf6cd6cd0f98998fbbd4722a4469b20dd9cd70d47c6756aeb5b6",
+      "bytes": 1725939
+    },
+    "source-tree/hw/lib/jlc.3dshapes/IND-SMD_L4.2-W4.4-H2.0.wrl": {
+      "sha256": "479f1c215c0c2e95e5c0b77df8884b95dc87aa70189ddf3c1aa2e5056f82961e",
+      "bytes": 61250
+    },
+    "source-tree/hw/lib/jlc.3dshapes/IND-SMD_L5.0-W5.0-H2.1.step": {
+      "sha256": "ee798af8e2f6665d9680faf71356a2cddec4efd09ba1a7ced8cd7d5457e47a98",
+      "bytes": 2548981
+    },
+    "source-tree/hw/lib/jlc.3dshapes/IND-SMD_L5.0-W5.0-H2.1.wrl": {
+      "sha256": "e68c89145d7290de5a5ffaac4185738f8de1f060d7051c70a5ba09094d3757b1",
+      "bytes": 250042
+    },
+    "source-tree/hw/lib/jlc.3dshapes/OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE.step": {
+      "sha256": "8bcf4d183d3147aea68863bb8059a9f046e83c9789b578278de22b3d8b3c56a0",
+      "bytes": 1373072
+    },
+    "source-tree/hw/lib/jlc.3dshapes/OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE.wrl": {
+      "sha256": "dc0d3319bd80c6a48bd2caa66a2e3599a7f29679e8b8cdff344c5d2c1e9e106b",
+      "bytes": 147355
+    },
+    "source-tree/hw/lib/jlc.3dshapes/PCIE-SMD_PCIE-64P11L.step": {
+      "sha256": "826b50759f09ff037b2df4d7f330b0c0ee472a7050c25313c90d6ec414f64158",
+      "bytes": 3333994
+    },
+    "source-tree/hw/lib/jlc.3dshapes/PCIE-SMD_PCIE-64P11L.wrl": {
+      "sha256": "730274d0f8600da47771630514f33b8f64a016cee4d1d9e83a48702b40fe6b90",
+      "bytes": 478132
+    },
+    "source-tree/hw/lib/jlc.3dshapes/PLCC-32_L14.0-W11.5-P1.27-T.step": {
+      "sha256": "ccdfaecb59be289a477891e8e1410b3c91bd5456e10b22bb9dfc3d552fd38137",
+      "bytes": 1577821
+    },
+    "source-tree/hw/lib/jlc.3dshapes/PLCC-32_L14.0-W11.5-P1.27-T.wrl": {
+      "sha256": "2195310263122622a06017286f253375fc748fe10abcacc172ffc7fbcea71326",
+      "bytes": 190680
+    },
+    "source-tree/hw/lib/jlc.3dshapes/R0402-8P_L2.0-W1.0-H0.5.step": {
+      "sha256": "5447f0e2f557ef5d92d2b1afd4a43c51a09671742a92ebdaa7e35fca8dc2740b",
+      "bytes": 1402182
+    },
+    "source-tree/hw/lib/jlc.3dshapes/R0402-8P_L2.0-W1.0-H0.5.wrl": {
+      "sha256": "7fcc4454ac652cf6267a586fa4eaed57a069833df81eeab901d70fce760baaaf",
+      "bytes": 30301
+    },
+    "source-tree/hw/lib/jlc.3dshapes/R0603-8P_L3.2-W1.6-H0.6.step": {
+      "sha256": "707b409dad0bc81e342cde3bc884afdeaa6dc1df7afd711ff034d174afc105ad",
+      "bytes": 1401820
+    },
+    "source-tree/hw/lib/jlc.3dshapes/R0603-8P_L3.2-W1.6-H0.6.wrl": {
+      "sha256": "1b58f30a43579f1f638c23bb471f99cfb734ef9decece1d3aee98f478e715dda",
+      "bytes": 30113
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SC-70-5_L2.1-W1.3-H1.0-LS2.1-P0.65.step": {
+      "sha256": "80e42aa0781e4ef1b4e14ad0d3b8a699f43cb31bb43c1aa2f219343ad9dfbceb",
+      "bytes": 2208816
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SC-70-5_L2.1-W1.3-H1.0-LS2.1-P0.65.wrl": {
+      "sha256": "c8940a540bc4f76c965abcf56790d1de3b3571c9339d0d9042c7d1f377acdee8",
+      "bytes": 95729
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOIC-8_L5.3-W5.3-H1.9-LS7.9-P1.27.step": {
+      "sha256": "9fa02890c7a92d7c26a0182382a0505c3ed2e075ce1ecbf7c6dda419d5ca0ae1",
+      "bytes": 3307579
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOIC-8_L5.3-W5.3-H1.9-LS7.9-P1.27.wrl": {
+      "sha256": "ca10a7dd660f5c145b727a3f65f6e1fc81503c72ca4442e7a3cd64fd5ff71e40",
+      "bytes": 566523
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-143-4P_L3.0-W1.3-H1.0-LS2.3-P1.70.step": {
+      "sha256": "ef9d34fab517812d310b8982d2adfeaa2e0d1281578a8fe9fb91b196d2e77475",
+      "bytes": 1246401
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-143-4P_L3.0-W1.3-H1.0-LS2.3-P1.70.wrl": {
+      "sha256": "e3d7e2cd19c4540be9696af581373bf88612613bc344d9c2e0801b4df4973d59",
+      "bytes": 130147
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-223-4P_L6.5-W3.5-H1.6-LS7.0-P2.30.step": {
+      "sha256": "626f754b8234c4be995185bb4b6227759060a36e52c567a0dae6a2f3182eb889",
+      "bytes": 2956913
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-223-4P_L6.5-W3.5-H1.6-LS7.0-P2.30.wrl": {
+      "sha256": "031133c022ba286194f6fefa35a371bd9d3eef551fc674fbfe589a16a854c38a",
+      "bytes": 256083
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-23-3L_L2.9-W1.6-H1.1-LS2.8-P0.95.step": {
+      "sha256": "5dcb6e5e088c8891b321686a6eb872c57d71b75753aac8519a866feb21821607",
+      "bytes": 1214930
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-23-3L_L2.9-W1.6-H1.1-LS2.8-P0.95.wrl": {
+      "sha256": "1ae883fdd848a10e526ae21b24f579cb50aab0aad75ef6857588e18a24ad2afa",
+      "bytes": 118701
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-23-5_L2.9-W1.6-H1.1-LS2.8-P0.95.step": {
+      "sha256": "428abdfbc472055993422a992aaa8df42fe862d74021d8cd7cbee9d7277f41b1",
+      "bytes": 2944507
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-23-5_L2.9-W1.6-H1.1-LS2.8-P0.95.wrl": {
+      "sha256": "a31f19311654f993ffb94fb7fcd835845aabb3e184ee28f9c23578d347cbf660",
+      "bytes": 379986
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95.step": {
+      "sha256": "f24d05dd87ac04518fdaed88a57d135441fe22452089387784c4deda2bc09d61",
+      "bytes": 3277159
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-23-6_L2.9-W1.6-H1.5-LS2.8-P0.95.wrl": {
+      "sha256": "3da95a191588d286e5c8ef4e2d1f8ea807bca93fb0b1a235252b68e1511ec5cb",
+      "bytes": 450670
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.step": {
+      "sha256": "11100b2dda71dd37a1c2d41349f80ca631c4710f2fa6d007c41aa9b00c7f33a2",
+      "bytes": 811001
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.wrl": {
+      "sha256": "6d478e1984c481a5e741c4d24ba06067b1d2eb026a8e1695bba5689f4d123dfd",
+      "bytes": 84389
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-563-6P_L1.6-W1.2-H0.6-LS1.6-P0.50.step": {
+      "sha256": "2ca3bdb69ee8a5f8cf104acb20bdf0da884fd8b5bb51859a2c34817e3e8e168d",
+      "bytes": 2388560
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SOT-563-6P_L1.6-W1.2-H0.6-LS1.6-P0.50.wrl": {
+      "sha256": "db34bfebae9aa5f9411b81ed6d6db8cd900ea05ea1f552d718d2d43e15d72017",
+      "bytes": 97724
+    },
+    "source-tree/hw/lib/jlc.3dshapes/STSOP-32_L8.0-W11.8-H1.2-LS13.4-P0.50.step": {
+      "sha256": "b0ab367328ed4f51fe5097ebb84693da28bf4f6ceb696feb431a50f2b14d620e",
+      "bytes": 7393966
+    },
+    "source-tree/hw/lib/jlc.3dshapes/STSOP-32_L8.0-W11.8-H1.2-LS13.4-P0.50.wrl": {
+      "sha256": "9c51de638b636dff9978c6c95e748e67b0117094b0327e1f3746f8fd32cd7f06",
+      "bytes": 1832902
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5.step": {
+      "sha256": "2b1a5886304dd712e477739b62a80c5f568d59d1771f5a236c6ebefee5b2f5b1",
+      "bytes": 1555846
+    },
+    "source-tree/hw/lib/jlc.3dshapes/SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5.wrl": {
+      "sha256": "13e20049f53e02cf9f1f562663a79da851fd1d7df3139be1fdf219862bcd8f91",
+      "bytes": 155256
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TF-SMD_TF-01A.step": {
+      "sha256": "c8adafc89d4299c188edf65906ef5205d14e60c42a22fa6bf97c5af92f0bdcc9",
+      "bytes": 3576373
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TF-SMD_TF-01A.wrl": {
+      "sha256": "7f8feef573fc23cf764c6b851df98dfdde038e4667604c0da8f971c5931122f9",
+      "bytes": 3121191
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL.step": {
+      "sha256": "84d6f51aaa7db1dd0a4307231b1a6ceb7c0afc2f08269245aea8e88a364f54d3",
+      "bytes": 5588925
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL.wrl": {
+      "sha256": "467826074db02ff27531c64b2b90a9e35738df3e06a666db74d9f2c65504d32c",
+      "bytes": 566984
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSOT-23-5_L2.9-W1.6-H1.00-LS2.8-P0.95.step": {
+      "sha256": "97059e3d687fbdcc15f53b7e35bdf0682068de607573cada3eaf9552b57c8ea6",
+      "bytes": 2975895
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSOT-23-5_L2.9-W1.6-H1.00-LS2.8-P0.95.wrl": {
+      "sha256": "576856ffd58483b51e2e8f651d079ea4b96e51bb168539a16a61165875fbcdbc",
+      "bytes": 405533
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSOT-23-6_L2.9-W1.6-H1.1-LS2.8-P0.95.step": {
+      "sha256": "dd29784c04129b052f7e155281493d618169bcca7010a3be75a40dc34da74ce1",
+      "bytes": 3189520
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSOT-23-6_L2.9-W1.6-H1.1-LS2.8-P0.95.wrl": {
+      "sha256": "77d83aef6d336c2a54adc5ad5f8491f9bcf72077a083d5031fc446acc45e5312",
+      "bytes": 474401
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSSOP-14_L5.0-W4.4-H1.0-LS6.4-P0.65.step": {
+      "sha256": "edee5bac5c525e4702e736c9feddb2dfb6a645ff5f964a7829aa48781736f168",
+      "bytes": 4412556
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSSOP-14_L5.0-W4.4-H1.0-LS6.4-P0.65.wrl": {
+      "sha256": "ef505f9dae99da4494ef73ebfdca2ed0520697eac9abc0d76e6bedb45a668156",
+      "bytes": 951369
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSSOP-16_L5.0-W4.4-H1.0-LS6.4-P0.65.step": {
+      "sha256": "684b2d11f7a055c38254eef824e203106e06c3dc151b194d126a8ebd59075f52",
+      "bytes": 4857396
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSSOP-16_L5.0-W4.4-H1.0-LS6.4-P0.65.wrl": {
+      "sha256": "6932970628cac61b308f90d5689e626eea7ff90e877b785eed6be262e746c881",
+      "bytes": 925247
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSSOP-24_L7.8-W4.4-H1.0-LS6.4-P0.65.step": {
+      "sha256": "696ed4df071ff20fce3b951423c783f4e0abcca3b61550c8da872baec990982e",
+      "bytes": 6119105
+    },
+    "source-tree/hw/lib/jlc.3dshapes/TSSOP-24_L7.8-W4.4-H1.0-LS6.4-P0.65.wrl": {
+      "sha256": "817b2c2ca20e4851a503907c58326f3c8ff3a27b047ed084776c76833e44a2d0",
+      "bytes": 1354968
+    },
+    "source-tree/hw/lib/jlc.3dshapes/USB-A-SMD_4P-L14.3-W13.7-H8.2.step": {
+      "sha256": "ffa9c6f2e06922142179189448b6d7bbd374e331ea7e928aaf3812ca5c1f3397",
+      "bytes": 1532245
+    },
+    "source-tree/hw/lib/jlc.3dshapes/USB-A-SMD_4P-L14.3-W13.7-H8.2.wrl": {
+      "sha256": "abd3136bc0264a027be014565a8cbfb8d024d7d93ce192c277984530271ca8d1",
+      "bytes": 195943
+    },
+    "source-tree/hw/lib/jlc.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.step": {
+      "sha256": "8e2740d91e1fef9c16bc8d316463ca6b3839f7c4f3ea068128ae1feb5b6c300e",
+      "bytes": 1377567
+    },
+    "source-tree/hw/lib/jlc.3dshapes/USB-C_SMD-TYPE-C-31-M-12_1.wrl": {
+      "sha256": "0457a14076c3c2f9d16ed2a995ac1f248173ab9ac1c200f99988a33d97d111b5",
+      "bytes": 548426
+    },
+    "source-tree/hw/lib/jlc.3dshapes/VQFN-10_L2.0-W2.0-P0.45-TL.step": {
+      "sha256": "d7a805b97e8c24cc388b72ed83b5ae958a63b7f9920c710381bf13da05fc5dd2",
+      "bytes": 1363307
+    },
+    "source-tree/hw/lib/jlc.3dshapes/VQFN-10_L2.0-W2.0-P0.45-TL.wrl": {
+      "sha256": "091397b6220840b422eabf3ad483514adfc1dba0ca097d1b5114318c4b0e7f44",
+      "bytes": 112092
+    },
+    "source-tree/hw/lib/jlc.3dshapes/VSON-10_L3.0-W2.0-P0.50-TL.step": {
+      "sha256": "0b7e4c915ebc03bd8f3e774e15c7fe1735bc16ce53746dda86b17af4fac6f750",
+      "bytes": 823310
+    },
+    "source-tree/hw/lib/jlc.3dshapes/VSON-10_L3.0-W2.0-P0.50-TL.wrl": {
+      "sha256": "5239ee6927982eaa17558413b5f5250b21a03fce03a5e50d92ed0ff171a7fe0d",
+      "bytes": 55840
+    },
+    "source-tree/hw/lib/jlc.3dshapes/WIFIM-SMD_61P-L13.2-W12.5-P0.80.step": {
+      "sha256": "f81a6f3de7b0356d862e5d1a1b5a9f5dc8b0924925902afdb4aa11e35eb07604",
+      "bytes": 1101159
+    },
+    "source-tree/hw/lib/jlc.3dshapes/WIFIM-SMD_61P-L13.2-W12.5-P0.80.wrl": {
+      "sha256": "b4cd95b9964a8736d91e8fff1a583357b40c856f70646f5f94eb314ff4fa7f76",
+      "bytes": 111216
+    },
+    "source-tree/hw/lib/jlc.kicad_sym": {
+      "sha256": "419dcd7c66ea7e573840c67d588d7b39fc09d0acce135db3f2ce06c04834b704",
+      "bytes": 227571
+    },
+    "source-tree/hw/lib/jlc.pretty/CONN-TH_36P-P1.00-V_3183-XXXXXPXT.kicad_mod": {
+      "sha256": "cb1ca9725b47ace22e8144f866555ef6835aec2f632619304c3533c7e661bdef",
+      "bytes": 8510
+    },
+    "source-tree/hw/lib/jlc.pretty/CONN-TH_98P-P1.00-V_3183-XXXXXPXT.kicad_mod": {
+      "sha256": "da7b534dff5f280eb3c98c29495a23aa01ca2df131b437c89fed78d8e2776396",
+      "bytes": 12586
+    },
+    "source-tree/hw/lib/jlc.pretty/CRYSTAL-SMD_4P-L3.2-W2.5-BL.kicad_mod": {
+      "sha256": "753a29af0fbe361963ee328f31f30561a061fe5d2babc4fd8bfb8a6667e6da20",
+      "bytes": 1865
+    },
+    "source-tree/hw/lib/jlc.pretty/HDMI-SMD_HDMI-19PIN-043.kicad_mod": {
+      "sha256": "18956f41d228c5b73211094749537f2100fc6a643b55f310c9bf708a7323ec81",
+      "bytes": 3754
+    },
+    "source-tree/hw/lib/jlc.pretty/HDR-TH_9P-P2.54-H-M-W10.4.kicad_mod": {
+      "sha256": "96780d44be7f1adc701ae8e8416176cad49e712e49279b7edea83a94a07036bc",
+      "bytes": 6405
+    },
+    "source-tree/hw/lib/jlc.pretty/IND-SMD_L3.0-W3.0_FNR30XXS.kicad_mod": {
+      "sha256": "eac81d00c9eb9b8227b546ebabbb609ce02a47d6f5b7debd3f2ebc3b1ab9cb86",
+      "bytes": 1255
+    },
+    "source-tree/hw/lib/jlc.pretty/IND-SMD_L4.4-W4.2.kicad_mod": {
+      "sha256": "b03c7885e65fad5d9ca787fab35a8fafc411977da561475d0a2334727b69943b",
+      "bytes": 1615
+    },
+    "source-tree/hw/lib/jlc.pretty/IND-SMD_L5.0-W5.0.kicad_mod": {
+      "sha256": "e0b6890b20ac4c7d61b2da99aa7e815eba9bd0709688d960f64495c08b5a59a6",
+      "bytes": 1305
+    },
+    "source-tree/hw/lib/jlc.pretty/OSC-SMD_4P-L3.2-W2.5-BL_TG-5006CE.kicad_mod": {
+      "sha256": "c94def716cb7261b0d29ca73b42924f6850cdeab43bcc463b172917bfce435c1",
+      "bytes": 1681
+    },
+    "source-tree/hw/lib/jlc.pretty/PCIE-SMD_PCIE-64P11L.kicad_mod": {
+      "sha256": "f21e479cb930b2e38cdc25c00f0d6d71330f5a6c0a0c58b66ad87f57878374a6",
+      "bytes": 7988
+    },
+    "source-tree/hw/lib/jlc.pretty/PLCC-32_L14.0-W11.5-P1.27-T.kicad_mod": {
+      "sha256": "105c9209a79a0629483745bed2e03a966fa42ec72847f48c52a0fcce3b425d22",
+      "bytes": 6585
+    },
+    "source-tree/hw/lib/jlc.pretty/RES-ARRAY-SMD_0402-8P-L2.0-W1.0-BL.kicad_mod": {
+      "sha256": "de7a519781d8a21442dd0c215e2f270d4254fe4bb6ec65fe30047c6576603efd",
+      "bytes": 2140
+    },
+    "source-tree/hw/lib/jlc.pretty/RES-ARRAY-SMD_0603-8P-L3.2-W1.6-BL.kicad_mod": {
+      "sha256": "f514fd642a4eeef867f55d8f5540eaf817d38cee8d9d1d83cb3324308e6466c6",
+      "bytes": 2045
+    },
+    "source-tree/hw/lib/jlc.pretty/SC-70-5_L2.1-W1.3-P0.65-LS2.1-BR.kicad_mod": {
+      "sha256": "315d93c33910b062f26af2cb37541af5976cfc1728f460ca6b7e065c75b7a9b9",
+      "bytes": 1773
+    },
+    "source-tree/hw/lib/jlc.pretty/SOIC-8_L5.3-W5.3-P1.27-LS8.0-BL.kicad_mod": {
+      "sha256": "d862611798d2904cd07f412ca93c9abd13c4d50c32f295b715a2f622f8a4a8bf",
+      "bytes": 2100
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-143_L2.9-W1.3-P1.92-LS2.3-BR.kicad_mod": {
+      "sha256": "4a1c9f4b0211f88b1ffed81b1ed5208b0178b1f1daeb9f5531b0f697cf89b2a8",
+      "bytes": 1765
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-223-3_L6.5-W3.4-P2.30-LS7.0-BR.kicad_mod": {
+      "sha256": "f4502f56c6dcedf4499b842cab7f3387a07e940835abcce0fe5549b178d0acaf",
+      "bytes": 1754
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-23-3_L2.9-W1.6-P1.90-LS2.8-BR.kicad_mod": {
+      "sha256": "e4625b942e4cfae10ab0cc907670a7648139531c0ec02358abf8433a60300440",
+      "bytes": 1672
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BL.kicad_mod": {
+      "sha256": "b602e38f60132a90fcabdc7246b3e43a06e8bde71c39a77696395e779eb89145",
+      "bytes": 1843
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR.kicad_mod": {
+      "sha256": "0f87d053f5439e9a22383313f38c34b747fbadf45dafd1f0897b614253ccfc8a",
+      "bytes": 1847
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL.kicad_mod": {
+      "sha256": "776b2c6b862a64d3d2a01c9788a526db6accbab10c72ffb65138210894b8ae17",
+      "bytes": 1850
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR.kicad_mod": {
+      "sha256": "12c693853b820ab46405e1ed515a405c124a60b17a201c3fd4f448b177cb91ab",
+      "bytes": 1769
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-353-5_L2.0-W1.6-P0.65-LS2.1-BL.kicad_mod": {
+      "sha256": "df35a20c85048e831327a41a8cdb5860e4e5d2d2a615f22fb2093f663be33bd1",
+      "bytes": 1768
+    },
+    "source-tree/hw/lib/jlc.pretty/SOT-563_L1.6-W1.2-P0.50-LS1.6-BR.kicad_mod": {
+      "sha256": "a6a54b3a0a52a27b5b6a22aff7fad3f22941388df1c76fbdd4fb89bc6389ddcd",
+      "bytes": 1775
+    },
+    "source-tree/hw/lib/jlc.pretty/STSOP-32_L8.0-W11.8-P0.50-LS13.4-TL.kicad_mod": {
+      "sha256": "82125f2986683c8cbd82345020bdcca8b428f74c46e4d23f50c6641402835d78",
+      "bytes": 4294
+    },
+    "source-tree/hw/lib/jlc.pretty/SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5.kicad_mod": {
+      "sha256": "6168707309100a47d6fd0431294a3a9ee97b8b70335af9a68d30038307df182c",
+      "bytes": 3034
+    },
+    "source-tree/hw/lib/jlc.pretty/TF-SMD_TF-01A.kicad_mod": {
+      "sha256": "e33cb674853a4f83c5204fc16210ab6a825a25eb05a263069460fcfd2a7195ac",
+      "bytes": 3072
+    },
+    "source-tree/hw/lib/jlc.pretty/TQFP-144_L20.0-W20.0-P0.50-LS22.0-BL.kicad_mod": {
+      "sha256": "9170b22d5ab75dbe12565fbff90c16c81e5c96f1ff00f70262ab3332c2423d9b",
+      "bytes": 15731
+    },
+    "source-tree/hw/lib/jlc.pretty/TSOT-23-5_L2.9-W1.6-P0.95-LS2.8-BL.kicad_mod": {
+      "sha256": "acb4da8e931489b1f6bfc6243902a12dc5cba045756bd0b5e74200f8429510de",
+      "bytes": 1848
+    },
+    "source-tree/hw/lib/jlc.pretty/TSOT-23-6_L2.9-W1.6-P0.95-LS2.8-TL.kicad_mod": {
+      "sha256": "384e64773c39e93fd81c2fa18c387518d264d946a115e5466ab6da862133fc25",
+      "bytes": 1785
+    },
+    "source-tree/hw/lib/jlc.pretty/TSSOP-14_L5.0-W4.4-P0.65-LS6.4-BL.kicad_mod": {
+      "sha256": "d6aecf86b7fda4ceeb28289a0c2d0892a5801ccf353b9d6b03cbe2a930636df9",
+      "bytes": 2680
+    },
+    "source-tree/hw/lib/jlc.pretty/TSSOP-16_L5.0-W4.4-P0.65-LS6.4-BL.kicad_mod": {
+      "sha256": "76df0940875618cde55fade2d5564f3f9f90ff8f1d5a0b847077f1a2caf882a3",
+      "bytes": 2813
+    },
+    "source-tree/hw/lib/jlc.pretty/TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL.kicad_mod": {
+      "sha256": "13762a344f606c2c7586356a9a833bcc0a8ffa26ec7aff841eab049b2a558631",
+      "bytes": 3764
+    },
+    "source-tree/hw/lib/jlc.pretty/USB-A-SMD_USB-302S.kicad_mod": {
+      "sha256": "298481fb9ba8a3d8601a967d47912bad57e3efd26cd97864e72bdff17f87b920",
+      "bytes": 11983
+    },
+    "source-tree/hw/lib/jlc.pretty/USB-C_SMD-TYPE-C-31-M-12_1.kicad_mod": {
+      "sha256": "61a03dea590107f59c316d71c619db7d9abf5565a79f6e348d4a601fa574fd12",
+      "bytes": 3198
+    },
+    "source-tree/hw/lib/jlc.pretty/VQFN-10_L2.0-W2.0-P0.45-TL.kicad_mod": {
+      "sha256": "a1b54b3e687ec796d99a721746f9721d8f3ff0a24fb59107863227c1c9c29dc1",
+      "bytes": 4496
+    },
+    "source-tree/hw/lib/jlc.pretty/VSON-10_L3.0-W2.0-P0.50-TL.kicad_mod": {
+      "sha256": "1eeca6ff7ac5d56e67c65fb9ccfdc528ff83a2b0e1465c98c3ba3d473bcca0d7",
+      "bytes": 2209
+    },
+    "source-tree/hw/lib/jlc.pretty/WIFIM-SMD_61P-L13.2-W12.5-P0.80.kicad_mod": {
+      "sha256": "debea5a20804212c5e963a49a99dc6b6d354110ac684f81119b7aa8bb7c695ae",
+      "bytes": 7082
+    },
+    "source-tree/hw/lib/models/HRO_TYPE-C-31-M-12.step": {
+      "sha256": "b083e67ce4d06850a2c3835a6366f4012b2def64f8f2781636381ebcaa33e9a0",
+      "bytes": 3046649
+    },
+    "source-tree/hw/lib/models/HRO_TYPE-C-31-M-12.wrl": {
+      "sha256": "0457a14076c3c2f9d16ed2a995ac1f248173ab9ac1c200f99988a33d97d111b5",
+      "bytes": 548426
+    },
+    "source-tree/hw/parts/C111738.yaml": {
+      "sha256": "f8ffe1f759fbcec30b078c7829f4cdb0307300f7203f8cbb2646b50a5369f2c0",
+      "bytes": 405
+    },
+    "source-tree/hw/parts/C112455.yaml": {
+      "sha256": "23c1b1fdfb278c8594700a3589b53e57ef32dc3d6dbed7d7b284c6a0d1c1e058",
+      "bytes": 478
+    },
+    "source-tree/hw/parts/C131025.yaml": {
+      "sha256": "fea6998fdd2387cc5580d92da808adf601879f24214cb51762bf70237538a0e5",
+      "bytes": 648
+    },
+    "source-tree/hw/parts/C1348955.yaml": {
+      "sha256": "b3991f06b8ba6bd22d7385b2e0e365f5cc5b5e36e3aed954426bd3f8f8ba56a3",
+      "bytes": 824
+    },
+    "source-tree/hw/parts/C138714.yaml": {
+      "sha256": "4b1c410d89be4115eefa6d84f26a587e7f89c198913bc2c679e0765562678676",
+      "bytes": 548
+    },
+    "source-tree/hw/parts/C141836.yaml": {
+      "sha256": "0426c4db3276e2283236ab9d8063774ab0dff8c78e94948b1b07c6957c50be7a",
+      "bytes": 402
+    },
+    "source-tree/hw/parts/C151890.yaml": {
+      "sha256": "605b2cdf30694e36f62ab91231a86207a4c36c56e33898b89ae9d5a9f50d4aa2",
+      "bytes": 303
+    },
+    "source-tree/hw/parts/C1521989.yaml": {
+      "sha256": "476f10058a2c7cfcff36339643f5193b864146fa2e49c81d5c55074c9375cc9a",
+      "bytes": 3030
+    },
+    "source-tree/hw/parts/C160457.yaml": {
+      "sha256": "93c6a2ca35529b74b0f74086da43ea5720fb5ac203337e632c82da289d819c08",
+      "bytes": 485
+    },
+    "source-tree/hw/parts/C165948.yaml": {
+      "sha256": "be30a357b5772168aef1e7ecca8053c1da5a4a9b9cb0697c8f98243ea21c1b38",
+      "bytes": 604
+    },
+    "source-tree/hw/parts/C179173.yaml": {
+      "sha256": "91bcea20a7111ccd77de48e696a3a304ba4b1f3ebe27783e4a5e2edaf9b144ed",
+      "bytes": 624
+    },
+    "source-tree/hw/parts/C182716.yaml": {
+      "sha256": "cbf92a122739846c8447cde7d59b586048820baa58f84b5a60a6328211e96948",
+      "bytes": 572
+    },
+    "source-tree/hw/parts/C187836.yaml": {
+      "sha256": "8ca835143fea8819dccc5e7d0212bb80430c7d835cefbdf202646f23bd8bf52a",
+      "bytes": 387
+    },
+    "source-tree/hw/parts/C19188869.yaml": {
+      "sha256": "9ab68d19008304e5910c029253cd621cc482d6c012a656eade146bc1c7415cb0",
+      "bytes": 2160
+    },
+    "source-tree/hw/parts/C2040.yaml": {
+      "sha256": "9274136cf193085f17d3c38bb69a40f719e7c6b8cd4800b604a50cdf56ca398e",
+      "bytes": 1388
+    },
+    "source-tree/hw/parts/C20526.yaml": {
+      "sha256": "1b548aad18665db80120f064cd530397d196d41d3a12f3e8ff8fca898ae7a710",
+      "bytes": 322
+    },
+    "source-tree/hw/parts/C25501.yaml": {
+      "sha256": "daebf8dae15e4e3a0dc78caeaca124d2f2f9f2b08f58a886606734be86b7feb4",
+      "bytes": 756
+    },
+    "source-tree/hw/parts/C25508.yaml": {
+      "sha256": "0da147ce99fde07f26762ccd97250dc76d6f069b3a2f91b0718448f642c33ce7",
+      "bytes": 454
+    },
+    "source-tree/hw/parts/C2845237.yaml": {
+      "sha256": "c4329f6b9d03f916f5e9362cf528b5deb31575e969c4585178dfa5f8ffff2d10",
+      "bytes": 528
+    },
+    "source-tree/hw/parts/C2858275.yaml": {
+      "sha256": "62584640b912f69f5da94b6abfc611fdc494012498df7728906eb45fee457628",
+      "bytes": 900
+    },
+    "source-tree/hw/parts/C2911374.yaml": {
+      "sha256": "1c345fe80c55bf1bbd2edbe9d7cd184be6d9c51437bf43a96b6e8d8a2790b5d8",
+      "bytes": 1246
+    },
+    "source-tree/hw/parts/C29718.yaml": {
+      "sha256": "b9f6ed366bfc2dbb6773bba1bffc87db50cd80efbd0b23048b2286535376bd14",
+      "bytes": 571
+    },
+    "source-tree/hw/parts/C318884.yaml": {
+      "sha256": "422f77dd4a04412d39a6e809ac848fdb0d189f97e9491a18adc01058a45f90ce",
+      "bytes": 578
+    },
+    "source-tree/hw/parts/C352826.yaml": {
+      "sha256": "b3f5d83e1d5c87a6c22b8cd1aaacfc50d764b8cc6c7d10ed50bc0f3a808ec6bf",
+      "bytes": 518
+    },
+    "source-tree/hw/parts/C3662799.yaml": {
+      "sha256": "a98e077c941c973e2189ef0bdd2fe2e90db453a2f6e26acc3fb526d957423bb6",
+      "bytes": 510
+    },
+    "source-tree/hw/parts/C398365.yaml": {
+      "sha256": "da086f23dec874090511f2bf4c72e62baf5352147e1ec449d0fe1ef32e5418b5",
+      "bytes": 478
+    },
+    "source-tree/hw/parts/C404111.yaml": {
+      "sha256": "fc848490d94e7cb24b283deb5367a0e601296c92409f3fde0783c24a6348e48e",
+      "bytes": 3019
+    },
+    "source-tree/hw/parts/C404113.yaml": {
+      "sha256": "c7dd1332b891cc1b9a71cb3b52ef4d9e4312333e12868e4e59af99d9621f4716",
+      "bytes": 1470
+    },
+    "source-tree/hw/parts/C42134.yaml": {
+      "sha256": "9caa346dab80f3ddd938c7088843e2a98d73bd33b14ca351fcfcfc95c2ef47bc",
+      "bytes": 385
+    },
+    "source-tree/hw/parts/C42431818.yaml": {
+      "sha256": "78bb30d75327509823a1e3b26bd625ebc5760c2992f635c7f30613aa8c92f2f2",
+      "bytes": 798
+    },
+    "source-tree/hw/parts/C425067.yaml": {
+      "sha256": "d11c2c80faf18be414f0a8dcda54bf32264b40eac81abd2d09e1da4014066473",
+      "bytes": 577
+    },
+    "source-tree/hw/parts/C465732.yaml": {
+      "sha256": "43a3495312077e5b9838b41c86c8f19aee9c17b0db5734d1a73c73b1ef66c534",
+      "bytes": 570
+    },
+    "source-tree/hw/parts/C46970911.yaml": {
+      "sha256": "477e9c23df4926b806f32eac95e9bd2e378113c83ed46d308b0660b2799bb339",
+      "bytes": 555
+    },
+    "source-tree/hw/parts/C492417.yaml": {
+      "sha256": "4fd81f49959bf470d00c67e9c5f2cec9a0e72a009a6a84d247d0d6573735d4c2",
+      "bytes": 531
+    },
+    "source-tree/hw/parts/C52140430.yaml": {
+      "sha256": "ba17146eba924ea7a0adb450acc020d6e38adc2dea1af9e264aabc544f1ad6c4",
+      "bytes": 481
+    },
+    "source-tree/hw/parts/C52984.yaml": {
+      "sha256": "3b405cad10cad57c5a4d6c78bbaa406d0dfd86e603fe7a6484bfde75e410fff7",
+      "bytes": 760
+    },
+    "source-tree/hw/parts/C55136.yaml": {
+      "sha256": "40819eeaa43b34c6bc373afe03d7f71d81301b1d38962ff041a40b12192273db",
+      "bytes": 362
+    },
+    "source-tree/hw/parts/C58464.yaml": {
+      "sha256": "5c2f77d6f6c228bfb50cecb9a0631c0369c770c021805fa2976f8f20abe15310",
+      "bytes": 431
+    },
+    "source-tree/hw/parts/C6186.yaml": {
+      "sha256": "ccc2508b5e758b00ac2dce72fd4ddbc61a0eb3a286e687e7c5fcd4f0dad14754",
+      "bytes": 518
+    },
+    "source-tree/hw/parts/C632854.yaml": {
+      "sha256": "e1b1de226ddf2eec8989e2ef7879cef9600ed83c6fddec2eba25f52cc316ec3c",
+      "bytes": 797
+    },
+    "source-tree/hw/parts/C645939.yaml": {
+      "sha256": "3276f8245271d2c76a23ca197cd8f216b7954b518caaa890fec2a99c163a0d19",
+      "bytes": 801
+    },
+    "source-tree/hw/parts/C702117.yaml": {
+      "sha256": "cb69f4288d8cf61e7e1476a618eb7412d737b7da0328863da6e44b4bc648fea7",
+      "bytes": 458
+    },
+    "source-tree/hw/parts/C7272.yaml": {
+      "sha256": "2865ab2cde7769669b95e430078e8072ea9b50441ac0f64405758ec394be6e7b",
+      "bytes": 375
+    },
+    "source-tree/hw/parts/C7519.yaml": {
+      "sha256": "5c9599ed84c9a231b75e1e0afa7a9ff15a49cf31e4774e0aeba1379fe9e30681",
+      "bytes": 391
+    },
+    "source-tree/hw/parts/C7809.yaml": {
+      "sha256": "6750143bf8367a1dd0510b24c562b3ea63023f6026b857f7ac3a4eb85ae67a16",
+      "bytes": 394
+    },
+    "source-tree/hw/parts/C7833.yaml": {
+      "sha256": "54f1bd1863b8999269481723c6a9362e3d38b274983d914c8c675fed48f6f68d",
+      "bytes": 409
+    },
+    "source-tree/hw/parts/C79401.yaml": {
+      "sha256": "d4413eb249c9256ae8432887ebddf4c23ade303935a6758ff9e61aa1952acf0c",
+      "bytes": 471
+    },
+    "source-tree/hw/parts/C82217.yaml": {
+      "sha256": "59c40f5b2682e85005c9917423656fd24d1ba82760fcde5ba35a9c8496884a65",
+      "bytes": 428
+    },
+    "source-tree/hw/parts/C8545.yaml": {
+      "sha256": "aa4702909126f80cd691c2a32e71150034023cc8c0bd5d52b4e541511701e6da",
+      "bytes": 292
+    },
+    "source-tree/hw/parts/C9002.yaml": {
+      "sha256": "e8636d078b2ff40a8397e9f9328bad2e64c5f4d12118db88c4e9f24602d9be57",
+      "bytes": 510
+    },
+    "source-tree/hw/parts/C91145.yaml": {
+      "sha256": "5354dc4c1465dcd17d9f982413f452536d5746515858230674161bfff134334e",
+      "bytes": 793
+    },
+    "source-tree/hw/parts/C919459.yaml": {
+      "sha256": "3800c68b545b7530ef1cd75a4097a0d4a5f7ec9a24125ec4a81c8e6896cfd2a1",
+      "bytes": 373
+    },
+    "source-tree/hw/parts/C92068.yaml": {
+      "sha256": "07a6a5ca21c856a4052bacdfe9d7fdc0cd32cbe79d9657e05136c5ae3c8cd9c8",
+      "bytes": 328
+    },
+    "source-tree/hw/parts/easyeda/C107055.yaml": {
+      "sha256": "35ef7558da928d2c5475b446fbfb96747596d3cfc77a4172a307bd3037a0bc04",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C111738.yaml": {
+      "sha256": "e8c60f9cf368b37b71892e16c05ca0d5fedc7d33017ab7e2e54a60b7f811b663",
+      "bytes": 518
+    },
+    "source-tree/hw/parts/easyeda/C112455.yaml": {
+      "sha256": "0d39ca1bffe437603880261cb2c0746a2c4038494c9ba6a1c7b1b4cfb45282a5",
+      "bytes": 492
+    },
+    "source-tree/hw/parts/easyeda/C11702.yaml": {
+      "sha256": "eafc0655ce3be516bd42c1d79e97630c2ea3c9a4237df06baaba6589b366154c",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C122538.yaml": {
+      "sha256": "6695632e74865c5b355336457f9907c664e413ab9c39a6c538aa74c7bf9f15b2",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C12624.yaml": {
+      "sha256": "c2de52dbb99be61845ef4a6f4c95bc88e22b0a530ec8374713ccbca3f66d9e4c",
+      "bytes": 357
+    },
+    "source-tree/hw/parts/easyeda/C127691.yaml": {
+      "sha256": "8ab8173d18d71525c75601dd16156418c55ce8b014dadd06d4d76c41e8de0296",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C131025.yaml": {
+      "sha256": "45bc52fe1ad952dc89e98e9c503e9adc04120de990bcf2e637a7cba6a5c1217b",
+      "bytes": 582
+    },
+    "source-tree/hw/parts/easyeda/C1348955.yaml": {
+      "sha256": "42d909f4dc810f69806a00eb210adc60e1ce1081fd1287852d6765eba02f01f8",
+      "bytes": 1390
+    },
+    "source-tree/hw/parts/easyeda/C138714.yaml": {
+      "sha256": "f773f33b65d1c877393832af449f07281d2806e73027734a88f3e614408eae72",
+      "bytes": 615
+    },
+    "source-tree/hw/parts/easyeda/C141836.yaml": {
+      "sha256": "665ff35f4739f958539ff6a6abd5515c7c5d9d4bec6ed53d7dc59767fe973750",
+      "bytes": 474
+    },
+    "source-tree/hw/parts/easyeda/C143975.yaml": {
+      "sha256": "c3679ff6ff4a069eed4d2f8de4574a4236d14d41a8f2c3560d3758394eaca2cb",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C14663.yaml": {
+      "sha256": "8232305d8ef9aeef52330f9d7cd7259de21b7c406deeb7ba190b8b3041173a6f",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C15008.yaml": {
+      "sha256": "e82191dcccede2707e3d82a987173ad03dac0f68068980391237acd8e173ebcd",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C151890.yaml": {
+      "sha256": "e8f2f3f7d8ee6f6f4a220f461d146e9b3fb017149b0e7263d0b054a847f876ac",
+      "bytes": 475
+    },
+    "source-tree/hw/parts/easyeda/C1521989.yaml": {
+      "sha256": "159a1d31fa2e8bc219d0b9121ff27aa57d8abf744e27a02254299fd58d204ffc",
+      "bytes": 5736
+    },
+    "source-tree/hw/parts/easyeda/C1525.yaml": {
+      "sha256": "b7c14f8ea0ff24ab655c7289c460ac9151a392f3bfab841d24ec64bed4e4a0b6",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C1562.yaml": {
+      "sha256": "9b64200a4e7aa0b24b939deb963ec17391e158ac0524b6d0ca5cf50e043f1b90",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C15849.yaml": {
+      "sha256": "39a4954af5a8a10193f628e6a09c4d072e367f69b078c60a7230902645693228",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C15850.yaml": {
+      "sha256": "882c2c6f7f9338f5c2cbea4a10453ef27510271eb311ac59d5d4be7cac23ce28",
+      "bytes": 352
+    },
+    "source-tree/hw/parts/easyeda/C160457.yaml": {
+      "sha256": "17ed36c63f74c33da530dd444c1dbcb867294ce1cbb0e3b84d1539b85f5d0731",
+      "bytes": 451
+    },
+    "source-tree/hw/parts/easyeda/C161327.yaml": {
+      "sha256": "bf0f4f3fe116310f32e61a2c7f71b39b262388f72638e2ec64b9b2d1f54b5937",
+      "bytes": 308
+    },
+    "source-tree/hw/parts/easyeda/C161329.yaml": {
+      "sha256": "239ce1d9e33a69c3c61dfc300b53f731caf8ef8cc3f31d8a92f674ed2daf3116",
+      "bytes": 308
+    },
+    "source-tree/hw/parts/easyeda/C165948.yaml": {
+      "sha256": "cc01a0ab3dfcd2c67f56ca37bca057ef9008abf67159c514064d9d0247e2ff7c",
+      "bytes": 799
+    },
+    "source-tree/hw/parts/easyeda/C1663.yaml": {
+      "sha256": "043c9fa0ec6e77b9d51bf4bea9715b2f5ef1350005eb59544a6d374ce04aa5d7",
+      "bytes": 352
+    },
+    "source-tree/hw/parts/easyeda/C167200.yaml": {
+      "sha256": "c0801a10a66a02600cf61b58889efe3c8ba16f27ae14e14d4360f2689e5c4ad5",
+      "bytes": 377
+    },
+    "source-tree/hw/parts/easyeda/C167203.yaml": {
+      "sha256": "ea0ebc22e1fb54854f4bb60d6c1a33854626d327f20813324535eeac8c8901f6",
+      "bytes": 377
+    },
+    "source-tree/hw/parts/easyeda/C167747.yaml": {
+      "sha256": "d6813450ac2448f1b423f06108f3bb40a0176aebcdfa3e64d231cdcf0d96a8c0",
+      "bytes": 382
+    },
+    "source-tree/hw/parts/easyeda/C17477.yaml": {
+      "sha256": "62a801c41d169b68de8f2989900fd3e4bb6409eb7dd39df35fa8ec7a4a2d4819",
+      "bytes": 352
+    },
+    "source-tree/hw/parts/easyeda/C17888.yaml": {
+      "sha256": "83d66a6f424cb19da3d61b44660e11bc862842215885be9709f6ad7a19f3c357",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C179173.yaml": {
+      "sha256": "2ed2c471d1117e22f5216b313636a6ce5a687b89fb330254f1a0ffe2951bd12b",
+      "bytes": 608
+    },
+    "source-tree/hw/parts/easyeda/C182716.yaml": {
+      "sha256": "57619eae6a96235f73d9abe4df9b5727a8be4faedb9906390cb63294a72b8665",
+      "bytes": 560
+    },
+    "source-tree/hw/parts/easyeda/C187836.yaml": {
+      "sha256": "6133d07adb817e80dba29ce1cd70a7f907c9cc36f961c55183eeac62eb38ef18",
+      "bytes": 522
+    },
+    "source-tree/hw/parts/easyeda/C19188869.yaml": {
+      "sha256": "e22d31705272231cb34d2924e0b8d85926e1f769260be6712afc47f3abb57dcd",
+      "bytes": 2348
+    },
+    "source-tree/hw/parts/easyeda/C193402.yaml": {
+      "sha256": "feb84aab13b3c0ea803244777d5ceed094a6fbae8f1adc61a63df4bfa85d3d1f",
+      "bytes": 380
+    },
+    "source-tree/hw/parts/easyeda/C19666.yaml": {
+      "sha256": "9f2a3306b4e071bbeb871e1adaf643916ef0fdf29f8fe6882292c19e93b92eda",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C19702.yaml": {
+      "sha256": "0a596d7fec0affe6139ae201100c9825f250c0103dcd9cba070bc648a25b450d",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C2040.yaml": {
+      "sha256": "37408525a18a8a7ade7911f0a317fd9ff284aae2022d7cefea23c2e0c6dfb3e3",
+      "bytes": 2306
+    },
+    "source-tree/hw/parts/easyeda/C20526.yaml": {
+      "sha256": "f1986b4d118b03bd981e26a888cb976a33c07655e09bb4140cb244e40fd24d9a",
+      "bytes": 407
+    },
+    "source-tree/hw/parts/easyeda/C20812.yaml": {
+      "sha256": "a4a409e6dbfd49b99292fdbf5d79c69343f40254f4524bc199c09c1c706df579",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C20975.yaml": {
+      "sha256": "0d219025de001e22d516c96bf3cea092f9e13bc5da708235fcdf985237b33bb5",
+      "bytes": 352
+    },
+    "source-tree/hw/parts/easyeda/C20976.yaml": {
+      "sha256": "9c176ea0f652b62fccd5cae2426d2ad87caa042b2b0078a2c42683530b9587ee",
+      "bytes": 352
+    },
+    "source-tree/hw/parts/easyeda/C21189.yaml": {
+      "sha256": "39eaba2f927c9bbd4208294d6d6bccfd9ccec44431ee3376ef610ac4f7ee75c7",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C21190.yaml": {
+      "sha256": "b6115022e67548dbebfc19e1a43f4ac834a0e2570ea513aa7a1ab7bac756fc28",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C22775.yaml": {
+      "sha256": "0d0001ca8dc6460c82aa92e3e6e207938abfe488db28e83080200b55587e1814",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C22833.yaml": {
+      "sha256": "7195d60dc714044df84c7d55d848461ce994873f6bc81b214136c784c64dcb9d",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C2286.yaml": {
+      "sha256": "b60a7dc304845262c04434dc6d83dd1d3f8f6e3c3ce4e8b5bbc1e4c847e62e09",
+      "bytes": 367
+    },
+    "source-tree/hw/parts/easyeda/C22935.yaml": {
+      "sha256": "74ee4893b26b31577bde1621a7aeb4a596eb36aa4b47a6182d0db05ebecea484",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23024.yaml": {
+      "sha256": "96d1ebe8b09bea3f929910183eed344d990b005c543c7d44695867ba97867f0a",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23140.yaml": {
+      "sha256": "f34f3dd2804ecd21439a3b950dea21479b3f1901930c8be5a6f604d153895799",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23162.yaml": {
+      "sha256": "a333c454f58e349216d43085047fd0769368874be65564fc1d8959af2bb473e6",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23166.yaml": {
+      "sha256": "8572d174f325c3cc63af1d14ccb5b9a4f4ff776c56442908b68d39f87e07d30f",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23186.yaml": {
+      "sha256": "470cc92496f8c8c1aa9aadbe2a91607bdbeb7023de40c3bc682bc7cfa9a6a0f0",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23213.yaml": {
+      "sha256": "01e3fd1b14f48a2c1eb2c57a9b3ade06d5c338ca5e3089abad01cdff31bac14e",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23240.yaml": {
+      "sha256": "f02b81cb0a67b5c999f0a5d158a02fab29fbcc58a45679aab5bedf515c5d5779",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23265.yaml": {
+      "sha256": "c1aaefcb970768142f5833f5dc98b4da38e72b969896684bad6dad380771758c",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C23733.yaml": {
+      "sha256": "540d28ecee5f274aacc7e62c609766939eb805aa574f49276962f56de11ab01d",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25076.yaml": {
+      "sha256": "0625c33cfbe0504bbf29d693d99aa32fd78b23cb7a9443d2975da334b04f7c92",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25083.yaml": {
+      "sha256": "753415a68a9a873925a4a2d7393e9a8b2faa1ce37ba3f36555c5ae77a528d2ce",
+      "bytes": 307
+    },
+    "source-tree/hw/parts/easyeda/C25091.yaml": {
+      "sha256": "5298cdf89b578a483c97493b8e1d8420440e208182635f9878753d451425e21b",
+      "bytes": 307
+    },
+    "source-tree/hw/parts/easyeda/C25099.yaml": {
+      "sha256": "566791c55f76577162b7a55fb8ec0be4695299d1994d35d81ec32925e900706b",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25100.yaml": {
+      "sha256": "e172a2c89bf8519c50ddb3feadecc49615c601cc705fcadc41a8160171bb08ca",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25118.yaml": {
+      "sha256": "834b035ff12fef671ecdc22f8878e1befb816dfb9ac567b51ae7b834d2856c3a",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25131.yaml": {
+      "sha256": "eb6ded5b0f663df5af6620ce12a89083884fbf727af73c80b6db0e01f5f1c83b",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25190.yaml": {
+      "sha256": "1e6eb183d2f94a8dba895f5b77c7a65921eae8e430079ed4f9f89397ffd8de2b",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25196.yaml": {
+      "sha256": "338178195eb9a94181631b62f56cfbdb21bed32d71e8accde3424cf0d78714cd",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25501.yaml": {
+      "sha256": "6270e92df9c1262925ada69a9608dc5e743ebd35a2c9f3c64186ffd702d941e1",
+      "bytes": 574
+    },
+    "source-tree/hw/parts/easyeda/C25508.yaml": {
+      "sha256": "1304e4ce1703a4d3df7f1e07de89e4dc426a21ae861c48d3b8303ba8e6867ead",
+      "bytes": 558
+    },
+    "source-tree/hw/parts/easyeda/C25741.yaml": {
+      "sha256": "6951ff7ed84a242638d60f24de18b9a2f8b0ebef0ee283086c977c0b6bc613b8",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25744.yaml": {
+      "sha256": "8262f0ca8e0d083ce24aedcc41cf71f4b16964080fe066cea15ac5a9031326db",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25752.yaml": {
+      "sha256": "b78834b2f25a783497118b47f5029a6fd2db097f71fa967b9c5f2541ed861d44",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25756.yaml": {
+      "sha256": "f37d38944edded76de8cf2dcc20a45b73fb73497e16ebb56aeeaf9b7b57d4278",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25768.yaml": {
+      "sha256": "5fecd7ca164b356f55036434e8a16bb4c3cfd0116d4a1af009e9a0134f7d5143",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25779.yaml": {
+      "sha256": "3826ca529916519f9eb1d1b43261e798ab184cecaec7b5da0c1ac8b9e468e8b4",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25792.yaml": {
+      "sha256": "aeb5289eda9ea7201ca85ee4aabf80fc70aa3bed6011949fdeae4653d48f5942",
+      "bytes": 307
+    },
+    "source-tree/hw/parts/easyeda/C25803.yaml": {
+      "sha256": "0f49e7abda09b645543f42fecd09abee064065a035c9f64df2c759c2a900eee2",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25804.yaml": {
+      "sha256": "c8eaafd74e9eb51ee004ba3c4a565501f0de66cc0ebf93d4631227dd84e0ca19",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25818.yaml": {
+      "sha256": "afa7c8021a2fbbc019055c117ddda4e7329da873780abf761d9738da745b52ee",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25819.yaml": {
+      "sha256": "f3b0bc94acc22f384368f8b0dc6b36e2bd5476d69eacbbbae8353732695bbd13",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25823.yaml": {
+      "sha256": "7cd6aa1e348db16d8c148381c3de130a000d6d7c2a4cd392f892f51fe4af8deb",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25879.yaml": {
+      "sha256": "88ce91e0294b86e69ee18f6b0477b5074740966d01888aafca4ba35206a49c9b",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C25900.yaml": {
+      "sha256": "ecd9e802ec90e0597d3b63d33822575b397170ed7d7d358b8218bb5b3374afcb",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C26095.yaml": {
+      "sha256": "6eaf25841ff4b52abeaeadacdc85e6586379eb2f771666b8d4ccdf410dfb40b8",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C26980.yaml": {
+      "sha256": "4c80091472a532b3dd5de5b64433b81e00572e0d6a3876f7974ff0c3e2edad96",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C27592.yaml": {
+      "sha256": "614511a9703c33c7ce9f02f57ff115466c0f5ae0464aef2c597f1602c7647d6c",
+      "bytes": 307
+    },
+    "source-tree/hw/parts/easyeda/C2845237.yaml": {
+      "sha256": "dbb1769a7bec2d4ecced87bfabae3abf603aa2092bbf35aef4ea22c8b7452257",
+      "bytes": 627
+    },
+    "source-tree/hw/parts/easyeda/C2858275.yaml": {
+      "sha256": "6f0a641831716aba393b7318cfc2c7e3857d60737c773c74853219ad13842e02",
+      "bytes": 1134
+    },
+    "source-tree/hw/parts/easyeda/C2911374.yaml": {
+      "sha256": "1b72c4638f81b4750a7cae8c22865e0989dc98414be8a0512fcbb2ad44c9d5cd",
+      "bytes": 2220
+    },
+    "source-tree/hw/parts/easyeda/C2912578.yaml": {
+      "sha256": "9ae044d9e7e0aa945f2f62b24893629db8543e7ad67df023901a76b41c8d2cdc",
+      "bytes": 360
+    },
+    "source-tree/hw/parts/easyeda/C29718.yaml": {
+      "sha256": "76916080cd65acea2f8968f9da4a5f68511e607581d80c018e7bc60a8f39db90",
+      "bytes": 558
+    },
+    "source-tree/hw/parts/easyeda/C318884.yaml": {
+      "sha256": "0d5b3f241721f0734a5713ad4c6449edc2e0815a8f9f7543722b90565bdb77eb",
+      "bytes": 455
+    },
+    "source-tree/hw/parts/easyeda/C326727.yaml": {
+      "sha256": "425ffa61c1a5caf1b6e869f16299e442a8233822eb26c4a9594def862712a3ee",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C32949.yaml": {
+      "sha256": "a3d303f951398aa8bb51cf4c31d63a68a60f494732ee1750676ee485a6f7555f",
+      "bytes": 307
+    },
+    "source-tree/hw/parts/easyeda/C352826.yaml": {
+      "sha256": "d2d409e6b6e0ba576ad0d622f6ffee0a8b92739d10553e51cd4f32842f51fe07",
+      "bytes": 829
+    },
+    "source-tree/hw/parts/easyeda/C357060.yaml": {
+      "sha256": "8196b59ef5b51165301c75ebec02fed23f7787755b1b004c200dcb2645da1a45",
+      "bytes": 371
+    },
+    "source-tree/hw/parts/easyeda/C3662799.yaml": {
+      "sha256": "3c044a84abc0483530af288e72171bbdd24c6ed919f9c5a9b0dda2108dd6f024",
+      "bytes": 663
+    },
+    "source-tree/hw/parts/easyeda/C393098.yaml": {
+      "sha256": "b3cad704d66394a171ee92ce000f8f70f3c4ad483511fc514dc01413d6a0ced3",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C398365.yaml": {
+      "sha256": "e033dcd7e637100f3f62e267f06e4bfdba77e730771d94bec499d18a6fdff71e",
+      "bytes": 513
+    },
+    "source-tree/hw/parts/easyeda/C404111.yaml": {
+      "sha256": "d8d4fca0852da22f7168d04f8b9418dab30909f747f0e69f9af75f280505b60e",
+      "bytes": 3284
+    },
+    "source-tree/hw/parts/easyeda/C404113.yaml": {
+      "sha256": "2b38cc03edc660cfd1e17433d87db72219d3ba473cc8dcf05a0d2e49aca7bc0d",
+      "bytes": 1363
+    },
+    "source-tree/hw/parts/easyeda/C408767.yaml": {
+      "sha256": "1bd54ce11170e915c03f5b311f5fc7ccdebb92e31209f5dd1d372b54f2f1d940",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C4190.yaml": {
+      "sha256": "2e4e68849a7381cae1b43b3a5963e4cd10feb1f7db59519c6fa55b5c17c86ed8",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C42134.yaml": {
+      "sha256": "5f182633c8fef168f78a761293698b8bd9688f3b2c187560fc4f34c9f9d4c9de",
+      "bytes": 473
+    },
+    "source-tree/hw/parts/easyeda/C4216.yaml": {
+      "sha256": "cdf6ec0d76d095b1580e0edc3c1370fede4af41bf19243b1ec47a21dffe5d730",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C42431818.yaml": {
+      "sha256": "6cb8f9c1d9a66d6b91e90573ea1ba70194537ae261efbe1dd7fced0e5f95caee",
+      "bytes": 651
+    },
+    "source-tree/hw/parts/easyeda/C425067.yaml": {
+      "sha256": "a33acb917914aa1f4384358f976bdb376137252960cdfaeb2c0dd9f890897d18",
+      "bytes": 560
+    },
+    "source-tree/hw/parts/easyeda/C45783.yaml": {
+      "sha256": "5ab8913c432f37a86be0cedb4990b969e0b1a3c913fa4c15027bc363d1cab140",
+      "bytes": 352
+    },
+    "source-tree/hw/parts/easyeda/C465732.yaml": {
+      "sha256": "21435b79f4ee9f4d71d27421225455607a7add0286a8a6e836472be3dd9a9f90",
+      "bytes": 1107
+    },
+    "source-tree/hw/parts/easyeda/C46970911.yaml": {
+      "sha256": "fe9a58a6a935ebf0de2baf8a788a96b18d6d9d7476cccf6997384df33a59c4f1",
+      "bytes": 362
+    },
+    "source-tree/hw/parts/easyeda/C492417.yaml": {
+      "sha256": "4f0165739c013dbe5f246cf5263e476528f79e1dbb5f7125120a8ca2d19e97dc",
+      "bytes": 597
+    },
+    "source-tree/hw/parts/easyeda/C52140430.yaml": {
+      "sha256": "63e0543bcf44a63fb442d7fff444017077384b86ca5b05dba31cda5e7a299fab",
+      "bytes": 482
+    },
+    "source-tree/hw/parts/easyeda/C52923.yaml": {
+      "sha256": "c7759e3e51a5bb01a52fd72e3f54a6c1d0af34e36e2c95b7abf5bfab8ab8a322",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/easyeda/C52984.yaml": {
+      "sha256": "520a24e63d9b2b61cee13e097d4e1487983722520ab43e7346b8c2d46e5ca7b7",
+      "bytes": 574
+    },
+    "source-tree/hw/parts/easyeda/C55136.yaml": {
+      "sha256": "fea35b81306f505945b4e5e3f02002a94cb3464530ec4ee9a6a879d036be5bdc",
+      "bytes": 480
+    },
+    "source-tree/hw/parts/easyeda/C58464.yaml": {
+      "sha256": "ef4d9692a0f9961b4cebe81ba5d58339ef3e634f798e3ab11f487ff1a2bc8897",
+      "bytes": 474
+    },
+    "source-tree/hw/parts/easyeda/C602037.yaml": {
+      "sha256": "5c4883fb641afb33cf2567b417eb143ec43a54143b4a21c1c77a879f8429b411",
+      "bytes": 354
+    },
+    "source-tree/hw/parts/easyeda/C6186.yaml": {
+      "sha256": "1fc5fb8598a627d9709692dd9eae02bd5f52bec040493af1007464272a6527fd",
+      "bytes": 445
+    },
+    "source-tree/hw/parts/easyeda/C632854.yaml": {
+      "sha256": "b4570c12983f00da7a5e1ae869d4d3b5c9faf384a8dd836a7a22190da282949b",
+      "bytes": 1512
+    },
+    "source-tree/hw/parts/easyeda/C645939.yaml": {
+      "sha256": "ee9c4b7c0a0fd3ac5748a4067b934db904413fef6381d94ccd01fc63af9d0e39",
+      "bytes": 1349
+    },
+    "source-tree/hw/parts/easyeda/C702117.yaml": {
+      "sha256": "34344a07710904919d39dd0a45649b414bea40494ec392479fc7d432787331fb",
+      "bytes": 483
+    },
+    "source-tree/hw/parts/easyeda/C705800.yaml": {
+      "sha256": "eafbbb435bdf2b68be4a740c4c14023ebb50079d36681e0586d2e2c84bc5270b",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C7272.yaml": {
+      "sha256": "ff945b2681836cac5952510ab82fc2c3a4237a0fb5757897cf26f271088ff426",
+      "bytes": 454
+    },
+    "source-tree/hw/parts/easyeda/C7519.yaml": {
+      "sha256": "22f6e715e2ac39b4d7c4d1a7a5b27ea2b17223a393da61587360941be1ad9781",
+      "bytes": 509
+    },
+    "source-tree/hw/parts/easyeda/C7809.yaml": {
+      "sha256": "155d6ea6ceb0ad0fd682610a58df3af8754cb53a16a01b6e67c1ec892284b61a",
+      "bytes": 736
+    },
+    "source-tree/hw/parts/easyeda/C7833.yaml": {
+      "sha256": "e46dedb7a191457eea6f6793b4077385b6ee591ed44028bccf53ac23c03cd182",
+      "bytes": 447
+    },
+    "source-tree/hw/parts/easyeda/C79401.yaml": {
+      "sha256": "ac6597355dd33a12959b495b047d2998d00152ac33d63e2117a0ce3522d134e7",
+      "bytes": 510
+    },
+    "source-tree/hw/parts/easyeda/C82217.yaml": {
+      "sha256": "4d2093ae1306a685c4884208a8208e25aaa4e77c21b4f06d052e35ad36b13bcd",
+      "bytes": 474
+    },
+    "source-tree/hw/parts/easyeda/C8545.yaml": {
+      "sha256": "dea3153d1be1b5fc8052c67191fef219673d4d3038d63b6c5a13259e757fbc8d",
+      "bytes": 405
+    },
+    "source-tree/hw/parts/easyeda/C8598.yaml": {
+      "sha256": "2daa5b7a12640741b99279dc58afc2cae132e4789791be63897410f9f64ed455",
+      "bytes": 374
+    },
+    "source-tree/hw/parts/easyeda/C860067.yaml": {
+      "sha256": "3f375875edc1a385e0fa87a7930b20b011e7640c264048e9d93775240ada5cac",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C861412.yaml": {
+      "sha256": "01d03514d70a6fdf1c663cf7545ced1578746211ffc936661d1e62befaff871f",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C861436.yaml": {
+      "sha256": "f7262d69ed9e21a9607ae7e8251b1b6a3851e9bc56ac4f4a4417f7744272269d",
+      "bytes": 358
+    },
+    "source-tree/hw/parts/easyeda/C9002.yaml": {
+      "sha256": "4cdd0c32a50cb2f79c60e8a6f3350a6b86c46407a7519b4fc1b772d9df7ea8ba",
+      "bytes": 443
+    },
+    "source-tree/hw/parts/easyeda/C91145.yaml": {
+      "sha256": "e6b2209bba932bd1d10c45592181be072ca13fd5595e202f42db19e7d82ba042",
+      "bytes": 743
+    },
+    "source-tree/hw/parts/easyeda/C919459.yaml": {
+      "sha256": "d32c55a70946f41e7b3402fccffe69470c1f31d49cd5e66dcfe6ed6f6d1233a5",
+      "bytes": 504
+    },
+    "source-tree/hw/parts/easyeda/C92068.yaml": {
+      "sha256": "f8e120a21864d07915b5f2b1e5f5304ea920efed193e8466238fe2b6ad35de11",
+      "bytes": 410
+    },
+    "source-tree/hw/parts/easyeda/C95204.yaml": {
+      "sha256": "1b2805c87e71b5e203a5a6f5cab7929bb9a12d3d3ebe603a769ac5d90903cba2",
+      "bytes": 356
+    },
+    "source-tree/hw/parts/identity/C25077.json": {
+      "sha256": "de6da5de4a5f0b7cfdf47be716fd7f03805d24d45a8cbedbbe435574fbff973f",
+      "bytes": 1351
+    },
+    "source-tree/hw/parts/identity/C25083.json": {
+      "sha256": "8b83998a76552296a979ad7648c4125272a68819fb2a43aa4384a9914a617204",
+      "bytes": 491
+    },
+    "source-tree/hw/parts/identity/C25099.json": {
+      "sha256": "a686295df0082ebf9940cd3fe219c8b644196b1669ba5fbfcc57c06df90028f6",
+      "bytes": 549
+    },
+    "source-tree/hw/parts/jlc_rotation.yaml": {
+      "sha256": "7889e136f3e787c6469178b16358c7b6ed64df1fb7d8164de00b3c4158636455",
+      "bytes": 9670
+    },
+    "source-tree/hw/pins.yaml": {
+      "sha256": "e17da629bc33ee89325d6edabb8496755a39b0eb6579bdbf524ae991117a3ba7",
+      "bytes": 13883
+    },
+    "source-tree/hw/power/copper_mesh.py": {
+      "sha256": "1045e4f98d17bcf9e197791fca093796034455a9e848cff27ceadda680cb7602",
+      "bytes": 20234
+    },
+    "source-tree/hw/power/polygon_raster.py": {
+      "sha256": "1da7926aa0db1a9b8b4520ca4a6029e36299a49bd57e0f5072f08486075b84c2",
+      "bytes": 3457
+    },
+    "source-tree/hw/tools/assembly_geometry.py": {
+      "sha256": "bde646b9a64368cb1135de3b490d7a2db073cbfd73f9ea637600cd543c650dfb",
+      "bytes": 1540
+    },
+    "source-tree/hw/tools/boardcheck.py": {
+      "sha256": "c8934724314de2882cd2035827d3edb63b0dc817fc7712c332c15aa06b6b0b31",
+      "bytes": 7230
+    },
+    "source-tree/hw/tools/boardevidence.py": {
+      "sha256": "54d71a8169e51b375690cbc02f467b50cdaec098539d47b14892e04f811fe024",
+      "bytes": 4531
+    },
+    "source-tree/hw/tools/bomcheck.py": {
+      "sha256": "e89609e0eb6aa9514ab0fc0ca2415b864d031c7f10ed079b7bf46e1718f3581b",
+      "bytes": 27807
+    },
+    "source-tree/hw/tools/connectorcheck.py": {
+      "sha256": "31c1b835539f76b7fba5c0f40d6020425d67741e88660e8b470a5eb65186eafe",
+      "bytes": 8511
+    },
+    "source-tree/hw/tools/cploverlay.py": {
+      "sha256": "7091a602fc741d59113083834f2afcef324be8432f79facd23efba2fc4fce772",
+      "bytes": 6831
+    },
+    "source-tree/hw/tools/crosstalk.py": {
+      "sha256": "a8afd862b5d3c8d3742b4d48440399607059a262eb7729383335e6e0154d5c28",
+      "bytes": 4438
+    },
+    "source-tree/hw/tools/edgesym.py": {
+      "sha256": "eaf007676970846ce2f9efcc0c89a689e9f012a9187fd3a363f958ca2dbb2541",
+      "bytes": 3983
+    },
+    "source-tree/hw/tools/fabcheck.py": {
+      "sha256": "d4076291e6047e7b4a24304b61b64e150874ea6eda54f6ca49692753deb21e11",
+      "bytes": 21295
+    },
+    "source-tree/hw/tools/fillfeature.py": {
+      "sha256": "3a966336cfa43d1019e59ddf5beafa18b26b33c20219c484e5a91f6f803923ba",
+      "bytes": 8002
+    },
+    "source-tree/hw/tools/genpins.py": {
+      "sha256": "421795084c4ffcda798e0d81d21cdd3ebb4e826b54831b464cf8acfd0372fef2",
+      "bytes": 4536
+    },
+    "source-tree/hw/tools/gerberdrc.py": {
+      "sha256": "4c84939e6c1fd552e87678dd318817ff26884305e518287c2ab6ae74ec10abf4",
+      "bytes": 82128
+    },
+    "source-tree/hw/tools/jlcimport.py": {
+      "sha256": "1ae6564e00ab678fc28632031377eae88edc855342bbe63edb50e2c85985376b",
+      "bytes": 13275
+    },
+    "source-tree/hw/tools/jlcparts.py": {
+      "sha256": "b6d5195e594b704c7fa1be8e3fbc765ba091ed30d5e771aeb4f467b6be8ff172",
+      "bytes": 3234
+    },
+    "source-tree/hw/tools/kicadgen.py": {
+      "sha256": "e92c0677b97b855477172d63b4bcaece01afea4bb709fedace9ed2431798f33a",
+      "bytes": 171468
+    },
+    "source-tree/hw/tools/logo.py": {
+      "sha256": "32a375e831f0f63d5a33a1707dbfe579f6957f0d075d739ec56cc684a4afaaa2",
+      "bytes": 8564
+    },
+    "source-tree/hw/tools/modelcheck.py": {
+      "sha256": "267b5b42f634b6fb6d64a4cedd61201ce768a18840dd8b639e00e438666c1c49",
+      "bytes": 4379
+    },
+    "source-tree/hw/tools/pincheck.py": {
+      "sha256": "b2688b34bc861fdfff91104414ebf7a613d78e395c1be54629b54abe7d01aee4",
+      "bytes": 29645
+    },
+    "source-tree/hw/tools/route_seed.py": {
+      "sha256": "30e8c754bbc0154192b7a4c26eb2757eb6cd1080e39a4c4fcd89e907ece7deec",
+      "bytes": 10607
+    },
+    "source-tree/hw/tools/sesreplay.py": {
+      "sha256": "62f40877a87b3cbc001cbf986e315880bfbd3db08ee9fc7fa72f791fa0303404",
+      "bytes": 12674
+    },
+    "source-tree/hw/tools/silk_glyph_coverage.py": {
+      "sha256": "365363b236c8b3d73748de30c47428b1ed7dfbf744b27693d491484c1260b8c2",
+      "bytes": 6172
+    },
+    "source-tree/hw/tools/silktextaudit.py": {
+      "sha256": "491638a9298bb360a435a7611af9bf463df6a299c2cebae76658f1391c8c8367",
+      "bytes": 5162
+    },
+    "source-tree/hw/tools/strapcheck.py": {
+      "sha256": "4d42a984241218b4a506b1d1803edc585d369bd08696607a93a5c3369ecb78e7",
+      "bytes": 5860
+    },
+    "source-tree/tools/fab_neck_coverage.py": {
+      "sha256": "9ccbfc2c92ee070ed78a9e71dddf1d304efa194a3388596411f717557c32cc7f",
+      "bytes": 28332
+    },
+    "tools/storage-actual-si.py": {
+      "sha256": "2e624c58fb287db9f8e1ae3ed975994a6c3ce2144402cf7681207c4ad1be236a",
+      "bytes": 2350
+    },
+    "tools/storage-insert-damping.py": {
+      "sha256": "2f4b093087a19304d0b6f6db7b4e9c63d8291b770c5e2e8f7e6a383cd41965f0",
+      "bytes": 3806
+    },
+    "tools/storage-sck-value-sensitivity.py": {
+      "sha256": "279dfef50f5c9b36d461e9fcdeb6660a7199d3ede8a59ba6c43a134f55347968",
+      "bytes": 2717
+    }
+  }
+}
