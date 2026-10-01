@@ -357,5 +357,15 @@ def main():
     print("LCSC:", " ".join(sorted(lcsc)))
 
 
+# The 51 mm finished card keeps its finger datum and central circuitry fixed.
+# Move only perimeter fittings to the new top edge; the local routed seed
+# and fresh full fabrication pipeline qualify their changed connections.
+TOP_EDGE_SHIFT_MM = 3.55
+TOP_EDGE_MOVED_REFS = ('H1', 'D1', 'R5', 'D2', 'R6', 'D3', 'R7', 'D4', 'R8')
+for _ref in TOP_EDGE_MOVED_REFS:
+    _at = PLACEMENT[_ref]
+    PLACEMENT[_ref] = (_at[0], _at[1] - TOP_EDGE_SHIFT_MM, *_at[2:])
+
+
 if __name__ == "__main__":
     main()

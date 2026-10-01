@@ -2,14 +2,14 @@
   "schema": 1,
   "kind": "route-design-seed",
   "origin": {
-    "file": "io-finished.kicad_pcb",
-    "sha256": "35d2072d946c4b5c3877781cc250cdf226abdcfce64399c4968db92341577b1b",
+    "file": "io-local-trial.kicad_pcb",
+    "sha256": "bc44c66a96d52d92fdf4baaaff5547d6e6b58a58e4245d4e08b7883d7a5097c4",
     "state": "design-candidate",
-    "note": "actual local LVC/RC candidate nativeDRC0/opens0; preserved originalgeometry/unrelatedcopper; no SI or supplier/release approval",
+    "note": "Full top body extension to 51 mm; only perimeter USB connector/LEDs/ground fanout locally moved; USB terminal loop follows connector; fresh full pipeline required",
     "manufacturing_pass": false,
     "receipt_sha256": null
   },
-  "body_sha256": "9b63a6e892731db610b90cf6666b3279ada2816aa746d6cbe690184af365fdd7",
+  "body_sha256": "050c2cab39da0f665aa46b0e1956c6fcd8f7463c937295abc04a29694bb8eabb",
   "body": {
     "board": "io",
     "pour_nets": [
@@ -18,19 +18,18 @@
     "post_route_contract": "io-ahc-local-flash-power-v1",
     "guards": {
       "footprints": {
-        "C20": {
-          "library": "Capacitor_SMD:C_0805_2012Metric",
+        "D2": {
+          "library": "LED_SMD:LED_0603_1608Metric",
           "at": [
             "at",
-            "40.3",
-            "-9.8",
-            "90"
+            "19",
+            "-44.55"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "10u",
+          "value": "red",
           "pads": [
             [
               "pad",
@@ -39,45 +38,13 @@
               "roundrect",
               [
                 "at",
-                "-0.95",
-                "0",
-                "90"
+                "-0.7875",
+                "0"
               ],
               [
                 "size",
-                "1",
-                "1.45"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/+5V"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.95",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1",
-                "1.45"
+                "0.875",
+                "0.95"
               ],
               [
                 "layers",
@@ -92,54 +59,10 @@
               [
                 "net",
                 "/GND"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C24": {
-          "library": "Capacitor_SMD:C_0805_2012Metric",
-          "at": [
-            "at",
-            "47.9",
-            "-15",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "22u",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.95",
-                "0",
-                "90"
               ],
               [
-                "size",
-                "1",
-                "1.45"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/VBOOST"
+                "zone_connect",
+                "1"
               ]
             ],
             [
@@ -149,14 +72,13 @@
               "roundrect",
               [
                 "at",
-                "0.95",
-                "0",
-                "90"
+                "0.7875",
+                "0"
               ],
               [
                 "size",
-                "1",
-                "1.45"
+                "0.875",
+                "0.95"
               ],
               [
                 "layers",
@@ -170,18 +92,18 @@
               ],
               [
                 "net",
-                "/GND"
+                "/LED_KBD_A"
               ]
             ]
           ],
           "physical_graphics": []
         },
-        "C7": {
+        "C6": {
           "library": "Capacitor_SMD:C_0402_1005Metric",
           "at": [
             "at",
             "31.7",
-            "-20.1"
+            "-16.3"
           ],
           "layer": [
             "layer",
@@ -256,18 +178,19 @@
           ],
           "physical_graphics": []
         },
-        "R4": {
-          "library": "Resistor_SMD:R_0603_1608Metric",
+        "C8": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
           "at": [
             "at",
-            "-3",
-            "-38.5"
+            "26.8",
+            "-24.7",
+            "90"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "1k",
+          "value": "100n",
           "pads": [
             [
               "pad",
@@ -276,13 +199,14 @@
               "roundrect",
               [
                 "at",
-                "-0.825",
-                "0"
+                "-0.48",
+                "0",
+                "90"
               ],
               [
                 "size",
-                "0.8",
-                "0.95"
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -306,13 +230,14 @@
               "roundrect",
               [
                 "at",
-                "0.825",
-                "0"
+                "0.48",
+                "0",
+                "90"
               ],
               [
                 "size",
-                "0.8",
-                "0.95"
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -326,101 +251,70 @@
               ],
               [
                 "net",
-                "/LED_PWR"
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
               ]
             ]
           ],
           "physical_graphics": []
         },
-        "R16": {
-          "library": "Resistor_SMD:R_0603_1608Metric",
+        "TP2": {
+          "library": "cupc8:TestPad_D1.0mm",
           "at": [
             "at",
-            "40.8",
-            "-13.3"
+            "-4",
+            "-18.5"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "750k",
+          "value": "SWCLK",
           "pads": [
             [
               "pad",
               "1",
               "smd",
-              "roundrect",
+              "circle",
               [
                 "at",
-                "-0.825",
+                "0",
                 "0"
               ],
               [
                 "size",
-                "0.8",
-                "0.95"
+                "1",
+                "1"
               ],
               [
                 "layers",
                 "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
+                "F.Mask"
               ],
               [
                 "net",
-                "/VBOOST"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.825",
-                "0"
-              ],
-              [
-                "size",
-                "0.8",
-                "0.95"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/BOOST_FB"
+                "/SWCLK"
               ]
             ]
           ],
           "physical_graphics": []
         },
-        "R62": {
+        "R12": {
           "library": "Resistor_SMD:R_0402_1005Metric",
           "at": [
             "at",
-            "18.3125",
-            "-13.9",
+            "33.5",
+            "-10.5",
             "90"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "220",
+          "value": "10k",
           "pads": [
             [
               "pad",
@@ -450,7 +344,7 @@
               ],
               [
                 "net",
-                "/SCK"
+                "/3V3"
               ]
             ],
             [
@@ -481,7 +375,7 @@
               ],
               [
                 "net",
-                "/SCK_MCU"
+                "/VBUS_nFAULT"
               ]
             ]
           ],
@@ -570,1318 +464,12 @@
           ],
           "physical_graphics": []
         },
-        "TP3": {
-          "library": "cupc8:TestPad_D1.0mm",
-          "at": [
-            "at",
-            "-4",
-            "-22"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "SWDIO",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "circle",
-              [
-                "at",
-                "0",
-                "0"
-              ],
-              [
-                "size",
-                "1",
-                "1"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask"
-              ],
-              [
-                "net",
-                "/SWDIO"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R15": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "36.8",
-            "-22.6"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "27R",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_DP"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_CONN_DP"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "D1": {
-          "library": "LED_SMD:LED_0603_1608Metric",
-          "at": [
-            "at",
-            "-3",
-            "-41"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "red",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.7875",
-                "0"
-              ],
-              [
-                "size",
-                "0.875",
-                "0.95"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.7875",
-                "0"
-              ],
-              [
-                "size",
-                "0.875",
-                "0.95"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/LED_PWR"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "Y1": {
-          "library": "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm",
-          "at": [
-            "at",
-            "22.6",
-            "-8.2"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "12MHz",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-1.1",
-                "0.85"
-              ],
-              [
-                "size",
-                "1.4",
-                "1.2"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.208333"
-              ],
-              [
-                "net",
-                "/XIN"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "1.1",
-                "0.85"
-              ],
-              [
-                "size",
-                "1.4",
-                "1.2"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.208333"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ],
-            [
-              "pad",
-              "3",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "1.1",
-                "-0.85"
-              ],
-              [
-                "size",
-                "1.4",
-                "1.2"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.208333"
-              ],
-              [
-                "net",
-                "/XTAL_OUT"
-              ]
-            ],
-            [
-              "pad",
-              "4",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-1.1",
-                "-0.85"
-              ],
-              [
-                "size",
-                "1.4",
-                "1.2"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.208333"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "H1": {
-          "library": "MountingHole:MountingHole_3.2mm_M3",
-          "at": [
-            "at",
-            "52",
-            "-40"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "M3",
-          "pads": [
-            [
-              "pad",
-              "",
-              "np_thru_hole",
-              "circle",
-              [
-                "at",
-                "0",
-                "0"
-              ],
-              [
-                "size",
-                "3.2",
-                "3.2"
-              ],
-              [
-                "drill",
-                "3.2"
-              ],
-              [
-                "layers",
-                "*.Cu",
-                "*.Mask"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C17": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "25.4",
-            "-8.2",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "33p",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/XTAL_OUT"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C6": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "31.7",
-            "-16.3"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R2": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "24.9",
-            "-12.1",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "1k",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/XOUT"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/XTAL_OUT"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R63": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "16.8125",
-            "-20.25",
-            "180"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "220",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0",
-                "180"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/MOSI"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0",
-                "180"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/MOSI_MCU"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C62": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "16.8125",
-            "-13.45",
-            "-90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "10p",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/CS_n_MCU"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "G1": {
-          "library": "cupc8:KaplanLabs_Logo_12mm",
-          "at": [
-            "at",
-            "7",
-            "-25"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "KaplanLabs_Logo_12mm",
-          "pads": [],
-          "physical_graphics": []
-        },
-        "C23": {
-          "library": "Capacitor_SMD:C_0805_2012Metric",
-          "at": [
-            "at",
-            "45.2",
-            "-15",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "22u",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.95",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1",
-                "1.45"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/VBOOST"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.95",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1",
-                "1.45"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R1": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "15",
-            "-27.5",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "1k",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/QSPI_SS"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/BOOTSEL"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "U6": {
-          "library": "Package_TO_SOT_SMD:SOT-23-6",
-          "at": [
-            "at",
-            "41.4",
-            "-25.3"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "USBLC6-2SC6",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-1.1375",
-                "-0.95"
-              ],
-              [
-                "size",
-                "1.325",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_CONN_DM"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-1.1375",
-                "0"
-              ],
-              [
-                "size",
-                "1.325",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ],
-            [
-              "pad",
-              "3",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-1.1375",
-                "0.95"
-              ],
-              [
-                "size",
-                "1.325",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_CONN_DP"
-              ]
-            ],
-            [
-              "pad",
-              "4",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "1.1375",
-                "0.95"
-              ],
-              [
-                "size",
-                "1.325",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_CONN_DP"
-              ]
-            ],
-            [
-              "pad",
-              "5",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "1.1375",
-                "0"
-              ],
-              [
-                "size",
-                "1.325",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/VBUS"
-              ]
-            ],
-            [
-              "pad",
-              "6",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "1.1375",
-                "-0.95"
-              ],
-              [
-                "size",
-                "1.325",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_CONN_DM"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R10": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "46.3",
-            "-22.6",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "45k3",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/ILIM"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R14": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "36.8",
-            "-19.6"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "27R",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_DM"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/USB_CONN_DM"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
         "J2": {
           "library": "cupc8:USB_A_SOFNG_USB-302S-T",
           "at": [
             "at",
             "39.5",
-            "-31.96",
+            "-35.51",
             "180"
           ],
           "layer": [
@@ -2107,6 +695,324 @@
           ],
           "physical_graphics": []
         },
+        "R14": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "36.8",
+            "-19.6"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "27R",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_DM"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_CONN_DM"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "D1": {
+          "library": "LED_SMD:LED_0603_1608Metric",
+          "at": [
+            "at",
+            "-3",
+            "-44.55"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "red",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.7875",
+                "0"
+              ],
+              [
+                "size",
+                "0.875",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.7875",
+                "0"
+              ],
+              [
+                "size",
+                "0.875",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/LED_PWR"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C5": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "26.9",
+            "-9.9",
+            "-90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R63": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "16.8125",
+            "-20.25",
+            "180"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "220",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "180"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/MOSI"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "180"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/MOSI_MCU"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
         "TP4": {
           "library": "cupc8:TestPad_D1.0mm",
           "at": [
@@ -2148,12 +1054,12 @@
           ],
           "physical_graphics": []
         },
-        "C3": {
+        "C4": {
           "library": "Capacitor_SMD:C_0402_1005Metric",
           "at": [
             "at",
-            "20.7",
-            "-19.1"
+            "21.3",
+            "-14.3"
           ],
           "layer": [
             "layer",
@@ -2223,6 +1129,289 @@
               [
                 "zone_connect",
                 "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C15": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "24.1",
+            "-27.5",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R65": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "14.35",
+            "-14.4",
+            "180"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "220",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "180"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/CS_n"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "180"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/CS_OE"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "TP5": {
+          "library": "cupc8:TestPad_D1.0mm",
+          "at": [
+            "at",
+            "-4",
+            "-29"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "UART_TX",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "circle",
+              [
+                "at",
+                "0",
+                "0"
+              ],
+              [
+                "size",
+                "1",
+                "1"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask"
+              ],
+              [
+                "net",
+                "/UART_TX"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "D3": {
+          "library": "LED_SMD:LED_0603_1608Metric",
+          "at": [
+            "at",
+            "25",
+            "-44.55"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "green",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.7875",
+                "0"
+              ],
+              [
+                "size",
+                "0.875",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.7875",
+                "0"
+              ],
+              [
+                "size",
+                "0.875",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/LED_KEY_A"
               ]
             ]
           ],
@@ -2311,232 +1500,42 @@
           ],
           "physical_graphics": []
         },
-        "L1": {
-          "library": "jlc:IND-SMD_L4.4-W4.2",
+        "TP1": {
+          "library": "cupc8:TestPad_D1.0mm",
           "at": [
             "at",
-            "47.5",
-            "-10.8"
+            "-4",
+            "-36"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "1u",
+          "value": "BOOTSEL",
           "pads": [
             [
               "pad",
               "1",
               "smd",
-              "rect",
+              "circle",
               [
                 "at",
-                "2.03",
-                "0"
-              ],
-              [
-                "size",
-                "1.4",
-                "2.12"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/+5V"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "rect",
-              [
-                "at",
-                "-2.03",
-                "0"
-              ],
-              [
-                "size",
-                "1.4",
-                "2.12"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/BOOST_SW"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C8": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "26.8",
-            "-24.7",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
                 "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C14": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "31.7",
-            "-25.5"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "1u",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
                 "0"
               ],
               [
                 "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/1V1"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
+                "1",
                 "1"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask"
+              ],
+              [
+                "net",
+                "/BOOTSEL"
               ]
             ]
           ],
@@ -4367,168 +3366,6 @@
           ],
           "physical_graphics": []
         },
-        "C16": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "20.5",
-            "-12.6",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "33p",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/XIN"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R65": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "14.35",
-            "-14.4",
-            "180"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "220",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0",
-                "180"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/CS_n"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0",
-                "180"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/CS_OE"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
         "C61": {
           "library": "Capacitor_SMD:C_0402_1005Metric",
           "at": [
@@ -4612,33 +3449,35 @@
           ],
           "physical_graphics": []
         },
-        "C9": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
+        "U7": {
+          "library": "jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR",
           "at": [
             "at",
-            "31.7",
-            "-21.9"
+            "43",
+            "-11.5",
+            "180"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "100n",
+          "value": "TPS61023DRLR",
           "pads": [
             [
               "pad",
               "1",
               "smd",
-              "roundrect",
+              "rect",
               [
                 "at",
-                "-0.48",
-                "0"
+                "0.75",
+                "0.5",
+                "270"
               ],
               [
                 "size",
-                "0.56",
-                "0.62"
+                "0.3",
+                "0.6"
               ],
               [
                 "layers",
@@ -4647,28 +3486,25 @@
                 "F.Paste"
               ],
               [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
                 "net",
-                "/3V3"
+                "/BOOST_FB"
               ]
             ],
             [
               "pad",
               "2",
               "smd",
-              "roundrect",
+              "rect",
               [
                 "at",
-                "0.48",
-                "0"
+                "0.75",
+                "0",
+                "270"
               ],
               [
                 "size",
-                "0.56",
-                "0.62"
+                "0.3",
+                "0.6"
               ],
               [
                 "layers",
@@ -4677,34 +3513,134 @@
                 "F.Paste"
               ],
               [
-                "roundrect_rratio",
-                "0.25"
+                "net",
+                "/+5V"
+              ]
+            ],
+            [
+              "pad",
+              "3",
+              "smd",
+              "rect",
+              [
+                "at",
+                "0.75",
+                "-0.5",
+                "270"
+              ],
+              [
+                "size",
+                "0.3",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/+5V"
+              ]
+            ],
+            [
+              "pad",
+              "4",
+              "smd",
+              "rect",
+              [
+                "at",
+                "-0.75",
+                "-0.5",
+                "270"
+              ],
+              [
+                "size",
+                "0.3",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
               ],
               [
                 "net",
                 "/GND"
+              ]
+            ],
+            [
+              "pad",
+              "5",
+              "smd",
+              "rect",
+              [
+                "at",
+                "-0.75",
+                "0",
+                "270"
               ],
               [
-                "zone_connect",
-                "1"
+                "size",
+                "0.3",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/BOOST_SW"
+              ]
+            ],
+            [
+              "pad",
+              "6",
+              "smd",
+              "rect",
+              [
+                "at",
+                "-0.75",
+                "0.5",
+                "270"
+              ],
+              [
+                "size",
+                "0.3",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/VBOOST"
               ]
             ]
           ],
           "physical_graphics": []
         },
-        "R12": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
+        "C21": {
+          "library": "Capacitor_SMD:C_1206_3216Metric",
           "at": [
             "at",
-            "33.5",
-            "-10.5",
+            "53.6",
+            "-17.5",
             "90"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "10k",
+          "value": "100u",
           "pads": [
             [
               "pad",
@@ -4713,14 +3649,14 @@
               "roundrect",
               [
                 "at",
-                "-0.51",
+                "-1.475",
                 "0",
                 "90"
               ],
               [
                 "size",
-                "0.54",
-                "0.64"
+                "1.15",
+                "1.8"
               ],
               [
                 "layers",
@@ -4730,11 +3666,11 @@
               ],
               [
                 "roundrect_rratio",
-                "0.25"
+                "0.217391"
               ],
               [
                 "net",
-                "/3V3"
+                "/VBUS"
               ]
             ],
             [
@@ -4744,14 +3680,14 @@
               "roundrect",
               [
                 "at",
-                "0.51",
+                "1.475",
                 "0",
                 "90"
               ],
               [
                 "size",
-                "0.54",
-                "0.64"
+                "1.15",
+                "1.8"
               ],
               [
                 "layers",
@@ -4761,11 +3697,11 @@
               ],
               [
                 "roundrect_rratio",
-                "0.25"
+                "0.217391"
               ],
               [
                 "net",
-                "/VBUS_nFAULT"
+                "/GND"
               ]
             ]
           ],
@@ -6001,19 +4937,18 @@
             ]
           ]
         },
-        "C25": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
+        "R16": {
+          "library": "Resistor_SMD:R_0603_1608Metric",
           "at": [
             "at",
-            "52.6",
-            "-25.6",
-            "90"
+            "40.8",
+            "-13.3"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "4.7u",
+          "value": "750k",
           "pads": [
             [
               "pad",
@@ -6022,14 +4957,13 @@
               "roundrect",
               [
                 "at",
-                "-0.48",
-                "0",
-                "90"
+                "-0.825",
+                "0"
               ],
               [
                 "size",
-                "0.56",
-                "0.62"
+                "0.8",
+                "0.95"
               ],
               [
                 "layers",
@@ -6053,604 +4987,13 @@
               "roundrect",
               [
                 "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C12": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "27.1",
-            "-12.1",
-            "-90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/1V1"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "U5": {
-          "library": "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
-          "at": [
-            "at",
-            "50",
-            "-22",
-            "180"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "TPS2553DBVR-1",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "rect",
-              [
-                "at",
-                "-0.95",
-                "1.15",
-                "180"
-              ],
-              [
-                "size",
-                "0.532",
-                "1.072"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/VBOOST"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0",
-                "1.15",
-                "180"
-              ],
-              [
-                "size",
-                "0.532",
-                "1.072"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ],
-            [
-              "pad",
-              "3",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0.95",
-                "1.15",
-                "180"
-              ],
-              [
-                "size",
-                "0.532",
-                "1.072"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/VBUS_EN"
-              ]
-            ],
-            [
-              "pad",
-              "4",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0.95",
-                "-1.15",
-                "180"
-              ],
-              [
-                "size",
-                "0.532",
-                "1.072"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/VBUS_nFAULT"
-              ]
-            ],
-            [
-              "pad",
-              "5",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0",
-                "-1.15",
-                "180"
-              ],
-              [
-                "size",
-                "0.532",
-                "1.072"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/ILIM"
-              ]
-            ],
-            [
-              "pad",
-              "6",
-              "smd",
-              "rect",
-              [
-                "at",
-                "-0.95",
-                "-1.15",
-                "180"
-              ],
-              [
-                "size",
-                "0.532",
-                "1.072"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/VBUS"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C22": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "44.9",
-            "-25.5",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/VBUS"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C2": {
-          "library": "Capacitor_SMD:C_0805_2012Metric",
-          "at": [
-            "at",
-            "3",
-            "-11.5",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "22u",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.95",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1",
-                "1.45"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.95",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1",
-                "1.45"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C21": {
-          "library": "Capacitor_SMD:C_1206_3216Metric",
-          "at": [
-            "at",
-            "53.6",
-            "-17.5",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100u",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-1.475",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1.15",
-                "1.8"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.217391"
-              ],
-              [
-                "net",
-                "/VBUS"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "1.475",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "1.15",
-                "1.8"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.217391"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "TP5": {
-          "library": "cupc8:TestPad_D1.0mm",
-          "at": [
-            "at",
-            "-4",
-            "-29"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "UART_TX",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "circle",
-              [
-                "at",
-                "0",
+                "0.825",
                 "0"
               ],
               [
                 "size",
-                "1",
-                "1"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask"
-              ],
-              [
-                "net",
-                "/UART_TX"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C11": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "31.7",
-            "-23.7"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "1u",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
+                "0.8",
+                "0.95"
               ],
               [
                 "layers",
@@ -6664,124 +5007,7 @@
               ],
               [
                 "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C10": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "26.8",
-            "-22.8",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
+                "/BOOST_FB"
               ]
             ]
           ],
@@ -6934,74 +5160,35 @@
           ],
           "physical_graphics": []
         },
-        "TP1": {
-          "library": "cupc8:TestPad_D1.0mm",
+        "C22": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
           "at": [
             "at",
-            "-4",
-            "-36"
+            "44.9",
+            "-25.5",
+            "90"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "BOOTSEL",
+          "value": "100n",
           "pads": [
             [
               "pad",
               "1",
               "smd",
-              "circle",
+              "roundrect",
               [
                 "at",
+                "-0.48",
                 "0",
-                "0"
+                "90"
               ],
               [
                 "size",
-                "1",
-                "1"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask"
-              ],
-              [
-                "net",
-                "/BOOTSEL"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R60": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "19",
-            "-20.5"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "220",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -7015,7 +5202,7 @@
               ],
               [
                 "net",
-                "/MISO_SRC"
+                "/VBUS"
               ]
             ],
             [
@@ -7025,13 +5212,14 @@
               "roundrect",
               [
                 "at",
-                "0.51",
-                "0"
+                "0.48",
+                "0",
+                "90"
               ],
               [
                 "size",
-                "0.54",
-                "0.64"
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -7045,83 +5233,7 @@
               ],
               [
                 "net",
-                "/MISO"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R5": {
-          "library": "Resistor_SMD:R_0603_1608Metric",
-          "at": [
-            "at",
-            "19",
-            "-38.5"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "1k",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.825",
-                "0"
-              ],
-              [
-                "size",
-                "0.8",
-                "0.95"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/LED_KBD"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.825",
-                "0"
-              ],
-              [
-                "size",
-                "0.8",
-                "0.95"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/LED_KBD_A"
+                "/GND"
               ]
             ]
           ],
@@ -7187,6 +5299,1301 @@
                 "size",
                 "0.54",
                 "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "G1": {
+          "library": "cupc8:KaplanLabs_Logo_12mm",
+          "at": [
+            "at",
+            "7",
+            "-25"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "KaplanLabs_Logo_12mm",
+          "pads": [],
+          "physical_graphics": []
+        },
+        "U6": {
+          "library": "Package_TO_SOT_SMD:SOT-23-6",
+          "at": [
+            "at",
+            "41.4",
+            "-25.3"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "USBLC6-2SC6",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-1.1375",
+                "-0.95"
+              ],
+              [
+                "size",
+                "1.325",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_CONN_DM"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-1.1375",
+                "0"
+              ],
+              [
+                "size",
+                "1.325",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ],
+            [
+              "pad",
+              "3",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-1.1375",
+                "0.95"
+              ],
+              [
+                "size",
+                "1.325",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_CONN_DP"
+              ]
+            ],
+            [
+              "pad",
+              "4",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "1.1375",
+                "0.95"
+              ],
+              [
+                "size",
+                "1.325",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_CONN_DP"
+              ]
+            ],
+            [
+              "pad",
+              "5",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "1.1375",
+                "0"
+              ],
+              [
+                "size",
+                "1.325",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/VBUS"
+              ]
+            ],
+            [
+              "pad",
+              "6",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "1.1375",
+                "-0.95"
+              ],
+              [
+                "size",
+                "1.325",
+                "0.6"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_CONN_DM"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R1": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "15",
+            "-27.5",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "1k",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/QSPI_SS"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/BOOTSEL"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C9": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "31.7",
+            "-21.9"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R64": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "16.8125",
+            "-15.45",
+            "-90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "220",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/CS_n"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/CS_n_MCU"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R61": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "20.5",
+            "-21.01",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "47k",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/MISO"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R6": {
+          "library": "Resistor_SMD:R_0603_1608Metric",
+          "at": [
+            "at",
+            "25",
+            "-42.05"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100R",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.825",
+                "0"
+              ],
+              [
+                "size",
+                "0.8",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/LED_KEY"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.825",
+                "0"
+              ],
+              [
+                "size",
+                "0.8",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/LED_KEY_A"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C20": {
+          "library": "Capacitor_SMD:C_0805_2012Metric",
+          "at": [
+            "at",
+            "40.3",
+            "-9.8",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "10u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.95",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "1",
+                "1.45"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/+5V"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.95",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "1",
+                "1.45"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C24": {
+          "library": "Capacitor_SMD:C_0805_2012Metric",
+          "at": [
+            "at",
+            "47.9",
+            "-15",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "22u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.95",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "1",
+                "1.45"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/VBOOST"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.95",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "1",
+                "1.45"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C3": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "20.7",
+            "-19.1"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C17": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "25.4",
+            "-8.2",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "33p",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/XTAL_OUT"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C11": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "31.7",
+            "-23.7"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "1u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R3": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "8.5",
+            "-12.5",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "10k",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/RUN"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "TP6": {
+          "library": "cupc8:TestPad_D1.0mm",
+          "at": [
+            "at",
+            "-4",
+            "-32.5"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "GND",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "circle",
+              [
+                "at",
+                "0",
+                "0"
+              ],
+              [
+                "size",
+                "1",
+                "1"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C63": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "14",
+            "-15.649999",
+            "180"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "10p",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "180"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/CS_OE"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "180"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C16": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "20.5",
+            "-12.6",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "33p",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/XIN"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -7475,18 +6882,570 @@
           ],
           "physical_graphics": []
         },
-        "R6": {
-          "library": "Resistor_SMD:R_0603_1608Metric",
+        "L1": {
+          "library": "jlc:IND-SMD_L4.4-W4.2",
           "at": [
             "at",
-            "25",
-            "-38.5"
+            "47.5",
+            "-10.8"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "100R",
+          "value": "1u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "rect",
+              [
+                "at",
+                "2.03",
+                "0"
+              ],
+              [
+                "size",
+                "1.4",
+                "2.12"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/+5V"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "rect",
+              [
+                "at",
+                "-2.03",
+                "0"
+              ],
+              [
+                "size",
+                "1.4",
+                "2.12"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/BOOST_SW"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "H1": {
+          "library": "MountingHole:MountingHole_3.2mm_M3",
+          "at": [
+            "at",
+            "52",
+            "-43.55"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "M3",
+          "pads": [
+            [
+              "pad",
+              "",
+              "np_thru_hole",
+              "circle",
+              [
+                "at",
+                "0",
+                "0"
+              ],
+              [
+                "size",
+                "3.2",
+                "3.2"
+              ],
+              [
+                "drill",
+                "3.2"
+              ],
+              [
+                "layers",
+                "*.Cu",
+                "*.Mask"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C14": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "31.7",
+            "-25.5"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "1u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/1V1"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "TP3": {
+          "library": "cupc8:TestPad_D1.0mm",
+          "at": [
+            "at",
+            "-4",
+            "-22"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "SWDIO",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "circle",
+              [
+                "at",
+                "0",
+                "0"
+              ],
+              [
+                "size",
+                "1",
+                "1"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask"
+              ],
+              [
+                "net",
+                "/SWDIO"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C7": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "31.7",
+            "-20.1"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C62": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "16.8125",
+            "-13.45",
+            "-90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "10p",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/CS_n_MCU"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R10": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "46.3",
+            "-22.6",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "45k3",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/ILIM"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R15": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "36.8",
+            "-22.6"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "27R",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.51",
+                "0"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_DP"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/USB_CONN_DP"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R4": {
+          "library": "Resistor_SMD:R_0603_1608Metric",
+          "at": [
+            "at",
+            "-3",
+            "-42.05"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "1k",
           "pads": [
             [
               "pad",
@@ -7515,7 +7474,7 @@
               ],
               [
                 "net",
-                "/LED_KEY"
+                "/3V3"
               ]
             ],
             [
@@ -7545,24 +7504,24 @@
               ],
               [
                 "net",
-                "/LED_KEY_A"
+                "/LED_PWR"
               ]
             ]
           ],
           "physical_graphics": []
         },
-        "D3": {
-          "library": "LED_SMD:LED_0603_1608Metric",
+        "R5": {
+          "library": "Resistor_SMD:R_0603_1608Metric",
           "at": [
             "at",
-            "25",
-            "-41"
+            "19",
+            "-42.05"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "green",
+          "value": "1k",
           "pads": [
             [
               "pad",
@@ -7571,13 +7530,122 @@
               "roundrect",
               [
                 "at",
-                "-0.7875",
+                "-0.825",
                 "0"
               ],
               [
                 "size",
-                "0.875",
+                "0.8",
                 "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/LED_KBD"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.825",
+                "0"
+              ],
+              [
+                "size",
+                "0.8",
+                "0.95"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/LED_KBD_A"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C25": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "52.6",
+            "-25.6",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "4.7u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/VBOOST"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -7592,40 +7660,6 @@
               [
                 "net",
                 "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.7875",
-                "0"
-              ],
-              [
-                "size",
-                "0.875",
-                "0.95"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/LED_KEY_A"
               ]
             ]
           ],
@@ -7711,19 +7745,19 @@
           ],
           "physical_graphics": []
         },
-        "R61": {
+        "R2": {
           "library": "Resistor_SMD:R_0402_1005Metric",
           "at": [
             "at",
-            "20.5",
-            "-21.01",
+            "24.9",
+            "-12.1",
             "90"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "47k",
+          "value": "1k",
           "pads": [
             [
               "pad",
@@ -7753,7 +7787,7 @@
               ],
               [
                 "net",
-                "/MISO"
+                "/XOUT"
               ]
             ],
             [
@@ -7784,6 +7818,221 @@
               ],
               [
                 "net",
+                "/XTAL_OUT"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "Y1": {
+          "library": "Crystal:Crystal_SMD_3225-4Pin_3.2x2.5mm",
+          "at": [
+            "at",
+            "22.6",
+            "-8.2"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "12MHz",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-1.1",
+                "0.85"
+              ],
+              [
+                "size",
+                "1.4",
+                "1.2"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.208333"
+              ],
+              [
+                "net",
+                "/XIN"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "1.1",
+                "0.85"
+              ],
+              [
+                "size",
+                "1.4",
+                "1.2"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.208333"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ],
+            [
+              "pad",
+              "3",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "1.1",
+                "-0.85"
+              ],
+              [
+                "size",
+                "1.4",
+                "1.2"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.208333"
+              ],
+              [
+                "net",
+                "/XTAL_OUT"
+              ]
+            ],
+            [
+              "pad",
+              "4",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-1.1",
+                "-0.85"
+              ],
+              [
+                "size",
+                "1.4",
+                "1.2"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.208333"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C12": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "27.1",
+            "-12.1",
+            "-90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.48",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/1V1"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "270"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
                 "/GND"
               ],
               [
@@ -7794,18 +8043,197 @@
           ],
           "physical_graphics": []
         },
-        "D2": {
-          "library": "LED_SMD:LED_0603_1608Metric",
+        "U5": {
+          "library": "jlc:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL",
           "at": [
             "at",
-            "19",
-            "-41"
+            "50",
+            "-22",
+            "180"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "red",
+          "value": "TPS2553DBVR-1",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "rect",
+              [
+                "at",
+                "-0.95",
+                "1.15",
+                "180"
+              ],
+              [
+                "size",
+                "0.532",
+                "1.072"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/VBOOST"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "rect",
+              [
+                "at",
+                "0",
+                "1.15",
+                "180"
+              ],
+              [
+                "size",
+                "0.532",
+                "1.072"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/GND"
+              ]
+            ],
+            [
+              "pad",
+              "3",
+              "smd",
+              "rect",
+              [
+                "at",
+                "0.95",
+                "1.15",
+                "180"
+              ],
+              [
+                "size",
+                "0.532",
+                "1.072"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/VBUS_EN"
+              ]
+            ],
+            [
+              "pad",
+              "4",
+              "smd",
+              "rect",
+              [
+                "at",
+                "0.95",
+                "-1.15",
+                "180"
+              ],
+              [
+                "size",
+                "0.532",
+                "1.072"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/VBUS_nFAULT"
+              ]
+            ],
+            [
+              "pad",
+              "5",
+              "smd",
+              "rect",
+              [
+                "at",
+                "0",
+                "-1.15",
+                "180"
+              ],
+              [
+                "size",
+                "0.532",
+                "1.072"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/ILIM"
+              ]
+            ],
+            [
+              "pad",
+              "6",
+              "smd",
+              "rect",
+              [
+                "at",
+                "-0.95",
+                "-1.15",
+                "180"
+              ],
+              [
+                "size",
+                "0.532",
+                "1.072"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "net",
+                "/VBUS"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "R60": {
+          "library": "Resistor_SMD:R_0402_1005Metric",
+          "at": [
+            "at",
+            "19",
+            "-20.5"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "220",
           "pads": [
             [
               "pad",
@@ -7814,13 +8242,122 @@
               "roundrect",
               [
                 "at",
-                "-0.7875",
+                "-0.51",
                 "0"
               ],
               [
                 "size",
-                "0.875",
-                "0.95"
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/MISO_SRC"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.51",
+                "0"
+              ],
+              [
+                "size",
+                "0.54",
+                "0.64"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/MISO"
+              ]
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C2": {
+          "library": "Capacitor_SMD:C_0805_2012Metric",
+          "at": [
+            "at",
+            "3",
+            "-11.5",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "22u",
+          "pads": [
+            [
+              "pad",
+              "1",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "-0.95",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "1",
+                "1.45"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.95",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "1",
+                "1.45"
               ],
               [
                 "layers",
@@ -7840,21 +8377,39 @@
                 "zone_connect",
                 "1"
               ]
-            ],
+            ]
+          ],
+          "physical_graphics": []
+        },
+        "C10": {
+          "library": "Capacitor_SMD:C_0402_1005Metric",
+          "at": [
+            "at",
+            "26.8",
+            "-22.8",
+            "90"
+          ],
+          "layer": [
+            "layer",
+            "F.Cu"
+          ],
+          "value": "100n",
+          "pads": [
             [
               "pad",
-              "2",
+              "1",
               "smd",
               "roundrect",
               [
                 "at",
-                "0.7875",
-                "0"
+                "-0.48",
+                "0",
+                "90"
               ],
               [
                 "size",
-                "0.875",
-                "0.95"
+                "0.56",
+                "0.62"
               ],
               [
                 "layers",
@@ -7868,7 +8423,42 @@
               ],
               [
                 "net",
-                "/LED_KBD_A"
+                "/3V3"
+              ]
+            ],
+            [
+              "pad",
+              "2",
+              "smd",
+              "roundrect",
+              [
+                "at",
+                "0.48",
+                "0",
+                "90"
+              ],
+              [
+                "size",
+                "0.56",
+                "0.62"
+              ],
+              [
+                "layers",
+                "F.Cu",
+                "F.Mask",
+                "F.Paste"
+              ],
+              [
+                "roundrect_rratio",
+                "0.25"
+              ],
+              [
+                "net",
+                "/GND"
+              ],
+              [
+                "zone_connect",
+                "1"
               ]
             ]
           ],
@@ -7957,19 +8547,19 @@
           ],
           "physical_graphics": []
         },
-        "C5": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
+        "C23": {
+          "library": "Capacitor_SMD:C_0805_2012Metric",
           "at": [
             "at",
-            "26.9",
-            "-9.9",
-            "-90"
+            "45.2",
+            "-15",
+            "90"
           ],
           "layer": [
             "layer",
             "F.Cu"
           ],
-          "value": "100n",
+          "value": "22u",
           "pads": [
             [
               "pad",
@@ -7978,14 +8568,14 @@
               "roundrect",
               [
                 "at",
-                "-0.48",
+                "-0.95",
                 "0",
-                "270"
+                "90"
               ],
               [
                 "size",
-                "0.56",
-                "0.62"
+                "1",
+                "1.45"
               ],
               [
                 "layers",
@@ -7999,7 +8589,7 @@
               ],
               [
                 "net",
-                "/3V3"
+                "/VBOOST"
               ]
             ],
             [
@@ -8009,193 +8599,24 @@
               "roundrect",
               [
                 "at",
-                "0.48",
+                "0.95",
                 "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C63": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "14",
-            "-15.649999",
-            "180"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "10p",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "180"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/CS_OE"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "180"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "TP2": {
-          "library": "cupc8:TestPad_D1.0mm",
-          "at": [
-            "at",
-            "-4",
-            "-18.5"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "SWCLK",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "circle",
-              [
-                "at",
-                "0",
-                "0"
+                "90"
               ],
               [
                 "size",
                 "1",
-                "1"
+                "1.45"
               ],
               [
                 "layers",
                 "F.Cu",
-                "F.Mask"
+                "F.Mask",
+                "F.Paste"
               ],
               [
-                "net",
-                "/SWCLK"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "TP6": {
-          "library": "cupc8:TestPad_D1.0mm",
-          "at": [
-            "at",
-            "-4",
-            "-32.5"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "GND",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "circle",
-              [
-                "at",
-                "0",
-                "0"
-              ],
-              [
-                "size",
-                "1",
-                "1"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask"
+                "roundrect_rratio",
+                "0.25"
               ],
               [
                 "net",
@@ -8205,13 +8626,13 @@
           ],
           "physical_graphics": []
         },
-        "R64": {
+        "R62": {
           "library": "Resistor_SMD:R_0402_1005Metric",
           "at": [
             "at",
-            "16.8125",
-            "-15.45",
-            "-90"
+            "18.3125",
+            "-13.9",
+            "90"
           ],
           "layer": [
             "layer",
@@ -8228,427 +8649,6 @@
                 "at",
                 "-0.51",
                 "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/CS_n"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.51",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.54",
-                "0.64"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/CS_n_MCU"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C4": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "21.3",
-            "-14.3"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "U7": {
-          "library": "jlc:SOT-563_L1.6-W1.2-P0.50-LS1.6-BR",
-          "at": [
-            "at",
-            "43",
-            "-11.5",
-            "180"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "TPS61023DRLR",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0.75",
-                "0.5",
-                "270"
-              ],
-              [
-                "size",
-                "0.3",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/BOOST_FB"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0.75",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.3",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/+5V"
-              ]
-            ],
-            [
-              "pad",
-              "3",
-              "smd",
-              "rect",
-              [
-                "at",
-                "0.75",
-                "-0.5",
-                "270"
-              ],
-              [
-                "size",
-                "0.3",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/+5V"
-              ]
-            ],
-            [
-              "pad",
-              "4",
-              "smd",
-              "rect",
-              [
-                "at",
-                "-0.75",
-                "-0.5",
-                "270"
-              ],
-              [
-                "size",
-                "0.3",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/GND"
-              ]
-            ],
-            [
-              "pad",
-              "5",
-              "smd",
-              "rect",
-              [
-                "at",
-                "-0.75",
-                "0",
-                "270"
-              ],
-              [
-                "size",
-                "0.3",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/BOOST_SW"
-              ]
-            ],
-            [
-              "pad",
-              "6",
-              "smd",
-              "rect",
-              [
-                "at",
-                "-0.75",
-                "0.5",
-                "270"
-              ],
-              [
-                "size",
-                "0.3",
-                "0.6"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "net",
-                "/VBOOST"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "C15": {
-          "library": "Capacitor_SMD:C_0402_1005Metric",
-          "at": [
-            "at",
-            "24.1",
-            "-27.5",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "100n",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/3V3"
-              ]
-            ],
-            [
-              "pad",
-              "2",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "0.48",
-                "0",
-                "90"
-              ],
-              [
-                "size",
-                "0.56",
-                "0.62"
-              ],
-              [
-                "layers",
-                "F.Cu",
-                "F.Mask",
-                "F.Paste"
-              ],
-              [
-                "roundrect_rratio",
-                "0.25"
-              ],
-              [
-                "net",
-                "/GND"
-              ],
-              [
-                "zone_connect",
-                "1"
-              ]
-            ]
-          ],
-          "physical_graphics": []
-        },
-        "R3": {
-          "library": "Resistor_SMD:R_0402_1005Metric",
-          "at": [
-            "at",
-            "8.5",
-            "-12.5",
-            "90"
-          ],
-          "layer": [
-            "layer",
-            "F.Cu"
-          ],
-          "value": "10k",
-          "pads": [
-            [
-              "pad",
-              "1",
-              "smd",
-              "roundrect",
-              [
-                "at",
-                "-0.51",
-                "0",
                 "90"
               ],
               [
@@ -8668,7 +8668,7 @@
               ],
               [
                 "net",
-                "/3V3"
+                "/SCK"
               ]
             ],
             [
@@ -8699,7 +8699,7 @@
               ],
               [
                 "net",
-                "/RUN"
+                "/SCK_MCU"
               ]
             ]
           ],
@@ -8830,7 +8830,7 @@
           [
             "end",
             "-6",
-            "-44"
+            "-47.55"
           ],
           [
             "stroke",
@@ -8853,12 +8853,12 @@
           [
             "start",
             "-6",
-            "-44"
+            "-47.55"
           ],
           [
             "end",
             "56",
-            "-44"
+            "-47.55"
           ],
           [
             "stroke",
@@ -8909,7 +8909,7 @@
           [
             "start",
             "56",
-            "-44"
+            "-47.55"
           ],
           [
             "end",
@@ -10265,7 +10265,7 @@
         3587500,
         -31087500,
         -3825000,
-        -38500000,
+        -42050000,
         150000
       ],
       [
@@ -10843,9 +10843,9 @@
         "/GND",
         "F.Cu",
         -3787500,
-        -41000000,
+        -44550000,
         -4787500,
-        -41000000,
+        -44550000,
         300000
       ],
       [
@@ -11053,9 +11053,9 @@
         "/GND",
         "F.Cu",
         18212500,
-        -41000000,
+        -44550000,
         17212500,
-        -41000000,
+        -44550000,
         300000
       ],
       [
@@ -11173,9 +11173,9 @@
         "/GND",
         "F.Cu",
         24212500,
-        -41000000,
+        -44550000,
         23212500,
-        -41000000,
+        -44550000,
         300000
       ],
       [
@@ -11333,7 +11333,7 @@
         "/GND",
         "F.Cu",
         32200000,
-        -33060000,
+        -36610000,
         30617861,
         -33298404,
         300000
@@ -11343,7 +11343,7 @@
         "/GND",
         "F.Cu",
         36000000,
-        -30960000,
+        -34510000,
         35038476,
         -30685278,
         300000
@@ -11453,7 +11453,7 @@
         "/GND",
         "F.Cu",
         46800000,
-        -33060000,
+        -36610000,
         48382138,
         -33298404,
         300000
@@ -11693,7 +11693,7 @@
         "/LED_KBD",
         "F.Cu",
         18175000,
-        -38500000,
+        -42050000,
         18579300,
         -38904300,
         150000
@@ -11783,9 +11783,9 @@
         "/LED_KBD_A",
         "F.Cu",
         19787500,
-        -38537500,
+        -42087500,
         19787500,
-        -41000000,
+        -44550000,
         200000
       ],
       [
@@ -11793,9 +11793,9 @@
         "/LED_KBD_A",
         "F.Cu",
         19825000,
-        -38500000,
+        -42050000,
         19787500,
-        -38537500,
+        -42087500,
         200000
       ],
       [
@@ -11803,9 +11803,9 @@
         "/LED_KEY",
         "F.Cu",
         24175000,
-        -38500000,
+        -42050000,
         24543600,
-        -38868600,
+        -42418600,
         150000
       ],
       [
@@ -11813,7 +11813,7 @@
         "/LED_KEY",
         "F.Cu",
         24543600,
-        -38868600,
+        -42418600,
         24543600,
         -39495900,
         150000
@@ -11873,9 +11873,9 @@
         "/LED_KEY_A",
         "F.Cu",
         25787500,
-        -38537500,
+        -42087500,
         25787500,
-        -41000000,
+        -44550000,
         200000
       ],
       [
@@ -11883,9 +11883,9 @@
         "/LED_KEY_A",
         "F.Cu",
         25825000,
-        -38500000,
+        -42050000,
         25787500,
-        -38537500,
+        -42087500,
         200000
       ],
       [
@@ -11893,9 +11893,9 @@
         "/LED_PWR",
         "F.Cu",
         -2175000,
-        -38500000,
+        -42050000,
         -2212500,
-        -38537500,
+        -42087500,
         200000
       ],
       [
@@ -11903,9 +11903,9 @@
         "/LED_PWR",
         "F.Cu",
         -2212500,
-        -38537500,
+        -42087500,
         -2212500,
-        -41000000,
+        -44550000,
         200000
       ],
       [
@@ -13595,7 +13595,7 @@
         37357500,
         -25324100,
         37357500,
-        -32694300,
+        -36244300,
         200000
       ],
       [
@@ -13603,9 +13603,9 @@
         "/USB_CONN_DM",
         "F.Cu",
         37357500,
-        -32694300,
+        -36244300,
         37824900,
-        -33161700,
+        -36711700,
         200000
       ],
       [
@@ -13613,9 +13613,9 @@
         "/USB_CONN_DM",
         "F.Cu",
         37824900,
-        -33161700,
+        -36711700,
         40500000,
-        -33161700,
+        -36711700,
         200000
       ],
       [
@@ -13635,7 +13635,7 @@
         40500000,
         -26487500,
         40500000,
-        -30960000,
+        -34510000,
         200000
       ],
       [
@@ -13643,9 +13643,9 @@
         "/USB_CONN_DM",
         "F.Cu",
         40500000,
-        -30960000,
+        -34510000,
         40500000,
-        -33161700,
+        -36711700,
         200000
       ],
       [
@@ -13693,7 +13693,7 @@
         "/USB_CONN_DP",
         "F.Cu",
         38500000,
-        -30960000,
+        -34510000,
         38500000,
         -24699200,
         200000
@@ -13983,7 +13983,7 @@
         "/VBUS",
         "F.Cu",
         43000000,
-        -30960000,
+        -34510000,
         43000000,
         -28608300,
         500000
@@ -14823,7 +14823,7 @@
         "via",
         "/GND",
         -4787500,
-        -41000000,
+        -44550000,
         600000,
         300000,
         "F.Cu",
@@ -14889,7 +14889,7 @@
         "via",
         "/GND",
         11000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -14900,7 +14900,7 @@
         "via",
         "/GND",
         11000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15010,7 +15010,7 @@
         "via",
         "/GND",
         14000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15021,7 +15021,7 @@
         "via",
         "/GND",
         14000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15098,7 +15098,7 @@
         "via",
         "/GND",
         17000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15109,7 +15109,7 @@
         "via",
         "/GND",
         17212500,
-        -41000000,
+        -44550000,
         600000,
         300000,
         "F.Cu",
@@ -15175,7 +15175,7 @@
         "via",
         "/GND",
         2000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15186,7 +15186,7 @@
         "via",
         "/GND",
         2000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15329,7 +15329,7 @@
         "via",
         "/GND",
         23000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15340,7 +15340,7 @@
         "via",
         "/GND",
         23212500,
-        -41000000,
+        -44550000,
         600000,
         300000,
         "F.Cu",
@@ -15461,7 +15461,7 @@
         "via",
         "/GND",
         29000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15472,7 +15472,7 @@
         "via",
         "/GND",
         29000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15493,8 +15493,8 @@
       [
         "via",
         "/GND",
-        30617861,
-        -33298404,
+        32000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15505,18 +15505,7 @@
         "via",
         "/GND",
         32000000,
-        -39000000,
-        600000,
-        300000,
-        "F.Cu",
-        "B.Cu",
-        4
-      ],
-      [
-        "via",
-        "/GND",
-        32000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15615,7 +15604,7 @@
         "via",
         "/GND",
         35000000,
-        -36000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15626,18 +15615,7 @@
         "via",
         "/GND",
         35000000,
-        -39000000,
-        600000,
-        300000,
-        "F.Cu",
-        "B.Cu",
-        4
-      ],
-      [
-        "via",
-        "/GND",
-        35000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15659,7 +15637,7 @@
         "via",
         "/GND",
         38000000,
-        -36000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15670,18 +15648,7 @@
         "via",
         "/GND",
         38000000,
-        -39000000,
-        600000,
-        300000,
-        "F.Cu",
-        "B.Cu",
-        4
-      ],
-      [
-        "via",
-        "/GND",
-        38000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15758,7 +15725,7 @@
         "via",
         "/GND",
         41000000,
-        -36000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15769,18 +15736,7 @@
         "via",
         "/GND",
         41000000,
-        -39000000,
-        600000,
-        300000,
-        "F.Cu",
-        "B.Cu",
-        4
-      ],
-      [
-        "via",
-        "/GND",
-        41000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15813,7 +15769,7 @@
         "via",
         "/GND",
         44000000,
-        -36000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15824,18 +15780,7 @@
         "via",
         "/GND",
         44000000,
-        -39000000,
-        600000,
-        300000,
-        "F.Cu",
-        "B.Cu",
-        4
-      ],
-      [
-        "via",
-        "/GND",
-        44000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15912,7 +15857,7 @@
         "via",
         "/GND",
         47000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15923,7 +15868,7 @@
         "via",
         "/GND",
         47000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -15967,7 +15912,7 @@
         "via",
         "/GND",
         5000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -15978,7 +15923,7 @@
         "via",
         "/GND",
         5000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -16154,7 +16099,7 @@
         "via",
         "/GND",
         8000000,
-        -39000000,
+        -42550000,
         600000,
         300000,
         "F.Cu",
@@ -16165,7 +16110,7 @@
         "via",
         "/GND",
         8000000,
-        -42000000,
+        -45550000,
         600000,
         300000,
         "F.Cu",
@@ -16801,5 +16746,5 @@
       ]
     ]
   },
-  "payload_sha256": "18874248135875ac5318e36c3a672a23abe0e363627bacb70538814e73f0a26a"
+  "payload_sha256": "7f3a685ba3489629a7852a44cb5fec53074433097b1543689813e9c6c07fc84d"
 }

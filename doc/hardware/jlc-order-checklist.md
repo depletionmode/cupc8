@@ -43,11 +43,7 @@ Any subsequent source or artifact change requires fresh evidence/review binding.
   fingers only on ENIG, no hard-gold option. Immersion gold is thin, so
   the design life is tens of insertions; revisit hard gold in a later
   revision. `order_spec` now writes `"finger_finish": "ENIG"`.
-- **Panels: one card per panel** (David). JLC's PCBA minimum counts panels,
-  so 2-up would assemble four cards. `order_spec` writes
-  `"cards_per_panel": 1`. The accepted 2026-09-29 plan is **panel by JLC**, one card per panel.
-  Review JLC's rails, tabs, finger clearance and production preview before payment;
-  no customer panel generator is required by that decision.
+- **2026-10-01 size revision:** select **Single PCB**, with one finished card per assembly unit. CPU/GPU/IO/storage/WiFi/eInk now measure **62 x 51 mm**; System remains **56 x 56.4 mm**. JLC may add temporary rails/carriers for assembly; require their removal before delivery and preserve fingers, notch and connector access. The earlier mandatory Panel by JLC selection is superseded. Review the actual production preview.
 - **Impedance control:** Yes on every 4- and 6-layer board, with the stackup
   named in each board's `fab/order.json` (JLC04161H-7628 / JLC06161H-3313),
   once the SI rows confirm our trace geometry hits the targets on it.
@@ -179,12 +175,12 @@ boards into a panel.
 | Board | Layers | Size (mm, job file) | Stackup | Fingers | BOM lines / placements | THT | Rev |
 |---|---|---|---|---|---|---|---|
 | main | 6 | 131.1 x 188.1 | JLC06161H-3313 | no | 71 / 274 | 8 THT (sockets, header); J1 SMT + PTH shell; J3 SMD + NPTH posts | A |
-| cpu | 6 | 62.1 x 47.55 | JLC06161H-3313 | x8, ENIG gold, 30° | 11 / 47 | none | A |
-| gpu | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 29 / 58 | none | A |
-| io | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 30 / 58 | none | A |
-| storage | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 21 / 48 | none | A |
-| wifi | 2 | 62.1 x 47.55 | (2-layer, none) | x1, ENIG gold, 30° | 22 / 47 | none | A |
-| eink | 4 | 62.1 x 47.55 | JLC04161H-7628 | x1, ENIG gold, 30° | 22 / 51 | none | A |
+| cpu | 6 | 62.1 x 51.1 | JLC06161H-3313 | x8, ENIG gold, 30° | 11 / 47 | none | A |
+| gpu | 4 | 62.1 x 51.1 | JLC04161H-7628 | x1, ENIG gold, 30° | 29 / 58 | none | A |
+| io | 4 | 62.1 x 51.1 | JLC04161H-7628 | x1, ENIG gold, 30° | 30 / 58 | none | A |
+| storage | 4 | 62.1 x 51.1 | JLC04161H-7628 | x1, ENIG gold, 30° | 21 / 48 | none | A |
+| wifi | 2 | 62.1 x 51.1 | (2-layer, none) | x1, ENIG gold, 30° | 22 / 47 | none | A |
+| eink | 4 | 62.1 x 51.1 | JLC04161H-7628 | x1, ENIG gold, 30° | 22 / 51 | none | A |
 | system | 4 | 56.1 x 56.5 | JLC04161H-7628 | x4, ENIG gold, 30° | 19 / 48 | none | A |
 
 (The "sockets" row in `fab-readiness.md` is not built and is not part of
@@ -205,7 +201,7 @@ not, stop: the zip is wrong.
 | PCB qty | section 5 | section 5 | section 5 | historical planning minimum 5; confirm current supplier quotation |
 | Product type | Industrial/Consumer electronics | same | same | |
 | Different design | 1 | 1 | 1 | one board per zip |
-| Delivery format | Single PCB (main) | **Panel by JLC**, one card per panel (`cards_per_panel`), fingers on the panel's outer edge | same | Supplier production preview remains pending; verify rails/tabs preserve fingers. A 62 x 47 mm card is under JLC's 70 x 70 mm Standard PCBA minimum and the 50 mm gold-finger minimum |
+| Delivery format | Single PCB (main) | **Single PCB**, supplier assembly rails/carrier removed before delivery | same | Supplier production preview remains pending; verify rails/tabs preserve fingers. The finished 62 x 51 mm cards meet the bevel size requirement; any assembly carrier is temporary and must preserve the supplied finished outline |
 | PCB thickness | 1.6 mm | 1.6 mm | 1.6 mm | `thickness_mm`; CEM card 1.57 ± 0.13 (`milestone-1.md`) |
 | PCB colour | Green | Green | Green | not specified anywhere; green is the cheapest and quickest |
 | Silkscreen | White | White | White | |
@@ -215,7 +211,7 @@ not, stop: the zip is wrong.
 | Inner copper weight | 0.5 oz | 0.5 oz | n/a | `finished_inner_copper_oz` |
 | Specify layer sequence | Yes if asked: L1 F_Cu (.gtl), L2 In1 (.g1), L3 In2 (.g2), L4 In3 (.g3), L5 In4 (.g4), L6 B_Cu (.gbl) | same for cpu; 4-layer: .gtl, .g1, .g2, .gbl | n/a | the SI and power models assume In1 is the ground plane under the top layer |
 | Impedance control | **Yes**, JLC06161H-3313 | **Yes**, cpu JLC06161H-3313; others JLC04161H-7628 | No | `stackup`; M2 |
-| Via covering | Tented | Tented | Tented (see M7) | the genuine normal builds enforce no unapproved open via in pad (M7); the RP2040 exposed-pad via U1.57 on gpu, io, storage, eink and system stays open in its pad (audit I3, accepted) |
+| Via covering | Epoxy Filled & Capped (current six-layer quote default) | Use current quote option; inspect CAM mask and RP2040 exposed-pad vias | Tented (see M7) | the genuine normal builds enforce no unapproved open via in pad (M7); the RP2040 exposed-pad via U1.57 on gpu, io, storage, eink and system stays open in its pad (audit I3, accepted) |
 | Min via hole size / diameter | 0.3 mm / (0.4/0.45 mm), the free default | same | same | our smallest via is 0.3 mm drill with a 0.6 mm or larger pad |
 | Board outline tolerance | ±0.2 mm (regular) | **±0.1 mm (high precision)** | **±0.1 mm** | M3; the MECH-101 0.10 mm gap assumes it |
 | Confirm production file | **Yes** | **Yes** | **Yes** | David, 2026-09-28 (live status A.3): JLC's CAM may trim fingers or move the notch; we check their files first (section 4) |
@@ -407,3 +403,9 @@ first article. What matters is what gates the *next* order. Recommended:
 | wifi | | | | | | | |
 | eink | | | | | | | |
 | system | | | | | | | |
+
+## Card-size revision receiving requirements
+
+The six enlarged cards require **3.55 mm more top headroom**, and their common M3 mounting hole is now at **(52, -43.55) mm** in the finger coordinate frame. Raise the existing support rail by 3.55 mm; Main mounting holes and sockets remain fixed. System remains unchanged. Any enclosure must provide the extra clearance.
+
+Require finished thickness at every card connector region within **1.44–1.70 mm** and measure on receipt. Preserve the named stackup; its nominal category alone does not guarantee this range. Select Standard PCBA, two assembled boards, correct sides, production-file and placement confirmation, and depanel before delivery.

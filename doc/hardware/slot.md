@@ -200,7 +200,9 @@ ESP ROM bootloader sync.
   LED rows aligned. **Every card in the row has exactly the same outline;
   only the finger tab differs (x8 or x1).** If the CPU card doesn't fit the
   outline below, the outline grows for every card (David allows up to about
-  68 × 40 mm), keeping the hole and LED 4 mm and 3 mm in from their corners.
+  68 × 40 mm in that earlier discussion; the 2026-10-01 approved
+  manufacturing amendment below uses a 42.60 mm body height), keeping the
+  hole and LED 4 mm and 3 mm in from their corners.
   **No finger tab ends at the body's edge:** every tab, the CPU card's x8
   included, has at least 5 mm of body beyond each of its ends (a shoulder),
   as the x1 cards have; the common outline widens if the x8 needs it. The CPU card has the I/O card outline (below) on its
@@ -218,14 +220,14 @@ ESP ROM bootloader sync.
   line up in the case and their power LEDs sit in one row. In KiCad's
   `BUS_PCIexpress_x1` footprint frame (finger B1 at the origin, fingers
   pointing +y):
-  - the body is x −6.0 … 56.0 mm, y −44.0 … −4.95 mm (62 × 39.05 mm above the
+  - the body is x −6.0 … 56.0 mm, y −47.55 … −4.95 mm (62 × 42.60 mm above the
     finger tab);
   - **M3 mounting hole** (3.2 mm, non-plated, 6.4 mm keep-out) centred at
-    (52.0, −40.0), 4 mm in from the top-right corner;
+    (52.0, −43.55), 4 mm in from the top-right corner;
   - **power LED** (0603, lit from the card's own 3.3 V rail) centred at
-    (−3.0, −41.0), 3 mm in from the top-left corner, the same on every card;
+    (−3.0, −44.55), 3 mm in from the top-left corner, the same on every card;
   - **other LEDs** (link, activity) in a row along the top edge to the
-    right of the power LED, centred on the same line (y = −41.0);
+    right of the power LED, centred on the same line (y = −44.55);
   - the board's **name and revision** (`<name> rev <X>`) on the silkscreen
     in the bottom-right corner of the body;
   - nothing but the fingers' ground ties within 5 mm above the tab.
@@ -240,7 +242,7 @@ ESP ROM bootloader sync.
 - **Mounting:** each card has an M3 hole that lines up with a standoff on a
   main board mounting rail. On the main board every socket in the row has
   contact 1 (A1/B1) at the same x, so the seven card holes sit in one line,
-  52 mm east of contact 1 and 40 mm above the board, 20.32 mm apart. The
+  52 mm east of contact 1 and 43.55 mm above the finger B1 datum, 20.32 mm apart. The
   rail is a bar along that line at that height, with one M3 standoff per
   card; it stands on two posts screwed into M3 holes in the main board on
   the same line, midway between slots 1 and 2 and 10 mm south of slot 6
@@ -269,3 +271,18 @@ ESP ROM bootloader sync.
     envelope is 14.47 mm on the component side and 2.67 mm on the solder side.
   - The M3 hole axis (the rail) is 47.10 mm above the main board's top, and
     the power LEDs are 48.10 mm above it.
+
+### First article 51 mm card height amendment (2026-10-01)
+
+The CPU and five I/O card types share a 62 × 51 mm finished outline, including
+the unchanged finger tab. The full top edge is raised by 3.55 mm to satisfy
+JLCPCB’s 50 mm minimum dimension for beveling. Top connectors, indicator
+LEDs and the M3 mounting holes rise by the same amount; their distances from
+the top edge remain unchanged. The mounting rail and its supports must be
+3.55 mm taller than the earlier 47.45 mm card design. The actual completed
+STEP fit places the rail axis 50.65 mm above the Main board’s top surface
+(previously 47.10 mm), with a clear 6.4 mm diameter mounting keep-out.
+Main mounting holes,
+card socket locations, finger geometry and the System card stay at their
+existing positions. Any enclosure must provide the additional 3.55 mm of
+headroom; no enclosure drawing is presently qualified.

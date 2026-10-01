@@ -2862,7 +2862,7 @@ def fill_zones(board):
 # ------------------------------------------------------ the I/O card outline
 # doc/hardware/slot.md, Mechanical: every I/O card is this shape, in the
 # frame of KiCad's BUS_PCIexpress_x1 (finger B1 at the origin, fingers +y)
-IO_CARD_BODY = (-6.0, -44.0, 56.0, -4.95)
+IO_CARD_BODY = (-6.0, -47.55, 56.0, -4.95)
 IO_CARD_TAB = (-0.65, 19.65)             # where the x1 tab meets the body
 X8_TAB = (-0.65, 50.65)                  # the CPU card's x8 tab, under the same body (cpu-bus.md, CPU card outline)
 
@@ -2875,8 +2875,8 @@ def io_card_edge(tab=IO_CARD_TAB):
 
 
 IO_CARD_EDGE = io_card_edge()
-IO_CARD_HOLE = (52.0, -40.0)             # M3, non-plated
-IO_CARD_PWR_LED = (-3.0, -41.0)          # the power LED, the same on every board: 3 mm in from top-left
+IO_CARD_HOLE = (52.0, -43.55)             # M3, non-plated
+IO_CARD_PWR_LED = (-3.0, -44.55)          # the power LED, the same on every board: 3 mm in from top-left
 MOUNTING_HOLE = "MountingHole:MountingHole_3.2mm_M3"
 
 

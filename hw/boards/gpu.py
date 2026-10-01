@@ -541,6 +541,16 @@ def _seeded_route(board, workdir):
     return 0
 
 
+# The 51 mm finished card keeps its finger datum and central circuitry fixed.
+# Move only perimeter fittings to the new top edge; the local routed seed
+# and fresh full fabrication pipeline qualify their changed connections.
+TOP_EDGE_SHIFT_MM = 3.55
+TOP_EDGE_MOVED_REFS = ('J2',)
+for _ref in TOP_EDGE_MOVED_REFS:
+    _at = PLACEMENT[_ref]
+    PLACEMENT[_ref] = (_at[0], _at[1] - TOP_EDGE_SHIFT_MM, *_at[2:])
+
+
 if __name__ == "__main__":
     rc.build("gpu", schematic, PLACEMENT, POWER_NETS, GRAPHICS, {"D1": "PWR"}, GPIOS, TITLE, REVISION,
              layers=LAYERS, passes=90, designator_reach=4, preroute=preroute, seeded_route=_seeded_route,

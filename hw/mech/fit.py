@@ -148,10 +148,10 @@ ROW_SLOTS = {"x8": 1, "x1": 6}         # slot.md: the CPU socket and six I/O slo
 ROW_KINDS = ("cpu", "io")
 
 # slot.md, Mechanical (and kicadgen IO_CARD_*): the I/O card outline, frame as CEM
-IO_BODY = (-6.0, -44.0, 56.0, -4.95)    # x0, y0 (top), x1, y1 (where the tab starts)
-IO_HOLE = (52.0, -40.0)
+IO_BODY = (-6.0, -47.55, 56.0, -4.95)    # x0, y0 (top), x1, y1 (where the tab starts)
+IO_HOLE = (52.0, -43.55)
 IO_HOLE_DRILL = 3.2
-IO_PWR_LED = (-3.0, -41.0)
+IO_PWR_LED = (-3.0, -44.55)
 TAB_ZONE = 5.0                         # nothing but GND ties within 5 mm above the tab
 RAIL_KEEPOUT = 6.4                     # the hole's keep-out: the rail standoff
 

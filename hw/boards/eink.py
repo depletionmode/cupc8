@@ -49,8 +49,11 @@ def schematic(path, footprint_libs):
     for i, net in enumerate(SIGNALS):
         s.connect(j2, 3 + i, net + "_J")
         # 0603 (C23140, basic), so its designator fits over it in the row
-        r = rc.passive(s, "R", "R%d" % (10 + i), "33R", ((186 + 5 * i) * G, 70 * G), fp=rc.R0603, lcsc="C23140")
+        r = rc.passive(s, "R", "R%d" % (10 + i), "1k" if net == "EPD_BUSY" else "68R", ((186 + 5 * i) * G, 70 * G), fp=rc.R0603, lcsc="C21190" if net == "EPD_BUSY" else "C27592")
         rc.two(s, r, net, net + "_J")
+
+    c22 = rc.passive(s, "C", "C22", "100p", (210 * G, 80 * G), fp=rc.C0402, lcsc="C1546")
+    rc.two(s, c22, "EPD_BUSY", "GND")
 
     # ---- the module's 3.3 V: through a 100 mA PTC, so a shorted cable or
     # module can't pull down the slot's +3V3 (shared by every card, with no
@@ -193,6 +196,8 @@ PLACEMENT.update({'R62': (34.1875, -17.1, 0.0), 'R63': (30.1875, -8.25, 180.0), 
 
 
 
+PLACEMENT["C22"] = (29.0, -21.3, 0)
+
 # Actual independently routed local OE passives, existing placements retained.
 PLACEMENT.update({'R62': (34.1875, -17.1, 0.0), 'R63': (30.1875, -8.25, 180.0), 'R64': (31.9375, -14.55, 90.0, 'B'), 'R65': (12.1, -13.15, -90.0), 'C60': (36.1875, -17.1, 0.0), 'C61': (28.1875, -8.25, 180.0), 'C62': (31.9375, -16.55, 90.0, 'B'), 'C63': (12.1, -15.15, 90.0)})
 
@@ -207,6 +212,16 @@ def _seeded_route(board, workdir):
     print("EInk full-route seed: %d copper items; origin %s; fresh full pipeline required" %
           (result['added'], result['origin_state']), end=" ", flush=True)
     return 0
+
+
+# The 51 mm finished card keeps its finger datum and central circuitry fixed.
+# Move only perimeter fittings to the new top edge; the local routed seed
+# and fresh full fabrication pipeline qualify their changed connections.
+TOP_EDGE_SHIFT_MM = 3.55
+TOP_EDGE_MOVED_REFS = ('J2', 'D2', 'R5')
+for _ref in TOP_EDGE_MOVED_REFS:
+    _at = PLACEMENT[_ref]
+    PLACEMENT[_ref] = (_at[0], _at[1] - TOP_EDGE_SHIFT_MM, *_at[2:])
 
 
 if __name__ == "__main__":

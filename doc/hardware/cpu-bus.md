@@ -246,9 +246,9 @@ card draws about 30 mA. See `power.md`.
 ## CPU card outline
 
 The CPU card has **the same outline as the I/O cards** (`slot.md`,
-Mechanical; David, 2026-09-24): the body is x −6.0 … 56.0 mm, y −44.0 …
+Mechanical; David, 2026-09-24): the body is x −6.0 … 56.0 mm, y −47.55 …
 −4.95 mm in the frame of its finger footprint (finger B1 at the origin), the
-M3 hole at (52.0, −40.0) and the power LED at (−3.0, −41.0). Only the tab
+M3 hole at (52.0, −43.55) and the power LED at (−3.0, −44.55). Only the tab
 differs: the x8 tab (98 contacts, about 50 mm wide) sits under the same body,
 where the I/O cards have their x1 tab. On the main board the CPU socket is
 first in the row of card sockets, so the CPU card stands in line with the
@@ -271,3 +271,8 @@ A card passes when all of the following hold.
    - reset asserted at random points (the CPU must restart cleanly at $e000)
 3. **Timing:** at 12 MHz, with the chipset model sampling at ±30% of the
    setup/hold margins.
+
+The 2026-10-01 first article amendment raises the common full top edge by
+3.55 mm for a 62 × 51 mm overall card. The CPU’s existing FPGA placement
+and routed core remain fixed; the top indicator row and M3 hole follow
+the new top edge. Mounting rail supports rise by 3.55 mm (see `slot.md`).

@@ -272,7 +272,7 @@ def schematic(path, footprint_libs):
 
 BODY = kg.IO_CARD_BODY
 TAB_TOP = BODY[3]                      # where the tab meets the body
-DY = BODY[1] + 44.0                  # the layout is drawn for a 39.05 mm body; a taller one adds at the top
+DY = 0.0                            # preserve qualified circuitry when the top edge grows by 3.55 mm
 FPGA = (24.5, -31.3 + DY, 0)         # its top pad row 0.85 mm from the top edge
 # 6 layers (David, 2026-09-25): sig / GND / sig / sig / 3V3 / sig, both planes
 # solid; GND also poured on the outer layers (zones[0], which the pipeline
@@ -357,7 +357,7 @@ def placement():
         # under its LED; the 1V2 LED's switch below; the LDO beside them
         "D1": POWER_LED + (0,), "R9": (POWER_LED[0], POWER_LED[1] + 2.6, 0),
         "D2": (POWER_LED[0] + 4.5, POWER_LED[1], 0), "R10": (POWER_LED[0] + 4.5, POWER_LED[1] + 2.6, 0),
-        "Q1": (POWER_LED[0] + 0.2, POWER_LED[1] + 8.8, 0), "R8": (POWER_LED[0] + 3.8, POWER_LED[1] + 12.6, 0),
+        "Q1": (POWER_LED[0] + 0.2, -41.0 + 8.8, 0), "R8": (POWER_LED[0] + 3.8, -41.0 + 12.6, 0),
         "U3": (5.4, -40.8 + DY, 0), "C21": (4.2, -36.4 + DY, 0), "C22": (4.2, -33.4 + DY, 0),
         "TP1": (-3.0, -19.0 + DY, 0), "TP2": (1.0, -19.0 + DY, 0), "TP3": (5.0, -19.0 + DY, 0),
     })

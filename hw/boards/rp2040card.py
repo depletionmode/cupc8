@@ -335,7 +335,7 @@ PAD_VIA_CLEAR = 0.1
 
 
 def build(name, schematic, placement, power_nets, graphics, labels, gpios, title, revision, usb=False,
-          layers=2, passes=40, preroute=None, seeded_route=None, post_fill=None, designator_reach=None):
+          layers=2, passes=40, preroute=None, seeded_route=None, post_fill=None, designator_reach=None, extra_fine_nets=()):
     """The whole pipeline for an RP2040 card (as hw/boards/wifi.py)."""
     import logo
     for fpid, *_ in graphics:
@@ -348,7 +348,7 @@ def build(name, schematic, placement, power_nets, graphics, labels, gpios, title
                        out=sys.argv[1] if len(sys.argv) > 1 else None, io_card=True,
                        title=title, revision=revision,
                        power_nets=power_nets, graphics=graphics, layers=layers, labels=labels, passes=passes,
-                       fine_nets=u1_nets(gpios, usb), prepare=prepare, route_tries=6, designator_reach=designator_reach,
+                       fine_nets=tuple(sorted(set(u1_nets(gpios, usb)) | set(extra_fine_nets))), prepare=prepare, route_tries=6, designator_reach=designator_reach,
                        seeded_route=seeded_route,
                        post_fill=post_fill,
                        logo_keepout=True, pad_via_clear=PAD_VIA_CLEAR, pad_via_ok=("U1.57",),

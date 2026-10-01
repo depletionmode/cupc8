@@ -14,7 +14,7 @@
 
 #define SD_SPI      spi1
 #define SLOW_HZ     400000u             /* identification: <= 400 kHz */
-#define FAST_HZ     12500000u           /* data transfer: <= 25 MHz */
+#define FAST_HZ     10000000u           /* 125 MHz SPI divider: 8.928571 MHz; qualified SD read budget */
 #define ACMD        0x80                /* a CMD55 first */
 
 volatile uint32_t sd_spi_last_access;
