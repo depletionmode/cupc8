@@ -14,6 +14,12 @@ set(CMAKE_C_STANDARD 11)
 pico_sdk_init()
 
 set(FW ${CMAKE_CURRENT_LIST_DIR}/..)
+# 64 ms for the 12 MHz crystal to start, not the SDK's 6, on every card: their
+# X322512MSB4SI (CL 20 pF, 33 pF + 1k in XOUT, hw/boards/rp2040card.py) is not
+# stable in 6 ms from a cold start, the PLL never locks and the RP2040 hangs in
+# its clock set-up. Measured on the system card (bring-up 2026-11-02): 0 of 4
+# cold starts at 6, 5 of 5 at 64 (doc/hardware/bringup.md).
+add_compile_definitions(PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64)
 # strict warnings on our sources only (the SDKs have their own opinions).
 # -Wstack-usage: the main stack is 2 KB and core 1's 1 KB, and an overflow
 # silently overwrites SCRATCH_X code (an 8 KB local in gpu_run() did)
@@ -92,6 +98,14 @@ target_include_directories(sysctl PRIVATE sysctl ${FW}/sysctl ${FW}/sysctl/core)
 target_compile_definitions(sysctl PRIVATE PICO_DEFAULT_UART_TX_PIN=0 PICO_DEFAULT_UART_RX_PIN=1)
 target_link_libraries(sysctl pico_stdlib pico_unique_id tinyusb_device hardware_spi hardware_i2c hardware_adc hardware_pio hardware_dma)
 pico_generate_pio_header(sysctl ${CMAKE_CURRENT_LIST_DIR}/sysctl/uart.pio)
+
+# the same firmware with the boot trace on its TX/RX LEDs (main.c, SYSCTL_BOOT_TRACE):
+# for the cold power-on fault in doc/hardware/bringup.md
+add_executable(sysctl_boottrace sysctl/main.c sysctl/usb_descriptors.c ${SYSCTL_CORE})
+target_include_directories(sysctl_boottrace PRIVATE sysctl ${FW}/sysctl ${FW}/sysctl/core)
+target_compile_definitions(sysctl_boottrace PRIVATE SYSCTL_BOOT_TRACE PICO_DEFAULT_UART_TX_PIN=0 PICO_DEFAULT_UART_RX_PIN=1)
+target_link_libraries(sysctl_boottrace pico_stdlib pico_unique_id tinyusb_device hardware_spi hardware_i2c hardware_adc hardware_pio hardware_dma)
+pico_generate_pio_header(sysctl_boottrace ${CMAKE_CURRENT_LIST_DIR}/sysctl/uart.pio)
 
 # system card bring-up diagnostic (not product firmware): flash-bus pin and
 # JEDEC ID report over USB stdio; load with picotool, then reflash sysctl

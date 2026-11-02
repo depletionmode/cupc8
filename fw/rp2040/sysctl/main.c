@@ -408,6 +408,10 @@ int main(void)
 	gpio_set_dir(PIN_LED_USB_TX, true);
 	gpio_init(PIN_LED_USB_RX);
 	gpio_set_dir(PIN_LED_USB_RX, true);
+#ifdef SYSCTL_BOOT_TRACE
+	gpio_put(PIN_LED_USB_TX, 1);             /* both on: past the peripheral set-up */
+	gpio_put(PIN_LED_USB_RX, 1);
+#endif
 
 	sysctl_init(&sys, &hal, NULL);
 	/* A self-powered device must not pull D+ up while VBUS is absent (USB 2.0,
@@ -435,7 +439,46 @@ int main(void)
 		}
 		sysctl_poll(&sys);                   /* and the console, while it is open */
 		uint32_t now = to_ms_since_boot(get_absolute_time());
+#ifdef SYSCTL_BOOT_TRACE
+		/* in the loop: TX blinks (1 Hz before USB starts, 4 Hz after), RX = VBUS seen */
+		gpio_put(PIN_LED_USB_TX, (now / (usb_started ? 125 : 500)) & 1);
+		gpio_put(PIN_LED_USB_RX, vbus);
+#else
 		gpio_put(PIN_LED_USB_TX, (int32_t)(led_tx_until - now) > 0);
 		gpio_put(PIN_LED_USB_RX, (int32_t)(led_rx_until - now) > 0);
+#endif
 	}
 }
+
+#ifdef SYSCTL_BOOT_TRACE
+/*
+ * Boot trace (bring-up 2026-11-02: after a cold power-on the card never
+ * reaches USB, while a RUN reset with power steady does). The TX/RX LEDs say
+ * how far start-up got; read them after a cold power-on:
+ *   TX on,  RX off  steady   stuck in clock set-up (XOSC/PLL)
+ *   TX off, RX on   steady   clocks up, stuck in main's peripheral set-up
+ *   TX on,  RX on   steady   stuck between the LED set-up and the loop
+ *   TX blinking 1 Hz         in the loop, USB not started (RX off: no VBUS seen)
+ *   TX blinking 4 Hz         in the loop, USB started (RX: VBUS seen)
+ *   both off                 never reached the first hook (boot ROM, boot2)
+ */
+#include "pico/runtime_init.h"
+
+static void trace_leds(bool tx, bool rx)
+{
+	gpio_init(PIN_LED_USB_TX);
+	gpio_init(PIN_LED_USB_RX);
+	gpio_put(PIN_LED_USB_TX, tx);
+	gpio_put(PIN_LED_USB_RX, rx);
+	gpio_set_dir(PIN_LED_USB_TX, true);
+	gpio_set_dir(PIN_LED_USB_RX, true);
+}
+
+/* after the early resets (IO bank and pads out of reset), before the clocks */
+static void trace_pre_clocks(void) { trace_leds(true, false); }
+PICO_RUNTIME_INIT_FUNC_HW(trace_pre_clocks, "00200");
+
+/* after the clocks and the post-clock resets */
+static void trace_post_clocks(void) { trace_leds(false, true); }
+PICO_RUNTIME_INIT_FUNC_HW(trace_post_clocks, "00700");
+#endif

@@ -59,13 +59,30 @@ picotool: `python3 tools/cupc8.py bootsel build/rp2040/sysctl.elf`. Confirmed at
 with the machine running throughout (GPO stayed $80). Cards that still run firmware
 from before this need the TP4 wire once.
 
+### Fix 3: the RP2040s hang in clock set-up after a cold start
+
+After every main-board power-on the system card never reached USB (no kernel USB events),
+while BOOTSEL, `picotool reboot` and `cupc8.py bootsel` always worked. A boot-trace build
+(`sysctl_boottrace`: the TX/RX LEDs show the start-up stage) stopped with TX on, RX off:
+past the early resets, never past the SDK's clock set-up. A RUN tap (full chip reset,
+power steady) hung the same way (it had worked once, at 11:13). What the working cases
+share: the boot ROM had already started the crystal. With the SDK's 6 ms start-up wait
+the 12 MHz X322512MSB4SI (CL 20 pF, 33 pF + 1 kΩ, the same circuit on every RP2040 card,
+`hw/boards/rp2040card.py`) is not stable from cold, the PLL does not lock, and the chip
+waits for ever. With `PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64` (64 ms): 8 of 8 cold starts
+(5 with the trace build, 3 with the real sysctl, 11:57–12:04); 0 of 4 before. Now set for
+every RP2040 firmware in `fw/rp2040/CMakeLists.txt`. With it the whole machine cold-boots
+by itself: both FPGAs from flash, the CPU to the kernel (GPO $80).
+
 ### Open
 
-- **System card cold start.** After a main-board power-on the system card never
-  connects to USB: no kernel USB events at all. BOOTSEL from cold works;
-  `picotool reboot` works; a RUN tap (TP3 to TP6) with power steady works (11:13:56).
-  Card B also dropped off USB unprovoked at 10:37:46. Suspect the power-on ramp; needs a
-  scope on system card TP5 (+3V3) at power-on. Workaround: tap RUN after power-on.
+- Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang
+  after a reset; not seen since fix 3).
+- The emulator does not model the RP2040 crystal oscillator (`XOSC_BASE` is an
+  `UnimplementedPeripheral`, `emu/rp2040/src/rp2040.cpp`), so it cannot see fix 3's cause.
+- **Next revision:** the cards' X322512MSB4SI crystal (CL 20 pF, 33 pF caps, 1 kΩ in
+  XOUT) starts slowly from cold. Check its start-up margin against Raspberry Pi's hardware
+  design guide or fit the reference ABM8-272-T3 (CL 10 pF, 15 pF caps).
 - `status` reports "CPU card FPGA configured" with no CPU card: CPU_CDONE has a pull-up
   on main; the report should depend on presence.
 - `test/hw/test_cosim_fpga_config.py` does not run against the current boards (its
