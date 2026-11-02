@@ -86,7 +86,7 @@ most significant first. Ports are 16-bit little-endian.
 | Op | Name | Args → response | Description |
 |---|---|---|---|
 | $01 | NET_STATUS | → state, rssi, ip[4], gw[4], dns[4] | state: 0 idle, 1 joining, 2 up, 3 failed |
-| $02 | SCAN | — | Asynchronous. Raises the `SCAN_DONE` event. |
+| $02 | SCAN | — | Asynchronous. Raises `SCAN_DONE` only after results are ready, or `ERROR` if scanning fails. BUSY stays set until completion. |
 | $03 | SCAN_RESULT | idx → rssi, auth, ssid(len8 + bytes) | Up to 16 results. RESP_LEN = 1 with `$FF` means past the end. |
 | $04 | JOIN | ssid(len8+…), psk(len8+…), save8 | Asynchronous. With `save = 1` the credentials are stored in NVS, and the card auto-joins at power-up. Raises `JOINED` or `JOIN_FAILED`. |
 | $05 | LEAVE | forget8 | Disconnect. `forget = 1` also erases the stored credentials. |

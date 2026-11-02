@@ -57,6 +57,7 @@ Drawing is clipped to the screen. In GFX mode y (and a box's h) is 8-bit on the 
 
 Terminal commands besides BASIC lines: `help`, `new` (clear the program), `list` (print it), `run`, `clr` (clear the screen), `refresh` (on the e-ink card, a clean full refresh of the panel, which clears the faint ghosts partial refreshes leave; on HDMI it does nothing) and `net`, for the Wi-Fi card:
 
+- `net scan` lists up to 16 nearby 2.4 GHz networks, their signal strength in dBm, and whether they are open or secured. A scan takes a few seconds. The simulator lists its test networks; the emulator lists `qemu-eth`.
 - `net join SSID PASSWORD` joins that network, keeps the credentials on the card (it joins them again at power-up) and prints the address it was given.
 - `net get HOST [PORT]` sends `GET / HTTP/1.0` (with a `Host:` header) to HOST, port 80 unless given, and prints the reply until the server closes the connection. HOST is a name, looked up by the kernel's own DNS client, or a dotted address used as it is. A refused connection prints `connect failed`.
 - `net lookup NAME` prints the address the DNS client finds for NAME. It asks the DNS server `net config` names (or the one DHCP gave), waits a second, asks once more, and takes the first A record of the answer. It says `name not found` (the server has no such name), `no address for that name` (the name exists, with no IPv4 address), `DNS server not answering`, `DNS server error`, `bad answer from the DNS server` or `no DNS server`.

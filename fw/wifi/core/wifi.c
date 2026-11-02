@@ -28,6 +28,14 @@ void wifi_poll(wifi_t *w)
 	if (w->net->poll)
 		w->net->poll(w->ctx);
 
+	if (w->scanning) {
+		int scan = w->net->scan_poll(w->ctx);
+		if (scan != 0) {
+			w->scanning = false;
+			event(w, scan > 0 ? WIFI_EV_SCAN_DONE : WIFI_EV_ERROR, 0);
+		}
+	}
+
 	/* link transitions */
 	int state = w->net->link_state(w->ctx, &rssi, ip, gw, dns);
 	if (state != w->link) {
@@ -106,7 +114,7 @@ static void cmd_scan_result(wifi_t *w, uint8_t idx)
 {
 	uint8_t r[2 + 1 + 32], rssi = 0, auth = 0;
 	char ssid[33] = {0};
-	int n = w->net->scan_result(w->ctx, idx, &rssi, &auth, ssid, (int)sizeof ssid - 1);
+	int n = w->net->scan_result(w->ctx, idx, &rssi, &auth, ssid, (int)sizeof ssid);
 	if (n < 0) {
 		uint8_t end = 0xFF;
 		card_respond(&w->card, &end, 1);
@@ -131,10 +139,12 @@ static void command(card_t *c, const uint8_t *f, int len)
 		cmd_net_status(w);
 		break;
 	case 0x02:
-		if (w->net->scan_start(w->ctx) == 0) {
-			w->busy = true;
-			event(w, WIFI_EV_SCAN_DONE, 0);    /* backends scan synchronously for now */
-			w->busy = false;
+		if (w->scanning || w->net->scan_start(w->ctx) != 0) {
+			event(w, WIFI_EV_ERROR, 0);
+		} else if (w->net->scan_poll) {
+			w->scanning = true;
+		} else {
+			event(w, WIFI_EV_SCAN_DONE, 0);    /* synchronous backend */
 		}
 		break;
 	case 0x03:
@@ -377,7 +387,7 @@ static uint8_t status(card_t *c)
 	uint8_t s = 0;
 	if (w->link == WIFI_LINK_UP)
 		s |= 0x40;
-	if (w->busy)
+	if (w->busy || w->scanning)
 		s |= 0x20;
 	if (w->nevents)
 		s |= 0x10;
@@ -408,6 +418,7 @@ void wifi_reset(wifi_t *w)
 	}
 	w->nevents = 0;
 	w->busy = false;
+	w->scanning = false;
 	w->pending_host[0] = 0;
 	w->pending_sock = -1;
 	w->resolve_ok = false;

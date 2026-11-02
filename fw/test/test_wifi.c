@@ -77,6 +77,69 @@ static bool wait_event(uint8_t code, uint8_t *sock)
 	return false;
 }
 
+/* A scan may take seconds on silicon. Completion belongs to scan_poll,
+ * never to the SCAN command's acceptance. */
+static int scan_completion;
+static int scan_starts;
+static int pending_scan_start(void *ctx) { (void)ctx; scan_starts++; return 0; }
+static int pending_scan_poll(void *ctx) { (void)ctx; return scan_completion; }
+static int full_scan_result(void *ctx, int idx, uint8_t *rssi, uint8_t *auth, char *ssid, int cap)
+{
+	(void)ctx; (void)idx;
+	*rssi = 55;
+	*auth = 3;
+	snprintf(ssid, (size_t)cap, "%s", "12345678901234567890123456789012");
+	return 0;
+}
+
+static void test_async_scan(void)
+{
+	uint8_t r[40];
+	spy_ops.scan_start = pending_scan_start;
+	spy_ops.scan_poll = pending_scan_poll;
+	scan_completion = 0;
+	scan_starts = 0;
+	SEND(0x02);
+	CHECK(status() & 0x20, "asynchronous scan stays BUSY");
+	SEND(0x1F);
+	CHECK_EQ(read_resp(r, sizeof r), 1);
+	CHECK_EQ(r[0], 0);                               /* no premature SCAN_DONE */
+	wifi_poll(&w);
+	CHECK(status() & 0x20, "polling pending scan keeps BUSY");
+	scan_completion = 1;
+	wifi_poll(&w);
+	CHECK(!(status() & 0x20), "completed scan clears BUSY");
+	SEND(0x1F);
+	CHECK_EQ(read_resp(r, sizeof r), 3);
+	CHECK_EQ(r[0], 1);
+	CHECK_EQ(r[1], WIFI_EV_SCAN_DONE);
+	SEND(0x03, 1);
+	CHECK(read_resp(r, sizeof r) >= 3 && r[2] == 9 && !memcmp(r + 3, "neighbour", 9), "completed scan results remain readable");
+
+	scan_completion = 0;
+	SEND(0x02);
+	SEND(0x02);                                     /* don't restart an active scan */
+	CHECK_EQ(scan_starts, 2);
+	SEND(0x1F);
+	CHECK_EQ(read_resp(r, sizeof r), 3);
+	CHECK_EQ(r[1], WIFI_EV_ERROR);
+	scan_completion = -1;
+	wifi_poll(&w);
+	CHECK(!(status() & 0x20), "failed scan clears BUSY");
+	SEND(0x1F);
+	CHECK_EQ(read_resp(r, sizeof r), 3);
+	CHECK_EQ(r[1], WIFI_EV_ERROR);
+
+	spy_ops.scan_result = full_scan_result;
+	SEND(0x03, 0);
+	CHECK_EQ(read_resp(r, sizeof r), 35);
+	CHECK_EQ(r[2], 32);
+	CHECK(!memcmp(r + 3, "12345678901234567890123456789012", 32), "32-byte SSID is not truncated");
+	spy_ops.scan_start = netposix_ops.scan_start;
+	spy_ops.scan_poll = NULL;
+	spy_ops.scan_result = netposix_ops.scan_result;
+}
+
 static void test_link(void)
 {
 	uint8_t r[16];
@@ -568,6 +631,7 @@ int main(void)
 	spy_ops.connect = spy_connect;
 	spy_ops.join = spy_join;
 	wifi_init(&w, &spy_ops, netposix_new());
+	test_async_scan();
 	test_link();
 	test_sockets();
 	test_refused();

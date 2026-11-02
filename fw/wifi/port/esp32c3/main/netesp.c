@@ -52,6 +52,7 @@ static struct {
 #if !CONFIG_CUPC8_QEMU
 	wifi_ap_record_t scan[SCAN_MAX];
 	uint16_t nscan;
+	volatile int scan_state;            /* 0 idle, 1 pending, 2 done, -1 failed */
 #endif
 } net;
 
@@ -78,11 +79,22 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 		net.link = WIFI_LINK_IDLE;
 #else
 	} else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+		const wifi_event_sta_disconnected_t *disconnected = data;
+		ESP_LOGW(TAG, "station disconnected, reason %u", (unsigned)disconnected->reason);
+		/* JOIN deliberately leaves the old association before connecting.
+		 * Its queued disconnect event must not fail the new attempt. */
+		if (net.link == WIFI_LINK_JOINING && disconnected->reason == WIFI_REASON_STA_LEAVING)
+			return;
 		net.link = net.link == WIFI_LINK_JOINING ? WIFI_LINK_FAILED : WIFI_LINK_IDLE;
 	} else if (base == WIFI_EVENT && id == WIFI_EVENT_SCAN_DONE) {
+		wifi_event_sta_scan_done_t *done = data;
 		net.nscan = SCAN_MAX;
-		if (esp_wifi_scan_get_ap_records(&net.nscan, net.scan) != ESP_OK)
+		if (done->status != 0 || esp_wifi_scan_get_ap_records(&net.nscan, net.scan) != ESP_OK) {
 			net.nscan = 0;
+			net.scan_state = -1;
+		} else {
+			net.scan_state = 2;
+		}
 #endif
 	}
 }
@@ -96,6 +108,7 @@ static int n_join(void *ctx, const char *ssid, const char *psk, bool save)
 {
 	if (!ssid[0])
 		return -1;
+	ESP_LOGI(TAG, "join requested (SSID length %u, save %u)", (unsigned)strlen(ssid), (unsigned)save);
 	net.link = WIFI_LINK_JOINING;
 #if CONFIG_CUPC8_QEMU
 	/* QEMU: every "network" is the emulated Ethernet, with DHCP */
@@ -169,7 +182,20 @@ static int n_scan_start(void *ctx)
 	return 0;
 #else
 	net.nscan = 0;
-	return esp_wifi_scan_start(NULL, false) == ESP_OK ? 0 : -1;
+	net.scan_state = 1;
+	if (esp_wifi_scan_start(NULL, false) == ESP_OK)
+		return 0;
+	net.scan_state = -1;
+	return -1;
+#endif
+}
+
+static int n_scan_poll(void *ctx)
+{
+#if CONFIG_CUPC8_QEMU
+	return 1;
+#else
+	return net.scan_state == 2 ? 1 : net.scan_state < 0 ? -1 : 0;
 #endif
 }
 
@@ -564,7 +590,7 @@ static void n_close(void *ctx, int h)
 
 const wifi_net_ops netesp_ops = {
 	.join = n_join, .link_state = n_link_state, .leave = n_leave,
-	.scan_start = n_scan_start, .scan_result = n_scan_result, .resolve = n_resolve,
+	.scan_start = n_scan_start, .scan_poll = n_scan_poll, .scan_result = n_scan_result, .resolve = n_resolve,
 	.net_config = n_net_config, .config_save = n_config_save, .config_load = n_config_load,
 	.open = n_open, .connect = n_connect, .listen = n_listen, .send = n_send,
 	.recv = n_recv, .bind = n_bind, .sendto = n_sendto, .recvfrom = n_recvfrom,

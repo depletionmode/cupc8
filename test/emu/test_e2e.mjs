@@ -725,6 +725,7 @@ async function e2e013() {
     if (!ok) console.log('---- screen\n' + screenText(m) + '\n----');
     return ok;
   };
+  expect(await run('net scan', 'qemu-eth  -40 dBm open'), 'net scan lists the QEMU network through real card firmware');
   expect(await run('net join cupc8 password', 'joined, address 10.0.2.15'), 'net join');
   expect(await run(`net config dns 10.0.2.2 ${dnsPort}`, `dns 10.0.2.2 port ${dnsPort}`),
     'net config dns 10.0.2.2 PORT: the settings shown');

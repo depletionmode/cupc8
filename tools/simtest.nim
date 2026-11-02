@@ -1794,6 +1794,30 @@ proc service(b: DnsBench) =
       b.sock.sendTo(address, port, r.mapIt(chr(it)).join)
     readable = @[b.sock.getFd]
 
+proc testKernelScan() =
+  ## The console scans through the same Wi-Fi firmware core as the real card.
+  echo "== kernel Wi-Fi scan =="
+  let rom = buildKernelRom()
+  machineCards([CardGpu, CardIo, CardWifi])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  let g = gpuCard()
+  settle(6_000_000)
+  typeLine("net scan")
+  settle(6_000_000)
+  let text = screenLines(g).join("\n")
+  expectTrue("scan announces progress", "scanning..." in text)
+  expectTrue("scan lists secured SSID and signal", "cupc8-test  -30 dBm secured" in text)
+  expectTrue("scan lists open SSID and signal", "neighbour  -50 dBm open" in text)
+  expectTrue("scan finishes without timeout", "net timeout" notin text and waiting)
+  typeLine("net join")
+  settle(2_000_000)
+  expectTrue("failed join reports immediately", gpuFind(g, "connect failed") >= 0 and waiting)
+  ioModel = imLegacy
+
+run testKernelScan
+
 proc testKernelNetwork() =
   ## KRN-004: the kernel's "net" command. "net join SSID PASSWORD" joins
   ## through the Wi-Fi card and prints the address; "net get HOST PORT"

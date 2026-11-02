@@ -51,6 +51,8 @@ typedef struct {
 	int (*link_state)(void *ctx, uint8_t *rssi, uint8_t ip[4], uint8_t gw[4], uint8_t dns[4]);
 	void (*leave)(void *ctx, bool forget);
 	int (*scan_start)(void *ctx);
+	/* optional asynchronous completion: 0 pending, 1 done, -1 failed */
+	int (*scan_poll)(void *ctx);
 	/* -1 past the end */
 	int (*scan_result)(void *ctx, int idx, uint8_t *rssi, uint8_t *auth, char *ssid, int cap);
 	/* 1 done, 0 pending, -1 failed */
@@ -96,6 +98,7 @@ struct wifi {
 	uint8_t events[WIFI_EVENTS][2];
 	int nevents;
 	bool busy;                        /* an asynchronous operation is running */
+	bool scanning;                    /* waiting for scan_poll */
 	char pending_host[64];            /* resolve in progress */
 	int pending_sock;                 /* socket waiting for that resolve */
 	uint16_t pending_port;

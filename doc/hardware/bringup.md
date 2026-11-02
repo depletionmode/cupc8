@@ -122,6 +122,56 @@ the old 1-in-7 rate 8 in a row is still 29% likely; keep counting. If it
 comes back, the hardware margin is next (R1, the 1 kΩ in XOUT, or the load
 capacitors).
 
+### Wi-Fi programming: slot 6 (F700)
+
+Resumed at 13:09. David identified the connector by its nearby fuse **F700**,
+which is **slot 6**, not slot 3 as targeted earlier. On slot 6 the ESP32-C3
+immediately answers over the programming UART: download mode works; normal boot
+reports `invalid header: 0xffffffff` (no valid boot image). The earlier silent
+slot-3 probes do not establish a Wi-Fi hardware fault.
+
+Programmed the F51mm release's ESP32 **card** bootloader, partition table and
+application, merged at their `flasher_args.json` offsets, through
+`cupc8.py card flash 6`. esptool identifies chip revision v0.4, 4 MB XMC flash,
+MAC `30:ed:a0:56:5f:04`; write hash verified. Merged image SHA256:
+`bbd3e87298c01573a61a6fe6fa42f0f02956755c93a2ef9de590c39e2ef21099`.
+UART capture confirms `cupc8_wifi` starts, ESP-IDF 5.5.5, Wi-Fi station mode,
+without a boot error in the four-second capture. After machine reset the boot
+ROM's slot table at $0002 reads `00 00 00 00 00 03`: Wi-Fi identified in slot 6
+over SPI. Source detection remains default USB (~430 mV CC); David authorized
+`power force` for the radio tests.
+
+Normal `build/rp2040/sysctl.elf` was reloaded and verified before this work,
+at David's request. Logs and merged image are in `build/bringup-20261102/`:
+`wc101-slot6-uart.log`, `wifi-card-release.bin`, `wc101-slot6-firstboot.log`.
+
+### Wi-Fi scan command and live radio test
+
+Added `net scan` (SSID, signal in dBm, open/secured). The ESP backend now
+signals scan completion after the radio finishes, with BUSY maintained until
+then; the kernel waits up to ten seconds and handles failures. Failed joins
+now report `connect failed` promptly. The ESP ignores the intentional station
+leaving event from an old connection during a new JOIN; real disconnect
+reasons are logged without passwords.
+
+Flashed the updated ESP application at $10000 (esptool hash verified) and the
+new kernel ROM (full 512 KiB readback matches `kernel-scan.rom`). David
+explicitly requested trying **without the external antenna**. With `power
+force`, live `net scan` completes with `no networks found`. A subsequent JOIN
+to `KaplansHome_IoT` reaches the ESP (SSID length 15, save=1), fails with
+disconnect reason 201 (`WIFI_REASON_NO_AP_FOUND`), and prints `connect failed`;
+`net` reports `link down`. This does not establish radio performance with an
+antenna. The user's console was resumed after capturing results, and the
+power override remains enabled until reset.
+
+Validation: Wi-Fi core ASan/UBSan 148 checks, zero failures; targeted simulator
+scan and kernel layout pass; rebuilt simulator CLI scan passes; native
+E2E-013 using real QEMU Wi-Fi firmware passes 13 checks, zero failures,
+including `net scan`. Updated card and QEMU images both build. Evidence:
+`net-scan-*.log`, `wifi-scan-flash.log`, `rom-readback-scan.bin`, and
+`wc101-live-{scan,join,status}-{console,uart}.log` in the host log directory.
+Console captures redact the password.
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang

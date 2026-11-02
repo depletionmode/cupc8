@@ -58,7 +58,7 @@ net_s_nosock db "\nno free socket\n"
 net_s_nxdomain db "\nname not found\n"
 net_s_noanswer db "\nno address for that name\n"
 net_s_malformed db "\nbad answer from the DNS server\n"
-net_s_usage db "\nnet join SSID PASSWORD | net get HOST [PORT] | net\nnet lookup NAME | net ping HOST [COUNT]\nnet config [dns IP [PORT] | ip IP MASK GW | dhcp | save]\n"
+net_s_usage db "\nnet scan | net join SSID PASSWORD | net get HOST [PORT] | net\nnet lookup NAME | net ping HOST [COUNT]\nnet config [dns IP [PORT] | ip IP MASK GW | dhcp | save]\n"
 net_s_nodns db "\nno DNS server\n"
 net_s_dnstime db "\nDNS server not answering\n"
 net_s_dnserr db "\nDNS server error\n"
@@ -73,8 +73,16 @@ net_s_port db " port "
 net_s_saved db "\nsaved\n"
 net_s_notsaved db "\nnot saved\n"
 net_s_nl db "\n"
+net_s_scanning db "\nscanning...\n"
+net_s_scan_none db "no networks found\n"
+net_s_scan_failed db "scan failed\n"
+net_s_signal db "  -"
+net_s_dbm db " dBm "
+net_s_open db "open\n"
+net_s_secured db "secured\n"
 
 ; words of the command line
+net_w_scan db "scan"
 net_w_join db "join"
 net_w_get db "get"
 net_w_lookup db "lookup"
@@ -86,6 +94,10 @@ net_w_dhcp db "dhcp"
 net_w_save db "save"
 
 
+net_scan_idx: resb 1
+net_scan_char: resb 1
+net_scan_event: resb 1
+net_scan_t0: resb 2
 net_spi: resb 1
 net_tmp: resb 2
 net_ptr: resb 2
@@ -1014,6 +1026,7 @@ net_print_err:
 ; ------------------------------------------------------------ the command
 
 ; net                     the link, up and its address, or down
+; net scan                list nearby 2.4 GHz networks
 ; net join SSID PASSWORD  join, keep the credentials (the card joins them at power-up)
 ; net get HOST [PORT]     an HTTP/1.0 GET of / (port 80 unless given); prints the reply
 ; net lookup NAME         the address the DNS client (resolv.s) finds
@@ -1037,6 +1050,13 @@ net_cmd:
 	ld r0, [net_wlen]
 	eq r0, #0
 	bzf .status
+	mov r0, #>[net_w_scan]
+	mov r1, #<[net_w_scan]
+	push pch
+	push pcl
+	b net_wordis
+	eq r0, #1
+	bzf .scan
 	mov r0, #>[net_w_join]
 	mov r1, #<[net_w_join]
 	push pch
@@ -1074,6 +1094,11 @@ net_cmd:
 	bzf .config
 	b .usage
 
+.scan:
+	push pch
+	push pcl
+	b net_c_scan
+	b .done
 .join:
 	push pch
 	push pcl
@@ -1137,6 +1162,198 @@ net_cmd:
 	pop pcl
 	pop pch
 
+; ------------------------------------------------------------ net scan
+net_c_scan:
+	; Discard old events so this command waits for its own completion.
+	push pch
+	push pcl
+	b net_events
+	mov r0, #>[net_s_scanning]
+	mov r1, #<[net_s_scanning]
+	push pch
+	push pcl
+	b str_printstr
+	mov r0, #2
+	push pch
+	push pcl
+	b net_begin
+	push pch
+	push pcl
+	b net_cs_off
+	push pch
+	push pcl
+	b net_now
+	ld r0, [net_u16]
+	st [net_scan_t0], r0
+	ld r0, [net_u16+1]
+	st [net_scan_t0+1], r0
+.wait:
+	push pch
+	push pcl
+	b net_events
+	ld r0, [net_rlen]
+	eq r0, #0
+	bzf .elapsed
+	mov r0, #1
+	st [net_scan_event], r0
+.event:
+	ld r0, [net_scan_event]
+	ld r1, [net_rlen]
+	lt r0, r1
+	bzf .event_read
+	b .elapsed
+.event_read:
+	ld r0, [net_scan_event]
+	ld r0, [net_buf]+r0
+	eq r0, #1
+	bzf .results
+	eq r0, #0x14
+	bzf .failed
+	ld r0, [net_scan_event]
+	add r0, #2
+	st [net_scan_event], r0
+	b .event
+.elapsed:
+	ld r0, [net_scan_t0]
+	st [net_t16], r0
+	ld r0, [net_scan_t0+1]
+	st [net_t16+1], r0
+	push pch
+	push pcl
+	b net_since
+	mov r0, #0x10
+	st [net_t16], r0
+	mov r0, #0x27             ; ten seconds in milliseconds
+	st [net_t16+1], r0
+	push pch
+	push pcl
+	b net_ge16
+	eq r0, #1
+	bzf .timeout
+	b .wait
+.results:
+	xor r0, r0
+	st [net_scan_idx], r0
+.next:
+	mov r0, #3
+	ld r1, [net_scan_idx]
+	push pch
+	push pcl
+	b net_op2
+	push pch
+	push pcl
+	b net_read
+	ld r0, [net_rlen]
+	eq r0, #0
+	bzf .timeout
+	ld r0, [net_buf]
+	eq r0, #255
+	bzf .end
+	ld r0, [net_rlen]
+	lt r0, #3
+	bzf .failed
+	ld r0, [net_buf+2]
+	lt r0, #33
+	bzf .length
+	b .failed
+.length:
+	add r0, #3
+	ld r1, [net_rlen]
+	lt r1, r0
+	bzf .failed
+	ld r0, [net_buf]
+	lt r0, #101
+	bzf .ssid
+	b .failed
+.ssid:
+	xor r0, r0
+	st [net_scan_char], r0
+.char:
+	ld r0, [net_scan_char]
+	ld r1, [net_buf+2]
+	eq r0, r1
+	bzf .signal
+	add r0, #3
+	ld r0, [net_buf]+r0
+	lt r0, #32
+	bzf .replace
+	lt r0, #127
+	bzf .print
+.replace:
+	mov r0, #63
+.print:
+	push pch
+	push pcl
+	b print_ascii_char
+	ld r0, [net_scan_char]
+	add r0, #1
+	st [net_scan_char], r0
+	b .char
+.signal:
+	mov r0, #>[net_s_signal]
+	mov r1, #<[net_s_signal]
+	push pch
+	push pcl
+	b str_printstr
+	mov r0, #100
+	ld r1, [net_buf]
+	sub r0, r1
+	st [net_u16], r0
+	xor r0, r0
+	st [net_u16+1], r0
+	push pch
+	push pcl
+	b net_print_u16
+	mov r0, #>[net_s_dbm]
+	mov r1, #<[net_s_dbm]
+	push pch
+	push pcl
+	b str_printstr
+	ld r0, [net_buf+1]
+	eq r0, #0
+	bzf .open
+	mov r0, #>[net_s_secured]
+	mov r1, #<[net_s_secured]
+	b .auth
+.open:
+	mov r0, #>[net_s_open]
+	mov r1, #<[net_s_open]
+.auth:
+	push pch
+	push pcl
+	b str_printstr
+	ld r0, [net_scan_idx]
+	add r0, #1
+	st [net_scan_idx], r0
+	lt r0, #16
+	bzf .next
+	b .done
+.end:
+	ld r0, [net_scan_idx]
+	eq r0, #0
+	bzf .none
+	b .done
+.none:
+	mov r0, #>[net_s_scan_none]
+	mov r1, #<[net_s_scan_none]
+	b .message
+.failed:
+	mov r0, #>[net_s_scan_failed]
+	mov r1, #<[net_s_scan_failed]
+.message:
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.timeout:
+	mov r0, #NET_E_TIMEOUT
+	push pch
+	push pcl
+	b net_print_err
+.done:
+	pop pcl
+	pop pch
+
 ; ---------------------------------------------------- net join SSID PASSWORD
 net_c_join:
 	mov r0, #4			; JOIN ssid, psk, save
@@ -1176,6 +1393,8 @@ net_c_join:
 	ld r0, [net_buf]
 	eq r0, #2
 	bzf .link_up
+	eq r0, #3
+	bzf .failed
 	push pch
 	push pcl
 	b net_backoff
@@ -1192,6 +1411,14 @@ net_c_join:
 	push pch
 	push pcl
 	b net_print_ip
+	pop pcl
+	pop pch
+.failed:
+	mov r0, #>[net_s_failed]
+	mov r1, #<[net_s_failed]
+	push pch
+	push pcl
+	b str_printstr
 	pop pcl
 	pop pch
 .timeout:

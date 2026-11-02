@@ -57,8 +57,10 @@ static int h_join(void *ctx, const char *ssid, const char *psk, bool save)
 	netposix_t *n = ctx;
 	(void)psk;
 	(void)save;                           /* the host has nothing to store */
-	if (!ssid[0])
+	if (!ssid[0]) {
+		n->link = WIFI_LINK_FAILED;
 		return -1;                        /* no SSID: fail, so tests can see it */
+	}
 	snprintf(n->ssid, sizeof n->ssid, "%s", ssid);
 	n->link = WIFI_LINK_JOINING;
 	n->joins = 0;
@@ -354,7 +356,7 @@ static void h_poll(void *ctx)
 
 const wifi_net_ops netposix_ops = {
 	.join = h_join, .link_state = h_link_state, .leave = h_leave,
-	.scan_start = h_scan_start, .scan_result = h_scan_result, .resolve = h_resolve,
+	.scan_start = h_scan_start, .scan_poll = NULL, .scan_result = h_scan_result, .resolve = h_resolve,
 	.net_config = h_net_config, .config_save = h_config_save, .config_load = h_config_load,
 	.open = h_open, .connect = h_connect, .listen = h_listen, .send = h_send,
 	.recv = h_recv, .bind = h_bind, .sendto = h_sendto, .recvfrom = h_recvfrom,
