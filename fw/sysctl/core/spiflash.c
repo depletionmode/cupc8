@@ -40,6 +40,18 @@ static int wait_ready(sysctl_t *s, int target, uint32_t timeout_ms)
 	}
 }
 
+/* Release from deep power-down (0xAB): in that state a W25Q hears nothing
+ * else and leaves DO undriven, so every command reads $FF. An iCE40 that
+ * fails to configure from a blank flash leaves it there (measured on the
+ * first-article boards, 2026-11-02), so a flash sysctl takes over may be
+ * asleep. Harmless when awake. tRES1 <= 3 us before the next command. */
+void fl_wake(sysctl_t *s, int target)
+{
+	uint8_t c = 0xAB;
+	cmd(s, target, &c, 0, 1);
+	s->hal->delay_us(s->ctx, 5);
+}
+
 void fl_id(sysctl_t *s, int target, uint8_t id[3])
 {
 	uint8_t tx[4] = {0x9F}, rx[4];

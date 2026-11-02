@@ -109,6 +109,10 @@ void w25q_select(w25q_t *m, bool sel, uint64_t now)
 	/* program and erase happen when /CS rises */
 	if (m->n == 0 || w25q_busy(m, now))
 		return;
+	if (m->cmd == 0xAB)
+		m->asleep = false;                /* released from deep power-down */
+	else if (m->cmd == 0xB9 && m->n == 1)
+		m->asleep = true;
 	if (m->cmd == 0x02 && m->n >= 5 && m->wel) {
 		uint32_t base = m->addr & ~0xFFu;
 		for (int i = 0; i < m->page_n; i++) {
@@ -137,6 +141,11 @@ uint8_t w25q_byte(w25q_t *m, uint8_t mosi, uint64_t now)
 	if (i == 0) {
 		m->cmd = mosi;
 		m->addr = 0;
+		/* asleep, only the release is heard (DO stays undriven: $FF) */
+		if (m->asleep && mosi != 0xAB) {
+			m->cmd = 0;
+			return out;
+		}
 		/* only the status register answers while busy */
 		if (w25q_busy(m, now) && mosi != 0x05) {
 			m->violations++;
@@ -147,6 +156,9 @@ uint8_t w25q_byte(w25q_t *m, uint8_t mosi, uint64_t now)
 	switch (m->cmd) {
 	case 0x05:
 		out = (uint8_t)((w25q_busy(m, now) ? 0x01 : 0) | (m->wel ? 0x02 : 0));
+		break;
+	case 0xAB:
+		out = i >= 4 ? 0x15 : 0xFF;           /* W25Q32 device ID after 3 dummy bytes */
 		break;
 	case 0x9F: {
 		static const uint8_t id[3] = {0xEF, 0x40, 0x16};
@@ -209,6 +221,9 @@ void ice40_tick(ice40_t *m, uint64_t now)
 	}
 	if (m->cdone)
 		m->loads++;
+	else
+		m->flash->asleep = true;          /* a failed boot leaves its flash in deep
+		                                     power-down (measured, first articles 2026-11-02) */
 }
 
 /* ----------------------------------------------------------------- bridge */

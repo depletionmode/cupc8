@@ -92,6 +92,20 @@ def main():
         print('native: hold/boot/flash id on both FPGAs; an image without the iCE40 sync word '
               f'leaves the CPU card unconfigured ({bad["output"].splitlines()[-1]}), a good one boots it')
 
+        # --- a blank chipset flash, as delivered: the iCE40's failed boot puts it in
+        # deep power-down (measured, 2026-11-02), so sysctl must wake it (0xAB) on hold
+        blank = node_probe('fpga_config_probe.mjs', top,
+                           json.dumps([['fpga', 'hold', 'chipset'], ['flash', 'id', 'chipset'],
+                                       ['fpga', 'flash', 'chipset', GOOD_IMAGE]]),
+                           env={'CUPC8_PROBE_OPTS': json.dumps({'chipsetFlash': 'ff*4096'})})
+        held, blank_id, programmed = blank['commands']
+        assert not blank['boot']['chipsetConfigured'], blank['boot']
+        assert blank_id['output'] == 'ef4016', blank_id  # ffffff without the wake
+        assert programmed['code'] == 0 and 'it configured' in programmed['output'], programmed
+        assert programmed['state']['chipsetConfigured'], programmed
+        print('native: a blank chipset flash, asleep after the failed boot, answers ef4016 and '
+              'programs once sysctl holds the FPGA')
+
         # --- one copper launch at a time
         cases = [
             # label, board, ref, pin, net, links now false, native commands, check

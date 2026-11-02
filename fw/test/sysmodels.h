@@ -45,6 +45,7 @@ typedef struct {
 	uint32_t stuck_addr;
 	uint8_t stuck_mask;
 	int violations;
+	bool asleep;                          /* deep power-down (0xB9): only 0xAB is heard */
 } w25q_t;
 
 void w25q_init(w25q_t *m);

@@ -113,6 +113,7 @@ void fl_read(sysctl_t *s, int target, uint32_t addr, uint8_t *data, int n);
 int fl_erase(sysctl_t *s, int target, uint32_t addr, uint32_t len);
 int fl_program(sysctl_t *s, int target, uint32_t addr, const uint8_t *data, int n, uint32_t *bad);
 void fl_id(sysctl_t *s, int target, uint8_t id[3]);
+void fl_wake(sysctl_t *s, int target);                    /* out of deep power-down (0xAB) */
 
 /* FPGA reset and reboot (fpga.c) */
 void fpga_hold(sysctl_t *s, int target);                  /* CRESET_n low: it lets go of its flash */

@@ -601,6 +601,7 @@ Machine::Machine(const Options &o) : board(std::make_unique<MainBoard>()), root(
     }
     c.copper = copper[i];
     c.configured = c.copper && c.flash.holdsBitstream();
+    c.flash.asleep = c.copper && !c.configured;  // a failed boot at power-on sleeps the flash
   }
   board->setCpuConfigured(fpgaCfg[1].configured);
   if (sysctl) {

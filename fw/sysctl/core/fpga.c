@@ -15,6 +15,7 @@ void fpga_hold(sysctl_t *s, int target)
 	s->hal->pin_write(s->ctx, creset[target], false);
 	s->hal->delay_us(s->ctx, 10);          /* CRESET_B low ≥ 200 ns; its SPI pins go high-Z */
 	s->held |= (uint8_t)(1u << target);
+	fl_wake(s, target);                    /* its failed boot may have put the flash to sleep */
 }
 
 bool fpga_done(sysctl_t *s, int target)

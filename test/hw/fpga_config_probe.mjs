@@ -14,6 +14,12 @@ const commands = JSON.parse(process.argv[2] ?? '[]');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cupc8-fpga-'));
 // CUPC8_PROBE_OPTS: more Machine.create options, as JSON (e.g. {"pwrHi": false})
 const extra = JSON.parse(process.env.CUPC8_PROBE_OPTS ?? '{}');
+// a flash image option given as "<hex>*<n>" (as the "@" arguments below) becomes a Buffer
+for (const k of ['chipsetFlash', 'cpuFlash']) {
+  if (typeof extra[k] !== 'string') continue;
+  const [bytes, times] = extra[k].split('*');
+  extra[k] = Buffer.from(bytes.repeat(Number(times ?? 1)), 'hex');
+}
 const m = await Machine.create({ slots: {}, sysctl: true, threaded: false, ...extra });
 const pick = (s) => ({ pc: s.pc, gpo: s.gpo, nrst: s.nrst, chipsetConfigured: s.chipsetConfigured,
   cpuConfigured: s.cpuConfigured, cdoneLed: s.cdoneLed });

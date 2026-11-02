@@ -7,8 +7,11 @@
 // This is a digital model for the netlist co-simulation (hw/cosim):
 // - SpiFlash: the W25Q commands sysctl uses (fw/sysctl/core/spiflash.c):
 //   JEDEC ID, read, status, write enable/disable, page program, 4 KB sector
-//   erase. Program and erase complete at CS_n rising with BUSY never set
-//   (tPP/tSE are not modelled: the firmware's polls return at once).
+//   erase, deep power-down and its release (0xB9/0xAB). Program and erase
+//   complete at CS_n rising with BUSY never set (tPP/tSE are not modelled:
+//   the firmware's polls return at once). A failed configuration (copper
+//   whole, no image) leaves the flash in deep power-down, as measured on the
+//   first-article boards (2026-11-02).
 // - A configuration is the FPGA reading its flash: it succeeds when the
 //   FPGA-to-flash copper is whole and the flash holds an iCE40 image (the
 //   0x7EAA997E sync word in its first 4 KB); it takes CONFIG_NS after
@@ -30,15 +33,24 @@ class SpiFlash {
   std::vector<uint8_t> mem = std::vector<uint8_t>(SIZE, 0xff);
   uint8_t id[3] = {0xef, 0x40, 0x16};
 
+  // deep power-down (0xB9): only 0xAB is heard, DO stays undriven (reads $FF
+  // through the FPGA's pull-up). An iCE40 that fails to configure leaves its
+  // flash here: measured on the first-article boards, 2026-11-02.
+  bool asleep = false;
+
   // one byte shifted while CS_n is low; returns the byte on DO
   uint8_t exchange(uint8_t in) {
     uint8_t out = 0xff;
     if (count == 0) {
       cmd = in;
+      if (asleep && cmd != 0xab) cmd = 0;  // ignored until released
       if (cmd == 0x06) wel = true;
       if (cmd == 0x04) wel = false;
     } else {
       switch (cmd) {
+        case 0xab:
+          out = count >= 4 ? 0x15 : 0xff;  // device ID after three dummy bytes
+          break;
         case 0x9f:
           out = count <= 3 ? id[count - 1] : 0xff;
           break;
@@ -71,6 +83,8 @@ class SpiFlash {
 
   // CS_n rising: a page program or an erase takes effect now
   void deselect() {
+    if (count >= 1 && cmd == 0xab) asleep = false;  // tRES1 (3 us) not modelled
+    if (count >= 1 && cmd == 0xb9) asleep = true;
     if (count >= 4 && wel && cmd == 0x02) {
       const uint32_t base = addr & ~0xffu & (SIZE - 1);
       uint32_t at = addr & 0xff;
@@ -125,6 +139,7 @@ struct FpgaConfig {
     if (readyAt >= 0 && t >= readyAt) {
       readyAt = -1;
       configured = copper && flash.holdsBitstream();
+      if (copper && !configured) flash.asleep = true;  // as measured: a failed boot sleeps it
     }
     return configured != was;
   }
