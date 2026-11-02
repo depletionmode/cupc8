@@ -35,7 +35,12 @@ static int selected = SPI_NONE;
 
 static void release_bus(int bus)
 {
-	for (int i = 0; i < 4; i++) {
+	/* CS_n first, driven high, then the rest: released while CS_n is still low,
+	 * SCK rises on a board pull-up (the CPU card's R4 on FL1_SCK) and that
+	 * extra edge makes a W25Q drop the write enable, erase or program it was
+	 * given (measured on the first articles, 2026-11-02). */
+	gpio_put(bus_pins[bus][3], 1);
+	for (int i = 3; i >= 0; i--) {
 		gpio_set_function(bus_pins[bus][i], GPIO_FUNC_SIO);
 		gpio_set_dir(bus_pins[bus][i], false);   /* Hi-Z: the FPGA owns its flash */
 	}
