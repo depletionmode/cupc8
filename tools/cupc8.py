@@ -14,6 +14,8 @@
     flash id chipset|cpu | flash read chipset|cpu ADDR LEN -o FILE
     card reset SLOT [--hold|--release] | card flash SLOT FILE [--esp] [--addr A]
     console [PORT] [--idle S]     (the kernel's terminal: Ctrl-] quits)
+    bootsel [FILE]      reboot the card into its USB boot ROM (no wire on TP4);
+                        with FILE (.elf/.uf2), load it with picotool and start it
 
 The port is --port, or $CUPC8_PORT, or the first system card found on USB
 (VID:PID 1209:C8C8, its first serial port: interface 0). tcp:HOST:PORT reaches the system card in the
@@ -700,6 +702,39 @@ def write_out(data, path):
             print("%06x  %s" % (i, data[i:i + 16].hex(" ")))
 
 
+BOOTSEL_BAUD = 1200      # the card's control port reboots into its boot ROM at this rate
+
+
+def bootsel(port, file):
+    """Set the control port to 1200 baud: sysctl reboots into the RP2040 boot
+    ROM (fw/rp2040/sysctl/main.c, tud_cdc_line_coding_cb). Then, with a file,
+    wait for the boot ROM and load it with picotool."""
+    if port.startswith("tcp:") or not os.path.exists(port):
+        print("bootsel needs the real card's serial port, not %s" % port, file=sys.stderr)
+        return 1
+    fd = os.open(port, os.O_RDWR | os.O_NOCTTY)
+    try:
+        attrs = termios.tcgetattr(fd)
+        attrs[4] = attrs[5] = termios.B1200
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass                      # the card may already be gone
+    print("rebooting the system card into BOOTSEL", flush=True)
+    if not file:
+        return 0
+    for _ in range(40):               # the boot ROM enumerates in about 1-2 s
+        time.sleep(0.25)
+        if subprocess.run(["picotool", "info"], capture_output=True).returncode == 0:
+            break
+    else:
+        print("no RP2040 in BOOTSEL after 10 s", file=sys.stderr)
+        return 1
+    return subprocess.run(["picotool", "load", "-v", "-x", file]).returncode
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="cupc8.py", description="the CUPC/8 system card, from the host")
     ap.add_argument("--port")
@@ -736,10 +771,14 @@ def main(argv=None):
     p = sub.add_parser("console", help="the kernel's terminal on the card's second serial port")
     p.add_argument("port", nargs="?", help="the console port (default $CUPC8_CONSOLE, or the card's)")
     p.add_argument("--idle", type=float, default=1.0, help="with stdin not a terminal: quit after this long quiet")
+    p = sub.add_parser("bootsel", help="reboot the card into BOOTSEL; with FILE, load and start it")
+    p.add_argument("file", nargs="?", help="firmware for picotool load -x (.elf or .uf2)")
     a = ap.parse_args(argv)
 
     if a.cmd == "console":
         return console(a.port or find_port("CUPC8_CONSOLE", 2), a.idle)
+    if a.cmd == "bootsel":
+        return bootsel(a.port or find_port(), a.file)
 
     sc = Sysctl(a.port or find_port())
     try:

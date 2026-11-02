@@ -14,6 +14,7 @@
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
 #include "hardware/spi.h"
+#include "pico/bootrom.h"
 #include "pico/stdlib.h"
 #include "pins.h"
 #include "sysctl.h"
@@ -161,6 +162,18 @@ static void h_usb_write(void *ctx, const uint8_t *data, int n)
 		if (!k)
 			tud_task();
 	}
+}
+
+/* The host sets the control port to 1200 baud: reboot into the USB boot ROM
+ * (BOOTSEL), so new firmware needs no wire on TP4 (`cupc8.py bootsel`; the
+ * Arduino/Pico convention). The console port ignores it, and so does every
+ * other rate: the protocol does not depend on the baud rate. */
+#define BOOTSEL_BAUD 1200
+
+void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const *coding)
+{
+	if (itf == CDC_PROTOCOL && coding->bit_rate == BOOTSEL_BAUD)
+		reset_usb_boot(0, 0);
 }
 
 /* ------------------------------------------------------------ the console */

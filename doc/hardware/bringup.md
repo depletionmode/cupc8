@@ -20,7 +20,8 @@ only (CC ≈ 440 mV), not the 3 A the plan requires for full loads.
 | MB-103 chipset bitstream | PASS after fix 1: qualified `chipset.bin`, 135100 bytes written, verified, configured in 3.8 s |
 | MB-104 SRAM | PASS: 512 KB × 4 patterns (address-unique, random, complement, 55/AA) through the bridge, 0 bad bytes |
 | MB-105 ROM | PASS: SST39SF040 ($BF/$D7); `kernel-program.bin` written and verified; full 512 KiB readback = release `kernel.rom` |
-| CC-101 CPU card | flash writes failed until fix 2; bench retest pending |
+| CC-101 CPU card | after fix 2: qualified `cpucard.bin` written, verified, configured; POST $20 → $80, the kernel runs. The 100-instruction single-step trace diff is not done yet |
+| (beyond M1 order) | BASIC over the USB console: `CUPC/8 BASIC 2026.09`, a `for` loop printed 7 14 21, `poke 61440, 85` set GPO $55 |
 
 ### Fix 1: the iCE40 leaves a blank flash in deep power-down
 
@@ -47,7 +48,16 @@ With fix 1 the CPU card flash read correctly but every sysctl program left it er
 on FL1 the CPU card's 10k pull-up (R4) on FL1_SCK raises SCK while CS_n is still low, an
 extra clock that makes a W25Q drop write enable, erase and program. FL0 has no SCK
 pull-up, so the chipset flash programmed. `release_bus` now drives CS_n high first.
-Not caught by the models: both exchange whole bytes, not pin edges.
+Not caught by the models: both exchange whole bytes, not pin edges. Confirmed on the
+bench at 11:48: the CPU card flash programmed and the CPU booted the kernel.
+
+### BOOTSEL without the wire
+
+The control port at 1200 baud now reboots sysctl into the RP2040 boot ROM
+(`tud_cdc_line_coding_cb`), and `cupc8.py bootsel [FILE]` does that and loads FILE with
+picotool: `python3 tools/cupc8.py bootsel build/rp2040/sysctl.elf`. Confirmed at 11:49
+with the machine running throughout (GPO stayed $80). Cards that still run firmware
+from before this need the TP4 wire once.
 
 ### Open
 
@@ -64,4 +74,3 @@ Not caught by the models: both exchange whole bytes, not pin edges.
   the native machine through `test/hw/fpga_config_probe.mjs`.
 - No `selftest ram`, `selftest slots`, `cpu load` or `trace --diff` in `cupc8.py`
   (`debugging.md` names them); MB-104 was scripted with `ram write`/`ram read`.
-- sysctl has no way back to BOOTSEL from USB; each reload needs the TP4 wire.
