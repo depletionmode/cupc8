@@ -212,6 +212,34 @@ open. Evidence: `storage-boot-load-check.log`, `storage-save-check.log`,
 `storage-reload-after-reset.log`, `storage-benchmark-from-sd.log` and
 `storage-final-power-force.log`.
 
+### E-ink card: slot 2 (F300), no display attached
+
+David fitted the card at F300 (slot 2), confirmed its power LED lit, and
+explicitly has no physical display yet. Flashed and verified
+`build/rp2040/eink750.elf`, selecting the planned 7.5-inch 800 x 480 panel.
+After whole-machine reset the slot table is `04 01 00 00 00 00`: storage in
+slot 1, graphics/e-ink in slot 2.
+
+Ran the existing kernel API diagnostic `tools/testdata/eink_prog.s` on the
+real CPU and card. AUTO/GET/STATUS all return success; the six configured
+policy bytes read back exactly `01 05 02 32 03 03`. Ran the existing
+`gfx2_prog.s` mode-2 diagnostic: drawing, blits, text, scrolling, pixel
+readback and rejection of oversized blits match its simulator expectations.
+Full result bytes at $be00:
+`00 00 00 00 00 00 00 00 00 00 00 01 fe fe 00 00 00 01`.
+SWD reads confirm configured panel dimensions 800 x 480 and zero graphics
+and card-protocol errors. Reset just the e-ink card afterward to restore
+its default policy, restored David's `power force` override, and resumed
+the user's console. No firmware source changes.
+
+This establishes the programmed card, kernel/SPI command path and framebuffer
+operations only. The disconnected BUSY input is pulled high, so zero panel
+timeouts or a completed firmware refresh do not prove any panel operation.
+Physical header signals, driver power, BUSY handshake, image quality, refresh
+waveforms/current and rail measurements remain untested. Evidence:
+`eink-check-console.log`, `eink-no-panel-results.json`,
+`eink-no-panel-state.json`, `eink-final-console.log`.
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang
