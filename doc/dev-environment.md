@@ -88,6 +88,15 @@ on a PC's terminal, both ways.
   machine, `Ctrl-]` quits, the sim's own messages on stderr. With a pipe:
   `tools/sim --headless --console < prog.txt`.
 
+**Serial port access on Linux.** The system card's ports (`1209:c8c8`)
+belong to `uucp` (Arch) or `dialout` (Ubuntu), so `cupc8.py` gets
+"Permission denied" until the logged-in user may open them. A udev rule
+grants it to the desk session, with no re-login (2026-11-02):
+
+    echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="c8c8", TAG+="uaccess"' \
+      | sudo tee /etc/udev/rules.d/70-cupc8.rules
+    sudo udevadm control --reload && sudo udevadm trigger
+
 ## KiCad 10
 
 The board scripts write KiCad 8 files, which Ubuntu's KiCad 7 cannot read.

@@ -93,6 +93,17 @@ target_compile_definitions(sysctl PRIVATE PICO_DEFAULT_UART_TX_PIN=0 PICO_DEFAUL
 target_link_libraries(sysctl pico_stdlib pico_unique_id tinyusb_device hardware_spi hardware_i2c hardware_adc hardware_pio hardware_dma)
 pico_generate_pio_header(sysctl ${CMAKE_CURRENT_LIST_DIR}/sysctl/uart.pio)
 
+# system card bring-up diagnostic (not product firmware): flash-bus pin and
+# JEDEC ID report over USB stdio; load with picotool, then reflash sysctl
+add_executable(sysctl_diag sysctl_diag/diag.c)
+cupc8_strict(sysctl_diag/diag.c)
+target_include_directories(sysctl_diag PRIVATE ${FW}/sysctl)
+target_link_libraries(sysctl_diag pico_stdlib hardware_spi)
+# the system card's USB ID, so the same udev rule grants access to the port
+target_compile_definitions(sysctl_diag PRIVATE USBD_VID=0x1209 USBD_PID=0xC8C8 USBD_PRODUCT="CUPC/8 system card diag")
+pico_enable_stdio_usb(sysctl_diag 1)
+pico_enable_stdio_uart(sysctl_diag 0)
+
 # e-ink graphics card: the graphics core with mode 2's buffer, the e-ink
 # core, the panel on SPI1 (eink.elf: 5.83" GDEY0583T81; eink750.elf: 7.5")
 foreach(_eink eink eink750)
