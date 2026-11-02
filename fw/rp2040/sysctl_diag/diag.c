@@ -367,6 +367,44 @@ int main(void)
 					as_input(b->sck); as_input(b->mosi); as_input(b->cs); as_input(b->miso);
 				}
 			}
+		} else if (c == 'A' || c == 'B' || c == 'C') {
+			/* the card programming port through the mux, slot 1 selected
+			 * (MUX_SEL = 000): A = SWCLK high, SWDIO low; B = SWCLK low,
+			 * SWDIO high; C = both released, SWDIO read with each pull, every slot */
+			reporting = false;
+			const uint sel[3] = {PIN_MUX_SEL0, PIN_MUX_SEL1, PIN_MUX_SEL2};
+			for (int i = 0; i < 3; i++) {
+				as_input(sel[i]);
+				gpio_put(sel[i], 0);
+				gpio_set_dir(sel[i], true);
+			}
+			as_input(PIN_PROG_CLK);
+			as_input(PIN_PROG_IO);
+			if (c != 'C') {
+				gpio_put(PIN_PROG_CLK, c == 'A');
+				gpio_put(PIN_PROG_IO, c == 'B');
+				gpio_set_dir(PIN_PROG_CLK, true);
+				gpio_set_dir(PIN_PROG_IO, true);
+				sleep_us(50);
+				printf("pattern %c, slot 1 selected: SWCLK %s, SWDIO %s (pads read back CLK=%d IO=%d, SEL=%d%d%d)\n",
+				       c, c == 'A' ? "HIGH" : "low", c == 'B' ? "HIGH" : "low",
+				       gpio_get(PIN_PROG_CLK), gpio_get(PIN_PROG_IO),
+				       gpio_get(sel[2]), gpio_get(sel[1]), gpio_get(sel[0]));
+			} else {
+				for (int s = 0; s < 8; s++) {
+					for (int i = 0; i < 3; i++)
+						gpio_put(sel[i], (s >> i) & 1);
+					pull(PIN_PROG_IO, true);
+					int u = gpio_get(PIN_PROG_IO);
+					pull(PIN_PROG_IO, false);
+					int d = gpio_get(PIN_PROG_IO);
+					printf("  channel %d (%s): SWDIO pull-up/down reads %d/%d\n", s,
+					       s < 6 ? (s == 0 ? "slot 1" : "slot") : "unused", u, d);
+				}
+				for (int i = 0; i < 3; i++)
+					gpio_put(sel[i], 0);
+				printf("  (1/0 = undriven line; 1/1 = something pulls it high: a card's SWDIO pull-up)\n");
+			}
 		} else if (c == 'x') {
 			reporting = false;
 			release_all();

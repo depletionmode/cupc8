@@ -26,6 +26,8 @@ typedef struct {
 	int after_alert;                  /* bits seen after the alert (-1: none) */
 	uint8_t act;                      /* the activation code as it arrives */
 	int phase, nbits;                 /* 0 idle, 1 request, 2 write data, 3 TARGETSEL data */
+	int lead;                         /* undriven clocks before the target drives: the turnaround */
+	int gap;                          /* TARGETSEL: clocks since the request (5 before the data) */
 	uint64_t shift;
 	uint8_t req;
 	uint8_t outq[40];                 /* bits the target drives next */

@@ -460,14 +460,19 @@ class Rp2040:
         self.write32(self.DCRDR, v)
         self.write32(self.DCRSR, 0x10000 | reg)
 
+    def read16(self, addr):
+        """A halfword: the AHB-AP reads whole aligned words."""
+        return self.read32(addr & ~3) >> (8 * (addr & 2)) & 0xFFFF
+
     def rom_functions(self):
         if self.read32(0x10) & 0xFFFFFF != 0x01754D:
             raise SwdError("no RP2040 boot ROM at 0 (magic %08x)" % self.read32(0x10))
-        table = self.read32(0x14) & 0xFFFF
+        # entries are 16-bit code, 16-bit address, from a table that is only
+        # 16-bit aligned ($7A on the RP2040 B2)
+        table = self.read16(0x14)
         funcs = {}
         while True:
-            w = self.read32(table)
-            code, addr = w & 0xFFFF, w >> 16
+            code, addr = self.read16(table), self.read16(table + 2)
             if not code:
                 return funcs
             funcs[chr(code & 0xFF) + chr(code >> 8)] = addr

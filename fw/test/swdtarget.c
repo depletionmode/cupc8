@@ -7,7 +7,7 @@
 #define AHB_AP_IDR  0x04770031u
 
 /* the boot ROM: magic at $10, the function table pointer at $14 */
-#define ROM_FUNCS   0x0100
+#define ROM_FUNCS   0x007A              /* as the real RP2040 B2: 16-bit aligned, not 32 */
 static const struct { char code[2]; uint16_t addr; } rom_funcs[] = {
 	{{'I', 'F'}, 0x0200}, {{'E', 'X'}, 0x0210}, {{'R', 'E'}, 0x0220},
 	{{'R', 'P'}, 0x0230}, {{'F', 'C'}, 0x0240}, {{'C', 'X'}, 0x0250},
@@ -55,7 +55,7 @@ static uint16_t rom16(uint32_t a)
 		int i = (int)(a - ROM_FUNCS) / 4;
 		if (i >= 6)
 			return 0;
-		return (a & 2) ? rom_funcs[i].addr : (uint16_t)(rom_funcs[i].code[0] | rom_funcs[i].code[1] << 8);
+		return ((a - ROM_FUNCS) & 2) ? rom_funcs[i].addr : (uint16_t)(rom_funcs[i].code[0] | rom_funcs[i].code[1] << 8);
 	}
 	return 0;
 }
@@ -243,12 +243,14 @@ static void request(swdt_t *t)
 		t->phase = 3;                      /* TARGETSEL: nobody drives the ack */
 		t->nbits = 0;
 		t->shift = 0;
+		t->gap = 0;
 		return;
 	}
 	if (!t->selected)
 		return;                            /* not us: the line stays pulled up */
 	uint32_t v = 0;
 	int ack = 1;
+	t->lead = 1;                           /* the turnaround, then the ack */
 	if (rd) {
 		if (ap) {
 			ack = ap_ack(t);
@@ -377,8 +379,15 @@ void swdt_out(swdt_t *t, int bit)
 		if (t->nbits == 8)
 			request(t);
 		return;
-	case 2:
 	case 3:
+		/* turnaround, 3 ack cycles, turnaround: the target counts every clock,
+		 * driven or not, and takes the data from the sixth on */
+		if (t->gap < 5) {
+			t->gap++;
+			return;
+		}
+		/* fall through */
+	case 2:
 		t->shift |= (uint64_t)bit << t->nbits++;
 		if (t->nbits == 33) {
 			if (t->phase == 2) {
@@ -393,9 +402,34 @@ void swdt_out(swdt_t *t, int bit)
 	}
 }
 
+static void phase3_bit(swdt_t *t, int bit);
+
 int swdt_in(swdt_t *t)
 {
+	/* a clock the host does not drive: during TARGETSEL it still counts, and
+	 * past the gap the target samples the pulled-up line as a data bit */
+	if (t->phase == 3) {
+		if (t->gap < 5)
+			t->gap++;
+		else
+			phase3_bit(t, 1);
+		return 1;
+	}
+	if (t->lead > 0) {
+		t->lead--;
+		return 1;                         /* turnaround: nobody drives */
+	}
 	if (t->outq_pos < t->outq_n)
 		return t->outq[t->outq_pos++];
 	return 1;                             /* undriven: the pull-up */
+}
+
+static void phase3_bit(swdt_t *t, int bit)
+{
+	t->shift |= (uint64_t)bit << t->nbits++;
+	if (t->nbits == 33) {
+		uint32_t v = (uint32_t)t->shift;
+		t->selected = v == TARGET_ID && (int)(t->shift >> 32 & 1) == parity32(v);
+		t->phase = 0;
+	}
 }

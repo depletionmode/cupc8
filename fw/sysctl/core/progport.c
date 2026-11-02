@@ -46,9 +46,13 @@ int swd_xfer(sysctl_t *s, uint8_t request, uint32_t *data)
 		h->swd_io(s->ctx, true, &w, 8);
 		if (request == TARGETSEL) {
 			/* the targets listen but none answers: turnaround, 3 undriven
-			 * ack cycles, turnaround, then the data */
+			 * ack cycles, turnaround, then the data. swd_io adds each
+			 * turnaround on its change of direction (sysctl.h), so ask for
+			 * the 3 ack cycles only: 5 here made 7 on the wire, the ID
+			 * arrived two clocks late and no RP2040 was selected (bench,
+			 * 2026-11-02) */
 			uint32_t skip;
-			h->swd_io(s->ctx, false, &skip, 5);
+			h->swd_io(s->ctx, false, &skip, 3);
 			w = *data;
 			h->swd_io(s->ctx, true, &w, 32);
 			w = (uint32_t)parity(*data);

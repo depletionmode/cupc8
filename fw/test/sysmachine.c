@@ -123,10 +123,20 @@ static void h_usb_write(void *ctx, const uint8_t *d, int n)
 
 static void h_prog_select(void *ctx, int slot) { (void)ctx; M.prog_slot = slot; }
 
+/* as the RP2040 HAL (fw/rp2040/sysctl/main.c): a change of direction costs
+ * one clock with nobody driving SWDIO (the turnaround, sysctl.h) */
+static bool swd_dir_out;
+
 static void h_swd_io(void *ctx, bool out, uint32_t *bits, int n)
 {
 	(void)ctx;
 	swdt_t *t = M.prog_slot >= 0 ? M.card[M.prog_slot] : 0;
+	if (out != swd_dir_out) {
+		if (t)
+			(void)swdt_in(t);             /* an undriven clock */
+		swd_dir_out = out;
+		M.now++;
+	}
 	if (!out)
 		*bits = 0;
 	for (int i = 0; i < n; i++) {

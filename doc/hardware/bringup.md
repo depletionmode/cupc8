@@ -74,6 +74,23 @@ waits for ever. With `PICO_XOSC_STARTUP_DELAY_MULTIPLIER=64` (64 ms): 8 of 8 col
 every RP2040 firmware in `fw/rp2040/CMakeLists.txt`. With it the whole machine cold-boots
 by itself: both FPGAs from flash, the CPU to the kernel (GPO $80).
 
+### Fixes 4 and 5: card programming over SWD
+
+`card flash` found no RP2040 in any slot (ACK 7) with two different HDMI cards. Static
+patterns through the mux (`sysctl_diag` A/B/C) showed the path whole: the slot 1 channel
+carries the card's SWDIO pull-up, SWCLK and SWDIO reach the card's TP2/TP3, RUN high.
+- **TARGETSEL clocks.** The core asked `swd_io` for 5 undriven clocks (turnaround, 3 ack,
+  turnaround) while the HAL adds each turnaround on a change of direction (its contract
+  in `sysctl.h`): 7 on the wire, the ID two clocks late, nothing selected. Now 3. The host
+  HAL now adds the turnaround as the RP2040 one does and the SWD target model counts every
+  clock: the old code fails 24 checks.
+- **The boot ROM table.** On the RP2040 B2 the function table is at $7A, 16-bit aligned;
+  `cupc8.py` read whole words at it, so every entry was shifted (`boot ROM has no IF
+  routine`). It now reads halfwords; the model's table moved to $7A.
+
+Then `card flash 1 gpu.elf`: 40 KB written and verified in 3.7 s; after `cupc8.py reset`
+the kernel found the GPU card and the console shows on the HDMI monitor (12:20).
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang
