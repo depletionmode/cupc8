@@ -240,6 +240,19 @@ waveforms/current and rail measurements remain untested. Evidence:
 `eink-check-console.log`, `eink-no-panel-results.json`,
 `eink-no-panel-state.json`, `eink-final-console.log`.
 
+### I/O card: slot 6 (F700), keyboard test pending
+
+David fitted the I/O card at F700 (slot 6), confirmed its power LED lit,
+with no keyboard attached initially. Flashed and verified
+`build/rp2040/io.elf` through SWD (36 KiB). After whole-machine reset the
+slot table reads `04 01 00 00 00 02`: storage, e-ink, three empty slots,
+I/O. SWD state confirms ASCII mode, repeat delay/rate 50/3 (500/30 ms),
+empty FIFO, zero card-protocol errors, no keyboard connected, and no VBUS
+fault. GPIO7 output is high (USB power switch enabled), GPIO8 input high
+(FAULT not asserted). This is a logic-state check, not a measurement of USB
+VBUS voltage/current. Asked David to attach a wired keyboard directly for
+enumeration and real key-input tests. Evidence: `io-slot6-no-keyboard.json`.
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang
