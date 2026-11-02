@@ -4466,6 +4466,44 @@ proc testHello() =
   ioModel = imLegacy
 
 run testHello
+
+proc testBenchProgram() =
+  ## examples/bench on the HDMI machine: the CPU loop, RAM write and read
+  ## (each about 1 s of the millisecond counter) and the RAM check over
+  ## $a000-$afff. The simulator's timing is not the machine's: only that it
+  ## runs to the end, the speeds are non-zero, the times about 1000 ms and the
+  ## check OK.
+  echo "== examples/bench =="
+  let rom = buildKernelRom()
+  let prg = workDir / "examples" / "bench.prg"
+  createDir(workDir / "examples")
+  mkprg(rootDir / "examples" / "bench" / "bench.s", prg)
+  machineCards([CardGpu, CardIo])
+  cpuReset()
+  cpuLoadRom(rom)
+  cpuBootRom()
+  settle(6_000_000)
+  let g = gpuCard()
+  expectTrue("the program goes in", runProgram(readFile(prg)))
+  expectTrue("it runs to the RAM check and back to the terminal", runUntil(proc (): bool =
+    gpuFind(g, "RAM check:") >= 0 and mem[ApiRun] == 0 and waiting, 60_000_000))
+  proc numbers(prefix: string): seq[int] =
+    let row = gpuFind(g, prefix)
+    if row < 0: return
+    for w in gpuLine(g, row).split(' '):
+      if w.len > 0 and w.allCharsInSet(Digits): result.add(parseInt(w))
+  let cpu = numbers("CPU:")
+  # CPU: K, chunks, 1024, ms;  RAM write/read: KB/s, pages, 256, ms
+  expectTrue("CPU: K/s, chunks x 1024, ms " & $cpu,
+             cpu.len == 4 and cpu[0] > 0 and cpu[0] == cpu[1] and cpu[2] == 1024 and cpu[3] in 1000..1010)
+  for what in ["RAM write:", "RAM read:"]:
+    let r = numbers(what)
+    expectTrue(what & " KB/s, pages, ms " & $r,
+               r.len == 4 and r[0] > 0 and r[0] == r[1] div 4 and r[2] == 256 and r[3] in 1000..1010)
+  expectTrue("RAM check: OK", gpuFind(g, "RAM check: OK") >= 0)
+  ioModel = imLegacy
+
+run testBenchProgram
 # ------------------------------------------------------------ the USB console
 # KRN-030 (doc/proposals/usb-console.md): the test plays the system card on
 # the API block's rings, as fw/sysctl/core/console.c does.
