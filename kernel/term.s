@@ -20,9 +20,12 @@ term_digs: resb 12
 
 term_s_usage db "\nSAVE, LOAD or DEL \"NAME\"\n"
 term_s_type_usage db "\nTYPE \"NAME\"\n"
-term_cmds db "help net dir del refresh exec type "
+term_cmds db "help net dir del refresh exec type power "
+pwr_force: resb 1			; "power force": 0, or 2 (PWR_HI's bit in $f203)
 
 term_do:
+	xor r0, r0				; no "power force" from before a reset (bss is not cleared)
+	st [pwr_force], r0
 	mov r0, #2				; API_RUN 2 while BASIC loads (cupc8.py run waits)
 	st API_RUN, r0
 
@@ -105,6 +108,8 @@ term_parse:
 	bzf sys_cmd_exec
 	eq r0, #7
 	bzf term_cmd_type
+	eq r0, #8
+	bzf term_cmd_power
 	; any other line: the program's at $7000
 	mov r0, #<[term_line_buf]
 	st API_ARGS, r0
@@ -234,13 +239,102 @@ term_hook:
 term_cmd_help:
 	; show help
 
-	term_s_help_buf db "\nNEW RUN LIST CLR NET SAVE LOAD DIR DEL TYPE REFRESH EXEC\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
+	term_s_help_buf db "\nNEW RUN LIST CLR NET SAVE LOAD DIR DEL TYPE REFRESH EXEC POWER\nBASIC: LET PRINT IF THEN ELSE FOR TO NEXT GOTO GOSUB RETURN REM END\nPEEK POKE MODE CLS COLOR PLOT LINE BOX PALETTE REFRESH\n"
 	mov r0, #>[term_s_help_buf]
 	mov r1, #<[term_s_help_buf]
 	push pch
 	push pcl
 	b str_printstr
 
+.done:
+	pop pcl
+	pop pch
+
+; ------------------------------------------------------------ the supply
+
+; "power" says what the USB-C source offers; "power force" trusts it as a 3 A
+; one until the next reset (a bench override, doc/hardware/bringup.md: a 5 V
+; supply on a USB-A-to-C cable always reads as default USB, so SD writes and
+; Wi-Fi are refused). kernel.s clears it at every start.
+term_w_force db "force"
+
+; r0 = SYSCTL ($f203) with PWR_HI (bit 1) also set while "power force" is on;
+; r1 is kept. Everything that asks for a 3 A source reads it here.
+pwr_read:
+	push r1
+	ld r1, [pwr_force]
+	ld r0, $f203
+	or r0, r1
+	pop r1
+	pop pcl
+	pop pch
+
+term_cmd_power:
+	mov r0, #<[term_line_buf]
+	st [net_line], r0
+	mov r0, #>[term_line_buf]
+	st [net_line+1], r0
+	mov r0, #1
+	push pch
+	push pcl
+	b net_word
+	ld r0, [net_wlen]
+	eq r0, #0
+	bzf .show
+	mov r0, #>[term_w_force]
+	mov r1, #<[term_w_force]
+	push pch
+	push pcl
+	b net_wordis
+	eq r0, #1
+	bzf .force
+	term_s_power_usage db "\nPOWER or POWER FORCE\n"
+	mov r0, #>[term_s_power_usage]
+	mov r1, #<[term_s_power_usage]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.force:
+	mov r0, #2
+	st [pwr_force], r0
+	term_s_power_forced db "\nsupply trusted as 3 A until reset\n"
+	mov r0, #>[term_s_power_forced]
+	mov r1, #<[term_s_power_forced]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.show:
+	ld r0, [pwr_force]
+	eq r0, #0
+	bzf .measured
+	term_s_power_trusted db "\n3 A (forced: POWER FORCE)\n"
+	mov r0, #>[term_s_power_trusted]
+	mov r1, #<[term_s_power_trusted]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.measured:
+	ld r0, $f203
+	and r0, #2
+	eq r0, #0
+	bzf .weak
+	term_s_power_3a db "\n3 A source\n"
+	mov r0, #>[term_s_power_3a]
+	mov r1, #<[term_s_power_3a]
+	push pch
+	push pcl
+	b str_printstr
+	b .done
+.weak:
+	term_s_power_weak db "\ndefault USB: no SD writes or Wi-Fi (POWER FORCE to override)\n"
+	mov r0, #>[term_s_power_weak]
+	mov r1, #<[term_s_power_weak]
+	push pch
+	push pcl
+	b str_printstr
 .done:
 	pop pcl
 	pop pch

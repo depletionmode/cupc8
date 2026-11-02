@@ -2666,8 +2666,22 @@ proc testStorage() =
   expectTrue("LOAD below 3 A", cmdOutput("load \"slow.bas\"") == @["LOADED"])
   expectTrue("the file loaded below 3 A runs", runOutput() == want)
   expectTrue("DIR below 3 A lists the card", cmdOutput("dir").len > 1)
+  # the bench override (doc/hardware/bringup.md): POWER FORCE until the next reset
+  const weakMsg = "default USB: no SD writes or Wi-Fi (POWER FORCE to override)"
+  expectTrue("POWER below 3 A", cmdOutput("power") == @[weakMsg])
+  expectTrue("POWER FORCE", cmdOutput("power force") == @["supply trusted as 3 A until reset"])
+  expectTrue("POWER when forced", cmdOutput("power") == @["3 A (forced: POWER FORCE)"])
+  expectTrue("POWER with a stray word", cmdOutput("power on") == @["POWER or POWER FORCE"])
+  expectTrue("SAVE below 3 A, forced", cmdOutput("save \"forced.bas\"") == @["SAVED"])
+  expectTrue("DEL below 3 A, forced", cmdOutput("del \"forced.bas\"").len == 0)
+  bootStorage(rom, img)                      # a reset: RAM kept, the override cleared
+  for line in prog:
+    typeLine(line)
+  expectTrue("POWER FORCE gone after a reset", cmdOutput("power") == @[weakMsg])
+  expectTrue("SAVE refused again after a reset", cmdOutput("save \"weak.bas\"") == @["USB power under 3A: SD writes off"])
   pwrHi = true
   bootStorage(rom, img)
+  expectTrue("POWER on a 3 A source", cmdOutput("power") == @["3 A source"])
   expectTrue("the card as it was: no WEAK.BAS, SLOW.BAS still there",
              cmdOutput("load \"weak.bas\"") == @["file not found"] and
              cmdOutput("load \"slow.bas\"") == @["LOADED"])
@@ -3533,7 +3547,8 @@ proc testExec() =
   expectTrue("no name", cmdOutput("exec") == @["EXEC \"NAME\""])
   expect("the terminal's stack as before, after all that", SP, sp0, 4)
   let help = cmdOutput("help")
-  expectTrue("help lists exec", help.len > 0 and help[0].endsWith("EXEC"))
+  expectTrue("help lists exec", help.len > 0 and "EXEC" in help[0].splitWhitespace())
+  expectTrue("help lists power", help.len > 0 and "POWER" in help[0].splitWhitespace())
   bootStorage(rom, "", fitted = false)
   expectTrue("no storage card", cmdOutput("exec \"prog.prg\"") == @["no storage card"])
   ioModel = imLegacy

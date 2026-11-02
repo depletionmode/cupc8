@@ -91,6 +91,18 @@ carries the card's SWDIO pull-up, SWCLK and SWDIO reach the card's TP2/TP3, RUN 
 Then `card flash 1 gpu.elf`: 40 KB written and verified in 3.7 s; after `cupc8.py reset`
 the kernel found the GPU card and the console shows on the HDMI monitor (12:20).
 
+### USB-C PD chargers do not switch on (design; rework deferred)
+
+A USB-C charger with a C-to-C cable leaves VBUS off (TP1 VBUS_F 0.1 V) while CC1 (TP8)
+reads 0.7 V and CC2 (TP9) 0.2 V. U1, the USBLC6-2SC6 on CC1/CC2, has its rail pin 5 on
+VBUS_F: before VBUS is up its rail diode clamps CC to VBUS_F + one diode (0.1 + 0.6 V)
+and back-feeds VBUS_F. Below 0.8 V a source offering 3 A takes the CC load for Ra (a
+powered cable), not Rd, and never turns VBUS on. A USB-A-to-C cable has no such check,
+so it works, but the board then sees default USB only: the kernel refuses Wi-Fi
+(`NET_E_POWER`) and SD writes (`ST_E_POWER`). **Rework (later):** lift U1 pin 5 (ST
+allows the USBLC6's VBUS pin unconnected; the lines keep the clamp to ground) or remove
+U1. **Next revision:** ESD on CC that clamps to ground only, rated for CC's 5.5 V.
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang

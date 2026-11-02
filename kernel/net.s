@@ -361,7 +361,9 @@ net_ready:
 	ld r0, [net_spi]
 	eq r0, #0xff
 	bzf .none
-	ld r0, $f203
+	push pch
+	push pcl
+	b pwr_read			; $f203, with "power force" (term.s)
 	and r0, #2
 	eq r0, #0
 	bzf .weak

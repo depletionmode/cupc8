@@ -268,7 +268,9 @@ st_open:
 	ld r0, [st_mode]
 	eq r0, #0
 	bzf .allowed				; reading - any source
-	ld r0, $f203				; writing - PWR_HI (a 3 A source)
+	push pch
+	push pcl
+	b pwr_read			; $f203, with "power force" (term.s)
 	and r0, #2
 	eq r0, #0
 	bzf .weak
@@ -403,7 +405,9 @@ st_delete:
 	ld r0, [st_spi]
 	eq r0, #0xff
 	bzf .nocard
-	ld r0, $f203
+	push pch
+	push pcl
+	b pwr_read			; $f203, with "power force" (term.s)
 	and r0, #2
 	eq r0, #0
 	bzf .weak
@@ -461,7 +465,9 @@ st_rename:
 	ld r0, [st_spi]
 	eq r0, #0xff
 	bzf .nocard
-	ld r0, $f203
+	push pch
+	push pcl
+	b pwr_read			; $f203, with "power force" (term.s)
 	and r0, #2
 	eq r0, #0
 	bzf .weak
