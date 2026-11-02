@@ -172,6 +172,46 @@ including `net scan`. Updated card and QEMU images both build. Evidence:
 `wc101-live-{scan,join,status}-{console,uart}.log` in the host log directory.
 Console captures redact the password.
 
+### Storage card: slot 1 (F200)
+
+Resumed at 15:04. David identified the storage connector by fuse F200, slot
+1, with no microSD inserted. Flashed `build/rp2040/storage.elf` through SWD:
+36 KiB erased/programmed, verified, target running. After machine reset the
+boot ROM slot table reads `04 00 00 00 00 00`: storage identified in slot 1.
+The kernel `dir` command returns `no SD card`, as expected. Logs:
+`storage-slot1-ident.log`, `storage-no-media.log`.
+
+David supplied a microSD in a USB reader and authorized flashing it (using
+pkexec). Identified the removable USB device as `/dev/sda`, 15,931,539,456
+bytes. Created a DOS partition table and one FAT32 partition at LBA 2048,
+label CUPC8, 4 KiB clusters. Rebuilt BASIC and all nine assembly examples
+from current source. Copied 15 files: ten PRGs including BASIC and BENCH,
+three BASIC demos recovered read-only from the existing `card.img`
+(HI1, PRIMES, BOUNCE, all given `.BAS` names), INDEX.HTM and README.TXT.
+All file hashes verified, fsck.fat passed; unmounted and powered off the
+reader before David transferred the medium. Manifest and preparation log:
+`storage-sd-manifest.json`, `storage-sd-prepare.log`.
+
+**Live results.** Initial insertion reported `no file system on the card`;
+SWD state showed zero initialized sectors. Resetting just the storage card
+made DIR work, although its first two entries printed blank names/zero
+sizes. A subsequent whole-machine reset produced the full correct directory
+and the banner **BASIC from the SD card**. `LOAD "HI1.BAS"`, LIST and RUN
+passed (`hi`). These initial insertion/first-directory anomalies remain
+unexplained; robust hot insertion is not established.
+
+With David's authorized `power force`, saved a new `TESTSD.BAS` containing
+`10 print "SD WRITE OK"` and `20 end`. After machine reset, NEW then LOAD,
+LIST and RUN read that file before any second SAVE and printed the expected
+message. This verifies reset persistence, not a physical cold power cycle.
+`EXEC "BENCH.PRG"` loaded and ran from SD: CPU 792 K loop instructions/s,
+RAM write/read both 133 KB/s, 4 KiB RAM check passed. Restored `power force`
+after the reset and resumed the user's console. No storage firmware source
+was changed. Physical current/rail tests and cold-power persistence remain
+open. Evidence: `storage-boot-load-check.log`, `storage-save-check.log`,
+`storage-reload-after-reset.log`, `storage-benchmark-from-sd.log` and
+`storage-final-power-force.log`.
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang
