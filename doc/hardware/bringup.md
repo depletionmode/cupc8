@@ -103,6 +103,25 @@ so it works, but the board then sees default USB only: the kernel refuses Wi-Fi
 allows the USBLC6's VBUS pin unconnected; the lines keep the clamp to ground) or remove
 U1. **Next revision:** ESD on CC that clamps to ground only, rated for CC's 5.5 V.
 
+Reworked on main unit 1 (pin 5 lifted): the USB-C charger then powered the board
+(`Type-C 3.0 A`, CC 1651 mV), but after one unplug it never powered it again. Not
+yet diagnosed: plug orientation (CC2 side: R2, J1 B5), U1 pin 5 touching its pad
+again, or the charger.
+
+### Fix 3b: a watchdog around the clock set-up
+
+On the USB-C charger the 64 ms wait still hung now and then.
+`fw/rp2040/common/boot_guard.c` (every card's firmware) arms the watchdog on
+the ring oscillator before the SDK's clock set-up and disarms it after.
+First version, the watchdog reset keeping the crystal oscillator running
+(meant for a merely slow crystal): 6 of 7 cold starts, one hung until power
+was removed, so a stuck oscillator was inherited by every retry. Second
+version, the reset also restarting the crystal oscillator: 8 of 8, back on
+USB 1.1-5.4 s after power-off (13:03-13:04). Encouraging, not proven: at
+the old 1-in-7 rate 8 in a row is still 29% likely; keep counting. If it
+comes back, the hardware margin is next (R1, the 1 kΩ in XOUT, or the load
+capacitors).
+
 ### Open
 
 - Card B's unprovoked USB drop at 10:37:46 is unexplained (possibly a clock-set-up hang

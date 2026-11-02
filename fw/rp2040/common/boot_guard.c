@@ -31,7 +31,10 @@
 static void boot_guard_arm(void)
 {
 	watchdog_hw->scratch[4] = 0;          /* a plain reset: no reboot-to-address magic */
-	psm_hw->wdsel = PSM_WDSEL_BITS & ~(PSM_WDSEL_ROSC_BITS | PSM_WDSEL_XOSC_BITS);
+	/* the reset takes the crystal oscillator too: kept running, a stuck one
+	 * hung every retry (bench, 1 cold start in 7); each retry is a fresh
+	 * start. Not the ring oscillator: it clocks the watchdog's tick. */
+	psm_hw->wdsel = PSM_WDSEL_BITS & ~PSM_WDSEL_ROSC_BITS;
 	watchdog_hw->tick = WATCHDOG_TICK_ENABLE_BITS | TICK_CYCLES;
 	watchdog_hw->load = GUARD_TICKS * 2;
 	watchdog_hw->ctrl = WATCHDOG_CTRL_ENABLE_BITS | WATCHDOG_CTRL_PAUSE_DBG0_BITS |
